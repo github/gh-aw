@@ -3,9 +3,8 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
-const { validateAdapter, createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput } = require("./work_queue_claim_adapters.cjs");
+const { validateAdapter, createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 
 const adapter = {
@@ -43,10 +42,11 @@ function assignment() {
 function registerTests({ describe, it }) {
   describe("trusted per-Claim GraphQL delivery", () => {
     it("verifies complete independent native fields and actual graph effects without trusting copied receipts or job success", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-graphql-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-graphql");
       const scoped = assignment();
       const effects = [];
       const message = { type: "custom", claim_handle: "h1", title: "Exact title", body: "Exact body", category: "category" };
+      scoped.claims[0].work.effect_contract.outputs[0].verification = { verifier_id: "custom", expected: { title: message.title, body: message.body, categoryId: message.category } };
       let writes = 0;
       let observed;
       let cancelled = false;
@@ -59,14 +59,14 @@ function registerTests({ describe, it }) {
               nodes: variables.ids.map(id => ({
                 id,
                 __typename: id === "repository" ? "Repository" : "DiscussionCategory",
-                ...(id === "repository" ? { nameWithOwner: "owner/repo" } : { repository: { nameWithOwner: id === "foreign" ? "other/repo" : "owner/repo" } }),
+                ...(id === "repository" ? { nameWithOwner: "owner/repo", databaseId: 7 } : { repository: { nameWithOwner: id === "foreign" ? "other/repo" : "owner/repo", databaseId: id === "foreign" ? 8 : 7 } }),
               })),
             };
           if (query.startsWith("mutation")) {
             assert.equal(query.match(/createDiscussion/g).length, 1);
             assert.deepEqual(variables.input, { title: message.title, body: message.body, categoryId: "category", repositoryId: "repository" });
             writes++;
-            observed = { id: "discussion", __typename: "Discussion", number: 42, repository: { nameWithOwner: "owner/repo" }, title: message.title, body: message.body, category: { id: "category" } };
+            observed = { id: "discussion", __typename: "Discussion", number: 42, repository: { nameWithOwner: "owner/repo", databaseId: 7 }, title: message.title, body: message.body, category: { id: "category" } };
             return { createDiscussion: { discussion: structuredClone(observed) } };
           }
           assert.ok(query.startsWith("query ClaimAdapterReadback"));
@@ -93,6 +93,7 @@ function registerTests({ describe, it }) {
             messages: [message],
             results: [{ messageIndex: 0, success: true, result }],
             verifyOutput: input => verifyClaimAdapterOutput({ ...input, adapter: configured }),
+            verifyDeclaredOutput: createDeclaredAdapterVerifier({ custom: adapter }),
           };
           assert.equal((await verifyClaimDelivery(verification)).verification, "verified");
           assert.equal(effects.length, 1);
@@ -122,10 +123,10 @@ function registerTests({ describe, it }) {
       const github = {
         graphql: async (query, variables) => {
           if (query.startsWith("query ClaimAdapterRepository")) return { repository: { id: "repository", nameWithOwner: "owner/repo" } };
-          if (query.startsWith("query WorkQueueEffectTargets")) return { nodes: variables.ids.map(id => ({ id, __typename: "Repository", nameWithOwner: id === "foreign" ? "other/repo" : "owner/repo" })) };
+          if (query.startsWith("query WorkQueueEffectTargets")) return { nodes: variables.ids.map(id => ({ id, __typename: "Repository", nameWithOwner: id === "foreign" ? "other/repo" : "owner/repo", databaseId: id === "foreign" ? 8 : 7 })) };
           if (query.startsWith("query ClaimAdapterReadback")) return { node: observed };
           writes++;
-          observed = { id: "native", __typename: "Discussion", number: 42, repository: { nameWithOwner: "owner/repo" }, title: variables.input.title, body: variables.input.body, category: { id: variables.input.categoryId } };
+          observed = { id: "native", __typename: "Discussion", number: 42, repository: { nameWithOwner: "owner/repo", databaseId: 7 }, title: variables.input.title, body: variables.input.body, category: { id: variables.input.categoryId } };
           return { createDiscussion: { discussion: observed } };
         },
       };

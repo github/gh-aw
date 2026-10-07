@@ -16,6 +16,7 @@ func TestNativeCodecRejectionCodeParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var fixture struct {
 		ErrorCodes []struct {
 			Name  string `json:"name"`
@@ -70,6 +71,36 @@ func TestNativeCodecRejectionCodeParity(t *testing.T) {
 			if nativeError == nil || !strings.HasPrefix(nativeError.Error(), prefix) ||
 				!strings.HasPrefix(response.Error, prefix) {
 				t.Fatalf("expected %s in both engines: Go=%v JavaScript=%s", test.Code, nativeError, response.Error)
+			}
+		})
+	}
+}
+
+func TestParsePreservesSemanticCommitRejectionCode(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		code   string
+		update func(*QueueCommit)
+	}{
+		{"actor", "actor_unauthorized", func(commit *QueueCommit) { commit.Actor.Principal = "worker-login" }},
+		{"fingerprint", "request_fingerprint", func(commit *QueueCommit) {
+			commit.Request.Fingerprint = strings.Repeat("0", 64)
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			commits := testGenesis(t, nil)
+			test.update(&commits[0])
+			direct := ValidateCommit(commits[0])
+			if direct == nil || !strings.HasPrefix(direct.Error(), test.code+":") {
+				t.Fatalf("semantic validator did not reject with %s: %v", test.code, direct)
+			}
+			data, err := canonicalValue(commits[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, parsed := Parse(append(data, '\n'))
+			if parsed == nil || parsed.Error() != direct.Error()+" (line 1)" {
+				t.Fatalf("parser lost original semantic rejection or line context: direct=%v parsed=%v", direct, parsed)
 			}
 		})
 	}

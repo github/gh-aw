@@ -45,11 +45,7 @@
           "$ref": "#/$defs/Resource"
         }
       },
-      "required": [
-        "kind",
-        "resource",
-        "condition"
-      ],
+      "required": ["kind", "resource", "condition"],
       "type": "object"
     },
     "Priority": {
@@ -70,11 +66,7 @@
           "$ref": "#/$defs/Resource"
         }
       },
-      "required": [
-        "kind",
-        "resource",
-        "condition"
-      ],
+      "required": ["kind", "resource", "condition"],
       "type": "object"
     },
     "Replacement": {
@@ -100,11 +92,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "work_id",
-        "disposition",
-        "evidence"
-      ],
+      "required": ["work_id", "disposition", "evidence"],
       "type": "object"
     },
     "Resource": {
@@ -136,14 +124,7 @@
           "$ref": "#/$defs/Decimal"
         }
       },
-      "required": [
-        "kind",
-        "host",
-        "repository",
-        "repository_id",
-        "resource_id",
-        "number"
-      ],
+      "required": ["kind", "host", "repository", "repository_id", "resource_id", "number"],
       "type": "object"
     },
     "Timestamp": {
@@ -161,10 +142,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id"
-      ],
+      "required": ["kind", "work_id"],
       "type": "object"
     },
     "WorkOperation": {
@@ -219,20 +197,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "graph_id",
-        "node_key",
-        "pool",
-        "priority",
-        "fairness_key",
-        "worker_profile",
-        "batch_trust_domain",
-        "payload",
-        "depends_on",
-        "enqueued"
-      ],
+      "required": ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
       "type": "object"
     }
   },

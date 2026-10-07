@@ -26,11 +26,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "reason"
-      ],
+      "required": ["kind", "work_id", "reason"],
       "type": "object"
     }
   },

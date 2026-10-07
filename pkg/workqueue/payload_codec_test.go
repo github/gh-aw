@@ -12,6 +12,25 @@ import (
 	"time"
 )
 
+func TestIndependentGraphIDUsesCanonicalPayloadNotNodeEncoding(t *testing.T) {
+	const graphID = "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777"
+	for _, payload := range []string{`{"a":1,"b":2}`, `{"b": 2, "a": 1}`, `{"\u0061":1,"b":2}`} {
+		id, err := IndependentGraphID([]byte(payload))
+		if err != nil || id != graphID {
+			t.Fatalf("canonical independent graph: %s %v", id, err)
+		}
+		if workID := NodeID(id, "root"); workID != "e41927adc7ede48a4d9ebae45074bbfd55f7714af750a3fe5b3734bc6c1ed62e" {
+			t.Fatalf("independent root differs from literal expected identity: %s", workID)
+		}
+		if NodeID(id, "distinct") == NodeID(id, "root") || NodeID("distinct", "root") == NodeID(id, "root") {
+			t.Fatal("explicit same-payload distinct nodes lost their requested identity")
+		}
+	}
+	if _, err := IndependentGraphID([]byte(`{"a":1.5}`)); err == nil {
+		t.Fatal("graph hashing weakened the canonical numeric domain")
+	}
+}
+
 func TestTypedNumericCodecRejectionCodeParity(t *testing.T) {
 	data, err := os.ReadFile("../../specs/work-queue/fixtures/canonical.json")
 	if err != nil {

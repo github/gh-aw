@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
 import { normalizeAssignment, normalizeClaimScope, assertClaimAuthorized, withClaimExecution, claimArtifactPath, scopedArtifactFilename } from "./work_queue_claim_scope.cjs";
+import sharedChecks from "./work_queue_claim_scope_checks.cjs";
 
 const assignment = count => ({
   version: 3,
@@ -14,6 +15,8 @@ const assignment = count => ({
 });
 
 describe("immutable Claim scope", () => {
+  it("matches the canonical shared identity fixtures and preserves opaque domain values", sharedChecks.checkSharedIdentityFixtures);
+
   it("defaults every output type only for an original singleton", () => {
     for (const type of ["create_issue", "custom_job", "custom_action", "upload_asset", "noop", "report_incomplete", "missing_tool", "missing_data", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"]) {
       expect(normalizeClaimScope({ type }, assignment(1))).toEqual({ type, claim_handle: "h1" });
@@ -29,6 +32,19 @@ describe("immutable Claim scope", () => {
     expect(() => normalizeClaimScope({ claim_handle: "h1", work_id: "w2" }, assignment(2))).toThrow(/conflicts/);
     for (const field of ["authorized", "run_id", "assignment", "work_queue_assignment", "work_queue_claim"]) {
       expect(() => normalizeClaimScope({ claim_handle: "h1", [field]: null }, assignment(1))).toThrow(/trusted authority/);
+    }
+  });
+
+  it("accepts 256-byte canonical identities without narrowing them to 128 characters", () => {
+    for (const id of ["x".repeat(256), "\u00e9".repeat(128), "\ud83d\ude80".repeat(64)]) {
+      const value = assignment(1);
+      Object.assign(value, { dispatch_id: id, request_id: id, commit_id: id, policy_epoch: id, pool: id, worker_profile: id });
+      Object.assign(value.claims[0], { handle: id, claim_id: id, work_id: id, result_refs: [{ work_id: id, result_commit_id: id, descriptor: {} }] });
+      const normalized = normalizeAssignment(value);
+      expect(normalizeClaimScope({ type: "noop", claim_handle: id }, normalized).claim_handle).toBe(id);
+      expect(normalizeClaimScope({ type: "noop" }, normalized).claim_handle).toBe(id);
+      expect(() => normalizeClaimScope({ claim_handle: `${id}x` }, normalized)).toThrow(/invalid/);
+      expect(() => normalizeAssignment({ ...value, request_id: `${id}x` })).toThrow(/invalid/);
     }
   });
 

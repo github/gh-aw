@@ -315,9 +315,8 @@ func planDispatch(state Projection, params DispatchParameters, requestID, commit
 		Tip: state.Tip, Operations: []Operation{}, Assignments: []Assignment{},
 		Reason: "no_work", Next: Selection{Observations: []string{}},
 	}
-	if params.MaxClaims < 1 || params.MaxClaims > 256 || params.MaxDispatches < 1 ||
-		params.MaxDispatches > 256 || params.MaxBytes < 1 || params.MaxBytes > 48<<10 {
-		return decision, queueError("request_invalid", "dispatch budgets outside bounds")
+	if err := validateDispatchParameters(params); err != nil {
+		return decision, err
 	}
 	if operationBudget < 0 || operationBudget > state.Policy.Limits.Operations {
 		return decision, queueError("request_invalid", "preceding operations exceed installed operation limit")

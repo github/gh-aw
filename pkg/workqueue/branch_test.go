@@ -31,10 +31,18 @@ type queueAPI struct {
 	truncated     bool
 	missingLog    bool
 	nativeRun     *NativeRun
+	nativeReads   int
 	issue         any
 	issueStatus   int
 	resourceReads int
+	resourceRead  func()
 	userID        json.Number
+	workerStatus  int
+	workerContent string
+	workerPath    string
+	workerState   string
+	workerReads   int
+	workerRef     string
 }
 
 type queueTransport struct{ url string }
@@ -116,15 +124,46 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		respond(map[string]any{"id": 1, "full_name": testRepository, "default_branch": "main", "permissions": map[string]bool{"push": true, "admin": true}})
 	case r.Method == http.MethodGet && path == "issues/7":
 		mock.resourceReads++
+		if mock.resourceRead != nil {
+			mock.resourceRead()
+		}
 		if mock.issueStatus != 0 {
 			fail(mock.issueStatus)
 		} else {
 			respond(mock.issue)
 		}
-	case r.Method == http.MethodGet && path == "actions/runs/202/attempts/1":
+	case r.Method == http.MethodGet && (path == "actions/runs/202/attempts/1" ||
+		mock.nativeRun != nil && path == "actions/runs/"+mock.nativeRun.ID.String()+"/attempts/1"):
+		mock.nativeReads++
 		respond(mock.nativeRun)
 	case r.Method == http.MethodGet && path == "git/ref/heads/main":
 		respond(map[string]any{"object": map[string]string{"sha": strings.Repeat("f", 40)}})
+	case r.Method == http.MethodGet && strings.HasPrefix(path, "contents/.github/workflows/"):
+		mock.workerReads++
+		mock.workerRef = r.URL.Query().Get("ref")
+		if mock.workerStatus != 0 {
+			fail(mock.workerStatus)
+			break
+		}
+		workerPath := strings.TrimPrefix(path, "contents/")
+		if mock.workerPath != "" {
+			workerPath = mock.workerPath
+		}
+		content := mock.workerContent
+		if content == "" {
+			content = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n"
+		}
+		respond(map[string]any{"type": "file", "path": workerPath, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
+	case r.Method == http.MethodGet && strings.HasPrefix(path, "actions/workflows/"):
+		workerPath := ".github/workflows/" + strings.TrimPrefix(path, "actions/workflows/")
+		if mock.workerPath != "" {
+			workerPath = mock.workerPath
+		}
+		state := mock.workerState
+		if state == "" {
+			state = "active"
+		}
+		respond(map[string]any{"path": workerPath, "state": state})
 	case r.Method == http.MethodGet && path == "git/ref/heads/"+DefaultBranch:
 		if mock.head == "" {
 			fail(404)
@@ -248,6 +287,12 @@ func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 	commits, err := branch.Read(context.Background())
 	if err != nil || len(commits) != 2 || operationKind(commits[0].Operations[0]) != "Policy" {
 		t.Fatalf("mandatory policy genesis absent: %v", err)
+	}
+	if commits[0].Request.ID != "init_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
+		commits[0].PolicyEpoch != "epoch_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
+		commits[0].ID != "q_50ddbfa08f7148bbb21046bd6c12fed643985baa93ecc09ae9a6d1c6366d1be7" ||
+		commits[1].ID != "q_55c9db94408bb38dd5f1731f2adc022fcca54ea724b4b1f4db2424d7194d9294" {
+		t.Fatal("default publisher identities differ from the independent canonical bootstrap example")
 	}
 	writes := mock.refWrites
 	again, err := branch.Publish(context.Background(), actor, request)

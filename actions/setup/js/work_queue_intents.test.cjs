@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
-import { randomUUID } from "crypto";
+import os from "node:os";
 import { defaultPolicy } from "./work_queue_policy.cjs";
 import { newRequest, generateRequestOperations } from "./work_queue_replay.cjs";
 import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
@@ -14,8 +14,7 @@ const directories = [];
 const origin = { authenticated: true, roles: ["dispatcher"], role: "dispatcher", principal: "11", repository: "owner/repo", workflow: ".github/workflows/dispatcher.lock.yml", run_id: "15", run_attempt: 1 };
 const policy = defaultPolicy({ repository: "owner/repo", principal: "11", ref: "a".repeat(40) });
 function filename() {
-  const directory = path.join(process.cwd(), `.queue-intents-test-${randomUUID()}`);
-  fs.mkdirSync(directory);
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-intents-"));
   directories.push(directory);
   return path.join(directory, "intents.jsonl");
 }
@@ -28,6 +27,10 @@ describe("trusted stable intent ingestion", () => {
     const parameters = { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 1000 };
     const request = requestForIntent(origin, "intent1", "dispatch_next", parameters);
     expect(requestForIntent(origin, "intent1", "dispatch_next", parameters)).toEqual(request);
+    expect(requestForIntent({ ...origin, publisher_attempt: 2 }, "intent1", "dispatch_next", parameters)).toEqual(request);
+    const laterOrigin = requestForIntent({ ...origin, run_attempt: 2 }, "intent1", "dispatch_next", parameters);
+    expect(laterOrigin.id).not.toBe(request.id);
+    expect(laterOrigin.fingerprint).not.toBe(request.fingerprint);
     expect(requestForIntent({ ...origin, run_id: "16" }, "intent1", "dispatch_next", parameters).id).not.toBe(request.id);
     expect(requestForIntent(origin, "intent2", "dispatch_next", parameters).id).not.toBe(request.id);
     expect(() => requestForIntent({ ...origin, authenticated: false }, "intent1", "dispatch_next", parameters)).toThrow();

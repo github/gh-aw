@@ -23,13 +23,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "handle",
-        "claim_id",
-        "work_id",
-        "work",
-        "result_refs"
-      ],
+      "required": ["handle", "claim_id", "work_id", "work", "result_refs"],
       "type": "object"
     },
     "Identity": {
@@ -53,11 +47,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "work_id",
-        "result_commit_id",
-        "descriptor"
-      ],
+      "required": ["work_id", "result_commit_id", "descriptor"],
       "type": "object"
     }
   },

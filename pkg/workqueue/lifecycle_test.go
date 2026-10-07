@@ -2,11 +2,16 @@ package workqueue
 
 import (
 	"encoding/json"
+	"os/exec"
 	"strings"
 	"testing"
 )
 
 func boundAssignment(t *testing.T, updates ...func(*Policy)) ([]QueueCommit, Assignment) {
+	return boundAssignmentWithWork(t, nil, updates...)
+}
+
+func boundAssignmentWithWork(t *testing.T, adjust func(*WorkDefinition), updates ...func(*Policy)) ([]QueueCommit, Assignment) {
 	t.Helper()
 	commits := testGenesis(t, func(policy *Policy) {
 		pool := policy.Pools["default"]
@@ -19,6 +24,11 @@ func boundAssignment(t *testing.T, updates ...func(*Policy)) ([]QueueCommit, Ass
 		}
 	})
 	a, b, c := testNode(t, commits, "a"), testNode(t, commits, "b"), testNode(t, commits, "c")
+	if adjust != nil {
+		adjust(&a)
+		adjust(&b)
+		adjust(&c)
+	}
 	commits = testSubmit(t, commits, "submit", a, b, c)
 	commits, decision := testGrant(t, commits, "grant", 3, 1)
 	assignment := decision.Assignments[0]
@@ -89,11 +99,11 @@ func TestIndependentMixedOutcomesAndNativeReservation(t *testing.T) {
 		state.Stats.Dispatches != 1 {
 		t.Fatalf("one member outcome settled the shared native reservation: %+v", state.Stats)
 	}
-	if err := AuthorizeEffect(state, workerActor(assignment, "h1")); err != nil {
+	if err := AuthorizeEffect(state, workerActor(assignment, "h1"), EffectResource{"repository": testRepository}); err != nil {
 		t.Fatal(err)
 	}
 	for _, handle := range []string{"h2", "h3"} {
-		if err := AuthorizeEffect(state, workerActor(assignment, handle)); err == nil {
+		if err := AuthorizeEffect(state, workerActor(assignment, handle), EffectResource{"repository": testRepository}); err == nil {
 			t.Fatal("cancelled/open sibling borrowed completed member authority")
 		}
 	}
@@ -332,11 +342,11 @@ func TestDispatcherOriginMayDifferFromApprovedLaunchPrincipal(t *testing.T) {
 		t.Fatal("binding or Completion conflated logical sender and native worker principals")
 	}
 	worker := workerActor(assignment, "h1")
-	if err := AuthorizeEffect(state, worker); err != nil {
+	if err := AuthorizeEffect(state, worker, EffectResource{"repository": testRepository}); err != nil {
 		t.Fatalf("approved native worker lost authority under a different logical sender: %v", err)
 	}
 	worker.Principal = sender.Principal
-	if err := AuthorizeEffect(state, worker); err == nil ||
+	if err := AuthorizeEffect(state, worker, EffectResource{"repository": testRepository}); err == nil ||
 		!strings.HasPrefix(err.Error(), "run_binding_conflict:") {
 		t.Fatalf("logical dispatcher borrowed native worker effect authority: %v", err)
 	}
@@ -373,9 +383,32 @@ func TestFinalRetryWorkerCancellationAtomicallyClosesWork(t *testing.T) {
 		t.Fatal("cold replay reopened exhausted Work, closed a sibling or released native capacity")
 	}
 	assertRecoveryReplayParity(t, next, "")
+	for _, invalid := range []struct {
+		name   string
+		workID string
+		reason string
+	}{
+		{"arbitrary terminal reason", assignment.Claims[0].WorkID, "worker_cancelled"},
+		{"foreign sibling closure", assignment.Claims[1].WorkID, "attempts_exhausted"},
+	} {
+		t.Run(invalid.name, func(t *testing.T) {
+			fork := append([]QueueCommit{}, next...)
+			tip := &fork[len(fork)-1]
+			tip.Operations = append([]Operation{}, tip.Operations...)
+			tip.Operations[1] = Op(map[string]any{
+				"kind": "WorkCancellation", "work_id": invalid.workID, "reason": invalid.reason,
+			})
+			if _, err := Replay(fork); err == nil || !strings.HasPrefix(err.Error(), "ownership_unauthorized:") {
+				t.Fatalf("exhausted finish acquired arbitrary Work closure authority: %v", err)
+			}
+		})
+	}
 }
 
 func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Fatalf("native run binding parity requires Node.js: %v", err)
+	}
 	commits, original := boundAssignment(t)
 	node := testNode(t, commits, "other")
 	commits = testSubmit(t, commits, "other-submit", node)
@@ -386,7 +419,10 @@ func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
 	commits = testOperations(t, commits, sender, "other-start", "dispatch", Op(map[string]any{
 		"kind": "Dispatch", "dispatch_id": target.DispatchID, "state": "started", "sender": sender,
 	}))
-	state, _ := Replay(commits)
+	state, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
 	originalRun := *state.Dispatches[original.DispatchID].Run
 	profile := state.Dispatches[target.DispatchID].Profile
 	evidence := Evidence{
@@ -397,11 +433,33 @@ func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
 	operation := Op(map[string]any{
 		"kind": "Dispatch", "dispatch_id": target.DispatchID, "state": "bound", "run": originalRun, "evidence": evidence,
 	})
-	request, _ := NewRequest("reuse-run", "dispatch", testActor("reconciler"), OperationsParameters{Operations: []Operation{operation}})
-	if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), request, 4000); err == nil ||
-		!strings.Contains(err.Error(), "run_binding_conflict") {
-		t.Fatalf("same native run acquired another group's claims: %v", err)
+	actor := testActor("reconciler")
+	request, err := NewRequest("reuse-run", "dispatch", actor, OperationsParameters{Operations: []Operation{operation}})
+	if err != nil {
+		t.Fatal(err)
 	}
+	assertReuseRejected := func(t *testing.T, prefix []QueueCommit) {
+		t.Helper()
+		if _, _, _, err := BuildCandidate(prefix, actor, request, 4000); err == nil ||
+			!strings.HasPrefix(err.Error(), "run_binding_conflict:") {
+			t.Fatalf("native run acquired another group's claims: %v", err)
+		}
+		assertRecoveryReplayParity(t, prefix, "")
+		previous := prefix[len(prefix)-1].ID
+		forbidden := QueueCommit{
+			Version: Version, ID: "forbidden-run-reuse", Previous: &previous,
+			Request: request, Actor: actor, PolicyEpoch: state.PolicyEpoch, At: 4000,
+			Operations: []Operation{operation},
+		}
+		invalid := append(append([]QueueCommit{}, prefix...), forbidden)
+		if _, err := Replay(invalid); err == nil || !strings.HasPrefix(err.Error(), "run_binding_conflict:") {
+			t.Fatalf("cold native replay accepted duplicate binding: %v", err)
+		}
+		assertRecoveryReplayParity(t, invalid, "run_binding_conflict")
+	}
+	t.Run("active", func(t *testing.T) {
+		assertReuseRejected(t, commits)
+	})
 	operations := []Operation{}
 	for _, member := range original.Claims {
 		operations = append(operations, Op(map[string]any{
@@ -413,7 +471,7 @@ func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
 		"kind": "Release", "dispatch_id": original.DispatchID, "evidence": terminalFor(state, original),
 	}))
 	commits = testOperations(t, commits, testActor("reconciler"), "release-original", "release", operations...)
-	if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), request, 4000); err == nil {
-		t.Fatal("released historical native run acquired new fair claims")
-	}
+	t.Run("released", func(t *testing.T) {
+		assertReuseRejected(t, commits)
+	})
 }

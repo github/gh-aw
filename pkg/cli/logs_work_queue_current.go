@@ -120,7 +120,7 @@ func parseCurrentWorkQueueSnapshot(data []byte) (*WorkQueueSnapshot, error) {
 		TransactionLog *string               `json:"transactionLog"`
 		CapturedAt     *int64                `json:"captured_at"`
 		Origin         *workqueue.Actor      `json:"origin"`
-		VisibleWorkIDs []string              `json:"visible_work_ids"`
+		VisibleWorkIDs json.RawMessage       `json:"visible_work_ids"`
 	}
 	if err := decodeClosedWorkQueueObject(data,
 		[]string{"version", "sha", "worker", "transactionLog", "captured_at", "origin"},
@@ -132,6 +132,13 @@ func parseCurrentWorkQueueSnapshot(data []byte) (*WorkQueueSnapshot, error) {
 		(envelope.SHA != nil && !validWorkQueueReceiptID(*envelope.SHA)) || envelope.Origin == nil ||
 		!validWorkQueueNativeID(envelope.Origin.Principal) {
 		return nil, errors.New("invalid current work queue snapshot")
+	}
+	if len(envelope.VisibleWorkIDs) != 0 {
+		var ids []*string
+		if err := json.Unmarshal(envelope.VisibleWorkIDs, &ids); err != nil ||
+			ids == nil || slices.Contains(ids, nil) {
+			return nil, errors.New("invalid current work queue snapshot visibility")
+		}
 	}
 	role := "dispatcher"
 	if envelope.Worker != nil {

@@ -4,8 +4,19 @@
 const crypto = require("crypto");
 const path = require("path");
 const { canonical, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
-const { assertClaimAuthorized, currentClaimHandle, claimIdentity, assertClaimIdentity, receiptMatchesClaim, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
+const {
+  assertClaimAuthorized,
+  currentClaimHandle,
+  claimIdentity,
+  assertClaimIdentity,
+  receiptMatchesClaim,
+  claimArtifactPath,
+  withClaimResourceEffects,
+  createClaimResourceVerification,
+  withClaimResourceVerification,
+} = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
+const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 const privateReceipts = new WeakMap();
@@ -124,6 +135,7 @@ function createGitTreeEffectHandler(adapter, suppliedClient) {
     await assertClaimAuthorized(message, { requireCompletion: !stagedMode });
     if (stagedMode) return { success: true, staged: true, claim_handle: identity.claim_handle };
     if (attempted) throw new Error("Code adapter allows only one immutable delivery per Claim");
+    const declaredFields = require("./work_queue_declared_verification.cjs").adapterEffectFields(adapter, message);
     const { data: base } = await github.rest.git.getCommit({ owner, repo, commit_sha: config["base-revision"] });
     if (base?.sha !== config["base-revision"] || !REVISION.test(base.tree?.sha)) throw new Error("Code adapter base commit does not match its trusted immutable revision");
     const { data: original } = await github.rest.git.getTree({ owner, repo, tree_sha: base.tree.sha, recursive: "1" });
@@ -131,66 +143,71 @@ function createGitTreeEffectHandler(adapter, suppliedClient) {
     const files = normalizeFiles(message.files, baseLeaves);
     if (config["pull-request"] && (typeof message.title !== "string" || !message.title || message.title.length > 256 || (message.body !== undefined && (typeof message.body !== "string" || Buffer.byteLength(message.body) > 65536))))
       throw new Error("Prepared code pull request requires bounded declared title and body");
-    for (const file of files) await assertClaimAuthorized({ ...message, repo: repository }, { resource: { repository, path: file.path, ref: `heads/${branch}` } });
+    const authorityResources = await Promise.all(files.map(file => resolveRepositoryTarget(github, { repository, path: file.path, ref: `refs/heads/${branch}` })));
     try {
       await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
       throw new Error("Code adapter cannot overwrite an existing Claim branch");
     } catch (error) {
       if (error.status !== 404) throw error;
     }
-    attempted = true;
-    const expected = new Map(baseLeaves);
-    const blobs = [];
-    const tree = [];
-    for (const file of files) {
-      if (file.sha === null) {
-        expected.delete(file.path);
-        tree.push(file);
-        continue;
+    return withClaimResourceEffects(authorityResources, ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.createRef", ...(config["pull-request"] ? ["rest.pulls.create"] : [])], async () => {
+      attempted = true;
+      const expected = new Map(baseLeaves);
+      const blobs = [];
+      const tree = [];
+      for (const file of files) {
+        if (file.sha === null) {
+          expected.delete(file.path);
+          tree.push(file);
+          continue;
+        }
+        const response = await github.rest.git.createBlob({ owner, repo, encoding: "base64", content: Buffer.from(file.content).toString("base64") });
+        const sha = blobIdentity(file.content, config["base-revision"]);
+        if (response.data?.sha !== sha) throw new Error("Native code blob differs from its exact prepared content");
+        const entry = { path: file.path, mode: file.mode, type: "blob", sha };
+        expected.set(file.path, entry);
+        tree.push(entry);
+        blobs.push({ sha, content: file.content.toString("base64") });
       }
-      const response = await github.rest.git.createBlob({ owner, repo, encoding: "base64", content: Buffer.from(file.content).toString("base64") });
-      const sha = blobIdentity(file.content, config["base-revision"]);
-      if (response.data?.sha !== sha) throw new Error("Native code blob differs from its exact prepared content");
-      const entry = { path: file.path, mode: file.mode, type: "blob", sha };
-      expected.set(file.path, entry);
-      tree.push(entry);
-      blobs.push({ sha, content: file.content.toString("base64") });
-    }
-    const createdTree = await github.rest.git.createTree({ owner, repo, base_tree: base.tree.sha, tree });
-    if (!REVISION.test(createdTree.data?.sha)) throw new Error("Native code tree has no immutable identity");
-    const commitMessage = `Apply work ${identity.work_id} for Claim ${identity.claim_id}`;
-    const commit = await github.rest.git.createCommit({ owner, repo, tree: createdTree.data.sha, parents: [base.sha], message: commitMessage });
-    if (!REVISION.test(commit.data?.sha)) throw new Error("Native code commit has no immutable identity");
-    await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
-    let pull;
-    if (config["pull-request"]) {
-      const { data } = await github.rest.pulls.create({ owner, repo, head: branch, base: config["base-branch"], title: message.title, body: message.body || "" });
-      if (!data || !Number.isSafeInteger(data.number) || data.number < 1) throw new Error("Native code pull request has no exact resource number");
-      pull = { id: nativeId(data.id), number: data.number, title: message.title, body: message.body || "" };
-    }
-    const result = { success: true, repo: repository, branch, commit: commit.data.sha, ...(pull ? { number: pull.number, id: pull.id } : {}) };
-    privateReceipts.set(result, {
-      ...identity,
-      repository,
-      branch,
-      parent: base.sha,
-      tree: createdTree.data.sha,
-      commit: commit.data.sha,
-      commitMessage,
-      expected: [...expected.values()].sort((a, b) => utf8Compare(a.path, b.path)),
-      blobs,
-      pull,
-      baseBranch: config["base-branch"],
-      adapter: canonical(adapter),
+      const createdTree = await github.rest.git.createTree({ owner, repo, base_tree: base.tree.sha, tree });
+      if (!REVISION.test(createdTree.data?.sha)) throw new Error("Native code tree has no immutable identity");
+      const commitMessage = `Apply work ${identity.work_id} for Claim ${identity.claim_id}`;
+      const commit = await github.rest.git.createCommit({ owner, repo, tree: createdTree.data.sha, parents: [base.sha], message: commitMessage });
+      if (!REVISION.test(commit.data?.sha)) throw new Error("Native code commit has no immutable identity");
+      await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+      let pull;
+      if (config["pull-request"]) {
+        const { data } = await github.rest.pulls.create({ owner, repo, head: branch, base: config["base-branch"], title: message.title, body: message.body || "" });
+        if (!data || !Number.isSafeInteger(data.number) || data.number < 1) throw new Error("Native code pull request has no exact resource number");
+        pull = { id: nativeId(data.id), number: data.number, title: message.title, body: message.body || "" };
+      }
+      const result = { success: true, repo: repository, branch, commit: commit.data.sha, ...(pull ? { number: pull.number, id: pull.id } : {}) };
+      privateReceipts.set(result, {
+        ...identity,
+        repository,
+        branch,
+        parent: base.sha,
+        tree: createdTree.data.sha,
+        commit: commit.data.sha,
+        commitMessage,
+        expected: [...expected.values()].sort((a, b) => utf8Compare(a.path, b.path)),
+        blobs,
+        pull,
+        baseBranch: config["base-branch"],
+        adapter: canonical(adapter),
+        declaredFields,
+        authorityResources,
+      });
+      return result;
     });
-    return result;
   };
 }
 
-async function verifyGitTreeDelivery({ adapter, result, claim, github }) {
+async function verifyGitTreeDelivery({ adapter, result, claim, github, verification = undefined }) {
   validateGitTreeAdapter(adapter);
   const receipt = result && privateReceipts.get(result);
   if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
+  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.declaredFields, verification)) return { verified: false };
   const [owner, repo] = receipt.repository.split("/");
   const { data: ref } = await github.rest.git.getRef({ owner, repo, ref: `heads/${receipt.branch}` });
   if (ref?.object?.sha !== receipt.commit) return { verified: false };
@@ -227,13 +244,21 @@ async function verifyGitTreeDelivery({ adapter, result, claim, github }) {
       return { verified: false };
     resource = { kind: "pull_request", repository: receipt.repository, id: receipt.pull.id, number: receipt.pull.number };
   }
-  return {
+  const authorityResources = [];
+  for (const target of receipt.authorityResources) {
+    const resource = await resolveRepositoryTarget(github, target);
+    authorityResources.push(resource);
+  }
+  const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
     resource,
+    authority_resource: authorityResources[0],
+    authority_resources: authorityResources,
     effect_resources: effects,
     evidence: { source: "independent_git_tree_readback", commit: receipt.commit, tree: receipt.tree, parent: receipt.parent, files_digest: digest(receipt.expected), content_digest: digest(receipt.blobs) },
-  };
+  });
+  return withClaimResourceVerification(proof, () => proof);
 }
 
 module.exports = { validateGitTreeAdapter, createGitTreeEffectHandler, verifyGitTreeDelivery };

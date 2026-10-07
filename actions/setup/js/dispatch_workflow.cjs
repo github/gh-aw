@@ -16,6 +16,7 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { buildAwContext, resolveWorkQueueRuntime } = require("./aw_context.cjs");
 const { currentClaimHandle } = require("./work_queue_claim_scope.cjs");
+const { createDispatchCredentialValidator } = require("./work_queue_dispatch_credential.cjs");
 const { loadTemporaryIdMapFromResolved, resolveIssueNumber, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 
 /**
@@ -172,11 +173,14 @@ async function main(config = {}) {
       if (!config.work_queue_enabled || isCrossRepoDispatch) return { success: false, error: "work_queue_dispatch_next requires a same-repository queue dispatcher" };
       try {
         const { dispatchQueueIntent } = require("./work_queue_dispatch.cjs");
+        if (!isStaged && config.work_queue_dispatch_credential === undefined) throw new Error("work_queue_dispatch_credential_binding_required");
+        const validateDispatchCredential = isStaged ? undefined : createDispatchCredentialValidator(githubClient, config.work_queue_dispatch_credential, config["github-token"]);
         const result = await dispatchQueueIntent({
           message,
           config,
           queueClient: github,
           dispatchClient: githubClient,
+          validateDispatchCredential,
           context,
           core,
           remainingDispatches: maxCount - processedCount - queueDispatches,
@@ -192,7 +196,7 @@ async function main(config = {}) {
       const observer = process.env.GH_AW_WORK_QUEUE_ROLE === "observer" && !currentClaimHandle() && resolveWorkQueueRuntime(context.payload).role === "observer";
       if (!observer) return { success: false, error: "Queue-scoped code cannot delegate an ordinary workflow dispatch; stage publisher-selected work_queue_dispatch_next" };
     }
-    if (message.inputs && ["work_queue", "work_queue_claim", "work_queue_assignment"].some(key => Object.hasOwn(message.inputs, key))) {
+    if (message.inputs && ["work_queue", "work_claim", "work_queue_claim", "work_queue_assignment"].some(key => Object.hasOwn(message.inputs, key))) {
       return { success: false, error: "Agent-supplied queue assignments and Work selectors are unsupported; stage work_queue_dispatch_next" };
     }
     // Check if we've hit the max limit

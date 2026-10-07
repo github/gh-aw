@@ -56,14 +56,11 @@ function setupGlobals(coreModule, githubModule, contextModule, execModule, ioMod
   githubModule.hook.before("request", options => {
     applyGitHubApiVersion(options.headers);
   });
-  // @ts-expect-error - Assigning to global properties that are declared as const
   // Wrap the github object so every github.rest.*.*() call automatically logs
   // x-ratelimit-* headers to github_rate_limits.jsonl for observability.
   global.github = createRateLimitAwareGithub(githubModule);
   global.context = contextModule;
-  // @ts-expect-error - Assigning to global properties that are declared as const
   global.exec = execModule;
-  // @ts-expect-error - Assigning to global properties that are declared as const
   global.io = ioModule;
   // Wrap getOctokit so every client created via global.getOctokit(token) also
   // carries the default X-GitHub-Api-Version for

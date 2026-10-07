@@ -33,12 +33,7 @@
           ]
         }
       },
-      "required": [
-        "kind",
-        "control",
-        "value",
-        "reason"
-      ],
+      "required": ["kind", "control", "value", "reason"],
       "type": "object"
     },
     "Identity": {

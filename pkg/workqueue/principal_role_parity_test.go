@@ -29,7 +29,7 @@ func TestNativePrincipalAndRequestRoleParity(t *testing.T) {
 		code, _, _ := strings.Cut(err.Error(), ":")
 		return code
 	}
-	for _, principal := range []string{"1001", strings.Repeat("9", 256), "operator", "0", "001", "-1", "1.0", "1e3"} {
+	for _, principal := range []string{"1001", strings.Repeat("9", 256), strings.Repeat("9", 257), "operator", "0", "001", "-1", "1.0", "1e3"} {
 		allowed := principal == "1001" || principal == strings.Repeat("9", 256)
 		for _, scope := range []string{"actor", "profile", "producer"} {
 			actor := testActor("administrator")
@@ -107,8 +107,7 @@ func TestNativePrincipalAndRequestRoleParity(t *testing.T) {
 	}
 	node, err := exec.LookPath("node")
 	if err != nil {
-		t.Log("JavaScript principal/role parity tooling unavailable; all native contract checks passed")
-		return
+		t.Fatal("strict principal/role parity requires Node test tooling")
 	}
 	const script = `
 const fs = require("node:fs");

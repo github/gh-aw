@@ -15,10 +15,7 @@
           "$ref": "#/$defs/CountBound"
         }
       },
-      "required": [
-        "max_attempts",
-        "backoff_ms"
-      ],
+      "required": ["max_attempts", "backoff_ms"],
       "type": "object"
     },
     "Timestamp": {

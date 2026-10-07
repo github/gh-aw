@@ -88,6 +88,11 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		builder.AddIfNotEmpty("target-ref", c.TargetRef)
 		builder.AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "dispatch-workflow", c.GitHubToken))
 		builder.AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged))
+		if cfg.WorkQueueEnabled {
+			config := builder.Build()
+			configureWorkQueueDispatchCredential(&WorkflowData{SafeOutputs: cfg}, config)
+			return config
+		}
 		return builder.Build()
 	},
 	"dispatch_repository": func(cfg *SafeOutputsConfig) map[string]any {

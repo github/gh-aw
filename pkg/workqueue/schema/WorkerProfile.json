@@ -44,16 +44,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "workflow",
-        "ref",
-        "principal",
-        "trust_domain",
-        "credential_scope",
-        "effect_scope",
-        "max_claims",
-        "share_keys"
-      ],
+      "required": ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
       "type": "object"
     }
   },

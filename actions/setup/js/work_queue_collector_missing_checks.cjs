@@ -3,12 +3,12 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
+const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
 
 function registerTests({ describe, it }) {
   describe("ordinary missing-output preservation", () => {
     it("does not discover stale patches when ordinary safe output is missing or empty", async () => {
-      const root = path.resolve(".queue-validation-cache", `queue-collector-${randomUUID()}`);
+      const root = temporaryDirectory("queue-collector");
       const keys = ["RUNNER_TEMP", "GH_AW_SAFE_OUTPUTS", "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_VALIDATION_CONFIG_PATH", "GH_AW_WORK_QUEUE_ENABLED"];
       const previous = keys.map(key => process.env[key]);
       const constantsPath = require.resolve("./constants.cjs");
@@ -28,7 +28,15 @@ function registerTests({ describe, it }) {
         process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH = path.join(root, "no-config.json");
         process.env.GH_AW_VALIDATION_CONFIG_PATH = path.join(root, "no-validation.json");
         delete process.env.GH_AW_WORK_QUEUE_ENABLED;
-        global.context = { repo: { owner: "owner", repo: "repo" }, payload: { repository: { full_name: "owner/repo" } } };
+        global.context = {
+          ...previousContext,
+          repo: { owner: "owner", repo: "repo" },
+          payload: { repository: { full_name: "owner/repo", name: "repo", owner: { login: "owner" } } },
+          /** @returns {{owner: string, repo: string, number: number}} */
+          get issue() {
+            throw new Error("Missing-output fixture has no trigger issue");
+          },
+        };
         fs.existsSync = filename => {
           if (filename === "/tmp/gh-aw") throw new Error("Missing ordinary outputs must not examine the legacy patch directory");
           return exists(filename);
@@ -36,7 +44,7 @@ function registerTests({ describe, it }) {
         const { main } = require(collectorPath);
         for (const present of [false, true]) {
           const outputs = new Map();
-          global.core = new Proxy({ setOutput: (key, value) => outputs.set(key, value) }, { get: (target, name) => target[name] || (() => {}) });
+          global.core = new Proxy({ ...previousCore, setOutput: (key, value) => outputs.set(key, value) }, { get: (target, name) => target[name] || (() => {}) });
           const filename = path.join(root, "source.jsonl");
           process.env.GH_AW_SAFE_OUTPUTS = filename;
           if (present) fs.writeFileSync(filename, "");

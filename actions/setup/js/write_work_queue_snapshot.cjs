@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { serializeTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
-const { canonical } = require("./work_queue_codec.cjs");
+const { MAX_SNAPSHOT_PARSE_BYTES, canonical } = require("./work_queue_codec.cjs");
 const { readInboundWorkQueueAssignment, resolveWorkQueueRuntime } = require("./aw_context.cjs");
 const { authenticatePublisher } = require("./work_queue_native.cjs");
 const { bindWorkerAssignment, loadQueue, validateStoredAssignment } = require("./work_queue_binding.cjs");
@@ -27,7 +27,7 @@ async function main(options = {}) {
   };
   const outputPath = options.snapshotPath || process.env.GH_AW_WORK_QUEUE_SNAPSHOT || SNAPSHOT_PATH;
   const runtime = resolveWorkQueueRuntime(configuration.context.payload, { role: options.role, requireAssignment: options.requireAssignment });
-  if (runtime.role === "observer" && configuration.initializationContext !== undefined) throw new Error("work_queue_observer_read_only");
+  if (runtime.role === "observer" && options.initializationContext !== undefined) throw new Error("work_queue_observer_read_only");
   const readConfiguration = runtime.role === "observer" ? { ...configuration, policyProposal: undefined } : configuration;
   let latest = await loadQueue(readConfiguration);
   if (!latest.projection.policy && !(runtime.role === "observer" && latest.sha === null && latest.transactions.length === 0)) throw new Error("work_queue_policy_missing");
@@ -52,8 +52,10 @@ async function main(options = {}) {
     worker,
     ...(options.visibleWorkIds === undefined ? {} : { visible_work_ids: options.visibleWorkIds }),
   };
+  const encoded = `${JSON.stringify(snapshot)}\n`;
+  if (Buffer.byteLength(encoded, "utf8") > MAX_SNAPSHOT_PARSE_BYTES) throw new TypeError("work queue snapshot exceeds its bounded input limit");
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, `${JSON.stringify(snapshot)}\n`, { mode: 0o444 });
+  fs.writeFileSync(outputPath, encoded, { mode: 0o444 });
   fs.chmodSync(outputPath, 0o444);
   configuration.core.setOutput?.("work_queue_origin", canonical(snapshot.origin));
   configuration.core.info(`Work queue activation: ${worker ? `${worker.claims.length} immutable Claims authenticated and bound` : runtime.role === "observer" ? "read-only observer" : "unassigned queue-control context"}; snapshot captured`);

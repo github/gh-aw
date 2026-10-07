@@ -4,7 +4,22 @@
 const { createHash } = require("node:crypto");
 const { canonical, canonicalBytes, closed, fingerprint, identity, integer, parseStrictJSON, queueError, utf8Compare, validateReason } = require("./work_queue_codec.cjs");
 const { boundedBytes, checkLedgerBudget } = require("./work_queue_limits.cjs");
-const { actorFromContext, bindingAuthority, claimAuthority, decimal, freshClocks, normalizeTrustedContext, poolPolicy, validateActor, validatePolicy, validateRequestRole, workerContinuationAuthority } = require("./work_queue_policy.cjs");
+const { validateEffectResourceAuthority } = require("./work_queue_resource_scope.cjs");
+const {
+  actorFromContext,
+  bindingAuthority,
+  claimAuthority,
+  decimal,
+  defaultPolicy,
+  freshClocks,
+  normalizeTrustedContext,
+  poolPolicy,
+  validateActor,
+  validatePolicy,
+  validateRequestRole,
+  validateSubmissionEntitlement,
+  workerContinuationAuthority,
+} = require("./work_queue_policy.cjs");
 const { dependencyStatus, gateKey, observationSatisfies, validateGraphAdmission, validateResource, workDefinition } = require("./work_queue_graph.cjs");
 const {
   applyScheduledClaim,
@@ -80,6 +95,7 @@ function validateEvidence(evidence) {
   if (!["prelaunch", "nonlaunch", "terminal_run", "delivery", "reconciliation"].includes(evidence.kind) || !["trusted_publisher", "github_api", "trusted_activation", "verified_receipts"].includes(evidence.source))
     throw queueError("evidence_invalid", "unsupported evidence source/kind");
   for (const field of ["repository", "workflow", "ref", "principal", "conclusion", "receipt"]) if (Object.hasOwn(evidence, field)) identity(evidence[field], field);
+  decimal(evidence.principal, "evidence principal", "evidence_invalid");
   if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(evidence.ref)) throw queueError("evidence_invalid", "evidence requires an immutable native revision");
   integer(evidence.checked_at, 0, Number.MAX_SAFE_INTEGER, "evidence timestamp");
   if (Object.hasOwn(evidence, "run_id")) decimal(evidence.run_id, "evidence run ID");
@@ -93,13 +109,14 @@ function validateRunBinding(run) {
   closed(run, ["run_id", "run_attempt", "repository", "workflow", "ref", "principal", "event"], [], "run binding");
   decimal(run.run_id, "native run ID");
   for (const field of ["repository", "workflow", "ref", "principal"]) identity(run[field], field);
+  decimal(run.principal, "native run principal", "run_binding_conflict");
   if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(run.ref)) throw queueError("run_binding_conflict", "native run requires an immutable revision");
   if (run.run_attempt !== 1 || run.event !== "workflow_dispatch") throw queueError("run_binding_conflict", "only original workflow_dispatch attempts can bind");
 }
 
 function validateOperation(operation) {
   if (!operation || !Object.hasOwn(OP_FIELDS, operation.kind)) throw queueError("unsupported_protocol", "unknown queue operation");
-  closed(operation, OP_FIELDS[operation.kind][0], OP_FIELDS[operation.kind][1], operation.kind);
+  closed(operation, OP_FIELDS[operation.kind][0], OP_FIELDS[operation.kind][1], operation.kind, "unsupported_protocol");
   for (const field of ["work_id", "claim_id", "dispatch_id", "handle", "claim_handle", "completion_id", "epoch", "observation_id", "credential_generation", "read_status"])
     if (Object.hasOwn(operation, field)) identity(operation[field], field);
   if (Object.hasOwn(operation, "reason")) validateReason(operation.reason);
@@ -241,10 +258,13 @@ function causalChain(transactions) {
 }
 
 function newState() {
+  /** @type {Array<ReturnType<typeof validateCommit>>} */
+  const transactions = [];
   return {
     repository: "",
     tip: "",
     policy_epoch: "",
+    /** @type {ReturnType<typeof defaultPolicy> | null} */
     policy: null,
     works: new Map(),
     claims: new Map(),
@@ -261,7 +281,7 @@ function newState() {
     terminalBarriers: new Map(),
     cancellations: new Map(),
     ledgerBytes: 0,
-    transactions: [],
+    transactions,
     stats: {},
   };
 }
@@ -270,14 +290,19 @@ function quiescent(state) {
   return [...state.works.values()].every(work => ["completed", "cancelled"].includes(work.state) && work.barrier !== "pending") && [...state.dispatches.values()].every(dispatch => dispatch.released);
 }
 
+/**
+ * @param state
+ * @param claimId
+ * @param context
+ * @param {{requireCompletion?: boolean, resource?: Record<string, string>}} [options]
+ */
 function validateClaimAuthority(state, claimId, context, { requireCompletion = false, resource } = {}) {
   const normalized = normalizeTrustedContext(context);
   const authority = claimAuthority(state, claimId, actorFromContext(context), requireCompletion);
   if (requireCompletion && authority.work.barrier !== "pending") throw queueError("claim_effects_unauthorized", "a terminal delivery barrier cannot authorize effects again");
   const run = authority.dispatch.run;
   if (normalized.ref !== run.ref || normalized.event !== run.event) throw queueError("run_binding_conflict", "native event/revision is not the approved bound run");
-  const profile = poolPolicy(state, authority.work.pool).profiles[authority.work.worker_profile];
-  if (resource && resource.repository !== profile.effect_scope) throw queueError("claim_scope_invalid", "resource lies outside this Claim's approved effect scope");
+  if (resource !== undefined) validateEffectResourceAuthority(state, authority, resource);
   return authority;
 }
 
@@ -488,7 +513,7 @@ function applyLifecycle(state, operation, commit) {
           throw queueError("run_binding_conflict", "activation may bind only its authenticated actual run");
         if (dispatch.run && canonical(dispatch.run) !== canonical(run)) throw queueError("run_binding_conflict", "assignment already belongs to a different native run");
         for (const existing of state.dispatches.values())
-          if (existing.dispatch_id !== dispatch.dispatch_id && existing.run?.run_id === run.run_id && existing.run.repository === run.repository) throw queueError("run_binding_conflict", "native run is already bound to another assignment");
+          if (existing.dispatch_id !== dispatch.dispatch_id && existing.run?.run_id === run.run_id) throw queueError("run_binding_conflict", "native run is already bound to another assignment");
         dispatch.run = run;
       } else if (operation.state === "rejected") {
         if (!operation.evidence || operation.run || operation.sender) throw queueError("evidence_invalid", "rejection requires positive nonlaunch evidence");
@@ -529,6 +554,7 @@ function finishOperations(state, request, actor, at) {
   const authority = claimAuthority(state, member.claim_id, actor, false);
   if (outcome === "completed") return [{ kind: "Completion", work_id: member.work_id, claim_id: member.claim_id, dispatch_id, claim_handle, run_id: authority.dispatch.run.run_id, run_attempt: 1 }];
   const retry = poolPolicy(state, authority.work.pool).retry;
+  /** @type {Array<{kind: string, work_id: string, claim_id: string, reason: string, retry_not_before: number} | {kind: string, work_id: string, reason: string}>} */
   const operations = [{ kind: "ClaimCancellation", work_id: member.work_id, claim_id: member.claim_id, reason: "worker_cancelled", retry_not_before: at + retry.backoff_ms }];
   if (authority.work.attempts >= retry.max_attempts) operations.push({ kind: "WorkCancellation", work_id: member.work_id, reason: "attempts_exhausted" });
   return operations;
@@ -538,9 +564,7 @@ function workerControlScope(state, commit) {
   if (commit.actor.role !== "worker" || !["submit", "dispatch_next", "observe"].includes(commit.request.kind)) return;
   const authority = workerContinuationAuthority(state, commit.actor);
   if (commit.request.kind === "submit") {
-    for (const node of commit.request.parameters.nodes)
-      if (node.pool !== authority.work.pool || node.priority !== authority.work.priority || node.fairness_key !== authority.work.fairness_key)
-        throw queueError("work_unauthorized", "children preserve trusted parent priority and accounting scope");
+    for (const node of commit.request.parameters.nodes) validateSubmissionEntitlement(state, node, commit.actor);
   }
   if (commit.request.kind === "dispatch_next" && commit.request.parameters.pool !== authority.work.pool) throw queueError("claim_scope_invalid", "worker dispatch control is restricted to its parent's pool");
   if (commit.request.kind === "observe")
@@ -552,6 +576,7 @@ function validateRequestContext(state, request, actor) {
   validateRequest(request, actor);
   validateRequestRole(actor, request.kind);
   workerControlScope(state, { actor, request });
+  if (request.kind === "dispatch_next") validateDispatchParameters(request.parameters, state);
   if (request.kind === "submit") validateGraphAdmission(state, request.parameters.nodes, actor);
 }
 
@@ -579,6 +604,7 @@ function replayTransactions(transactions) {
       state.clocks = freshClocks(state.policy);
       state.observation_writes = new Map();
     } else if (!state.policy || commit.policy_epoch !== state.policy_epoch) throw queueError("policy_invalid", "commit does not bind authoritative installed epoch");
+    if (!state.policy) throw queueError("policy_missing", "existing queue has no policy genesis");
     if (commit.operations.length > state.policy.limits.operations) throw queueError("resource_limit", "operation count exceeds installed policy");
     workerControlScope(state, commit);
     if (commit.request.kind === "finish" && canonical(finishOperations(state, commit.request, commit.actor, commit.at)) !== canonical(commit.operations)) throw queueError("request_invalid", "finish differs from exact scoped outcome");
@@ -643,8 +669,9 @@ function replayTransactions(transactions) {
     );
     state.ledgerBytes += bytes;
   }
+  if (!state.policy) throw queueError("policy_missing", "existing queue has no policy genesis");
   projectViews(state);
-  return state;
+  return Object.assign(state, { policy: state.policy });
 }
 
 function projectViews(state) {

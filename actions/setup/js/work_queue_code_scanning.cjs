@@ -5,7 +5,19 @@ const crypto = require("crypto");
 const path = require("path");
 const zlib = require("zlib");
 const { canonical } = require("./work_queue_codec.cjs");
-const { currentClaimHandle, assertClaimAuthorized, claimArtifactPath, claimIdentity, assertClaimIdentity, receiptMatchesClaim } = require("./work_queue_claim_scope.cjs");
+const {
+  currentClaimHandle,
+  assertClaimAuthorized,
+  claimArtifactPath,
+  claimIdentity,
+  assertClaimIdentity,
+  receiptMatchesClaim,
+  withClaimResourceEffects,
+  createClaimResourceVerification,
+  withClaimResourceVerification,
+} = require("./work_queue_claim_scope.cjs");
+const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
+const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const privateReceipts = new WeakMap();
 
@@ -14,7 +26,7 @@ async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
   if (!handle) throw new Error("Queue code scanning requires a Claim factory");
   const factoryIdentity = claimIdentity(handle);
-  const github = suppliedClient || global.github;
+  const github = wrapClaimEffectClient(suppliedClient || global.github, { claim_handle: handle });
   const repository = config["target-repo"] || process.env.GITHUB_REPOSITORY;
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue code scanning requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
@@ -30,7 +42,7 @@ async function main(config = {}, suppliedClient) {
     if (currentClaimHandle() !== handle) throw new Error("Queue code scanning cannot escape its original Claim");
     assertClaimIdentity(factoryIdentity);
     if (Object.hasOwn(message, "repo") && message.repo !== repository) throw new Error("Queue code scanning explicit repository conflicts with its trusted adapter");
-    message = await assertClaimAuthorized({ ...message, repo: repository }, { requireCompletion: !stagedMode, resource: { repository, ref, path: message.file } });
+    message = await assertClaimAuthorized({ ...message, repo: repository }, { requireCompletion: !stagedMode });
     if (stagedMode) return { success: true, staged: true, claim_handle: handle };
     const number = ++count;
     if (!Number.isSafeInteger(maximum) || maximum < 1 || number > maximum) throw new Error("Queue code scanning exceeds the trusted per-Claim limit");
@@ -63,10 +75,13 @@ async function main(config = {}, suppliedClient) {
       $schema: "https://json.schemastore.org/sarif-2.1.0.json",
       runs: [{ tool: { driver: { name: driver, version: "1.0.0" } }, automationDetails: { id: category }, results: [finding] }],
     };
-    const upload = await github.rest.codeScanning.uploadSarif({ owner, repo, commit_sha: revision, ref, sarif: zlib.gzipSync(Buffer.from(JSON.stringify(report))).toString("base64"), tool_name: driver, validate: true });
+    const authorityResource = await resolveRepositoryTarget(github, { repository, ref, path: message.file });
+    const upload = await withClaimResourceEffects([authorityResource], ["rest.codeScanning.uploadSarif"], () =>
+      github.rest.codeScanning.uploadSarif({ owner, repo, commit_sha: revision, ref, sarif: zlib.gzipSync(Buffer.from(JSON.stringify(report))).toString("base64"), tool_name: driver, validate: true })
+    );
     if (typeof upload.data.id !== "string" || !upload.data.id) throw new Error("Queue code scanning has no exact service receipt");
     const result = { success: true, sarif_id: upload.data.id, repo: repository, ref, commit_sha: revision };
-    privateReceipts.set(result, { ...factoryIdentity, repository, revision, ref, driver, category, finding, sarif_id: upload.data.id });
+    privateReceipts.set(result, { ...factoryIdentity, repository, revision, ref, driver, category, finding, sarif_id: upload.data.id, authorityResource });
     return result;
   };
 }
@@ -111,7 +126,7 @@ async function verifyCodeScanningDelivery({ claim, result, github }) {
     locations: [{ physicalLocation: { artifactLocation: { uri: location?.artifactLocation?.uri }, region: { startLine: location?.region?.startLine, startColumn: location?.region?.startColumn } } }],
   };
   if (canonical(projected) !== canonical(receipt.finding)) return { verified: false };
-  return {
+  const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
     resource: {
@@ -124,8 +139,10 @@ async function verifyCodeScanningDelivery({ claim, result, github }) {
       category: receipt.category,
       path: receipt.finding.locations[0].physicalLocation.artifactLocation.uri,
     },
+    authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
     evidence: { source: "github_code_scanning_api", sarif_id: receipt.sarif_id, analysis_id: analysis.id, result_sha256: crypto.createHash("sha256").update(canonical(receipt.finding)).digest("hex") },
-  };
+  });
+  return withClaimResourceVerification(proof, () => proof);
 }
 
 module.exports = { main, verifyCodeScanningDelivery };

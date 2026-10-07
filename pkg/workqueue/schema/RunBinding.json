@@ -41,15 +41,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "run_id",
-        "run_attempt",
-        "repository",
-        "workflow",
-        "ref",
-        "principal",
-        "event"
-      ],
+      "required": ["run_id", "run_attempt", "repository", "workflow", "ref", "principal", "event"],
       "type": "object"
     }
   },

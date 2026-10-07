@@ -3,6 +3,8 @@ package workqueue
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -17,6 +19,22 @@ func configureNativeRun(mock *queueAPI, assignment Assignment) {
 	run.Actor.Login, run.Actor.ID, run.TriggeringActor.ID = "operator", json.Number(testPrincipal), json.Number(testPrincipal)
 	run.Repository.FullName = testRepository
 	mock.nativeRun = run
+}
+
+func boundDeliveryAssignment(t *testing.T, updates ...func(*Policy)) ([]QueueCommit, Assignment) {
+	t.Helper()
+	return boundAssignmentWithWork(t, func(work *WorkDefinition) {
+		var payload map[string]json.RawMessage
+		if err := json.Unmarshal(work.Payload, &payload); err != nil {
+			t.Fatal(err)
+		}
+		payload["effect_contract"] = json.RawMessage(`{"kind":"none"}`)
+		var err error
+		work.Payload, err = json.Marshal(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}, updates...)
 }
 
 func TestNativePrincipalIsImmutableNumericIdentityNotLogin(t *testing.T) {
@@ -88,14 +106,68 @@ func TestNativeTerminalRecoveryPreservesCompletedMembers(t *testing.T) {
 	}
 }
 
+func TestNativeUnboundReconciliationDoesNotConsumeLifecycleCapacity(t *testing.T) {
+	branch, mock := newQueueAPI(t)
+	original, assignment := boundAssignment(t, func(policy *Policy) {
+		pool := policy.Pools["default"]
+		pool.Retry.MaxAttempts, pool.Reconciliation.MaxAttempts = 1, 1
+		policy.Pools["default"] = pool
+	})
+	binding := original[len(original)-1]
+	commits := original[:len(original)-1]
+	state, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sender := state.Dispatches[assignment.DispatchID].Sender
+	commits = testOperations(t, commits, *sender, "uncertain-launch", "dispatch", Op(map[string]any{
+		"kind": "Dispatch", "dispatch_id": assignment.DispatchID,
+		"state": "uncertain", "reason": "dispatch_response_unknown",
+	}))
+	installMockLog(t, mock, commits)
+	before := mock.head
+	for index := range 3 {
+		recovery, err := branch.Reconcile(context.Background(), assignment.DispatchID, fmt.Sprintf("unbound-%d", index))
+		if err != nil || recovery.Publication != nil || recovery.Reason != "launch_unresolved" {
+			t.Fatalf("unbound recovery invented optional telemetry: %+v %v", recovery, err)
+		}
+	}
+	latest, err := branch.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err = Replay(latest)
+	if err != nil || state.Dispatches[assignment.DispatchID].LifecycleWrites != 2 ||
+		len(latest) != len(commits) || mock.head != before || mock.refWrites != 0 {
+		t.Fatalf("readonly unbound recovery consumed finite lifecycle capacity: %v", err)
+	}
+	commits = testOperations(t, latest, binding.Actor, "late-original-bind", "dispatch", binding.Operations...)
+	installMockLog(t, mock, commits)
+	configureNativeRun(mock, assignment)
+	recovery, err := branch.Reconcile(context.Background(), assignment.DispatchID, "late-original-release")
+	if err != nil || recovery.Reason != "native_released_delivery_independent" || recovery.Publication == nil {
+		t.Fatalf("optional telemetry stranded a later original binding/release: %+v %v", recovery, err)
+	}
+	latest, err = branch.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err = Replay(latest)
+	if err != nil || state.Stats.Dispatches != 0 || state.Stats.Cancelled != 3 ||
+		state.Dispatches[assignment.DispatchID].LifecycleWrites != 3 {
+		t.Fatalf("original terminal recovery did not remain within the five-write cap: %+v %v", state.Stats, err)
+	}
+}
+
 func TestNativeResultNeedsScopedVerificationCapability(t *testing.T) {
 	branch, mock := newQueueAPI(t)
-	commits, assignment := boundAssignment(t)
+	commits, assignment := boundDeliveryAssignment(t)
 	commits = finishMember(t, commits, assignment, 0, "completed", time.Now().UnixMilli())
 	installMockLog(t, mock, commits)
 	configureNativeRun(mock, assignment)
-	if _, err := branch.RecoverDelivery(context.Background(), assignment.Claims[0].WorkID, "result"); err == nil {
-		t.Fatal("actor/evidence strings substituted for a trusted verifier")
+	if _, err := branch.RecoverDelivery(context.Background(), assignment.Claims[0].WorkID, "result"); err == nil ||
+		!strings.HasPrefix(err.Error(), "delivery_verifier_required:") {
+		t.Fatalf("pending delivery must require a trusted verifier: %v", err)
 	}
 	calls := 0
 	branch.DeliveryVerifier = func(_ context.Context, state Projection, claim ClaimState) (DeliveryVerification, error) {
@@ -118,7 +190,7 @@ func TestNativeResultNeedsScopedVerificationCapability(t *testing.T) {
 
 func TestNativeMissingReceiptsBecomeUnknownNotNone(t *testing.T) {
 	branch, mock := newQueueAPI(t)
-	commits, assignment := boundAssignment(t)
+	commits, assignment := boundDeliveryAssignment(t)
 	commits = finishMember(t, commits, assignment, 0, "completed", time.Now().UnixMilli())
 	installMockLog(t, mock, commits)
 	configureNativeRun(mock, assignment)
@@ -154,7 +226,7 @@ func TestNativeFailureDispositionPreservesPositiveReceipts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			branch, mock := newQueueAPI(t)
-			commits, assignment := boundAssignment(t, func(policy *Policy) {
+			commits, assignment := boundDeliveryAssignment(t, func(policy *Policy) {
 				pool := policy.Pools["default"]
 				pool.Reconciliation.MaxAttempts = 1
 				policy.Pools["default"] = pool
@@ -192,7 +264,7 @@ func TestNativeMalformedVerifiedDescriptorsFailWithoutPublishing(t *testing.T) {
 	for _, descriptor := range []string{`null`, `[]`, `{"a":1,"a":2}`, `{"bad":1e0}`} {
 		t.Run(descriptor, func(t *testing.T) {
 			branch, mock := newQueueAPI(t)
-			commits, assignment := boundAssignment(t)
+			commits, assignment := boundDeliveryAssignment(t)
 			commits = finishMember(t, commits, assignment, 0, "completed", time.Now().UnixMilli())
 			installMockLog(t, mock, commits)
 			configureNativeRun(mock, assignment)
@@ -211,7 +283,7 @@ func TestNativeMalformedVerifiedDescriptorsFailWithoutPublishing(t *testing.T) {
 
 func TestNoEffectsProofCannotPrecedeNativeTermination(t *testing.T) {
 	branch, mock := newQueueAPI(t)
-	commits, assignment := boundAssignment(t)
+	commits, assignment := boundDeliveryAssignment(t)
 	commits = finishMember(t, commits, assignment, 0, "completed", time.Now().UnixMilli())
 	installMockLog(t, mock, commits)
 	configureNativeRun(mock, assignment)

@@ -34,7 +34,7 @@ type NativeRun struct {
 
 func (b Branch) exactRun(ctx context.Context, id string) (NativeRun, error) {
 	if !decimalIdentity(id) {
-		return NativeRun{}, queueError("run_invalid", "run ID must be a positive canonical decimal string")
+		return NativeRun{}, queueError("run_invalid", "invalid run ID; expected 1..256 canonical decimal digits without a leading zero (for example: 202)")
 	}
 	var run NativeRun
 	if err := b.request(ctx, http.MethodGet, "actions/runs/"+id+"/attempts/1", nil, &run); err != nil {
@@ -48,7 +48,7 @@ func (b Branch) exactRun(ctx context.Context, id string) (NativeRun, error) {
 }
 
 func decimalIdentity(id string) bool {
-	if id == "" || id[0] == '0' {
+	if id == "" || len(id) > 256 || id[0] == '0' {
 		return false
 	}
 	for _, char := range id {
@@ -94,6 +94,20 @@ func correlatedNativeTitle(title, dispatchID string) bool {
 }
 
 func (b Branch) verifyRequestEvidence(ctx context.Context, state Projection, actor Actor, request Request) error {
+	if request.Kind == "policy" {
+		var parameters OperationsParameters
+		if err := json.Unmarshal(request.Parameters, &parameters); err != nil || len(parameters.Operations) != 1 ||
+			operationKind(parameters.Operations[0]) != "Policy" {
+			return queueError("request_invalid", "prospective policy requires exactly one Policy operation")
+		}
+		var operation struct {
+			Policy Policy `json:"policy"`
+		}
+		if err := json.Unmarshal(parameters.Operations[0], &operation); err != nil {
+			return queueError("request_invalid", "prospective policy operation is malformed")
+		}
+		return b.verifyWorkerRoutes(ctx, operation.Policy)
+	}
 	if request.Kind == "submit" {
 		var params SubmitParameters
 		if err := json.Unmarshal(request.Parameters, &params); err != nil {
@@ -182,9 +196,17 @@ func (b Branch) verifyRequestEvidence(ctx context.Context, state Projection, act
 			if b.DeliveryVerifier == nil || claim == nil {
 				return queueError("delivery_verifier_required", "native Result requires a separately bound trusted scoped receipt verifier")
 			}
+			work := state.Works[claim.WorkID]
+			if work == nil {
+				return queueError("work_missing", "Result references missing immutable Work")
+			}
+			if err := validateDeliveryContract(work.Payload); err != nil {
+				return err
+			}
 			verification, err := b.DeliveryVerifier(ctx, state, *claim)
 			if err != nil || !verification.Verified || verification.Receipt == "" ||
-				verification.Receipt != result.Evidence.Receipt || !sameJSON(verification.Descriptor, result.Descriptor) {
+				verification.Receipt != result.Evidence.Receipt || !sameJSON(verification.Descriptor, result.Descriptor) ||
+				result.Evidence.Effects != "" && result.Evidence.Effects != verification.Disposition {
 				return queueError("delivery_evidence_required", "scoped delivery verification failed")
 			}
 			dispatch := state.Dispatches[claim.DispatchID]

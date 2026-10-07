@@ -13,10 +13,9 @@ import (
 func TestNativeEffectAndContinuationAuthorityParity(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
-		t.Log("JavaScript authority parity tooling unavailable; native scope tests still run")
-		return
+		t.Fatal("strict JavaScript authority parity requires Node test tooling")
 	}
-	commits, assignment := boundAssignment(t)
+	commits, assignment, target := boundEffectAssignment(t)
 	commits = finishMember(t, commits, assignment, 0, "completed")
 	commits = finishMember(t, commits, assignment, 1, "completed")
 	verified := verifiedMemberResult(t, commits, assignment, 0)
@@ -31,6 +30,7 @@ func TestNativeEffectAndContinuationAuthorityParity(t *testing.T) {
 		"claim_id": assignment.Claims[0].ClaimID, "completion_id": state.Works[assignment.Claims[0].WorkID].CompletionID,
 		"reason": "verification_exhausted", "disposition": "unknown", "evidence": failure,
 	}))
+	drainedEpoch := retireAssignmentEpoch(t, commits, assignment)
 	tests := []struct {
 		name         string
 		commits      []QueueCommit
@@ -40,12 +40,13 @@ func TestNativeEffectAndContinuationAuthorityParity(t *testing.T) {
 		continuation string
 	}{
 		{"pending", commits, "h1", false, "allowed", "allowed"},
-		{"verified", verified, "h1", false, "claim_effects_unauthorized", "allowed"},
+		{"verified", verified, "h1", false, "claim_effects_unauthorized", "claim_effects_unauthorized"},
 		{"pending-sibling", verified, "h2", false, "allowed", "allowed"},
 		{"failed", failed, "h1", false, "claim_effects_unauthorized", "claim_effects_unauthorized"},
 		{"failed-sibling", failed, "h2", false, "allowed", "allowed"},
 		{"retired-pending", commits, "h1", true, "claim_ineffective", "claim_ineffective"},
 		{"retired-verified", verified, "h1", true, "claim_ineffective", "claim_ineffective"},
+		{"drained-retired-epoch", drainedEpoch, "h1", false, "claim_ineffective", "claim_ineffective"},
 	}
 	const script = `
 const fs = require("node:fs");
@@ -67,7 +68,7 @@ function outcome(operation) {
 }
 process.stdout.write(JSON.stringify({
   effect: outcome(() => validateClaimAuthority(state, member.claim_id, context,
-    { requireCompletion: true })),
+    { requireCompletion: true, resource: input.target })),
   continuation: outcome(() => validateWorkerContinuation(state, context))
 }));
 `
@@ -94,14 +95,14 @@ process.stdout.write(JSON.stringify({
 				code, _, _ := strings.Cut(err.Error(), ":")
 				return code
 			}
-			nativeEffect := code(AuthorizeEffect(state, actor))
+			nativeEffect := code(AuthorizeEffect(state, actor, target))
 			nativeContinuation := code(authorizeWorkerQueueRequest(state, actor, request))
 			if nativeEffect != test.effect || nativeContinuation != test.continuation {
 				t.Fatalf("native expected effects=%s continuation=%s; got %s / %s",
 					test.effect, test.continuation, nativeEffect, nativeContinuation)
 			}
 			input, err := json.Marshal(map[string]any{
-				"commits": test.commits, "actor": actor, "retired": test.retired,
+				"commits": test.commits, "actor": actor, "retired": test.retired, "target": target,
 			})
 			if err != nil {
 				t.Fatal(err)

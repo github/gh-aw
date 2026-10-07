@@ -4,8 +4,8 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
-const { queueFixture, REF, REPOSITORY, WORKFLOW, DISPATCHER } = require("./work_queue_lifecycle.test_helpers.cjs");
+const os = require("node:os");
+const { queueFixture, noWriteClaimVerifier, REF, REPOSITORY, WORKFLOW, DISPATCHER } = require("./work_queue_lifecycle.test_helpers.cjs");
 const { immutableRef, nativeId, dispatchResponse, validateNativeRun } = require("./work_queue_native.cjs");
 const { createWorkQueueDispatchTool, createWorkQueueFinishTool, createWorkQueueSubmitTool, loadWorkQueueSnapshot, readWorkQueueState } = require("./work_queue_mcp_server.cjs");
 const { readStagedIntents, requestForIntent } = require("./work_queue_intents.cjs");
@@ -16,9 +16,14 @@ const { cancelBeforeLaunch, reconcileDispatch } = require("./work_queue_reconcil
 const { resolveExternalEdges, isFreshObservation } = require("./work_queue_dependency_resolver.cjs");
 const { renderSummary } = require("./work_queue_summary.cjs");
 
+function assignedFixture(options = {}) {
+  const fixture = queueFixture(options);
+  if (!fixture.assignment) throw new Error("fixture_assignment_required");
+  return Object.assign(fixture, { assignment: fixture.assignment });
+}
+
 async function run() {
-  const directory = path.join(process.cwd(), `.queue-lifecycle-checks-${randomUUID()}`);
-  fs.mkdirSync(directory);
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-lifecycle-"));
   let checked = 0;
   const check = condition => {
     assert(condition);
@@ -26,6 +31,7 @@ async function run() {
   };
   const optionsFor = (fixture, worker = true) => ({
     githubClient: fixture.githubClient,
+    validateDispatchCredential: fixture.validateDispatchCredential,
     context: worker ? fixture.workerContext : fixture.dispatcherContext,
     workflowRef: `${REPOSITORY}/${worker ? WORKFLOW : DISPATCHER}@${REF}`,
     assignment: fixture.assignment,
@@ -70,7 +76,12 @@ async function run() {
     submitTool.handler({ nodes: [{ graph_id: "g2", node_key: "n", payload: { plan: "new stored plan" } }] });
     check(readStagedIntents(intentPath).length === 2 && readFixture.state.claims.size === 0);
     const stagedControlsCount = readFixture.transactions.length;
-    const stagedControls = await processWorkQueueIntents({ ...optionsFor(readFixture, false), assignment: null, intentPath, config: { staged: true } });
+    const stagedControls = await processWorkQueueIntents({
+      ...optionsFor(readFixture, false),
+      assignment: null,
+      intentPath,
+      config: { staged: true, work_queue_workflows: ["worker"], aw_context_workflows: ["worker"], max: 1 },
+    });
     check(stagedControls.receipts.every(receipt => receipt.status === "staged_preview") && readFixture.transactions.length === stagedControlsCount);
     prepareLaunch(readFixture, { status: 204, data: {} });
     const controls = await processWorkQueueIntents({ ...optionsFor(readFixture, false), assignment: null, intentPath, maxDispatches: 1, config: { work_queue_workflows: ["worker"], aw_context_workflows: ["worker"], max: 1 } });
@@ -103,7 +114,7 @@ async function run() {
     check((fs.statSync(activationOptions.snapshotPath).mode & 0o777) === 0o444);
     assert.throws(() => validateNativeRun({ ...activationFixture.nativeRun(), run_attempt: 2 }, { repository: REPOSITORY, workflow: WORKFLOW, ref: REF, principal_id: "11" }));
 
-    const fixture = queueFixture({ bound: true });
+    const fixture = assignedFixture({ bound: true });
     const finishPath = path.join(directory, "finish.jsonl");
     const finishTool = createWorkQueueFinishTool({ snapshot: { worker: fixture.assignment }, finishIntentPath: finishPath, createIntentId: () => "finish-h1" });
     assert.throws(() => finishTool.handler({}));
@@ -130,14 +141,16 @@ async function run() {
     check(finished.status === "completed_with_cancellations" && !Object.hasOwn(finished, "authorized"));
     check(finished.claims.h1.authorized && !finished.claims.h2.authorized && finished.claims.h3.authorized);
     check(!fixture.state.dispatches.get(fixture.assignment.dispatch_id).released);
-    check((await authorizeWorkerClaim({ ...workerOptions, claim_handle: "h2" })).suppressed);
+    const cancelledProof = await authorizeWorkerClaim({ ...workerOptions, claim_handle: "h2" });
+    check("suppressed" in cancelledProof && cancelledProof.suppressed);
     const count = fixture.transactions.length;
     await reconcileWorkerClaim(workerOptions);
     check(fixture.transactions.length === count);
     let verifications = 0;
-    const verifyEffects = async member => {
+    const protectedVerifier = noWriteClaimVerifier(workerOptions);
+    const verifyEffects = async (member, scope) => {
       verifications++;
-      return { verified: true, contractVerified: true, receipt: `trusted:${member.handle}`, descriptor: { report: member.work.plan }, effects: "none" };
+      return protectedVerifier(member, scope);
     };
     const result = await finalizeWorkerResults({ ...workerOptions, now: fixture.at, verifyEffects });
     check(result.claims.h1.state === "result" && result.claims.h3.state === "result" && result.claims.h2.state === "cancelled");
@@ -147,11 +160,11 @@ async function run() {
     check((await authorizeWorkerClaim({ ...workerOptions, claim_handle: "h1" })).authorized === false);
     await assert.rejects(authorizeWorkerClaim({ ...workerOptions, claim_handle: "h1", resource: { repository: "foreign/repo" } }), /scope/);
     check(renderSummary({ projection: activationFixture.state, worker: fixture.assignment }, fixture.state).includes("completed_with_cancellations"));
-    const fanout = queueFixture({
+    const fanout = assignedFixture({
       count: 2,
       bound: true,
       workerPrincipal: "22",
-      workDefaults: { priority: 1, fairness_key: "tenant" },
+      workDefaults: { priority: 1, fairness_key: "tenant", payload: { effect_contract: { version: 1, outputs: [{ type: "work_queue_submit", min: 1, max: 1 }] } } },
       configurePolicy: policy => {
         policy.accounting_weights.tenant = 1;
         policy.producers["11"].fairness_keys.push("tenant");
@@ -162,7 +175,6 @@ async function run() {
     stageFinish(fanoutFinishPath, "h2", "cancelled");
     const fanoutOptions = { ...optionsFor(fanout), finishIntentPath: fanoutFinishPath };
     await reconcileWorkerClaim(fanoutOptions);
-    await finalizeWorkerResults({ ...fanoutOptions, now: fanout.at, verifyEffects: async () => ({ verified: true, contractVerified: true, receipt: "trusted:fanout", descriptor: { outputs: [] }, effects: "none" }) });
     const fanoutPath = path.join(directory, "fanout-controls.jsonl");
     const child = { graph_id: "g1", node_key: "child", payload: { plan: "scoped follow-up", effect_contract: { kind: "none" } }, depends_on: [{ kind: "work", work_id: fanout.assignment.claims[0].work_id }] };
     fs.writeFileSync(
@@ -193,7 +205,7 @@ async function run() {
     checked++;
     const admittedChild = [...fanout.state.works.values()].find(work => work.node_key === "child");
     check(admittedChild.priority === 1 && admittedChild.fairness_key === "tenant" && admittedChild.pool === "default");
-    check(fanout.state.works.size === 3 && fanout.state.works.get(fanout.assignment.claims[0].work_id).barrier === "verified");
+    check(fanout.state.works.size === 3 && fanout.state.works.get(fanout.assignment.claims[0].work_id).barrier === "pending");
 
     const unknown = queueFixture({ count: 1, bound: true });
     const unknownPath = path.join(directory, "unknown-finish.jsonl");
@@ -208,24 +220,24 @@ async function run() {
     const failed = await finalizeWorkerResults({ ...unknownOptions, now: unknown.at, verifyEffects: unknownVerification });
     check(failed.claims.h1.state === "delivery_failed" && failed.claims.h1.effects === "unknown");
 
-    const launch = queueFixture();
+    const launch = assignedFixture();
     const posts = prepareLaunch(launch);
     const launchOptions = optionsFor(launch, false);
     check((await launchAssignment(launchOptions, launch.assignment)).state === "bound");
     await launchAssignment(launchOptions, launch.assignment);
     check(posts() === 1 && launch.state.dispatches.get(launch.assignment.dispatch_id).run.run_id === "42");
-    const concurrent = queueFixture();
+    const concurrent = assignedFixture();
     const concurrentPosts = prepareLaunch(concurrent);
     await Promise.all([launchAssignment(optionsFor(concurrent, false), concurrent.assignment), launchAssignment(optionsFor(concurrent, false), concurrent.assignment)]);
     check(concurrentPosts() === 1 && concurrent.state.dispatches.get(concurrent.assignment.dispatch_id).run.run_id === "42");
     for (const destination of [{ repository: "foreign/repo" }, { workflow: ".github/workflows/other.yml" }, { ref: "b".repeat(40) }]) {
-      const invalidDestination = queueFixture();
+      const invalidDestination = assignedFixture();
       const destinationPosts = prepareLaunch(invalidDestination);
       await assert.rejects(launchAssignment({ ...optionsFor(invalidDestination, false), destination }, invalidDestination.assignment));
       check(destinationPosts() === 0 && invalidDestination.state.dispatches.get(invalidDestination.assignment.dispatch_id).state === "reserved");
     }
     for (const response of [new Error("timeout"), { status: 204, data: {} }, { status: 200, data: { workflow_run_id: "42" } }]) {
-      const uncertain = queueFixture();
+      const uncertain = assignedFixture();
       const uncertainPosts = prepareLaunch(uncertain, response);
       const uncertainOptions = optionsFor(uncertain, false);
       check((await launchAssignment(uncertainOptions, uncertain.assignment)).state === "launch_unresolved");
@@ -233,7 +245,7 @@ async function run() {
       check(uncertainPosts() === 1 && !uncertain.state.dispatches.get(uncertain.assignment.dispatch_id).released);
       check([...uncertain.state.claims.values()].every(claim => claim.state === "open"));
     }
-    const recovered = queueFixture();
+    const recovered = assignedFixture();
     const recoveredPosts = prepareLaunch(recovered);
     const recoveredOptions = optionsFor(recovered, false);
     const publisher = recoveredOptions.publishWorkQueueRequest;
@@ -250,7 +262,7 @@ async function run() {
     check([...rejected.state.claims.values()].every(claim => claim.state === "cancelled"));
     await launchAssignment(optionsFor(rejected, false), rejected.assignment);
     check(rejectedPosts() === 1);
-    const reserved = queueFixture();
+    const reserved = assignedFixture();
     check((await cancelBeforeLaunch(optionsFor(reserved, false))).released);
     reserved.append("cancel_work", { operations: reserved.assignment.claims.map(member => ({ kind: "WorkCancellation", work_id: member.work_id, reason: "retired" })) });
     const nextPolicy = JSON.parse(JSON.stringify(reserved.policy));
@@ -260,11 +272,11 @@ async function run() {
     const started = queueFixture({ started: true });
     await assert.rejects(cancelBeforeLaunch(optionsFor(started, false)));
 
-    const duplicate = queueFixture({ started: true });
+    const duplicate = assignedFixture({ started: true });
     duplicate.githubClient.rest.actions.listWorkflowRuns = async () => ({ status: 200, data: { workflow_runs: [duplicate.nativeRun(), { ...duplicate.nativeRun(), id: "43" }] } });
     check((await reconcileDispatch(optionsFor(duplicate, false))).state === "run_binding_conflict");
     check(!duplicate.state.dispatches.get(duplicate.assignment.dispatch_id).run);
-    const terminal = queueFixture({ bound: true });
+    const terminal = assignedFixture({ bound: true });
     terminal.append("finish", { dispatch_id: terminal.assignment.dispatch_id, claim_handle: "h1", outcome: "completed" }, { ...terminal.workerActor, dispatch_id: terminal.assignment.dispatch_id, claim_handle: "h1" });
     const getTerminal = terminal.githubClient.rest.actions.getWorkflowRun;
     terminal.githubClient.rest.actions.getWorkflowRun = async args => ({ status: 200, data: { ...(await getTerminal(args)).data, ...(args.run_id === "42" ? { status: "completed", conclusion: "cancelled" } : {}) } });
@@ -368,7 +380,8 @@ async function run() {
     check(foreignBatch.dispatches === 1 && foreign.state.claims.size === 2 && foreign.state.observations.size === 1);
     const foreignClaim = [...foreign.state.claims.values()].find(claim => claim.work_id === admittedForeign.work_id);
     check(foreignClaim.observations.length === 1);
-    check(foreign.state.policy.pools.default.profiles.default.effect_scope === REPOSITORY);
+    const installedPolicy = foreign.state.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Policy").policy;
+    check(installedPolicy.pools.default.profiles.default.effect_scope === REPOSITORY);
 
     console.log(`Work queue lifecycle checks passed (${checked} assertions, plus rejection/ambiguity checks).`);
   } finally {

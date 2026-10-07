@@ -2,7 +2,8 @@
 "use strict";
 
 const { canonical, canonicalBytes, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
-const { assertClaimAuthorized, currentClaimHandle, claimIdentity, assertClaimIdentity, receiptMatchesClaim } = require("./work_queue_claim_scope.cjs");
+const { assertClaimAuthorized, currentClaimHandle, claimIdentity, assertClaimIdentity, receiptMatchesClaim, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
+const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient, graphEffectIdentity } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
@@ -147,8 +148,11 @@ async function verifyGraphqlAdapterDelivery(options) {
   validateGraphqlAdapter(adapter);
   const receipt = result && receipts.get(result);
   if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
+  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return { verified: false };
   const config = adapter.graphql;
-  const query = `query ClaimAdapterReadback($id:ID!) { node(id:$id) { id __typename ... on ${config["resource-type"]} { ${readbackSelection(config)} } } }`;
+  const typed = ["Issue", "PullRequest"].includes(config["resource-type"]);
+  const nativeSelection = config["resource-type"] === "Repository" ? "databaseId" : `${typed ? "databaseId number " : ""}repository { databaseId }`;
+  const query = `query ClaimAdapterReadback($id:ID!) { node(id:$id) { id __typename ... on ${config["resource-type"]} { ${readbackSelection(config)} ${nativeSelection} } } }`;
   const response = await github.graphql(query, { id: receipt.id });
   const node = response?.node;
   if (!node || nodeIdentity(node.id) !== receipt.id || node.__typename !== config["resource-type"] || observedField(node, config["repository-field"]) !== adapter["target-repo"]) return { verified: false };
@@ -157,13 +161,21 @@ async function verifyGraphqlAdapterDelivery(options) {
   }
   const number = config["number-field"] === undefined ? undefined : observedField(node, config["number-field"]);
   if (number !== undefined && (!Number.isSafeInteger(number) || number < 1)) return { verified: false };
-  return {
+  const authorityResource = await resolveRepositoryTarget(github, {
+    repository: adapter["target-repo"],
+    ...(typed ? { kind: config["resource-type"] === "Issue" ? "issue" : "pull_request", resource_id: node.databaseId } : {}),
+    ...((typed ? node.number : number) === undefined ? {} : { number: typed ? node.number : number }),
+    repository_id: config["resource-type"] === "Repository" ? node.databaseId : node.repository?.databaseId,
+  });
+  const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
     resource: { kind: config["resource-kind"], repository: adapter["target-repo"], id: receipt.id, ...(number === undefined ? {} : { number }) },
+    authority_resource: authorityResource,
     effect_resources: [{ kind: "graphql", repository: adapter["target-repo"], id: receipt.effect_id }],
     evidence: { source: "independent_native_readback", id: receipt.id, fields_digest: digest(receipt.fields) },
-  };
+  });
+  return withClaimResourceVerification(proof, () => proof);
 }
 
 module.exports = { validateGraphqlAdapter, createGraphqlEffectHandler, verifyGraphqlAdapterDelivery };

@@ -25,11 +25,7 @@
           "$ref": "#/$defs/Resource"
         }
       },
-      "required": [
-        "kind",
-        "resource",
-        "condition"
-      ],
+      "required": ["kind", "resource", "condition"],
       "type": "object"
     },
     "Resource": {
@@ -61,14 +57,7 @@
           "$ref": "#/$defs/Decimal"
         }
       },
-      "required": [
-        "kind",
-        "host",
-        "repository",
-        "repository_id",
-        "resource_id",
-        "number"
-      ],
+      "required": ["kind", "host", "repository", "repository_id", "resource_id", "number"],
       "type": "object"
     }
   },

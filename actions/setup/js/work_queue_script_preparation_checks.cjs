@@ -3,14 +3,13 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
 const { prepareAdapterContext } = require("./work_queue_prepare_claim_adapter.cjs");
 const { main } = require("./work_queue_prepare_claim_script.cjs");
 
 function registerTests({ describe, it }) {
   describe("credential-free Claim script preparation", () => {
     it("runs the compiler-produced script against exact isolated inputs and only exports declared data", async () => {
-      const root = path.resolve(".queue-validation-cache", `queue-script-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-script");
       const keys = ["RUNNER_TEMP", "GH_AW_CLAIM_INPUT", "GH_AW_CLAIM_OUTPUT", "GH_AW_CLAIM_SCRIPT_FILENAME"];
       const previous = keys.map(key => process.env[key]);
       const assignment = {

@@ -24,9 +24,7 @@
           ]
         }
       },
-      "required": [
-        "outcome"
-      ],
+      "required": ["outcome"],
       "type": "object"
     }
   },

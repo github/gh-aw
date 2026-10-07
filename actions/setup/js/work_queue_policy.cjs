@@ -16,6 +16,14 @@ const ROLE_KINDS = {
 const ACTOR_FIELDS = ["role", "principal", "repository"];
 const ACTOR_OPTIONAL = ["workflow", "run_id", "run_attempt", "dispatch_id", "claim_handle"];
 
+/** @typedef {{role: string, principal: string, repository: string, workflow?: string, run_id?: string, run_attempt?: number, dispatch_id?: string, claim_handle?: string}} QueueActor */
+
+/**
+ * @param {unknown} value
+ * @param {string} name
+ * @param {string} [code]
+ * @returns {string}
+ */
 function decimal(value, name, code = "ledger_invalid") {
   const match = typeof value === "string" && value.match(/^[1-9][0-9]*$/);
   if (!match || match[0] !== value || value.length > 256) throw queueError(code, `${name} must be a positive decimal identity string`);
@@ -23,10 +31,10 @@ function decimal(value, name, code = "ledger_invalid") {
 }
 
 function validateActor(actor) {
-  closed(actor, ACTOR_FIELDS, ACTOR_OPTIONAL, "actor");
+  closed(actor, ACTOR_FIELDS, ACTOR_OPTIONAL, "actor", "unsupported_protocol");
   if (!ROLES.has(actor.role)) throw queueError("actor_unauthorized", "unsupported operation role");
-  for (const field of ["principal", "repository", "workflow", "dispatch_id", "claim_handle"]) if (Object.hasOwn(actor, field)) identity(actor[field], field);
   decimal(actor.principal, "actor principal", "actor_unauthorized");
+  for (const field of ["repository", "workflow", "dispatch_id", "claim_handle"]) if (Object.hasOwn(actor, field)) identity(actor[field], field);
   if (!/^[^/\s]+\/[^/\s]+$/.test(actor.repository)) throw queueError("actor_unauthorized", "repository must be owner/name");
   if (Object.hasOwn(actor, "run_id")) decimal(actor.run_id, "actor run_id");
   if (Object.hasOwn(actor, "run_attempt")) integer(actor.run_attempt, 1, 4096, "originating run attempt");
@@ -46,15 +54,19 @@ function normalizeTrustedContext(context) {
   if (!context || context.authenticated !== true || !Array.isArray(context.roles) || !context.roles.includes(context.role)) {
     throw queueError("actor_unauthorized", "authenticated caller credentials and approved role are required");
   }
-  const actor = {};
+  const actor = { role: context.role, principal: context.principal, repository: context.repository };
   for (const field of [...ACTOR_FIELDS, ...ACTOR_OPTIONAL]) if (Object.hasOwn(context, field)) actor[field] = context[field];
   validateActor(actor);
   return { ...actor, ...(context.ref ? { ref: identity(context.ref, "ref") } : {}), ...(context.event ? { event: identity(context.event, "event") } : {}) };
 }
 
+/** @returns {QueueActor} */
 function actorFromContext(context) {
   const normalized = normalizeTrustedContext(context);
-  return Object.fromEntries([...ACTOR_FIELDS, ...ACTOR_OPTIONAL].filter(field => Object.hasOwn(normalized, field)).map(field => [field, normalized[field]]));
+  /** @type {QueueActor} */
+  const actor = { role: normalized.role, principal: normalized.principal, repository: normalized.repository };
+  for (const field of ACTOR_OPTIONAL) if (Object.hasOwn(normalized, field)) actor[field] = normalized[field];
+  return actor;
 }
 
 function validateTrustedContext(context, actor) {
@@ -64,8 +76,8 @@ function validateTrustedContext(context, actor) {
 
 function validateProfile(profile) {
   closed(profile, ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"], [], "worker profile");
-  for (const field of ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope"]) identity(profile[field], field);
   decimal(profile.principal, "worker principal", "policy_invalid");
+  for (const field of ["workflow", "ref", "trust_domain", "credential_scope", "effect_scope"]) identity(profile[field], field);
   if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(profile.ref) || !profile.workflow.startsWith(".github/workflows/") || !profile.workflow.endsWith(".lock.yml") || profile.workflow.includes(".."))
     throw queueError("policy_invalid", "profiles require immutable revisions and approved workflow paths");
   integer(profile.max_claims, 1, 16, "profile max_claims");
@@ -110,7 +122,6 @@ function validatePolicy(policy) {
     integer(pool.reconciliation.deadline_ms, 1, 3600000, "reconciliation deadline");
   }
   for (const [principal, rule] of Object.entries(policy.producers)) {
-    identity(principal, "producer");
     decimal(principal, "producer principal", "policy_invalid");
     closed(rule, ["pools", "priorities", "fairness_keys"], [], "producer rule");
     for (const name of ["pools", "priorities", "fairness_keys"]) if (!Array.isArray(rule[name]) || !rule[name].length || rule[name].length > 1024) throw queueError("policy_invalid", `invalid producer ${name}`);
@@ -163,7 +174,22 @@ function workerContinuationAuthority(state, actor) {
   const dispatch = state.dispatches.get(actor.dispatch_id);
   const member = dispatch?.claims.find(member => member.handle === actor.claim_handle);
   if (!member) throw queueError("claim_scope_invalid", "worker control intent is outside original assignment");
-  return claimAuthority(state, member.claim_id, actor, true);
+  const authority = bindingAuthority(state, member.claim_id, actor);
+  const { claim, work } = authority;
+  if (work.claim_id !== claim.claim_id || claim.state !== "completed" || work.state !== "completed" || work.barrier !== "pending")
+    throw queueError("claim_effects_unauthorized", "Claim-scoped queue continuation requires its original completed Work with pending delivery");
+  return authority;
+}
+
+function validateSubmissionEntitlement(state, node, actor) {
+  validateRequestRole(actor, "submit");
+  if (actor.role === "worker") {
+    const { work: parent } = workerContinuationAuthority(state, actor);
+    if (node.pool !== parent.pool || node.priority !== parent.priority || node.fairness_key !== parent.fairness_key) throw queueError("child_entitlement", "children preserve trusted parent priority and accounting scope");
+    return;
+  }
+  const rule = state.policy.producers[actor.principal];
+  if (!rule || !rule.pools.includes(node.pool) || !rule.priorities.includes(node.priority) || !rule.fairness_keys.includes(node.fairness_key)) throw queueError("admission_unauthorized", "producer lacks immutable submission entitlement");
 }
 
 function freshClocks(policy) {
@@ -210,6 +236,7 @@ module.exports = {
   validatePolicy,
   validateProfile,
   validateRequestRole,
+  validateSubmissionEntitlement,
   validateTrustedContext,
   workerContinuationAuthority,
 };

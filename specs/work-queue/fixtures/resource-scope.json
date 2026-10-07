@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "inherit-frozen-profile",
+      "target": { "repository": "owner/repo" },
+      "valid": true
+    },
+    {
+      "name": "foreign-profile-repository",
+      "target": { "repository": "other/repo" },
+      "valid": false
+    },
+    {
+      "name": "exact-number-narrowing",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "7" }] },
+      "target": { "repository": "owner/repo", "number": "7" },
+      "valid": true
+    },
+    {
+      "name": "same-repository-foreign-number",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "7" }] },
+      "target": { "repository": "owner/repo", "number": "8" },
+      "valid": false
+    },
+    {
+      "name": "missing-narrowing-field",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "7" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "target-cannot-replace-frozen-scope",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "7" }] },
+      "target": { "repository": "owner/repo", "number": "8", "resource_scope": "allow" },
+      "valid": false
+    },
+    {
+      "name": "scope-cannot-widen-profile",
+      "scope": { "version": 1, "resources": [{ "repository": "other/repo" }] },
+      "target": { "repository": "other/repo" },
+      "valid": false
+    },
+    {
+      "name": "explicit-empty-scope-denies",
+      "scope": { "version": 1, "resources": [] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "null-scope-is-not-absence",
+      "scope_schema_valid": false,
+      "scope": null,
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "unknown-version",
+      "scope_schema_valid": false,
+      "scope": { "version": 2, "resources": [{ "repository": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "missing-version",
+      "scope_schema_valid": false,
+      "scope": { "resources": [{ "repository": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "null-resources",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": null },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "unknown-scope-field",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo" }], "authority": "administrator" },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "unknown-selector-field",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "repo": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "duplicate-selectors",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo" }, { "repository": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "noncanonical-selector-id",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "007" }] },
+      "target": { "repository": "owner/repo", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "noncanonical-target-id",
+      "target": { "repository": "owner/repo", "number": "007" },
+      "valid": false
+    },
+    {
+      "name": "foreign-host",
+      "target": { "repository": "owner/repo", "host": "evil.example" },
+      "valid": false
+    },
+    {
+      "name": "target-control",
+      "target": { "repository": "owner/repo", "ref": "refs/heads/topic\n" },
+      "valid": false
+    },
+    {
+      "name": "exact-ref",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "ref": "refs/heads/topic" }] },
+      "target": { "repository": "owner/repo", "ref": "refs/heads/topic" },
+      "valid": true
+    },
+    {
+      "name": "ref-prefix-is-not-authority",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "ref": "refs/heads/topic" }] },
+      "target": { "repository": "owner/repo", "ref": "refs/heads/topic-other" },
+      "valid": false
+    },
+    {
+      "name": "exact-path",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "path": "src/a.go" }] },
+      "target": { "repository": "owner/repo", "path": "src/a.go" },
+      "valid": true
+    },
+    {
+      "name": "path-prefix-is-not-authority",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "path": "src/a.go" }] },
+      "target": { "repository": "owner/repo", "path": "src/a.go/other" },
+      "valid": false
+    },
+    {
+      "name": "path-traversal",
+      "target": { "repository": "owner/repo", "path": "src/../a.go" },
+      "valid": false
+    },
+    {
+      "name": "original-native-run",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "run_id": "202" }] },
+      "target": { "repository": "owner/repo", "run_id": "202" },
+      "valid": true
+    },
+    {
+      "name": "scope-cannot-borrow-sibling-run",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "run_id": "203" }] },
+      "target": { "repository": "owner/repo", "run_id": "203" },
+      "valid": false
+    },
+    {
+      "name": "missing-target",
+      "target": {},
+      "valid": false
+    },
+    {
+      "name": "full-immutable-subject",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": true
+    },
+    {
+      "name": "subject-foreign-number",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" },
+      "valid": false
+    },
+    {
+      "name": "subject-foreign-resource-id",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "subject-kind-spoof",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "pull_request", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "subject-missing-identity",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "repository": "owner/repo", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "repository-selector-does-not-remove-subject",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo" }] },
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" },
+      "valid": false
+    }
+  ]
+}

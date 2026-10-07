@@ -1,6 +1,18 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
-import { API_VERSION, immutableRef, nativeId, nativeAttempt, dispatchResponse, fetchNativeRunAttempt, postQueueDispatch, validateNativeRun, authenticatePublisher, authenticateIntentPublisher } from "./work_queue_native.cjs";
+import {
+  API_VERSION,
+  immutableRef,
+  nativeId,
+  nativeAttempt,
+  hasDispatchToken,
+  dispatchResponse,
+  fetchNativeRunAttempt,
+  postQueueDispatch,
+  validateNativeRun,
+  authenticatePublisher,
+  authenticateIntentPublisher,
+} from "./work_queue_native.cjs";
 import { requestForIntent } from "./work_queue_intents.cjs";
 
 const ref = "a".repeat(40);
@@ -21,6 +33,9 @@ const run = {
 };
 
 describe("authenticated native queue runs", () => {
+  const nativeClient = (actions, repository = run.repository) => ({
+    rest: { repos: { get: vi.fn().mockResolvedValue({ status: 200, data: repository }) }, actions },
+  });
   it("matches the 256-digit positive canonical ID boundary without numeric coercion", () => {
     const id = "9".repeat(256);
     expect(nativeId(id)).toBe(id);
@@ -32,13 +47,48 @@ describe("authenticated native queue runs", () => {
     const options = {
       context,
       workflowRef: `${expected.repository}/${expected.workflow}@${ref}`,
-      githubClient: { rest: { actions: { getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: { ...run, run_attempt: 2, created_at: "2026-10-05T00:00:00Z" } }) } } },
+      githubClient: nativeClient({ getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: { ...run, run_attempt: 2, created_at: "2026-10-05T00:00:00Z" } }) }),
     };
     expect(await authenticatePublisher({ ...options, role: "dispatcher" })).toMatchObject({ authenticated: true, role: "dispatcher", run_attempt: 2, run_id: run.id, principal: "11" });
     await expect(authenticatePublisher({ ...options, role: "worker" })).rejects.toThrow(/rerun/);
     await expect(authenticatePublisher({ ...options, role: "dispatcher", context: { ...context, runAttempt: 3 } })).rejects.toThrow(/rerun/);
     expect(nativeAttempt("4096")).toBe(4096);
     for (const value of ["4097", "1".repeat(256), 0, "01"]) expect(() => nativeAttempt(value)).toThrow();
+  });
+
+  it("uses the actual repository API identity for native proofs and publisher Actors regardless of context casing", async () => {
+    const canonicalRepository = { full_name: "Owner/Repo", id: 7 };
+    const githubClient = nativeClient({ getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: run }), getWorkflowRunAttempt: vi.fn().mockResolvedValue({ status: 200, data: run }) }, canonicalRepository);
+    const context = { repo: { owner: "OWNER", repo: "REPO" }, runId: run.id, runAttempt: 1, actorId: "11", sha: ref, eventName: "workflow_dispatch", payload: { repository: { id: 7 } } };
+    const authenticated = await authenticatePublisher({ role: "worker", context, workflowRef: `owner/repo/${expected.workflow}@${ref}`, githubClient });
+    expect(authenticated.repository).toBe(canonicalRepository.full_name);
+    expect(authenticated.native_run.repository).toEqual(canonicalRepository);
+    const proof = validateNativeRun(await fetchNativeRunAttempt(githubClient, "OWNER/REPO", run.id), expected);
+    expect(proof.repository).toBe(canonicalRepository.full_name);
+    expect(githubClient.rest.repos.get.mock.calls[0][0]).toMatchObject({ owner: "OWNER", repo: "REPO", headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, timeout: 15000 } });
+    expect(githubClient.rest.actions.getWorkflowRun.mock.calls[0][0]).toMatchObject({ owner: "Owner", repo: "Repo" });
+  });
+
+  it("requires a successful actual repository read and matching lossless run repository ID before granting authority", async () => {
+    const context = { repo: { owner: "owner", repo: "repo" }, runId: run.id, runAttempt: 1, actorId: "11", sha: ref, eventName: "workflow_dispatch" };
+    const options = { role: "worker", context, workflowRef: `${expected.repository}/${expected.workflow}@${ref}` };
+    const missing = { rest: { actions: { getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: run }) } } };
+    await expect(authenticatePublisher({ ...options, githubClient: missing })).rejects.toThrow(/repository_api_missing/);
+    expect(missing.rest.actions.getWorkflowRun).not.toHaveBeenCalled();
+    for (const identity of [
+      { full_name: "foreign/repo", id: 7 },
+      { full_name: "owner/repo", id: 8 },
+      { full_name: "owner/repo", id: Number.MAX_SAFE_INTEGER + 1 },
+    ]) {
+      const githubClient = nativeClient({ getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: run }) }, identity);
+      await expect(authenticatePublisher({ ...options, githubClient })).rejects.toThrow();
+    }
+    const githubClient = nativeClient({ getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: run }) });
+    for (const status of [undefined, 403, 404, 500]) {
+      githubClient.rest.repos.get.mockResolvedValue({ status, data: run.repository });
+      await expect(authenticatePublisher({ ...options, githubClient })).rejects.toThrow(/repository_identity_mismatch/);
+    }
+    expect(githubClient.rest.actions.getWorkflowRun).not.toHaveBeenCalled();
   });
 
   it("recovers a protected original intent origin through its exact native attempt without changing request identity", async () => {
@@ -50,7 +100,7 @@ describe("authenticated native queue runs", () => {
       context,
       workflowRef: `${expected.repository}/${expected.workflow}@${ref}`,
       intentOrigin: JSON.stringify(origin),
-      githubClient: { rest: { actions: { getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: { ...run, run_attempt: 2, created_at: "2026-10-05T00:00:00Z" } }), getWorkflowRunAttempt: getAttempt } } },
+      githubClient: nativeClient({ getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: { ...run, run_attempt: 2, created_at: "2026-10-05T00:00:00Z" } }), getWorkflowRunAttempt: getAttempt }),
     };
     const recovered = await authenticateIntentPublisher(options);
     expect(recovered).toMatchObject({ authenticated: true, run_attempt: 1, publisher_attempt: 2 });
@@ -83,7 +133,7 @@ describe("authenticated native queue runs", () => {
       context,
       workflowRef: `${expected.repository}/${expected.workflow}@${ref}`,
       intentOrigin: origin,
-      githubClient: { rest: { actions: { getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: { ...run, run_attempt: 2, created_at: "2026-10-05T00:00:00Z" } }) } } },
+      githubClient: nativeClient({ getWorkflowRun: vi.fn().mockResolvedValue({ status: 200, data: { ...run, run_attempt: 2, created_at: "2026-10-05T00:00:00Z" } }) }),
     };
     expect(await authenticateIntentPublisher(options)).toMatchObject({ authenticated: true, run_attempt: 2, publisher_attempt: 2 });
   });
@@ -124,13 +174,30 @@ describe("authenticated native queue runs", () => {
   });
 
   it("requires a complete dispatch identity token, not a sibling prefix or embedded substring", () => {
-    for (const title of ["queue d10", "queue notd1", "queue d1_suffix", "queue (d1)"]) {
+    for (const title of ["queue d10", "queue notd1", "queue _d1", "queue d1_suffix", "queue d1suffix"]) {
       expect(() => validateNativeRun({ ...run, display_title: title }, expected)).toThrow(/run_correlation_mismatch/);
     }
-    expect(validateNativeRun({ ...run, display_title: "gh-aw work-queue d1" }, expected).run_id).toBe(run.id);
+    for (const title of ["gh-aw work-queue d1", "queue (d1)", "diagnostic: d1, ready", "d1"]) expect(validateNativeRun({ ...run, display_title: title }, expected).run_id).toBe(run.id);
     const dispatchId = `d_${"a".repeat(64)}_1`;
-    expect(validateNativeRun({ ...run, display_title: `gh-aw work-queue ${dispatchId}` }, { ...expected, dispatch_id: dispatchId }).run_id).toBe(run.id);
-    expect(() => validateNativeRun({ ...run, display_title: `gh-aw work-queue ${dispatchId}0` }, { ...expected, dispatch_id: dispatchId })).toThrow(/run_correlation_mismatch/);
+    for (const title of [`gh-aw work-queue ${dispatchId}`, `custom worker (${dispatchId}) diagnostic suffix`, `prefix:[${dispatchId}]:suffix`]) {
+      expect(validateNativeRun({ ...run, display_title: title }, { ...expected, dispatch_id: dispatchId }).run_id).toBe(run.id);
+    }
+    for (const title of [`gh-aw work-queue ${dispatchId}0`, `${dispatchId}_foreign`, `prefix_${dispatchId}`]) {
+      expect(() => validateNativeRun({ ...run, display_title: title }, { ...expected, dispatch_id: dispatchId })).toThrow(/run_correlation_mismatch/);
+    }
+  });
+
+  it("escapes dispatch tokens literally and never treats regex characters or adjacent identifier characters as correlation", () => {
+    const dispatchId = "d.[x](y)+$^|\\token";
+    expect(hasDispatchToken(`diagnostic (${dispatchId}), ready`, dispatchId)).toBe(true);
+    for (const title of ["unrelated", "dQxyyyyytoken", `${dispatchId}suffix`, `prefix${dispatchId}`, `${dispatchId}_suffix`]) expect(hasDispatchToken(title, dispatchId)).toBe(false);
+    for (const [title, token] of [
+      [null, "d1"],
+      ["d1", null],
+      ["d1", ""],
+      ["D1", "d1"],
+    ])
+      expect(hasDispatchToken(title, token)).toBe(false);
   });
 
   it("requires the pinned modern response and exact URLs", () => {
@@ -151,7 +218,7 @@ describe("authenticated native queue runs", () => {
 
   it("reads exact attempt-one terminal evidence without authorizing a later rerun", async () => {
     const getAttempt = vi.fn().mockResolvedValue({ status: 200, data: { ...run, status: "completed", conclusion: "cancelled" } });
-    const proof = validateNativeRun(await fetchNativeRunAttempt({ rest: { actions: { getWorkflowRunAttempt: getAttempt } } }, expected.repository, run.id), expected);
+    const proof = validateNativeRun(await fetchNativeRunAttempt(nativeClient({ getWorkflowRunAttempt: getAttempt }), expected.repository, run.id), expected);
     expect(proof).toMatchObject({ run_attempt: 1, terminal: true });
     expect(getAttempt.mock.calls[0][0]).toMatchObject({ run_id: run.id, attempt_number: 1, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0 } });
     expect(() => validateNativeRun({ ...run, run_attempt: 2 }, expected)).toThrow(/rerun/);

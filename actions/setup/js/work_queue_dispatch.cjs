@@ -4,6 +4,7 @@
 const { canonical, closed, digest, integer } = require("./work_queue_codec.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
 const { gateKey } = require("./work_queue_graph.cjs");
+const { observationRefreshBudget } = require("./work_queue_limits.cjs");
 const { assignmentsForRequest, generateRequestOperations, validateWorkerContinuation } = require("./work_queue_replay.cjs");
 const store = require("./work_queue_store.cjs");
 const { normalizeAssignment, normalizeClaimScope, readClaimScopeContext } = require("./work_queue_claim_scope.cjs");
@@ -16,6 +17,7 @@ const { DEFAULT_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { resolveWorkQueueRuntime } = require("./aw_context.cjs");
 const { controlReceiptForRequest } = require("./work_queue_control_receipts.cjs");
+const { createDispatchCredentialValidator, isDispatchCredentialProof } = require("./work_queue_dispatch_credential.cjs");
 
 function assertQueueControlRole(options) {
   const runtime = resolveWorkQueueRuntime(options.context?.payload, { role: options.role, requireAssignment: options.requireAssignment });
@@ -65,11 +67,14 @@ function staleEdges(state, pool, at) {
 async function refreshDependencies(options, state, pool, trustedContext) {
   if (trustedContext.role === "worker") {
     if (validateWorkerContinuation(state, trustedContext).work.pool !== pool) throw new Error("work_queue_control_pool_not_authorized");
+    return [];
   } else if (!["dispatcher", "reconciler", "administrator"].includes(trustedContext.role)) {
     throw new Error("work_queue_observation_role_required");
   }
+  const budget = observationRefreshBudget(state);
+  if (budget === 0) return [];
   const at = options.now ?? Date.now();
-  const edges = staleEdges(state, pool, at).slice(0, 128);
+  const edges = staleEdges(state, pool, at).slice(0, budget);
   if (!edges.length) return [];
   const operations = [];
   const readable = [];
@@ -97,7 +102,7 @@ async function refreshDependencies(options, state, pool, trustedContext) {
 }
 
 async function resolveAdmissionResources(options, state, parameters, trustedContext) {
-  assertSafeReplacements(state, parameters);
+  assertRemediationBackend(state, parameters, options.remediationVerifier);
   const references = [];
   for (const node of parameters.nodes) {
     for (const edge of node.depends_on) {
@@ -132,11 +137,11 @@ async function resolveAdmissionResources(options, state, parameters, trustedCont
   return parameters;
 }
 
-function assertSafeReplacements(state, parameters) {
+function assertRemediationBackend(state, parameters, verifier) {
   for (const node of parameters.nodes) {
     if (!node.replacement_of) continue;
     const failed = state.works.get(node.replacement_of.work_id);
-    if (failed?.barrier === "failed" && failed.disposition !== "none") throw new Error("work_queue_trusted_remediation_required");
+    if (failed?.barrier === "failed" && failed.disposition !== "none" && typeof verifier !== "function") throw new Error("work_queue_trusted_remediation_required");
   }
 }
 
@@ -155,6 +160,10 @@ async function launchAssignment(options, supplied) {
   if (dispatch.released) return { state: "released", released: true, dispatched: false };
   if (dispatch.state !== "reserved") return { ...(await reconcileDispatch({ ...options, assignment })), dispatched: false };
   immutableRef(profile.ref);
+  if (typeof options.validateDispatchCredential !== "function") throw new Error("work_queue_dispatch_credential_validator_required");
+  const credential = await options.validateDispatchCredential({ assignment, profile });
+  if (credential?.principal !== profile.principal) throw new Error("work_queue_dispatch_credential_principal_mismatch");
+  if (!isDispatchCredentialProof(credential, options.dispatchClient || options.githubClient, profile)) throw new Error("work_queue_dispatch_credential_proof_invalid");
   const destinationMetadata = options.destination || {};
   closed(destinationMetadata, [], ["host", "api_host"], "work_queue_native_destination");
   const trustedContext = await authenticatePublisher({ ...options, role: "dispatcher" });
@@ -191,7 +200,7 @@ async function launchAssignment(options, supplied) {
     return { state: "launch_unresolved", released: false, dispatched: true };
   }
   try {
-    const expected = expectedWorkerRun(assignment, profile, options.context);
+    const expected = expectedWorkerRun(assignment, profile, options.context, sender.repository);
     const proof = validateNativeRun(await fetchNativeRun(options.dispatchClient || options.githubClient, sender.repository, returned.run_id), { ...expected, run_id: returned.run_id });
     const binding = bindingForRun(proof, expected);
     const evidence = lifecycleEvidence(assignment, profile, sender.repository, "reconciliation", "github_api", options.now ?? Date.now(), { run_id: proof.run_id, run_attempt: 1 });
@@ -209,7 +218,7 @@ async function launchAssignment(options, supplied) {
   }
 }
 
-async function intentContext(options, intent, { recoverAccepted = false } = {}) {
+async function intentContext(options, intent, { recoverAccepted = false, preview = false } = {}) {
   const runtime = assertQueueControlRole(options);
   const normalized = normalizeControlIntentScope(options, intent, runtime);
   if (!normalized) {
@@ -217,28 +226,26 @@ async function intentContext(options, intent, { recoverAccepted = false } = {}) 
   }
   const scope = options.assignment === undefined ? runtime.assignment || readClaimScopeContext()?.assignment : options.assignment;
   const latest = await loadQueue({ ...options, policyProposal: undefined, initializationContext: undefined });
-  const { assignment, dispatch, profile } = validateStoredAssignment(latest.projection, scope, { allowReleased: true });
+  const { assignment, dispatch, profile } = validateStoredAssignment(latest.projection, scope, { allowReleased: !preview });
   const trustedContext = await authenticateIntentPublisher({ ...options, role: "worker", dispatch_id: assignment.dispatch_id, claim_handle: normalized.claim_handle });
-  const expected = expectedWorkerRun(assignment, profile, options.context);
+  const expected = expectedWorkerRun(assignment, profile, options.context, trustedContext.repository);
   const proof = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
   if (!dispatch.run || canonical(dispatch.run) !== canonical(bindingForRun(proof, expected))) throw new Error("work_queue_binding_not_durable");
+  if (preview) return trustedContext;
   if (recoverAccepted && intent.intent_id !== undefined && latest.projection.requests.has(requestIdForIntent(trustedContext, intent.intent_id))) return trustedContext;
   validateWorkerContinuation(latest.projection, trustedContext);
   assertPolicyProposal(latest.projection, options);
   return trustedContext;
 }
 
-function inheritWorkerSubmission(state, trustedContext, parameters) {
-  if (trustedContext.role !== "worker") return parameters;
+/** @param {{graph_id: string}[]} [acceptedNodes] */
+function inheritedSubmissionParameters(parent, parameters, acceptedNodes = undefined) {
   closed(parameters, ["nodes"], [], "submit intent");
   if (!Array.isArray(parameters.nodes)) throw new Error("work_queue_graph_limit");
-  const dispatch = state.dispatches.get(trustedContext.dispatch_id);
-  const member = dispatch?.claims.find(claim => claim.handle === trustedContext.claim_handle);
-  const parent = member && state.works.get(member.work_id);
-  if (!parent) throw new Error("work_queue_control_claim_not_authorized");
   return {
-    nodes: parameters.nodes.map(node => ({
+    nodes: parameters.nodes.map((node, index) => ({
       ...node,
+      graph_id: node.graph_id === undefined ? (acceptedNodes?.[index]?.graph_id ?? parent.graph_id) : node.graph_id,
       pool: node.pool === undefined ? parent.pool : node.pool,
       priority: node.priority === undefined ? parent.priority : node.priority,
       fairness_key: node.fairness_key === undefined ? parent.fairness_key : node.fairness_key,
@@ -246,11 +253,25 @@ function inheritWorkerSubmission(state, trustedContext, parameters) {
   };
 }
 
+function inheritWorkerSubmission(state, trustedContext, parameters) {
+  if (actorFromContext(trustedContext).role !== "worker") return parameters;
+  return inheritedSubmissionParameters(validateWorkerContinuation(state, trustedContext).work, parameters);
+}
+
 function acceptedSubmissionParameters(state, trustedContext, parameters, prior) {
-  if (prior.request.kind !== "submit") throw new Error("work_queue_request_reused");
+  if (prior.request.kind !== "submit" || canonical(prior.actor) !== canonical(actorFromContext(trustedContext))) throw new Error("work_queue_request_reused");
   const policy = state.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Policy" && operation.epoch === prior.policy_epoch)?.policy;
   if (!policy) throw new Error("work_queue_policy_missing");
-  const normalized = normalizeSubmitParameters(inheritWorkerSubmission(state, trustedContext, parameters), policy, trustedContext.created_at, state);
+  let inherited = parameters;
+  if (trustedContext.role === "worker") {
+    // Reconstruct an accepted request's immutable metadata without granting fresh continuation authority.
+    const dispatch = state.dispatches.get(trustedContext.dispatch_id);
+    const member = dispatch?.claims.find(claim => claim.handle === trustedContext.claim_handle);
+    const parent = member && state.works.get(member.work_id);
+    if (!parent) throw new Error("work_queue_control_claim_not_authorized");
+    inherited = inheritedSubmissionParameters(parent, parameters, prior.request.parameters.nodes);
+  }
+  const normalized = normalizeSubmitParameters(inherited, policy, trustedContext.created_at, state);
   const restoreIdentity = (resource, accepted) => {
     if (!resource || !accepted) return resource;
     return {
@@ -285,16 +306,18 @@ async function dispatchQueueIntent(options) {
   const message = options.message;
   closed(message, ["type", "intent_id", "pool", "max_claims", "max_dispatches"], ["claim_handle"], "work_queue_dispatch_next");
   if (message.type !== "work_queue_dispatch_next") throw new Error("work_queue_dispatch_intent_invalid");
-  normalizeControlIntentScope(options, message, runtime);
+  const normalized = normalizeControlIntentScope(options, message, runtime);
   const configured = { ...options, githubClient: options.githubClient || options.queueClient };
   let latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
   if (!latest.projection.policy) throw new Error("policy_missing");
   const requested = { pool: message.pool, max_claims: message.max_claims, max_dispatches: message.max_dispatches };
   if (isStagedMode(options) || isStagedMode(options.config)) {
+    const trustedContext = await intentContext(configured, message, { preview: true });
+    if (trustedContext.role === "worker" && latest.projection.dispatches.get(trustedContext.dispatch_id)?.pool !== requested.pool) throw new Error("work_queue_control_pool_not_authorized");
     assertPolicyProposal(latest.projection, configured);
     approvedProfiles(latest.projection, options.config || {});
     normalizeDispatchParameters(requested, latest.projection.policy, options.remainingDispatches);
-    return { success: true, staged: true, status: "staged_preview", dispatches: 0 };
+    return { success: true, staged: true, status: "staged_preview", dispatches: 0, ...(normalized ? { claim_handle: normalized.claim_handle } : {}) };
   }
   const trustedContext = await intentContext(configured, message, { recoverAccepted: true });
   latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
@@ -356,15 +379,12 @@ async function processWorkQueueIntents(options) {
   const runtime = assertQueueControlRole(options);
   const { intents, errors } = readStagedIntentBatch(options.intentPath || process.env.GH_AW_WORK_QUEUE_INTENTS || DEFAULT_INTENT_PATH);
   let remaining = options.maxDispatches ?? 1;
+  /** @type {Array<{status: string, intent_id?: string, reason?: string, line?: number, claim_handle?: string, request_id?: string, commit_id?: string, success?: boolean, staged?: boolean, dispatches?: number, recovered?: boolean, launches?: object[], acknowledgement_only?: boolean, control?: object | null}>} */
   const receipts = errors.map(error => ({ ...error, status: "blocked" }));
   for (const intent of intents) {
     try {
       if (intent.kind === "finish") throw new Error("work_queue_control_intent_invalid");
-      normalizeControlIntentScope(options, intent, runtime);
-      if (isStagedMode(options) || isStagedMode(options.config)) {
-        receipts.push({ intent_id: intent.intent_id, status: "staged_preview" });
-        continue;
-      }
+      const normalized = normalizeControlIntentScope(options, intent, runtime);
       if (intent.kind === "dispatch_next") {
         const result = await dispatchQueueIntent({
           ...options,
@@ -374,6 +394,11 @@ async function processWorkQueueIntents(options) {
         remaining -= result.dispatches;
         receipts.push({ intent_id: intent.intent_id, ...result });
       } else {
+        if (isStagedMode(options) || isStagedMode(options.config)) {
+          await intentContext(options, intent, { preview: true });
+          receipts.push({ intent_id: intent.intent_id, status: "staged_preview", ...(normalized ? { claim_handle: normalized.claim_handle } : {}) });
+          continue;
+        }
         const trustedContext = await intentContext(options, intent, { recoverAccepted: true });
         const latest = await loadQueue({ ...options, policyProposal: undefined, initializationContext: undefined });
         if (!latest.projection.policy) throw new Error("policy_missing");
@@ -398,10 +423,10 @@ async function processWorkQueueIntents(options) {
           context: trustedContext,
           actor: actorFromContext(trustedContext),
           request,
+          remediationVerifier: options.remediationVerifier,
           generateOperations: (state, stable, actor, at, id) => {
             assertPolicyProposal(state, options);
             if (actor.role === "worker") validateWorkerContinuation(state, trustedContext);
-            assertSafeReplacements(state, stable.parameters);
             return generateRequestOperations(state, stable, actor, at, id);
           },
           core: options.core,
@@ -432,8 +457,12 @@ async function main(options = {}) {
   let result;
   try {
     assertQueueControlRole({ ...options, context });
-    const dispatchClient = options.dispatchClient || (await require("./handler_auth.cjs").createAuthenticatedGitHubClient(config));
-    result = await processWorkQueueIntents({ ...options, core: coreApi, githubClient, context, config, dispatchClient, maxDispatches: configuredDispatchBudget({ ...options, config }) });
+    const preview = isStagedMode(options) || isStagedMode(config);
+    const dispatchClient = options.dispatchClient || (preview ? githubClient : await require("./handler_auth.cjs").createAuthenticatedGitHubClient(config));
+    const validateDispatchCredential =
+      options.validateDispatchCredential ||
+      (preview || config.work_queue_dispatch_credential === undefined ? undefined : createDispatchCredentialValidator(dispatchClient, config.work_queue_dispatch_credential, config["github-token"]));
+    result = await processWorkQueueIntents({ ...options, core: coreApi, githubClient, context, config, dispatchClient, validateDispatchCredential, maxDispatches: configuredDispatchBudget({ ...options, config }) });
   } catch {
     result = { version: 3, receipts: [{ status: "blocked", reason: "staged_queue_intents_invalid" }], remaining_dispatches: 0 };
   }
@@ -450,7 +479,7 @@ module.exports = {
   staleEdges,
   refreshDependencies,
   resolveAdmissionResources,
-  assertSafeReplacements,
+  assertRemediationBackend,
   rejectionReceipt,
   launchAssignment,
   intentContext,

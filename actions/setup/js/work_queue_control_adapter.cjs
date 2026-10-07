@@ -7,6 +7,7 @@ const { readStagedIntentBatch } = require("./work_queue_intents.cjs");
 const { DEFAULT_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
 const { API_VERSION, nativeId } = require("./work_queue_native.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { createDispatchCredentialValidator } = require("./work_queue_dispatch_credential.cjs");
 
 function credentialBindings(raw) {
   const value = raw === undefined ? {} : parseStrictJSON(raw);
@@ -114,9 +115,28 @@ async function main(options = {}) {
   /** @type {Record<string, any>} */
   const configured = { ...options, githubClient: options.githubClient || options.github || global.github, context: options.context || global.context };
   const intents = readStagedIntentBatch(configured.intentPath || process.env.GH_AW_WORK_QUEUE_INTENTS || DEFAULT_INTENT_PATH).intents;
+  if (isStagedMode(configured) || isStagedMode(configured.config)) {
+    configured.validateDispatchCredential = async () => {
+      throw new Error("work_queue_preview_cannot_validate_launch_credential");
+    };
+  }
   if (intents.some(intent => ["submit", "dispatch_next"].includes(intent.kind)) && !isStagedMode(configured) && !isStagedMode(configured.config)) {
     const latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
     configured.dependencyResolver = createCompilerDependencyResolver({ ...configured, state: latest.projection });
+  }
+  if (intents.some(intent => intent.kind === "dispatch_next") && !isStagedMode(configured) && !isStagedMode(configured.config)) {
+    const token = configured.config?.["github-token"];
+    if (token !== undefined) {
+      if (typeof token !== "string" || !token || token.length > 16384 || /[\x00-\x1f\x7f]/.test(token)) throw new Error("work_queue_dispatch_credential_token_invalid");
+      const factory = configured.getOctokit || global.getOctokit;
+      if (typeof factory !== "function") throw new Error("work_queue_dispatch_credential_client_unavailable");
+      configured.dispatchClient = await factory(token);
+    } else configured.dispatchClient ||= configured.githubClient;
+    if (configured.config?.work_queue_dispatch_credential !== undefined) {
+      configured.validateDispatchCredential = createDispatchCredentialValidator(configured.dispatchClient, configured.config.work_queue_dispatch_credential, token);
+    } else if (configured.config?.work_queue_enabled === true || process.env.GH_AW_WORK_QUEUE_ROLE === "worker" || process.env.GH_AW_WORK_QUEUE_ROLE === "dispatcher") {
+      throw new Error("work_queue_dispatch_credential_binding_required");
+    }
   }
   return require("./work_queue_dispatch.cjs").main(configured);
 }

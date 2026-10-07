@@ -141,8 +141,11 @@ func (state Projection) validateGraph() error {
 
 func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, position Position) error {
 	pool, ok := state.Policy.Pools[node.Pool]
-	if !ok || !state.allowedProducer(commit.Actor, node) {
+	if !ok {
 		return queueError("admission_unauthorized", "principal has no pool/priority/account entitlement")
+	}
+	if err := state.validateSubmissionEntitlement(commit.Actor, node); err != nil {
+		return err
 	}
 	profile, ok := pool.Profiles[node.WorkerProfile]
 	if !ok || profile.TrustDomain != node.BatchTrustDomain ||
@@ -172,18 +175,6 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 			return queueError("node_conflict", "graph/node key already exists")
 		}
 	}
-	if commit.Actor.Role == "worker" {
-		claim, err := state.scopedClaim(commit.Actor, "", "")
-		if err != nil {
-			return err
-		}
-		parent := state.Works[claim.WorkID]
-		if claim.State != "completed" || parent.State != "completed" ||
-			node.Priority != parent.Priority || node.FairnessKey != parent.FairnessKey ||
-			node.Pool != parent.Pool {
-			return queueError("child_entitlement", "worker children require scoped Completion and inherited parent accounting scope")
-		}
-	}
 	if node.ReplacementOf != nil {
 		old := state.Works[node.ReplacementOf.WorkID]
 		if old == nil || old.Barrier != "failed" || old.GraphID != node.GraphID ||
@@ -194,10 +185,12 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 	state.Works[node.WorkID] = &WorkState{
 		WorkDefinition: node, State: "available", Position: position, Barrier: "none",
 	}
-	// Future opaque IDs can contain 256 maximally JSON-escaped codepoints.
+	// Valid identities forbid C0 controls; quotes/backslashes have the maximum
+	// canonical escaping cost per UTF-8 byte.
+	worstIdentity := strings.Repeat("\\", 256)
 	testAssignment := Assignment{
 		Version: Version, DispatchID: strings.Repeat("d", 70),
-		RequestID: strings.Repeat("\x01", 256), CommitID: strings.Repeat("\x01", 256), PolicyEpoch: commit.PolicyEpoch,
+		RequestID: worstIdentity, CommitID: worstIdentity, PolicyEpoch: commit.PolicyEpoch,
 		Pool: node.Pool, WorkerProfile: node.WorkerProfile,
 		Claims: []AssignmentClaim{{
 			Handle: "h16", ClaimID: strings.Repeat("c", 70), WorkID: node.WorkID,
@@ -208,7 +201,7 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 	for _, edge := range node.DependsOn {
 		if edge.Kind == "work" {
 			reference := ResultReference{
-				WorkID: edge.WorkID, ResultCommitID: strings.Repeat("\x01", 256),
+				WorkID: edge.WorkID, ResultCommitID: worstIdentity,
 				Descriptor: json.RawMessage(`{}`),
 			}
 			parent := state.Works[edge.WorkID]
@@ -223,7 +216,7 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 	encoded, _ := canonicalValue(testAssignment)
 	assignmentBytes := int64(len(encoded)) + unresolvedBytes
 	if assignmentBytes > state.Policy.Limits.AssignmentBytes {
-		return queueError("assignment_limit", "Work cannot fit a single-Claim assignment")
+		return queueError("assignment_limit", "Work and bounded declared Result inputs cannot fit a single-Claim assignment")
 	}
 	return nil
 }

@@ -21,12 +21,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "pool",
-        "max_claims",
-        "max_dispatches",
-        "max_bytes"
-      ],
+      "required": ["pool", "max_claims", "max_dispatches", "max_bytes"],
       "type": "object"
     },
     "Identity": {

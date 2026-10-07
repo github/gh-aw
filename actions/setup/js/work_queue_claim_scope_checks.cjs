@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
 const scope = require("./work_queue_claim_scope.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
 const { verifyClaimDelivery, validateDeliveryContract, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
@@ -30,6 +31,47 @@ function assignment(count = 1, contract = { version: 1, outputs: [], no_writes: 
 
 const authorized = async request => ({ authorized: true, claim_handle: request.claim_handle });
 
+function checkSharedIdentityFixtures() {
+  const fixture = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../specs/work-queue/fixtures/identity-validation.json"), "utf8"));
+  assert.equal(fixture.version, 3);
+  assert.equal(fixture.identity_max_utf8_bytes, 256);
+  assert.equal(fixture.decimal_max_digits, 256);
+  for (const location of ["assignment", "claim", "result"]) {
+    const fields = location === "assignment" ? ["dispatch_id", "request_id", "commit_id", "policy_epoch", "pool", "worker_profile"] : location === "claim" ? ["handle", "claim_id", "work_id"] : ["work_id", "result_commit_id"];
+    for (const field of fields) {
+      for (const entry of fixture.identity) {
+        const id = entry.text.repeat(entry.repeat);
+        const label = `${location}.${field}: ${entry.name}`;
+        assert.equal(Buffer.byteLength(id, "utf8"), entry.expected_utf8_bytes, label);
+        const value = assignment();
+        const reference = { work_id: "dependency", result_commit_id: "result", descriptor: {} };
+        value.claims[0].result_refs = [reference];
+        const target = location === "assignment" ? value : location === "claim" ? value.claims[0] : reference;
+        Object.assign(target, { [field]: id });
+        if (entry.valid) {
+          const normalized = scope.normalizeAssignment(value);
+          assert.deepEqual(normalized, value, label);
+          assert.equal(scope.normalizeClaimScope({ claim_handle: normalized.claims[0].handle }, normalized).claim_handle, normalized.claims[0].handle, label);
+        } else {
+          assert.throws(() => scope.normalizeAssignment(value), /invalid/, label);
+        }
+        if (location === "claim" && field === "handle" && !entry.valid) assert.throws(() => scope.normalizeClaimScope({ claim_handle: id }, assignment()), /invalid/, label);
+      }
+    }
+  }
+  for (const entry of fixture.decimal) {
+    const value = assignment();
+    value.claims[0].handle = "1".repeat(entry.digits);
+    if (entry.valid) assert.equal(scope.normalizeAssignment(value).claims[0].handle.length, entry.digits, entry.name);
+    else assert.throws(() => scope.normalizeAssignment(value), /invalid/, entry.name);
+  }
+  const opaque = { graph_id: "x".repeat(400), principal: "1".repeat(400), control: "\u0001" };
+  const value = assignment();
+  Object.assign(value.claims[0].work, opaque);
+  value.claims[0].result_refs = [{ work_id: "dependency", result_commit_id: "result", descriptor: opaque }];
+  assert.deepEqual(scope.normalizeAssignment(value), value);
+}
+
 /** @param {unknown} error @param {string} state @param {string} [code] */
 function isSuppressedClaimError(error, state, code) {
   return error instanceof Error && "suppressed" in error && error.suppressed === true && "state" in error && error.state === state && (code === undefined || ("code" in error && error.code === code));
@@ -37,6 +79,335 @@ function isSuppressedClaimError(error, state, code) {
 
 function registerTests({ describe, it }) {
   describe("universal immutable Claim-scoped safe outputs", () => {
+    it("matches shared identity fixtures without scanning opaque Work payload or Result descriptors", checkSharedIdentityFixtures);
+
+    it("preserves explicitly compiled observer manager outputs without treating missing snapshots as worker downgrade", async () => {
+      const root = temporaryDirectory("observer-manager");
+      const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT"];
+      const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+      const previousContext = global.context;
+      const previousCore = global.core;
+      const previousGithub = global.github;
+      let writes = 0;
+      try {
+        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+        process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
+        process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "missing-snapshot.json");
+        Reflect.set(global, "context", { repo: { owner: "owner", repo: "repo" }, runId: "15", payload: {} });
+        Reflect.set(global, "core", { info() {}, warning() {}, error() {}, debug() {}, setOutput() {} });
+        Reflect.set(global, "github", {
+          rest: {
+            actions: {
+              createWorkflowDispatch: async () => {
+                writes++;
+                return { data: {} };
+              },
+            },
+          },
+        });
+        const { processMessages } = require("./safe_output_handler_manager.cjs");
+        const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
+        const handlers = new Map([
+          [
+            "custom",
+            async () => {
+              const client = await createAuthenticatedGitHubClient({});
+              await client.rest.actions.createWorkflowDispatch({});
+              return { success: true };
+            },
+          ],
+        ]);
+        const messages = [{ type: "custom", title: "ordinary approved observer output" }];
+        assert.equal((await processMessages(handlers, messages)).success, true);
+        assert.equal(writes, 1);
+        for (const payload of [
+          { inputs: { work_queue_assignment: null } },
+          { inputs: { work_queue_assignment: JSON.stringify(assignment()) } },
+          { inputs: { aw_context: JSON.stringify({ work_queue_assignment: assignment() }) } },
+          { inputs: { work_queue_assignment: null }, client_payload: { work_queue_assignment: assignment() } },
+        ]) {
+          Reflect.set(global, "context", { payload });
+          await assert.rejects(processMessages(handlers, messages));
+          assert.equal(writes, 1);
+        }
+        Reflect.set(global, "context", { payload: {} });
+        for (const role of [undefined, "dispatcher", "worker", "invalid"]) {
+          if (role === undefined) delete process.env.GH_AW_WORK_QUEUE_ROLE;
+          else process.env.GH_AW_WORK_QUEUE_ROLE = role;
+          await assert.rejects(processMessages(handlers, messages), /snapshot is missing|invalid protected compiler role/);
+          assert.equal(writes, 1);
+        }
+        process.env.GH_AW_WORK_QUEUE_ENABLED = "false";
+        process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
+        await assert.rejects(processMessages(handlers, messages), /snapshot is missing/);
+        assert.equal(writes, 1);
+        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+        process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
+        for (const snapshot of ["{", Buffer.from([0xff]), JSON.stringify({ version: 3, sha: "head", transactionLog: "", captured_at: 1, origin: {}, worker: assignment(), role: "worker" })]) {
+          fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, snapshot);
+          await assert.rejects(processMessages(handlers, messages));
+          assert.equal(writes, 1);
+        }
+        fs.unlinkSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT);
+        fs.symlinkSync(path.join(root, "missing-target"), process.env.GH_AW_WORK_QUEUE_SNAPSHOT);
+        await assert.rejects(processMessages(handlers, messages), /bounded regular-file/);
+        assert.equal(writes, 1);
+      } finally {
+        for (const key of keys) {
+          if (previous[key] === undefined) delete process.env[key];
+          else process.env[key] = previous[key];
+        }
+        Reflect.set(global, "context", previousContext);
+        Reflect.set(global, "core", previousCore);
+        Reflect.set(global, "github", previousGithub);
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("accepts bounded lifecycle role metadata without allowing snapshots to promote observers or unassigned workers", async () => {
+      const fixture = require("./work_queue_lifecycle.test_helpers.cjs").queueFixture({ granted: false });
+      const transactionLog = require("./work_queue_replay.cjs").serializeTransactionLog(fixture.transactions);
+      const root = temporaryDirectory("scope-role");
+      const filename = path.join(root, "snapshot.json");
+      const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT"];
+      const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+      const write = (worker, role) => fs.writeFileSync(filename, JSON.stringify({ version: 3, sha: "head", transactionLog, captured_at: fixture.at, origin: fixture.dispatcher, worker, role }));
+      try {
+        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+        process.env.GH_AW_WORK_QUEUE_SNAPSHOT = filename;
+        process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
+        write(null, "observer");
+        assert.equal(scope.readClaimScopeContext(), null);
+        for (const message of [{ type: "noop" }, { type: "create_issue", title: "ordinary observer report" }]) assert.deepEqual(scope.normalizeRuntimeMessage(message), message);
+        for (const type of ["work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"]) assert.throws(() => scope.normalizeRuntimeMessage({ type }), /observers cannot emit queue-control/);
+        for (const role of [null, "", "unknown", {}, []]) {
+          write(null, role);
+          assert.throws(() => scope.readClaimScopeContext(), /protected compiler role/);
+        }
+        write(null, "observer");
+        for (const metadata of [
+          { role: "observer", extra: true },
+          { role: "observer", visible_work_ids: null },
+          { role: "observer", visible_work_ids: [""] },
+          { role: "observer", visible_work_ids: [1] },
+        ]) {
+          fs.writeFileSync(filename, JSON.stringify({ version: 3, sha: "head", transactionLog, captured_at: fixture.at, origin: fixture.dispatcher, worker: null, ...metadata }));
+          assert.throws(() => scope.readClaimScopeContext());
+        }
+        write(null, "observer");
+        let checked = false;
+        await scope.assertClaimAuthorized(
+          { type: "noop" },
+          {
+            authorize: async () => {
+              checked = true;
+              throw new Error("observer cannot borrow worker authority");
+            },
+          }
+        );
+        assert.equal(checked, false);
+        write(assignment(), "worker");
+        assert.throws(() => scope.readClaimScopeContext(), /protected compiler/);
+        process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
+        write(null, "worker");
+        assert.throws(() => scope.readClaimScopeContext(), /require their original assignment/);
+        write(assignment(), "worker");
+        const workerScope = scope.readClaimScopeContext();
+        assert.ok(workerScope?.assignment);
+        assert.equal(workerScope.assignment.claims[0].handle, "h1");
+        write({ ...assignment(), claims: [] }, "worker");
+        assert.throws(() => scope.readClaimScopeContext(), /immutable array/);
+        write({ ...assignment(), dispatch_id: "foreign-dispatch" }, "observer");
+        assert.throws(() => scope.readClaimScopeContext(), /protected compiler/);
+        write(null, "unknown");
+        assert.throws(() => scope.readClaimScopeContext(), /protected compiler/);
+        process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
+        fs.writeFileSync(filename, JSON.stringify({ version: 3, sha: "head", transactionLog: '"'.repeat(Math.floor(require("./work_queue_codec.cjs").MAX_PARSE_BYTES / 2) + 1), captured_at: 1, origin: {}, worker: null, role: "observer" }));
+        assert.throws(() => scope.readClaimScopeContext(), /ledger_invalid/);
+        fs.writeFileSync(filename, JSON.stringify({ version: 3, sha: "head", transactionLog: " ".repeat(require("./work_queue_codec.cjs").MAX_PARSE_BYTES + 1), captured_at: 1, origin: {}, worker: null, role: "observer" }));
+        assert.throws(() => scope.readClaimScopeContext(), /ledger exceeds its bounded input limit/);
+        fs.truncateSync(filename, 162 * 1024 * 1024 + 1);
+        assert.throws(() => scope.readClaimScopeContext(), /bounded regular-file/);
+      } finally {
+        for (const key of keys) {
+          if (previous[key] === undefined) delete process.env[key];
+          else process.env[key] = previous[key];
+        }
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("permits genuine absent-branch outputs only for a protected observer and rejects existing empty ledgers before handlers", async () => {
+      const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
+      const { serializeTransactionLog } = require("./work_queue_replay.cjs");
+      const fixture = queueFixture({ granted: false });
+      const root = temporaryDirectory("observer-branch-boundary");
+      const filename = path.join(root, "snapshot.json");
+      const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT"];
+      const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+      const previousContext = global.context;
+      const previousCore = global.core;
+      const previousGithub = global.github;
+      const snapshot = { version: 3, sha: null, transactionLog: "", captured_at: fixture.at, origin: fixture.dispatcher, worker: null, role: "observer" };
+      const write = value => fs.writeFileSync(filename, JSON.stringify(value));
+      let writes = 0;
+      try {
+        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+        process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
+        process.env.GH_AW_WORK_QUEUE_SNAPSHOT = filename;
+        Reflect.set(global, "context", { repo: { owner: "owner", repo: "repo" }, runId: "15", payload: {} });
+        Reflect.set(global, "core", { info() {}, warning() {}, error() {}, debug() {}, setOutput() {} });
+        Reflect.set(global, "github", {
+          rest: {
+            issues: {
+              create: async () => {
+                writes++;
+                return { data: { id: 100, number: 42, title: "ordinary observer report", html_url: "https://github.com/owner/repo/issues/42" } };
+              },
+            },
+          },
+        });
+        const handlers = await manager.loadHandlers({ noop: {}, create_issue: { footer: false, deduplicate_by_title: false } }, undefined, undefined);
+        assert.equal(handlers.size, 2);
+        const messages = [
+          { type: "noop", message: "Observer has no queue writes." },
+          { type: "create_issue", title: "ordinary observer report" },
+        ];
+        const processConfigured = async () => {
+          const result = await manager.processMessages(handlers, messages);
+          assert.equal(result.success, true);
+          assert.equal(result.results.length, 2);
+          assert.ok(
+            result.results.every(entry => entry.success === true),
+            JSON.stringify(result.results)
+          );
+        };
+        write(snapshot);
+        for (const message of messages) assert.deepEqual(scope.normalizeRuntimeMessage(message), message);
+        await processConfigured();
+        assert.equal(writes, 1);
+        write({ ...snapshot, sha: "existing", transactionLog: serializeTransactionLog(fixture.transactions) });
+        await processConfigured();
+        assert.equal(writes, 2);
+        write({ ...snapshot, sha: "existing", transactionLog: " \n\t " });
+        for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message), /ledger_invalid/);
+        await assert.rejects(manager.processMessages(handlers, messages), /ledger_invalid/);
+        assert.equal(writes, 2);
+        write({ ...snapshot, sha: "existing", transactionLog: "not a ledger" });
+        for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message), /ledger_invalid/);
+        await assert.rejects(manager.processMessages(handlers, messages), /ledger_invalid/);
+        assert.equal(writes, 2);
+        write({ ...snapshot, role: null });
+        for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message), /protected compiler role/);
+        await assert.rejects(manager.processMessages(handlers, messages), /protected compiler role/);
+        assert.equal(writes, 2);
+        write({ ...snapshot, role: undefined });
+        await processConfigured();
+        assert.equal(writes, 3);
+        const forbidden = await manager.processMessages(handlers, [{ type: "create_issue", title: "foreign report", repo: "foreign/repo" }]);
+        assert.equal(forbidden.results[0].success, false);
+        assert.match(forbidden.results[0].error, /allowed-repos/);
+        const disabledHandlers = await manager.loadHandlers({ noop: {} }, undefined, undefined);
+        assert.equal((await manager.processMessages(disabledHandlers, [{ type: "create_issue", title: "disabled report" }])).results[0].success, false);
+        assert.equal(writes, 3);
+        write({ ...snapshot, sha: "existing" });
+        for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message), /policy_missing/);
+        await assert.rejects(manager.processMessages(handlers, messages), /policy_missing/);
+        assert.equal(writes, 3);
+        write(snapshot);
+        delete process.env.GH_AW_WORK_QUEUE_ROLE;
+        for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message), /protected compiler role/);
+        await assert.rejects(manager.processMessages(handlers, messages), /protected compiler role/);
+        assert.equal(writes, 3);
+        for (const role of ["dispatcher", "worker"]) {
+          process.env.GH_AW_WORK_QUEUE_ROLE = role;
+          write({ ...snapshot, role });
+          for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message));
+          await assert.rejects(manager.processMessages(handlers, messages));
+          assert.equal(writes, 3);
+        }
+      } finally {
+        for (const key of keys) {
+          if (previous[key] === undefined) delete process.env[key];
+          else process.env[key] = previous[key];
+        }
+        Reflect.set(global, "context", previousContext);
+        Reflect.set(global, "core", previousCore);
+        Reflect.set(global, "github", previousGithub);
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("normalizes actual emitted observer and worker snapshots without promoting artifact metadata", async () => {
+      const { main: writeSnapshot } = require("./write_work_queue_snapshot.cjs");
+      const { queueFixture, REF, REPOSITORY, WORKFLOW, DISPATCHER } = require("./work_queue_lifecycle.test_helpers.cjs");
+      const root = temporaryDirectory("emitted-role-scope");
+      const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT"];
+      const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+      const previousContext = global.context;
+      try {
+        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+        for (const role of ["observer", "worker"]) {
+          const fixture = queueFixture({ granted: role === "worker", bound: role === "worker", count: 1 });
+          const context = role === "worker" ? fixture.workerContext : fixture.dispatcherContext;
+          const filename = path.join(root, `${role}.json`);
+          process.env.GH_AW_WORK_QUEUE_ROLE = role;
+          process.env.GH_AW_WORK_QUEUE_SNAPSHOT = filename;
+          Reflect.set(global, "context", context);
+          const snapshot = await writeSnapshot({
+            githubClient: fixture.githubClient,
+            context,
+            core: { info() {}, setOutput() {} },
+            role,
+            requireAssignment: role === "worker",
+            workflowRef: `${REPOSITORY}/${role === "worker" ? WORKFLOW : DISPATCHER}@${REF}`,
+            snapshotPath: filename,
+            readWorkQueueLog: fixture.readWorkQueueLog,
+            publishWorkQueueRequest: fixture.publishWorkQueueRequest,
+            now: fixture.at,
+          });
+          assert.equal(snapshot.role, role);
+          assert.equal(snapshot.origin.role, role === "worker" ? "worker" : "producer");
+          assert.equal(Object.hasOwn(snapshot.origin, "authenticated"), false);
+          assert.equal(Object.hasOwn(snapshot, "native_run"), false);
+          for (const message of [
+            { type: "noop", message: "Scoped snapshot read." },
+            { type: "create_issue", title: "Snapshot report" },
+          ]) {
+            if (role === "worker") {
+              assert.ok(fixture.assignment);
+              assert.deepEqual(scope.normalizeRuntimeMessage(message), { ...message, claim_handle: fixture.assignment.claims[0].handle });
+            } else {
+              assert.deepEqual(scope.normalizeRuntimeMessage(message), message);
+            }
+          }
+          if (role === "observer") {
+            assert.equal(scope.readClaimScopeContext(), null);
+            delete process.env.GH_AW_WORK_QUEUE_ROLE;
+            assert.throws(() => scope.normalizeRuntimeMessage({ type: "noop" }), /protected compiler role/);
+          } else {
+            const worker = scope.readClaimScopeContext();
+            assert.ok(worker?.assignment);
+            assert.equal(canonical(worker.assignment), canonical(fixture.assignment));
+            process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
+            assert.throws(() => scope.normalizeRuntimeMessage({ type: "noop" }));
+            process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
+            const forgedPath = path.join(root, "worker-missing-assignment.json");
+            fs.writeFileSync(forgedPath, JSON.stringify({ ...snapshot, worker: null }));
+            process.env.GH_AW_WORK_QUEUE_SNAPSHOT = forgedPath;
+            assert.throws(() => scope.normalizeRuntimeMessage({ type: "noop" }), /require their original assignment/);
+          }
+        }
+      } finally {
+        for (const key of keys) {
+          if (previous[key] === undefined) delete process.env[key];
+          else process.env[key] = previous[key];
+        }
+        Reflect.set(global, "context", previousContext);
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
     it("matches the shared canonical assignment fixture unchanged and freezes its original membership", () => {
       const fixture = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../specs/work-queue/fixtures/canonical-prefix.json"), "utf8"));
       const normalized = scope.normalizeAssignment(fixture.assignment);
@@ -44,6 +415,28 @@ function registerTests({ describe, it }) {
       assert.ok(Object.isFrozen(normalized.claims));
       assert.ok(Object.isFrozen(normalized.claims[0].work));
       assert.throws(() => scope.normalizeClaimScope({ type: "noop" }, normalized), /original multi-Claim/);
+    });
+
+    it("uses the canonical 256-byte UTF-8 identity ceiling for every assignment identifier and explicit handle", () => {
+      for (const location of ["assignment", "claim", "result"]) {
+        const fields = location === "assignment" ? ["dispatch_id", "request_id", "commit_id", "policy_epoch", "pool", "worker_profile"] : location === "claim" ? ["handle", "claim_id", "work_id"] : ["work_id", "result_commit_id"];
+        for (const field of fields) {
+          for (const id of ["x".repeat(256), "\u00e9".repeat(128), "\ud83d\ude80".repeat(64)]) {
+            assert.equal(Buffer.byteLength(id, "utf8"), 256);
+            const value = assignment();
+            const reference = { work_id: "dependency", result_commit_id: "result", descriptor: {} };
+            value.claims[0].result_refs = [reference];
+            const target = location === "assignment" ? value : location === "claim" ? value.claims[0] : reference;
+            Object.assign(target, { [field]: id });
+            const normalized = scope.normalizeAssignment(value);
+            assert.deepEqual(normalized, value);
+            assert.equal(scope.normalizeClaimScope({ claim_handle: normalized.claims[0].handle }, normalized).claim_handle, normalized.claims[0].handle);
+            if (location === "claim" && field === "handle") assert.throws(() => scope.normalizeClaimScope({ claim_handle: `${id}x` }, normalized), /invalid/);
+            Object.assign(target, { [field]: `${id}x` });
+            assert.throws(() => scope.normalizeAssignment(value), /invalid/);
+          }
+        }
+      }
     });
 
     it("does not reuse local handles, factory contexts or receipts across immutable dispatch identities", async () => {
@@ -68,7 +461,7 @@ function registerTests({ describe, it }) {
 
     it("pins manifest writers to the full original Claim and persists immutable attribution", async () => {
       const { createManifestLogger } = require("./safe_output_manifest.cjs");
-      const root = path.resolve(".queue-validation-cache", `claim-manifest-${require("crypto").randomUUID()}`);
+      const root = temporaryDirectory("claim-manifest");
       const first = assignment();
       const second = assignment();
       second.dispatch_id = "different-dispatch";
@@ -135,7 +528,10 @@ function registerTests({ describe, it }) {
       const inherited = Object.create({ worker_profile: "default" });
       Object.assign(inherited, assignment());
       delete inherited.worker_profile;
-      assert.throws(() => scope.normalizeAssignment(inherited), /JSON/);
+      assert.throws(
+        () => scope.normalizeAssignment(inherited),
+        error => error instanceof Error && "code" in error && error.code === "codec_invalid" && /JSON data/.test(error.message)
+      );
       for (const result of [null, {}, { work_id: "dep", result_commit_id: "r", descriptor: null }, { work_id: "dep", result_commit_id: "r", descriptor: {}, authorized: true }]) {
         const invalid = assignment();
         invalid.claims[0].result_refs = [result];
@@ -388,8 +784,16 @@ function registerTests({ describe, it }) {
     it("isolates real handler maps, temporary IDs and failed/deferred passes", async () => {
       const oldCore = global.core;
       const oldContext = global.context;
-      global.core = { info() {}, warning() {}, debug() {}, error() {}, setOutput() {}, setFailed() {} };
-      global.context = { repo: { owner: "owner", repo: "repo" }, payload: {} };
+      global.core = { ...oldCore, info() {}, warning() {}, debug() {}, error() {}, setOutput() {}, setFailed() {} };
+      global.context = {
+        ...oldContext,
+        repo: { owner: "owner", repo: "repo" },
+        payload: {},
+        /** @returns {{owner: string, repo: string, number: number}} */
+        get issue() {
+          throw new Error("Claim handler fixture has no trigger issue");
+        },
+      };
       try {
         /** @type {Map<string, (...args: any[]) => Promise<Record<string, unknown>>>} */
         const handlers = new Map();
@@ -478,4 +882,4 @@ function registerTests({ describe, it }) {
 }
 
 if (require.main === module) registerTests(require("node:test"));
-module.exports = { registerTests };
+module.exports = { registerTests, checkSharedIdentityFixtures };

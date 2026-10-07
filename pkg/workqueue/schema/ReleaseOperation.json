@@ -95,15 +95,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "source",
-        "repository",
-        "workflow",
-        "ref",
-        "principal",
-        "checked_at"
-      ],
+      "required": ["kind", "source", "repository", "workflow", "ref", "principal", "checked_at"],
       "type": "object"
     },
     "Identity": {
@@ -126,11 +118,7 @@
           "const": "Release"
         }
       },
-      "required": [
-        "kind",
-        "dispatch_id",
-        "evidence"
-      ],
+      "required": ["kind", "dispatch_id", "evidence"],
       "type": "object"
     },
     "Revision": {

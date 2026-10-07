@@ -2,7 +2,7 @@
 private: true
 emoji: "🧪"
 name: Smoke Work Queue
-description: End-to-end smoke test for work queue snapshot and finish tools
+description: Smoke test for queue snapshot tools and rejection of unassigned finish
 on:
   schedule: every 2 days
   workflow_dispatch:
@@ -19,15 +19,6 @@ sandbox:
 tools:
   work-queue: true
 safe-outputs:
-  steps:
-    - name: Verify queue finish intent artifact
-      run: |
-        if grep -Eq '"type"[[:space:]]*:[[:space:]]*"create_issue"' /tmp/gh-aw/safeoutputs.jsonl; then
-          echo 'Work queue smoke failure reported; processing the failure issue'
-        else
-          test -s /tmp/gh-aw/work-queue.finish.jsonl
-          grep -Fx '{"outcome":"completed"}' /tmp/gh-aw/work-queue.finish.jsonl
-        fi
   create-issue:
     max: 1
     title-prefix: "[smoke-work-queue] "
@@ -54,8 +45,10 @@ jobs:
             echo "::error::Work queue smoke test reported a tool failure"
             exit 1
           fi
-          test -s /tmp/gh-aw/work-queue.finish.jsonl
-          grep -Fx '{"outcome":"completed"}' /tmp/gh-aw/work-queue.finish.jsonl
+          if test -s /tmp/gh-aw/work-queue.finish.jsonl; then
+            echo "::error::An unassigned observer recorded a worker finish intent"
+            exit 1
+          fi
           grep -Eq '"type"[[:space:]]*:[[:space:]]*"noop"' /tmp/gh-aw/safeoutputs.jsonl
 timeout-minutes: 10
 strict: true
@@ -65,9 +58,11 @@ features:
 
 # Work Queue Smoke Test
 
-Exercise the queue MCP server mounted from the activation snapshot and the
-trusted safe-output finish-intent path. This workflow has no inbound worker claim,
-so it must not mutate the durable queue log.
+Exercise the queue MCP server mounted from the activation snapshot and rejection
+of unassigned finish attempts. This workflow is a read-only queue observer, not a
+dispatcher or worker; it must not mutate the durable queue log. Its ordinary
+failure-report and `noop` safe outputs use normal workflow authorization, not
+queue-control or worker Claim authority.
 
 Use the tool interface advertised in the runtime prompt. If `work-queue` is
 listed in `<mcp-clis>`, invoke `work-queue work_queue_read` and
@@ -78,16 +73,20 @@ are subcommands, not standalone executables.
    `work: "__gh_aw_smoke__-${{ github.run_id }}"`. Verify the returned work is
    `absent` and that the response includes `snapshot_sha` (which is `null` when
    the queue branch does not exist).
-2. Call `work_queue_claim_finish` with `outcome: "completed"`. Verify it reports
-   that the finish intent was recorded. Do not supply work or claim identifiers.
-   The safe-output check must find this finish intent in the downloaded agent
-   artifact before the `noop` handler runs.
-3. If both tool checks pass, call `noop` with a concise success summary.
-4. If either check fails, create one issue with the failed tool name and this
+2. Call `work_queue_explain` for the same absent Work and confirm that its
+   explanation is explicitly snapshot-based, not a durable grant.
+3. If `work_queue_claim_finish` is advertised, call it with
+   `outcome: "completed"` and verify that the missing assignment is rejected
+   without recording a finish intent. If observer tools omit this mutator,
+   verify that it is unavailable. Do not invent a Claim selector or write an
+   intent file manually.
+4. If the observer checks pass, call `noop` with a concise success summary.
+5. If a check fails, create one issue with the failed tool name and this
    run URL:
    `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`.
    Do not include snapshot contents, identifiers other than the run ID, or
    unredacted errors in the issue.
 
-The final verification job fails the run after processing any failure issue.
-Only a completed finish-intent artifact and a `noop` output count as success.
+The final verification job fails the run after processing any failure issue or
+recorded worker finish. A `noop` with no finish artifact counts as smoke success,
+not proof of native run binding, effect delivery, or full runtime conformance.

@@ -12,8 +12,8 @@ const MAX_INTENT_BYTES = 4 * 1024 * 1024;
 const MAX_INTENTS = 256;
 const INTENT_KINDS = ["submit", "dispatch_next", "finish"];
 
-function readStagedIntentBatch(filename) {
-  if (!fs.existsSync(filename)) return { intents: [], errors: [] };
+function readIntentLines(filename) {
+  if (!fs.existsSync(filename)) return [];
   const stat = fs.statSync(filename);
   if (!stat.isFile() || stat.size > MAX_INTENT_BYTES) throw new Error("work_queue_intent_limit");
   const bytes = fs.readFileSync(filename);
@@ -26,6 +26,11 @@ function readStagedIntentBatch(filename) {
   }
   const lines = text.split("\n");
   if (lines.filter(line => line.trim()).length > MAX_INTENTS) throw new Error("work_queue_intent_limit");
+  return lines;
+}
+
+function readStagedIntentBatch(filename) {
+  const lines = readIntentLines(filename);
   const ids = new Map();
   const invalid = new Set();
   const errors = [];
@@ -128,4 +133,4 @@ function normalizeSubmitParameters(parameters, policy, at, state) {
   };
 }
 
-module.exports = { MAX_INTENT_BYTES, MAX_INTENTS, readStagedIntentBatch, readStagedIntents, stageIntent, requestIdForIntent, requestForIntent, normalizeDispatchParameters, normalizeSubmitParameters };
+module.exports = { MAX_INTENT_BYTES, MAX_INTENTS, readIntentLines, readStagedIntentBatch, readStagedIntents, stageIntent, requestIdForIntent, requestForIntent, normalizeDispatchParameters, normalizeSubmitParameters };

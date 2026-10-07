@@ -25,15 +25,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "dispatch_id",
-        "claim_handle",
-        "run_id",
-        "run_attempt"
-      ],
+      "required": ["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "run_id", "run_attempt"],
       "type": "object"
     },
     "Decimal": {

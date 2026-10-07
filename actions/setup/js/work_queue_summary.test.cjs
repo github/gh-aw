@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
-import { randomUUID } from "crypto";
+import os from "node:os";
 import { main, renderSummary } from "./work_queue_summary.cjs";
 import { serializeTransactionLog } from "./work_queue_replay.cjs";
 import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
@@ -12,8 +12,7 @@ afterEach(() => {
   for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 function snapshotFile(fixture) {
-  const directory = path.join(process.cwd(), `.queue-summary-test-${randomUUID()}`);
-  fs.mkdirSync(directory);
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-summary-"));
   directories.push(directory);
   const filename = path.join(directory, "snapshot.json");
   fs.writeFileSync(filename, JSON.stringify({ version: 3, sha: "activation", worker: fixture.assignment, origin: fixture.dispatcher, captured_at: fixture.at, transactionLog: serializeTransactionLog(fixture.transactions) }));

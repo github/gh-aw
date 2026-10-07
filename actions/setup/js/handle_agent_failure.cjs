@@ -3768,7 +3768,7 @@ async function detectAndHandleFailureCascade(owner, repo, triggeringIssueNumber)
  */
 async function isInvalidatedPRMergeCheckout() {
   const prNumber = context.payload?.pull_request?.number;
-  if (process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF !== "true" || context.eventName !== "pull_request" || !Number.isSafeInteger(prNumber) || context.ref !== `refs/pull/${prNumber}/merge`) {
+  if (process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF !== "true" || context.eventName !== "pull_request" || typeof prNumber !== "number" || !Number.isSafeInteger(prNumber) || context.ref !== `refs/pull/${prNumber}/merge`) {
     core.debug("PR merge-ref invalidation check skipped: requires a pull_request merge ref and compiler-confirmed default checkout");
     return false;
   }

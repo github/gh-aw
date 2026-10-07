@@ -32,6 +32,9 @@ silently initialize policy over an existing invalid ledger.
 |---|---|
 | `replay`, `stats` | Inspect the causal projection, typed graph nodes, independent Claims and native reservations |
 | `explain --pool POOL [--work-id ID]` | Evaluate the native selector or inspect a dependency path without changing passes |
+| `explain --request-id ID` or `explain --claim-id ID` | Reconstruct an exact historical grant using the authoritative prefix |
+| `trace --request-id ID` or `trace --claim-id ID` | Read bounded causal events without exposing payloads or receipt contents; use `--offset` and `--limit` for pagination |
+| `compact` | Canonicalize and deduplicate complete commits without dropping history, resetting debt or moving FIFO positions |
 | `policy --file policy.json --epoch EPOCH` | Install an authorized prospective policy only when the queue is drained |
 | `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed entitlements |
 | `submit-graph` | Atomically admit a bounded normalized graph, including Issue/PR dependency nodes |
@@ -180,9 +183,11 @@ python3 specs/work-queue/generate_contract.py --check
 and fails on drift. A separate validation runs the genuine
 `@typespec/compiler@1.16.0` and `@typespec/json-schema@1.16.0` with
 `file-type=json` and `seal-object-schemas=true` into a disposable output
-directory. Successful official compilation/emission does not establish semantic
-equivalence with the checked-in subset-generated schemas; that comparison remains
-unverified. Do not overwrite the checked-in schemas with that separate output.
+directory. The fail-closed comparison below resolves references and compares
+validation constraints for the supported schema subset, including custom
+identity bounds. The current 41-schema set passes this comparison; this is not
+a general JSON Schema equivalence solver or a proof of runtime validation.
+Do not overwrite the checked-in schemas with the separate official output.
 
 For official validation, `TOOL_DIR` denotes a disposable directory containing
 those two exact pinned packages, and `OUT_DIR` denotes a separate output
@@ -195,6 +200,8 @@ cp specs/work-queue/transactions.tsp "$TOOL_DIR/transactions.tsp"
   --option @typespec/json-schema.file-type=json \
   --option @typespec/json-schema.seal-object-schemas=true \
   --output-dir "$OUT_DIR"
+python3 specs/work-queue/verify_official_contract.py \
+  --official-dir "$OUT_DIR/@typespec/json-schema"
 ```
 
 The [current wire profile](priority-and-fairness.md#current-wire-encoding)

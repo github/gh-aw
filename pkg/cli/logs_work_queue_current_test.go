@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workqueue"
@@ -17,14 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var currentWorkQueueTestDirectorySequence atomic.Uint64
-
 func currentWorkQueueTestDir(t *testing.T) string {
 	t.Helper()
-	path := fmt.Sprintf(".work-queue-report-test-%d-%d", os.Getpid(), currentWorkQueueTestDirectorySequence.Add(1))
-	require.NoError(t, os.Mkdir(path, 0o700))
-	t.Cleanup(func() { require.NoError(t, os.RemoveAll(path)) })
-	return path
+	return t.TempDir()
 }
 
 func currentWorkQueueFixture(t *testing.T) map[string]any {
@@ -279,6 +273,9 @@ func TestWorkQueueCurrentSnapshotRoles(t *testing.T) {
 		{"null-role", nil, false, false, "producer", false},
 		{"empty-role", "", false, false, "producer", false},
 		{"unknown-role", "private-token-value", false, false, "producer", false},
+		{"administrator-role", "administrator", false, false, "administrator", false},
+		{"producer-role", "producer", false, false, "producer", false},
+		{"reconciler-role", "reconciler", false, false, "reconciler", false},
 		{"numeric-role", 3, false, false, "producer", false},
 		{"object-role", map[string]any{}, false, false, "producer", false},
 	} {
@@ -321,6 +318,63 @@ func TestWorkQueueCurrentSnapshotRoles(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWorkQueueCurrentSnapshotVisibilityShape(t *testing.T) {
+	t.Parallel()
+	for _, role := range []string{"worker", "dispatcher", "observer", "absent-observer"} {
+		for _, scenario := range []struct {
+			name  string
+			value any
+			valid bool
+		}{
+			{"omitted", nil, true},
+			{"empty", []string{}, true},
+			{"strings", []string{"work-a", "work-b"}, true},
+			{"presentation-only", []string{"", "unknown-work", "unknown-work", "unicode-\u00e9"}, true},
+			{"null", nil, false},
+			{"null-entry", []any{nil}, false},
+			{"mixed-null-entry", []any{"work-a", nil}, false},
+			{"number-entry", []any{1}, false},
+			{"boolean-entry", []any{false}, false},
+			{"object-entry", []any{map[string]any{}}, false},
+			{"nested-array-entry", []any{[]string{"work-a"}}, false},
+			{"string", "private-token-value", false},
+			{"number", 1, false},
+			{"object", map[string]any{"private-token-value": true}, false},
+		} {
+			t.Run(role+"/"+scenario.name, func(t *testing.T) {
+				fixture := currentWorkQueueFixture(t)
+				fixture["role"] = role
+				if role != "worker" {
+					fixture["worker"] = nil
+					origin := fixture["origin"].(workqueue.Actor)
+					origin.Role, origin.DispatchID, origin.ClaimHandle = "dispatcher", "", ""
+					if role == "observer" || role == "absent-observer" {
+						fixture["role"], origin.Role = "observer", "producer"
+					}
+					fixture["origin"] = origin
+				}
+				if role == "absent-observer" {
+					fixture["sha"], fixture["transactionLog"] = nil, ""
+				}
+				if scenario.name != "omitted" {
+					fixture["visible_work_ids"] = scenario.value
+				}
+				data, err := json.Marshal(fixture)
+				require.NoError(t, err)
+				snapshot, err := parseWorkQueueSnapshot(data)
+				if !scenario.valid {
+					require.Error(t, err)
+					assert.NotContains(t, err.Error(), "private-token-value")
+					return
+				}
+				require.NoError(t, err)
+				assert.Equal(t, role == "worker", snapshot.Current.Assignment != nil)
+				assert.Equal(t, role != "absent-observer", snapshot.Current.PolicyInstalled)
+			})
+		}
 	}
 }
 
@@ -377,6 +431,89 @@ func TestWorkQueueCurrentObserverProvenanceAndFinish(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkQueueCurrentObserverNativeAttempts(t *testing.T) {
+	t.Parallel()
+	for _, absent := range []bool{false, true} {
+		for _, scenario := range []struct {
+			name     string
+			explicit bool
+			attempt  int
+			valid    bool
+		}{
+			{"original", true, 1, true},
+			{"rerun", true, 2, true},
+			{"maximum", true, 4096, true},
+			{"zero", true, 0, false},
+			{"over-bound", true, 4097, false},
+			{"implicit-observer", false, 1, false},
+		} {
+			t.Run(fmt.Sprintf("absent-%t/%s", absent, scenario.name), func(t *testing.T) {
+				fixture := currentWorkQueueFixture(t)
+				fixture["worker"] = nil
+				if scenario.explicit {
+					fixture["role"] = "observer"
+				} else {
+					delete(fixture, "role")
+				}
+				origin := fixture["origin"].(workqueue.Actor)
+				origin.Role, origin.DispatchID, origin.ClaimHandle = "producer", "", ""
+				origin.RunAttempt = scenario.attempt
+				fixture["origin"] = origin
+				if absent {
+					fixture["sha"], fixture["transactionLog"] = nil, ""
+				}
+				data, err := json.Marshal(fixture)
+				require.NoError(t, err)
+				snapshot, err := parseWorkQueueSnapshot(data)
+				if !scenario.valid {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
+				assert.Equal(t, "observer", snapshot.Current.Role)
+				assert.Equal(t, !absent, snapshot.Current.PolicyInstalled)
+				assert.Nil(t, snapshot.Current.Assignment)
+			})
+		}
+	}
+}
+
+func TestWorkQueueCurrentOriginExcludesRuntimeContext(t *testing.T) {
+	t.Parallel()
+	for _, role := range []string{"worker", "dispatcher", "observer"} {
+		for _, field := range []string{"authenticated", "native_run"} {
+			t.Run(role+"/"+field, func(t *testing.T) {
+				fixture := currentWorkQueueFixture(t)
+				fixture["role"] = role
+				origin := fixture["origin"].(workqueue.Actor)
+				if role != "worker" {
+					fixture["worker"] = nil
+					origin.DispatchID, origin.ClaimHandle = "", ""
+					origin.Role = "dispatcher"
+					if role == "observer" {
+						origin.Role = "producer"
+					}
+				}
+				data, err := json.Marshal(origin)
+				require.NoError(t, err)
+				var fields map[string]any
+				require.NoError(t, json.Unmarshal(data, &fields))
+				fields[field] = true
+				if field == "native_run" {
+					fields[field] = map[string]any{"credential": "private-token-value"}
+				}
+				fixture["origin"] = fields
+				data, err = json.Marshal(fixture)
+				require.NoError(t, err)
+				_, err = parseWorkQueueSnapshot(data)
+				require.Error(t, err)
+				assert.NotContains(t, err.Error(), "private-token-value")
+			})
+		}
+	}
+}
+
 func TestWorkQueueCurrentNativeIdentifierBoundaries(t *testing.T) {
 	t.Parallel()
 	for _, field := range []string{"principal", "run"} {

@@ -1,23 +1,26 @@
 // @ts-check
 "use strict";
 
-const { assertClaimAuthorized, currentClaimHandle, recordClaimEffect, claimIdentity, assertClaimIdentity } = require("./work_queue_claim_scope.cjs");
+const { assertClaimAuthorized, currentClaimHandle, recordClaimEffect, claimIdentity, assertClaimIdentity, currentClaimResourceEffects } = require("./work_queue_claim_scope.cjs");
 const { digest } = require("./work_queue_codec.cjs");
+const { canonicalResourceTarget, nativeDecimalIdentity, resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 
 const READ_METHODS = new Set(["get", "list", "getSarif", "getAnalysis", "getComment", "getCommit", "getRef", "getTree", "getBlob", "getArtifact", "getBranch", "getByUsername", "getWorkflowRun", "getWorkflowRunAttempt"]);
+/** @type {WeakMap<object, {identity: ReturnType<typeof claimIdentity>, options: Record<string, unknown>}>} */
+const claimClients = new WeakMap();
 const NODE_QUERY = `query WorkQueueEffectTargets($ids: [ID!]!) {
   nodes(ids: $ids) {
     __typename
     id
-    ... on Repository { nameWithOwner }
-    ... on Issue { number repository { nameWithOwner } }
-    ... on PullRequest { number repository { nameWithOwner } }
-    ... on Discussion { number repository { nameWithOwner } }
-    ... on DiscussionCategory { repository { nameWithOwner } }
-    ... on IssueComment { issue { number repository { nameWithOwner } } }
-    ... on PullRequestReview { pullRequest { number repository { nameWithOwner } } }
-    ... on PullRequestReviewComment { pullRequest { number repository { nameWithOwner } } }
-    ... on DiscussionComment { discussion { number repository { nameWithOwner } } }
+    ... on Repository { nameWithOwner databaseId }
+    ... on Issue { databaseId number repository { nameWithOwner databaseId } }
+    ... on PullRequest { databaseId number repository { nameWithOwner databaseId } }
+    ... on Discussion { number repository { nameWithOwner databaseId } }
+    ... on DiscussionCategory { repository { nameWithOwner databaseId } }
+    ... on IssueComment { databaseId issue { __typename databaseId number repository { nameWithOwner databaseId } } }
+    ... on PullRequestReview { pullRequest { __typename databaseId number repository { nameWithOwner databaseId } } }
+    ... on PullRequestReviewComment { databaseId pullRequest { __typename databaseId number repository { nameWithOwner databaseId } } }
+    ... on DiscussionComment { discussion { number repository { nameWithOwner databaseId } } }
   }
 }`;
 
@@ -55,6 +58,23 @@ async function resolveRestResource(client, route, parameters, namespace) {
   for (const field of ["comment_id", "review_id", "release_id", "tag_name", "ref", "path", "workflow_id", "check_run_id", "deployment_id"]) {
     if (Object.prototype.hasOwnProperty.call(parameters, field)) resource[field] = parameters[field];
   }
+  const concretePath = pathname.match(/\/contents\/([^?#]+)/)?.[1];
+  if (concretePath && !concretePath.includes("{")) {
+    const path = decodeURIComponent(concretePath);
+    if (resource.path !== undefined && resource.path !== path) throw new Error("Claim native file path conflicts with its request selector");
+    resource.path = path;
+  }
+  const concreteRef = pathname.match(/\/git\/refs\/([^?#]+)/)?.[1];
+  if (concreteRef && !concreteRef.includes("{")) {
+    const ref = decodeURIComponent(concreteRef);
+    if (resource.ref !== undefined && resource.ref.replace(/^refs\//, "") !== ref.replace(/^refs\//, "")) throw new Error("Claim native ref conflicts with its request selector");
+    resource.ref = ref;
+  }
+  if (resource.path !== undefined && parameters.branch !== undefined) {
+    const ref = `refs/heads/${parameters.branch}`;
+    if (resource.ref !== undefined && resource.ref !== ref) throw new Error("Claim native branch conflicts with its request selector");
+    resource.ref = ref;
+  }
   let number = concreteNumber || parameters.issue_number || parameters.pull_number || parameters.discussion_number;
   const commentRoute = pathname.match(/\/(issues|pulls)\/comments\/([1-9][0-9]*)(?:\/|$)/);
   const commentId = commentRoute?.[2] || parameters.comment_id;
@@ -75,10 +95,21 @@ async function resolveRestResource(client, route, parameters, namespace) {
   if (number !== undefined) {
     number = Number(number);
     if (!Number.isSafeInteger(number) || number < 1) throw new Error("Claim resource number is invalid");
+    const repository = repositoryFromRoute(route, parameters);
+    const [owner, repo] = repository.split("/");
+    const pulls = namespace === "pulls" || /\/pulls\//.test(pathname);
+    const getParent = pulls ? client.rest?.pulls?.get : client.rest?.issues?.get;
+    if (typeof getParent === "function") {
+      const { data } = await getParent({ owner, repo, [pulls ? "pull_number" : "issue_number"]: number });
+      if (!data || data.number !== number) throw new Error("Claim effect parent identity mismatch");
+      Object.assign(resource, await resolveParentResourceTarget(client, { repository, kind: pulls ? "pull_request" : "issue", number }, data));
+    }
   }
   const run = pathname.match(/\/actions\/runs\/([1-9][0-9]*)(?:\/|$)/)?.[1] || parameters.run_id;
   if (run !== undefined) resource.target_run_id = run;
-  return { number, resource };
+  if (typeof resource.ref === "string" && /^(?:heads|tags)\//.test(resource.ref)) resource.ref = `refs/${resource.ref}`;
+  const target = { ...resource, repository: repositoryFromRoute(route, parameters), ...(number === undefined ? {} : { number }) };
+  return { number, resource: resource.repository_id === undefined ? await resolveRepositoryTarget(client, target) : canonicalResourceTarget(target) };
 }
 
 // Resolve only arguments actually consumed by each root mutation. Unused variables
@@ -211,22 +242,46 @@ function collectNodeIds(value, ids, depth = 0) {
 /** @param {any} client @param {Record<string, any>} options */
 function wrapClaimEffectClient(client, options) {
   const factoryIdentity = claimIdentity(options.claim_handle);
+  const existing = claimClients.get(client);
+  if (existing && Object.keys(options).every(key => existing.options[key] === options[key])) {
+    assertClaimIdentity(existing.identity);
+    return client;
+  }
   const cache = new WeakMap();
   const checkContext = () => {
     if (currentClaimHandle() !== options.claim_handle) throw new Error("GitHub effect client cannot escape its trusted Claim context");
     assertClaimIdentity(factoryIdentity);
   };
+  const read = (target, receiver, args) => {
+    if (!options.signal) return Reflect.apply(target, receiver, args);
+    options.signal.throwIfAborted();
+    const index = typeof args[0] === "string" || typeof args[0] === "function" ? 1 : 0;
+    const scopedArgs = [...args];
+    if (typeof scopedArgs[index] === "function") scopedArgs.splice(index, 0, {});
+    const parameters = scopedArgs[index] || {};
+    scopedArgs[index] = { ...parameters, request: { ...parameters.request, signal: options.signal } };
+    const result = Reflect.apply(target, receiver, scopedArgs);
+    if (result && typeof result.then === "function")
+      return result.then(value => {
+        options.signal.throwIfAborted();
+        return value;
+      });
+    return result;
+  };
+  /** @param {string} repository @param {number | string | undefined} [number] @param {Record<string, unknown>} [resource] */
   const authorize = async (repository, number, resource = {}) => {
     checkContext();
     if (options.targetRepository && repository !== options.targetRepository) throw new Error("Claim adapter effect target conflicts with its fixed repository");
+    const messageResource = { ...resource };
+    delete messageResource.run_id;
     await assertClaimAuthorized(
-      { ...resource, type: "work_queue_resource_effect", claim_handle: options.claim_handle, repo: repository, ...(number ? { item_number: number } : {}) },
+      { ...messageResource, type: "work_queue_resource_effect", claim_handle: options.claim_handle, repo: repository, ...(number ? { item_number: number } : {}) },
       {
         authorize: options.authorize,
         github: options.authorizeGithub || client,
         context: options.context,
         effect: true,
-        resource: { ...resource, repository, ...(number ? { number } : {}) },
+        resource: canonicalResourceTarget({ ...resource, repository, ...(number ? { number } : {}) }),
       }
     );
   };
@@ -259,7 +314,7 @@ function wrapClaimEffectClient(client, options) {
         for (const [key, nested] of Object.entries(value)) {
           if (key === "repositoryNameWithOwner") {
             if (typeof nested !== "string") throw new Error("Claim GraphQL repository target is invalid");
-            await authorize(nested);
+            await authorize(nested, undefined, await resolveRepositoryTarget(client, { repository: nested }));
             repositories.add(nested);
             namedTargets++;
           } else if (nested && typeof nested === "object") await namedRepositories(nested, depth + 1);
@@ -279,7 +334,14 @@ function wrapClaimEffectClient(client, options) {
         const resource = node.issue || node.pullRequest || node.discussion || node;
         const repository = resource.repository?.nameWithOwner || (node.__typename === "Repository" ? node.nameWithOwner : null);
         if (!repository) throw new Error("Unsupported Claim GraphQL effect resource");
-        await authorize(repository, resource.number);
+        const target = {
+          ...(["Issue", "PullRequest"].includes(resource.__typename) ? { kind: resource.__typename === "Issue" ? "issue" : "pull_request" } : {}),
+          ...(resource.databaseId === undefined || node.__typename === "Repository" ? {} : { resource_id: nativeDecimalIdentity(resource.databaseId) }),
+          ...(node.__typename === "Repository" ? { repository_id: nativeDecimalIdentity(node.databaseId) } : resource.repository?.databaseId === undefined ? {} : { repository_id: nativeDecimalIdentity(resource.repository.databaseId) }),
+          ...(["IssueComment", "PullRequestReviewComment"].includes(node.__typename) && node.databaseId !== undefined ? { comment_id: nativeDecimalIdentity(node.databaseId) } : {}),
+          ...((process.env.GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "") === "https://api.github.com" ? { host: "github.com" } : {}),
+        };
+        await authorize(repository, resource.number, target);
         repositories.add(repository);
       }
     }
@@ -327,6 +389,7 @@ function wrapClaimEffectClient(client, options) {
           const method = typeof metadata === "string" ? metadata.match(/^([A-Z]+)\s/)?.[1] : metadata?.method;
           if (method !== "GET" || (args[1]?.method && String(args[1].method).toUpperCase() !== "GET")) throw new Error("Claim effect clients only paginate explicit read endpoints");
           assertApiOrigin(args[1]?.url || (typeof metadata === "string" ? metadata : metadata?.url), args[1] || {}, metadata || {});
+          return read(target, receiver, args);
         }
         if (names.includes("graphql")) {
           const query = typeof args[0] === "string" ? args[0] : args[0]?.query;
@@ -347,7 +410,7 @@ function wrapClaimEffectClient(client, options) {
               return response;
             });
           }
-          return Reflect.apply(target, receiver, args);
+          return read(target, receiver, args);
         }
         if (names[0] === "rest" || names[0] === "request") {
           const parameters = typeof args[0] === "string" ? args[1] || {} : args[0] || {};
@@ -384,17 +447,30 @@ function wrapClaimEffectClient(client, options) {
                                 ? "pull_request"
                                 : "unknown");
             return resolveRestResource(client, route, immutableParameters, names[1]).then(async ({ number, resource }) => {
-              await authorize(repository, number, resource);
-              if (names[1] === "git" && name === "createTree") {
-                if (!Array.isArray(immutableParameters.tree) || immutableParameters.tree.length > 4096) throw new Error("Claim git tree requires a bounded concrete path set");
+              const resources = currentClaimResourceEffects(names.join(".")) || currentClaimResourceEffects(`request:${method} ${String(route).replace(/^[A-Z]+\s+/, "")}`) || [resource];
+              const pathname = /^https?:\/\//i.test(String(route)) ? new URL(route).pathname : String(route).replace(/^[A-Z]+\s+/, "").split("?")[0];
+              const treeMutation = (names[1] === "git" && name === "createTree") || /\/git\/trees\/?$/.test(pathname);
+              for (const target of resources) {
+                if (resources.length !== 1 || target !== resource) {
+                  for (const [field, value] of Object.entries(resource)) {
+                    if (target[field] !== value) throw new Error("Native adapter operation conflicts with its independently resolved Claim target");
+                  }
+                }
+                if (!treeMutation || target !== resource) await authorize(repository, number, target);
+              }
+              if (treeMutation) {
+                if (!Array.isArray(immutableParameters.tree) || immutableParameters.tree.length < 1 || immutableParameters.tree.length > 4096) throw new Error("Claim git tree requires a bounded concrete path set");
                 for (const entry of immutableParameters.tree) {
                   if (!entry || typeof entry.path !== "string" || !entry.path) throw new Error("Claim git tree has an unresolved effect path");
-                  await authorize(repository, number, { ...resource, path: entry.path });
+                  const targets = resources.filter(target => !Object.hasOwn(target, "path") || target.path === entry.path);
+                  if (!targets.length) throw new Error("Claim git tree path is outside its protected adapter target set");
+                  for (const target of targets) await authorize(repository, number, { ...target, path: entry.path });
                 }
               }
               return mutate(target, receiver, immutableArgs, repository, number, kind);
             });
           }
+          return read(target, receiver, args);
         }
         return Reflect.apply(target, receiver, args);
       },
@@ -402,7 +478,9 @@ function wrapClaimEffectClient(client, options) {
     cache.set(value, proxy);
     return proxy;
   };
-  return wrap(client, []);
+  const wrapped = wrap(client, []);
+  claimClients.set(wrapped, { identity: factoryIdentity, options: { ...options } });
+  return wrapped;
 }
 
 async function withClaimEffectClients(options, callback) {

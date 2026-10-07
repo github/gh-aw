@@ -8,7 +8,7 @@
   "required": ["on"],
   "properties": {
     "work-queue-policy": {
-      "description": "Version-3 scheduling policy proposal. The installed ledger Policy remains authoritative; scheduling cannot be disabled.",
+      "description": "Version-3 scheduling policy proposal. Workers and dispatchers proposing Policy require explicit approved worker-profiles or pools with fixed numeric launch principals; a dispatcher actor ID does not identify an alternate dispatch credential. Credential-only read bindings are separate adapter configuration. The installed ledger Policy remains authoritative; scheduling cannot be disabled.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -102,7 +102,12 @@
           "properties": {
             "repositories": { "type": "array", "maxItems": 64, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
             "max-observation-age": { "type": "string", "pattern": "^[1-9][0-9]*(ms|s|m)$" },
-            "read-credentials": { "type": "object", "maxProperties": 64, "additionalProperties": { "type": "string", "pattern": "^\\$\\{\\{ secrets\\.[A-Za-z_][A-Za-z0-9_]* \\}\\}$" } }
+            "read-credentials": {
+              "description": "Separate read-only repository credentials, never part of a Policy proposal or snapshot. Credential-only configuration uses the installed Policy's allowed repositories.",
+              "type": "object",
+              "maxProperties": 64,
+              "additionalProperties": { "type": "string", "pattern": "^\\$\\{\\{ secrets\\.[A-Za-z_][A-Za-z0-9_]* \\}\\}$" }
+            }
           }
         },
         "limits": {
@@ -5170,11 +5175,11 @@
           "examples": [true, null]
         },
         "work-queue": {
-          "description": "Read the immutable version-3 activation snapshot and stage queue intents. The installed ledger Policy is authoritative. Only Git storage is supported.",
+          "description": "Read the immutable version-3 activation snapshot. Nonworkers without approved dispatch targets are read-only observers; workers and approved dispatchers may stage scoped queue intents. The installed ledger Policy is authoritative. Only Git storage is supported.",
           "oneOf": [
             {
               "const": true,
-              "description": "Enable the mandatory scheduled work queue."
+              "description": "Enable read-only queue observation, or queue-control intents when approved worker dispatch targets are configured."
             },
             {
               "type": "null",
@@ -12379,16 +12384,29 @@
                 "mode": { "enum": ["prepared", "script"] },
                 "effect-type": { "enum": ["create_issue", "update_issue", "close_issue", "add_comment", "add_labels", "remove_labels", "replace_label", "github_rest", "git_tree", "github_graphql"] },
                 "target-repo": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9._-]+$" },
+                "verifier-id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+                  "description": "Trusted native GitHub effect verifier identifier for immutable effect_contract references. Defaults to the normalized output name. Expected assertions must contain exactly every declared field-map/expected destination field; success alone is never delivery proof."
+                },
                 "field-map": {
                   "type": "object",
                   "maxProperties": 64,
-                  "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" },
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_][A-Za-z_0-9]*$",
+                    "not": { "enum": ["claim_handle", "claim_id", "work_id", "dispatch_id", "receipt_id", "__proto__", "constructor", "prototype"] }
+                  },
                   "additionalProperties": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" }
                 },
                 "expected": {
                   "type": "object",
                   "maxProperties": 64,
-                  "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" }
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_][A-Za-z_0-9]*$",
+                    "not": { "enum": ["claim_handle", "claim_id", "work_id", "dispatch_id", "receipt_id", "__proto__", "constructor", "prototype"] }
+                  }
                 },
                 "graphql": {
                   "type": "object",

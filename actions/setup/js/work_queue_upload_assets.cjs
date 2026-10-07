@@ -4,7 +4,20 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { assertClaimAuthorized, currentClaimHandle, claimArtifactPath, assertClaimArtifactFile, claimIdentity, assertClaimIdentity, receiptMatchesClaim } = require("./work_queue_claim_scope.cjs");
+const {
+  assertClaimAuthorized,
+  currentClaimHandle,
+  claimArtifactPath,
+  assertClaimArtifactFile,
+  claimIdentity,
+  assertClaimIdentity,
+  receiptMatchesClaim,
+  withClaimResourceEffects,
+  createClaimResourceVerification,
+  withClaimResourceVerification,
+} = require("./work_queue_claim_scope.cjs");
+const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
+const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
@@ -15,7 +28,7 @@ async function main(config = {}, suppliedClient) {
   const factoryClaim = currentClaimHandle();
   if (!factoryClaim) throw new Error("Queue asset adapter requires an immutable Claim factory");
   const factoryIdentity = claimIdentity(factoryClaim);
-  const client = suppliedClient || global.github;
+  const client = wrapClaimEffectClient(suppliedClient || global.github, { claim_handle: factoryClaim });
   const repository = config["target-repo"] || process.env.GITHUB_REPOSITORY || `${global.context.repo.owner}/${global.context.repo.repo}`;
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue asset requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
@@ -53,7 +66,7 @@ async function main(config = {}, suppliedClient) {
     const sha256 = crypto.createHash("sha256").update(content).digest("hex");
     if (message.sha !== undefined && message.sha !== sha256) throw new Error("Queue asset staged content differs from its declared digest");
     const assetPath = `claims/${namespace}/${sha256}${extension}`;
-    await assertClaimAuthorized({ ...message, repo: repository, ref: `heads/${branch}`, path: assetPath });
+    const authorityResource = await resolveRepositoryTarget(client, { repository, ref: `refs/heads/${branch}`, path: assetPath });
     let head = null;
     let baseTree;
     try {
@@ -67,14 +80,17 @@ async function main(config = {}, suppliedClient) {
       const commit = await client.rest.git.getCommit({ owner, repo, commit_sha: head });
       baseTree = commit.data.tree.sha;
     }
-    const blob = await client.rest.git.createBlob({ owner, repo, content: content.toString("base64"), encoding: "base64" });
-    const tree = await client.rest.git.createTree({ owner, repo, ...(baseTree ? { base_tree: baseTree } : {}), tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });
-    const commit = await client.rest.git.createCommit({ owner, repo, message: `Publish Claim ${factoryClaim} asset ${sha256}`, tree: tree.data.sha, parents: head ? [head] : [] });
-    if (head) await client.rest.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.data.sha, force: false });
-    else await client.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+    const { blob, tree, commit } = await withClaimResourceEffects([authorityResource], ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.updateRef", "rest.git.createRef"], async () => {
+      const blob = await client.rest.git.createBlob({ owner, repo, content: content.toString("base64"), encoding: "base64" });
+      const tree = await client.rest.git.createTree({ owner, repo, ...(baseTree ? { base_tree: baseTree } : {}), tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });
+      const commit = await client.rest.git.createCommit({ owner, repo, message: `Publish Claim ${factoryClaim} asset ${sha256}`, tree: tree.data.sha, parents: head ? [head] : [] });
+      if (head) await client.rest.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.data.sha, force: false });
+      else await client.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+      return { blob, tree, commit };
+    });
     const server = process.env.GITHUB_SERVER_URL || "https://github.com";
     const result = { success: true, repo: repository, branch, path: assetPath, sha: sha256, commit: commit.data.sha, url: `${server}/${repository}/blob/${branch}/${assetPath}?raw=true` };
-    receipts.set(result, { ...factoryIdentity, repository, branch, path: assetPath, sha256, blob: blob.data.sha, tree: tree.data.sha, commit: commit.data.sha, parent: head });
+    receipts.set(result, { ...factoryIdentity, repository, branch, path: assetPath, sha256, blob: blob.data.sha, tree: tree.data.sha, commit: commit.data.sha, parent: head, authorityResource });
     return result;
   };
 }
@@ -92,10 +108,11 @@ async function verifyAssetDelivery({ claim, result, github }) {
   if (tree.data.truncated || tree.data.sha !== receipt.tree || !tree.data.tree?.some(entry => entry.path === receipt.path && entry.type === "blob" && entry.mode === "100644" && entry.sha === receipt.blob)) return { verified: false };
   const blob = await github.rest.git.getBlob({ owner, repo, file_sha: receipt.blob });
   if (blob.data.sha !== receipt.blob || blob.data.encoding !== "base64" || crypto.createHash("sha256").update(Buffer.from(blob.data.content, "base64")).digest("hex") !== receipt.sha256) return { verified: false };
-  return {
+  const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
     resource: { kind: "asset", repository: receipt.repository, id: receipt.commit, ref: `heads/${receipt.branch}`, path: receipt.path, sha256: receipt.sha256, url: result.url },
+    authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
     effect_resources: [
       { kind: "git_blob", repository: receipt.repository, id: receipt.blob },
       { kind: "git_tree", repository: receipt.repository, id: receipt.tree },
@@ -103,7 +120,8 @@ async function verifyAssetDelivery({ claim, result, github }) {
       { kind: "git_ref", repository: receipt.repository, id: receipt.commit },
     ],
     evidence: { source: "github_git_api", commit: receipt.commit, tree: receipt.tree, blob: receipt.blob, sha256: receipt.sha256 },
-  };
+  });
+  return withClaimResourceVerification(proof, () => proof);
 }
 
 module.exports = { main, verifyAssetDelivery };

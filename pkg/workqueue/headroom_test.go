@@ -6,6 +6,39 @@ import (
 	"testing"
 )
 
+func TestRecoveryHeadroomReportsActualReservationWithoutMutation(t *testing.T) {
+	if RecoveryHeadroom(newProjection()) != 0 {
+		t.Fatal("an empty projection must not reserve closure bytes")
+	}
+	commits := testGenesis(t, nil)
+	work := testNode(t, commits, "headroom-diagnostic")
+	commits = testSubmit(t, commits, "submit-headroom-diagnostic", work)
+	state, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := canonicalValue(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reserve := RecoveryHeadroom(state); reserve != 55296 || reserve != remainingHeadroom(state) {
+		t.Fatalf("expected 55296 bytes for three future attempts and delivery, got %d", reserve)
+	}
+	after, err := canonicalValue(state)
+	if err != nil || string(before) != string(after) {
+		t.Fatal("headroom diagnostics mutated the replayed projection")
+	}
+	commits = testOperations(t, commits, testActor("administrator"), "cancel-headroom-diagnostic", "cancel_work",
+		Op(map[string]any{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "operator_cancelled"}))
+	closed, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if RecoveryHeadroom(closed) != 0 {
+		t.Fatal("closed Work retained an outstanding reservation")
+	}
+}
+
 func TestOperationalControlsCannotConsumeOutstandingRecoveryReserve(t *testing.T) {
 	commits := testGenesis(t, func(policy *Policy) {
 		policy.Limits.LedgerBytes = 6000

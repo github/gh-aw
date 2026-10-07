@@ -5,7 +5,20 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const zlib = require("zlib");
-const { currentClaimHandle, assertClaimAuthorized, claimArtifactPath, assertClaimArtifactFile, claimIdentity, assertClaimIdentity, receiptMatchesClaim } = require("./work_queue_claim_scope.cjs");
+const {
+  currentClaimHandle,
+  assertClaimAuthorized,
+  claimArtifactPath,
+  assertClaimArtifactFile,
+  claimIdentity,
+  assertClaimIdentity,
+  receiptMatchesClaim,
+  withClaimResourceEffects,
+  createClaimResourceVerification,
+  withClaimResourceVerification,
+} = require("./work_queue_claim_scope.cjs");
+const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
+const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const privateReceipts = new WeakMap();
 
@@ -14,7 +27,7 @@ async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
   if (!handle) throw new Error("Queue coverage requires a Claim factory");
   const factoryIdentity = claimIdentity(handle);
-  const github = suppliedClient || global.github;
+  const github = wrapClaimEffectClient(suppliedClient || global.github, { claim_handle: handle });
   const repository = process.env.GITHUB_REPOSITORY;
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue coverage requires its trusted native repository");
   const [owner, repo] = repository.split("/");
@@ -29,7 +42,7 @@ async function main(config = {}, suppliedClient) {
     if (currentClaimHandle() !== handle) throw new Error("Queue coverage cannot escape its original Claim");
     assertClaimIdentity(factoryIdentity);
     if (Object.hasOwn(message, "repo") && message.repo !== repository) throw new Error("Queue coverage explicit repository conflicts with its trusted adapter");
-    message = await assertClaimAuthorized({ ...message, repo: repository }, { requireCompletion: !stagedMode, resource: { repository, ref, path: message.file } });
+    message = await assertClaimAuthorized({ ...message, repo: repository }, { requireCompletion: !stagedMode });
     if (stagedMode) return { success: true, staged: true, claim_handle: handle };
     if (!Number.isSafeInteger(limit) || limit < 1 || ++count > limit) throw new Error("Queue coverage exceeds its trusted per-Claim maximum");
     if (
@@ -61,18 +74,21 @@ async function main(config = {}, suppliedClient) {
     }
     const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
     const label = `${message.label}/claim/${path.basename(claimArtifactPath("", handle))}`;
-    const { data } = await github.request("PUT /repos/{owner}/{repo}/code-coverage/report", {
-      owner,
-      repo,
-      commit_oid: revision,
-      ref,
-      language_name: message.language,
-      label,
-      coverage_report: zlib.gzipSync(bytes).toString("base64"),
-    });
+    const authorityResource = await resolveRepositoryTarget(github, { repository, ref, path: message.file });
+    const { data } = await withClaimResourceEffects([authorityResource], ["request:PUT /repos/{owner}/{repo}/code-coverage/report"], () =>
+      github.request("PUT /repos/{owner}/{repo}/code-coverage/report", {
+        owner,
+        repo,
+        commit_oid: revision,
+        ref,
+        language_name: message.language,
+        label,
+        coverage_report: zlib.gzipSync(bytes).toString("base64"),
+      })
+    );
     if (typeof data.id !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(data.id)) throw new Error("Queue coverage has no exact service upload receipt");
     const result = { success: true, report_id: data.id, repo: repository, ref, commit_sha: revision, sha256 };
-    privateReceipts.set(result, { ...factoryIdentity, repository, ref, revision, language: message.language, label, sha256, report_id: data.id, timeout: config["wait-for-processing-timeout"] ?? 160 });
+    privateReceipts.set(result, { ...factoryIdentity, repository, ref, revision, path: message.file, language: message.language, label, sha256, report_id: data.id, timeout: config["wait-for-processing-timeout"] ?? 160, authorityResource });
     return result;
   };
 }
@@ -90,12 +106,14 @@ async function verifyCodeCoverageDelivery({ claim, result, github }) {
     await new Promise(resolve => setTimeout(resolve, Math.min(2000, deadline - Date.now())));
   } while (Date.now() <= deadline);
   if (status.processing_status !== "succeeded" || status.errors?.length) return { verified: false };
-  return {
+  const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
     resource: { kind: "code_coverage", repository: receipt.repository, id: receipt.report_id, ref: receipt.ref, commit_sha: receipt.revision, label: receipt.label, sha256: receipt.sha256 },
+    authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
     evidence: { source: "github_code_coverage_api", report_id: receipt.report_id, processing_status: "succeeded", request_sha256: receipt.sha256, language: receipt.language },
-  };
+  });
+  return withClaimResourceVerification(proof, () => proof);
 }
 
 module.exports = { main, verifyCodeCoverageDelivery };

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -155,7 +156,8 @@ func TestWorkQueueDeclaredGraphQLAdapterRequiresCompleteNativeVerifier(t *testin
 		"jobs": map[string]any{"discussion": map[string]any{"steps": []any{map[string]any{"run": "node prepare-discussion.cjs"}}}},
 		"claim-adapters": map[string]any{"discussion": map[string]any{
 			"mode": "prepared", "effect-type": "github_graphql", "target-repo": "owner/repo",
-			"field-map": map[string]any{"title": "title", "body": "body", "categoryId": "category"},
+			"verifier-id": "DiscussionCreated.v1",
+			"field-map":   map[string]any{"title": "title", "body": "body", "categoryId": "category"},
 			"graphql": map[string]any{
 				"mutation": "createDiscussion", "input-type": "CreateDiscussionInput", "response-field": "discussion",
 				"resource-type": "Discussion", "resource-kind": "discussion", "repository-input": "repositoryId",
@@ -168,6 +170,12 @@ func TestWorkQueueDeclaredGraphQLAdapterRequiresCompleteNativeVerifier(t *testin
 	require.NoError(t, validateWorkQueueConfiguration(data))
 	adapter := config.ClaimAdapters["discussion"]
 	require.Equal(t, "createDiscussion", adapter.GraphQL.Mutation)
+	require.Equal(t, "DiscussionCreated.v1", adapter.VerifierID)
+	runtime := make(map[string]any)
+	addWorkQueueClaimAdapterRuntimeConfig(runtime, data)
+	encoded, err := json.Marshal(runtime)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"verifier-id":"DiscussionCreated.v1"`)
 	permissions := computePermissionsForSafeOutputs(&SafeOutputsConfig{ClaimAdapters: config.ClaimAdapters}, false)
 	level, _ := permissions.Get(PermissionDiscussions)
 	require.Equal(t, PermissionWrite, level)

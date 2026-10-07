@@ -7,13 +7,14 @@ import (
 	"syscall"
 )
 
-func processRSSPeak() int64 {
+func processRSSPeak() (*int64, error) {
 	var usage syscall.Rusage
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
-		return 0
+		return nil, err
 	}
-	if runtime.GOOS == "darwin" {
-		return usage.Maxrss
+	peak := usage.Maxrss
+	if runtime.GOOS != "darwin" {
+		peak *= 1024
 	}
-	return usage.Maxrss * 1024
+	return &peak, nil
 }

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,19 +42,28 @@ func TestWorkQueueClaimAdapterSchema(t *testing.T) {
 	}
 	valid := map[string]any{"mode": "prepared", "effect-type": "update_issue", "target-repo": "owner/repo", "field-map": map[string]any{"body": "content"}}
 	require.NoError(t, validate(valid))
-	for _, mutation := range []map[string]any{
-		{"mode": "job-success"}, {"effect-type": "unverified"}, {"target-repo": "${{ inputs.repo }}"},
-		{"field-map": map[string]any{"claim_handle": "content"}}, {"field-map": map[string]any{"body": "a.b"}},
-		{"expected": map[string]any{"claim_handle": "foreign"}}, {"authorized": true},
+	for _, test := range []struct {
+		name     string
+		mutation map[string]any
+	}{
+		{"unverified-mode", map[string]any{"mode": "job-success"}},
+		{"unverified-effect", map[string]any{"effect-type": "unverified"}},
+		{"dynamic-repository", map[string]any{"target-repo": "${{ inputs.repo }}"}},
+		{"mapped-claim-selector", map[string]any{"field-map": map[string]any{"claim_handle": "content"}}},
+		{"nested-source-field", map[string]any{"field-map": map[string]any{"body": "a.b"}}},
+		{"fixed-claim-selector", map[string]any{"expected": map[string]any{"claim_handle": "foreign"}}},
+		{"agent-authorization", map[string]any{"authorized": true}},
 	} {
-		candidate := make(map[string]any, len(valid)+1)
-		for key, value := range valid {
-			candidate[key] = value
-		}
-		for key, value := range mutation {
-			candidate[key] = value
-		}
-		require.Error(t, validate(candidate))
+		t.Run(test.name, func(t *testing.T) {
+			candidate := make(map[string]any, len(valid)+1)
+			for key, value := range valid {
+				candidate[key] = value
+			}
+			for key, value := range test.mutation {
+				candidate[key] = value
+			}
+			require.Error(t, validate(candidate))
+		})
 	}
 	rest := map[string]any{
 		"mode": "prepared", "effect-type": "github_rest", "target-repo": "owner/repo",
@@ -62,6 +72,30 @@ func TestWorkQueueClaimAdapterSchema(t *testing.T) {
 		"verifier":  map[string]any{"route": "/repos/{owner}/{repo}/check-runs/{receipt_id}", "resource-kind": "check_run", "fields": map[string]any{"name": "name"}},
 	}
 	require.NoError(t, validate(rest))
+	for _, field := range []string{"field-map", "expected"} {
+		for _, reserved := range []string{"claim_handle", "claim_id", "work_id", "dispatch_id", "receipt_id", "__proto__", "constructor", "prototype"} {
+			t.Run("native-"+field+"-"+reserved, func(t *testing.T) {
+				candidate := make(map[string]any, len(rest))
+				for key, value := range rest {
+					candidate[key] = value
+				}
+				candidate[field] = map[string]any{reserved: "content"}
+				require.Error(t, validate(candidate))
+			})
+		}
+	}
+	for _, id := range []string{"CheckCreated.v1", "v", strings.Repeat("a", 128)} {
+		rest["verifier-id"] = id
+		require.NoError(t, validate(rest))
+	}
+	for _, id := range []any{"", "_invalid", "read user", "${{ inputs.verifier }}", strings.Repeat("a", 129), nil, 1} {
+		rest["verifier-id"] = id
+		require.Error(t, validate(rest))
+	}
+	delete(rest, "verifier-id")
+	valid["verifier-id"] = "IssueUpdated.v1"
+	require.NoError(t, validate(valid))
+	delete(valid, "verifier-id")
 	for _, field := range []string{"request", "verifier"} {
 		candidate := make(map[string]any)
 		for key, value := range rest {

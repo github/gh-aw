@@ -68,12 +68,29 @@ func validateRequestOrigin(actor Actor, request Request) error {
 	if err := validateActorOrigin(actor); err != nil {
 		return err
 	}
+	if request.Kind == "dispatch_next" {
+		var params DispatchParameters
+		if err := json.Unmarshal(request.Parameters, &params); err != nil {
+			return queueError("request_invalid", "dispatch_next requires closed numeric budgets")
+		}
+		if err := validateDispatchParameters(params); err != nil {
+			return err
+		}
+	}
 	fingerprint, err := Fingerprint(actor, request.Kind, request.Parameters)
 	if err != nil {
 		return err
 	}
 	if fingerprint != request.Fingerprint {
 		return queueError("request_fingerprint", "request origin does not bind actor and immutable intent")
+	}
+	return nil
+}
+
+func validateDispatchParameters(params DispatchParameters) error {
+	if params.MaxClaims < 1 || params.MaxClaims > 256 || params.MaxDispatches < 1 ||
+		params.MaxDispatches > 256 || params.MaxBytes < 1 || params.MaxBytes > 48<<10 {
+		return queueError("request_invalid", "dispatch budgets require claims/dispatches 1..256 and bytes 1..49152")
 	}
 	return nil
 }

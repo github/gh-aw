@@ -57,14 +57,14 @@ function sourceHashes() {
 
 function registerTests({ describe, it }) {
   describe("integrated original-worker child capability", () => {
-    it("case192 publishes worker22 child through activation, staged intents, real CAS store and verified Result with only producer11 registered", async () => {
+    it("case192 publishes worker22 children before Result, rejects fresh controls after Result, and recovers accepted requests with only producer11 registered", async () => {
       const hashes = sourceHashes();
       console.log(`case192_source_sha256=${JSON.stringify(hashes)}`);
       const fixture = queueFixture({
         started: true,
         count: 1,
         workerPrincipal: "22",
-        workDefaults: { priority: 1, fairness_key: "tenant", payload: { effect_contract: { version: 1, outputs: [{ type: "work_queue_submit", min: 1, max: 1 }] } } },
+        workDefaults: { priority: 1, fairness_key: "tenant", payload: { effect_contract: { version: 1, outputs: [{ type: "work_queue_submit", min: 1, max: 2 }] } } },
         configurePolicy: policy => {
           policy.accounting_weights.tenant = 7;
           policy.producers["11"].priorities = [1];
@@ -89,6 +89,7 @@ function registerTests({ describe, it }) {
         },
       };
       const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-case192-"));
+      /** @type {string | undefined} */
       let originOutput;
       const options = {
         githubClient,
@@ -116,6 +117,7 @@ function registerTests({ describe, it }) {
         assert.equal(snapshot.origin.role, "worker");
         assert.equal(snapshot.origin.run_attempt, 1);
         assert.deepEqual(snapshot.worker, fixture.assignment);
+        assert.ok(typeof originOutput === "string");
         assert.equal(JSON.parse(originOutput).principal, "22");
         assert.equal(fake.log().at(-1).operations[0].run.principal, "22");
         assert.equal(fake.log().at(-1).actor.principal, "22");
@@ -226,6 +228,32 @@ function registerTests({ describe, it }) {
         assert.equal(recovered.receipts[0].request_id, publication.receipts[0].request_id);
         assert.equal(canonical(fake.log()), beforeRecovery);
         assert.equal(fake.log().filter(commit => commit.request.id === childCommit.request.id).length, 1);
+        assert.equal((await authorizeWorkerClaim({ ...runtime, claim_handle: member.handle })).authorized, false);
+        const followupParameters = { nodes: [{ node_key: "verified-parent-followup", payload: { task: "fresh continuation after Result", effect_contract: { kind: "none" } }, depends_on: [{ kind: "work", work_id: member.work_id }] }] };
+        const followup = JSON.parse(createWorkQueueSubmitTool(loaded, { ...options, createIntentId: () => "case192-verified-continuation" }).handler(followupParameters).content[0].text);
+        assert.equal(followup.status, "staged");
+        nativePrincipal = "11";
+        assert.equal((await processWorkQueueIntents(runtime)).receipts[1].status, "blocked");
+        assert.equal(canonical(fake.log()), beforeRecovery);
+        nativePrincipal = "22";
+        const rejected = await processWorkQueueIntents(runtime);
+        assert.equal(rejected.receipts[0].status, "durable", JSON.stringify(rejected));
+        assert.equal(rejected.receipts[0].request_id, publication.receipts[0].request_id);
+        assert.equal(rejected.receipts[1].status, "blocked", JSON.stringify(rejected));
+        assert.equal(canonical(fake.log()), beforeRecovery);
+        assert.equal(replayTransactions(fake.log()).works.has(nodeId("g1", "verified-parent-followup")), false);
+        assert.equal((await authorizeWorkerClaim({ ...runtime, claim_handle: member.handle })).authorized, false);
+        assert.equal(
+          fake
+            .log()
+            .flatMap(commit => commit.operations)
+            .filter(operation => operation.kind === "Result").length,
+          1
+        );
+        const retry = await processWorkQueueIntents(runtime);
+        assert.equal(retry.receipts[0].request_id, publication.receipts[0].request_id);
+        assert.equal(retry.receipts[1].status, "blocked");
+        assert.equal(canonical(fake.log()), beforeRecovery);
         assert.equal(dispatchPosts, 0);
         assert.deepEqual(sourceHashes(), hashes, "Integrated route sources changed during execution");
       } finally {

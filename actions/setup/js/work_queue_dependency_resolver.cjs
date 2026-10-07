@@ -15,11 +15,9 @@ function dependencyKey(resource) {
     condition: resource.condition,
     ...(resource.repository_id === undefined ? {} : { repository_id: nativeId(resource.repository_id, "external repository ID") }),
     ...(resource.resource_id === undefined ? {} : { resource_id: nativeId(resource.resource_id, "external resource ID") }),
+    repository: resource.repository.toLowerCase(),
+    number: nativeId(resource.number, "external resource number"),
   };
-  if (resource.repository_id === undefined || resource.resource_id === undefined) {
-    identity.repository = resource.repository.toLowerCase();
-    identity.number = nativeId(resource.number, "external resource number");
-  }
   return canonical(identity);
 }
 
@@ -181,7 +179,7 @@ async function resolveExternalEdges(edges, options) {
       credential_generation: observation.access_generation,
       read_status: observation.read_status,
     };
-    const updated = Date.parse(observation.source_updated_at);
+    const updated = typeof observation.source_updated_at === "string" ? Date.parse(observation.source_updated_at) : NaN;
     if (Number.isSafeInteger(updated) && updated >= 0) operation.source_updated_at = updated;
     for (const key of ["state_reason", "resource_state", "merged", "merge_commit"]) {
       if (Object.hasOwn(observation, key)) operation[key] = observation[key];

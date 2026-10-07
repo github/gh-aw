@@ -54,19 +54,7 @@
           "$ref": "#/$defs/Timestamp"
         }
       },
-      "required": [
-        "ledger_bytes",
-        "recovery_bytes",
-        "payload_bytes",
-        "graph_nodes",
-        "predecessors",
-        "pending_nodes",
-        "operations",
-        "assignment_bytes",
-        "result_bytes",
-        "evidence_bytes",
-        "observation_writes"
-      ],
+      "required": ["ledger_bytes", "recovery_bytes", "payload_bytes", "graph_nodes", "predecessors", "pending_nodes", "operations", "assignment_bytes", "result_bytes", "evidence_bytes", "observation_writes"],
       "type": "object"
     },
     "PolicyOperation": {
@@ -82,11 +70,7 @@
           "$ref": "#/$defs/QueuePolicy"
         }
       },
-      "required": [
-        "kind",
-        "epoch",
-        "policy"
-      ],
+      "required": ["kind", "epoch", "policy"],
       "type": "object"
     },
     "PoolPolicy": {
@@ -129,16 +113,7 @@
           "$ref": "#/$defs/RetryPolicy"
         }
       },
-      "required": [
-        "default_profile",
-        "profiles",
-        "logical_limit",
-        "native_limit",
-        "allowed_repositories",
-        "max_observation_age_ms",
-        "retry",
-        "reconciliation"
-      ],
+      "required": ["default_profile", "profiles", "logical_limit", "native_limit", "allowed_repositories", "max_observation_age_ms", "retry", "reconciliation"],
       "type": "object"
     },
     "Priority": {
@@ -168,11 +143,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "pools",
-        "priorities",
-        "fairness_keys"
-      ],
+      "required": ["pools", "priorities", "fairness_keys"],
       "type": "object"
     },
     "QueuePolicy": {
@@ -224,14 +195,7 @@
           "x-key-utf8-max-bytes": 256
         }
       },
-      "required": [
-        "mode",
-        "class_weights",
-        "accounting_weights",
-        "producers",
-        "pools",
-        "limits"
-      ],
+      "required": ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"],
       "type": "object"
     },
     "ReconciliationPolicy": {
@@ -244,10 +208,7 @@
           "$ref": "#/$defs/CountBound"
         }
       },
-      "required": [
-        "max_attempts",
-        "deadline_ms"
-      ],
+      "required": ["max_attempts", "deadline_ms"],
       "type": "object"
     },
     "RetryPolicy": {
@@ -260,10 +221,7 @@
           "$ref": "#/$defs/CountBound"
         }
       },
-      "required": [
-        "max_attempts",
-        "backoff_ms"
-      ],
+      "required": ["max_attempts", "backoff_ms"],
       "type": "object"
     },
     "Revision": {
@@ -308,16 +266,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "workflow",
-        "ref",
-        "principal",
-        "trust_domain",
-        "credential_scope",
-        "effect_scope",
-        "max_claims",
-        "share_keys"
-      ],
+      "required": ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
       "type": "object"
     }
   },

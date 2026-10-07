@@ -7,7 +7,7 @@ const { randomUUID } = require("crypto");
 const { TextDecoder } = require("util");
 const { createServer, registerTool, start } = require("./mcp_server_core.cjs");
 const queue = require("./work_queue_replay.cjs");
-const { closed, identity, integer, parseStrictJSON, utf8Compare, validString } = require("./work_queue_codec.cjs");
+const { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, closed, identity, integer, parseStrictJSON, utf8Compare } = require("./work_queue_codec.cjs");
 const { normalizeAssignment, normalizeClaimScope } = require("./work_queue_claim_scope.cjs");
 const { readStagedIntents, stageIntent } = require("./work_queue_intents.cjs");
 const { resolveWorkQueueRuntime } = require("./aw_context.cjs");
@@ -16,58 +16,16 @@ const DEFAULT_SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
 const DEFAULT_FINISH_INTENT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "work-queue", "work-queue.finish.jsonl");
 const DEFAULT_INTENT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "work-queue", "work-queue.intents.jsonl");
 const MAX_READ = 128;
-const MAX_SNAPSHOT_BYTES = 162 * 1024 * 1024;
-
 function parseSnapshotEnvelope(text) {
-  if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_SNAPSHOT_BYTES) throw new TypeError("work queue snapshot exceeds its bounded input limit");
-  const stringEnd = start => {
-    for (let i = start + 1; i < text.length; i++) {
-      if (text[i] === "\\") i++;
-      else if (text[i] === '"') return i + 1;
-    }
-    throw new TypeError("work queue snapshot has an unterminated JSON string");
-  };
-  let depth = 0;
-  let previous = 0;
-  let ledgerToken;
-  const metadata = [];
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '"') {
-      const end = stringEnd(i);
-      let colon = end;
-      while (/[\x20\t\r\n]/.test(text[colon] || "")) colon++;
-      if (depth === 1 && end - i <= 128 && text[colon] === ":" && JSON.parse(text.slice(i, end)) === "transactionLog") {
-        let start = colon + 1;
-        while (/[\x20\t\r\n]/.test(text[start] || "")) start++;
-        if (text[start] === '"') {
-          const valueEnd = stringEnd(start);
-          // The outer JSON may double the 80 MiB ledger through escaping. Only
-          // this string token bypasses the metadata parser's unchanged limit.
-          metadata.push(text.slice(previous, start), '""');
-          ledgerToken ??= [start, valueEnd];
-          previous = valueEnd;
-          i = valueEnd - 1;
-          continue;
-        }
-      }
-      i = end - 1;
-    } else if (text[i] === "{" || text[i] === "[") depth++;
-    else if (text[i] === "}" || text[i] === "]") depth--;
-  }
-  metadata.push(text.slice(previous));
-  const snapshot = parseStrictJSON(metadata.join(""));
-  // Keep duplicate keys, malformed syntax and all nested values in the strict
-  // parser; JSON.parse is used only for the extracted primitive string.
-  if (ledgerToken) {
-    snapshot.transactionLog = validString(JSON.parse(text.slice(...ledgerToken)));
-    if (Buffer.byteLength(snapshot.transactionLog, "utf8") > 80 * 1024 * 1024) throw new TypeError("work queue ledger exceeds its bounded input limit");
-  }
+  if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_SNAPSHOT_PARSE_BYTES) throw new TypeError("work queue snapshot exceeds its bounded input limit");
+  const snapshot = parseStrictJSON(text, { maxBytes: MAX_SNAPSHOT_PARSE_BYTES });
+  if (typeof snapshot?.transactionLog === "string" && Buffer.byteLength(snapshot.transactionLog, "utf8") > MAX_PARSE_BYTES) throw new TypeError("work queue ledger exceeds its bounded input limit");
   return snapshot;
 }
 
 function loadWorkQueueSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPSHOT || DEFAULT_SNAPSHOT_PATH) {
   const stat = fs.statSync(snapshotPath);
-  if (!stat.isFile() || stat.size > MAX_SNAPSHOT_BYTES) throw new TypeError("work queue snapshot exceeds its bounded input limit");
+  if (!stat.isFile() || stat.size > MAX_SNAPSHOT_PARSE_BYTES) throw new TypeError("work queue snapshot exceeds its bounded input limit");
   const snapshot = parseSnapshotEnvelope(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(fs.readFileSync(snapshotPath)));
   closed(snapshot, ["version", "sha", "transactionLog", "worker", "captured_at", "origin"], ["visible_work_ids", "role"], "work queue snapshot");
   if (snapshot.version !== 3 || (snapshot.sha !== null && typeof snapshot.sha !== "string") || typeof snapshot.transactionLog !== "string") throw new TypeError("work queue snapshot has an invalid current-only shape");
@@ -292,6 +250,7 @@ function createWorkQueueSubmitTool(snapshot, options = {}) {
 }
 
 function createWorkQueueTools(snapshot, options = {}) {
+  /** @type {import("./mcp_server_core.cjs").Tool[]} */
   const tools = [createWorkQueueStateTool(snapshot), createWorkQueueExplainTool(snapshot)];
   if (snapshotRuntimeRole(snapshot) !== "observer") tools.push(createWorkQueueSubmitTool(snapshot, options), createWorkQueueDispatchTool(snapshot, options), createWorkQueueFinishTool({ ...options, snapshot }));
   return tools;

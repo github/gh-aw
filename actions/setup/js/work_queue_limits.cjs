@@ -3,6 +3,9 @@
 
 const { canonicalBytes, integer, queueError } = require("./work_queue_codec.cjs");
 
+/** @typedef {{ledger_bytes: number, recovery_bytes: number, payload_bytes: number, graph_nodes: number, predecessors: number, pending_nodes: number, operations: number, assignment_bytes: number, result_bytes: number, evidence_bytes: number, observation_writes: number}} QueueLimits */
+
+/** @type {Readonly<QueueLimits>} */
 const DEFAULT_LIMITS = Object.freeze({
   ledger_bytes: 64 * 1024 * 1024,
   recovery_bytes: 16 * 1024 * 1024,
@@ -25,6 +28,13 @@ function validateLimits(limits) {
   for (const [name, ceiling] of Object.entries(DEFAULT_LIMITS)) integer(limits[name], 1, ceiling, `limit ${name}`);
   if (Object.keys(limits).some(name => !Object.hasOwn(DEFAULT_LIMITS, name))) throw queueError("resource_limit", "unknown limit");
   return limits;
+}
+
+function observationRefreshBudget(state, maximum = 128) {
+  if (!state.policy) throw queueError("policy_missing", "observation refresh requires an installed policy");
+  integer(maximum, 0, DEFAULT_LIMITS.operations - 1, "observation refresh budget");
+  if (state.grants_paused || state.ledgerBytes >= state.policy.limits.ledger_bytes) return 0;
+  return Math.min(maximum, Math.max(0, state.policy.limits.operations - 1));
 }
 
 function recoveryHeadroom(state) {
@@ -55,8 +65,8 @@ function checkLedgerBudget(state, candidateBytes, admission, observations = fals
   if (headroom > limits.ledger_bytes + limits.recovery_bytes - total) throw queueError("ledger_limit", "write would consume remaining bounded closure/recovery headroom");
   if (observations && total > limits.ledger_bytes) throw queueError("ledger_limit", "optional observations cannot consume closure/recovery headroom");
   if (admission && (total > limits.ledger_bytes || headroom > limits.recovery_bytes)) {
-    throw queueError("ledger_limit", "new admission would consume closure/recovery headroom");
+    throw queueError("ledger_limit", "new admission would consume bounded closure/recovery headroom");
   }
 }
 
-module.exports = { DEFAULT_LIMITS, boundedBytes, checkLedgerBudget, recoveryHeadroom, validateLimits };
+module.exports = { DEFAULT_LIMITS, boundedBytes, checkLedgerBudget, observationRefreshBudget, recoveryHeadroom, validateLimits };

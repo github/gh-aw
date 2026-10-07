@@ -2,28 +2,74 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
 const { main, MAX_BYTES, MAX_LINES } = require("./collect_work_queue_intents.cjs");
 const { readClaimControlMessages } = require("./work_queue_control_delivery.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 
 function fixture(callback) {
-  const root = path.join(process.cwd(), ".queue-validation-cache", `collection-${randomUUID()}`);
-  const sourceDir = path.join(root, "source");
-  const outputDir = path.join(root, "output");
-  fs.mkdirSync(sourceDir, { recursive: true });
-  fs.mkdirSync(outputDir);
-  const failures = [];
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-work-queue-collection-"));
   try {
+    const root = fs.realpathSync(temporaryRoot);
+    const sourceDir = path.join(root, "source");
+    const outputDir = path.join(root, "output");
+    fs.mkdirSync(sourceDir, { recursive: true });
+    fs.mkdirSync(outputDir);
+    const failures = [];
     callback({ root, sourceDir, outputDir, failures, core: { setFailed: value => failures.push(value) } });
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
   }
 }
 
 function registerTests({ describe, it }) {
   describe("bounded queue-control artifact collection", () => {
+    it("uses canonical system-temp fixture paths and cleans callback failures", () => {
+      /** @type {string | undefined} */
+      let root;
+      assert.throws(
+        () =>
+          fixture(options => {
+            root = options.root;
+            assert.ok(root);
+            assert.equal(path.dirname(root), fs.realpathSync(os.tmpdir()));
+            assert.ok(path.basename(root).startsWith("gh-aw-work-queue-collection-"));
+            assert.equal(options.sourceDir, path.join(root, "source"));
+            assert.equal(options.outputDir, path.join(root, "output"));
+            throw new Error("expected callback failure");
+          }),
+        /expected callback failure/
+      );
+      assert.ok(root);
+      assert.equal(fs.existsSync(root), false);
+    });
+
+    it("cleans its allocated fixture when directory setup fails", () => {
+      const mkdir = fs.mkdirSync;
+      /** @type {string | undefined} */
+      let root;
+      let called = false;
+      try {
+        fs.mkdirSync = directory => {
+          root = path.dirname(directory);
+          throw new Error("expected setup failure");
+        };
+        assert.throws(
+          () =>
+            fixture(() => {
+              called = true;
+            }),
+          /expected setup failure/
+        );
+      } finally {
+        fs.mkdirSync = mkdir;
+      }
+      assert.equal(called, false);
+      assert.ok(root);
+      assert.equal(fs.existsSync(root), false);
+    });
+
     it("reports missing runtime temporary-directory configuration before touching artifacts", () => {
       fixture(options => {
         const previous = process.env.RUNNER_TEMP;
@@ -76,7 +122,9 @@ function registerTests({ describe, it }) {
     });
 
     it("accounts for per-Claim staged controls instead of falsely proving a no-write Result", async () => {
+      /** @type {string | undefined} */
       let directory;
+      /** @type {ReturnType<typeof readClaimControlMessages> | undefined} */
       let control;
       fixture(options => {
         directory = options.root;
@@ -104,6 +152,8 @@ function registerTests({ describe, it }) {
         assert.equal(control.messages[0].claim_handle, "h1");
         assert.equal(control.errors.length, 2);
       });
+      assert.ok(directory);
+      assert.ok(control);
       assert.equal(fs.existsSync(directory), false);
       const assignment = {
         version: 3,

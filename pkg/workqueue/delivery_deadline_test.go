@@ -151,26 +151,40 @@ func TestDeliveryExhaustionDeadlineAndAttemptNativeParity(t *testing.T) {
 }
 
 func TestNativeExpiredDeliveryDeadlineDoesNotRestartOrRelease(t *testing.T) {
-	for _, status := range []string{"completed", "in_progress"} {
-		t.Run(status, func(t *testing.T) {
+	for _, test := range []struct {
+		status   string
+		verifier bool
+	}{
+		{"completed", true},
+		{"completed", false},
+		{"in_progress", true},
+		{"in_progress", false},
+	} {
+		name := test.status
+		if !test.verifier {
+			name += "-verifier-unavailable"
+		}
+		t.Run(name, func(t *testing.T) {
 			branch, mock := newQueueAPI(t)
 			commits, assignment := boundAssignment(t)
 			commits = finishMember(t, commits, assignment, 0, "completed")
 			installMockLog(t, mock, commits)
 			configureNativeRun(mock, assignment)
-			mock.nativeRun.Status = status
-			if status != "completed" {
+			mock.nativeRun.Status = test.status
+			if test.status != "completed" {
 				mock.nativeRun.Conclusion = ""
 			}
-			branch.DeliveryVerifier = func(context.Context, Projection, ClaimState) (DeliveryVerification, error) {
-				t.Fatal("expired Completion deadline restarted verification polling")
-				return DeliveryVerification{}, nil
+			if test.verifier {
+				branch.DeliveryVerifier = func(context.Context, Projection, ClaimState) (DeliveryVerification, error) {
+					t.Fatal("expired Completion deadline restarted verification polling")
+					return DeliveryVerification{}, nil
+				}
 			}
 			recovery, err := branch.RecoverDelivery(context.Background(), assignment.Claims[0].WorkID, "expired-delivery")
 			if err != nil || recovery.Attempts != 0 {
 				t.Fatalf("expired deadline recovery failed: %+v %v", recovery, err)
 			}
-			if status == "completed" {
+			if test.status == "completed" {
 				if recovery.Publication == nil || recovery.Reason != "delivery_failed_unknown" {
 					t.Fatalf("terminal deadline exhaustion did not conservatively settle: %+v", recovery)
 				}
@@ -187,9 +201,24 @@ func TestNativeExpiredDeliveryDeadlineDoesNotRestartOrRelease(t *testing.T) {
 				t.Fatalf("deadline released native capacity or changed original sibling ownership: %v", err)
 			}
 			work := state.Works[assignment.Claims[0].WorkID]
-			if status == "completed" {
+			if test.status == "completed" {
 				if work.Barrier != "failed" || work.Disposition != "unknown" {
 					t.Fatal("missing receipt became positive no-effects proof")
+				}
+				tip := latest[len(latest)-1]
+				if len(tip.Operations) != 1 || operationKind(tip.Operations[0]) != "DeliveryFailure" {
+					t.Fatal("expired recovery published Result, Release or unrelated operations")
+				}
+				var failure struct {
+					Evidence Evidence `json:"evidence"`
+				}
+				if err := json.Unmarshal(tip.Operations[0], &failure); err != nil {
+					t.Fatal(err)
+				}
+				if failure.Evidence.Kind != "terminal_run" || failure.Evidence.RunAttempt != 1 ||
+					failure.Evidence.Attempts != 0 || failure.Evidence.Effects != "unknown" ||
+					failure.Evidence.Receipt != "" {
+					t.Fatal("expiry invented verification attempts, effects or non-original terminal proof")
 				}
 			} else if work.Barrier != "pending" {
 				t.Fatal("nonterminal native run lost its pending delivery barrier")

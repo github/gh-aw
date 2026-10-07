@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
-const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, validateAdapter } = require("./work_queue_claim_adapters.cjs");
+const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, validateAdapter, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
 
@@ -55,6 +55,12 @@ function native() {
   /** @type {{mutateReadback: ((tree: any) => void) | null, afterBlob: (() => void) | null}} */
   const state = { mutateReadback: null, afterBlob: null };
   const rest = {
+    repos: {
+      get: async ({ owner, repo }) => {
+        assert.equal(`${owner}/${repo}`, "owner/repo");
+        return { data: { id: 7, full_name: "owner/repo" } };
+      },
+    },
     git: {
       getCommit: async ({ commit_sha }) => ({ data: structuredClone(commits.get(commit_sha)) }),
       getTree: async ({ tree_sha }) => {
@@ -137,7 +143,7 @@ async function prepare(root, assignment, handle, adapter, message, github) {
 function registerTests({ describe, it }) {
   describe("immutable per-Claim prepared code delivery", () => {
     it("verifies exact complete tree, bytes, parent, branch and PR fields without a shared writer checkout", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-code-${crypto.randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code");
       const assignment = assigned();
       const adapter = configured();
       const host = native();
@@ -154,6 +160,7 @@ function registerTests({ describe, it }) {
         title: "Claim code",
         body: "Exact delivered code",
       };
+      assignment.claims[0].work.effect_contract.outputs[0].verification = { verifier_id: "code", expected: { files: message.files, title: message.title, body: message.body } };
       try {
         await withClaimExecution({ assignment, claim_handle: "h1", authorize, effects }, async () => {
           const handler = await prepare(root, assignment, "h1", adapter, message, host.github);
@@ -168,6 +175,7 @@ function registerTests({ describe, it }) {
             github: host.github,
             authorize,
             verifyOutput: input => verifyClaimAdapterOutput({ ...input, adapter }),
+            verifyDeclaredOutput: createDeclaredAdapterVerifier({ code: adapter }),
           };
           assert.equal((await verifyClaimDelivery(options)).verification, "verified");
           assert.equal((await verifyClaimAdapterOutput({ claim: assignment.claims[0], result: structuredClone(result), github: host.github, adapter })).verified, false);
@@ -187,7 +195,7 @@ function registerTests({ describe, it }) {
     });
 
     it("isolates failed and valid sibling code effects and persistent branch-only deliveries", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-code-${crypto.randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code");
       const assignment = assigned();
       const host = native();
       let cancelled = false;
@@ -230,7 +238,7 @@ function registerTests({ describe, it }) {
     });
 
     it("rejects malformed, conflicting and unauthorized file paths before any native mutation", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-code-${crypto.randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code");
       const assignment = assigned();
       const host = native();
       const adapter = configured(false);

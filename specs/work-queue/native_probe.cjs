@@ -9,8 +9,48 @@ const queue = require("../../actions/setup/js/work_queue_replay.cjs");
 const codec = require("../../actions/setup/js/work_queue_codec.cjs");
 const scheduler = require("../../actions/setup/js/work_queue_scheduler.cjs");
 const policy = require("../../actions/setup/js/work_queue_policy.cjs");
+const limits = require("../../actions/setup/js/work_queue_limits.cjs");
 
 function execute(input) {
+  if (input.action === "typed_number_literal") {
+    if (typeof input.literal !== "string" || !/^(?:NaN|[+-]Infinity|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$/.test(input.literal)) {
+      throw new Error("adapter_invalid: expected a typed number literal");
+    }
+    const number = Number(input.literal);
+    let value;
+    switch (input.container) {
+      case "root":
+        value = number;
+        break;
+      case "object":
+        value = { value: number };
+        break;
+      case "array":
+        value = [number];
+        break;
+      case "nested":
+        value = { payload: { numbers: [number], sentinel: "9007199254740993" } };
+        break;
+      default:
+        throw new Error("adapter_invalid: expected root, object, array, or nested container");
+    }
+    return { canonical: codec.canonical(value) };
+  }
+  if (input.action === "typed_canonical") {
+    const value = JSON.parse(input.data);
+    // Validate original strings too, including values overwritten by duplicate keys.
+    for (let offset = 0; offset < input.data.length; offset++) {
+      if (input.data[offset] !== '"') continue;
+      const start = offset;
+      offset++;
+      while (input.data[offset] !== '"') {
+        if (input.data[offset] === "\\") offset++;
+        offset++;
+      }
+      codec.canonical(JSON.parse(input.data.slice(start, offset + 1)));
+    }
+    return { canonical: codec.canonical(value) };
+  }
   if (input.action === "canonical") return { canonical: codec.canonical(codec.parseStrictJSON(input.data)) };
   if (input.action === "validate_commit") {
     const commit = codec.parseStrictJSON(input.data);
@@ -32,6 +72,7 @@ function execute(input) {
   start = performance.now();
   const state = queue.replayTransactions(commits);
   const cold_replay_ms = performance.now() - start;
+  if (input.action === "recovery_headroom") return { headroom_bytes: limits.recoveryHeadroom(state) };
   start = performance.now();
   const selection = scheduler.selectionOnly(queue.planNext(state, input.pool, input.at));
   const selection_ms = performance.now() - start;
@@ -45,8 +86,13 @@ function execute(input) {
     selection,
     packing,
     metrics: {
-      parse_ms, cold_replay_ms, selection_ms, packing_ms, serialization_ms,
-      input_bytes: Buffer.byteLength(data), canonical_bytes: Buffer.byteLength(serialized),
+      parse_ms,
+      cold_replay_ms,
+      selection_ms,
+      packing_ms,
+      serialization_ms,
+      input_bytes: Buffer.byteLength(data),
+      canonical_bytes: Buffer.byteLength(serialized),
       canonical_sha256: createHash("sha256").update(serialized).digest("hex"),
       rss_peak_bytes: process.resourceUsage().maxRSS * 1024,
       heap_used_bytes: process.memoryUsage().heapUsed,

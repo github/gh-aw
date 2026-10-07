@@ -3,7 +3,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
 const zlib = require("node:zlib");
 const { withClaimExecution, claimArtifactPath, readClaimScopeContext, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
@@ -43,7 +42,7 @@ async function nativeEnvironment(callback) {
 function registerTests({ describe, it }) {
   describe("trusted standalone native Claim adapters", () => {
     it("rejects symlinked Claim roots and parent directories rather than consuming a sibling artifact", async () => {
-      const root = path.resolve(".queue-validation-cache", `queue-isolation-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-isolation");
       const assignment = assigned("noop");
       const first = claimArtifactPath(root, "h1", assignment);
       const sibling = claimArtifactPath(root, "h2", assignment);
@@ -66,14 +65,16 @@ function registerTests({ describe, it }) {
     });
 
     it("uses only explicit closed current snapshots and leaves non-queue runs unaffected", () => {
-      const root = path.resolve(".queue-validation-cache", `queue-snapshot-${randomUUID()}`);
+      const fixture = require("./work_queue_lifecycle.test_helpers.cjs").queueFixture({ granted: false });
+      const transactionLog = require("./work_queue_replay.cjs").serializeTransactionLog(fixture.transactions);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-snapshot");
       const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_SNAPSHOT"];
       const previous = keys.map(key => process.env[key]);
       try {
         fs.mkdirSync(root, { recursive: true });
         const filename = path.join(root, "snapshot.json");
         process.env.GH_AW_WORK_QUEUE_SNAPSHOT = filename;
-        const snapshot = { version: 3, sha: "a".repeat(40), transactionLog: [], captured_at: 0, origin: {}, worker: assigned("noop") };
+        const snapshot = { version: 3, sha: "a".repeat(40), transactionLog, captured_at: fixture.at, origin: fixture.dispatcher, worker: assigned("noop") };
         fs.writeFileSync(filename, JSON.stringify(snapshot));
         process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
         const scope = readClaimScopeContext();
@@ -81,6 +82,10 @@ function registerTests({ describe, it }) {
         assert.equal(scope.assignment.claims.length, 2);
         fs.writeFileSync(filename, JSON.stringify({ ...snapshot, version: 2 }));
         assert.throws(readClaimScopeContext, /current closed version-3/);
+        fs.writeFileSync(filename, JSON.stringify({ ...snapshot, transactionLog: [] }));
+        assert.throws(readClaimScopeContext, /current closed version-3/);
+        fs.writeFileSync(filename, JSON.stringify({ ...snapshot, transactionLog: "" }));
+        assert.throws(readClaimScopeContext, /policy_missing/);
         fs.writeFileSync(filename, JSON.stringify({ ...snapshot, worker: { assignment: snapshot.worker } }));
         assert.throws(readClaimScopeContext, /immutable array/);
         delete process.env.GH_AW_WORK_QUEUE_ENABLED;
@@ -183,7 +188,7 @@ function registerTests({ describe, it }) {
 
     it("requires exact private coverage upload bytes plus independently successful service processing", () =>
       nativeEnvironment(async () => {
-        const root = path.resolve(".queue-validation-cache", `queue-coverage-${randomUUID()}`);
+        const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-coverage");
         const assignment = assigned("upload_code_coverage");
         const effects = [];
         const bytes = Buffer.from("TN:\nSF:src/file.c\nDA:1,1\nend_of_record\n");

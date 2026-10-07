@@ -80,7 +80,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 		// in the unified agent artifact so they survive into the downstream job.
 		paths = append(paths, collectSafeJobArtifactPaths(data.SafeOutputs.Jobs)...)
 	}
-	if isWorkQueueEnabled(data) {
+	if isWorkQueueParticipant(data) {
 		paths = append(paths, constants.WorkQueueFinishIntentPath)
 		paths = append(paths, constants.WorkQueueIntentPath)
 		for _, extension := range secretRedactionScannedExtensions {

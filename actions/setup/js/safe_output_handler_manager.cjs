@@ -31,12 +31,21 @@ const { checkRateLimitHeadroom } = require("./rate_limit_helpers.cjs");
 const { redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
 const nodePath = require("path");
 const fs = require("fs");
-const { readClaimScopeContext, normalizeClaimScope, normalizeRuntimeMessage, assertClaimAuthorized, withClaimExecution, currentClaimHandle, currentClaimAssignment, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
-const { withClaimEffectClients } = require("./work_queue_effect_client.cjs");
+const {
+  readClaimScopeContext,
+  normalizeClaimScope,
+  normalizeRuntimeMessage,
+  assertClaimAuthorized,
+  withClaimExecution,
+  currentClaimHandle,
+  currentClaimAssignment,
+  claimArtifactPath,
+  closeClaimEffectChannel,
+} = require("./work_queue_claim_scope.cjs");
+const { withClaimEffectClients, wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { readClaimControlMessages } = require("./work_queue_control_delivery.cjs");
-const { readDeliveryControlInventory, verifyClaimDelivery, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
-const { digest, canonical } = require("./work_queue_codec.cjs");
-const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath } = require("./work_queue_claim_adapters.cjs");
+const { readDeliveryControlInventory, inspectClaimDelivery, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
+const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
 
 /**
@@ -458,13 +467,14 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
 
           const executable = wrapWithClientRebinding(type, messageHandler, handlerGithubClient);
           const factoryClaim = currentClaimHandle();
+          const declaredExecutable = factoryClaim ? wrapDeclaredBuiltinHandler(type, executable) : executable;
           const assertFactoryScope = () => {
             if (currentClaimHandle() !== factoryClaim) throw new Error("Handler state cannot escape its trusted Claim factory context");
           };
           const authorizedHandler = async (message, ...args) => {
             assertFactoryScope();
             const scopedMessage = await assertClaimAuthorized({ ...message, repo: message.repo ?? getDefaultTargetRepo(handlerConfig) });
-            return executable(scopedMessage, ...args);
+            return declaredExecutable(scopedMessage, ...args);
           };
           if (factoryClaim) {
             for (const [name, value] of Object.entries(executable)) {
@@ -1819,24 +1829,33 @@ function recordSafeOutputFailure(report) {
 /** @param {any} scope @param {any[]} messages @param {any[]} results @param {Record<string, any>} [options] */
 async function settleClaimDelivery(scope, messages, results, options = {}) {
   const handle = currentClaimHandle();
+  const member = scope.assignment.claims.find(claim => claim.handle === handle);
+  if (!member) throw new Error("Claim delivery lost its immutable assignment member");
+  const verificationGithub = options.github || github;
+  const verificationContext = options.context || context;
   for (const result of results) result.claim_handle = handle;
   if (options.registerVerification) options.registerVerification(messages, results);
   const controls = options.controlMessages || [];
   const controlProofs = new Map();
   const outcomes = [...results, ...controls.map((message, index) => ({ messageIndex: messages.length + index, success: true, claim_handle: handle, result: null }))];
   const queueControls = require("./work_queue_control_receipts.cjs");
-  const delivery = await verifyClaimDelivery({
+  const delivery = await inspectClaimDelivery({
     assignment: scope.assignment,
     claim_handle: handle,
     messages: [...messages, ...controls],
     results: outcomes,
     effects: options.effects || [],
-    context,
-    github,
+    effectChannel: closeClaimEffectChannel(),
+    authorize: options.authorize,
+    context: verificationContext,
+    github: verificationGithub,
+    signal: options.signal,
     staged: isStagedMode(),
     requireControlInventory: true,
     readControlInventory: async () => {
-      const inventory = await (options.readControlInventory ? options.readControlInventory() : readDeliveryControlInventory({ assignment: scope.assignment, claim_handle: handle, github, context, core }));
+      const inventory = await (options.readControlInventory
+        ? options.readControlInventory()
+        : readDeliveryControlInventory({ assignment: scope.assignment, claim_handle: handle, github: verificationGithub, queueClient: options.queueClient, context: verificationContext, core, signal: options.signal }));
       for (const message of controls) {
         const proof = await queueControls.verifyClaimQueueControl({ assignment: scope.assignment, claim_handle: handle, message, inventory });
         controlProofs.set(message.intent_id, proof);
@@ -1856,7 +1875,11 @@ async function settleClaimDelivery(scope, messages, results, options = {}) {
         if (input.message.type === "upload_code_coverage") return require("./work_queue_code_coverage.cjs").verifyCodeCoverageDelivery(verification);
         return adapter ? verifyClaimAdapterOutput({ ...verification, adapter }) : verifyBuiltinDeliveryOutput(verification);
       }),
+    verifyDeclaredOutput: member.work.effect_contract?.outputs?.some(output => output.verification !== undefined)
+      ? options.verifyDeclaredOutput || createDeclaredAdapterVerifier(loadConfig().claim_adapters, loadConfig(), options.effects)
+      : undefined,
   });
+  options.signal?.throwIfAborted();
   const directory = claimArtifactPath(options.deliveryArtifactRoot || "/tmp/gh-aw", handle);
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(nodePath.join(directory, "delivery-receipt.json"), JSON.stringify(delivery) + "\n");
@@ -1897,13 +1920,15 @@ async function main(options = {}) {
         const authorize = options.authorize || (request => require("./finish_work_queue_claim.cjs").authorizeWorkerClaim({ ...request, github: unscopedGithub }));
         const claimOptions = {
           ...options,
+          authorize,
           effects,
           controlMessages: controls.messages.filter(message => message.claim_handle === handle),
           registerVerification: (originalMessages, originalResults) => {
-            verificationPasses.set(handle, () =>
-              withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () =>
-                withClaimEffectClients({ claim_handle: handle, authorize, authorizeGithub: unscopedGithub, context }, () => settleClaimDelivery(scope, originalMessages, originalResults, { ...claimOptions, registerVerification: undefined }))
-              )
+            verificationPasses.set(handle, verification =>
+              withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () => {
+                const readbackGithub = wrapClaimEffectClient(unscopedGithub, { claim_handle: handle, authorize, authorizeGithub: unscopedGithub, context, signal: verification?.signal });
+                return settleClaimDelivery(scope, originalMessages, originalResults, { ...claimOptions, github: readbackGithub, context, signal: verification?.signal, registerVerification: undefined });
+              })
             );
           },
         };
@@ -1938,34 +1963,17 @@ async function main(options = {}) {
         github,
         context,
         assignment: scope.assignment,
-        verifyEffects: async (member, verification) => {
-          const original = scope.assignment.claims.find(claim => claim.handle === member.handle);
-          if (
-            !original ||
-            !verification?.assignment ||
-            verification.contract === undefined ||
-            original.work.effect_contract === undefined ||
-            canonical(verification.assignment) !== canonical(scope.assignment) ||
-            canonical(verification.contract) !== canonical(original.work.effect_contract)
-          ) {
-            return { verified: false, effects: "unknown" };
-          }
-          const recheck = verificationPasses.get(member.handle);
-          if (disputed.has(member.handle) || !recheck) return { verified: false, effects: "unknown" };
-          const delivery = await recheck();
-          const settlement = settlements.find(settlement => settlement.claim_handle === member.handle);
-          if (settlement) settlement.delivery = delivery;
-          if (disputed.has(member.handle) || delivery?.verification !== "verified" || delivery.claim_id !== member.claim_id || delivery.work_id !== member.work_id || delivery.dispatch_id !== scope.assignment.dispatch_id)
-            return { verified: false, effects: "unknown" };
-          return {
-            verified: true,
-            contractVerified: true,
-            receipt: digest(delivery.descriptor),
-            descriptor: delivery.descriptor,
-            controls_digest: delivery.controls_digest,
-            effects: delivery.disposition === "none" ? "none" : "partial",
-          };
-        },
+        verifyEffects: createClaimDeliveryVerifier({
+          assignment: scope.assignment,
+          recheck: async (member, verification) => {
+            const recheck = verificationPasses.get(member.handle);
+            if (disputed.has(member.handle) || !recheck) return null;
+            const delivery = await recheck(verification);
+            const settlement = settlements.find(settlement => settlement.claim_handle === member.handle);
+            if (settlement) settlement.delivery = delivery;
+            return delivery;
+          },
+        }),
       });
     }
     core.setOutput("claim_results", JSON.stringify({ settlements, reconciliation: finalized }));

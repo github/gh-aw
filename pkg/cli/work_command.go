@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +18,15 @@ import (
 )
 
 func NewWorkCommand() *cobra.Command {
+	return NewWorkCommandWithNativeDeliveryHost(nil)
+}
+
+type nativeDeliveryHostKey struct{}
+
+// NewWorkCommandWithNativeDeliveryHost is the protected native-process entry
+// point. An embedding host supplies approved callbacks, never a CLI receipt
+// filename, verifier executable, digest, or actor/source assertion.
+func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "work-queue", Short: "Inspect and publish the current fair Git-backed DAG work queue",
 		Long: "Inspect and publish the current fair Git-backed DAG work queue.\n\n" +
@@ -26,6 +36,9 @@ func NewWorkCommand() *cobra.Command {
 			"representation without dropping history, resetting debt, or adopting legacy queues.",
 		Args: cobra.NoArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if host != nil {
+				cmd.SetContext(context.WithValue(cmd.Context(), nativeDeliveryHostKey{}, host))
+			}
 			storage, _ := cmd.Flags().GetString("storage")
 			if storage != "git" {
 				return errors.New("unsupported_backend: work queues require Git storage; Issues storage is not supported")
@@ -49,7 +62,10 @@ func NewWorkCommand() *cobra.Command {
 func workBranch(cmd *cobra.Command) workqueue.Branch {
 	repo, _ := cmd.Flags().GetString("repo")
 	branch, _ := cmd.Flags().GetString("branch")
-	return workqueue.Branch{Remote: repo, Name: branch}
+	result := workqueue.Branch{Remote: repo, Name: branch}
+	host, _ := cmd.Context().Value(nativeDeliveryHostKey{}).(*workqueue.NativeDeliveryHost)
+	result.DeliveryVerifier = host.Verifier(result)
+	return result
 }
 
 func workPrint(cmd *cobra.Command, value any, human string) error {
@@ -310,6 +326,11 @@ func workSubmitCommand() *cobra.Command {
 		Use: "submit-work", Short: "Admit immutable Work with queue-like defaults and trusted policy entitlements",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			graph, _ := cmd.Flags().GetString("graph-id")
+			key, _ := cmd.Flags().GetString("node-key")
+			if cmd.Flags().Changed("graph-id") && graph == "" || cmd.Flags().Changed("node-key") && key == "" {
+				return errors.New("work_invalid: explicitly supplied graph/node identities are empty. Use nonempty values, for example --graph-id review --node-key root, or omit the flags for payload-hash/root defaults")
+			}
 			payload, err := workReadJSON(cmd)
 			if err != nil {
 				return err
@@ -328,11 +349,12 @@ func workSubmitCommand() *cobra.Command {
 			} else {
 				return err
 			}
-			graph, _ := cmd.Flags().GetString("graph-id")
-			key, _ := cmd.Flags().GetString("node-key")
 			pool, _ := cmd.Flags().GetString("pool")
-			if graph == "" {
-				graph = workqueue.NodeID(string(payload), "root")
+			if !cmd.Flags().Changed("graph-id") {
+				graph, err = workqueue.IndependentGraphID(payload)
+				if err != nil {
+					return err
+				}
 			}
 			work, err := workqueue.NewWork(payload, graph, key, pool, policy, time.Now().UnixMilli())
 			if err != nil {
@@ -372,8 +394,8 @@ func workSubmitCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().String("file", "", "JSON work object path (- for stdin)")
-	cmd.Flags().String("graph-id", "", "Explicit graph namespace (default: identity-based independent root)")
-	cmd.Flags().String("node-key", "root", "Stable node identity inside its graph")
+	cmd.Flags().String("graph-id", "", "Nonempty graph namespace (when omitted: canonical payload SHA256)")
+	cmd.Flags().String("node-key", "root", "Nonempty node identity inside its graph (when omitted: root)")
 	cmd.Flags().String("pool", "default", "Approved scheduling pool")
 	cmd.Flags().Int("priority", 3, "Entitled priority 1..5")
 	cmd.Flags().String("fairness-key", "", "Entitled accounting key (default: one shared bucket)")
@@ -422,8 +444,12 @@ func workDispatchNextCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			claimsGranted := 0
+			for _, assignment := range published.Decision.Assignments {
+				claimsGranted += len(assignment.Claims)
+			}
 			return workPrint(cmd, published, fmt.Sprintf("Fair prefix: %d Claims, %d reserved assignments; %s",
-				len(published.Decision.Operations), len(published.Decision.Assignments), published.Decision.Reason))
+				claimsGranted, len(published.Decision.Assignments), published.Decision.Reason))
 		},
 	}
 	cmd.Flags().String("pool", "default", "Complete approved scheduling pool")
@@ -532,14 +558,22 @@ func workReconcileCommand() *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			id, _ := cmd.Flags().GetString("dispatch-id")
-			if id == "" {
-				return errors.New("--dispatch-id is required")
+			workID, _ := cmd.Flags().GetString("work-id")
+			cancelReserved, _ := cmd.Flags().GetBool("cancel-reserved")
+			if (id == "") == (workID == "") || workID != "" && cancelReserved {
+				return errors.New("provide exactly one of --dispatch-id or --work-id; --cancel-reserved requires --dispatch-id")
 			}
 			request, err := workRequestID(cmd)
 			if err != nil {
 				return err
 			}
-			cancelReserved, _ := cmd.Flags().GetBool("cancel-reserved")
+			if workID != "" {
+				result, err := workBranch(cmd).RecoverDelivery(cmd.Context(), workID, request)
+				if err != nil {
+					return err
+				}
+				return workPrint(cmd, result, result.Reason+"; Work "+workID)
+			}
 			var result workqueue.Reconciliation
 			if cancelReserved {
 				result, err = workBranch(cmd).CancelReserved(cmd.Context(), id, request)
@@ -553,6 +587,7 @@ func workReconcileCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().String("dispatch-id", "", "Immutable native reservation identity")
+	cmd.Flags().String("work-id", "", "Reconcile delivery independently with protected native host callbacks; missing proof remains unknown")
 	cmd.Flags().Bool("cancel-reserved", false, "Cancel only if CAS proves no launch start marker exists (not a force release)")
 	return cmd
 }

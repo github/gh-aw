@@ -23,13 +23,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "handle",
-        "claim_id",
-        "work_id",
-        "work",
-        "result_refs"
-      ],
+      "required": ["handle", "claim_id", "work_id", "work", "result_refs"],
       "type": "object"
     },
     "Identity": {
@@ -53,11 +47,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "work_id",
-        "result_commit_id",
-        "descriptor"
-      ],
+      "required": ["work_id", "result_commit_id", "descriptor"],
       "type": "object"
     },
     "WorkQueueAssignment": {
@@ -93,16 +83,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "version",
-        "dispatch_id",
-        "request_id",
-        "commit_id",
-        "policy_epoch",
-        "pool",
-        "worker_profile",
-        "claims"
-      ],
+      "required": ["version", "dispatch_id", "request_id", "commit_id", "policy_epoch", "pool", "worker_profile", "claims"],
       "type": "object"
     }
   },

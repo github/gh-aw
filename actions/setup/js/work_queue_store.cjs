@@ -6,6 +6,8 @@ const { createHash } = require("node:crypto");
 const { canonical, digest, identity, integer, queueError } = require("./work_queue_codec.cjs");
 const { actorFromContext, defaultPolicy, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
 const { assignmentsForRequest } = require("./work_queue_scheduler.cjs");
+const { validateEffectResource } = require("./work_queue_resource_scope.cjs");
+const { verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
 const {
   appendCommit,
   generateRequestOperations,
@@ -15,6 +17,7 @@ const {
   proposedCommitId,
   replayTransactions,
   serializeTransactionLog,
+  validateClaimAuthority,
   validateRequest,
   validateRequestContext,
   validateWorkerContinuation,
@@ -25,6 +28,8 @@ const WORK_QUEUE_LOG_PATH = "work-queue.jsonl";
 const LEGACY_BRANCHES = ["dispatch-coordinator", "gh-aw-work-queue"];
 const LEGACY_LOGS = ["dispatch-work-coordinator.jsonl"];
 const DEFAULT_MAX_RETRIES = 5;
+
+/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, storage?: string, core?: {info(message: string): void}}} QueueReadOptions */
 
 function storageSupported(storage = process.env.GH_AW_WORK_QUEUE_STORAGE || "git") {
   if (storage !== "git") throw queueError("unsupported_backend", "only the mandatory fair Git queue backend is supported");
@@ -95,7 +100,8 @@ async function readRef(githubClient, owner, repo, branch) {
   }
 }
 
-async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, storage, core: coreApi }) {
+/** @param {QueueReadOptions} options */
+async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, storage = undefined, core: coreApi = undefined }) {
   storageSupported(storage);
   validateBranch(branch);
   const repository = await verifyRepository(githubClient, owner, repo);
@@ -149,6 +155,35 @@ function stableRequestResult(current, request, actor) {
   return { ...current, commit, assignments, operations: commit.operations, publishedNow: false, reused: true, persisted: false, recovered: true, idempotent: true, rejected: [] };
 }
 
+function validateExtendingPrefix(previous, current, message) {
+  if (previous.some((commit, index) => !current[index] || canonical(current[index]) !== canonical(commit))) throw queueError("ledger_invalid", message);
+}
+
+/**
+ * @param {QueueReadOptions & {context: Parameters<typeof actorFromContext>[0]}} options
+ * @returns {(resource: unknown) => Promise<ReturnType<typeof validateClaimAuthority>>}
+ */
+function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, storage = undefined, core: coreApi = undefined }) {
+  storageSupported(storage);
+  validateBranch(branch);
+  const actor = actorFromContext(context);
+  const trusted = validateTrustedContext(context, actor);
+  if (actor.role !== "worker" || actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "effect authorization requires the authenticated original worker repository");
+  if (!actor.claim_handle) throw queueError("claim_scope_required", "effect authorization requires immutable Claim scope");
+  if (trusted.event !== "workflow_dispatch" || !trusted.ref || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(trusted.ref)) throw queueError("run_binding_conflict", "effect authorization requires the original immutable native event and revision");
+  const protectedContext = Object.freeze({ ...trusted, authenticated: true, roles: Object.freeze([actor.role]) });
+  let observedPrefix = [];
+  return async resource => {
+    const target = validateEffectResource(resource);
+    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+    validateExtendingPrefix(observedPrefix, current.transactions, "queue history was rewritten during effect authorization");
+    observedPrefix = current.transactions;
+    const member = current.state.dispatches.get(actor.dispatch_id)?.claims.find(candidate => candidate.handle === actor.claim_handle);
+    if (!member) throw queueError("claim_scope_invalid", "effect target has no original immutable assignment member");
+    return structuredClone(validateClaimAuthority(current.state, member.claim_id, protectedContext, { requireCompletion: true, resource: target }));
+  };
+}
+
 async function writeCandidate({ githubClient, owner, repo, current, transactions }) {
   const content = serializeTransactionLog(transactions);
   const blob = await githubClient.rest.git.createBlob({ owner, repo, content, encoding: "utf-8" });
@@ -159,26 +194,40 @@ async function writeCandidate({ githubClient, owner, repo, current, transactions
   return commit.data.sha;
 }
 
+/**
+ * @param {QueueReadOptions & {
+ * request: ReturnType<typeof newRequest>,
+ * context: Parameters<typeof actorFromContext>[0],
+ * actor?: import("./work_queue_policy.cjs").QueueActor,
+ * generateOperations?: typeof generateRequestOperations,
+ * refreshObservations?: (state: Parameters<typeof generateRequestOperations>[0], request: ReturnType<typeof newRequest>, actor: import("./work_queue_policy.cjs").QueueActor) => Promise<unknown>,
+ * remediationVerifier?: (state: Parameters<typeof generateRequestOperations>[0], node: Parameters<typeof import("./work_queue_graph.cjs").validateWork>[0], context: ReturnType<typeof validateTrustedContext>) => boolean | Promise<boolean>,
+ * policyProposal?: Parameters<typeof validatePolicy>[0],
+ * initializationContext?: Parameters<typeof actorFromContext>[0],
+ * initializeOnly?: boolean, maxRetries?: number, now?: () => number,
+ * commitId?: typeof proposedCommitId, sleepFn?: (delay: number) => Promise<void>
+ * }} options
+ */
 async function publishWorkQueueRequest({
   githubClient,
   owner,
   repo,
   branch = WORK_QUEUE_BRANCH,
-  storage,
+  storage = undefined,
   request,
   context,
   actor = actorFromContext(context),
   generateOperations = generateRequestOperations,
-  refreshObservations,
-  remediationVerifier,
-  policyProposal,
-  initializationContext,
+  refreshObservations = undefined,
+  remediationVerifier = undefined,
+  policyProposal = undefined,
+  initializationContext = undefined,
   initializeOnly = false,
   maxRetries = DEFAULT_MAX_RETRIES,
   now = Date.now,
   commitId = proposedCommitId,
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
-  core: coreApi,
+  core: coreApi = undefined,
 }) {
   storageSupported(storage);
   validateBranch(branch);
@@ -196,8 +245,7 @@ async function publishWorkQueueRequest({
   let lastConflict;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
-    if (observedPrefix.some((commit, index) => !current.transactions[index] || canonical(current.transactions[index]) !== canonical(commit)))
-      throw queueError("ledger_invalid", "refreshed queue history does not extend the previously validated prefix");
+    validateExtendingPrefix(observedPrefix, current.transactions, "refreshed queue history does not extend the previously validated prefix");
     observedPrefix = current.transactions;
     const recovered = stableRequestResult(current, stable, stableActor);
     if (recovered) return recovered;
@@ -236,18 +284,20 @@ async function publishWorkQueueRequest({
         if (!verified) throw queueError("remediation_invalid", "trusted replacement proof was not independently confirmed");
       }
     const refresh = refreshObservations ? await refreshObservations(structuredClone(current.state), structuredClone(stable), structuredClone(stableActor)) : [];
-    const observations = Array.isArray(refresh) ? refresh : refresh?.operations;
+    const observations = Array.isArray(refresh) ? refresh : refresh && typeof refresh === "object" && "operations" in refresh ? refresh.operations : undefined;
     if (!Array.isArray(observations) || observations.some(operation => operation?.kind !== "Observation")) throw queueError("request_invalid", "observation refresh must return only typed Observation operations");
     const at = integer(now(), 0, Number.MAX_SAFE_INTEGER, "trusted publication time");
     const id = identity(commitId(structuredClone(current.state), structuredClone(stable)), "candidate commit ID");
     const generated = await generateOperations(structuredClone(current.state), structuredClone(stable), structuredClone(stableActor), at, id, structuredClone(observations));
     const decision = Array.isArray(generated) ? { operations: generated } : generated;
     if (!decision || !Array.isArray(decision.operations)) throw queueError("request_invalid", "candidate generator must return operations");
-    if (!decision.operations.length) return { ...decision, ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: decision.idempotent === true, rejected: [] };
+    if (!decision.operations.length)
+      return { ...decision, ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: "idempotent" in decision && decision.idempotent === true, rejected: [] };
     if (observations.length && canonical(decision.operations.slice(0, observations.length)) !== canonical(observations)) throw queueError("request_invalid", "candidate must bind every refreshed observation before its Claim prefix");
     const policyOp = decision.operations.find(operation => operation.kind === "Policy");
     const candidate = { version: 3, id, previous: current.state.tip || null, request: stable, actor: stableActor, policy_epoch: policyOp?.epoch ?? current.state.policy_epoch, at, operations: decision.operations };
     const checked = appendCommit(current.transactions, candidate);
+    if (policyOp) await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
     try {
       const sha = await writeCandidate({ githubClient, owner, repo, current, transactions: checked.transactions });
       coreApi?.info(`Work queue: published checked request (${decision.operations.length} operations)`);
@@ -258,7 +308,7 @@ async function publishWorkQueueRequest({
       // A lost response is not permission to choose another request. Refresh
       // before another candidate, and at exhaustion before reporting uncertainty.
       const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
-      if (observedPrefix.some((commit, index) => !refreshed.transactions[index] || canonical(refreshed.transactions[index]) !== canonical(commit))) throw queueError("ledger_invalid", "queue history was rewritten during publication");
+      validateExtendingPrefix(observedPrefix, refreshed.transactions, "queue history was rewritten during publication");
       const committed = stableRequestResult(refreshed, stable, stableActor);
       if (committed) return committed;
       observedPrefix = refreshed.transactions;
@@ -283,10 +333,17 @@ async function initializeWorkQueue(options) {
   const actor = actorFromContext(options.context);
   if (actor.role !== "administrator") throw queueError("actor_unauthorized", "trusted Policy initialization requires administrator credentials");
   const branch = options.branch || WORK_QUEUE_BRANCH;
+  const current = await readWorkQueueLog({ ...options, branch });
+  if (current.sha) {
+    const operation = { kind: "Policy", epoch: current.state.policy_epoch, policy: current.state.policy };
+    const request = newRequest(`init:${digest({ actor, branch, operation })}`, "policy", actor, { operations: [operation] });
+    const recovered = stableRequestResult(current, request, actor);
+    return recovered || { ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: false, rejected: [] };
+  }
   const policy = await initializationPolicy({ ...options, actor });
   const operation = { kind: "Policy", epoch: options.epoch || "initial", policy };
   const request = newRequest(`init:${digest({ actor, branch, operation })}`, "policy", actor, { operations: [operation] });
   return publishWorkQueueRequest({ ...options, actor, request, initializeOnly: true });
 }
 
-module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, storageSupported, verifyRepository };
+module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, freshAuthorizer, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, storageSupported, verifyRepository };

@@ -9,6 +9,10 @@ const { identity, canonical, canonicalBytes } = require("./work_queue_codec.cjs"
 
 const MAX_ASSIGNMENT_CLAIMS = 16;
 const claimExecution = new AsyncLocalStorage();
+/** @type {import("node:async_hooks").AsyncLocalStorage<{identity: ReturnType<typeof claimIdentity>, targets: readonly import("./work_queue_resource_scope.cjs").EffectResource[], operations: readonly string[], verification?: true}>} */
+const resourceExecution = new AsyncLocalStorage();
+/** @type {WeakMap<object, {identity: ReturnType<typeof claimIdentity>, targets: readonly import("./work_queue_resource_scope.cjs").EffectResource[]}>} */
+const resourceVerifications = new WeakMap();
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -96,29 +100,67 @@ function snapshotPath() {
 }
 
 function readClaimScopeContext() {
-  const enabled = process.env.GH_AW_WORK_QUEUE_ENABLED === "true";
+  const configuredRole = process.env.GH_AW_WORK_QUEUE_ROLE;
+  const enabled = process.env.GH_AW_WORK_QUEUE_ENABLED === "true" || configuredRole !== undefined;
   if (!enabled) return null;
+  if (configuredRole !== undefined && !["observer", "dispatcher", "worker"].includes(configuredRole)) throw scopeError("invalid protected compiler role");
+  if (configuredRole === "observer") require("./aw_context.cjs").resolveWorkQueueRuntime(global.context?.payload, { role: configuredRole });
   const filename = snapshotPath();
-  if (!fs.existsSync(filename)) {
-    if (enabled) throw scopeError("trusted activation snapshot is missing");
+  let stat;
+  try {
+    stat = fs.lstatSync(filename);
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+    if (configuredRole === "observer") return null;
+    throw scopeError("trusted activation snapshot is missing");
+  }
+  if (!stat.isFile() || stat.nlink !== 1 || stat.size > 162 * 1024 * 1024) throw scopeError("trusted activation snapshot exceeds its bounded regular-file transport");
+  const { closed } = require("./work_queue_codec.cjs");
+  const snapshot = require("./work_queue_mcp_server.cjs").parseSnapshotEnvelope(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(fs.readFileSync(filename)));
+  closed(snapshot, ["version", "sha", "transactionLog", "captured_at", "origin", "worker"], ["visible_work_ids", "role"], "trusted queue snapshot");
+  if (
+    snapshot.version !== 3 ||
+    (snapshot.sha !== null && typeof snapshot.sha !== "string") ||
+    typeof snapshot.transactionLog !== "string" ||
+    !object(snapshot.origin) ||
+    !Number.isSafeInteger(snapshot.captured_at) ||
+    snapshot.captured_at < 0
+  )
+    throw scopeError("trusted activation snapshot requires the current closed version-3 contract");
+  if (own(snapshot, "role") && !["observer", "dispatcher", "worker"].includes(snapshot.role)) throw scopeError("snapshot role is not a valid protected compiler role");
+  if (own(snapshot, "visible_work_ids")) {
+    if (!Array.isArray(snapshot.visible_work_ids)) throw scopeError("snapshot visibility requires a bounded array of Work identifiers");
+    for (const id of snapshot.visible_work_ids) identifier(id, "visible Work ID");
+  }
+  const value = snapshot.worker;
+  const role = snapshot.role ?? configuredRole ?? (value ? "worker" : "dispatcher");
+  if (!["observer", "dispatcher", "worker"].includes(role) || (configuredRole !== undefined && configuredRole !== role)) throw scopeError("snapshot role conflicts with protected compiler configuration");
+  if ((role === "worker") !== (value !== null)) throw scopeError("declared workers require their original assignment and nonworkers cannot acquire one");
+  if (role === "observer" && configuredRole !== "observer") throw scopeError("ordinary observer outputs require an explicit protected compiler role");
+  const runtime = require("./aw_context.cjs").resolveWorkQueueRuntime(value === null ? {} : { inputs: { work_queue_assignment: value } }, { role: configuredRole ?? snapshot.role });
+  if (snapshot.transactionLog === "" && !(configuredRole === "observer" && role === "observer" && snapshot.sha === null))
+    throw scopeError("work_queue_policy_missing: existing and participant queues require an installed Policy; only a protected observer may read a genuinely absent branch", "work_queue_policy_missing");
+  if (role === "observer") {
+    if (snapshot.transactionLog !== "") {
+      const queue = require("./work_queue_replay.cjs");
+      if (!queue.replayTransactions(queue.parseTransactionLog(snapshot.transactionLog)).policy) throw scopeError("work_queue_policy_missing: observer snapshot has no installed Policy", "work_queue_policy_missing");
+    }
     return null;
   }
-  const { parseStrictJSON, closed } = require("./work_queue_codec.cjs");
-  const snapshot = parseStrictJSON(fs.readFileSync(filename, "utf8"));
-  closed(snapshot, ["version", "sha", "transactionLog", "captured_at", "origin", "worker"], ["visible_work_ids"], "trusted queue snapshot");
-  if (snapshot.version !== 3 || !object(snapshot.origin) || !Number.isSafeInteger(snapshot.captured_at) || snapshot.captured_at < 0) throw scopeError("trusted activation snapshot requires the current closed version-3 contract");
-  const value = snapshot.worker;
   if (!value) {
     if (enabled) return { assignment: null, snapshot };
     return null;
   }
-  return { assignment: normalizeAssignment(value), snapshot };
+  return { assignment: normalizeAssignment(runtime.assignment), snapshot };
 }
 
 function normalizeRuntimeMessage(message) {
   const execution = claimExecution.getStore();
   const scope = execution || readClaimScopeContext();
-  if (!scope) return message;
+  if (!scope) {
+    if (process.env.GH_AW_WORK_QUEUE_ROLE === "observer" && ["work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"].includes(message?.type)) throw scopeError("protected observers cannot emit queue-control operations");
+    return message;
+  }
   if (!scope.assignment) throw scopeError("unassigned dispatcher cannot emit worker safe outputs");
   const normalized = normalizeClaimScope(message, scope.assignment);
   if (execution?.claim_handle && normalized.claim_handle !== execution.claim_handle) throw scopeError("message cannot escape its trusted per-Claim execution context");
@@ -132,9 +174,12 @@ async function assertClaimAuthorized(message, options = {}) {
   const scope = execution || readClaimScopeContext();
   if (!scope) return normalized;
   if (options.effect === true) {
+    if (execution?.closedEffectChannel) throw scopeError("Claim write channel is closed for independent delivery verification");
+    if (resourceExecution.getStore()?.verification) throw scopeError("Claim resource verification is read-only");
     if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true" || execution?.staged === true) throw scopeError("read-only Claim preview cannot perform resource effects");
     const member = scope.assignment.claims.find(claim => claim.handle === normalized.claim_handle);
     if (member.work.effect_contract?.kind === "none" || member.work.effect_contract?.no_writes === true) throw scopeError("immutable Work effect_contract prohibits ordinary resource writes");
+    if (options.resource === undefined) throw scopeError("resource effects require their independently resolved immutable Work target");
   }
   const authorize = options.authorize || execution?.authorize || require("./finish_work_queue_claim.cjs").authorizeWorkerClaim;
   if (typeof authorize !== "function") throw scopeError("trusted per-Claim authorizer is unavailable");
@@ -235,9 +280,109 @@ function currentClaimAssignment() {
   return claimExecution.getStore()?.assignment;
 }
 
+/**
+ * @template T
+ * @param {ReadonlyArray<Record<string, unknown>>} resources
+ * @param {readonly string[]} operations
+ * @param {() => T | Promise<T>} callback
+ * @returns {Promise<T>}
+ */
+async function withClaimResourceEffects(resources, operations, callback) {
+  if (
+    !Array.isArray(resources) ||
+    resources.length < 1 ||
+    resources.length > 128 ||
+    !Array.isArray(operations) ||
+    operations.length < 1 ||
+    operations.length > 16 ||
+    operations.some(operation => typeof operation !== "string" || !operation || operation.length > 256)
+  ) {
+    throw scopeError("adapter effects require bounded concrete targets and native operations");
+  }
+  const identity = claimIdentity(currentClaimHandle());
+  const targets = resources.map(resource => require("./work_queue_effect_resource.cjs").canonicalResourceTarget(resource));
+  const scope = freeze({ identity, targets, operations: [...operations] });
+  return resourceExecution.run(scope, async () => {
+    for (const resource of targets) {
+      await assertClaimAuthorized({ type: "work_queue_resource_effect", claim_handle: identity.claim_handle, repo: resource.repository }, { effect: true, resource });
+    }
+    return callback();
+  });
+}
+
+/**
+ * Register only independently read-back adapter receipts, never agent messages.
+ * @template {Record<string, unknown>} T
+ * @param {T} proof
+ * @returns {T}
+ */
+function createClaimResourceVerification(proof) {
+  const identity = claimIdentity(currentClaimHandle());
+  if (proof.verified !== true || proof.claim_handle !== identity.claim_handle || !object(proof.authority_resource)) throw scopeError("adapter verification requires an independently resolved authority receipt");
+  const resources = proof.authority_resources === undefined ? [proof.authority_resource] : proof.authority_resources;
+  if (!Array.isArray(resources) || resources.length < 1 || resources.length > 128) throw scopeError("adapter verification requires bounded complete authority targets");
+  const targets = resources.map(resource => require("./work_queue_resource_scope.cjs").validateEffectResource(require("./work_queue_effect_resource.cjs").canonicalResourceTarget(resource)));
+  if (targets.some(target => target.host !== "github.com" || !target.repository_id)) throw scopeError("adapter verification requires independently resolved native repository identities");
+  if (canonical(targets[0]) !== canonical(require("./work_queue_effect_resource.cjs").canonicalResourceTarget(proof.authority_resource))) throw scopeError("adapter verification has conflicting authority targets");
+  resourceVerifications.set(proof, { identity, targets: freeze(targets) });
+  return freeze(proof);
+}
+
+/**
+ * @template T
+ * @param {unknown} proof
+ * @param {() => T | Promise<T>} callback
+ * @returns {Promise<T>}
+ */
+async function withClaimResourceVerification(proof, callback) {
+  const facts = proof !== null && typeof proof === "object" ? resourceVerifications.get(proof) : undefined;
+  if (!facts) throw scopeError("adapter verification requires its private in-process authority receipt");
+  assertClaimIdentity(facts.identity);
+  return resourceExecution.run({ ...facts, operations: [], verification: true }, async () => {
+    for (const resource of facts.targets) {
+      await assertClaimAuthorized({ type: "work_queue_resource_verification", claim_handle: facts.identity.claim_handle, repo: resource.repository }, { resource });
+    }
+    return callback();
+  });
+}
+
+/** @param {unknown} resource */
+function isProtectedClaimResourceTarget(resource) {
+  const scope = resourceExecution.getStore();
+  if (!scope) return false;
+  assertClaimIdentity(scope.identity);
+  return scope.targets.some(target => canonical(target) === canonical(resource));
+}
+
+/** @param {string} operation */
+function currentClaimResourceEffects(operation) {
+  const scope = resourceExecution.getStore();
+  if (!scope || !scope.operations.includes(operation)) return null;
+  assertClaimIdentity(scope.identity);
+  return scope.targets;
+}
+
+const closedEffectChannels = new WeakMap();
+
+function closeClaimEffectChannel() {
+  const execution = claimExecution.getStore();
+  if (!execution || !Array.isArray(execution.effects)) throw scopeError("closing a write channel requires trusted scoped effect accounting");
+  if (execution.closedEffectChannel) return execution.closedEffectChannel;
+  const channel = Object.freeze({});
+  closedEffectChannels.set(channel, { identity: claimIdentity(execution.claim_handle), effects: canonical(execution.effects) });
+  execution.closedEffectChannel = channel;
+  return channel;
+}
+
+function claimEffectChannelMatches(channel, effects, assignment, handle) {
+  const closed = channel && closedEffectChannels.get(channel);
+  return !!closed && canonical(closed.identity) === canonical(claimIdentity(handle, assignment)) && closed.effects === canonical(effects);
+}
+
 function recordClaimEffect(effect) {
   const execution = claimExecution.getStore();
   if (!execution || !Array.isArray(execution.effects)) return null;
+  if (execution.closedEffectChannel) throw scopeError("Claim write channel is closed for independent delivery verification");
   const attempt = { ...effect, ...claimIdentity(execution.claim_handle) };
   execution.effects.push(attempt);
   return attempt;
@@ -264,6 +409,13 @@ module.exports = {
   assertClaimArtifactFile,
   currentClaimHandle,
   currentClaimAssignment,
+  withClaimResourceEffects,
+  createClaimResourceVerification,
+  withClaimResourceVerification,
+  currentClaimResourceEffects,
+  isProtectedClaimResourceTarget,
   recordClaimEffect,
+  closeClaimEffectChannel,
+  claimEffectChannelMatches,
   scopedArtifactFilename,
 };

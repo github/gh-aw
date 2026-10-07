@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -239,12 +241,76 @@ func Canonical(data []byte) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func canonicalValue(value any) ([]byte, error) {
+// CanonicalValue encodes typed JSON data using the integer-only wire profile.
+func CanonicalValue(value any) ([]byte, error) {
+	if err := validateTypedNumbers(reflect.ValueOf(value), 0); err != nil {
+		return nil, err
+	}
 	data, err := json.Marshal(value)
 	if err != nil {
 		return nil, err
 	}
 	return Canonical(data)
+}
+
+func validateTypedNumbers(value reflect.Value, depth int) error {
+	for wrappers := 0; value.IsValid() &&
+		(value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer); wrappers++ {
+		if value.IsNil() {
+			return nil
+		}
+		if wrappers > 64 {
+			return queueError("resource_limit", "cyclic or excessive typed JSON indirection")
+		}
+		value = value.Elem()
+	}
+	if !value.IsValid() {
+		return nil
+	}
+	if depth > 64 {
+		return queueError("resource_limit", "typed JSON nesting exceeds 64")
+	}
+	switch value.Kind() {
+	case reflect.Float32, reflect.Float64:
+		number := value.Float()
+		if math.IsNaN(number) || math.IsInf(number, 0) || math.Abs(number) > float64(MaxTimestamp) ||
+			number != math.Trunc(number) || number == 0 && math.Signbit(number) {
+			return queueError("noncanonical_number", "typed numbers must be finite safe integers without negative zero")
+		}
+	case reflect.Map:
+		for entries := value.MapRange(); entries.Next(); {
+			if err := validateTypedNumbers(entries.Value(), depth+1); err != nil {
+				return err
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		if value.Type().Elem().Kind() == reflect.Uint8 {
+			return nil
+		}
+		if value.Len() > 16384 {
+			return queueError("resource_limit", "JSON array exceeds 16384 members")
+		}
+		for index := 0; index < value.Len(); index++ {
+			if err := validateTypedNumbers(value.Index(index), depth+1); err != nil {
+				return err
+			}
+		}
+	case reflect.Struct:
+		for index := 0; index < value.NumField(); index++ {
+			field := value.Type().Field(index)
+			if field.PkgPath != "" || field.Tag.Get("json") == "-" {
+				continue
+			}
+			if err := validateTypedNumbers(value.Field(index), depth+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func canonicalValue(value any) ([]byte, error) {
+	return CanonicalValue(value)
 }
 
 func hashBytes(data []byte) string {
@@ -255,6 +321,14 @@ func hashBytes(data []byte) string {
 func NodeID(graphID, nodeKey string) string {
 	data, _ := canonicalValue(map[string]string{"graph_id": graphID, "node_key": nodeKey})
 	return hashBytes(data)
+}
+
+func IndependentGraphID(payload []byte) (string, error) {
+	data, err := Canonical(payload)
+	if err != nil {
+		return "", err
+	}
+	return hashBytes(data), nil
 }
 
 func Fingerprint(actor Actor, kind string, parameters json.RawMessage) (string, error) {
@@ -365,7 +439,7 @@ func Parse(data []byte) ([]QueueCommit, error) {
 			return nil, queueError("unsupported_protocol", "line %d: %v", index+1, err)
 		}
 		if err := ValidateCommit(commit); err != nil {
-			return nil, queueError("ledger_invalid", "line %d: %v", index+1, err)
+			return nil, fmt.Errorf("%w (line %d)", err, index+1)
 		}
 		result = append(result, commit)
 	}

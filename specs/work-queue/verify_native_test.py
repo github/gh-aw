@@ -2,10 +2,16 @@
 """Dependency-free checks for the independent driver (python3 -B ...)."""
 
 import importlib.util
+import io
 import json
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location("verify_native", Path(__file__).with_name("verify_native.py"))
 verify = importlib.util.module_from_spec(spec)
@@ -16,6 +22,406 @@ fixture_spec.loader.exec_module(fixtures)
 
 
 class IndependentDriverTests(unittest.TestCase):
+    def test_conformance_refuses_missing_positive_before_native_execution(self):
+        path = verify.ROOT / "actions/setup/js/work_queue_worker_child_fixtures.json"
+        original = path.read_bytes()
+        original_read = Path.read_bytes
+        for scenario in ("no-positive", "substituted-positive"):
+            with self.subTest(scenario=scenario):
+                source = json.loads(original)
+                for case in source["cases"]:
+                    case["valid"] = False
+                    if scenario == "substituted-positive" and case["name"] == "completed-parent-inherited-entitlement":
+                        case["valid"] = True
+                        case["name"] = "unrelated-completed-positive"
+                if scenario == "substituted-positive":
+                    source["cases"].append({"name": "second-unrelated-completed-positive", "valid": True, "expected": {}})
+                    self.assertEqual(sum(case["valid"] for case in source["cases"]), 2)
+
+                def read(candidate):
+                    return verify.canonical(source).encode() if candidate == path else original_read(candidate)
+
+                with mock.patch.object(Path, "read_bytes", read), mock.patch.object(verify, "Native") as native:
+                    with self.assertRaisesRegex(AssertionError, "^required pending parent positive$"):
+                        fixtures.conformance(verify.SPEC / "fixtures", {}, {}, Path("unused"), verify)
+                    native.assert_not_called()
+
+    def test_worker_child_required_scenarios_allow_additions_not_substitution(self):
+        source = json.loads((verify.ROOT / "actions/setup/js/work_queue_worker_child_fixtures.json").read_bytes())
+        original = verify.canonical(source)
+        self.assertEqual(fixtures.validate_worker_child_cases(source), source["cases"])
+        added = {"name": "additional-independent-positive", "valid": True, "expected": {}}
+        source["cases"].append(added)
+        self.assertIs(fixtures.validate_worker_child_cases(source)[-1], added)
+        self.assertEqual(verify.canonical({**source, "cases": source["cases"][:-1]}), original)
+        for scenario in ("substitute", "missing", "duplicate", "missing-negative", "positive-negative",
+                         "nonboolean", "missing-expected", "wrong-terminal-code", "missing-terminal-code",
+                         "terminal-acceptance"):
+            with self.subTest(scenario=scenario):
+                altered = json.loads(verify.canonical(source))
+                verified = next(case for case in altered["cases"] if case["name"] == "verified-parent-inherited-entitlement")
+                pending = next(case for case in altered["cases"] if case["name"] == "completed-parent-inherited-entitlement")
+                negative = next(case for case in altered["cases"] if case["name"] == "foreign-native-run")
+                if scenario == "substitute":
+                    pending["valid"] = False
+                elif scenario == "missing":
+                    altered["cases"].remove(verified)
+                elif scenario == "duplicate":
+                    altered["cases"].append(dict(verified))
+                elif scenario == "missing-negative":
+                    altered["cases"].remove(negative)
+                elif scenario == "positive-negative":
+                    negative["valid"], negative["expected"] = True, {}
+                elif scenario == "nonboolean":
+                    altered["cases"][-1]["valid"] = 1
+                elif scenario == "wrong-terminal-code":
+                    verified["error_code"] = "admission_unauthorized"
+                elif scenario == "missing-terminal-code":
+                    del verified["error_code"]
+                elif scenario == "terminal-acceptance":
+                    verified["valid"], verified["expected"] = True, {}
+                else:
+                    del pending["expected"]
+                with self.assertRaises(AssertionError):
+                    fixtures.validate_worker_child_cases(altered)
+
+    def test_recovery_headroom_audit_requires_exact_exported_integer_measurements(self):
+        outputs = [{"headroom_bytes": value} for value in (0, 55296, 0)]
+        with mock.patch.object(verify, "Native") as native:
+            engine = native.return_value.__enter__.return_value
+            engine.call.side_effect = outputs
+            rows, failures = verify.recovery_headroom_audit({"go": ["native"]}, {})
+            self.assertEqual(failures, [])
+            self.assertEqual([row["output"] for row in rows], outputs)
+            self.assertEqual([row["expected_headroom_bytes"] for row in rows], [0, 55296, 0])
+            requests = [call.args[0] for call in engine.call.call_args_list]
+            self.assertTrue(all(value["action"] == "recovery_headroom" for value in requests))
+            self.assertEqual(len(requests[0]["data"].splitlines()), 1)
+            self.assertEqual(len(requests[1]["data"].splitlines()), 2)
+            self.assertEqual(len(requests[2]["data"].splitlines()), 3)
+        for invalid in ({"headroom_bytes": True}, {"headroom_bytes": 55296.0},
+                        {"headroom_bytes": None}, {"headroom_bytes": -1},
+                        {"headroom_bytes": 0}, {"error": "ledger_limit: refused"},
+                        {"headroom_bytes": 55296, "unexpected": 1}):
+            with self.subTest(invalid=invalid), mock.patch.object(verify, "Native") as native:
+                native.return_value.__enter__.return_value.call.side_effect = [outputs[0], invalid, outputs[2]]
+                rows, failures = verify.recovery_headroom_audit({"go": ["native"]}, {})
+                self.assertEqual(len(failures), 1)
+                self.assertEqual(rows[1]["output"], invalid)
+
+    def test_native_shutdown_timeout_kills_and_closes_owned_process(self):
+        native = verify.Native(["test-native"], {})
+        native.process = mock.Mock(stdin=io.StringIO(), stdout=io.StringIO(), stderr=io.StringIO())
+        native.process.wait.side_effect = [subprocess.TimeoutExpired("test-native", 30), 0]
+        with self.assertRaisesRegex(RuntimeError, "did not stop within 30 seconds"):
+            native.__exit__(None, None, None)
+        native.process.kill.assert_called_once_with()
+        self.assertTrue(native.process.stdin.closed)
+        self.assertTrue(native.process.stdout.closed)
+        self.assertTrue(native.process.stderr.closed)
+
+    def test_native_build_cleanup_retains_reports_on_success_and_failure(self):
+        args = SimpleNamespace(benchmark_only=True, benchmark=True, sizes=[1], iterations=1)
+        for scenario in ("success", "build-failure", "benchmark-failure"):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temporary:
+                evidence = Path(temporary)
+
+                def build(command, **kwargs):
+                    Path(command[command.index("-o") + 1]).write_bytes(b"temporary executable")
+                    if scenario == "build-failure":
+                        raise subprocess.CalledProcessError(1, command)
+
+                def benchmark(*unused):
+                    (evidence / "benchmark.json").write_text('{"status":"passed"}\n')
+                    if scenario == "benchmark-failure":
+                        raise RuntimeError("expected benchmark failure")
+                    return {"status": "passed"}
+
+                with mock.patch.object(verify, "engine_source_hashes", return_value={"test": "hash"}), \
+                        mock.patch.object(verify.subprocess, "run", side_effect=build), \
+                        mock.patch.object(verify, "benchmark", side_effect=benchmark):
+                    if scenario == "success":
+                        self.assertEqual(verify.run_native_gates(args, evidence), {"benchmark": "passed"})
+                    else:
+                        with self.assertRaises((RuntimeError, subprocess.CalledProcessError)):
+                            verify.run_native_gates(args, evidence)
+                    self.assertFalse(any(evidence.glob("native-build-*")))
+                    self.assertEqual(json.loads((evidence / "sources.json").read_text())["status"], "stable")
+                    if scenario != "build-failure":
+                        self.assertEqual(json.loads((evidence / "benchmark.json").read_text())["status"], "passed")
+
+    def test_existing_evidence_cannot_be_overwritten(self):
+        for filename in ("conformance.json", "run.log"):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as temporary:
+                evidence = Path(temporary)
+                report = evidence / filename
+                report.write_text('{"status":"historical"}\n')
+                with mock.patch.object(sys, "argv", ["verify_native.py", "--evidence-dir", str(evidence)]), \
+                        mock.patch.object(verify, "run_native_gates") as gates:
+                    with self.assertRaisesRegex(SystemExit, "existing evidence is preserved"):
+                        verify.main()
+                    gates.assert_not_called()
+                self.assertEqual(report.read_text(), '{"status":"historical"}\n')
+
+    def test_empty_caller_run_log_does_not_block_fresh_capture(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary)
+            log = evidence / "run.log"
+            log.touch()
+            with mock.patch.object(sys, "argv", ["verify_native.py", "--evidence-dir", str(evidence)]), \
+                    mock.patch.object(verify, "run_native_gates", return_value={"conformance": "passed"}) as gates, \
+                    mock.patch.object(sys, "stdout", io.StringIO()):
+                self.assertEqual(verify.main(), 0)
+                gates.assert_called_once()
+            self.assertEqual(log.read_bytes(), b"")
+
+    def test_benchmark_resources_require_real_finite_measurements(self):
+        metrics = {"rss_peak_bytes": 1, **{key: 0.5 for key in (
+            "parse_ms", "cold_replay_ms", "selection_ms", "packing_ms", "serialization_ms")}}
+        verify.verify_benchmark_resources({"metrics": metrics})
+        for key, invalid in (
+            ("rss_peak_bytes", None), ("rss_peak_bytes", 0), ("rss_peak_bytes", -1),
+            ("rss_peak_bytes", True), ("rss_peak_bytes", "1"),
+            ("parse_ms", -1), ("parse_ms", float("nan")), ("parse_ms", float("inf")),
+            ("cold_replay_ms", True), ("packing_ms", None), ("serialization_ms", "0.5"),
+        ):
+            with self.subTest(key=key, invalid=invalid), self.assertRaises(AssertionError):
+                verify.verify_benchmark_resources({"metrics": {**metrics, key: invalid}})
+
+    def test_typed_parser_controls_preserve_literal_answers(self):
+        cases = fixtures.typed_canonical_cases()
+        self.assertEqual(len(cases), 7)
+        self.assertEqual([case["expected"] for case in cases[:3]], ["1", "1", '{"x":2}'])
+        self.assertEqual(cases[3]["input"], '{"x":"\\ud800","x":"valid"}')
+        self.assertEqual(cases[3]["error_code"], "invalid_unicode")
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                output = {"error": "invalid_unicode: original string"} if case.get("reject") else {
+                    "canonical": case["expected"]}
+                fixtures.verify_canonical_output(case, output)
+                invalid = {"error": "codec_invalid: source"} if case.get("reject") else {"canonical": "false"}
+                with self.assertRaises(AssertionError):
+                    fixtures.verify_canonical_output(case, invalid)
+
+    def test_constructed_number_fixture_answers_and_typed_transport_are_preserved(self):
+        source = json.loads((verify.SPEC / "fixtures/canonical-typed.json").read_bytes())
+        original = verify.canonical(source)
+        cases = fixtures.shared_constructed_number_cases(source)
+        self.assertEqual(len(cases), len(source["cases"]))
+        self.assertEqual({case["container"] for case in cases}, {"root", "object", "array", "nested"})
+        self.assertTrue({"NaN", "+Infinity", "-Infinity", "-0"}.issubset({case["literal"] for case in cases}))
+        for raw, case in zip(source["cases"], cases):
+            with self.subTest(case=case["name"]):
+                self.assertEqual(case["literal"], raw["literal"])
+                self.assertEqual(case["container"], raw["container"])
+                if "expected" in raw:
+                    self.assertEqual(case["expected"], raw["expected"])
+                    fixtures.verify_canonical_output(case, {"canonical": raw["expected"]})
+                else:
+                    self.assertEqual(case["error_code"], raw["code"])
+                    fixtures.verify_canonical_output(case, {"error": f"{raw['code']}: actual typed guard"})
+                    with self.assertRaises(AssertionError):
+                        fixtures.verify_canonical_output(case, {"canonical": "null"})
+        self.assertEqual(verify.canonical(source), original)
+        for scenario in ("version", "api", "container", "duplicate", "both-answers"):
+            with self.subTest(scenario=scenario):
+                altered = json.loads(original)
+                if scenario == "version":
+                    altered["version"] = 3
+                elif scenario == "api":
+                    altered["go_api"] = "json.Marshal"
+                elif scenario == "container":
+                    altered["cases"][0]["container"] = "foreign"
+                elif scenario == "duplicate":
+                    altered["cases"].append(dict(altered["cases"][0]))
+                else:
+                    altered["cases"][0]["code"] = "noncanonical_number"
+                with self.assertRaises(AssertionError):
+                    fixtures.shared_constructed_number_cases(altered)
+
+    def test_shared_typed_numeric_oracles_preserve_negative_zero_and_nested_payload(self):
+        codec = {
+            "valid": [{"name": "nested", "input": '{"z":["1.25",null,0,{"n":"-0"}]}',
+                       "expected": '{"z":["1.25",null,0,{"n":"-0"}]}'}],
+            "typed_number_rejections": [
+                {"name": "negative-zero", "input": "-0", "code": "noncanonical_number"},
+                {"name": "fraction", "input": "1.25", "code": "noncanonical_number"},
+            ],
+            "error_codes": [
+                {"name": "surrogate-value", "input": '{"x":"\\ud800"}', "code": "invalid_unicode"},
+                {"name": "surrogate-key", "input": '{"\\udc00":1}', "code": "invalid_unicode"},
+                {"name": "duplicate", "input": '{"x":1,"x":2}', "code": "duplicate_key"},
+            ],
+        }
+        original = verify.canonical(codec)
+        cases = fixtures.shared_typed_canonical_cases(codec)
+        self.assertEqual(len(cases), 7)
+        self.assertEqual(cases[0]["input"], codec["valid"][0]["input"])
+        self.assertEqual(cases[0]["expected"], codec["valid"][0]["expected"])
+        self.assertEqual([case["input"] for case in cases[1:5]], [
+            "-0", '{"payload":{"nested":[-0]}}',
+            "1.25", '{"payload":{"nested":[1.25]}}',
+        ])
+        self.assertEqual([case["input"] for case in cases[5:]],
+                         [case["input"] for case in codec["error_codes"][:2]])
+        self.assertTrue(all(case["error_code"] == "invalid_unicode" for case in cases[5:]))
+        for index, case in enumerate(cases[1:], 1):
+            self.assertEqual(case["error_code"], "noncanonical_number" if index < 5 else "invalid_unicode")
+            fixtures.verify_canonical_output(case, {"error": f"{case['error_code']}: typed value"})
+            for output in ({"canonical": "0"}, {"error": "codec_invalid: typed value"}):
+                with self.subTest(case=case["name"], output=output), self.assertRaises(AssertionError):
+                    fixtures.verify_canonical_output(case, output)
+        self.assertEqual(verify.canonical(codec), original)
+
+    def test_worker_child_provenance_uses_public_request_records(self):
+        producer = {"role": "producer", "principal": "11", "repository": "owner/repo"}
+        worker = {"role": "worker", "principal": "22", "repository": "owner/repo",
+                  "run_id": "202", "run_attempt": 1, "workflow": ".github/workflows/worker.lock.yml",
+                  "dispatch_id": "original-dispatch", "claim_handle": "h1"}
+        records = [{"request": {"id": "root"}, "actor": producer},
+                   {"request": {"id": "child"}, "actor": worker}]
+        case = {"transactions": records, "canonical": verify.ledger_text(records),
+                "expected": {"worker_principal": "22", "producer_principal": "11",
+                             "child_work_id": "child", "parent_work_id": "parent",
+                             "pool": "default", "priority": 1, "fairness_key": "tenant"}}
+        output = {"canonical_ledger": case["canonical"], "projection": {
+            "works": {"child": {"pool": "default", "priority": 1, "fairness_key": "tenant", "state": "available"},
+                      "parent": {"position": {"commit": 0}, "state": "completed", "barrier": "pending"}},
+            "requests": {"child": {"actor": dict(worker)}, "root": {"actor": dict(producer)}},
+            "policy": {"producers": {"11": {}}},
+        }}
+        original = verify.canonical(output)
+        fixtures.verify_worker_child_output(case, output)
+        self.assertNotIn("transactions", output["projection"])
+        self.assertEqual(verify.canonical(output), original)
+        for scenario in ("worker-role", "worker-principal", "producer-principal",
+                         "producer-role", "worker-run", "worker-attempt", "worker-workflow", "worker-dispatch",
+                         "worker-handle", "worker-repository", "actor-origin-spoof",
+                         "child-pool", "child-priority", "child-key", "root-entitlement", "canonical-bytes"):
+            with self.subTest(scenario=scenario):
+                altered = json.loads(json.dumps(output))
+                projection = altered["projection"]
+                if scenario == "worker-role":
+                    projection["requests"]["child"]["actor"]["role"] = "producer"
+                elif scenario == "worker-principal":
+                    projection["requests"]["child"]["actor"]["principal"] = "11"
+                elif scenario == "producer-principal":
+                    projection["requests"]["root"]["actor"]["principal"] = "22"
+                elif scenario == "producer-role":
+                    projection["requests"]["root"]["actor"]["role"] = "administrator"
+                elif scenario == "actor-origin-spoof":
+                    projection["requests"]["child"]["actor"]["logical_origin"] = producer
+                elif scenario.startswith("worker-"):
+                    field, value = {
+                        "worker-run": ("run_id", "203"), "worker-attempt": ("run_attempt", 2),
+                        "worker-workflow": ("workflow", ".github/workflows/foreign.lock.yml"),
+                        "worker-dispatch": ("dispatch_id", "sibling-dispatch"),
+                        "worker-handle": ("claim_handle", "h2"), "worker-repository": ("repository", "foreign/repo"),
+                    }[scenario]
+                    projection["requests"]["child"]["actor"][field] = value
+                elif scenario == "root-entitlement":
+                    projection["policy"]["producers"]["22"] = {}
+                elif scenario == "canonical-bytes":
+                    altered["canonical_ledger"] += "\n"
+                else:
+                    field, value = {"child-pool": ("pool", "foreign"), "child-priority": ("priority", 5),
+                                    "child-key": ("fairness_key", "")}[scenario]
+                    projection["works"]["child"][field] = value
+                with self.assertRaises(AssertionError):
+                    fixtures.verify_worker_child_output(case, altered)
+        for name in ("completed-parent-inherited-entitlement",
+                     "completed-parent-cancelled-sibling-unit-weight-entitlement"):
+            with self.subTest(name=name):
+                named = {**case, "name": name}
+                altered = json.loads(original)
+                fixtures.verify_worker_child_output(named, altered)
+                for field, value in (("state", "claimed"), ("barrier", "failed"),
+                                     ("barrier", "verified")):
+                    invalid = json.loads(verify.canonical(altered))
+                    invalid["projection"]["works"]["parent"][field] = value
+                    with self.assertRaises(AssertionError):
+                        fixtures.verify_worker_child_output(named, invalid)
+
+    def test_worker_child_mixed_sibling_output_checks_all_independent_expectations(self):
+        producer = {"role": "producer", "principal": "11"}
+        worker = {"role": "worker", "principal": "22", "dispatch_id": "dispatch"}
+        records = [{"request": {"id": "root"}, "actor": producer},
+                   {"request": {"id": "child"}, "actor": worker}]
+        case = {
+            "name": "completed-parent-cancelled-sibling-unit-weight-entitlement",
+            "transactions": records, "canonical": verify.ledger_text(records),
+            "expected": {"worker_principal": "22", "producer_principal": "11", "child_work_id": "child",
+                         "parent_work_id": "parent", "pool": "default", "priority": 1, "fairness_key": "tenant",
+                         "accounting_weight": 1, "bound_claims": 2, "cancelled_sibling_work_id": "sibling"},
+        }
+        output = {"canonical_ledger": case["canonical"], "projection": {
+            "works": {"child": {"pool": "default", "priority": 1, "fairness_key": "tenant", "state": "available"},
+                      "parent": {"position": {"commit": 0}, "state": "completed", "barrier": "pending"},
+                      "sibling": {"state": "available", "retry_not_before": 34400}},
+            "requests": {"child": {"actor": worker}, "root": {"actor": producer}},
+            "policy": {"producers": {"11": {}}, "accounting_weights": {"tenant": 1}},
+            "dispatches": {"dispatch": {"claims": [{"work_id": "parent", "claim_id": "c1"},
+                                                 {"work_id": "sibling", "claim_id": "c2"}],
+                                        "state": "bound", "released": False}},
+            "claims": {"c1": {"state": "completed"}, "c2": {"state": "cancelled"}},
+        }}
+        original = verify.canonical(output)
+        fixtures.verify_worker_child_output(case, output)
+        for scenario in ("weight", "boolean-weight", "size", "assignment", "unbound", "released", "work-count",
+                         "parent", "retry", "sibling", "parent-claim", "sibling-claim"):
+            with self.subTest(scenario=scenario):
+                altered = json.loads(original)
+                projection = altered["projection"]
+                if scenario == "weight":
+                    projection["policy"]["accounting_weights"]["tenant"] = 3
+                elif scenario == "boolean-weight":
+                    projection["policy"]["accounting_weights"]["tenant"] = True
+                elif scenario == "size":
+                    projection["dispatches"]["dispatch"]["claims"].pop()
+                elif scenario == "assignment":
+                    projection["dispatches"]["dispatch"]["claims"].reverse()
+                elif scenario == "unbound":
+                    projection["dispatches"]["dispatch"]["state"] = "started"
+                elif scenario == "released":
+                    projection["dispatches"]["dispatch"]["released"] = True
+                elif scenario == "work-count":
+                    projection["works"]["extra"] = {}
+                elif scenario == "parent":
+                    projection["works"]["parent"]["barrier"] = "verified"
+                elif scenario == "retry":
+                    projection["works"]["sibling"]["retry_not_before"] = 0
+                elif scenario == "sibling":
+                    projection["works"]["sibling"]["state"] = "completed"
+                else:
+                    projection["claims"]["c1" if scenario == "parent-claim" else "c2"]["state"] = "open"
+                with self.assertRaises(AssertionError):
+                    fixtures.verify_worker_child_output(case, altered)
+        self.assertEqual(verify.canonical(output), original)
+
+    def test_worker_child_fixtures_retain_literal_authority_and_valid_fingerprints(self):
+        path = "actions/setup/js/work_queue_worker_child_fixtures.json"
+        source = json.loads((verify.ROOT / path).read_bytes())
+        fence = verify.engine_source_hashes()
+        self.assertIn(path, fence)
+        self.assertIn("actions/setup/js/work_queue_worker_child_fixture_generator.cjs", fence)
+        for case in source["cases"]:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(verify.ledger_text(case["transactions"]), case["canonical"])
+                for record in case["transactions"]:
+                    self.assertEqual(record["request"]["fingerprint"], verify.digest({
+                        "actor": record["actor"], "kind": record["request"]["kind"],
+                        "parameters": record["request"]["parameters"],
+                    }))
+                if case["valid"]:
+                    record = case["transactions"][-1]
+                    self.assertEqual(record["actor"]["principal"], "22")
+                    self.assertEqual(record["actor"]["role"], "worker")
+                    self.assertEqual(case["transactions"][1]["actor"]["principal"], "11")
+                    self.assertNotIn("22", case["transactions"][0]["operations"][0]["policy"]["producers"])
+                    self.assertEqual(record["operations"][0]["priority"], 1)
+                    self.assertEqual(record["operations"][0]["fairness_key"], "tenant")
+        fixtures.validate_worker_child_cases(source)
+
     def test_integer_and_unicode_canonical_oracle(self):
         self.assertEqual(verify.canonical({"\U00010000": 9007199254740991, "\ue000": "9007199254740992"}),
                          '{"\ue000":"9007199254740992","\U00010000":9007199254740991}')
@@ -151,10 +557,40 @@ class IndependentDriverTests(unittest.TestCase):
                      "specs/work-queue/native_probe/main.go", "specs/work-queue/native_probe/rss_unix.go",
                      "specs/work-queue/verify_native.py", "specs/work-queue/verify_native_fixtures.py",
                      "specs/work-queue/fixtures/canonical-prefix.json",
+                     "specs/work-queue/fixtures/canonical-typed.json",
                      "specs/work-queue/fixtures/reason-validation.json",
                      "specs/work-queue/fixtures/identity-validation.json",
+                     "specs/work-queue/effect-contract.schema.json",
+                     "specs/work-queue/resource-scope.schema.json",
+                     "specs/work-queue/fixtures/effect-contract.json",
+                     "specs/work-queue/fixtures/resource-scope.json",
+                     "pkg/workqueue/resource_scope.go",
+                     "actions/setup/js/work_queue_resource_scope.cjs",
+                     "actions/setup/js/work_queue_store.cjs",
+                     "actions/setup/js/work_queue_provisioning.cjs",
+                     "actions/setup/js/work_queue_yaml.cjs",
                      "actions/setup/js/work_queue_conformance_fixtures.json"):
             self.assertIn(path, sources)
+        for path in sources:
+            if not path.startswith("actions/setup/js/") or not path.endswith(".cjs"):
+                continue
+            text = (verify.ROOT / path).read_text()
+            for dependency in re.findall(r"""require\(["'](\./[^"']+\.cjs)["']\)""", text):
+                resolved = (verify.ROOT / path).parent.joinpath(dependency).resolve()
+                self.assertIn(str(resolved.relative_to(verify.ROOT)), sources, path)
+        original_read = Path.read_bytes
+        for name in ("actions/setup/js/work_queue_claim_scope.cjs",
+                     "actions/setup/js/work_queue_store.cjs", "actions/setup/js/work_queue_provisioning.cjs",
+                     "actions/setup/js/work_queue_yaml.cjs", "specs/work-queue/effect-contract.schema.json",
+                     "specs/work-queue/resource-scope.schema.json"):
+            with self.subTest(source=name):
+                target = verify.ROOT / name
+                data = original_read(target)
+                with mock.patch.object(Path, "read_bytes", autospec=True,
+                                       side_effect=lambda path: data + b"\n" if path == target else original_read(path)):
+                    changed = verify.engine_source_hashes()
+                self.assertEqual(set(changed), set(sources))
+                self.assertEqual([path for path in sources if changed[path] != sources[path]], [name])
 
     def test_principal_policy_answers_are_not_engine_outputs(self):
         cases = fixtures.principal_policy_cases(verify)
@@ -196,6 +632,43 @@ class IndependentDriverTests(unittest.TestCase):
         upper_bound = len(verify.canonical(assignment).encode()) + 7 * (descriptor - 2)
         self.assertLess(upper_bound, limit, "seven references fit even with escaped future identities")
 
+    def test_future_reference_closed_envelope_bounds_are_literal_and_legal(self):
+        for count, expected_bytes, refusal in ((7, 34515, False), (9, 43961, False),
+                                               (10, 48684, False), (11, 53407, True)):
+            with self.subTest(references=count):
+                ledger = verify.future_reference_workload(count)
+                original = ledger.text()
+                assignment, bound = verify.future_reference_assignment_bound(ledger)
+                self.assertEqual(bound, expected_bytes)
+                self.assertEqual(bound, 1454 + count * 4723)
+                self.assertEqual(bound > ledger.policy["limits"]["assignment_bytes"], refusal)
+                identities = [assignment["request_id"], assignment["commit_id"],
+                              *[reference["result_commit_id"] for reference in assignment["claims"][0]["result_refs"]]]
+                for identity in identities:
+                    self.assertEqual(len(identity.encode()), 256)
+                    self.assertEqual(len(verify.canonical(identity).encode()) - 2, 512)
+                    self.assertFalse(any(ord(char) < 32 or ord(char) == 127 for char in identity))
+                descriptor = {"p": "x" * (ledger.policy["limits"]["result_bytes"] - 8)}
+                self.assertEqual(len(verify.canonical(descriptor).encode()), 4096)
+                for reference in assignment["claims"][0]["result_refs"]:
+                    reference["descriptor"] = descriptor
+                self.assertEqual(len(verify.canonical(assignment).encode()), expected_bytes)
+                self.assertEqual(ledger.text(), original)
+
+    def test_future_exact_boundary_policy_is_installed_before_fingerprinting(self):
+        for count, bound in ((9, 43961), (10, 48684)):
+            for limit in (bound, bound - 1):
+                with self.subTest(references=count, assignment_bytes=limit):
+                    ledger = verify.future_reference_workload(count, assignment_bytes=limit)
+                    self.assertEqual(ledger.policy["limits"]["assignment_bytes"], limit)
+                    genesis = ledger.commits[0]
+                    self.assertEqual(genesis["request"]["fingerprint"], verify.digest({
+                        "actor": genesis["actor"], "kind": "policy", "parameters": genesis["request"]["parameters"],
+                    }))
+                    _, actual = verify.future_reference_assignment_bound(ledger)
+                    self.assertEqual(actual, bound)
+        self.assertEqual(verify.default_policy()["limits"]["assignment_bytes"], 49152)
+
     def test_structural_wire_answers_preserve_shared_inputs_and_request_binding(self):
         source = json.loads((verify.SPEC / "fixtures/canonical-prefix.json").read_bytes())
         original = verify.canonical(source)
@@ -219,10 +692,6 @@ class IndependentDriverTests(unittest.TestCase):
                         if operation["kind"] == "Observation")
                     self.assertEqual(bool(re.fullmatch(r"[1-9][0-9]{0,255}", value)), case["valid"])
         self.assertEqual(verify.canonical(source), original)
-
-    def test_independent_expected_values_are_not_parity_only(self):
-        with self.assertRaises(AssertionError):
-            verify.assert_subset({"selection": {"work_id": "wrong"}}, {"selection": {"work_id": "expected"}})
 
     def test_shared_deadline_answers_and_trusted_record_binding_are_preserved(self):
         source = json.loads((verify.SPEC / "fixtures/canonical-prefix.json").read_bytes())

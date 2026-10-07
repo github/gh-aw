@@ -2,4 +2,4 @@
 
 package main
 
-func processRSSPeak() int64 { return 0 }
+func processRSSPeak() (*int64, error) { return nil, nil }

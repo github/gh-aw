@@ -44,11 +44,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "role",
-        "principal",
-        "repository"
-      ],
+      "required": ["role", "principal", "repository"],
       "type": "object"
     },
     "ClaimBound": {
@@ -75,13 +71,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "reason",
-        "retry_not_before"
-      ],
+      "required": ["kind", "work_id", "claim_id", "reason", "retry_not_before"],
       "type": "object"
     },
     "ClaimOperation": {
@@ -111,14 +101,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "dispatch_id",
-        "handle",
-        "observations"
-      ],
+      "required": ["kind", "work_id", "claim_id", "dispatch_id", "handle", "observations"],
       "type": "object"
     },
     "CompletionOperation": {
@@ -146,15 +129,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "dispatch_id",
-        "claim_handle",
-        "run_id",
-        "run_attempt"
-      ],
+      "required": ["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "run_id", "run_attempt"],
       "type": "object"
     },
     "ControlOperation": {
@@ -190,12 +165,7 @@
           ]
         }
       },
-      "required": [
-        "kind",
-        "control",
-        "value",
-        "reason"
-      ],
+      "required": ["kind", "control", "value", "reason"],
       "type": "object"
     },
     "CountBound": {
@@ -243,15 +213,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "completion_id",
-        "reason",
-        "disposition",
-        "evidence"
-      ],
+      "required": ["kind", "work_id", "claim_id", "completion_id", "reason", "disposition", "evidence"],
       "type": "object"
     },
     "Dependency": {
@@ -287,12 +249,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "pool",
-        "max_claims",
-        "max_dispatches",
-        "max_bytes"
-      ],
+      "required": ["pool", "max_claims", "max_dispatches", "max_bytes"],
       "type": "object"
     },
     "DispatchOperation": {
@@ -336,11 +293,7 @@
           ]
         }
       },
-      "required": [
-        "kind",
-        "dispatch_id",
-        "state"
-      ],
+      "required": ["kind", "dispatch_id", "state"],
       "type": "object"
     },
     "Evidence": {
@@ -428,15 +381,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "source",
-        "repository",
-        "workflow",
-        "ref",
-        "principal",
-        "checked_at"
-      ],
+      "required": ["kind", "source", "repository", "workflow", "ref", "principal", "checked_at"],
       "type": "object"
     },
     "FinishParameters": {
@@ -459,11 +404,7 @@
           ]
         }
       },
-      "required": [
-        "dispatch_id",
-        "claim_handle",
-        "outcome"
-      ],
+      "required": ["dispatch_id", "claim_handle", "outcome"],
       "type": "object"
     },
     "Identity": {
@@ -493,11 +434,7 @@
           "$ref": "#/$defs/Resource"
         }
       },
-      "required": [
-        "kind",
-        "resource",
-        "condition"
-      ],
+      "required": ["kind", "resource", "condition"],
       "type": "object"
     },
     "Limits": {
@@ -537,19 +474,7 @@
           "$ref": "#/$defs/Timestamp"
         }
       },
-      "required": [
-        "ledger_bytes",
-        "recovery_bytes",
-        "payload_bytes",
-        "graph_nodes",
-        "predecessors",
-        "pending_nodes",
-        "operations",
-        "assignment_bytes",
-        "result_bytes",
-        "evidence_bytes",
-        "observation_writes"
-      ],
+      "required": ["ledger_bytes", "recovery_bytes", "payload_bytes", "graph_nodes", "predecessors", "pending_nodes", "operations", "assignment_bytes", "result_bytes", "evidence_bytes", "observation_writes"],
       "type": "object"
     },
     "ObservationOperation": {
@@ -635,16 +560,7 @@
           ]
         }
       },
-      "required": [
-        "kind",
-        "observation_id",
-        "resource",
-        "condition",
-        "state",
-        "observed_at",
-        "credential_generation",
-        "read_status"
-      ],
+      "required": ["kind", "observation_id", "resource", "condition", "state", "observed_at", "credential_generation", "read_status"],
       "type": "object"
     },
     "OperationsParameters": {
@@ -659,9 +575,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "operations"
-      ],
+      "required": ["operations"],
       "type": "object"
     },
     "PolicyOperation": {
@@ -677,11 +591,7 @@
           "$ref": "#/$defs/QueuePolicy"
         }
       },
-      "required": [
-        "kind",
-        "epoch",
-        "policy"
-      ],
+      "required": ["kind", "epoch", "policy"],
       "type": "object"
     },
     "PoolPolicy": {
@@ -724,16 +634,7 @@
           "$ref": "#/$defs/RetryPolicy"
         }
       },
-      "required": [
-        "default_profile",
-        "profiles",
-        "logical_limit",
-        "native_limit",
-        "allowed_repositories",
-        "max_observation_age_ms",
-        "retry",
-        "reconciliation"
-      ],
+      "required": ["default_profile", "profiles", "logical_limit", "native_limit", "allowed_repositories", "max_observation_age_ms", "retry", "reconciliation"],
       "type": "object"
     },
     "Priority": {
@@ -763,11 +664,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "pools",
-        "priorities",
-        "fairness_keys"
-      ],
+      "required": ["pools", "priorities", "fairness_keys"],
       "type": "object"
     },
     "PullRequestEdge": {
@@ -783,11 +680,7 @@
           "$ref": "#/$defs/Resource"
         }
       },
-      "required": [
-        "kind",
-        "resource",
-        "condition"
-      ],
+      "required": ["kind", "resource", "condition"],
       "type": "object"
     },
     "QueueCommit": {
@@ -833,16 +726,7 @@
           "const": 3
         }
       },
-      "required": [
-        "version",
-        "id",
-        "previous",
-        "request",
-        "actor",
-        "policy_epoch",
-        "at",
-        "operations"
-      ],
+      "required": ["version", "id", "previous", "request", "actor", "policy_epoch", "at", "operations"],
       "type": "object"
     },
     "QueueOperation": {
@@ -934,14 +818,7 @@
           "x-key-utf8-max-bytes": 256
         }
       },
-      "required": [
-        "mode",
-        "class_weights",
-        "accounting_weights",
-        "producers",
-        "pools",
-        "limits"
-      ],
+      "required": ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"],
       "type": "object"
     },
     "QueueRequest": {
@@ -997,12 +874,7 @@
           "$ref": "#/$defs/RequestParameters"
         }
       },
-      "required": [
-        "id",
-        "kind",
-        "parameters",
-        "fingerprint"
-      ],
+      "required": ["id", "kind", "parameters", "fingerprint"],
       "type": "object"
     },
     "ReasonCode": {
@@ -1021,10 +893,7 @@
           "$ref": "#/$defs/CountBound"
         }
       },
-      "required": [
-        "max_attempts",
-        "deadline_ms"
-      ],
+      "required": ["max_attempts", "deadline_ms"],
       "type": "object"
     },
     "ReleaseOperation": {
@@ -1040,11 +909,7 @@
           "const": "Release"
         }
       },
-      "required": [
-        "kind",
-        "dispatch_id",
-        "evidence"
-      ],
+      "required": ["kind", "dispatch_id", "evidence"],
       "type": "object"
     },
     "Replacement": {
@@ -1070,11 +935,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "work_id",
-        "disposition",
-        "evidence"
-      ],
+      "required": ["work_id", "disposition", "evidence"],
       "type": "object"
     },
     "RequestParameters": {
@@ -1122,14 +983,7 @@
           "$ref": "#/$defs/Decimal"
         }
       },
-      "required": [
-        "kind",
-        "host",
-        "repository",
-        "repository_id",
-        "resource_id",
-        "number"
-      ],
+      "required": ["kind", "host", "repository", "repository_id", "resource_id", "number"],
       "type": "object"
     },
     "ResultOperation": {
@@ -1155,14 +1009,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "completion_id",
-        "descriptor",
-        "evidence"
-      ],
+      "required": ["kind", "work_id", "claim_id", "completion_id", "descriptor", "evidence"],
       "type": "object"
     },
     "RetryPolicy": {
@@ -1175,10 +1022,7 @@
           "$ref": "#/$defs/CountBound"
         }
       },
-      "required": [
-        "max_attempts",
-        "backoff_ms"
-      ],
+      "required": ["max_attempts", "backoff_ms"],
       "type": "object"
     },
     "Revision": {
@@ -1210,15 +1054,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "run_id",
-        "run_attempt",
-        "repository",
-        "workflow",
-        "ref",
-        "principal",
-        "event"
-      ],
+      "required": ["run_id", "run_attempt", "repository", "workflow", "ref", "principal", "event"],
       "type": "object"
     },
     "SubmitParameters": {
@@ -1233,9 +1069,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "nodes"
-      ],
+      "required": ["nodes"],
       "type": "object"
     },
     "Timestamp": {
@@ -1277,11 +1111,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "reason"
-      ],
+      "required": ["kind", "work_id", "reason"],
       "type": "object"
     },
     "WorkEdge": {
@@ -1294,10 +1124,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id"
-      ],
+      "required": ["kind", "work_id"],
       "type": "object"
     },
     "WorkOperation": {
@@ -1352,20 +1179,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "graph_id",
-        "node_key",
-        "pool",
-        "priority",
-        "fairness_key",
-        "worker_profile",
-        "batch_trust_domain",
-        "payload",
-        "depends_on",
-        "enqueued"
-      ],
+      "required": ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
       "type": "object"
     },
     "WorkerProfile": {
@@ -1396,16 +1210,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "workflow",
-        "ref",
-        "principal",
-        "trust_domain",
-        "credential_scope",
-        "effect_scope",
-        "max_claims",
-        "share_keys"
-      ],
+      "required": ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
       "type": "object"
     }
   },

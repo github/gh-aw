@@ -16,6 +16,10 @@ func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID
 	envVars := make(map[string]string)
 	if isWorkQueueEnabled(data) {
 		envVars["GH_AW_WORK_QUEUE_ENABLED"] = `"true"`
+		envVars["GH_AW_WORK_QUEUE_ROLE"] = fmt.Sprintf("%q", workQueueRuntimeRole(data))
+		if isWorkQueueParticipant(data) {
+			envVars["GH_AW_WORK_QUEUE_INTENT_ORIGIN"] = `"${{ needs.agent.outputs.work_queue_origin }}"`
+		}
 		envVars["GH_AW_WORK_QUEUE_SNAPSHOT"] = fmt.Sprintf("%q", constants.WorkQueueSnapshotPath)
 	}
 

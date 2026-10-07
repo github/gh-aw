@@ -21,11 +21,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "work_id",
-        "result_commit_id",
-        "descriptor"
-      ],
+      "required": ["work_id", "result_commit_id", "descriptor"],
       "type": "object"
     }
   },

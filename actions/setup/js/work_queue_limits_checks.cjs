@@ -3,25 +3,89 @@
 const assert = require("node:assert/strict");
 const { canonicalBytes } = require("./work_queue_codec.cjs");
 const { defaultPolicy } = require("./work_queue_policy.cjs");
-const { checkLedgerBudget, recoveryHeadroom } = require("./work_queue_limits.cjs");
-const { newRequest, replayTransactions } = require("./work_queue_replay.cjs");
-const { administrator, bind, commit, evidence, finish, genesis, grant, reconciler, submission } = require("./work_queue_test_helpers.cjs");
+const { checkLedgerBudget, observationRefreshBudget, recoveryHeadroom } = require("./work_queue_limits.cjs");
+const { appendCommit, generateRequestOperations, newRequest, replayTransactions, serializeProjection } = require("./work_queue_replay.cjs");
+const { administrator, bind, commit, dispatcher, evidence, finish, genesis, grant, reconciler, submission } = require("./work_queue_test_helpers.cjs");
 
 function registerTests({ describe, it }) {
   describe("queue operating envelope and conservative closure reserve", () => {
+    it("reserves a Claim slot before optional reads without changing replay state", () => {
+      const state = replayTransactions([genesis()]);
+      const before = serializeProjection(state);
+      assert.equal(observationRefreshBudget(state), 128);
+      assert.equal(observationRefreshBudget(state, 255), 255);
+      assert.equal(observationRefreshBudget(state, 0), 0);
+      assert.deepEqual(serializeProjection(state), before);
+      for (const maximum of [-1, 0.5, 256, NaN, Infinity]) assert.throws(() => observationRefreshBudget(state, maximum), /observation refresh budget/);
+      assert.throws(() => observationRefreshBudget({ policy: null }), /policy_missing/);
+      const paused = structuredClone(state);
+      paused.grants_paused = true;
+      assert.equal(observationRefreshBudget(paused), 0);
+      const full = structuredClone(state);
+      for (const extra of [0, 1, full.policy.limits.recovery_bytes]) {
+        full.ledgerBytes = full.policy.limits.ledger_bytes + extra;
+        assert.equal(observationRefreshBudget(full), 0);
+      }
+    });
+    it("keeps unknown gates from spending the final operation slot needed by independent ready Work", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      policy.limits.operations = 3;
+      policy.pools.default.profiles.default.max_claims = 1;
+      const resource = { kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: "1", number: "1" };
+      const log = [genesis(policy)];
+      log.push(
+        submission(log, ["gated-a", "gated-b", "gated-c"], {
+          transform: (node, index) => ({ ...node, depends_on: [{ kind: "issue", condition: "completed", resource: { ...resource, resource_id: String(index + 1), number: String(index + 1) } }] }),
+        })
+      );
+      log.push(submission(log, ["independent"], { id: "independent" }));
+      const state = replayTransactions(log);
+      const before = serializeProjection(state);
+      const request = newRequest("bounded-unknown-frontier", "dispatch_next", dispatcher, { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 });
+      const budget = observationRefreshBudget(state);
+      assert.equal(budget, 2);
+      const observations = log[1].operations.slice(0, budget).map((node, index) => ({
+        kind: "Observation",
+        observation_id: `bounded-${index}`,
+        resource: node.depends_on[0].resource,
+        condition: "completed",
+        state: "unknown",
+        observed_at: 100,
+        credential_generation: state.credential_generation,
+        read_status: "external_read_credentials_missing",
+      }));
+      const decision = generateRequestOperations(state, request, dispatcher, 100, "bounded-grant", observations);
+      assert.deepEqual(
+        decision.operations.map(operation => operation.kind),
+        ["Observation", "Observation", "Claim"]
+      );
+      assert.ok("assignments" in decision);
+      assert.equal(decision.assignments.length, 1);
+      assert.equal(decision.assignments[0].claims[0].work_id, log[2].operations[0].work_id);
+      const candidate = { version: 3, id: "bounded-grant", previous: state.tip, request, actor: dispatcher, policy_epoch: state.policy_epoch, at: 100, operations: decision.operations };
+      const accepted = appendCommit(log, candidate);
+      assert.equal(accepted.state.observations.size, 2);
+      assert.equal(accepted.state.requests.has(request.id), true);
+      assert.deepEqual(serializeProjection(state), before);
+      const waiting = replayTransactions(log.slice(0, 2));
+      const noGrant = generateRequestOperations(waiting, request, dispatcher, 100, "waiting-grant", observations);
+      assert.equal(noGrant.operations.length, 0);
+      assert.equal(waiting.observations.size, 0);
+      assert.equal(waiting.requests.has(request.id), false);
+    });
     it("rejects payload, assignment, graph, pending-node and operation bounds before admission", () => {
-      for (const [field, value, transform] of [
-        ["payload_bytes", 8, node => node],
-        ["assignment_bytes", 1, node => node],
-        ["graph_nodes", 1, node => node],
-        ["pending_nodes", 1, node => node],
-        ["operations", 1, node => node],
+      for (const { field, value } of [
+        { field: "payload_bytes", value: 8 },
+        { field: "assignment_bytes", value: 1 },
+        { field: "graph_nodes", value: 1 },
+        { field: "pending_nodes", value: 1 },
+        { field: "operations", value: 1 },
       ]) {
         const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
         policy.limits[field] = value;
         assert.throws(() => {
           const log = [genesis(policy)];
-          const nodes = submission(log, ["a", "b"], { transform });
+          const nodes = submission(log, ["a", "b"]);
           replayTransactions([...log, nodes]);
         }, /resource_limit|assignment_limit|policy_invalid/);
       }
@@ -49,9 +113,12 @@ function registerTests({ describe, it }) {
       policy.limits.recovery_bytes = 1024;
       const log = [genesis(policy)];
       log.push(submission(log, ["a"]));
-      assert.throws(() => replayTransactions(log), /ledger_limit/);
+      assert.throws(
+        () => replayTransactions(log),
+        error => error instanceof Error && "code" in error && error.code === "ledger_limit" && error.message === "ledger_limit: new admission would consume bounded closure/recovery headroom"
+      );
     });
-    it("funds last-attempt Completion, maximum delivery and mixed closure after Controls fill free recovery capacity", () => {
+    it("funds last-attempt Completion, maximum delivery and mixed closure after Controls fill free recovery capacity", test => {
       const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
       policy.limits.ledger_bytes = 8 * 1024;
       policy.limits.recovery_bytes = 220 * 1024;
@@ -66,23 +133,23 @@ function registerTests({ describe, it }) {
       const dispatchId = granted.assignments[0].dispatch_id;
       log = bind(log, dispatchId);
       let state = replayTransactions(log);
-      function fillFreeCapacity(stage) {
+      function fillFreeCapacity(stage, transactions = log, projection = state) {
         for (let index = 0; index < 512; index++) {
           const operations = [{ kind: "Control", control: "grants_paused", value: true, reason: "x" }];
-          const candidate = commit(state.tip, `fill-${stage}-${index}`, "control", administrator, { operations }, operations, 4000, state.policy_epoch);
+          const candidate = commit(projection.tip, `fill-${stage}-${index}`, "control", administrator, { operations }, operations, 4000, projection.policy_epoch);
           let next;
           try {
-            next = replayTransactions([...log, candidate]);
+            next = replayTransactions([...transactions, candidate]);
           } catch (error) {
             assert.equal(error.code, "ledger_limit");
-            assert.ok(state.ledgerBytes > state.policy.limits.ledger_bytes);
-            assert.ok(state.policy.limits.ledger_bytes + state.policy.limits.recovery_bytes - state.ledgerBytes - recoveryHeadroom(state) < canonicalBytes(candidate) + 1);
-            assert.equal(state.requests.has(candidate.request.id), false);
-            assert.equal(replayTransactions(log).tip, state.tip);
-            return;
+            assert.ok(projection.ledgerBytes > projection.policy.limits.ledger_bytes);
+            assert.ok(projection.policy.limits.ledger_bytes + projection.policy.limits.recovery_bytes - projection.ledgerBytes - recoveryHeadroom(projection) < canonicalBytes(candidate) + 1);
+            assert.equal(projection.requests.has(candidate.request.id), false);
+            assert.equal(replayTransactions(transactions).tip, projection.tip);
+            return projection;
           }
-          log.push(candidate);
-          state = next;
+          transactions.push(candidate);
+          projection = next;
         }
         assert.fail("Controls did not exhaust unallocated recovery capacity");
       }
@@ -102,7 +169,7 @@ function registerTests({ describe, it }) {
         assert.equal(canonicalBytes(proof), state.policy.limits.evidence_bytes);
         return proof;
       }
-      fillFreeCapacity("completion");
+      state = fillFreeCapacity("completion");
       const beforeCompletion = recoveryHeadroom(state);
       const completion = finish(log, dispatchId, "h1", "completed", { id: "last-attempt", at: 4000 });
       log.push(completion);
@@ -110,16 +177,39 @@ function registerTests({ describe, it }) {
       assert.equal(beforeCompletion - recoveryHeadroom(state), 8192);
       const member = granted.assignments[0].claims[0];
       assert.equal(state.works.get(member.work_id).barrier, "pending");
-      fillFreeCapacity("result");
       const descriptor = { x: "x".repeat(state.policy.limits.result_bytes - 8) };
       assert.equal(canonicalBytes(descriptor), state.policy.limits.result_bytes);
+      const releasePendingOperations = granted.assignments[0].claims.slice(1).flatMap(claim => [
+        { kind: "ClaimCancellation", work_id: claim.work_id, claim_id: claim.claim_id, reason: "x".repeat(128), retry_not_before: 34000 },
+        { kind: "WorkCancellation", work_id: claim.work_id, reason: "x".repeat(128) },
+      ]);
+      releasePendingOperations.push({ kind: "Release", dispatch_id: dispatchId, evidence: maximumEvidence(false) });
+      const releasePending = commit(state.tip, "release-before-delivery", "release", maximumActor, { operations: releasePendingOperations }, releasePendingOperations, 4000, state.policy_epoch);
+      const releasedLog = [...log, releasePending];
+      let releasedPending = replayTransactions(releasedLog);
+      assert.equal(releasedPending.dispatches.get(dispatchId).released, true);
+      assert.equal(releasedPending.works.get(member.work_id).barrier, "pending");
+      assert.equal(recoveryHeadroom(releasedPending), 2 * policy.limits.result_bytes + 2 * policy.limits.evidence_bytes + 8192);
+      releasedPending = fillFreeCapacity("released-pending", releasedLog, releasedPending);
+      const pendingResults = [{ kind: "Result", work_id: member.work_id, claim_id: member.claim_id, completion_id: completion.id, descriptor, evidence: maximumEvidence(true) }];
+      const pendingResult = commit(releasedPending.tip, "released-maximum-result", "result", maximumActor, { operations: pendingResults }, pendingResults, 4000, releasedPending.policy_epoch);
+      pendingResult.request = newRequest("\\".repeat(256), "result", maximumActor, { operations: pendingResults });
+      const pendingResultBytes = canonicalBytes(pendingResult) + 1;
+      assert.equal(pendingResultBytes, 13448);
+      assert.ok(pendingResultBytes <= recoveryHeadroom(releasedPending));
+      const deliveredAfterRelease = replayTransactions([...releasedLog, pendingResult]);
+      assert.equal(deliveredAfterRelease.ledgerBytes - releasedPending.ledgerBytes, pendingResultBytes);
+      assert.equal(deliveredAfterRelease.works.get(member.work_id).barrier, "verified");
+      assert.equal(recoveryHeadroom(deliveredAfterRelease), 0);
+      test.diagnostic?.(`Released pending Completion: maximum Result ${pendingResultBytes} canonical bytes; discharged reserve ${recoveryHeadroom(releasedPending)} bytes`);
+      state = fillFreeCapacity("result");
       const results = [{ kind: "Result", work_id: member.work_id, claim_id: member.claim_id, completion_id: completion.id, descriptor, evidence: maximumEvidence(true) }];
       const result = commit(state.tip, "maximum-result", "result", maximumActor, { operations: results }, results, 4000, state.policy_epoch);
       result.request = newRequest("\\".repeat(256), "result", maximumActor, { operations: results });
       log.push(result);
       state = replayTransactions(log);
       assert.equal(state.works.get(member.work_id).barrier, "verified");
-      fillFreeCapacity("release");
+      state = fillFreeCapacity("release");
       const operations = granted.assignments[0].claims.slice(1).flatMap(claim => [
         { kind: "ClaimCancellation", work_id: claim.work_id, claim_id: claim.claim_id, reason: "x".repeat(128), retry_not_before: 34000 },
         { kind: "WorkCancellation", work_id: claim.work_id, reason: "x".repeat(128) },
@@ -153,7 +243,7 @@ function registerTests({ describe, it }) {
         state = replayTransactions(log);
       }
       assert.equal(recoveryHeadroom(state), 2 * state.policy.limits.evidence_bytes + 8192);
-      fillFreeCapacity("native-only");
+      state = fillFreeCapacity("native-only");
       const finalOperations = [{ kind: "Release", dispatch_id: dispatchId, evidence: maximumEvidence(false) }];
       const finalRelease = commit(state.tip, "final-native-release", "release", maximumActor, { operations: finalOperations }, finalOperations, 4000, state.policy_epoch);
       finalRelease.request = newRequest('"'.repeat(256), "release", maximumActor, { operations: finalOperations });

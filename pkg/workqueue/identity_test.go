@@ -1,11 +1,121 @@
 package workqueue
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 )
+
+func TestNativeDecimalIdentityBoundsBeforeWireValidation(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		digits int
+		valid  bool
+	}{
+		{name: "positive", digits: 1, valid: true},
+		{name: "lossless-large", digits: 129, valid: true},
+		{name: "exact-ceiling", digits: 256, valid: true},
+		{name: "above-ceiling", digits: 257},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			id := strings.Repeat("9", test.digits)
+			if decimalIdentity(id) != test.valid {
+				t.Errorf("native decimal guard validity=%t, want %t", decimalIdentity(id), test.valid)
+			}
+			actor := testActor("administrator")
+			actor.Principal = id
+			if err := validateActorOrigin(actor); (err == nil) != test.valid {
+				t.Errorf("native actor origin validity disagrees: %v", err)
+			} else if !test.valid && !strings.HasPrefix(err.Error(), "actor_unauthorized:") {
+				t.Errorf("native actor origin used the wrong rejection code: %v", err)
+			}
+			for _, scope := range []string{"profile", "producer"} {
+				policy := DefaultPolicy(testPrincipal, testRepository)
+				if scope == "profile" {
+					pool := policy.Pools["default"]
+					profile := pool.Profiles["default"]
+					profile.Principal = id
+					pool.Profiles["default"] = profile
+					policy.Pools["default"] = pool
+				} else {
+					policy.Producers[id] = policy.Producers[testPrincipal]
+					delete(policy.Producers, testPrincipal)
+				}
+				if err := validatePolicy(policy); (err == nil) != test.valid {
+					t.Errorf("native %s policy validity disagrees before schema validation: %v", scope, err)
+				} else if !test.valid && !strings.HasPrefix(err.Error(), "policy_invalid:") {
+					t.Errorf("native %s policy used the wrong rejection code: %v", scope, err)
+				}
+			}
+			branch, mock := newQueueAPI(t)
+			mock.userID = json.Number(id)
+			authenticated, err := branch.Authenticate(context.Background(), "administrator")
+			if (err == nil) != test.valid || test.valid && authenticated.Principal != id {
+				t.Errorf("native authenticated principal bound/lossless value disagrees: %+v %v", authenticated, err)
+			} else if !test.valid && !strings.HasPrefix(err.Error(), "actor_unauthorized:") {
+				t.Errorf("native authenticated principal used the wrong rejection code: %v", err)
+			}
+			mock.nativeRun = &NativeRun{ID: json.Number(id), RunAttempt: 1, Event: "workflow_dispatch"}
+			mock.nativeRun.Repository.FullName = testRepository
+			run, err := branch.exactRun(context.Background(), id)
+			if (err == nil) != test.valid || test.valid && run.ID.String() != id {
+				t.Errorf("native exact run bound/lossless value disagrees: %+v %v", run, err)
+			} else if !test.valid && (!strings.HasPrefix(err.Error(), "run_invalid:") ||
+				!strings.Contains(err.Error(), "1..256") || !strings.Contains(err.Error(), "example: 202")) {
+				t.Errorf("native exact run did not explain its bounded decimal format: %v", err)
+			}
+			expectedReads := 0
+			if test.valid {
+				expectedReads = 1
+			}
+			if mock.nativeReads != expectedReads {
+				t.Errorf("native run requests=%d, want %d", mock.nativeReads, expectedReads)
+			}
+		})
+	}
+}
+
+func TestNativeDecimalOriginRejectedBeforeNoOpAndAcknowledgment(t *testing.T) {
+	for _, kind := range []string{"no-grant", "accepted-request"} {
+		t.Run(kind, func(t *testing.T) {
+			commits := testGenesis(t, nil)
+			if kind == "accepted-request" {
+				commits = testOperations(t, commits, testActor("administrator"), "accepted", "control", Op(map[string]any{
+					"kind": "Control", "control": "admission_paused", "value": true, "reason": "incident",
+				}))
+			}
+			before, err := Serialize(commits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			actor := testActor("administrator")
+			actor.Principal = strings.Repeat("9", 257)
+			var request Request
+			if kind == "no-grant" {
+				request, err = NewRequest("no-grant", "dispatch_next", actor, DispatchParameters{
+					Pool: "default", MaxClaims: 1, MaxDispatches: 1, MaxBytes: 48 << 10,
+				})
+			} else {
+				request, err = NewRequest("accepted", "control", actor, OperationsParameters{
+					Operations: commits[len(commits)-1].Operations,
+				})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, _, err := BuildCandidate(commits, actor, request, 4000); err == nil ||
+				!strings.HasPrefix(err.Error(), "request_invalid:") {
+				t.Fatalf("invalid origin reached no-op/acknowledgment before closed validation: %v", err)
+			}
+			after, err := Serialize(commits)
+			if err != nil || string(before) != string(after) {
+				t.Fatal("invalid no-op/acknowledgment origin modified authoritative history")
+			}
+		})
+	}
+}
 
 func TestSharedIdentityByteValidationFixtures(t *testing.T) {
 	data, err := os.ReadFile("../../specs/work-queue/fixtures/identity-validation.json")

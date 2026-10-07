@@ -12,10 +12,13 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import platform
+import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -36,13 +39,29 @@ def engine_source_hashes():
     files = [path for path in (ROOT / "pkg/workqueue").rglob("*")
              if path.is_file() and (path.suffix == ".json" or path.suffix == ".go" and not path.name.endswith("_test.go"))]
     files += [ROOT / "actions/setup/js" / f"work_queue_{module}.cjs"
-              for module in ("codec", "policy", "scheduler", "graph", "limits", "replay")]
-    files += [ROOT / "go.mod", ROOT / "go.sum", SPEC / "native_probe.cjs",
+              for module in ("codec", "policy", "scheduler", "graph", "limits", "replay",
+                             "resource_scope", "store", "provisioning", "yaml")]
+    files += [ROOT / "go.mod", ROOT / "go.sum", SPEC / "effect-contract.schema.json",
+              SPEC / "resource-scope.schema.json", SPEC / "native_probe.cjs",
               SPEC / "verify_native.py", SPEC / "verify_native_fixtures.py"]
     files += list((SPEC / "native_probe").glob("*.go"))
     files += list((SPEC / "fixtures").glob("*.json"))
     files += [ROOT / "actions/setup/js/work_queue_conformance_fixtures.json"]
-    return {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(files)}
+    files += [ROOT / "actions/setup/js" / name for name in
+              ("work_queue_worker_child_fixtures.json", "work_queue_worker_child_fixture_generator.cjs")]
+    sources = set(files)
+    pending = [path for path in sources if path.suffix == ".cjs"]
+    while pending:
+        source = pending.pop()
+        for dependency in re.findall(r"""require\s*\(\s*["'](\.{1,2}/[^"']+\.(?:cjs|json))["']\s*\)""",
+                                     source.read_text()):
+            target = (source.parent / dependency).resolve(strict=True)
+            target.relative_to(ROOT)
+            if target not in sources:
+                sources.add(target)
+                if target.suffix == ".cjs":
+                    pending.append(target)
+    return {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(sources)}
 
 
 class Native:
@@ -64,11 +83,18 @@ class Native:
         return json.loads(output)
 
     def __exit__(self, *args):
-        self.process.stdin.close()
-        self.process.wait(timeout=30)
-        error = self.process.stderr.read()
-        self.process.stdout.close()
-        self.process.stderr.close()
+        try:
+            self.process.stdin.close()
+            try:
+                self.process.wait(timeout=30)
+            except subprocess.TimeoutExpired as error:
+                self.process.kill()
+                self.process.wait()
+                raise RuntimeError(f"{self.command}: native process did not stop within 30 seconds") from error
+            error = self.process.stderr.read()
+        finally:
+            self.process.stdout.close()
+            self.process.stderr.close()
         if self.process.returncode:
             raise RuntimeError(f"{self.command}: exit {self.process.returncode}: {error}")
 
@@ -124,16 +150,6 @@ def assert_native_parity(go, js):
     compare(without_metrics(go), without_metrics(js), "")
     if differences:
         raise AssertionError("; ".join(difference[:512] for difference in differences[:8]))
-
-
-def assert_subset(actual, expected, path=""):
-    if isinstance(expected, dict):
-        assert isinstance(actual, dict), f"{path}: expected object, got {actual!r}"
-        for key, value in expected.items():
-            assert key in actual, f"{path}/{key}: missing"
-            assert_subset(actual[key], value, f"{path}/{key}")
-    else:
-        assert actual == expected, f"{path}: actual={actual!r}, expected={expected!r}"
 
 
 def request(ledger, **overrides):
@@ -254,7 +270,16 @@ def verify_benchmark_serialization(output, text):
     assert metrics["canonical_sha256"] == hashlib.sha256(expected).hexdigest(), "canonical ledger content hash"
 
 
-def mock_contention(commands, env, evidence):
+def verify_benchmark_resources(output):
+    metrics = output["metrics"]
+    rss = metrics["rss_peak_bytes"]
+    assert type(rss) is int and rss > 0, "positive peak RSS measurement unavailable"
+    for key in ("parse_ms", "cold_replay_ms", "selection_ms", "packing_ms", "serialization_ms"):
+        value = metrics[key]
+        assert type(value) in (int, float) and math.isfinite(value) and value >= 0, f"invalid {key} measurement"
+
+
+def mock_contention(commands, env):
     """Actual planning/replay with an explicitly MOCK in-memory CAS."""
     rows = []
     dispatcher = {"role": "dispatcher", "principal": "42", "repository": "owner/repo",
@@ -351,13 +376,33 @@ def local_finalization(commands, env):
     return rows
 
 
-def future_reference_workload(parent_count):
-    ledger = Ledger()
+def future_reference_workload(parent_count, assignment_bytes=None):
+    policy = default_policy()
+    if assignment_bytes is not None:
+        policy["limits"]["assignment_bytes"] = assignment_bytes
+    ledger = Ledger(policy)
     parents = [ledger.work(f"future-result-{index}", payload_size=8) for index in range(parent_count)]
     child = ledger.work("future-result-child", payload_size=8)
     child["depends_on"] = [{"kind": "work", "work_id": parent["work_id"]} for parent in parents]
     ledger.submit([child, *parents])
     return ledger
+
+
+def future_reference_assignment_bound(ledger):
+    child = ledger.commits[1]["operations"][0]
+    identity = "\\" * 256
+    assignment = {
+        "version": 3, "dispatch_id": "d" * 70,
+        "request_id": identity, "commit_id": identity, "policy_epoch": "epoch",
+        "pool": "default", "worker_profile": "default",
+        "claims": [{"handle": "h16", "claim_id": "c" * 70, "work_id": child["work_id"],
+                    "work": child["payload"],
+                    "result_refs": [{"work_id": edge["work_id"], "result_commit_id": identity, "descriptor": {}}
+                                    for edge in child["depends_on"]]}],
+    }
+    bound = len(canonical(assignment).encode()) + len(child["depends_on"]) * (
+        ledger.policy["limits"]["result_bytes"] - 2)
+    return assignment, bound
 
 
 def closure_byte_cases():
@@ -424,6 +469,27 @@ def closure_byte_audit(commands, env):
     return rows, failures
 
 
+def recovery_headroom_audit(commands, env):
+    ledger = Ledger()
+    phases = [("empty-policy", ledger.text(), 0)]
+    ledger.submit([ledger.work("headroom", payload_size=8)])
+    phases.append(("available-single-work", ledger.text(), 55296))
+    phases.append(("cancelled-single-work", drained_workload(ledger).text(), 0))
+    rows, failures = [], []
+    for name, command in commands.items():
+        with Native(command, env) as engine:
+            for phase, text, expected in phases:
+                output = engine.call(request(text, action="recovery_headroom"))
+                rows.append({"engine": name, "gate": "actual-recovery-headroom", "phase": phase,
+                             "expected_headroom_bytes": expected, "input_ledger": text,
+                             "boundary": "actual exported estimator on bounded causal replay; no universal closure proof",
+                             "output": output})
+                if (set(output) != {"headroom_bytes"} or type(output["headroom_bytes"]) is not int
+                        or output["headroom_bytes"] != expected):
+                    failures.append(f"{name}/{phase}: expected exact headroom {expected}, got {output}")
+    return rows, failures
+
+
 def benchmark(commands, env, evidence, sizes, iterations):
     rows, failures = [], []
     # Bounded retained Control records supply bytes without inventing huge
@@ -461,6 +527,7 @@ def benchmark(commands, env, evidence, sizes, iterations):
                 else:
                     try:
                         verify_benchmark_serialization(output, base)
+                        verify_benchmark_resources(output)
                         if target == 80:
                             stats = output["metrics"]["stats"]
                             assert stats["cancelled"] == 128, "drained retained history"
@@ -485,6 +552,7 @@ def benchmark(commands, env, evidence, sizes, iterations):
                         assert stats["nodes"] == 4096 and stats["cancelled"] == 128, "drained mixed graph"
                         assert stats["available"] == stats["claimed"] == stats["claims"] == 0, "no active Claims or Work"
                         verify_benchmark_serialization(output, drained_text)
+                        verify_benchmark_resources(output)
                     except (AssertionError, KeyError) as error:
                         failures.append(f"{name} drained {target} MiB: {error}")
             nodes = [ledger.work(f"over-watermark-{i}", payload_size=16000) for i in range(4)]
@@ -511,7 +579,7 @@ def benchmark(commands, env, evidence, sizes, iterations):
                              "ordinary_watermark_excess_bytes": len(refusal_text.encode()) - ledger.policy["limits"]["ledger_bytes"],
                              "candidate_outstanding_reserve_bytes": outstanding,
                              "reserve_failure_excluded_by_candidate_formula": True, **output})
-                if "ledger_limit" not in output.get("error", ""):
+                if not output.get("error", "").startswith("ledger_limit:"):
                     failures.append(f"{name}: missing ledger_limit above admission watermark")
     # Demonstrate reserve refusal BEFORE the advertised 4096-Work node cap.
     insufficient = Ledger()
@@ -523,7 +591,7 @@ def benchmark(commands, env, evidence, sizes, iterations):
         with Native(command, env) as engine:
             output = engine.call(request(insufficient.text(), include_canonical=False))
         rows.append({"engine": name, "gate": "recovery-headroom-refusal", **output})
-        if "ledger_limit" not in output.get("error", ""):
+        if not output.get("error", "").startswith("ledger_limit:"):
             failures.append(f"{name}: missing exact ledger_limit for reserve refusal")
     # The default 4096-node graph ceiling is not a promise to admit 4096 Work.
     # Each legal 256-operation batch fits the operation cap; their outstanding
@@ -540,26 +608,48 @@ def benchmark(commands, env, evidence, sizes, iterations):
                      "graph_ceiling": 4096, "input_bytes": len(default_reserve.text().encode()), **output})
         if not output.get("error", "").startswith("ledger_limit:"):
             failures.append(f"{name}: missing ledger_limit for 512 active Work under default recovery allocation")
-    # Eleven unresolved maximum-size descriptors plus escaped future commit IDs
-    # already exceed 48 KiB before any assignment envelope overhead. Seven fit
-    # with the documented bounded envelope; neither answer comes from an engine.
-    for count, refusal in ((7, False), (11, True)):
+    # Legal 256-byte identities contribute at most 512 escaped content bytes.
+    # Count the whole envelope and maximum descriptors, not invalid C0 strings.
+    for count, refusal in ((7, False), (9, False), (10, False), (11, True)):
         ledger = future_reference_workload(count)
+        _, assignment_bound = future_reference_assignment_bound(ledger)
+        assert (assignment_bound > ledger.policy["limits"]["assignment_bytes"]) == refusal
         for name, command in commands.items():
             with Native(command, env) as engine:
                 output = engine.call(request(ledger.text(), include_canonical=False))
             rows.append({"engine": name, "gate": "future-result-assignment-budget",
-                         "unresolved_references": count, "expected_refusal": refusal, **output})
+                         "unresolved_references": count, "expected_refusal": refusal,
+                         "independent_assignment_upper_bytes": assignment_bound, **output})
             if refusal:
                 if not output.get("error", "").startswith("assignment_limit:"):
                     failures.append(f"{name}: missing assignment_limit for eleven escaped future Result references")
             elif "error" in output:
-                failures.append(f"{name}: seven bounded future Result references refused: {output['error']}")
+                failures.append(f"{name}: {count} bounded future Result references refused: {output['error']}")
+    for count in (9, 10):
+        _, bound = future_reference_assignment_bound(future_reference_workload(count))
+        for assignment_limit, refusal in ((bound, False), (bound - 1, True)):
+            ledger = future_reference_workload(count, assignment_bytes=assignment_limit)
+            for name, command in commands.items():
+                with Native(command, env) as engine:
+                    output = engine.call(request(ledger.text(), include_canonical=False,
+                                                 parameters={"pool": "default", "max_claims": 16,
+                                                             "max_dispatches": 1, "max_bytes": assignment_limit}))
+                rows.append({"engine": name, "gate": "future-result-exact-byte-boundary",
+                             "unresolved_references": count, "assignment_bytes": assignment_limit,
+                             "independent_assignment_upper_bytes": bound, "expected_refusal": refusal, **output})
+                if refusal:
+                    if not output.get("error", "").startswith("assignment_limit:"):
+                        failures.append(f"{name}: {count} references not refused one byte below exact bound")
+                elif "error" in output:
+                    failures.append(f"{name}: {count} references refused at exact bound: {output['error']}")
     try:
+        headroom_rows, headroom_failures = recovery_headroom_audit(commands, env)
+        rows.extend(headroom_rows)
+        failures.extend(headroom_failures)
         closure_rows, closure_failures = closure_byte_audit(commands, env)
         rows.extend(closure_rows)
         failures.extend(closure_failures)
-        rows.extend(mock_contention(commands, env, evidence))
+        rows.extend(mock_contention(commands, env))
         rows.extend(local_finalization(commands, env))
     except AssertionError as error:
         failures.append(f"mock publisher contention: {error}")
@@ -570,7 +660,8 @@ def benchmark(commands, env, evidence, sizes, iterations):
                         "go": subprocess.check_output(["go", "version"], text=True).strip()},
         "scope": "Local cold parse/replay, actual selection/packing/serialization and typed graph/resource budgets.",
         "measurement_note": "Single fresh-process samples on a shared development host; no isolation, confidence interval or SLO.",
-        "unmet_gates": ["No runtime latency/memory/API SLO set or validated.", "No incremental replay API measured.",
+        "unmet_gates": ["No runtime latency/memory/API SLO set or validated.", "Peak RSS requires an available native process measurement.",
+                        "No incremental replay API measured.",
                         "No live Git CAS, remote publication, supported-host dispatch or observation API-rate measurement.",
                         "Closure-byte audit samples structural envelopes; not proof of all permitted retry/native-group closures.",
                         "No CPU-time fairness, unbounded retained-history or writer-restriction claim."],
@@ -579,7 +670,32 @@ def benchmark(commands, env, evidence, sizes, iterations):
     return report
 
 
+def run_native_gates(args, evidence):
+    before_sources = engine_source_hashes()
+    summaries = {}
+    try:
+        with tempfile.TemporaryDirectory(prefix="native-build-", dir=evidence) as temporary:
+            build = Path(temporary)
+            env = {**os.environ, "GOTMPDIR": str(build), "TMPDIR": str(build), "PYTHONDONTWRITEBYTECODE": "1"}
+            executable = build / "native-go"
+            subprocess.run(["go", "build", "-o", str(executable), "./specs/work-queue/native_probe"], cwd=ROOT, env=env, check=True)
+            commands = {"go": [str(executable)], "js": ["node", str(SPEC / "native_probe.cjs")]}
+            if not args.benchmark_only:
+                from verify_native_fixtures import conformance
+                summaries["conformance"] = conformance(args.fixtures, commands, env, evidence, sys.modules[__name__])["status"]
+            if args.benchmark or args.benchmark_only:
+                summaries["benchmark"] = benchmark(commands, env, evidence, args.sizes, args.iterations)["status"]
+    finally:
+        after_sources = engine_source_hashes()
+        source_status = "stable" if before_sources == after_sources else "changed_during_run"
+        (evidence / "sources.json").write_text(json.dumps({"status": source_status, "before": before_sources, "after": after_sources}, indent=2) + "\n")
+    if source_status != "stable":
+        summaries["source_identity"] = "failed"
+    return summaries
+
+
 def main():
+    sys.dont_write_bytecode = True
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixtures", type=Path, default=SPEC / "fixtures")
     parser.add_argument("--evidence-dir", type=Path, required=True)
@@ -593,28 +709,18 @@ def main():
         raise SystemExit("--evidence-dir must be outside the checkout (session-only evidence)")
     if args.iterations < 1 or args.iterations > 10:
         raise SystemExit("--iterations must be 1..10")
-    sizes = [int(size) for size in args.sizes.split(",")]
-    if not sizes or sizes != sorted(set(sizes)) or any(size < 1 or size > 80 for size in sizes):
+    try:
+        args.sizes = [int(size) for size in args.sizes.split(",")]
+    except ValueError:
         raise SystemExit("--sizes must be increasing unique MiB sizes in 1..80")
+    if not args.sizes or args.sizes != sorted(set(args.sizes)) or any(size < 1 or size > 80 for size in args.sizes):
+        raise SystemExit("--sizes must be increasing unique MiB sizes in 1..80")
+    if evidence.exists():
+        for path in evidence.iterdir():
+            if path.name != "run.log" or path.is_symlink() or not path.is_file() or path.stat().st_size != 0:
+                raise SystemExit("--evidence-dir must be new or empty; existing evidence is preserved")
     evidence.mkdir(parents=True, exist_ok=True)
-    build = evidence / "go-build"
-    build.mkdir(exist_ok=True)
-    env = {**os.environ, "GOTMPDIR": str(build), "TMPDIR": str(build)}
-    before_sources = engine_source_hashes()
-    executable = evidence / "native-go"
-    subprocess.run(["go", "build", "-o", str(executable), "./specs/work-queue/native_probe"], cwd=ROOT, env=env, check=True)
-    commands = {"go": [str(executable)], "js": ["node", str(SPEC / "native_probe.cjs")]}
-    summaries = {}
-    if not args.benchmark_only:
-        from verify_native_fixtures import conformance
-        summaries["conformance"] = conformance(args.fixtures, commands, env, evidence, sys.modules[__name__])["status"]
-    if args.benchmark or args.benchmark_only:
-        summaries["benchmark"] = benchmark(commands, env, evidence, sizes, args.iterations)["status"]
-    after_sources = engine_source_hashes()
-    source_status = "stable" if before_sources == after_sources else "changed_during_run"
-    (evidence / "sources.json").write_text(json.dumps({"status": source_status, "before": before_sources, "after": after_sources}, indent=2) + "\n")
-    if source_status != "stable":
-        summaries["source_identity"] = "failed"
+    summaries = run_native_gates(args, evidence)
     print(canonical({"evidence_dir": str(evidence), **summaries}))
     return 1 if "failed" in summaries.values() else 0
 

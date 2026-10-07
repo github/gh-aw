@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -12,12 +13,16 @@ var mcpRendererBuiltinLog = logger.New("workflow:mcp_renderer_builtin")
 
 const workQueueMCPServerEntrypoint = "${RUNNER_TEMP}/gh-aw/actions/work_queue_mcp_server.cjs"
 
-// RenderWorkQueueMCP mounts the activation snapshot read-only and
-// the finish-intent directory writable; the server has no Git client or credentials.
+// RenderWorkQueueMCP mounts the activation snapshot read-only; only participants
+// receive a writable intent directory. The server has no Git client or credentials.
 func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, workflowData *WorkflowData) {
 	image := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
 	serverName := "work-queue"
-	mounts := []string{constants.DefaultGhAwMount, constants.WorkQueueSnapshotMount, constants.WorkQueueFinishIntentMount}
+	role := workQueueRuntimeRole(workflowData)
+	mounts := []string{constants.DefaultGhAwMount, constants.WorkQueueSnapshotMount}
+	if role != "observer" {
+		mounts = append(mounts, constants.WorkQueueFinishIntentMount)
+	}
 
 	if r.options.Format == "toml" {
 		yaml.WriteString("          \n")
@@ -25,6 +30,7 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 		yaml.WriteString("          container = \"" + image + "\"\n")
 		yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
 		yaml.WriteString("          env_vars = [\"RUNNER_TEMP\"]\n")
+		fmt.Fprintf(yaml, "          env = { GH_AW_WORK_QUEUE_ROLE = %q }\n", role)
 		yaml.WriteString("          entrypoint = \"node\"\n")
 		yaml.WriteString("          entrypointArgs = [\"" + workQueueMCPServerEntrypoint + "\"]\n")
 		return
@@ -33,12 +39,13 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 	yaml.WriteString("              \"" + serverName + "\": {\n")
 	if r.options.IncludeCopilotFields {
 		yaml.WriteString("                \"type\": \"stdio\",\n")
-		yaml.WriteString("                \"tools\": [\"work_queue_read\", \"work_queue_explain\", \"work_queue_submit\", \"work_queue_dispatch_next\", \"work_queue_claim_finish\"],\n")
+		yaml.WriteString("                \"tools\": [\"" + strings.Join(workQueueMCPToolNames(workflowData), "\", \"") + "\"],\n")
 	}
 	yaml.WriteString("                \"container\": \"" + image + "\",\n")
 	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
 	yaml.WriteString("                \"env\": {\n")
-	yaml.WriteString("                  \"RUNNER_TEMP\": \"\\${RUNNER_TEMP}\"\n")
+	yaml.WriteString("                  \"RUNNER_TEMP\": \"\\${RUNNER_TEMP}\",\n")
+	fmt.Fprintf(yaml, "                  \"GH_AW_WORK_QUEUE_ROLE\": %q\n", role)
 	yaml.WriteString("                },\n")
 	yaml.WriteString("                \"entrypoint\": \"node\",\n")
 	yaml.WriteString("                \"entrypointArgs\": [\"" + workQueueMCPServerEntrypoint + "\"]\n")
@@ -136,7 +143,7 @@ func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, 
 	mounts := []string{constants.DefaultWorkspaceMount, constants.DefaultSafeOutputsMount, constants.DefaultTmpGhAwMount}
 	if isWorkQueueEnabled(workflowData) {
 		mounts = append(mounts, constants.WorkQueueSnapshotMount)
-		yaml.WriteString("          env = { GH_AW_WORK_QUEUE_ENABLED = \"true\" }\n")
+		fmt.Fprintf(yaml, "          env = { GH_AW_WORK_QUEUE_ENABLED = \"true\", GH_AW_WORK_QUEUE_ROLE = %q }\n", workQueueRuntimeRole(workflowData))
 	}
 	yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
 	yaml.WriteString("          args = [\"-w\", \"$GITHUB_WORKSPACE\"]\n")
@@ -355,6 +362,11 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 			value     string
 			isLiteral bool
 		}{"GH_AW_WORK_QUEUE_ENABLED", "true", true})
+		envVars = append(envVars, struct {
+			name      string
+			value     string
+			isLiteral bool
+		}{"GH_AW_WORK_QUEUE_ROLE", workQueueRuntimeRole(workflowData), true})
 	}
 
 	// Append GH_AW_INPUT_* vars referenced by the safe-outputs config so the nested

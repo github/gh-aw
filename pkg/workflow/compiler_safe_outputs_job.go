@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"path/filepath"
@@ -117,7 +116,7 @@ func messagesContainPreActivationRef(cfg *SafeOutputMessagesConfig) bool {
 // 3. Each safe output step requires from the local filesystem
 func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobName, markdownPath string) (*Job, []string, error) {
 	if data.SafeOutputs == nil {
-		if !isWorkQueueEnabled(data) {
+		if !isWorkQueueParticipant(data) {
 			consolidatedSafeOutputsJobLog.Print("No safe outputs configured, skipping consolidated job")
 			return nil, nil, nil
 		}
@@ -144,7 +143,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	}
 
 	// Early return when no safe output handler steps were emitted
-	if len(safeOutputStepNames) == 0 && !isWorkQueueEnabled(data) {
+	if len(safeOutputStepNames) == 0 && !isWorkQueueParticipant(data) {
 		consolidatedSafeOutputsJobLog.Print("No safe output steps were added")
 		return nil, nil, nil
 	}
@@ -176,7 +175,7 @@ func safeOutputsJobPermissions(data *WorkflowData) (*Permissions, bool) {
 	if buildLedgerRequestCompactionHandlerConfig(data.LedgerConfig) != nil {
 		permissions.Set(PermissionActions, PermissionWrite)
 	}
-	if isWorkQueueEnabled(data) {
+	if isWorkQueueParticipant(data) {
 		permissions.Set(PermissionActions, PermissionWrite)
 		if data.SafeOutputs != nil && data.SafeOutputs.UploadCodeCoverage != nil && !isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), data.SafeOutputs.UploadCodeCoverage.Staged) {
 			permissions.Set(PermissionCodeQuality, PermissionWrite)
@@ -200,7 +199,11 @@ func (c *Compiler) buildSafeOutputsSetupAndDownloadSteps(data *WorkflowData, age
 	steps = append(steps, c.buildSafeOutputsSetupSteps(data)...)
 	steps = append(steps, c.buildSafeOutputsDownloadSteps(data, agentArtifactPrefix)...)
 	steps = append(steps, c.buildWorkQueueClaimReconciliationStep(data)...)
-	steps = append(steps, c.buildWorkQueueControlProcessingStep(data)...)
+	controls, err := c.buildWorkQueueControlProcessingStep(data)
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, controls...)
 
 	// Configure GH_HOST for GHES/GHEC compatibility.
 	// The safe-outputs job runs as an independent GitHub Actions job and does not
@@ -329,7 +332,7 @@ func (c *Compiler) buildSafeOutputsDownloadSteps(data *WorkflowData, agentArtifa
 }
 
 func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []string {
-	if !isWorkQueueEnabled(data) {
+	if !isWorkQueueParticipant(data) {
 		return nil
 	}
 	mainCall := "            await main({ core, github, context });\n"
@@ -374,9 +377,9 @@ func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []s
 	)
 }
 
-func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) []string {
-	if !isWorkQueueEnabled(data) || data.WorkQueuePolicy == nil {
-		return nil
+func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) ([]string, error) {
+	if !isWorkQueueParticipant(data) || data.WorkQueuePolicy == nil {
+		return nil, nil
 	}
 	names := make([]string, 0)
 	for _, pool := range data.WorkQueuePolicy.Policy.Pools {
@@ -389,18 +392,27 @@ func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) []str
 		}
 	}
 	slices.Sort(names)
-	config := map[string]any{"work_queue_workflows": names, "aw_context_workflows": names}
+	config := map[string]any{"work_queue_enabled": true, "work_queue_workflows": names, "aw_context_workflows": names}
 	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
 		config = handlerRegistry["dispatch_workflow"](data.SafeOutputs)
 		config["work_queue_workflows"] = names
 		config["aw_context_workflows"] = names
 	}
-	encoded, _ := json.Marshal(config)
-	steps := []string{
+	config["work_queue_enabled"] = true
+	dispatchApp := configureWorkQueueDispatchCredential(data, config)
+	encoded, err := marshalSafeOutputsConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("work-queue: serialize protected control configuration: %w", err)
+	}
+	var steps []string
+	if dispatchApp != nil {
+		steps = append(steps, c.buildWorkQueueDispatchAppTokenSteps(data, dispatchApp)...)
+	}
+	steps = append(steps,
 		"      - name: Process trusted work queue controls\n",
 		"        id: work_queue_controls\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
-	}
+	)
 	env := workQueuePolicyEnvironment(data)
 	var staged *TemplatableBool
 	if data.SafeOutputs != nil {
@@ -416,21 +428,22 @@ func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) []str
 	if isWorkQueueWorker(data) {
 		assignmentRequirement = ", requireAssignment: true"
 	}
+	steps = append(steps, "        with:\n")
+	c.addSafeOutputGitHubTokenForConfig(&steps, data, "")
 	return append(steps,
-		"        with:\n",
 		"          script: |\n",
 		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
 		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_control_adapter.cjs');\n",
 		"            const config = JSON.parse(process.env.GH_AW_WORK_QUEUE_CONTROL_CONFIG);\n",
 		"            await main({ core, github, context, config, maxDispatches: Number(process.env.GH_AW_WORK_QUEUE_DISPATCH_BUDGET || 1)"+assignmentRequirement+" });\n",
-	)
+	), nil
 }
 
 // buildSafeOutputsUserProvidedSteps converts the user-provided safe-outputs.steps
 // frontmatter entries into pinned, YAML-rendered workflow steps.
 func (c *Compiler) buildSafeOutputsUserProvidedSteps(data *WorkflowData) ([]string, error) {
-	if isWorkQueueEnabled(data) {
+	if isWorkQueueParticipant(data) {
 		return nil, nil
 	}
 	var steps []string
@@ -494,7 +507,7 @@ type safeOutputsHandlerOutputsAndActionState struct {
 // hasHandlerManagerTypes reports whether the workflow configures any safe-output type that is
 // processed by the consolidated handler manager step (as opposed to a dedicated job/step).
 func hasHandlerManagerTypes(data *WorkflowData) bool {
-	return isWorkQueueEnabled(data) ||
+	return isWorkQueueParticipant(data) ||
 		data.SafeOutputs.CreateIssues != nil ||
 		data.SafeOutputs.CreateWorkItems != nil ||
 		data.SafeOutputs.UpdateWorkItems != nil ||
@@ -562,7 +575,7 @@ func (c *Compiler) appendLedgerTransactionsArtifactUpload(data *WorkflowData, st
 // appendCustomScriptFilesStep appends the setup step(s) for writing custom safe-output scripts to
 // disk, when the workflow declares any, to the accumulated job state.
 func (c *Compiler) appendCustomScriptFilesStep(data *WorkflowData, state *safeOutputsHandlerOutputsAndActionState) error {
-	if !isWorkQueueEnabled(data) && len(data.SafeOutputs.Scripts) > 0 {
+	if !isWorkQueueParticipant(data) && len(data.SafeOutputs.Scripts) > 0 {
 		consolidatedSafeOutputsJobLog.Printf("Adding setup step for %d custom safe-output script(s)", len(data.SafeOutputs.Scripts))
 		scriptSetupSteps, err := buildCustomScriptFilesStep(data.SafeOutputs.Scripts)
 		if err != nil {
@@ -614,7 +627,7 @@ func (c *Compiler) appendHandlerManagerStep(data *WorkflowData, state *safeOutpu
 // handler manager, when create_code_scanning_alert is configured and not staged, and exposes its
 // sarif_file output for the downstream upload_code_scanning_sarif job.
 func (c *Compiler) appendSarifArtifactUploadStep(data *WorkflowData, agentArtifactPrefix string, state *safeOutputsHandlerOutputsAndActionState) {
-	if !isWorkQueueEnabled(data) && data.SafeOutputs.CreateCodeScanningAlerts != nil && !isHandlerStaged(c.trialMode || templatableBoolIsTrue(data.SafeOutputs.Staged), data.SafeOutputs.CreateCodeScanningAlerts.Staged) {
+	if !isWorkQueueParticipant(data) && data.SafeOutputs.CreateCodeScanningAlerts != nil && !isHandlerStaged(c.trialMode || templatableBoolIsTrue(data.SafeOutputs.Staged), data.SafeOutputs.CreateCodeScanningAlerts.Staged) {
 		consolidatedSafeOutputsJobLog.Print("Exposing sarif_file output for upload_code_scanning_sarif job")
 		state.outputs["sarif_file"] = "${{ steps.process_safe_outputs.outputs.sarif_file }}"
 		state.steps = append(state.steps, buildSarifArtifactUploadStep(agentArtifactPrefix, c.getActionPin)...)
@@ -624,7 +637,7 @@ func (c *Compiler) appendSarifArtifactUploadStep(data *WorkflowData, agentArtifa
 // appendCustomActionSteps resolves and appends the steps for any custom safe-output actions
 // declared by the workflow, recording a step name for each so later steps can depend on it.
 func (c *Compiler) appendCustomActionSteps(data *WorkflowData, markdownPath string, state *safeOutputsHandlerOutputsAndActionState) {
-	if isWorkQueueEnabled(data) {
+	if isWorkQueueParticipant(data) {
 		return
 	}
 	if len(data.SafeOutputs.Actions) > 0 {

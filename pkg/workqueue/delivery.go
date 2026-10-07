@@ -63,9 +63,12 @@ func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (
 		result.Reason = "already_" + work.Barrier
 		return result, nil
 	}
-	if b.DeliveryVerifier == nil {
+	recovery := state.Policy.Pools[work.Pool].Reconciliation
+	now := time.Now()
+	if b.DeliveryVerifier == nil && !deliveryVerificationExhausted(work, recovery, 0, now.UnixMilli()) {
 		return result, queueError("delivery_verifier_required", "bind a trusted scoped receipt verifier before delivery reconciliation")
 	}
+	contractSupported := validateDeliveryContract(work.Payload) == nil
 	claim := state.Claims[work.ClaimID]
 	dispatch := state.Dispatches[claim.DispatchID]
 	if dispatch.Run == nil {
@@ -75,20 +78,18 @@ func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (
 	if err != nil {
 		return result, err
 	}
-	recovery := state.Policy.Pools[work.Pool].Reconciliation
-	now := time.Now()
 	remaining := max(0, min(recovery.DeadlineMS, work.completionAt+recovery.DeadlineMS-now.UnixMilli()))
 	deadline := now.Add(time.Duration(remaining) * time.Millisecond)
 	last := DeliveryVerification{Disposition: "unknown"}
-	for attempt := 0; attempt < recovery.MaxAttempts && time.Now().Before(deadline); attempt++ {
+	for attempt := 0; b.DeliveryVerifier != nil && attempt < recovery.MaxAttempts && time.Now().Before(deadline); attempt++ {
 		callContext, cancel := context.WithDeadline(ctx, deadline)
 		verification, verifyErr := b.DeliveryVerifier(callContext, state, *claim)
 		cancel()
 		result.Attempts++
-		if verifyErr == nil {
+		if verifyErr == nil && contractSupported {
 			last = verification
 		}
-		if verifyErr == nil && verification.Verified && verification.Receipt != "" {
+		if verifyErr == nil && contractSupported && verification.Verified && verification.Receipt != "" {
 			descriptor, err := Canonical(verification.Descriptor)
 			var object map[string]any
 			if err != nil || json.Unmarshal(descriptor, &object) != nil || object == nil ||
@@ -101,6 +102,9 @@ func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (
 			}
 			evidence.Kind, evidence.Source, evidence.Receipt = "delivery", "verified_receipts", verification.Receipt
 			evidence.Status, evidence.Conclusion = "", ""
+			if verification.Disposition == "none" || verification.Disposition == "partial" {
+				evidence.Effects = verification.Disposition
+			}
 			operation := Op(map[string]any{
 				"kind": "Result", "work_id": work.WorkID, "claim_id": claim.ClaimID,
 				"completion_id": work.CompletionID, "descriptor": json.RawMessage(descriptor), "evidence": evidence,
@@ -110,8 +114,12 @@ func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (
 				return result, err
 			}
 			publication, err := b.Publish(ctx, actor, request)
+			if err != nil {
+				result.Reason = "delivery_unresolved"
+				return result, err
+			}
 			result.Publication, result.Reason = &publication, "delivery_verified"
-			return result, err
+			return result, nil
 		}
 		if ctx.Err() != nil {
 			return result, ctx.Err()
@@ -159,6 +167,10 @@ func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (
 		return result, err
 	}
 	publication, err := b.Publish(ctx, actor, request)
+	if err != nil {
+		result.Reason = "delivery_unresolved"
+		return result, err
+	}
 	result.Publication, result.Reason = &publication, "delivery_failed_"+disposition
-	return result, err
+	return result, nil
 }

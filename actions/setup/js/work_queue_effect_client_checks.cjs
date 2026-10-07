@@ -3,7 +3,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
 const { withClaimExecution, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { assertGitPushAuthorized, gitPushRepository } = require("./work_queue_git_effects.cjs");
@@ -106,6 +105,32 @@ function registerTests({ describe, it }) {
         const descriptor = Object.getOwnPropertyDescriptor(client.rest.issues, "create");
         assert.ok(descriptor);
         await assert.rejects(descriptor.value({ owner: "foreign", repo: "repo" }), /same-Claim/);
+        assert.equal(writes, 1);
+      });
+    });
+
+    it("resolves repository identities before create effects that have no existing parent resource", async () => {
+      let writes = 0;
+      let repositoryId = 7;
+      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.resource.repository_id === "7" });
+      const source = {
+        rest: {
+          repos: { get: async () => ({ data: { full_name: "owner/repo", id: repositoryId } }) },
+          issues: {
+            create: async () => {
+              writes++;
+              return { data: { id: 100, number: 42 } };
+            },
+          },
+        },
+      };
+      await withClaimExecution({ assignment, claim_handle: "h1", authorize }, async () => {
+        const client = wrapClaimEffectClient(source, { claim_handle: "h1", authorize });
+        repositoryId = 8;
+        await assert.rejects(client.rest.issues.create({ owner: "owner", repo: "repo", title: "wrong native repository" }), /same-Claim/);
+        assert.equal(writes, 0);
+        repositoryId = 7;
+        await client.rest.issues.create({ owner: "owner", repo: "repo", title: "approved native repository" });
         assert.equal(writes, 1);
       });
     });
@@ -276,7 +301,7 @@ function registerTests({ describe, it }) {
     });
 
     it("partitions actual artifact uploads, resolver files and outputs and gates their real repository", async () => {
-      const directory = path.resolve(".queue-validation-cache", `claim-artifacts-${randomUUID()}`);
+      const directory = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-artifacts");
       const keys = ["RUNNER_TEMP", "GH_AW_ARTIFACT_RESOLVER_FILE", "GITHUB_REPOSITORY", "GITHUB_RUN_ID"];
       const oldEnvironment = keys.map(key => process.env[key]);
       const oldCore = global.core;
@@ -288,7 +313,7 @@ function registerTests({ describe, it }) {
       process.env.GH_AW_ARTIFACT_RESOLVER_FILE = path.join(directory, "artifact-resolver.json");
       process.env.GITHUB_REPOSITORY = "owner/repo";
       process.env.GITHUB_RUN_ID = "123";
-      global.core = { info() {}, warning() {}, setOutput: (key, value) => outputs.push([key, value]) };
+      global.core = { ...oldCore, info() {}, warning() {}, setOutput: (key, value) => outputs.push([key, value]) };
       global.__createArtifactClient = () => ({
         uploadArtifact: async (name, files, root) => {
           uploads.push({ name, files, root, content: fs.readFileSync(files[0], "utf8") });

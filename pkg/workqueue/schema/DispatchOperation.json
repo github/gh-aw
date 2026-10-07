@@ -44,11 +44,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "role",
-        "principal",
-        "repository"
-      ],
+      "required": ["role", "principal", "repository"],
       "type": "object"
     },
     "CountBound": {
@@ -102,11 +98,7 @@
           ]
         }
       },
-      "required": [
-        "kind",
-        "dispatch_id",
-        "state"
-      ],
+      "required": ["kind", "dispatch_id", "state"],
       "type": "object"
     },
     "Evidence": {
@@ -194,15 +186,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "source",
-        "repository",
-        "workflow",
-        "ref",
-        "principal",
-        "checked_at"
-      ],
+      "required": ["kind", "source", "repository", "workflow", "ref", "principal", "checked_at"],
       "type": "object"
     },
     "Identity": {
@@ -247,15 +231,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "run_id",
-        "run_attempt",
-        "repository",
-        "workflow",
-        "ref",
-        "principal",
-        "event"
-      ],
+      "required": ["run_id", "run_attempt", "repository", "workflow", "ref", "principal", "event"],
       "type": "object"
     },
     "Timestamp": {

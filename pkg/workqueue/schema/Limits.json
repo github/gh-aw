@@ -42,19 +42,7 @@
           "$ref": "#/$defs/Timestamp"
         }
       },
-      "required": [
-        "ledger_bytes",
-        "recovery_bytes",
-        "payload_bytes",
-        "graph_nodes",
-        "predecessors",
-        "pending_nodes",
-        "operations",
-        "assignment_bytes",
-        "result_bytes",
-        "evidence_bytes",
-        "observation_writes"
-      ],
+      "required": ["ledger_bytes", "recovery_bytes", "payload_bytes", "graph_nodes", "predecessors", "pending_nodes", "operations", "assignment_bytes", "result_bytes", "evidence_bytes", "observation_writes"],
       "type": "object"
     },
     "Timestamp": {

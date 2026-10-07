@@ -1,7 +1,9 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -23,10 +25,46 @@ func TestWorkQueueProposalValidationPreservesTemplatesAndNativePrincipalKeys(t *
 	require.Equal(t, "${{ github.repository }}", policy.Pools["default"].Profiles["default"].EffectScope)
 	require.Equal(t, before.AllowedRepositories, policy.Pools["default"].AllowedRepositories)
 	require.Equal(t, "2", validated.Pools["default"].Profiles["default"].Principal)
-	_, err := workqueue.Genesis(workqueue.Actor{
-		Role: "administrator", Principal: "1", Repository: "compiler/validation",
-	}, validated, "compiler-policy-validation", "compiler-proposal", 1)
-	require.NoError(t, err)
+	require.Error(t, workqueue.ValidatePolicy(policy))
+	require.NoError(t, workqueue.ValidatePolicy(validated))
+}
+
+func TestWorkQueueConfiguredProducerPrincipalsAreNativeDecimalIDs(t *testing.T) {
+	configuration := func(principal string) *WorkflowData {
+		return &WorkflowData{
+			Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
+			RawFrontmatter: map[string]any{"work-queue-policy": map[string]any{
+				"producers": map[string]any{principal: map[string]any{
+					"pools": []string{"default"}, "priorities": []int{1, 2, 3, 4, 5}, "fairness-keys": []string{""},
+				}},
+				"worker-profiles": map[string]any{"default": map[string]any{
+					"workflow": ".github/workflows/worker.lock.yml", "ref": strings.Repeat("a", 40),
+					"principal": "888", "trust-domain": "team", "credential-scope": "repository",
+					"effect-scope": "owner/repo", "max-claims-per-dispatch": 1,
+				}},
+			}},
+		}
+	}
+	for _, principal := range []string{"compiler", "bot", "0", "01", "-1", "+1", "12.3", "${{ github.actor }}", "${{ github.actor_id }}", strings.Repeat("1", 257)} {
+		t.Run(principal, func(t *testing.T) {
+			err := validateWorkQueueConfiguration(configuration(principal))
+			require.ErrorContains(t, err, "work-queue-policy.producers")
+			require.ErrorContains(t, err, "stable positive decimal GitHub actor IDs")
+			require.ErrorContains(t, err, "Example:")
+		})
+	}
+	for _, principal := range []string{"1", "777", strings.Repeat("1", 129), strings.Repeat("1", 256)} {
+		t.Run(principal, func(t *testing.T) {
+			data := configuration(principal)
+			require.NoError(t, validateWorkQueueConfiguration(data))
+			require.Contains(t, data.WorkQueuePolicy.Policy.Producers, principal)
+			require.NotContains(t, data.WorkQueuePolicy.Policy.Producers, "${{ github.actor_id }}")
+			environment := strings.Join(workQueuePolicyEnvironment(data), "")
+			require.Contains(t, environment, fmt.Sprintf(`\"%s\":`, principal))
+			require.NotContains(t, environment, "compiler/validation")
+			require.NotContains(t, environment, "github.actor_id")
+		})
+	}
 }
 
 func TestWorkQueueImplicitPolicyDoesNotAssertCallerDependentWorkerIdentity(t *testing.T) {
@@ -45,7 +83,7 @@ func TestWorkQueueImplicitPolicyDoesNotAssertCallerDependentWorkerIdentity(t *te
 
 func TestWorkQueueExplicitPolicyKeepsDistinctImmutableSenderAndWorkerPrincipals(t *testing.T) {
 	data := &WorkflowData{
-		Tools: map[string]any{"work-queue": true},
+		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
 		RawFrontmatter: map[string]any{"work-queue-policy": map[string]any{
 			"producers": map[string]any{"777": map[string]any{
 				"pools": []string{"default"}, "priorities": []int{1, 2, 3, 4, 5}, "fairness-keys": []string{""},
@@ -68,6 +106,62 @@ func TestWorkQueueExplicitPolicyKeepsDistinctImmutableSenderAndWorkerPrincipals(
 	require.NotContains(t, environment, "github.actor }}")
 }
 
+func TestWorkQueuePartialProfileProposalCannotPinCallerRelativeProducer(t *testing.T) {
+	data := &WorkflowData{
+		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
+		RawFrontmatter: map[string]any{"work-queue-policy": map[string]any{
+			"worker-profiles": map[string]any{"default": map[string]any{
+				"workflow": ".github/workflows/worker.lock.yml", "ref": strings.Repeat("a", 40),
+				"principal": "22", "trust-domain": "team", "credential-scope": "repository", "effect-scope": "owner/repo",
+			}},
+		}},
+	}
+	require.ErrorContains(t, validateWorkQueueConfiguration(data), "explicit producers table")
+	require.NotContains(t, strings.Join(workQueuePolicyEnvironment(data), ""), "GH_AW_WORK_QUEUE_POLICY:")
+	data.RawFrontmatter["work-queue-policy"].(map[string]any)["producers"] = workQueueTestProducerRules()
+	require.NoError(t, validateWorkQueueConfiguration(data))
+	environment := strings.Join(workQueuePolicyEnvironment(data), "")
+	require.Contains(t, environment, `\"777\":`)
+	require.Contains(t, environment, `\"principal\":\"22\"`)
+	require.NotContains(t, environment, "github.actor_id")
+}
+
+func workQueueTestProducerRules() map[string]any {
+	return map[string]any{"777": map[string]any{
+		"pools": []string{"default"}, "priorities": []int{1, 2, 3, 4, 5}, "fairness-keys": []string{""},
+	}}
+}
+
+func TestWorkQueuePolicyProposalCannotInferLaunchPrincipalFromDispatcher(t *testing.T) {
+	for _, block := range []map[string]any{
+		{"mode": "weighted-priority"},
+		{"class-weights": []int{8, 4, 2, 1, 1}},
+		{"dependencies": map[string]any{"max-observation-age": "60s"}},
+	} {
+		for _, worker := range []bool{false, true} {
+			data := &WorkflowData{
+				Tools:          map[string]any{"work-queue": map[string]any{"worker": worker}},
+				RawFrontmatter: map[string]any{"work-queue-policy": block},
+			}
+			if !worker {
+				data.SafeOutputs = &SafeOutputsConfig{DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"worker"}}}
+			}
+			err := validateWorkQueueConfiguration(data)
+			require.ErrorContains(t, err, "approved dispatch credential's numeric GitHub principal")
+			require.ErrorContains(t, err, "Example:")
+			require.NotContains(t, strings.Join(workQueuePolicyEnvironment(data), ""), "GH_AW_WORK_QUEUE_POLICY:")
+		}
+	}
+	for _, block := range []map[string]any{{}, {"dependencies": map[string]any{"read-credentials": map[string]any{"foreign/design": "${{ secrets.DESIGN_READ_TOKEN }}"}}}} {
+		data := &WorkflowData{
+			Tools:          map[string]any{"work-queue": map[string]any{"worker": true}},
+			RawFrontmatter: map[string]any{"work-queue-policy": block},
+		}
+		require.NoError(t, validateWorkQueueConfiguration(data))
+		require.NotContains(t, strings.Join(workQueuePolicyEnvironment(data), ""), "GH_AW_WORK_QUEUE_POLICY:")
+	}
+}
+
 func TestWorkQueueReconciliationPropagatesPreviewWithoutGlobalAuthority(t *testing.T) {
 	for _, value := range []TemplatableBool{"true", "${{ inputs.preview }}"} {
 		data := &WorkflowData{
@@ -79,6 +173,28 @@ func TestWorkQueueReconciliationPropagatesPreviewWithoutGlobalAuthority(t *testi
 		require.Contains(t, step, "GH_AW_SAFE_OUTPUTS_STAGED:")
 		require.Contains(t, step, "requireAssignment: true")
 		require.NotContains(t, step, "claim_authorized")
+	}
+	literalFalse := TemplatableBool("false")
+	for _, value := range []*TemplatableBool{nil, &literalFalse} {
+		data := &WorkflowData{
+			Tools:       map[string]any{"work-queue": map[string]any{"worker": true}},
+			SafeOutputs: &SafeOutputsConfig{Staged: value},
+		}
+		require.NoError(t, validateWorkQueueConfiguration(data))
+		compiler := NewCompiler()
+		controls, err := compiler.buildWorkQueueControlProcessingStep(data)
+		require.NoError(t, err)
+		for _, step := range [][]string{compiler.buildWorkQueueClaimReconciliationStep(data), controls} {
+			require.NotContains(t, strings.Join(step, ""), "GH_AW_SAFE_OUTPUTS_STAGED:", "unset/literal false must not shadow an inherited global preview")
+		}
+		compiler.trialMode = true
+		controls, err = compiler.buildWorkQueueControlProcessingStep(data)
+		require.NoError(t, err)
+		for _, step := range [][]string{compiler.buildWorkQueueClaimReconciliationStep(data), controls} {
+			text := strings.Join(step, "")
+			require.Contains(t, text, `GH_AW_SAFE_OUTPUTS_STAGED: "true"`, "global trial mode must reach both reconciliation and controls")
+			require.NotContains(t, text, "claim_authorized")
+		}
 	}
 }
 
@@ -101,6 +217,58 @@ func TestWorkQueueMandatoryPolicy(t *testing.T) {
 		require.Error(t, validateWorkQueueConfiguration(&WorkflowData{
 			Tools: map[string]any{"work-queue": true}, RawFrontmatter: map[string]any{"work-queue-policy": map[string]any{"mode": mode}},
 		}))
+	}
+}
+
+func TestWorkQueueObserverPreservesOrdinaryOutputsAndProtectedRuntimeRoles(t *testing.T) {
+	observer := &WorkflowData{
+		Tools:          map[string]any{"work-queue": true},
+		SafeOutputs:    &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}, Steps: []any{map[string]any{"run": "echo ordinary"}}},
+		RawFrontmatter: map[string]any{},
+	}
+	require.NoError(t, validateWorkQueueConfiguration(observer))
+	compiler := NewCompiler()
+	require.NoError(t, compiler.validateWorkQueueTargets(observer, "observer.md"))
+	require.Equal(t, "observer", workQueueRuntimeRole(observer))
+	require.Empty(t, compiler.buildWorkQueueClaimReconciliationStep(observer))
+	controlSteps, err := compiler.buildWorkQueueControlProcessingStep(observer)
+	require.NoError(t, err)
+	require.Empty(t, controlSteps)
+	permissions, _ := safeOutputsJobPermissions(observer)
+	require.NotContains(t, permissions.RenderToYAML(), "contents: write")
+	require.NotContains(t, permissions.RenderToYAML(), "actions: write")
+	steps, err := compiler.buildSafeOutputsUserProvidedSteps(observer)
+	require.NoError(t, err)
+	require.Contains(t, strings.Join(steps, ""), "echo ordinary")
+	require.Contains(t, strings.Join(workQueuePolicyEnvironment(observer), ""), `GH_AW_WORK_QUEUE_ROLE: "observer"`)
+	require.NotContains(t, strings.Join(workQueuePolicyEnvironment(observer), ""), "GH_AW_WORK_QUEUE_POLICY:")
+	for _, env := range []map[string]string{compiler.buildMainJobEnv(observer), compiler.buildJobLevelSafeOutputEnvVars(observer, "observer")} {
+		require.Equal(t, `"observer"`, env["GH_AW_WORK_QUEUE_ROLE"])
+		require.NotContains(t, env, "GH_AW_WORK_QUEUE_INTENT_ORIGIN")
+	}
+	worker := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}}
+	require.Equal(t, `"worker"`, compiler.buildMainJobEnv(worker)["GH_AW_WORK_QUEUE_ROLE"])
+	require.Equal(t, `"${{ needs.activation.outputs.work_queue_origin }}"`, compiler.buildMainJobEnv(worker)["GH_AW_WORK_QUEUE_INTENT_ORIGIN"])
+	require.Equal(t, `"worker"`, compiler.buildJobLevelSafeOutputEnvVars(worker, "worker")["GH_AW_WORK_QUEUE_ROLE"])
+	require.Equal(t, `"${{ needs.agent.outputs.work_queue_origin }}"`, compiler.buildJobLevelSafeOutputEnvVars(worker, "worker")["GH_AW_WORK_QUEUE_INTENT_ORIGIN"])
+	require.Equal(t, "${{ steps.work_queue_intent_origin.outputs.work_queue_origin }}", compiler.buildMainJobOutputs(worker)["work_queue_origin"])
+	require.NotContains(t, compiler.buildMainJobOutputs(observer), "work_queue_origin")
+	for _, role := range []*WorkflowData{observer, worker} {
+		permissions, err := compiler.buildMainJobPermissions(role)
+		require.NoError(t, err)
+		if role == worker {
+			require.Contains(t, permissions, "actions: read")
+		} else {
+			require.NotContains(t, permissions, "actions: read")
+		}
+		var originStep strings.Builder
+		compiler.generateWorkQueueIntentOriginStep(&originStep, role)
+		if role == worker {
+			require.Contains(t, originStep.String(), "id: work_queue_intent_origin")
+			require.Contains(t, originStep.String(), "capture_work_queue_intent_origin.cjs")
+		} else {
+			require.Empty(t, originStep.String())
+		}
 	}
 }
 
@@ -141,26 +309,31 @@ func TestWorkQueueControlsRunAfterCompletionWithBoundedCompilerConfiguration(t *
 	data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}, SafeOutputs: &SafeOutputsConfig{}}
 	require.NoError(t, validateWorkQueueConfiguration(data))
 	compiler := NewCompiler()
-	step := strings.Join(compiler.buildWorkQueueControlProcessingStep(data), "")
+	controlSteps, err := compiler.buildWorkQueueControlProcessingStep(data)
+	require.NoError(t, err)
+	step := strings.Join(controlSteps, "")
 	require.Contains(t, step, "GH_AW_WORK_QUEUE_CONTROL_CONFIG")
 	require.Contains(t, step, "JSON.parse(process.env.GH_AW_WORK_QUEUE_CONTROL_CONFIG)")
 	require.Contains(t, step, "work_queue_control_adapter.cjs")
 	require.Contains(t, step, "requireAssignment: true")
 	require.NotContains(t, step, "authorized")
+	require.Equal(t, 1, strings.Count(step, "const { setupGlobals }"))
+	require.Equal(t, 1, strings.Count(step, "setupGlobals(core, github, context, exec, io, getOctokit);"))
 	steps, err := compiler.buildSafeOutputsSetupAndDownloadSteps(data, "")
 	require.NoError(t, err)
 	all := strings.Join(steps, "")
 	require.Less(t, strings.Index(all, "work_queue_claim_reconciliation"), strings.Index(all, "work_queue_controls"))
 	require.Contains(t, all, "GH_AW_WORK_QUEUE_FINISH_INTENT:")
-	dispatcher := &WorkflowData{Tools: map[string]any{"work-queue": true}}
+	dispatcher := &WorkflowData{Tools: map[string]any{"work-queue": true}, SafeOutputs: &SafeOutputsConfig{DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"worker"}}}}
 	require.NoError(t, validateWorkQueueConfiguration(dispatcher))
-	require.NotContains(t, strings.Join(compiler.buildWorkQueueControlProcessingStep(dispatcher), ""), "requireAssignment:")
+	controlSteps, err = compiler.buildWorkQueueControlProcessingStep(dispatcher)
+	require.NoError(t, err)
+	require.NotContains(t, strings.Join(controlSteps, ""), "requireAssignment:")
 }
 
 func TestWorkQueueForeignReadsBindSeparateEnvironmentCredentials(t *testing.T) {
-	data := &WorkflowData{Tools: map[string]any{"work-queue": true}, RawFrontmatter: map[string]any{
+	data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}, RawFrontmatter: map[string]any{
 		"work-queue-policy": map[string]any{"dependencies": map[string]any{
-			"repositories": []any{"foreign/design", "foreign/code"},
 			"read-credentials": map[string]any{
 				"foreign/design": "${{ secrets.DESIGN_READ_TOKEN }}",
 				"foreign/code":   "${{ secrets.CODE_READ_TOKEN }}",
@@ -170,6 +343,8 @@ func TestWorkQueueForeignReadsBindSeparateEnvironmentCredentials(t *testing.T) {
 	require.NoError(t, validateWorkQueueConfiguration(data))
 	env := workQueuePolicyEnvironment(data)
 	all := strings.Join(env, "")
+	require.NotContains(t, all, "GH_AW_WORK_QUEUE_POLICY:")
+	require.NotContains(t, all, "github.actor_id")
 	require.Contains(t, all, "GH_AW_WORK_QUEUE_DEPENDENCY_READ_TOKEN_0: ${{ secrets.CODE_READ_TOKEN }}")
 	require.Contains(t, all, "GH_AW_WORK_QUEUE_DEPENDENCY_READ_TOKEN_1: ${{ secrets.DESIGN_READ_TOKEN }}")
 	for _, line := range env {
@@ -218,6 +393,100 @@ func TestWorkQueueProfileBoundsAndImmutableRevision(t *testing.T) {
 	}
 }
 
+func TestWorkQueueExplicitProfilesReplaceSynthesizedDefaults(t *testing.T) {
+	profile := func(principal string) map[string]any {
+		return map[string]any{
+			"workflow": ".github/workflows/worker.lock.yml", "ref": strings.Repeat("a", 40),
+			"principal": principal, "trust-domain": "trusted", "credential-scope": "repository", "effect-scope": "owner/repo",
+		}
+	}
+	profiles := map[string]any{"zeta": profile("888"), "alpha": profile("777")}
+	data := &WorkflowData{
+		Tools:          map[string]any{"work-queue": map[string]any{"worker": true}},
+		RawFrontmatter: map[string]any{"work-queue-policy": map[string]any{"worker-profiles": profiles, "producers": workQueueTestProducerRules()}},
+	}
+	require.NoError(t, validateWorkQueueConfiguration(data))
+	pool := data.WorkQueuePolicy.Policy.Pools["default"]
+	require.Len(t, pool.Profiles, 2)
+	require.NotContains(t, pool.Profiles, "default")
+	require.Equal(t, "alpha", pool.DefaultProfile)
+	require.Equal(t, "777", pool.Profiles["alpha"].Principal)
+	require.Equal(t, "888", pool.Profiles["zeta"].Principal)
+	require.Equal(t, 1, pool.Profiles["alpha"].MaxClaims)
+	profiles["default"] = profile("999")
+	require.NoError(t, validateWorkQueueConfiguration(data))
+	require.Equal(t, "default", data.WorkQueuePolicy.Policy.Pools["default"].DefaultProfile)
+	data.RawFrontmatter["work-queue-policy"] = map[string]any{"worker-profiles": map[string]any{}}
+	require.ErrorContains(t, validateWorkQueueConfiguration(data), "at least one approved profile")
+}
+
+func TestWorkQueuePolicySharedIdentityFixtures(t *testing.T) {
+	data, err := os.ReadFile("../../specs/work-queue/fixtures/identity-validation.json")
+	require.NoError(t, err)
+	var fixture struct {
+		Version              int `json:"version"`
+		IdentityMaxUTF8Bytes int `json:"identity_max_utf8_bytes"`
+		DecimalMaxDigits     int `json:"decimal_max_digits"`
+		Identity             []struct {
+			Name              string `json:"name"`
+			Text              string `json:"text"`
+			Repeat            int    `json:"repeat"`
+			ExpectedUTF8Bytes int    `json:"expected_utf8_bytes"`
+			Valid             bool   `json:"valid"`
+		} `json:"identity"`
+		Decimal []struct {
+			Name   string `json:"name"`
+			Digits int    `json:"digits"`
+			Valid  bool   `json:"valid"`
+		} `json:"decimal"`
+	}
+	require.NoError(t, json.Unmarshal(data, &fixture))
+	require.Equal(t, 3, fixture.Version)
+	require.Equal(t, 256, fixture.IdentityMaxUTF8Bytes)
+	require.Equal(t, 256, fixture.DecimalMaxDigits)
+	validate := func(principal, profileName, trustDomain string) error {
+		profile := map[string]any{
+			"workflow": ".github/workflows/worker.lock.yml", "ref": strings.Repeat("a", 40),
+			"principal": principal, "trust-domain": trustDomain, "credential-scope": "repository", "effect-scope": "owner/repo",
+		}
+		workflow := &WorkflowData{
+			Tools:          map[string]any{"work-queue": map[string]any{"worker": true}},
+			RawFrontmatter: map[string]any{"work-queue-policy": map[string]any{"worker-profiles": map[string]any{profileName: profile}, "producers": workQueueTestProducerRules()}},
+		}
+		return validateWorkQueueConfiguration(workflow)
+	}
+	for _, entry := range fixture.Decimal {
+		t.Run(entry.Name, func(t *testing.T) {
+			err := validate(strings.Repeat("1", entry.Digits), "default", "trusted")
+			if entry.Valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+	for _, entry := range fixture.Identity {
+		id := strings.Repeat(entry.Text, entry.Repeat)
+		require.Equal(t, entry.ExpectedUTF8Bytes, len(id), entry.Name)
+		for _, field := range []string{"profile", "trust-domain"} {
+			t.Run(field+"/"+entry.Name, func(t *testing.T) {
+				profile, trust := "default", "trusted"
+				if field == "profile" {
+					profile = id
+				} else {
+					trust = id
+				}
+				err := validate("123", profile, trust)
+				if entry.Valid {
+					require.NoError(t, err)
+				} else {
+					require.Error(t, err)
+				}
+			})
+		}
+	}
+}
+
 func TestWorkQueueForeignReadsRequireSeparateCredential(t *testing.T) {
 	data := &WorkflowData{
 		Tools: map[string]any{"work-queue": true},
@@ -244,7 +513,7 @@ func TestWorkQueueRejectsUnscopedDelegation(t *testing.T) {
 		{UploadCodeCoverage: &UploadCodeCoverageConfig{}},
 		{CreateCodeScanningAlerts: &CreateCodeScanningAlertsConfig{}},
 	} {
-		data := &WorkflowData{Tools: map[string]any{"work-queue": true}, SafeOutputs: safe}
+		data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}, SafeOutputs: safe}
 		require.ErrorContains(t, validateWorkQueueConfiguration(data), "trusted per-Claim delivery adapter")
 	}
 }
@@ -254,7 +523,7 @@ func TestWorkQueueRejectsExternalHandlerTransports(t *testing.T) {
 		{CreateWorkItems: &CreateWorkItemConfig{}},
 		{UploadWorkItemAttachments: &UploadWorkItemAttachmentConfig{}},
 	} {
-		data := &WorkflowData{Tools: map[string]any{"work-queue": true}, SafeOutputs: safe}
+		data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}, SafeOutputs: safe}
 		require.ErrorContains(t, validateWorkQueueConfiguration(data), "trusted per-Claim target and delivery adapter")
 	}
 }
@@ -265,7 +534,7 @@ func TestWorkQueueRejectsPersistentStandaloneWrites(t *testing.T) {
 		{RepoMemoryConfig: &RepoMemoryConfig{}},
 		{DriveMemoryConfig: &DriveMemoryConfig{}},
 	} {
-		data.Tools = map[string]any{"work-queue": true}
+		data.Tools = map[string]any{"work-queue": map[string]any{"worker": true}}
 		require.ErrorContains(t, validateWorkQueueConfiguration(data), "trusted per-Claim delivery adapter")
 	}
 }

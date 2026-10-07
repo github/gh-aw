@@ -13,13 +13,12 @@ function lifecycleEvidence(assignment, profile, repository, kind, source, checke
 
 function cancellationOperations(state, assignment, at, reason) {
   const retry = state.policy.pools[assignment.pool].retry;
-  const publicationHeadroom = Math.max(1000, Math.min(300000, state.policy.pools[assignment.pool].reconciliation.deadline_ms));
   const operations = [];
   for (const member of assignment.claims) {
     const claim = state.claims.get(member.claim_id);
     const work = state.works.get(member.work_id);
     if (claim?.state !== "open") continue;
-    operations.push({ kind: "ClaimCancellation", work_id: member.work_id, claim_id: member.claim_id, reason, retry_not_before: at + retry.backoff_ms + publicationHeadroom });
+    operations.push({ kind: "ClaimCancellation", work_id: member.work_id, claim_id: member.claim_id, reason, retry_not_before: at + retry.backoff_ms });
     if (work.attempts >= retry.max_attempts) operations.push({ kind: "WorkCancellation", work_id: member.work_id, reason: "attempts_exhausted" });
   }
   return operations;
@@ -74,7 +73,7 @@ async function discoverRuns(options, expected) {
         return { candidates: [...candidates.values()], conflict: true };
       }
       if (candidates.has(runId)) continue;
-      const original = run.run_attempt === 1 || run.run_attempt === "1" ? run : await fetchNativeRunAttempt(options.githubClient, expected.repository, runId);
+      const original = await fetchNativeRunAttempt(options.githubClient, expected.repository, runId);
       try {
         const proof = validateNativeRun(original, { ...expected, run_id: runId });
         candidates.set(proof.run_id, proof);
@@ -102,10 +101,10 @@ async function reconcileDispatch(options) {
   const initial = await loadQueue(options);
   const { assignment, dispatch, profile } = validateStoredAssignment(initial.projection, options.assignment, { allowReleased: true });
   if (dispatch.released) return { state: "released", released: true };
-  const repository = `${options.context.repo.owner}/${options.context.repo.repo}`;
-  const expected = expectedWorkerRun(assignment, profile, options.context);
   if (dispatch.state === "reserved") return { state: "reserved", released: false };
   const trustedContext = await authenticatePublisher({ ...options, role: "reconciler" });
+  const repository = trustedContext.repository;
+  const expected = expectedWorkerRun(assignment, profile, options.context, repository);
   if (dispatch.run) {
     const proof = validateNativeRun(await fetchNativeRunAttempt(options.githubClient, repository, dispatch.run.run_id), { ...expected, run_id: dispatch.run.run_id });
     if (!proof.terminal) {
@@ -184,7 +183,8 @@ async function cancelBeforeLaunch(options) {
   const { assignment, dispatch, profile } = validateStoredAssignment(latest.projection, options.assignment, { allowReleased: true });
   if (dispatch.released) return { state: "released", released: true };
   if (dispatch.state !== "reserved" || dispatch.sender || dispatch.run) throw new Error("work_queue_launch_may_have_started");
-  const evidence = lifecycleEvidence(assignment, profile, `${options.context.repo.owner}/${options.context.repo.repo}`, "prelaunch", "trusted_publisher", options.now ?? Date.now());
+  const trustedContext = await authenticatePublisher({ ...options, role: "reconciler" });
+  const evidence = lifecycleEvidence(assignment, profile, trustedContext.repository, "prelaunch", "trusted_publisher", options.now ?? Date.now());
   return releaseAssignment(options, assignment, evidence);
 }
 

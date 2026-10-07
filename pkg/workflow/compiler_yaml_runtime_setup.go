@@ -54,6 +54,7 @@ func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, 
 	// turn. Unlike cache-memory/repo-memory (pure restores), comment-memory fetches comment
 	// content via the GitHub API, which is available at this point in the job.
 	c.generateActivationArtifactAndCommentMemorySteps(yaml, data)
+	c.generateWorkQueueIntentOriginStep(yaml, data)
 
 	// Add cache-memory steps before custom steps so that user steps: code can read
 	// /tmp/gh-aw/cache-memory/<key>/ without an LLM turn.
@@ -77,6 +78,18 @@ func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, 
 	generateCacheSteps(yaml, data, c.verbose)
 
 	return customStepsContainCheckout
+}
+
+func (c *Compiler) generateWorkQueueIntentOriginStep(yaml *strings.Builder, data *WorkflowData) {
+	if !isWorkQueueParticipant(data) {
+		return
+	}
+	yaml.WriteString("      - name: Capture authenticated work queue intent origin\n")
+	yaml.WriteString("        id: work_queue_intent_origin\n")
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	yaml.WriteString("        with:\n")
+	yaml.WriteString("          script: |\n")
+	yaml.WriteString(generateGitHubScriptWithRequire("capture_work_queue_intent_origin.cjs"))
 }
 
 func (c *Compiler) prepareRuntimeSetupAndCheckoutInfo(data *WorkflowData) ([]GitHubActionStep, bool) {

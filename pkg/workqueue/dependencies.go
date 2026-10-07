@@ -126,10 +126,35 @@ func (b Branch) readObservation(ctx context.Context, edge Dependency, generation
 	return observation
 }
 
+// ObservationRefreshBudget reserves a Claim slot and excludes optional recovery-capacity reads.
+func ObservationRefreshBudget(state Projection, requested int) (int, error) {
+	if state.Policy == nil {
+		return 0, queueError("policy_missing", "queue requires an installed policy")
+	}
+	if requested < 0 || requested > 255 {
+		return 0, queueError("ledger_invalid", "observation refresh budget must be an integer in 0..255")
+	}
+	if state.Policy.Limits.Operations < 1 {
+		return 0, queueError("policy_invalid", "observation refresh requires a positive operation limit")
+	}
+	if state.GrantsPaused || state.LedgerBytes >= state.Policy.Limits.LedgerBytes {
+		return 0, nil
+	}
+	return min(requested, state.Policy.Limits.Operations-1), nil
+}
+
 func (b Branch) refreshForDispatch(ctx context.Context, state Projection, poolName, requestID string) ([]Observation, error) {
+	budget, err := ObservationRefreshBudget(state, 128)
+	if err != nil {
+		return nil, err
+	}
 	pool, ok := state.Policy.Pools[poolName]
 	if !ok {
 		return nil, queueError("pool_invalid", "unknown pool %s", poolName)
+	}
+	observations := []Observation{}
+	if budget == 0 {
+		return observations, nil
 	}
 	at := time.Now().UnixMilli()
 	works := []*WorkState{}
@@ -147,12 +172,7 @@ func (b Branch) refreshForDispatch(ctx context.Context, state Projection, poolNa
 		}
 		return 0
 	})
-	observations := []Observation{}
 	seen := map[string]bool{}
-	budget := min(255, state.Policy.Limits.Operations-1)
-	if state.GrantsPaused {
-		return observations, nil
-	}
 	for _, work := range works {
 		workReady := true
 		for _, edge := range work.DependsOn {

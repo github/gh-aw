@@ -20,11 +20,7 @@
           ]
         }
       },
-      "required": [
-        "dispatch_id",
-        "claim_handle",
-        "outcome"
-      ],
+      "required": ["dispatch_id", "claim_handle", "outcome"],
       "type": "object"
     },
     "Identity": {

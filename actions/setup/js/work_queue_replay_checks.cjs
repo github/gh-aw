@@ -6,6 +6,7 @@ const {
   appendCommit,
   causalChain,
   explainWork,
+  generateRequestOperations,
   newRequest,
   parseTransactionLog,
   planDispatchWithObservations,
@@ -18,8 +19,8 @@ const {
   validateRequestContext,
   validateWorkerContinuation,
 } = require("./work_queue_replay.cjs");
-const { defaultPolicy } = require("./work_queue_policy.cjs");
-const { newWork, dependencyStatus, gateKey, validateGraphAdmission } = require("./work_queue_graph.cjs");
+const { actorFromContext, defaultPolicy, validateTrustedContext } = require("./work_queue_policy.cjs");
+const { newChildWork, newWork, dependencyStatus, gateKey, validateGraphAdmission } = require("./work_queue_graph.cjs");
 const { diagnostics, planDispatch, planNext, reservationCounts } = require("./work_queue_scheduler.cjs");
 const { administrator, bind, commit, context, dispatcher, evidence, finish, genesis, grant, operationCommit, producer, reconciler, submission, workerActor } = require("./work_queue_test_helpers.cjs");
 
@@ -31,6 +32,78 @@ function fixture(names = ["a", "b", "c"], policy = defaultPolicy({ repository: "
 
 function registerTests({ describe, it }) {
   describe("closed causal fair queue replay", () => {
+    it("bounds producer WorkCancellation by installed pool, priority and accounting entitlements", () => {
+      const base = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      const policy = {
+        ...base,
+        accounting_weights: { "": 1, tenant: 2, other: 3 },
+        pools: { ...base.pools, other: structuredClone(base.pools.default) },
+        producers: {
+          "1001": { pools: ["default"], priorities: [3], fairness_keys: ["tenant"] },
+          "1002": { pools: ["default", "other"], priorities: [3, 4], fairness_keys: ["tenant", "other"] },
+        },
+      };
+      const log = [genesis(policy)];
+      const allowed = { ...newWork({ task: "allowed" }, "graph", "allowed", "default", policy, 1), fairness_key: "tenant" };
+      log.push(commit("genesis", "allowed-submission", "submit", producer, { nodes: [allowed] }, [allowed], 1));
+      const outside = [
+        { ...newWork({ task: "outside-pool" }, "other-graph", "outside-pool", "other", policy, 2), fairness_key: "tenant" },
+        { ...newWork({ task: "outside-priority" }, "graph", "outside-priority", "default", policy, 2), priority: 4, fairness_key: "tenant" },
+        { ...newWork({ task: "outside-key" }, "graph", "outside-key", "default", policy, 2), fairness_key: "other" },
+      ];
+      log.push(commit("allowed-submission", "foreign-submission", "submit", { ...producer, principal: "1002" }, { nodes: outside }, outside, 2));
+      const operation = { kind: "WorkCancellation", work_id: allowed.work_id, reason: "producer_cancelled" };
+      const accepted = operationCommit(log, "allowed-cancellation", "cancel_work", [operation], producer, 3);
+      const state = replayTransactions([...log, accepted]);
+      assert.equal(state.works.get(allowed.work_id).state, "cancelled");
+      assert.equal(state.claims.size, 0);
+      const beforeSelection = canonical(serializeProjection(state));
+      assert.equal(planNext(state, "default", 4).work_id, outside[2].work_id);
+      const packing = planDispatch(state, { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 }, { requestId: "cancelled-producer-selection", commitId: "cancelled-producer-claim", at: 4 });
+      assert.deepEqual(
+        packing.operations.map(operation => operation.work_id),
+        [outside[2].work_id]
+      );
+      assert.equal(canonical(serializeProjection(state)), beforeSelection);
+      for (const node of outside) {
+        const rejected = operationCommit(log, `reject-${node.node_key}`, "cancel_work", [{ ...operation, work_id: node.work_id }], producer, 3);
+        assert.throws(
+          () => replayTransactions([...log, rejected]),
+          error => error instanceof Error && "code" in error && error.code === "admission_unauthorized",
+          node.node_key
+        );
+      }
+      const unregistered = operationCommit(log, "unregistered-cancellation", "cancel_work", [operation], { ...producer, principal: "1003" }, 3);
+      assert.throws(
+        () => replayTransactions([...log, unregistered]),
+        error => error instanceof Error && "code" in error && error.code === "admission_unauthorized"
+      );
+      assert.ok([...replayTransactions(log).works.values()].every(work => work.state === "available"));
+    });
+    it("rechecks producer entitlements before identical terminal cancellation no-ops", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      policy.accounting_weights.other = 1;
+      policy.producers["1002"] = { pools: ["default"], priorities: [3], fairness_keys: ["other"] };
+      const entitled = { ...producer, principal: "1002" };
+      const work = { ...newWork({ task: "foreign-account" }, "graph", "foreign-account", "default", policy, 1), fairness_key: "other" };
+      const log = [genesis(policy)];
+      log.push(commit("genesis", "foreign-admission", "submit", entitled, { nodes: [work] }, [work], 1));
+      const operation = { kind: "WorkCancellation", work_id: work.work_id, reason: "producer_cancelled" };
+      const terminal = operationCommit(log, "entitled-cancellation", "cancel_work", [operation], entitled, 2);
+      log.push(terminal);
+      const before = canonical(serializeProjection(replayTransactions(log)));
+      const repeated = operationCommit(log, "entitled-terminal-repeat", "cancel_work", [operation], entitled, 3);
+      assert.equal(replayTransactions([...log, repeated]).works.get(work.work_id).cancellation_commit_id, terminal.id);
+      for (const principal of ["1001", "1003"]) {
+        const rejected = operationCommit(log, `foreign-terminal-repeat-${principal}`, "cancel_work", [operation], { ...producer, principal }, 3);
+        assert.throws(
+          () => replayTransactions([...log, rejected]),
+          error => error instanceof Error && "code" in error && error.code === "admission_unauthorized",
+          principal
+        );
+      }
+      assert.equal(canonical(serializeProjection(replayTransactions(log))), before);
+    });
     it("selects FIFO by causal position rather than age, IDs, or physical line ordering", () => {
       const log = [genesis()];
       log.push(submission(log, ["z", "a", "b"], { transform: (node, index) => ({ ...node, enqueued: 100 - index }) }));
@@ -51,7 +124,7 @@ function registerTests({ describe, it }) {
       const log = [genesis()];
       for (let index = 1; index <= 80; index++) {
         const operations = [{ kind: "Control", control: "grants_paused", value: index % 2 === 1, reason: "bounded_control" }];
-        log.push(commit(log.at(-1).id, `long-history-${index}`, "control", administrator, { operations }, operations, index));
+        log.push(commit(log[log.length - 1].id, `long-history-${index}`, "control", administrator, { operations }, operations, index));
       }
       const expected = log.map(entry => canonical(entry)).join("\n") + "\n";
       assert.equal(serializeTransactionLog(log), expected);
@@ -99,6 +172,30 @@ function registerTests({ describe, it }) {
       assert.throws(() => validateEvidence({ ...proof, run_id: "200", run_attempt: 2 }), /native attempt 1/);
       assert.throws(() => validateRunBinding({ ...run, run_attempt: 2 }), /original workflow_dispatch attempts/);
     });
+    it("requires positive decimal principals on standalone native evidence and run bindings", () => {
+      const proof = { kind: "reconciliation", source: "github_api", repository: "owner/repo", workflow: ".github/workflows/worker.lock.yml", ref: "a".repeat(40), principal: "1001", checked_at: 1 };
+      const run = { run_id: "200", run_attempt: 1, repository: proof.repository, workflow: proof.workflow, ref: proof.ref, principal: proof.principal, event: "workflow_dispatch" };
+      for (const principal of ["1", "9007199254740993", "9".repeat(256)]) {
+        assert.doesNotThrow(() => validateEvidence({ ...proof, principal }));
+        assert.doesNotThrow(() => validateRunBinding({ ...run, principal }));
+      }
+      for (const principal of ["login", "0", "01", "-1", "+1", "1.5", "1e3", "\u0661"]) {
+        assert.throws(
+          () => validateEvidence({ ...proof, principal }),
+          error => error instanceof Error && "code" in error && error.code === "evidence_invalid",
+          principal
+        );
+        assert.throws(
+          () => validateRunBinding({ ...run, principal }),
+          error => error instanceof Error && "code" in error && error.code === "run_binding_conflict",
+          principal
+        );
+      }
+      for (const principal of ["", "1\n", "9".repeat(257), 1001, null]) {
+        assert.throws(() => validateEvidence({ ...proof, principal }));
+        assert.throws(() => validateRunBinding({ ...run, principal }));
+      }
+    });
     it("allows positive originating dispatcher reruns to start once without granting rerun worker authority", () => {
       const log = fixture(["a"]);
       const granted = grant(log);
@@ -111,8 +208,7 @@ function registerTests({ describe, it }) {
       assert.equal(started.dispatches.get(dispatchId).sender.run_attempt, 2);
       const again = operationCommit([...log, start], "rerun-origin-again", "dispatch", operations, actor);
       assert.throws(() => replayTransactions([...log, start, again]), /start marker/);
-      const missingWorkflow = { ...actor };
-      delete missingWorkflow.workflow;
+      const { workflow: omittedWorkflow, ...missingWorkflow } = actor;
       const invalid = operationCommit(log, "origin-missing-workflow", "dispatch", [{ ...operations[0], sender: missingWorkflow }], missingWorkflow);
       assert.throws(() => replayTransactions([...log, invalid]), /start marker/);
       const profile = started.dispatches.get(dispatchId).profile;
@@ -138,6 +234,91 @@ function registerTests({ describe, it }) {
       const worker = context(workerActor(bound, dispatchId), { ref: profile.ref, event: "workflow_dispatch" });
       assert.equal(validateClaimAuthority(bound, granted.operations[0].claim_id, worker).claim.claim_id, granted.operations[0].claim_id);
       assert.throws(() => validateClaimAuthority(bound, granted.operations[0].claim_id, { ...worker, principal: actor.principal }), /run_binding_conflict/);
+    });
+    it("never reuses a released historical native run and distinguishes exact large run IDs", () => {
+      const firstRunId = "9007199254740993";
+      const secondRunId = "9007199254740992";
+      assert.equal(Number(firstRunId), Number(secondRunId));
+      let log = fixture(["first", "second"]);
+      const first = grant(log, { id: "first-reservation" });
+      log.push(first.commit);
+      const firstDispatch = first.assignments[0].dispatch_id;
+      log = bind(log, firstDispatch, { id: "first-native", runId: firstRunId });
+      log.push(finish(log, firstDispatch, "h1", "completed"));
+      let state = replayTransactions(log);
+      const claim = state.claims.get(first.operations[0].claim_id);
+      log.push(
+        operationCommit(
+          log,
+          "first-native-result",
+          "result",
+          [
+            {
+              kind: "Result",
+              work_id: claim.work_id,
+              claim_id: claim.claim_id,
+              completion_id: claim.terminal_commit_id,
+              descriptor: {},
+              evidence: evidence(state, state.dispatches.get(firstDispatch), "delivery", 50, { source: "verified_receipts", run_id: firstRunId, run_attempt: 1, receipt: "first-native-receipt" }),
+            },
+          ],
+          reconciler,
+          50
+        )
+      );
+      state = replayTransactions(log);
+      log.push(
+        operationCommit(
+          log,
+          "first-native-release",
+          "release",
+          [{ kind: "Release", dispatch_id: firstDispatch, evidence: evidence(state, state.dispatches.get(firstDispatch), "terminal_run", 60, { run_id: firstRunId, run_attempt: 1, status: "completed", conclusion: "success" }) }],
+          reconciler,
+          60
+        )
+      );
+      const second = grant(log, { id: "second-reservation", at: 70 });
+      log.push(second.commit);
+      const secondDispatch = second.assignments[0].dispatch_id;
+      log.push(operationCommit(log, "second-native-start", "dispatch", [{ kind: "Dispatch", dispatch_id: secondDispatch, state: "started", sender: dispatcher }], dispatcher, 79));
+      state = replayTransactions(log);
+      assert.equal(state.dispatches.get(firstDispatch).released, true);
+      assert.equal(state.dispatches.get(firstDispatch).run.run_id, firstRunId);
+      const profile = state.dispatches.get(secondDispatch).profile;
+      const binding = (run_id, id) =>
+        operationCommit(
+          log,
+          id,
+          "dispatch",
+          [
+            {
+              kind: "Dispatch",
+              dispatch_id: secondDispatch,
+              state: "bound",
+              run: { run_id, run_attempt: 1, repository: "owner/repo", workflow: profile.workflow, ref: profile.ref, principal: profile.principal, event: "workflow_dispatch" },
+              evidence: evidence(state, state.dispatches.get(secondDispatch), "reconciliation", 80, { run_id, run_attempt: 1 }),
+            },
+          ],
+          reconciler,
+          80
+        );
+      const unchangedLog = serializeTransactionLog(log);
+      const unchangedProjection = serializeProjection(state);
+      const reused = binding(firstRunId, "reused-native-binding");
+      for (const records of [[...log, reused], [...log, reused].reverse()])
+        assert.throws(
+          () => replayTransactions(records),
+          error => error instanceof Error && "code" in error && error.code === "run_binding_conflict" && error.message.includes("native run is already bound to another assignment")
+        );
+      assert.equal(serializeTransactionLog(log), unchangedLog);
+      assert.deepEqual(serializeProjection(replayTransactions(log)), unchangedProjection);
+      const distinct = binding(secondRunId, "distinct-native-binding");
+      const accepted = replayTransactions([...log, distinct]);
+      assert.equal(accepted.dispatches.get(firstDispatch).run.run_id, firstRunId);
+      assert.equal(accepted.dispatches.get(secondDispatch).run.run_id, secondRunId);
+      assert.equal(reservationCounts(accepted, "default", "").native, 1);
+      assert.deepEqual(accepted.clocks, state.clocks);
+      assert.deepEqual(serializeProjection(replayTransactions([...log, distinct].reverse())), serializeProjection(accepted));
     });
     it("rejects invalid persisted reason codes even when their request fingerprints are valid", () => {
       const log = fixture(["a"]);
@@ -166,7 +347,7 @@ function registerTests({ describe, it }) {
       ])
         assert.throws(
           () => replayTransactions([...log, operationCommit(log, "changed-claim-cancellation", "cancel_claim", [operation], reconciler, 50)]),
-          error => error.code === "cancellation_conflict"
+          error => error instanceof Error && "code" in error && error.code === "cancellation_conflict"
         );
       const workOperation = { kind: "WorkCancellation", work_id: claimOperation.work_id, reason: "operator_cancelled" };
       const terminal = operationCommit(log, "terminal-work-cancellation", "cancel_work", [workOperation], reconciler, 50);
@@ -175,7 +356,7 @@ function registerTests({ describe, it }) {
       assert.equal(replayTransactions([...log, duplicateWork]).works.get(workOperation.work_id).cancellation_commit_id, terminal.id);
       assert.throws(
         () => replayTransactions([...log, operationCommit(log, "changed-work-cancellation", "cancel_work", [{ ...workOperation, reason: "different_reason" }], reconciler, 60)]),
-        error => error.code === "cancellation_conflict"
+        error => error instanceof Error && "code" in error && error.code === "cancellation_conflict"
       );
     });
     it("revalidates both fair choices and deterministic maximal packing", () => {
@@ -449,8 +630,8 @@ function registerTests({ describe, it }) {
         state_reason: "completed",
       };
       const observe = newRequest("worker-observe", "observe", actor, { operations: [observation] });
-      for (const intent of [submit, request, observe]) assert.throws(() => validateRequestContext(bound, intent, actor), /must be completed/);
-      assert.throws(() => validateWorkerContinuation(bound, trusted), /must be completed/);
+      for (const intent of [submit, request, observe]) assert.throws(() => validateRequestContext(bound, intent, actor), { code: "claim_effects_unauthorized" });
+      assert.throws(() => validateWorkerContinuation(bound, trusted), { code: "claim_effects_unauthorized" });
       log.push(finish(log, dispatchId, "h1", "completed"));
       const completed = replayTransactions(log);
       for (const intent of [submit, request, observe]) assert.doesNotThrow(() => validateRequestContext(completed, intent, actor));
@@ -459,10 +640,10 @@ function registerTests({ describe, it }) {
       const childCommit = commit(completed.tip, "worker-child", "submit", actor, { nodes: [child] }, [child], 40);
       assert.equal(replayTransactions([...log, childCommit]).works.get(child.work_id).node_key, "child");
       assert.throws(() => validateGraphAdmission(completed, [child], { ...actor, role: "producer" }), /submission entitlement/);
-      assert.throws(() => validateGraphAdmission(bound, [child], actor), /must be completed/);
+      assert.throws(() => validateGraphAdmission(bound, [child], actor), { code: "claim_effects_unauthorized" });
       for (const changed of [{ principal: "1004" }, { run_id: "201" }, { workflow: ".github/workflows/foreign.lock.yml" }, { claim_handle: "h2" }])
         assert.throws(() => validateGraphAdmission(completed, [child], { ...actor, ...changed }), /run_binding_conflict|claim_scope_invalid/);
-      for (const changed of [{ pool: "other" }, { priority: 1 }, { fairness_key: "other" }]) assert.throws(() => validateGraphAdmission(completed, [{ ...child, ...changed }], actor), /work_unauthorized/);
+      for (const changed of [{ pool: "other" }, { priority: 1 }, { fairness_key: "other" }]) assert.throws(() => validateGraphAdmission(completed, [{ ...child, ...changed }], actor), { code: "child_entitlement" });
       const failed = structuredClone(completed);
       failed.works.get(completed.claims.get([...completed.claims.keys()][0]).work_id).barrier = "failed";
       assert.throws(() => validateGraphAdmission(failed, [child], actor), /claim_effects_unauthorized/);
@@ -483,6 +664,171 @@ function registerTests({ describe, it }) {
       assert.throws(() => planDispatchWithObservations(completed, request, actor, 40, "foreign-preface", [foreign]), /parent's pool/);
       const observationCommit = operationCommit(log, "worker-observe", "observe", [observation], actor, 40);
       assert.equal(replayTransactions([...log, observationCommit]).observations.size, 1);
+    });
+    it("retains producer 11's frozen tenant/priority entitlement without impersonation by bound worker 22", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "11" });
+      policy.accounting_weights.tenant = 7;
+      policy.producers["11"] = { pools: ["default"], priorities: [1], fairness_keys: ["tenant"] };
+      policy.pools.default.profiles.default.principal = "22";
+      policy.pools.other = structuredClone(policy.pools.default);
+      const origin = { role: "producer", principal: "11", repository: "owner/repo" };
+      const parent = { ...newWork({ task: "parent" }, "lineage", "parent", "default", policy, 1), priority: 1, fairness_key: "tenant" };
+      let log = [genesis(policy)];
+      log.push(commit("genesis", "producer-parent", "submit", origin, { nodes: [parent] }, [parent], 1));
+      const granted = grant(log);
+      log.push(granted.commit);
+      const dispatchId = granted.assignments[0].dispatch_id;
+      log = bind(log, dispatchId);
+      const bound = replayTransactions(log);
+      const actor = workerActor(bound, dispatchId);
+      const trusted = context(actor, { ref: "0".repeat(40), event: "workflow_dispatch" });
+      const child = {
+        ...newWork({ task: "child" }, "lineage", "child", parent.pool, policy, 40),
+        priority: parent.priority,
+        fairness_key: parent.fairness_key,
+        depends_on: [{ kind: "work", work_id: parent.work_id }],
+      };
+      const request = newRequest("worker-22-child", "submit", actor, { nodes: [child] });
+      assert.equal(actor.principal, "22");
+      assert.equal(policy.producers["22"], undefined);
+      assert.throws(() => newChildWork(bound, actor, child.payload, child.node_key, child.enqueued), { code: "claim_effects_unauthorized" });
+      assert.throws(() => validateRequestContext(bound, request, actor), { code: "claim_effects_unauthorized" });
+      log.push(finish(log, dispatchId, "h1", "completed"));
+      const completed = replayTransactions(log);
+      const claim = completed.claims.get(completed.works.get(parent.work_id).claim_id);
+      const dispatch = completed.dispatches.get(dispatchId);
+      log.push(
+        operationCommit(
+          log,
+          "verified-parent",
+          "result",
+          [
+            {
+              kind: "Result",
+              work_id: parent.work_id,
+              claim_id: claim.claim_id,
+              completion_id: claim.terminal_commit_id,
+              descriptor: {},
+              evidence: evidence(completed, dispatch, "delivery", 45, { source: "verified_receipts", run_id: "200", run_attempt: 1, receipt: "trusted-parent" }),
+            },
+          ],
+          reconciler,
+          45
+        )
+      );
+      for (const prefix of [log.slice(0, -1), log]) {
+        const state = replayTransactions(prefix);
+        if (state.works.get(parent.work_id).barrier === "verified") {
+          for (const validate of [
+            () => validateClaimAuthority(state, claim.claim_id, trusted, { requireCompletion: true }),
+            () => newChildWork(state, actor, child.payload, child.node_key, child.enqueued),
+            () => validateWorkerContinuation(state, trusted),
+            () => validateRequestContext(state, request, actor),
+            () => validateGraphAdmission(state, [child], actor),
+          ])
+            assert.throws(validate, { code: "claim_effects_unauthorized" });
+          continue;
+        }
+        assert.deepEqual({ ...newChildWork(state, actor, child.payload, child.node_key, child.enqueued), depends_on: child.depends_on }, child);
+        assert.doesNotThrow(() => validateWorkerContinuation(state, trusted));
+        assert.doesNotThrow(() => validateRequestContext(state, request, actor));
+        assert.doesNotThrow(() => validateGraphAdmission(state, [child], actor));
+        const admitted = commit(state.tip, "worker-child-22", "submit", actor, { nodes: [child] }, [child], 50);
+        assert.deepEqual(generateRequestOperations(state, request, actor, 50, admitted.id).operations, [child]);
+        const replayed = replayTransactions([...prefix, admitted]);
+        assert.deepEqual(replayed.requests.get(admitted.request.id).actor, actor);
+        assert.deepEqual(replayed.transactions[replayed.works.get(parent.work_id).position.commit].actor, origin);
+        assert.deepEqual(serializeProjection(replayTransactions([...prefix, admitted].reverse())), serializeProjection(replayed));
+        assert.equal(replayed.works.get(child.work_id).fairness_key, "tenant");
+        assert.equal(replayed.works.get(child.work_id).priority, 1);
+        for (const changed of [{ principal: "11" }, { run_id: "201" }, { run_attempt: 2 }, { claim_handle: "h2" }]) {
+          const spoofed = { ...actor, ...changed };
+          assert.throws(() => newChildWork(state, spoofed, child.payload, child.node_key, child.enqueued));
+          assert.throws(() => validateRequestContext(state, newRequest("spoofed-child", "submit", spoofed, { nodes: [child] }), spoofed));
+        }
+        for (const changed of [{ role: "producer" }, { role: "administrator" }, { principal: "11", role: "producer" }]) assert.throws(() => validateTrustedContext(trusted, { ...actor, ...changed }), /request origin differs/);
+        assert.deepEqual(actorFromContext({ ...trusted, logical_origin: origin }), actor);
+        assert.throws(() => actorFromContext({ ...trusted, role: "producer" }), /approved role/);
+        assert.throws(() => newChildWork(state, { ...actor, logical_origin: origin }, child.payload, child.node_key, child.enqueued));
+        for (const changed of [{ pool: "other" }, { priority: 5 }, { fairness_key: "" }, { worker_profile: "agent-admin" }, { logical_origin: origin }])
+          assert.throws(() => validateRequestContext(state, newRequest("escalated-child", "submit", actor, { nodes: [{ ...child, ...changed }] }), actor));
+        const resource = { kind: "issue", host: "github.com", repository: "foreign/repo", repository_id: "9", resource_id: "10", number: "1" };
+        assert.throws(() => validateRequestContext(state, newRequest("foreign-resource-child", "submit", actor, { nodes: [{ ...child, subject: resource }] }), actor), /not allowlisted/);
+        assert.throws(() => validateRequestContext(state, newRequest("broader-dispatch", "dispatch_next", actor, { pool: "other", max_claims: 1, max_dispatches: 1, max_bytes: 49152 }), actor), /parent's pool/);
+        assert.throws(() => validateRequestContext(state, newRequest("worker-policy", "policy", actor, { operations: [{ kind: "Policy", epoch: "spoofed", policy }] }), actor), /cannot publish policy/);
+      }
+    });
+    it("closes fresh scoped queue controls after Result without closing a delivery-pending sibling", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      policy.pools.default.profiles.default.max_claims = 2;
+      let log = fixture(["parent", "sibling", "next"], policy);
+      const granted = grant(log, { max_claims: 2 });
+      log.push(granted.commit);
+      const dispatchId = granted.assignments[0].dispatch_id;
+      log = bind(log, dispatchId);
+      log.push(finish(log, dispatchId, "h1", "completed"));
+      log.push(finish(log, dispatchId, "h2", "completed"));
+      const pending = replayTransactions(log);
+      const first = pending.claims.get(granted.operations[0].claim_id);
+      const result = {
+        kind: "Result",
+        work_id: first.work_id,
+        claim_id: first.claim_id,
+        completion_id: first.terminal_commit_id,
+        descriptor: { summary: "all scoped effects verified" },
+        evidence: evidence(pending, pending.dispatches.get(dispatchId), "delivery", 65, { source: "verified_receipts", run_id: "200", run_attempt: 1, receipt: "complete-control-inventory" }),
+      };
+      const verified = operationCommit(log, "closed-control-result", "result", [result], reconciler, 65);
+      const closedLog = [...log, verified];
+      const closed = replayTransactions(closedLog);
+      const before = canonical(serializeProjection(closed));
+      for (const handle of ["h1", "h2"]) {
+        const actor = workerActor(pending, dispatchId, handle);
+        const child = newChildWork(pending, actor, { task: `child-${handle}` }, `child-${handle}`, 60);
+        const observation = {
+          kind: "Observation",
+          observation_id: `control-observation-${handle}`,
+          resource: { kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: "2", number: "2" },
+          condition: "completed",
+          state: "ready",
+          observed_at: 70,
+          credential_generation: "initial",
+          read_status: "ok",
+          resource_state: "closed",
+          state_reason: "completed",
+        };
+        for (const [kind, parameters] of Object.entries({
+          submit: { nodes: [child] },
+          dispatch_next: { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 },
+          observe: { operations: [observation] },
+        })) {
+          const id = `worker-control-${handle}-${kind}`;
+          const request = newRequest(`request-${id}`, kind, actor, parameters);
+          const decision = generateRequestOperations(pending, request, actor, 70, id);
+          assert.equal(decision.operations.length, 1);
+          const candidate = commit(closed.tip, id, kind, actor, parameters, decision.operations, 70);
+          const trusted = context(actor, { ref: "0".repeat(40), event: "workflow_dispatch" });
+          if (handle === "h1") {
+            for (const validate of [
+              () => validateRequestContext(closed, request, actor),
+              () => generateRequestOperations(closed, request, actor, 70, id),
+              () => replayTransactions([...closedLog, candidate]),
+              () => validateWorkerContinuation(closed, trusted),
+              () => validateClaimAuthority(closed, first.claim_id, trusted, { requireCompletion: true }),
+            ])
+              assert.throws(validate, { code: "claim_effects_unauthorized" });
+            if (kind === "dispatch_next") assert.throws(() => planDispatchWithObservations(closed, request, actor, 70, id, []), { code: "claim_effects_unauthorized" });
+          } else {
+            assert.doesNotThrow(() => validateRequestContext(closed, request, actor));
+            assert.equal(generateRequestOperations(closed, request, actor, 70, id).operations.length, 1);
+            assert.equal(replayTransactions([...closedLog, candidate]).requests.has(request.id), true);
+            if (kind === "dispatch_next") assert.equal(planDispatchWithObservations(closed, request, actor, 70, id, []).operations.length, 1);
+            assert.doesNotThrow(() => validateWorkerContinuation(closed, trusted));
+            assert.doesNotThrow(() => validateClaimAuthority(closed, pending.dispatches.get(dispatchId).claims[1].claim_id, trusted, { requireCompletion: true }));
+          }
+          assert.equal(canonical(serializeProjection(closed)), before);
+        }
+      }
     });
     it("requires verified Result rather than Completion, keeps terminal barriers exclusive, and admits safe immutable replacements", () => {
       let log = fixture(["parent", "child"]);
@@ -510,7 +856,7 @@ function registerTests({ describe, it }) {
       assert.equal(planNext(state, "default", 50).work_id, child.work_id);
       const source = context(workerActor(state, dispatchId, "h1"), { ref: "0".repeat(40), event: "workflow_dispatch" });
       assert.throws(() => validateClaimAuthority(state, result.claim_id, source, { requireCompletion: true }), /claim_effects_unauthorized/);
-      assert.equal(validateWorkerContinuation(state, source).claim.claim_id, result.claim_id);
+      assert.throws(() => validateWorkerContinuation(state, source), { code: "claim_effects_unauthorized" });
       const terminal = evidence(state, state.dispatches.get(dispatchId), "terminal_run", 51, { run_id: "200", run_attempt: 1, status: "completed", conclusion: "success" });
       const release = operationCommit([...log, verified], "verified-release", "release", [{ kind: "Release", dispatch_id: dispatchId, evidence: terminal }], reconciler, 51);
       assert.throws(() => validateWorkerContinuation(replayTransactions([...log, verified, release]), source), /claim_ineffective/);
@@ -569,7 +915,15 @@ function registerTests({ describe, it }) {
       log.push(finish(log, second.assignments[0].dispatch_id, "h1", "cancelled", { id: "exhausted", at: 70 }));
       state = replayTransactions(log);
       assert.equal(state.works.get(first.operations[0].work_id).state, "cancelled");
-      assert.equal(log.at(-1).operations.at(-1).kind, "WorkCancellation");
+      const exhausted = log[log.length - 1].operations;
+      assert.equal(exhausted[exhausted.length - 1].kind, "WorkCancellation");
+      const prefix = log.slice(0, -1);
+      const wrongReason = structuredClone(log[log.length - 1]);
+      wrongReason.operations[wrongReason.operations.length - 1].reason = "operator_cancelled";
+      assert.throws(() => replayTransactions([...prefix, wrongReason]), /request_invalid|work_unauthorized/);
+      const siblingClosure = structuredClone(log[log.length - 1]);
+      siblingClosure.operations[siblingClosure.operations.length - 1].work_id = log[1].operations[1].work_id;
+      assert.throws(() => replayTransactions([...prefix, siblingClosure]), /request_invalid|work_unauthorized/);
     });
     it("never releases uncertain launches or live runs on deadlines/cancellation alone", () => {
       let log = fixture(["a"]);
@@ -628,6 +982,30 @@ function registerTests({ describe, it }) {
       mixedProof[2].retry_not_before = mixedProof[0].retry_not_before;
       assert.throws(() => replayTransactions([...log, operationCommit(log, "mixed-proof", "release", mixedProof, reconciler, 60000)]), /retry_invalid/);
       assert.throws(() => replayTransactions([...log, operationCommit(log, "unanchored", "cancel_claim", [operations[0]], reconciler, 60000)]), /retry_invalid/);
+      const exact = structuredClone(operations);
+      assert.ok(exact[1].evidence);
+      assert.ok(exact[3].evidence);
+      exact[0].retry_not_before = 34000;
+      exact[1].evidence.checked_at = 4000;
+      exact[2].retry_not_before = 39000;
+      exact[3].evidence.checked_at = 9000;
+      const exactState = replayTransactions([...log, operationCommit(log, "exact-proof-backoff", "release", exact, reconciler, 50000)]);
+      assert.equal(exactState.works.get(granted.operations[0].work_id).retry_not_before, 34000);
+      assert.equal(exactState.works.get(granted.operations[1].work_id).retry_not_before, 39000);
+      assert.deepEqual(diagnostics(exactState.clocks.get("default")), diagnostics(state.clocks.get("default")));
+      const earlySecond = structuredClone(exact);
+      earlySecond[2].retry_not_before = 38000;
+      assert.throws(() => replayTransactions([...log, operationCommit(log, "early-second-proof", "release", earlySecond, reconciler, 50000)]), /retry_invalid/);
+      const absentSecond = structuredClone(exact.slice(0, 3));
+      assert.throws(() => replayTransactions([...log, operationCommit(log, "absent-second-proof", "release", absentSecond, reconciler, 50000)]), /retry_invalid/);
+      absentSecond[2].retry_not_before = 80000;
+      const unanchoredSecond = replayTransactions([...log, operationCommit(log, "decision-time-second", "release", absentSecond, reconciler, 50000)]);
+      assert.equal(unanchoredSecond.works.get(granted.operations[1].work_id).retry_not_before, 80000);
+      assert.equal(reservationCounts(unanchoredSecond, "default", "").native, 1);
+      const foreignSecond = structuredClone(exact);
+      assert.ok(foreignSecond[3].evidence);
+      foreignSecond[3].evidence.run_id = "201";
+      assert.throws(() => replayTransactions([...log, operationCommit(log, "foreign-second-proof", "release", foreignSecond, reconciler, 50000)]), /evidence_invalid/);
     });
   });
 }

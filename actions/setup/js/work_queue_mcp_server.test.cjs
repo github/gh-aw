@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
-import { randomUUID } from "crypto";
+import os from "node:os";
 import {
   createWorkQueueDispatchTool,
   createWorkQueueExplainTool,
@@ -18,12 +18,12 @@ import { serializeTransactionLog } from "./work_queue_replay.cjs";
 import { readStagedIntents } from "./work_queue_intents.cjs";
 import { createServer, handleMessage, registerTool } from "./mcp_server_core.cjs";
 import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
+import { MAX_PARSE_BYTES, MAX_SNAPSHOT_PARSE_BYTES, parseStrictJSON } from "./work_queue_codec.cjs";
 
 const directories = [];
 function setup(options = {}) {
   const fixture = queueFixture({ granted: false, ...options });
-  const directory = path.join(process.cwd(), `.queue-mcp-test-${randomUUID()}`);
-  fs.mkdirSync(directory);
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-mcp-"));
   directories.push(directory);
   const envelope = { version: 3, sha: "activation-head", captured_at: fixture.at, origin: fixture.dispatcher, worker: fixture.assignment, transactionLog: serializeTransactionLog(fixture.transactions) };
   const snapshotPath = path.join(directory, "snapshot.json");
@@ -135,7 +135,7 @@ describe("bounded credential-free work queue MCP", () => {
     expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/duplicate/);
   });
 
-  it("frames escaped ledger strings independently without weakening strict metadata or ledger parsing", () => {
+  it("uses shared strict outer framing without weakening metadata or ledger parsing", () => {
     const test = setup();
     const encoded = JSON.stringify(test.envelope).replace('"transactionLog":', '"transaction\\u004cog":');
     expect(parseSnapshotEnvelope(encoded)).toEqual(test.envelope);
@@ -150,6 +150,8 @@ describe("bounded credential-free work queue MCP", () => {
       '{"transactionLog":"\\x20"}',
       '{"metadata":"transactionLog":"x"}',
       '{"transactionLog":"unterminated}',
+      '{"transactionLog":"x","metadata":' + "[".repeat(65) + "0" + "]".repeat(65) + "}",
+      '{"transactionLog":"x","metadata":[' + Array.from({ length: 16385 }, () => "null").join(",") + "]}",
     ])
       expect(() => parseSnapshotEnvelope(invalid)).toThrow();
     const nested = { transactionLog: '{"nested":"transactionLog: \\\\ end"}\n', worker: { transactionLog: "must stay strictly parsed" } };
@@ -162,17 +164,21 @@ describe("bounded credential-free work queue MCP", () => {
     expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow();
   });
 
-  it("accepts outer escaping above 80 MiB while retaining the decoded 80 MiB ledger bound", () => {
-    const ledger = '"'.repeat(40 * 1024 * 1024 + 1);
+  it("accepts an exactly 80 MiB decoded ledger in escaped outer framing above 160 MiB", () => {
+    const ledger = "\\".repeat(MAX_PARSE_BYTES);
     const encoded = JSON.stringify({ transactionLog: ledger, version: 3 });
-    expect(Buffer.byteLength(encoded)).toBeGreaterThan(80 * 1024 * 1024);
+    expect(Buffer.byteLength(ledger)).toBe(MAX_PARSE_BYTES);
+    expect(Buffer.byteLength(encoded)).toBeGreaterThan(2 * MAX_PARSE_BYTES);
+    expect(Buffer.byteLength(encoded)).toBeLessThan(MAX_SNAPSHOT_PARSE_BYTES);
+    expect(() => parseStrictJSON(encoded)).toThrow(/parser limit/);
     expect(parseSnapshotEnvelope(encoded).transactionLog).toBe(ledger);
+    expect(() => parseStrictJSON(encoded)).toThrow(/parser limit/);
   });
 
   it("rejects oversized decoded ledgers and outer files before authoritative replay", () => {
-    expect(() => parseSnapshotEnvelope('{"transactionLog":"' + "x".repeat(80 * 1024 * 1024 + 1) + '"}')).toThrow(/ledger exceeds.*bounded/);
+    expect(() => parseSnapshotEnvelope('{"transactionLog":"' + "x".repeat(MAX_PARSE_BYTES + 1) + '"}')).toThrow(/ledger exceeds.*bounded/);
     const test = setup();
-    fs.truncateSync(test.snapshotPath, 162 * 1024 * 1024 + 1);
+    fs.truncateSync(test.snapshotPath, MAX_SNAPSHOT_PARSE_BYTES + 1);
     expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/snapshot exceeds.*bounded/);
   });
 

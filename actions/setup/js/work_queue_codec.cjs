@@ -11,6 +11,7 @@ function queueError(code, message) {
   return Object.assign(new Error(`${code}: ${message}`), { code });
 }
 
+/** @returns {number} */
 function utf8Compare(a, b) {
   return Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
 }
@@ -22,14 +23,18 @@ function validString(value) {
   return value;
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} [depth]
+ * @returns {string}
+ */
 function canonical(value, depth = 0) {
   if (depth > MAX_DEPTH) throw queueError("resource_limit", "JSON nesting exceeds 64");
   if (value === null) return "null";
   if (typeof value === "string") return JSON.stringify(validString(value));
   if (typeof value === "boolean") return String(value);
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw queueError("codec_invalid", "expected a finite JSON number");
-    if (!Number.isSafeInteger(value) || Object.is(value, -0)) throw queueError("noncanonical_number", "use safe integer numbers or explicit strings for other exact quantities");
+    if (!Number.isSafeInteger(value) || Object.is(value, -0)) throw queueError("noncanonical_number", "use finite safe integer numbers or explicit strings for other exact quantities");
     return String(value);
   }
   if (Array.isArray(value)) {
@@ -63,8 +68,12 @@ function fingerprint(actor, kind, parameters) {
 }
 
 // JSON.parse alone cannot detect duplicate (including escaped-equivalent) keys.
+/**
+ * @param {string} text
+ * @param {{maxBytes?: unknown}} [options]
+ */
 function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES } = {}) {
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_SNAPSHOT_PARSE_BYTES) throw queueError("resource_limit", "JSON parser byte limit must be a positive safe integer at most 161 MiB");
+  if (typeof maxBytes !== "number" || !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_SNAPSHOT_PARSE_BYTES) throw queueError("resource_limit", "JSON parser byte limit must be a positive safe integer at most 161 MiB");
   if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > maxBytes) throw queueError("resource_limit", "JSON input exceeds parser limit");
   let i = 0;
   const skip = () => {
@@ -149,10 +158,17 @@ function parseStrictJSON(text, { maxBytes = MAX_PARSE_BYTES } = {}) {
   return result;
 }
 
-function closed(value, required, optional = [], name = "record") {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw queueError("ledger_invalid", `${name} must be an object`);
+/**
+ * @param {unknown} value
+ * @param {string[]} required
+ * @param {string[]} [optional]
+ * @param {string} [name]
+ * @param {string} [code]
+ */
+function closed(value, required, optional = [], name = "record", code = "ledger_invalid") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw queueError(code, `${name} must be an object`);
   if (required.some(key => !Object.hasOwn(value, key)) || Object.keys(value).some(key => !required.includes(key) && !optional.includes(key))) {
-    throw queueError("ledger_invalid", `${name} has missing or unknown fields`);
+    throw queueError(code, `${name} has missing or unknown fields`);
   }
 }
 

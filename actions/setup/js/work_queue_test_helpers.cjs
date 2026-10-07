@@ -23,7 +23,7 @@ function genesis(policy = defaultPolicy({ repository: "owner/repo", principal: "
   return commit(null, "genesis", "policy", administrator, { operations }, operations, 0);
 }
 
-function submission(log, names, { at = 1, graph = "graph", transform = node => node, id = "submit" } = {}) {
+function submission(log, names, { at = 1, graph = "graph", transform = (node, index) => node, id = "submit" } = {}) {
   const state = replayTransactions(log);
   const nodes = names.map((name, index) => transform(newWork({ task: name }, graph, name, "default", state.policy, at), index));
   return commit(state.tip, id, "submit", producer, { nodes }, nodes, at, state.policy_epoch);
@@ -42,9 +42,17 @@ function operationCommit(log, id, kind, operations, actor = reconciler, at = 20)
   return commit(state.tip, id, kind, actor, { operations }, operations, at, state.policy_epoch);
 }
 
-function evidence(state, dispatch, kind, at, extra = {}) {
+/**
+ * @template {object} Extras
+ * @param state
+ * @param dispatch
+ * @param kind
+ * @param at
+ * @param {Extras} [extra]
+ */
+function evidence(state, dispatch, kind, at, extra) {
   const profile = state.policy.pools[dispatch.pool].profiles[dispatch.worker_profile];
-  return { kind, source: "github_api", repository: "owner/repo", workflow: profile.workflow, ref: profile.ref, principal: profile.principal, checked_at: at, ...extra };
+  return Object.assign({ kind, source: "github_api", repository: "owner/repo", workflow: profile.workflow, ref: profile.ref, principal: profile.principal, checked_at: at }, extra);
 }
 
 function bind(log, dispatchId, { id = "binding", at = 30, runId = "200" } = {}) {

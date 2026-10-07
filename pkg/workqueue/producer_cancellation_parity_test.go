@@ -75,7 +75,30 @@ func TestProducerCancellationPreservesForeignScopeAndNativeProjection(t *testing
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, node, "../../specs/work-queue/native_probe.cjs")
+	const script = `
+const fs = require("node:fs");
+const queue = require("../../actions/setup/js/work_queue_replay.cjs");
+const scheduler = require("../../actions/setup/js/work_queue_scheduler.cjs");
+const input = JSON.parse(fs.readFileSync(0, "utf8"));
+try {
+  const commits = queue.parseTransactionLog(input.data);
+  const state = queue.replayTransactions(commits);
+  const result = {
+    projection: queue.serializeProjection(state),
+    canonical_ledger: queue.serializeTransactionLog(commits),
+  };
+  if (input.parameters !== undefined) {
+    result.selection = scheduler.selectionOnly(queue.planNext(state, input.pool, input.at));
+    result.packing = scheduler.planDispatch(state, input.parameters,
+      { requestId: input.request_id, commitId: input.commit_id, at: input.at });
+  }
+  console.log(JSON.stringify(result));
+} catch (error) {
+  if (typeof error.code !== "string") throw error;
+  console.log(JSON.stringify({ error: error.message }));
+}
+`
+	command := exec.CommandContext(ctx, node, "-e", script)
 	command.Stdin = bytes.NewReader(append(input, '\n'))
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
@@ -87,6 +110,8 @@ func TestProducerCancellationPreservesForeignScopeAndNativeProjection(t *testing
 		Error      string          `json:"error"`
 		Projection json.RawMessage `json:"projection"`
 		Canonical  string          `json:"canonical_ledger"`
+		Selection  json.RawMessage `json:"selection"`
+		Packing    json.RawMessage `json:"packing"`
 	}
 	if err := json.Unmarshal(output, &response); err != nil {
 		t.Fatal(err)
@@ -104,6 +129,19 @@ func TestProducerCancellationPreservesForeignScopeAndNativeProjection(t *testing
 	}
 	if !bytes.Equal(expected, actual) || response.Canonical != string(ledger) {
 		t.Fatal("producer cancellation changed canonical bytes or complete native projection")
+	}
+	selection, err := PlanNext(state, "default", 4000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packing, err := PlanDispatch(state, DispatchParameters{
+		Pool: "default", MaxClaims: 1, MaxDispatches: 1, MaxBytes: 48 << 10,
+	}, "producer-parity-request", "producer-parity-commit", 4000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameJSON(selection, response.Selection) || !sameJSON(packing, response.Packing) {
+		t.Fatal("producer cancellation changed exact selection or packing across native engines")
 	}
 	for _, test := range []struct {
 		name    string
@@ -148,7 +186,7 @@ func TestProducerCancellationPreservesForeignScopeAndNativeProjection(t *testing
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, node, "../../specs/work-queue/native_probe.cjs")
+			command := exec.CommandContext(ctx, node, "-e", script)
 			command.Stdin = bytes.NewReader(append(input, '\n'))
 			var stderr bytes.Buffer
 			command.Stderr = &stderr

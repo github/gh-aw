@@ -1,23 +1,64 @@
 // @ts-check
 "use strict";
 
-const fs = require("fs");
+const { isProxy } = require("node:util").types;
 const queue = require("./work_queue_replay.cjs");
 const store = require("./work_queue_store.cjs");
-const { closed, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
+const { canonical, closed, digest, integer, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { normalizeAssignment, normalizeClaimScope } = require("./work_queue_claim_scope.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
 const { DEFAULT_FINISH_INTENT_PATH, loadWorkQueueSnapshot } = require("./work_queue_mcp_server.cjs");
-const { MAX_INTENTS, MAX_INTENT_BYTES, requestForIntent } = require("./work_queue_intents.cjs");
-const { bindWorkerAssignment, loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun } = require("./work_queue_binding.cjs");
+const { readIntentLines, requestForIntent } = require("./work_queue_intents.cjs");
+const { bindWorkerAssignment, loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
 const { authenticatePublisher, fetchNativeRunAttempt, validateNativeRun } = require("./work_queue_native.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { claimControlReceipts } = require("./work_queue_control_receipts.cjs");
-const { validateDeliveryContract } = require("./work_queue_delivery.cjs");
+const { validateDeliveryContract, isTrustedClaimDelivery } = require("./work_queue_delivery.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
 const FINISH_INTENT_PATH = DEFAULT_FINISH_INTENT_PATH;
-const SAFE_OUTPUTS_PATH = "/tmp/gh-aw/safeoutputs.jsonl";
+
+/** @typedef {Record<string, unknown> & {verified: true, contractVerified: true, receipt: string, descriptor: object, effects: "none" | "partial"}} VerifiedClaimEffects */
+
+/**
+ * @param {Record<string, unknown> | null} value
+ * @returns {value is VerifiedClaimEffects}
+ */
+function verifiedClaimEffects(value) {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    value.verified === true &&
+    value.contractVerified === true &&
+    typeof value.receipt === "string" &&
+    value.receipt.length > 0 &&
+    value.descriptor !== null &&
+    typeof value.descriptor === "object" &&
+    !Array.isArray(value.descriptor) &&
+    (value.effects === "none" || value.effects === "partial")
+  );
+}
+
+/** @param {VerifiedClaimEffects} proof */
+function snapshotClaimDelivery(proof) {
+  const ancestors = new Set();
+  /**
+   * @param {unknown} value
+   * @param {number} depth
+   */
+  function inspect(value, depth) {
+    if (value === null || typeof value !== "object") return;
+    if (depth > 64 || ancestors.has(value) || isProxy(value)) throw new Error("work_queue_delivery_proof_invalid");
+    ancestors.add(value);
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+      if (descriptor.get || descriptor.set) throw new Error("work_queue_delivery_proof_invalid");
+      if (descriptor.enumerable) inspect(descriptor.value, depth + 1);
+    }
+    ancestors.delete(value);
+  }
+  inspect(proof, 0);
+  return JSON.parse(canonical(proof));
+}
 
 function readWorkerSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPSHOT || SNAPSHOT_PATH) {
   return loadWorkQueueSnapshot(snapshotPath).worker;
@@ -26,15 +67,9 @@ function readWorkerSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPSHOT
 function readFinishIntent(filename = process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || FINISH_INTENT_PATH, assignment) {
   const intents = new Map();
   const errors = [];
-  if (!fs.existsSync(filename)) return { intents, errors };
-  const stat = fs.statSync(filename);
-  if (!stat.isFile() || stat.size > MAX_INTENT_BYTES) throw new Error("work_queue_intent_limit");
-  const lines = fs
-    .readFileSync(filename, "utf8")
-    .split("\n")
-    .filter(line => line.trim());
-  if (lines.length > MAX_INTENTS) throw new Error("work_queue_intent_limit");
+  const lines = readIntentLines(filename);
   for (const [index, line] of lines.entries()) {
+    if (!line.trim()) continue;
     let handle = null;
     try {
       const intent = parseStrictJSON(line);
@@ -68,15 +103,23 @@ async function authorizeWorkerClaim(options = {}) {
   const latest = await loadQueue(configured);
   const { dispatch, profile } = validateStoredAssignment(latest.projection, assignment);
   const trustedContext = await authenticatePublisher({ ...configured, role: "worker", dispatch_id: assignment.dispatch_id, claim_handle: member.handle });
-  const native = validateNativeRun(trustedContext.native_run, { ...expectedWorkerRun(assignment, profile, configured.context), run_id: trustedContext.run_id });
-  if (!dispatch.run || dispatch.run.run_id !== native.run_id || dispatch.run.run_attempt !== 1) throw new Error("work_queue_binding_not_durable");
+  const expected = expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository);
+  const native = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
+  if (!dispatch.run || dispatch.state !== "bound" || canonical(dispatch.run) !== canonical(bindingForRun(native, expected))) throw new Error("work_queue_binding_not_durable");
   const targets = [normalized.repository, normalized.repo, normalized.target_repo, normalized["target-repo"]].filter(value => value !== undefined);
   if (targets.some(target => typeof target !== "string" || target !== profile.effect_scope)) throw new Error("work_queue_effect_scope_denied");
   const claim = latest.projection.claims.get(member.claim_id);
   const work = latest.projection.works.get(member.work_id);
   const base = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, run_id: native.run_id, run_attempt: 1, effect_scope: profile.effect_scope };
-  const resource = options.resource || { repository: targets[0] || profile.effect_scope };
-  if (resource.repository !== profile.effect_scope) throw new Error("work_queue_effect_scope_denied");
+  let resource;
+  if (options.resource !== undefined) {
+    const suppliedResource = options.resource;
+    if (!suppliedResource || typeof suppliedResource !== "object" || Array.isArray(suppliedResource)) throw new Error("work_queue_effect_scope_denied");
+    const resourceTargets = [suppliedResource.repository, suppliedResource.repo].filter(value => value !== undefined);
+    if (!resourceTargets.length || resourceTargets.some(target => typeof target !== "string" || target !== profile.effect_scope)) throw new Error("work_queue_effect_scope_denied");
+    resource = { ...suppliedResource, repository: resourceTargets[0] };
+    delete resource.repo;
+  }
   if (claim?.state === "cancelled") return { ...base, authorized: false, suppressed: true, state: "cancelled" };
   if (options.requireCompletion !== false && claim?.state !== "completed") return { ...base, authorized: false, state: "open" };
   if (options.requireCompletion !== false && work.barrier !== "pending") {
@@ -85,7 +128,7 @@ async function authorizeWorkerClaim(options = {}) {
   }
   queue.validateClaimAuthority(latest.projection, member.claim_id, trustedContext, {
     requireCompletion: options.requireCompletion !== false,
-    resource,
+    ...(resource === undefined ? {} : { resource }),
   });
   return { ...base, authorized: true, state: options.requireCompletion === false ? "open" : "completed" };
 }
@@ -159,22 +202,28 @@ async function reconcileWorkerClaim(options = {}) {
   return { version: 3, dispatch_id: assignment.dispatch_id, run_id: admitted.binding.run_id, run_attempt: 1, status, claims: states, errors: staged.errors };
 }
 
+/**
+ * @param {(member: object, context: Record<string, unknown> & {signal: AbortSignal}) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>} verifier
+ * @param {object} member
+ * @param {Record<string, unknown>} context
+ * @param {number} remainingMs
+ * @returns {Promise<Record<string, unknown> | null>}
+ */
 async function verifyWithinBudget(verifier, member, context, remainingMs) {
   const controller = new AbortController();
   let timer;
   try {
-    return await Promise.race([
-      Promise.resolve().then(() => verifier(member, { ...context, signal: controller.signal })),
-      new Promise(resolve => {
-        timer = setTimeout(
-          () => {
-            controller.abort();
-            resolve(null);
-          },
-          Math.max(1, Math.min(15000, remainingMs))
-        );
-      }),
-    ]);
+    /** @type {Promise<null>} */
+    const timeout = new Promise(resolve => {
+      timer = setTimeout(
+        () => {
+          controller.abort();
+          resolve(null);
+        },
+        Math.max(1, Math.min(15000, remainingMs))
+      );
+    });
+    return await Promise.race([Promise.resolve().then(() => verifier(member, { ...context, signal: controller.signal })), timeout]);
   } finally {
     clearTimeout(timer);
   }
@@ -188,7 +237,7 @@ async function finalizeWorkerResults(options = {}) {
   if (isStagedMode(options) || isStagedMode(options.config))
     return { version: 3, dispatch_id: assignment.dispatch_id, claims: Object.fromEntries(assignment.claims.map(member => [member.handle, { state: "staged_preview", effects: "unknown" }])) };
   const trustedContext = await authenticatePublisher({ ...configured, role: "reconciler" });
-  const expected = { ...expectedWorkerRun(assignment, profile, configured.context), run_id: dispatch.run?.run_id };
+  const expected = { ...expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository), run_id: dispatch.run?.run_id };
   if (!dispatch.run) throw new Error("work_queue_binding_not_durable");
   if (trustedContext.run_id === dispatch.run.run_id && trustedContext.run_attempt !== 1) throw new Error("rerun_not_authorized");
   const results = Object.create(null);
@@ -220,32 +269,39 @@ async function finalizeWorkerResults(options = {}) {
       }
       const policy = latest.projection.policy.pools[assignment.pool].reconciliation;
       const beforeVerification = validateNativeRun(await fetchNativeRunAttempt(configured.githubClient, expected.repository, dispatch.run.run_id), expected);
+      if (trustedContext.run_id !== dispatch.run.run_id && !beforeVerification.terminal) {
+        results[member.handle] = { state: "pending", effects: "unknown", reason: "terminal_evidence_required" };
+        continue;
+      }
+      /** @type {Record<string, unknown> | null} */
       let verification = null;
       let attempts = 0;
-      let verified = false;
+      /** @type {VerifiedClaimEffects | null} */
+      let verified = null;
+      /** @type {VerifiedClaimEffects | null} */
+      let verifiedSnapshot = null;
       const verificationStarted = Date.now();
-      for (; attempts < policy.max_attempts; attempts++) {
+      integer(work.completion_at, 0, Number.MAX_SAFE_INTEGER, "Completion timestamp");
+      const remainingDeadline = policy.deadline_ms - Math.max(0, (options.now ?? verificationStarted) - work.completion_at);
+      for (; attempts < policy.max_attempts && Date.now() - verificationStarted < remainingDeadline; attempts++) {
         try {
-          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts + 1, run: dispatch.run }, policy.deadline_ms - (Date.now() - verificationStarted));
+          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts + 1, run: dispatch.run }, remainingDeadline - (Date.now() - verificationStarted));
         } catch {
           verification = null;
         }
-        verified =
-          contractSupported &&
-          verification?.verified === true &&
-          verification.contractVerified === true &&
-          typeof verification.receipt === "string" &&
-          verification.receipt.length > 0 &&
-          verification.descriptor &&
-          typeof verification.descriptor === "object" &&
-          !Array.isArray(verification.descriptor) &&
-          ["none", "partial"].includes(verification.effects);
-        if (verified) break;
-        if (Date.now() - verificationStarted >= policy.deadline_ms) {
+        const trustedDelivery = isTrustedClaimDelivery(verification, assignment, member.handle);
+        if (verification?.verified === true && !trustedDelivery) verification = null;
+        verified = contractSupported && trustedDelivery && verifiedClaimEffects(verification) ? verification : null;
+        if (verified) {
+          verifiedSnapshot = snapshotClaimDelivery(verified);
+          break;
+        }
+        if (Date.now() - verificationStarted >= remainingDeadline) {
           attempts++;
           break;
         }
-        if (attempts + 1 < policy.max_attempts) await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** attempts));
+        if (attempts + 1 < policy.max_attempts)
+          await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** attempts, Math.max(0, remainingDeadline - (Date.now() - verificationStarted))));
       }
       latest = await loadQueue(configured);
       validateStoredAssignment(latest.projection, assignment, { allowReleased: true });
@@ -261,32 +317,36 @@ async function finalizeWorkerResults(options = {}) {
       const native = validateNativeRun(await fetchNativeRunAttempt(configured.githubClient, expected.repository, dispatch.run.run_id), expected);
       const controls = claimControlReceipts(latest.projection, assignment, member.handle);
       const controlsDigest = digest(controls);
-      const verifiedControlsDigest = verification?.controls_digest;
-      if (verifiedControlsDigest !== undefined ? verifiedControlsDigest !== controlsDigest : controls.length !== 0) verified = false;
+      const verifiedControlsDigest = verifiedSnapshot?.controls_digest;
+      const verificationReceipt = typeof verification?.receipt === "string" && verification.receipt.length > 0 ? verification.receipt : undefined;
+      if (typeof verifiedControlsDigest !== "string" || !/^[0-9a-f]{64}$/.test(verifiedControlsDigest) || verifiedControlsDigest !== controlsDigest) verified = null;
       const checkedAt = options.now ?? Date.now();
       const base = { repository: expected.repository, workflow: expected.workflow, ref: expected.ref, principal: expected.principal_id, checked_at: checkedAt, run_id: dispatch.run.run_id, run_attempt: 1 };
-      if (verified) {
+      if (verified && verifiedSnapshot) {
+        if (!isTrustedClaimDelivery(verified, assignment, member.handle)) throw new Error("work_queue_delivery_proof_changed");
         const operation = {
           kind: "Result",
           work_id: member.work_id,
           claim_id: member.claim_id,
           completion_id: work.completion_id,
-          descriptor: verification.descriptor,
-          evidence: { ...base, kind: "delivery", source: "verified_receipts", receipt: verification.receipt, effects: verification.effects },
+          descriptor: verifiedSnapshot.descriptor,
+          evidence: { ...base, kind: "delivery", source: "verified_receipts", receipt: verifiedSnapshot.receipt, effects: verifiedSnapshot.effects },
         };
         await publishOperations(configured, trustedContext, ["result", assignment.dispatch_id, member.handle, work.completion_id], "result", [operation], state => {
-          if (digest(claimControlReceipts(state, assignment, member.handle)) !== controlsDigest) throw new Error("work_queue_control_inventory_changed");
+          if (!isTrustedClaimDelivery(verified, assignment, member.handle)) throw new Error("work_queue_delivery_proof_changed");
+          validateStoredAssignment(state, assignment, { allowReleased: true });
+          if (digest(claimControlReceipts(state, assignment, member.handle)) !== verifiedSnapshot.controls_digest) throw new Error("work_queue_control_inventory_changed");
         });
-        results[member.handle] = { state: "result", effects: verification.effects ?? "unknown" };
+        results[member.handle] = { state: "result", effects: verifiedSnapshot.effects };
       } else {
-        let disposition = contractSupported && ["none", "partial"].includes(verification?.effects) ? verification.effects : "unknown";
+        let disposition = contractSupported && verificationReceipt && (verification?.effects === "none" || verification?.effects === "partial") ? verification.effects : "unknown";
         if (controls.length && disposition === "none") disposition = "partial";
-        if (disposition === "none" && (!verification?.receipt || !beforeVerification.terminal)) disposition = "unknown";
+        if (disposition === "none" && (!verificationReceipt || !beforeVerification.terminal)) disposition = "unknown";
         if (!native.terminal) {
           results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid" };
           continue;
         }
-        if (attempts < policy.max_attempts) {
+        if (attempts < policy.max_attempts && checkedAt - work.completion_at < policy.deadline_ms) {
           results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted" };
           continue;
         }
@@ -296,9 +356,9 @@ async function finalizeWorkerResults(options = {}) {
           source: "github_api",
           status: "completed",
           conclusion: native.conclusion,
-          attempts: Math.max(1, attempts),
+          ...(attempts > 0 ? { attempts } : {}),
           effects: disposition,
-          ...(verification?.receipt ? { receipt: verification.receipt } : {}),
+          ...(verificationReceipt ? { receipt: verificationReceipt } : {}),
         };
         const operation = { kind: "DeliveryFailure", work_id: member.work_id, claim_id: member.claim_id, completion_id: work.completion_id, reason: "verification_exhausted", disposition, evidence };
         await publishOperations(configured, trustedContext, ["delivery_failure", assignment.dispatch_id, member.handle, work.completion_id], "delivery_failure", [operation]);
@@ -335,7 +395,6 @@ async function main(options = {}) {
 
 module.exports = {
   FINISH_INTENT_PATH,
-  SAFE_OUTPUTS_PATH,
   SNAPSHOT_PATH,
   main,
   readFinishIntent,

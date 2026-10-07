@@ -33,7 +33,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fillUnallocated := func(stage string) {
+	fillUnallocated := func(t *testing.T, stage string) {
 		t.Helper()
 		rejected := false
 		for index := range 512 {
@@ -71,7 +71,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 			t.Fatal("fixture did not fill the unallocated recovery region")
 		}
 	}
-	fillUnallocated("completion")
+	fillUnallocated(t, "completion")
 	actor := workerActor(assignment, "h1")
 	finish, err := NewRequest("last-attempt-completion", "finish", actor, FinishParameters{
 		DispatchID: assignment.DispatchID, ClaimHandle: "h1", Outcome: "completed",
@@ -89,7 +89,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 	}
 	commits, state = next, closed
 	assertRecoveryReplayParity(t, commits, "")
-	fillUnallocated("result")
+	fillUnallocated(t, "result")
 	member := assignment.Claims[0]
 	reconciler := maximumClosureActor()
 	result, err := NewRequest(strings.Repeat("\\", 256), "result", reconciler, OperationsParameters{
@@ -113,7 +113,8 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fillUnallocated("native-release")
+	nativePrefix := append([]QueueCommit{}, commits...)
+	fillUnallocated(t, "native-release")
 	operations := []Operation{}
 	for _, member := range assignment.Claims[1:] {
 		operations = append(operations, Op(map[string]any{
@@ -141,4 +142,53 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 		t.Fatalf("bounded independent success/cancellation/native suffix did not fully close: %+v %v", closed.Stats, err)
 	}
 	assertRecoveryReplayParity(t, next, "")
+	t.Run("fully-exhausted-native-escrow", func(t *testing.T) {
+		commits = nativePrefix
+		for member := 1; member < len(assignment.Claims); member++ {
+			commits = finishMember(t, commits, assignment, member, "cancelled")
+		}
+		state, err = Replay(commits)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dispatch := state.Dispatches[assignment.DispatchID]
+		for dispatch.LifecycleWrites < state.Policy.Pools[dispatch.Pool].Reconciliation.MaxAttempts+4 {
+			evidence := terminalFor(state, assignment)
+			evidence.Kind, evidence.Status, evidence.Conclusion = "reconciliation", "", ""
+			commits = testOperations(t, commits, testActor("reconciler"), fmt.Sprintf("exhaust-native-%d", dispatch.LifecycleWrites),
+				"dispatch", Op(map[string]any{
+					"kind": "Dispatch", "dispatch_id": dispatch.DispatchID, "state": "bound",
+					"run": dispatch.Run, "evidence": evidence,
+				}))
+			state, err = Replay(commits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dispatch = state.Dispatches[assignment.DispatchID]
+		}
+		finalEscrow := 2*state.Policy.Limits.EvidenceBytes + 8192
+		if remainingHeadroom(state) != finalEscrow {
+			t.Fatalf("final-only native reservation differs: want %d, got %d", finalEscrow, remainingHeadroom(state))
+		}
+		fillUnallocated(t, "native-escrow-only")
+		request, err := NewRequest(strings.Repeat("\\", 255)+"\"", "release", reconciler, OperationsParameters{
+			Operations: []Operation{Op(map[string]any{
+				"kind": "Release", "dispatch_id": assignment.DispatchID,
+				"evidence": maximumClosureEvidence(t, state, assignment, false),
+			})},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		next, _, _, err := BuildCandidate(commits, reconciler, request, 4000)
+		if err != nil {
+			t.Fatalf("maximum final Release cannot spend its fully exhausted native escrow: %v", err)
+		}
+		closed, err := Replay(next)
+		if err != nil || remainingHeadroom(closed) != 0 || closed.Stats.Dispatches != 0 ||
+			closed.Stats.Completed != 1 || closed.Stats.Cancelled != 2 {
+			t.Fatalf("native-only recovery suffix did not fully close: %+v %v", closed.Stats, err)
+		}
+		assertRecoveryReplayParity(t, next, "")
+	})
 }

@@ -35,11 +35,34 @@ function registerTests({ describe, it }) {
         assert.throws(() => parseStrictJSON(input), { code: "codec_invalid" });
       }
     });
+    it("uses invalid_unicode for every unpaired scalar without reclassifying malformed JSON", () => {
+      for (const text of ['"\\ud800"', '"\\udc00"', '"\\ud800x"', '"\\ud800\\u0041"', '"\\ud800\\ud800\\udc00"', '"\\udc00\\ud800"', '{"\\ud800":1}', '{"outer":[{"value":"\\udc00"}]}'])
+        assert.throws(() => parseStrictJSON(text), { code: "invalid_unicode" }, text);
+      for (const scalar of ["\ud800", "\udc00", "\ud800x", "x\udc00", "\ud800\ud800\udc00", "\udc00\ud800"]) {
+        for (const text of [`"${scalar}"`, `{"${scalar}":1}`, `{"outer":["${scalar}"]}`]) assert.throws(() => parseStrictJSON(text), { code: "invalid_unicode" });
+        for (const value of [scalar, { [scalar]: 1 }, { outer: [scalar] }]) assert.throws(() => canonical(value), { code: "invalid_unicode" });
+      }
+      for (const text of ['"\\ud80"', '"\\ud800\\uZZZZ"', '"\\ud800\\x00"', '"\\ud800']) assert.throws(() => parseStrictJSON(text), { code: "codec_invalid" }, text);
+      const paired = "\ud83d\ude00";
+      assert.equal(parseStrictJSON('"\\ud83d\\ude00"'), paired);
+      assert.equal(canonical(parseStrictJSON(`"${paired}"`)), `"${paired}"`);
+    });
     it("rejects typed nonintegral, unsafe and negative-zero values without changing them", () => {
       const fixture = require("../../../specs/work-queue/fixtures/canonical.json");
       for (const test of fixture.typed_number_rejections) {
         assert.throws(() => canonical(JSON.parse(test.input)), { code: test.code }, test.name);
       }
+    });
+    it("applies all independent typed numeric literals before any lossy JSON encoding", () => {
+      const fixture = require("../../../specs/work-queue/fixtures/canonical-typed.json");
+      assert.equal(fixture.cases.length, 25);
+      for (const test of fixture.cases) {
+        const number = test.literal === "NaN" ? NaN : test.literal === "+Infinity" ? Infinity : test.literal === "-Infinity" ? -Infinity : Number(test.literal);
+        const value = test.container === "object" ? { value: number } : test.container === "array" ? [number] : test.container === "nested" ? { payload: { numbers: [number], sentinel: "9007199254740993" } } : number;
+        if (Object.hasOwn(test, "code")) assert.throws(() => canonical(value), { code: test.code }, test.name);
+        else assert.equal(canonical(value), test.expected, test.name);
+      }
+      for (const value of [undefined, 1n, new Date(), [undefined]]) assert.throws(() => canonical(value), { code: "codec_invalid" });
     });
     it("binds fingerprints to stable actor, kind, and semantic parameters, never branch state", () => {
       const actor = { role: "dispatcher", principal: "approved" };

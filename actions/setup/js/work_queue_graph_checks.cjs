@@ -5,7 +5,7 @@ const { canonicalBytes, identity } = require("./work_queue_codec.cjs");
 const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { dependencyStatus, gateKey, validateResource, observationSatisfies } = require("./work_queue_graph.cjs");
 const { newRequest, replayTransactions } = require("./work_queue_replay.cjs");
-const { genesis, operationCommit, reconciler, submission } = require("./work_queue_test_helpers.cjs");
+const { bind, evidence, finish, genesis, grant, operationCommit, reconciler, submission } = require("./work_queue_test_helpers.cjs");
 
 function registerTests({ describe, it }) {
   describe("typed bounded Work/Issue/PR dependency graph", () => {
@@ -110,11 +110,11 @@ function registerTests({ describe, it }) {
       nodes.request = newRequest(nodes.request.id, "submit", nodes.actor, { nodes: nodes.operations });
       assert.throws(
         () => replayTransactions([...log, nodes]),
-        error => error.code === "assignment_limit" && /bounded declared Result inputs/.test(error.message)
+        error => error instanceof Error && "code" in error && error.code === "assignment_limit" && /bounded declared Result inputs/.test(error.message)
       );
     });
-    it("admits ten legally bounded future Result references and rejects eleven with the shared assignment limit code", () => {
-      for (const count of [7, 9, 10, 11]) {
+    it("admits ten bounded future Result references and atomically rejects eleven or more with the shared assignment limit code", () => {
+      for (const count of [7, 9, 10, 11, 12]) {
         const log = [genesis()];
         const nodes = submission(log, ["child", ...Array.from({ length: count }, (_, index) => `parent-${index}`)]);
         nodes.operations[0].depends_on = nodes.operations.slice(1).map(parent => ({ kind: "work", work_id: parent.work_id }));
@@ -123,19 +123,21 @@ function registerTests({ describe, it }) {
         else
           assert.throws(
             () => replayTransactions([...log, nodes]),
-            error => error.code === "assignment_limit"
+            error => error instanceof Error && "code" in error && error.code === "assignment_limit"
           );
       }
     });
-    it("admits at the exact legal escaped future assignment byte ceiling and rejects one byte below it", () => {
+    it("admits at the exact conservative escaped future assignment byte ceiling and rejects one byte below it", () => {
       const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
       const initial = [genesis(policy)];
       const nodes = submission(initial, ["child", "parent"]);
       const [child, parent] = nodes.operations;
       child.depends_on = [{ kind: "work", work_id: parent.work_id }];
       const worstIdentity = "\\".repeat(256);
-      assert.equal(identity(worstIdentity), worstIdentity);
       assert.equal(canonicalBytes(worstIdentity), 514);
+      assert.equal(canonicalBytes('"'.repeat(256)), 514);
+      assert.equal(identity(worstIdentity), worstIdentity);
+      assert.equal(identity('"'.repeat(256)), '"'.repeat(256));
       assert.throws(() => identity("\u0001".repeat(256)), /ledger_invalid/);
       const descriptor = { data: "x".repeat(policy.limits.result_bytes - canonicalBytes({ data: "" })) };
       assert.equal(canonicalBytes(descriptor), policy.limits.result_bytes);
@@ -160,9 +162,58 @@ function registerTests({ describe, it }) {
         else
           assert.throws(
             () => replayTransactions(log),
-            error => error.code === "assignment_limit"
+            error => error instanceof Error && "code" in error && error.code === "assignment_limit"
           );
       }
+    });
+    it("charges actual immutable verified Results instead of reserving the maximum for every predecessor", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      policy.limits.assignment_bytes = 8192;
+      policy.pools.default.logical_limit = 9;
+      policy.pools.default.profiles.default.max_claims = 9;
+      let log = [genesis(policy)];
+      log.push(
+        submission(
+          log,
+          Array.from({ length: 9 }, (_, index) => `parent-${index}`)
+        )
+      );
+      const parents = log[1].operations;
+      const granted = grant(log, { max_claims: parents.length, max_dispatches: 1 });
+      assert.equal(granted.assignments.length, 1);
+      assert.equal(granted.assignments[0].claims.length, parents.length);
+      log.push(granted.commit);
+      const dispatchId = granted.assignments[0].dispatch_id;
+      log = bind(log, dispatchId);
+      for (const member of granted.assignments[0].claims) log.push(finish(log, dispatchId, member.handle, "completed"));
+      for (const member of granted.assignments[0].claims) {
+        const state = replayTransactions(log);
+        const claim = state.claims.get(member.claim_id);
+        const dispatch = state.dispatches.get(dispatchId);
+        log.push(
+          operationCommit(
+            log,
+            `verified-${member.handle}`,
+            "result",
+            [
+              {
+                kind: "Result",
+                work_id: member.work_id,
+                claim_id: member.claim_id,
+                completion_id: claim.terminal_commit_id,
+                descriptor: {},
+                evidence: evidence(state, dispatch, "delivery", 100, { source: "verified_receipts", run_id: "200", run_attempt: 1, receipt: `receipt-${member.handle}` }),
+              },
+            ],
+            reconciler,
+            100
+          )
+        );
+      }
+      const admitted = submission(log, ["known-results-child"], { id: "submit-known-results-child", transform: node => ({ ...node, depends_on: parents.map(parent => ({ kind: "work", work_id: parent.work_id })) }) });
+      const state = replayTransactions([...log, admitted]);
+      assert.equal(state.works.size, parents.length + 1);
+      assert.equal(dependencyStatus(state, admitted.operations[0], 100).ready, true);
     });
   });
 }

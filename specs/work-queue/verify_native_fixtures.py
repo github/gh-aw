@@ -40,6 +40,53 @@ def shared_canonical_cases(codec, extra):
     return cases
 
 
+def shared_typed_canonical_cases(codec):
+    cases = [{"name": f"typed-valid/{case['name']}", "input": case["input"], "expected": case["expected"]}
+             for case in codec["valid"]]
+    for case in codec["typed_number_rejections"]:
+        for variant, text in (("scalar", case["input"]),
+                              ("nested", '{"payload":{"nested":[' + case["input"] + ']}}')):
+            cases.append({"name": f"typed-rejection/{case['name']}/{variant}", "input": text,
+                          "reject": True, "error_code": case["code"]})
+    cases.extend({"name": f"typed-unicode/{case['name']}", "input": case["input"],
+                  "reject": True, "error_code": case["code"]}
+                 for case in codec.get("error_codes", []) if case["code"] == "invalid_unicode")
+    return cases
+
+
+def typed_canonical_cases():
+    return [
+        {"name": "typed-exponent-integer", "input": "1e0", "expected": "1"},
+        {"name": "typed-fraction-spelling-integer", "input": "1.0", "expected": "1"},
+        {"name": "typed-valid-duplicate-object", "input": '{"x":1,"x":2}', "expected": '{"x":2}'},
+        {"name": "typed-overwritten-invalid-string", "input": r'{"x":"\ud800","x":"valid"}',
+         "reject": True, "error_code": "invalid_unicode"},
+        {"name": "typed-literal-surrogate-escape", "input": r'{"\\ud800":"\\udc00"}',
+         "expected": r'{"\\ud800":"\\udc00"}'},
+        {"name": "typed-escaped-quote", "input": r'{"x":"a\"b"}', "expected": r'{"x":"a\"b"}'},
+        {"name": "typed-escaped-backslash-and-quote", "input": r'{"x":"\\\"tail"}',
+         "expected": r'{"x":"\\\"tail"}'},
+    ]
+
+
+def shared_constructed_number_cases(source):
+    assert source["version"] == 1
+    assert source["go_api"] == "github.com/github/gh-aw/pkg/workqueue.CanonicalValue"
+    assert source["js_api"] == "actions/setup/js/work_queue_codec.cjs#canonical"
+    assert set(source["containers"]) == {"root", "object", "array", "nested"}
+    assert source["cases"]
+    assert len({case["name"] for case in source["cases"]}) == len(source["cases"])
+    cases = []
+    for case in source["cases"]:
+        assert type(case["literal"]) is str and case["container"] in source["containers"]
+        assert ("expected" in case) != ("code" in case)
+        fields = {"expected": case["expected"]} if "expected" in case else {
+            "reject": True, "error_code": case["code"]}
+        cases.append({"name": f"typed-number-literal/{case['name']}", "literal": case["literal"],
+                      "container": case["container"], **fields})
+    return cases
+
+
 def verify_canonical_output(case, output):
     if case.get("reject"):
         error = output.get("error")
@@ -269,22 +316,91 @@ def verify_prefix(output, expected):
     assert clock["keys"].get("3", {"v": "0"})["v"] == expected["key_v"]
 
 
+def validate_worker_child_cases(source):
+    assert source["version"] == 3
+    cases = source["cases"]
+    names = {case["name"]: case for case in cases}
+    assert len(names) == len(cases), "unique worker-child case names"
+    positives = ("completed-parent-inherited-entitlement",)
+    assert all(name in names and names[name]["valid"] is True and
+               isinstance(names[name].get("expected"), dict) for name in positives), (
+                   "required pending parent positive")
+    terminal = names.get("verified-parent-inherited-entitlement", {})
+    assert terminal.get("valid") is False and terminal.get("error_code") == "claim_effects_unauthorized", (
+        "required verified parent terminal denial")
+    negatives = (
+        "open-parent-cannot-admit", "producer-principal-is-not-worker-identity",
+        "foreign-native-run", "native-rerun", "foreign-original-claim",
+        "worker-is-not-a-root-producer", "worker-is-not-an-administrator",
+        "actor-logical-origin-is-not-artifact-input", "work-logical-origin-is-not-artifact-input",
+        "pool-escalation", "priority-entitlement-change", "accounting-key-escalation",
+        "unapproved-worker-profile", "foreign-resource-escalation",
+    )
+    assert all(name in names and names[name]["valid"] is False for name in negatives), (
+        "required worker-child negative controls")
+    assert all(type(case["valid"]) is bool and
+               (not case["valid"] or isinstance(case.get("expected"), dict)) for case in cases), (
+                   "literal worker-child validity and positive expectations")
+    return cases
+
+
+def verify_worker_child_output(case, output):
+    expected = case["expected"]
+    projection = output["projection"]
+    child = projection["works"][expected["child_work_id"]]
+    parent = projection["works"][expected["parent_work_id"]]
+    assert output["canonical_ledger"] == case["canonical"], "canonical child ledger"
+    accepted = projection["requests"][case["transactions"][-1]["request"]["id"]]
+    original_record = case["transactions"][parent["position"]["commit"]]
+    original = projection["requests"][original_record["request"]["id"]]
+    assert accepted["actor"] == case["transactions"][-1]["actor"], "original worker Actor metadata"
+    assert original["actor"] == original_record["actor"], "original producer Actor metadata"
+    assert accepted["actor"]["role"] == "worker"
+    assert accepted["actor"]["principal"] == expected["worker_principal"]
+    assert original["actor"]["role"] == "producer"
+    assert original["actor"]["principal"] == expected["producer_principal"]
+    assert expected["worker_principal"] not in projection["policy"]["producers"]
+    assert all(child[key] == expected[key] for key in ("pool", "priority", "fairness_key"))
+    assert child["state"] == "available", "available inherited child"
+    assert parent["state"] == "completed", "completed original parent"
+    assert parent["barrier"] == "pending", "pending original parent"
+    if "cancelled_sibling_work_id" in expected:
+        sibling_id = expected["cancelled_sibling_work_id"]
+        sibling = projection["works"][sibling_id]
+        dispatch = projection["dispatches"][accepted["actor"]["dispatch_id"]]
+        weight = projection["policy"]["accounting_weights"][expected["fairness_key"]]
+        assert type(expected["accounting_weight"]) is int and expected["accounting_weight"] == 1
+        assert type(weight) is int and weight == 1
+        assert type(expected["bound_claims"]) is int and expected["bound_claims"] == len(dispatch["claims"]) == 2
+        assert [claim["work_id"] for claim in dispatch["claims"]] == [expected["parent_work_id"], sibling_id]
+        assert dispatch["state"] == "bound" and not dispatch["released"], "retained mixed native reservation"
+        assert len(projection["works"]) == 3
+        assert parent["barrier"] == "pending"
+        assert sibling["state"] == "available" and sibling["retry_not_before"] == 34400
+        assert projection["claims"][dispatch["claims"][0]["claim_id"]]["state"] == "completed"
+        assert projection["claims"][dispatch["claims"][1]["claim_id"]]["state"] == "cancelled"
+
+
 def conformance(fixtures, commands, env, evidence, api):
     paths = {file: fixtures / file
-             for file in ("canonical.json", "canonical-prefix.json", "selection.json", "contract.json",
+             for file in ("canonical.json", "canonical-typed.json", "canonical-prefix.json", "selection.json", "contract.json",
                           "reason-validation.json", "identity-validation.json", "delivery-deadlines.json")}
     extra_path = "actions/setup/js/work_queue_conformance_fixtures.json"
     paths[extra_path] = api.ROOT / extra_path
+    children_path = "actions/setup/js/work_queue_worker_child_fixtures.json"
+    paths[children_path] = api.ROOT / children_path
     raw = {file: path.read_bytes() for file, path in paths.items()}
     hashes = {file: hashlib.sha256(data).hexdigest() for file, data in raw.items()}
     source = json.loads(raw["canonical-prefix.json"])
     selections = json.loads(raw["selection.json"])
     contract = json.loads(raw["contract.json"])
     codec = json.loads(raw["canonical.json"])
+    typed = json.loads(raw["canonical-typed.json"])
     reasons = json.loads(raw["reason-validation.json"])
     identities = json.loads(raw["identity-validation.json"])
     deadlines = json.loads(raw["delivery-deadlines.json"])
     extra = json.loads(raw[extra_path])
+    children = json.loads(raw[children_path])
     assert contract["version"] == 3
     assert reasons["version"] == 3
     assert reasons["pattern"] == "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
@@ -294,11 +410,32 @@ def conformance(fixtures, commands, env, evidence, api):
     assert extra["version"] == 3
     assert deadlines["version"] == 3
     assert deadlines["cases"]
+    child_cases = validate_worker_child_cases(children)
+    constructed_numbers = shared_constructed_number_cases(typed)
     assert len(source["prefixes"]) == len(source["commits"]) > 0
     assert source["canonical"] == api.ordered_ledger(api.ledger_text(source["commits"]))
     rows, failures = [], []
     with contextlib.ExitStack() as stack:
         engines = {name: stack.enter_context(api.Native(command, env)) for name, command in commands.items()}
+        for case in child_cases:
+            variants = {"ordered": case["canonical"],
+                        "restart-reversed": api.ledger_text(list(reversed(case["transactions"])) + [case["transactions"][-1]])}
+            for variant, text in variants.items():
+                outputs = {name: engine.call(api.request(text, at=5000)) for name, engine in engines.items()}
+                try:
+                    for name, output in outputs.items():
+                        assert ("error" not in output) == case["valid"], (
+                            f"{name}: expected literal validity {case['valid']}, got {output.get('error', 'acceptance')}")
+                        if not case["valid"]:
+                            verify_canonical_output({**case, "reject": True}, output)
+                            continue
+                        verify_worker_child_output(case, output)
+                    if case["valid"]:
+                        api.assert_native_parity(outputs["go"], outputs["js"])
+                except (AssertionError, KeyError) as error:
+                    failures.append(f"worker-child-{case['name']}/{variant}: {error}")
+                rows.append({"case": f"worker-child-{case['name']}/{variant}",
+                             "gate": "independent-worker-child-entitlement-replay", "engines": outputs})
         for case in shared_canonical_cases(codec, extra) + canonical_cases():
             outputs = {name: engine.call({"action": "canonical", "data": case["input"]}) for name, engine in engines.items()}
             for name, output in outputs.items():
@@ -307,6 +444,24 @@ def conformance(fixtures, commands, env, evidence, api):
                 except AssertionError as error:
                     failures.append(f"{name}/{case['name']}: {error}")
             rows.append({"case": case["name"], "gate": "independent-canonical", "engines": outputs})
+        for case in shared_typed_canonical_cases(codec) + typed_canonical_cases():
+            outputs = {name: engine.call({"action": "typed_canonical", "data": case["input"]})
+                       for name, engine in engines.items()}
+            for name, output in outputs.items():
+                try:
+                    verify_canonical_output(case, output)
+                except AssertionError as error:
+                    failures.append(f"{name}/{case['name']}: {error}")
+            rows.append({"case": case["name"], "gate": "independent-typed-canonical", "engines": outputs})
+        for case in constructed_numbers:
+            outputs = {name: engine.call({"action": "typed_number_literal", "literal": case["literal"],
+                                         "container": case["container"]}) for name, engine in engines.items()}
+            for name, output in outputs.items():
+                try:
+                    verify_canonical_output(case, output)
+                except AssertionError as error:
+                    failures.append(f"{name}/{case['name']}: {error}")
+            rows.append({"case": case["name"], "gate": "independent-native-constructed-number", "engines": outputs})
         for case in principal_policy_cases(api):
             outputs = {name: engine.call({"action": "validate_policy", "data": api.canonical(case["policy"])})
                        for name, engine in engines.items()}

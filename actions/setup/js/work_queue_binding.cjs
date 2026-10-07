@@ -99,9 +99,9 @@ function validateStoredAssignment(state, supplied, { allowReleased = false } = {
   return { assignment: stored, dispatch, profile };
 }
 
-function expectedWorkerRun(assignment, profile, context) {
+function expectedWorkerRun(assignment, profile, context, canonicalRepository = `${context.repo.owner}/${context.repo.repo}`) {
   return {
-    repository: `${context.repo.owner}/${context.repo.repo}`,
+    repository: canonicalRepository,
     ...(context.payload?.repository?.id === undefined ? {} : { repository_id: context.payload.repository.id }),
     workflow: profile.workflow,
     ref: profile.ref,
@@ -111,7 +111,7 @@ function expectedWorkerRun(assignment, profile, context) {
 }
 
 function bindingForRun(proof, expected) {
-  return { run_id: proof.run_id, run_attempt: 1, repository: expected.repository, workflow: expected.workflow, ref: expected.ref, principal: expected.principal_id, event: "workflow_dispatch" };
+  return { run_id: proof.run_id, run_attempt: 1, repository: proof.repository, workflow: expected.workflow, ref: expected.ref, principal: expected.principal_id, event: "workflow_dispatch" };
 }
 
 async function bindWorkerAssignment(options) {
@@ -119,7 +119,7 @@ async function bindWorkerAssignment(options) {
   const { assignment, dispatch, profile } = validateStoredAssignment(initial.projection, options.assignment);
   if (!["started", "uncertain", "unresolved", "bound"].includes(dispatch.state)) throw new Error("work_queue_launch_marker_required");
   const trustedContext = await authenticatePublisher({ ...options, role: "worker", dispatch_id: assignment.dispatch_id });
-  const expected = expectedWorkerRun(assignment, profile, options.context);
+  const expected = expectedWorkerRun(assignment, profile, options.context, trustedContext.repository);
   const proof = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
   const binding = bindingForRun(proof, expected);
   if (dispatch.run && canonical(dispatch.run) !== canonical(binding)) throw new Error("run_binding_conflict");

@@ -2,17 +2,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
-import { randomUUID } from "crypto";
+import os from "node:os";
 import { main, resolveWorkerAssignment } from "./write_work_queue_snapshot.cjs";
 import { loadWorkQueueSnapshot } from "./work_queue_mcp_server.cjs";
+import { normalizeRuntimeMessage, readClaimScopeContext } from "./work_queue_claim_scope.cjs";
 import { queueFixture, REF, REPOSITORY, WORKFLOW, DISPATCHER } from "./work_queue_lifecycle.test_helpers.cjs";
-import { newRequest, newState, replayTransactions } from "./work_queue_replay.cjs";
+import { newRequest, newState, replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
+import { fakeGitHub } from "./work_queue_store_checks.cjs";
+import { MAX_SNAPSHOT_PARSE_BYTES } from "./work_queue_codec.cjs";
 
 const directories = [];
 function setup(options = {}) {
   const fixture = queueFixture(options);
-  const directory = path.join(process.cwd(), `.queue-snapshot-test-${randomUUID()}`);
-  fs.mkdirSync(directory);
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-snapshot-"));
   directories.push(directory);
   const context = fixture.assignment ? fixture.workerContext : fixture.dispatcherContext;
   return {
@@ -34,6 +36,73 @@ afterEach(() => {
 });
 
 describe("authenticated immutable activation snapshots", () => {
+  it("uses installed producer authority for a distinct native worker and rejects caller-relative proposals when supplied as pins", async () => {
+    const { fixture, options } = setup({ started: true, count: 1, workerPrincipal: "22" });
+    const fake = fakeGitHub(fixture.transactions);
+    const githubClient = { rest: { ...fixture.githubClient.rest, git: fake.githubClient.rest.git } };
+    const configured = { ...options, githubClient, readWorkQueueLog: undefined, publishWorkQueueRequest: undefined, requireAssignment: true };
+    const callerRelative = structuredClone(fixture.policy);
+    callerRelative.producers = { "22": callerRelative.producers["11"] };
+    await expect(main({ ...configured, policyProposal: callerRelative })).rejects.toThrow("work_queue_policy_proposal_mismatch");
+    expect(fake.state.updates).toBe(0);
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+    expect(fs.existsSync(options.snapshotPath)).toBe(false);
+    const snapshot = await main({ ...configured, policyProposal: undefined });
+    expect(snapshot.origin.principal).toBe("22");
+    expect(snapshot.worker).toEqual(fixture.assignment);
+    const installed = loadWorkQueueSnapshot(options.snapshotPath).projection.policy;
+    expect(installed.producers).toEqual(fixture.policy.producers);
+    expect(installed.producers).not.toHaveProperty("22");
+    expect(fake.log()[0].actor.principal).toBe("11");
+    expect(fake.log().at(-1).actor.principal).toBe("22");
+    expect(fake.state.updates).toBe(1);
+  });
+
+  it.each(["owner/repo", "Owner/Repo"])("preserves actual API repository %s through the real store and authenticated worker binding despite uppercase lookup aliases", async repository => {
+    const { fixture, options } = setup({ started: true, count: 1 });
+    const transactions = structuredClone(fixture.transactions);
+    for (const commit of transactions) {
+      commit.actor.repository = repository;
+      for (const operation of commit.operations) if (operation.kind === "Dispatch" && operation.sender) operation.sender.repository = repository;
+      if (commit.request.kind === "dispatch") commit.request.parameters.operations = commit.operations;
+      commit.request = newRequest(commit.request.id, commit.request.kind, commit.actor, commit.request.parameters);
+    }
+    const fake = fakeGitHub(transactions);
+    fake.githubClient.rest.repos.get = vi.fn(async () => ({ status: 200, data: { full_name: repository, id: 7, default_branch: "main", size: 1 } }));
+    const githubClient = { rest: { ...fake.githubClient.rest, actions: fixture.githubClient.rest.actions } };
+    const snapshot = await main({
+      ...options,
+      githubClient,
+      context: { ...options.context, repo: { owner: "OWNER", repo: "REPO" } },
+      readWorkQueueLog: undefined,
+      publishWorkQueueRequest: undefined,
+      requireAssignment: true,
+    });
+    expect(snapshot.origin.repository).toBe(repository);
+    expect(snapshot.worker).toEqual(fixture.assignment);
+    expect(JSON.parse(options.core.setOutput.mock.calls[0][1]).repository).toBe(repository);
+    const binding = fake.log().at(-1);
+    expect(binding.actor.repository).toBe(repository);
+    expect(binding.operations[0]).toMatchObject({ kind: "Dispatch", state: "bound", run: { repository, run_attempt: 1, run_id: "42" }, evidence: { repository, source: "trusted_activation" } });
+    expect(fake.state.updates).toBe(1);
+  });
+
+  it("rejects a replay-valid foreign genesis through the real store before native authentication, snapshot output, or writes", async () => {
+    const { fixture, options } = setup({ granted: false });
+    const genesis = structuredClone(fixture.transactions[0]);
+    genesis.actor.repository = "foreign/repo";
+    genesis.request = newRequest(genesis.request.id, genesis.request.kind, genesis.actor, genesis.request.parameters);
+    const fake = fakeGitHub([genesis]);
+    fake.githubClient.rest.repos.get = vi.fn(async () => ({ status: 200, data: { full_name: REPOSITORY, id: 7, default_branch: "main", size: 1 } }));
+    const getWorkflowRun = vi.fn(fixture.githubClient.rest.actions.getWorkflowRun);
+    const githubClient = { rest: { ...fake.githubClient.rest, actions: { ...fixture.githubClient.rest.actions, getWorkflowRun } } };
+    await expect(main({ ...options, githubClient, readWorkQueueLog: undefined, publishWorkQueueRequest: undefined })).rejects.toThrow(/actor_unauthorized/);
+    expect(getWorkflowRun).not.toHaveBeenCalled();
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+    expect(fs.existsSync(options.snapshotPath)).toBe(false);
+    expect(fake.state.updates).toBe(0);
+  });
+
   it("bootstraps only genuine absence with an explicit approved and natively authenticated administrator", async () => {
     const { fixture, options } = setup({ granted: false });
     let log = { sha: null, transactions: [], state: newState() };
@@ -108,6 +177,16 @@ describe("authenticated immutable activation snapshots", () => {
     expect(loadWorkQueueSnapshot(options.snapshotPath).projection.policy_epoch).toBe("e1");
   });
 
+  it("rejects actual oversized encoded framing before creating a snapshot or publishing origin output", async () => {
+    const { fixture, options } = setup({ granted: false });
+    const before = fixture.transactions;
+    const visibleWorkIds = ["\0".repeat(Math.ceil(MAX_SNAPSHOT_PARSE_BYTES / 6))];
+    await expect(main({ ...options, visibleWorkIds })).rejects.toThrow(/snapshot exceeds.*bounded/);
+    expect(fs.existsSync(options.snapshotPath)).toBe(false);
+    expect(options.core.setOutput).not.toHaveBeenCalled();
+    expect(fixture.transactions).toEqual(before);
+  });
+
   it("rejects a replay-valid ledger from another repository without treating casing as another authority", async () => {
     const { fixture, options } = setup({ granted: false });
     const logFor = repository => {
@@ -175,6 +254,36 @@ describe("authenticated immutable activation snapshots", () => {
     expect(fixture.transactions).toHaveLength(before);
     expect(options.core.info).toHaveBeenCalledWith(expect.stringContaining("read-only observer"));
     await expect(main({ ...options, role: "observer", initializationContext: { role: "administrator" } })).rejects.toThrow(/observer_read_only/);
+  });
+
+  it("passes the actual observer writer envelope through the scope reader without stripping its role", async () => {
+    const { fixture, options } = setup({ granted: false });
+    const before = serializeTransactionLog(fixture.transactions);
+    const snapshot = await main({ ...options, role: "observer" });
+    const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT"];
+    const previous = keys.map(key => process.env[key]);
+    const hadContext = Object.hasOwn(global, "context");
+    const previousContext = global.context;
+    try {
+      process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+      process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
+      process.env.GH_AW_WORK_QUEUE_SNAPSHOT = options.snapshotPath;
+      global.context = options.context;
+      expect(readClaimScopeContext()).toBeNull();
+      const message = { type: "report_incomplete", body: "Read-only observation" };
+      expect(normalizeRuntimeMessage(message)).toBe(message);
+      expect(() => normalizeRuntimeMessage({ type: "work_queue_submit", parameters: { nodes: [] } })).toThrow(/observers/);
+      expect(JSON.parse(fs.readFileSync(options.snapshotPath, "utf8"))).toEqual(snapshot);
+      expect(snapshot.role).toBe("observer");
+      expect(serializeTransactionLog(fixture.transactions)).toBe(before);
+    } finally {
+      keys.forEach((key, index) => {
+        if (previous[index] === undefined) delete process.env[key];
+        else process.env[key] = previous[index];
+      });
+      if (hadContext) global.context = previousContext;
+      else delete global.context;
+    }
   });
 
   it("lets explicit observers read genuine queue absence without installing a compiled policy proposal", async () => {

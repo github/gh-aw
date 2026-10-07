@@ -57,16 +57,7 @@
           "$ref": "#/$defs/RetryPolicy"
         }
       },
-      "required": [
-        "default_profile",
-        "profiles",
-        "logical_limit",
-        "native_limit",
-        "allowed_repositories",
-        "max_observation_age_ms",
-        "retry",
-        "reconciliation"
-      ],
+      "required": ["default_profile", "profiles", "logical_limit", "native_limit", "allowed_repositories", "max_observation_age_ms", "retry", "reconciliation"],
       "type": "object"
     },
     "ReconciliationPolicy": {
@@ -79,10 +70,7 @@
           "$ref": "#/$defs/CountBound"
         }
       },
-      "required": [
-        "max_attempts",
-        "deadline_ms"
-      ],
+      "required": ["max_attempts", "deadline_ms"],
       "type": "object"
     },
     "RetryPolicy": {
@@ -95,10 +83,7 @@
           "$ref": "#/$defs/CountBound"
         }
       },
-      "required": [
-        "max_attempts",
-        "backoff_ms"
-      ],
+      "required": ["max_attempts", "backoff_ms"],
       "type": "object"
     },
     "Revision": {
@@ -138,16 +123,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "workflow",
-        "ref",
-        "principal",
-        "trust_domain",
-        "credential_scope",
-        "effect_scope",
-        "max_claims",
-        "share_keys"
-      ],
+      "required": ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
       "type": "object"
     }
   },

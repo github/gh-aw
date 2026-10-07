@@ -301,6 +301,9 @@ func (b Branch) defaultPolicy(ctx context.Context, principal string) (Policy, er
 	profile.Ref = ref.Object.SHA
 	pool.Profiles["default"] = profile
 	policy.Pools["default"] = pool
+	if err := b.verifyWorkerRoutes(ctx, policy); err != nil {
+		return Policy{}, err
+	}
 	return policy, nil
 }
 
@@ -340,6 +343,9 @@ func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publ
 	if err := validateRequestOrigin(actor, request); err != nil {
 		return Publication{}, err
 	}
+	if err := validateRequestRole(actor, request.Kind); err != nil {
+		return Publication{}, err
+	}
 	var last []QueueCommit
 	var pendingErr error
 	for attempt := range maxRetries {
@@ -351,27 +357,22 @@ func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publ
 			return Publication{}, queueError("ledger_nonextending", "queue history was deleted or rewritten during publication")
 		}
 		creating := snapshot.head == ""
+		var initial *QueueCommit
 		if creating {
-			admin, err := b.Authenticate(ctx, "administrator")
-			if err != nil {
-				return Publication{}, queueError("policy_missing", "new queues require authenticated policy initialization: %v", err)
-			}
-			policy, err := b.defaultPolicy(ctx, admin.Principal)
-			if err != nil {
-				return Publication{}, err
-			}
-			genesis, err := Genesis(admin, policy,
-				"init_"+hashBytes([]byte(request.ID)), "epoch_"+hashBytes([]byte(request.ID)), time.Now().UnixMilli())
+			genesis, genuine, err := b.initialPolicyCommit(ctx, actor, request)
 			if err != nil {
 				return Publication{}, err
 			}
 			transactions = []QueueCommit{genesis}
+			if genuine {
+				initial = &transactions[0]
+			}
 		}
 		state, err := Replay(transactions)
 		if err != nil {
 			return Publication{}, err
 		}
-		if existing, ok := state.Requests[request.ID]; ok {
+		if existing, ok := state.Requests[request.ID]; ok && initial == nil {
 			if existing.Request.Fingerprint != request.Fingerprint || !sameJSON(existing.Actor, actor) {
 				return Publication{}, queueError("request_reuse", "request identity has different accepted meaning")
 			}
@@ -386,8 +387,10 @@ func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publ
 			(hasStatus(pendingErr, http.StatusUnauthorized) || hasStatus(pendingErr, http.StatusForbidden)) {
 			return Publication{}, pendingErr
 		}
-		if err := b.verifyRequestEvidence(ctx, state, actor, request); err != nil {
-			return Publication{}, err
+		if initial == nil {
+			if err := b.verifyRequestEvidence(ctx, state, actor, request); err != nil {
+				return Publication{}, err
+			}
 		}
 		var observations []Observation
 		if request.Kind == "dispatch_next" {
@@ -400,31 +403,20 @@ func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publ
 				return Publication{}, err
 			}
 		}
-		next, commit, decision, err := buildCandidateWithObservations(transactions, actor, request, time.Now().UnixMilli(), observations)
+		var next []QueueCommit
+		var commit *QueueCommit
+		var decision Decision
+		if initial != nil {
+			next, commit = transactions, initial
+			decision = Decision{Tip: state.Tip, Operations: commit.Operations, Assignments: []Assignment{}}
+		} else {
+			next, commit, decision, err = buildCandidateWithObservations(transactions, actor, request, time.Now().UnixMilli(), observations)
+		}
 		if err != nil {
 			return Publication{}, err
 		}
 		if commit == nil {
-			if len(observations) == 0 {
-				return Publication{Decision: decision}, nil
-			}
-			operations := []Operation{}
-			for _, observation := range observations {
-				operations = append(operations, Op(observation))
-			}
-			evidence, _ := canonicalValue(operations)
-			observationRequest, err := NewRequest("observe_"+hashBytes([]byte(request.ID+"\n"+state.Tip+"\n"+string(evidence))),
-				"observe", actor, OperationsParameters{Operations: operations})
-			if err != nil {
-				return Publication{}, err
-			}
-			next, commit, _, err = BuildCandidate(transactions, actor, observationRequest, time.Now().UnixMilli())
-			if err != nil {
-				return Publication{}, err
-			}
-			// The read evidence is durable, but no-grant still does not consume
-			// the original dispatch request or any service charge.
-			decision.Tip = commit.ID
+			return Publication{Decision: decision}, nil
 		}
 		conflict, err := b.publish(ctx, snapshot, next)
 		if err == nil {

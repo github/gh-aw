@@ -265,10 +265,11 @@ func validateRequest(commit QueueCommit) error {
 		}
 	case "dispatch_next":
 		var params DispatchParameters
-		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil ||
-			params.MaxClaims < 1 || params.MaxClaims > 256 || params.MaxDispatches < 1 ||
-			params.MaxDispatches > 256 || params.MaxBytes < 1 || params.MaxBytes > 48<<10 {
+		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
 			return queueError("request_invalid", "invalid dispatch budgets")
+		}
+		if err := validateDispatchParameters(params); err != nil {
+			return err
 		}
 		if len(parameters) != 4 {
 			return queueError("request_invalid", "dispatch_next requires exactly pool/max_claims/max_dispatches/max_bytes")
@@ -301,6 +302,29 @@ func (state Projection) allowedProducer(actor Actor, node WorkDefinition) bool {
 		slices.Contains(rule.Priorities, node.Priority) && slices.Contains(rule.FairnessKeys, node.FairnessKey)
 }
 
+func (state Projection) validateSubmissionEntitlement(actor Actor, node WorkDefinition) error {
+	if err := validateActorOrigin(actor); err != nil {
+		return err
+	}
+	if err := validateRequestRole(actor, "submit"); err != nil {
+		return err
+	}
+	if actor.Role == "worker" {
+		_, parent, err := state.workerContinuationScope(actor)
+		if err != nil {
+			return err
+		}
+		if node.Pool != parent.Pool || node.Priority != parent.Priority || node.FairnessKey != parent.FairnessKey {
+			return queueError("child_entitlement", "worker children must inherit their parent's pool, priority and account")
+		}
+		return nil
+	}
+	if !state.allowedProducer(actor, node) {
+		return queueError("admission_unauthorized", "principal has no pool/priority/account entitlement")
+	}
+	return nil
+}
+
 func NewWork(payload []byte, graphID, nodeKey, pool string, policy Policy, at int64) (WorkDefinition, error) {
 	canonical, err := Canonical(payload)
 	if err != nil {
@@ -325,11 +349,16 @@ func NewWork(payload []byte, graphID, nodeKey, pool string, policy Policy, at in
 }
 
 func NewChildWork(state Projection, actor Actor, payload []byte, nodeKey string, at int64) (WorkDefinition, error) {
-	claim, err := state.scopedClaim(actor, "", "")
+	if err := validateActorOrigin(actor); err != nil {
+		return WorkDefinition{}, err
+	}
+	if err := validateRequestRole(actor, "submit"); err != nil {
+		return WorkDefinition{}, err
+	}
+	_, parent, err := state.workerContinuationScope(actor)
 	if err != nil {
 		return WorkDefinition{}, err
 	}
-	parent := state.Works[claim.WorkID]
 	work, err := NewWork(payload, parent.GraphID, nodeKey, parent.Pool, *state.Policy, at)
 	if err != nil {
 		return WorkDefinition{}, err

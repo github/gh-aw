@@ -4,6 +4,7 @@
 const { currentClaimHandle, readClaimScopeContext, assertClaimAuthorized } = require("./work_queue_claim_scope.cjs");
 const { execGitSync } = require("./git_helpers.cjs");
 const { randomUUID } = require("crypto");
+const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 
 function gitPushRepository(url) {
   const expected = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
@@ -42,10 +43,8 @@ async function assertGitPushAuthorized(options) {
   if (!urls.length || urls.length > 128) throw new Error("Claim git remote targets exceed the count bound");
   for (const url of urls) {
     const repository = gitPushRepository(url);
-    await assertClaimAuthorized(
-      { type: "work_queue_git_effect", claim_handle: currentClaimHandle(), repo: repository, branch_name: options.branch },
-      { authorize: options.authorize, effect: true, resource: { repository, ref: options.branch } }
-    );
+    const resource = await resolveRepositoryTarget(options.github || global.github, { repository, ref: options.branch });
+    await assertClaimAuthorized({ type: "work_queue_git_effect", claim_handle: currentClaimHandle(), repo: repository, branch_name: options.branch }, { authorize: options.authorize, effect: true, resource });
   }
 }
 

@@ -34,11 +34,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "pools",
-        "priorities",
-        "fairness_keys"
-      ],
+      "required": ["pools", "priorities", "fairness_keys"],
       "type": "object"
     }
   },

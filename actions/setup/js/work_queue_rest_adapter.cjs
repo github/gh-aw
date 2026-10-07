@@ -1,6 +1,8 @@
 // @ts-check
 "use strict";
 
+const { resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
+
 const { canonical, closed } = require("./work_queue_codec.cjs");
 const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, receiptMatchesClaim } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
@@ -111,6 +113,7 @@ async function verifyRestAdapterDelivery(options) {
   validateRestAdapter(adapter);
   const receipt = result && privateReceipts.get(result);
   if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
+  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return { verified: false };
   const [owner, repo] = adapter["target-repo"].split("/");
   const route = concreteRoute(adapter.verifier.route, { ...receipt.fields, owner, repo, receipt_id: receipt.id });
   const { data } = await github.request(`GET ${route}`);
@@ -122,7 +125,13 @@ async function verifyRestAdapterDelivery(options) {
   const number = numberField === undefined ? undefined : data[numberField];
   if (numberField !== undefined && (!Number.isSafeInteger(number) || number < 1)) return { verified: false };
   const resource = { kind: adapter.verifier["resource-kind"], repository: adapter["target-repo"], id: receipt.id, ...(number === undefined ? {} : { number }) };
-  return { verified: true, claim_handle: claim.handle, resource, evidence: { source: "independent_native_readback", id: receipt.id, fields: Object.keys(adapter.verifier.fields) } };
+  return {
+    verified: true,
+    claim_handle: claim.handle,
+    resource,
+    authority_resource: ["issue", "pull_request"].includes(resource.kind) ? await resolveParentResourceTarget(github, { repository: resource.repository, kind: resource.kind, number }, data) : await resolveRepositoryTarget(github, resource),
+    evidence: { source: "independent_native_readback", id: receipt.id, fields: Object.keys(adapter.verifier.fields) },
+  };
 }
 
 module.exports = { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery };

@@ -6,12 +6,15 @@ const { canonical, identity, parseStrictJSON, validateReason } = require("./work
 const { decimal, defaultPolicy } = require("./work_queue_policy.cjs");
 const { genesis, grant, submission } = require("./work_queue_test_helpers.cjs");
 const { parseTransactionLog, replayTransactions, serializeProjection, serializeTransactionLog, validateClaimAuthority } = require("./work_queue_replay.cjs");
-const { assignmentOnly, diagnostics, planDispatch, planNext } = require("./work_queue_scheduler.cjs");
+const { assignmentOnly, diagnostics, planDispatch, planNext, selectionOnly } = require("./work_queue_scheduler.cjs");
 const sharedSelections = require("../../../specs/work-queue/fixtures/selection.json");
 const sharedPrefixes = require("../../../specs/work-queue/fixtures/canonical-prefix.json");
 const sharedReasons = require("../../../specs/work-queue/fixtures/reason-validation.json");
 const sharedIdentities = require("../../../specs/work-queue/fixtures/identity-validation.json");
 const sharedCanonical = require("../../../specs/work-queue/fixtures/canonical.json");
+const sharedWorkerChildren = require("./work_queue_worker_child_fixtures.json");
+const { buildFixtures } = require("./work_queue_worker_child_fixture_generator.cjs");
+const { newChildWork } = require("./work_queue_graph.cjs");
 
 function runFixture(fixture) {
   const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
@@ -36,6 +39,29 @@ function runFixture(fixture) {
 
 function registerTests({ describe, it }) {
   describe("independent shared queue conformance fixtures", () => {
+    it("reproduces independent worker-child fixtures without importing either queue engine", () => assert.deepEqual(buildFixtures(), sharedWorkerChildren));
+    for (const fixture of sharedWorkerChildren.cases)
+      it(`shared Go/JS worker child: ${fixture.name}`, () => {
+        if (!fixture.valid) {
+          assert.throws(() => replayTransactions(parseTransactionLog(fixture.canonical)));
+          return;
+        }
+        const state = replayTransactions(parseTransactionLog(fixture.canonical));
+        const expected = fixture.expected;
+        assert.ok(expected);
+        const child = state.works.get(expected.child_work_id);
+        const parent = state.works.get(expected.parent_work_id);
+        const committed = state.transactions.at(-1);
+        assert.equal(committed.actor.principal, expected.worker_principal);
+        assert.equal(state.transactions[parent.position.commit].actor.principal, expected.producer_principal);
+        assert.equal(Object.hasOwn(state.policy.producers, expected.worker_principal), false);
+        assert.equal(child.pool, expected.pool);
+        assert.equal(child.priority, expected.priority);
+        assert.equal(child.fairness_key, expected.fairness_key);
+        assert.equal(canonical({ ...newChildWork(state, committed.actor, child.payload, child.node_key, child.enqueued), depends_on: child.depends_on }), canonical(committed.operations[0]));
+        assert.equal(serializeTransactionLog(fixture.transactions), fixture.canonical);
+        assert.equal(canonical(serializeProjection(replayTransactions([...fixture.transactions].reverse()))), canonical(serializeProjection(state)));
+      });
     for (const fixture of sharedCanonical.valid) it(`shared Go/JS canonical: ${fixture.name}`, () => assert.equal(canonical(parseStrictJSON(fixture.input)), fixture.expected));
     for (const [index, input] of sharedCanonical.invalid.entries()) it(`shared Go/JS canonical: reject malformed representation ${index + 1}`, () => assert.throws(() => parseStrictJSON(input)));
     for (const fixture of sharedReasons.cases)
@@ -133,7 +159,9 @@ function registerTests({ describe, it }) {
       assert.equal(view.repository, "owner/repo");
       const dispatch = view.dispatches[sharedPrefixes.assignment.dispatch_id];
       assert.equal(dispatch.lifecycle_writes, 2);
-      assert.deepEqual(dispatch.profile, sharedPrefixes.commits[0].operations[0].policy.pools.default.profiles.default);
+      const initial = sharedPrefixes.commits[0].operations[0];
+      assert.ok("policy" in initial);
+      assert.deepEqual(dispatch.profile, initial.policy.pools.default.profiles.default);
       assert.deepEqual(
         sharedPrefixes.assignment.claims.map(member => view.claims[member.claim_id].terminal_commit_id),
         ["q6", "q8", "q9"]
@@ -150,8 +178,6 @@ if (require.main === module) {
   if (process.argv.includes("--json")) process.stdout.write(canonical(fixtures.selection.map(runFixture)) + "\n");
   else if (process.argv.includes("--replay")) {
     const fs = require("node:fs");
-    const { planDispatch, planNext, selectionOnly } = require("./work_queue_scheduler.cjs");
-    const { serializeTransactionLog } = require("./work_queue_replay.cjs");
     const input = parseStrictJSON(fs.readFileSync(0, "utf8"));
     const state = replayTransactions(input.transactions);
     const output = { state: serializeProjection(state), canonical: serializeTransactionLog(input.transactions) };

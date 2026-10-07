@@ -27,14 +27,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "dispatch_id",
-        "handle",
-        "observations"
-      ],
+      "required": ["kind", "work_id", "claim_id", "dispatch_id", "handle", "observations"],
       "type": "object"
     },
     "Identity": {

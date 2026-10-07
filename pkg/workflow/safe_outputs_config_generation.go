@@ -44,7 +44,7 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 	}
 
 	addSafeJobsConfig(safeOutputsConfig, data.SafeOutputs.Jobs)
-	if isWorkQueueEnabled(data) && len(data.SafeOutputs.Steps) > 0 {
+	if isWorkQueueParticipant(data) && len(data.SafeOutputs.Steps) > 0 {
 		safeOutputsConfig["raw_steps"] = map[string]any{"description": "Trusted Claim-scoped custom step preparation"}
 	}
 	addSafeScriptsConfig(safeOutputsConfig, data.SafeOutputs.Scripts)

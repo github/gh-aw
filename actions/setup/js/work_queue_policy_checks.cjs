@@ -1,10 +1,11 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { actorFromContext, decimal, defaultPolicy, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
+const { actorFromContext, decimal, defaultPolicy, validateActor, validatePolicy, validateProfile, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
 const { replayTransactions } = require("./work_queue_replay.cjs");
 const { administrator, context, dispatcher, genesis, operationCommit } = require("./work_queue_test_helpers.cjs");
 const sharedContract = require("../../../specs/work-queue/fixtures/contract.json");
+const sharedIdentities = require("../../../specs/work-queue/fixtures/identity-validation.json");
 
 function registerTests({ describe, it }) {
   describe("mandatory immutable queue policy and trusted caller normalization", () => {
@@ -49,7 +50,7 @@ function registerTests({ describe, it }) {
           else
             assert.throws(
               () => validateRequestRole(actor, kind),
-              error => error.code === "actor_unauthorized",
+              error => error instanceof Error && "code" in error && error.code === "actor_unauthorized",
               `${role}/${kind}`
             );
           combinations++;
@@ -75,14 +76,14 @@ function registerTests({ describe, it }) {
     });
     it("requires lossless canonical GitHub IDs for authenticated principals, profiles and producer keys", () => {
       for (const principal of ["bot", "0", "01", "1\n", "", 1001, "9".repeat(257)]) {
-        assert.throws(() => actorFromContext(context({ ...dispatcher, principal })));
+        assert.throws(() => actorFromContext(context({ ...dispatcher, principal })), { code: "actor_unauthorized" });
         const profilePolicy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
         profilePolicy.pools.default.profiles.default.principal = principal;
-        assert.throws(() => validatePolicy(profilePolicy));
+        assert.throws(() => validatePolicy(profilePolicy), { code: "policy_invalid" });
         if (typeof principal === "string") {
           const producerPolicy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
           producerPolicy.producers = { [principal]: producerPolicy.producers["1001"] };
-          assert.throws(() => validatePolicy(producerPolicy));
+          assert.throws(() => validatePolicy(producerPolicy), { code: "policy_invalid" });
         }
       }
       for (const principal of ["9007199254740993", "9".repeat(129), "9".repeat(256)]) {
@@ -90,6 +91,60 @@ function registerTests({ describe, it }) {
         const policy = defaultPolicy({ repository: "owner/repo", principal });
         assert.equal(validatePolicy(policy).pools.default.profiles.default.principal, principal);
         assert.deepEqual(Object.keys(policy.producers), [principal]);
+      }
+    });
+    it("applies independent shared decimal boundaries to every actor role, profile and producer key", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      const profile = policy.pools.default.profiles.default;
+      const rule = policy.producers["1001"];
+      for (const fixture of sharedIdentities.decimal) {
+        const principal = "9".repeat(fixture.digits);
+        const validate = callback => (fixture.valid ? assert.doesNotThrow(callback, fixture.name) : assert.throws(callback, fixture.name));
+        for (const role of Object.keys(sharedContract.request_roles)) {
+          const actor = { ...dispatcher, role, principal, ...(role === "worker" ? { dispatch_id: "bound-dispatch", claim_handle: "h1" } : {}) };
+          validate(() => validateActor(actor));
+        }
+        validate(() => validateProfile({ ...profile, principal }));
+        validate(() => validatePolicy({ ...policy, producers: { [principal]: rule } }));
+      }
+    });
+    it("validates positive decimal worker principals through the standalone profile API", () => {
+      const profile = defaultPolicy({ repository: "owner/repo", principal: "1001" }).pools.default.profiles.default;
+      for (const principal of ["1", "9007199254740993", "9".repeat(256)]) assert.doesNotThrow(() => validateProfile({ ...profile, principal }));
+      for (const principal of ["bot", "0", "00", "01", "-1", "+1", "1.0", "1e3", "\u0661"]) {
+        assert.throws(
+          () => validateProfile({ ...profile, principal }),
+          error => error instanceof Error && "code" in error && error.code === "policy_invalid",
+          principal
+        );
+      }
+      for (const principal of ["", "1\n", "9".repeat(257), 1001, null]) assert.throws(() => validateProfile({ ...profile, principal }), { code: "policy_invalid" });
+    });
+    it("validates producer map keys independently of profile principals with policy-specific errors", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      const rule = policy.producers["1001"];
+      for (const principal of ["1001", "9".repeat(256)]) assert.doesNotThrow(() => validatePolicy({ ...policy, producers: { [principal]: rule } }));
+      for (const principal of ["operator", "0", "001", "-1", "1.0", "1e3"]) {
+        assert.throws(
+          () => validatePolicy({ ...policy, producers: { [principal]: rule } }),
+          error => error instanceof Error && "code" in error && error.code === "policy_invalid",
+          principal
+        );
+      }
+      assert.throws(() => validatePolicy({ ...policy, producers: { ["9".repeat(257)]: rule } }), { code: "policy_invalid" });
+    });
+    it("enforces positive decimal principal semantics for every canonical operation role", () => {
+      for (const role of ["administrator", "producer", "dispatcher", "worker", "reconciler"]) {
+        const actor = { ...dispatcher, role, ...(role === "worker" ? { dispatch_id: "bound-dispatch", claim_handle: "h1" } : {}) };
+        for (const principal of ["1", "9007199254740993", "9".repeat(256)]) assert.equal(validateActor({ ...actor, principal }).principal, principal);
+        for (const principal of ["login", "0", "01", "-1", "+1", "1.5", "1e3", "\u0661"]) {
+          assert.throws(
+            () => validateActor({ ...actor, principal }),
+            error => error instanceof Error && "code" in error && error.code === "actor_unauthorized",
+            `${role}/${principal}`
+          );
+        }
+        assert.throws(() => validateActor({ ...actor, principal: "9".repeat(257) }), { code: "actor_unauthorized" });
       }
     });
     it("does not resurrect a stale credential-generation observation on a repeated cutover name", () => {

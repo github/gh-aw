@@ -5,6 +5,7 @@ const { actorFromContext, defaultPolicy, validateTrustedContext } = require("./w
 const { appendCommit, generateRequestOperations, newRequest, newState, replayTransactions } = require("./work_queue_replay.cjs");
 const { assignmentOnly } = require("./work_queue_scheduler.cjs");
 const { nodeId } = require("./work_queue_graph.cjs");
+const { createDispatchCredentialValidator } = require("./work_queue_dispatch_credential.cjs");
 
 const REF = "a".repeat(40);
 const REPOSITORY = "owner/repo";
@@ -40,29 +41,34 @@ function queueFixture(options = {}) {
   append(
     "submit",
     {
-      nodes: Array.from({ length: options.count ?? 3 }, (_, index) => ({
-        kind: "Work",
-        work_id: nodeId("g1", `n${index + 1}`),
-        graph_id: "g1",
-        node_key: `n${index + 1}`,
-        pool: "default",
-        priority: 3,
-        fairness_key: "",
-        worker_profile: "default",
-        batch_trust_domain: "default",
-        payload: { plan: `stored task ${index + 1}`, effect_contract: { kind: "none" } },
-        depends_on: [],
-        enqueued: 1000,
-        ...(options.workDefaults || {}),
-      })),
+      nodes: Array.from({ length: options.count ?? 3 }, (_, index) => {
+        const work = {
+          kind: "Work",
+          work_id: nodeId("g1", `n${index + 1}`),
+          graph_id: "g1",
+          node_key: `n${index + 1}`,
+          pool: "default",
+          priority: 3,
+          fairness_key: "",
+          worker_profile: "default",
+          batch_trust_domain: "default",
+          payload: { plan: `stored task ${index + 1}`, effect_contract: { kind: "none" } },
+          depends_on: [],
+          enqueued: 1000,
+          ...(options.workDefaults || {}),
+        };
+        options.configureWork?.(work, index);
+        return work;
+      }),
     },
     { role: "producer", principal, repository: REPOSITORY }
   );
   if (options.granted !== false) append("dispatch_next", { pool: "default", max_claims: options.count ?? 3, max_dispatches: 16, max_bytes: policy.limits.assignment_bytes }, dispatcher);
   const assignment = options.granted === false ? null : assignmentOnly([...replayTransactions(transactions).dispatches.values()][0]);
   const binding = { run_id: "42", run_attempt: 1, repository: REPOSITORY, workflow: WORKFLOW, ref: REF, principal: workerPrincipal, event: "workflow_dispatch" };
-  if (options.started || options.bound) append("dispatch", { operations: [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "started", sender: dispatcher }] }, dispatcher);
-  if (options.bound)
+  if ((options.started || options.bound) && !assignment) throw new Error("fixture_assignment_required");
+  if (assignment && (options.started || options.bound)) append("dispatch", { operations: [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "started", sender: dispatcher }] }, dispatcher);
+  if (assignment && options.bound)
     append(
       "dispatch",
       {
@@ -88,6 +94,7 @@ function queueFixture(options = {}) {
     payload: { repository: { id: 7 }, ...(assignment ? { inputs: { work_queue_assignment: JSON.stringify(assignment) } } : {}) },
   };
   const dispatcherContext = { ...workerContext, runId: "15", runAttempt: dispatcher.run_attempt, actorId: principal, eventName: "schedule", payload: { repository: { id: 7 } } };
+  /** @returns {{id: string, run_attempt: number, repository: {full_name: string, id: number}, path: string, event: string, head_sha: string, actor: {id: string}, triggering_actor: {id: string}, display_title: string, status: string, conclusion: string | null, created_at: string}} */
   const nativeRun = (context = workerContext) => ({
     id: context.runId,
     run_attempt: context.runAttempt,
@@ -102,7 +109,13 @@ function queueFixture(options = {}) {
     conclusion: null,
     created_at: "2026-10-05T00:00:00Z",
   });
-  const githubClient = { rest: { actions: { getWorkflowRun: async ({ run_id }) => ({ status: 200, data: nativeRun(run_id === "42" ? workerContext : dispatcherContext) }) } } };
+  const githubClient = {
+    rest: {
+      users: { getAuthenticated: async () => ({ status: 200, data: { id: workerPrincipal, type: "Bot" } }) },
+      repos: { get: async () => ({ status: 200, data: { full_name: REPOSITORY, id: 7 } }) },
+      actions: { getWorkflowRun: async ({ run_id }) => ({ status: 200, data: nativeRun(run_id === "42" ? workerContext : dispatcherContext) }) },
+    },
+  };
   githubClient.rest.actions.getWorkflowRunAttempt = async parameters => {
     const response = await githubClient.rest.actions.getWorkflowRun(parameters);
     return { ...response, data: { ...response.data, run_attempt: parameters.attempt_number } };
@@ -127,14 +140,25 @@ function queueFixture(options = {}) {
         reused: true,
         assignments: [...state.dispatches.values()].filter(dispatch => dispatch.request_id === args.request.id),
       };
+    if (args.request.kind === "submit")
+      for (const node of args.request.parameters.nodes) {
+        const failed = node.replacement_of && state.works.get(node.replacement_of.work_id);
+        if (!failed || failed.disposition === "none") continue;
+        if (typeof args.remediationVerifier !== "function") throw new Error("remediation_verifier_required");
+        if ((await args.remediationVerifier(structuredClone(state), structuredClone(node), validateTrustedContext(args.context, actor))) !== true) throw new Error("remediation_invalid");
+      }
     const refresh = args.refreshObservations ? await args.refreshObservations(structuredClone(state), structuredClone(args.request), structuredClone(actor)) : [];
     const observations = Array.isArray(refresh) ? refresh : refresh.operations;
-    const id = `test-commit-${++sequence}`;
-    const now = ++at;
+    const id = `test-commit-${sequence + 1}`;
+    const now = at + 1;
     const decision = await (args.generateOperations || generateRequestOperations)(state, args.request, actor, now, id, observations);
     if (!decision.operations.length) return { state, transactions, ...decision, persisted: false, publishedNow: false };
     const commit = { version: 3, id, previous: state.tip || null, request: args.request, actor, policy_epoch: state.policy_epoch, at: now, operations: decision.operations };
     const result = appendCommit(transactions, commit);
+    if (!result.idempotent) {
+      sequence++;
+      at = now;
+    }
     transactions = result.transactions;
     return {
       ...decision,
@@ -156,6 +180,7 @@ function queueFixture(options = {}) {
     workerContext,
     dispatcherContext,
     githubClient,
+    validateDispatchCredential: createDispatchCredentialValidator(githubClient, { kind: "authenticated" }),
     nativeRun,
     append,
     readWorkQueueLog,
@@ -172,4 +197,34 @@ function queueFixture(options = {}) {
   };
 }
 
-module.exports = { REF, REPOSITORY, WORKFLOW, DISPATCHER, queueFixture };
+function noWriteClaimVerifier(options) {
+  const { normalizeAssignment, withClaimExecution, closeClaimEffectChannel } = require("./work_queue_claim_scope.cjs");
+  const { createClaimDeliveryVerifier, readDeliveryControlInventory, verifyClaimDelivery } = require("./work_queue_delivery.cjs");
+  const { authorizeWorkerClaim } = require("./finish_work_queue_claim.cjs");
+  const assignment = normalizeAssignment(options.assignment);
+  const authorize = request => authorizeWorkerClaim({ ...options, ...request });
+  return createClaimDeliveryVerifier({
+    assignment,
+    recheck: async (member, verification) => {
+      const inventory = await readDeliveryControlInventory({ ...options, assignment, claim_handle: member.handle, signal: verification.signal });
+      const effects = [];
+      return withClaimExecution({ assignment, claim_handle: member.handle, authorize, effects }, () =>
+        verifyClaimDelivery({
+          ...options,
+          assignment,
+          claim_handle: member.handle,
+          signal: verification.signal,
+          authorize,
+          messages: [{ type: "noop", claim_handle: member.handle }],
+          results: [{ messageIndex: 0, success: true, claim_handle: member.handle }],
+          effects,
+          effectChannel: closeClaimEffectChannel(),
+          requireControlInventory: true,
+          readControlInventory: async () => inventory,
+        })
+      );
+    },
+  });
+}
+
+module.exports = { REF, REPOSITORY, WORKFLOW, DISPATCHER, queueFixture, noWriteClaimVerifier };

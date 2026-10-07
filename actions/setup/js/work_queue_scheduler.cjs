@@ -247,7 +247,10 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
       }
       applyScheduledClaim(working, claim, next, commit);
       groups.push(working.dispatches.get(dispatchId));
-    } else applyScheduledClaim(working, claim, next, commit);
+    } else {
+      if (!claim) throw queueError("packing_invalid", "compatible packing group has no proposed Claim");
+      applyScheduledClaim(working, claim, next, commit);
+    }
     operations.push(claim);
     lastSelection = next;
     next = planNext(working, parameters.pool, at);

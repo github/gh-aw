@@ -72,7 +72,7 @@ async function readClaimQueueControls(options) {
   if (!dispatch.run) throw new Error("work_queue_binding_not_durable");
   const caller = await authenticatePublisher({ ...configured, role: "reconciler" });
   if (caller.run_id === dispatch.run.run_id && caller.run_attempt !== 1) throw new Error("rerun_not_authorized");
-  const expected = { ...expectedWorkerRun(assignment, profile, configured.context), run_id: dispatch.run.run_id };
+  const expected = { ...expectedWorkerRun(assignment, profile, configured.context, caller.repository), run_id: dispatch.run.run_id };
   const run = await fetchNativeRunAttempt(configured.githubClient, expected.repository, dispatch.run.run_id);
   const proof = validateNativeRun(run, expected);
   if (canonical(dispatch.run) !== canonical(bindingForRun(proof, expected))) throw new Error("run_binding_conflict");
@@ -97,6 +97,37 @@ async function readClaimQueueControls(options) {
   return inventory;
 }
 
+/**
+ * @param {unknown} inventory
+ * @param {unknown} supplied
+ * @param {unknown} handle
+ * @returns {boolean}
+ */
+function isTrustedClaimQueueControlInventory(inventory, supplied, handle) {
+  const facts = inventory !== null && typeof inventory === "object" && inventories.get(inventory);
+  if (!facts || facts.context.claim_handle !== handle) return false;
+  try {
+    return canonical(facts.assignment) === canonical(normalizeAssignment(supplied));
+  } catch {
+    return false;
+  }
+}
+
+// Ledger absence is not proof that a request executed or evaluated to no_work.
+function isUncommittedClaimDispatchNext(options) {
+  const assignment = normalizeAssignment(options.assignment);
+  const message = normalizeClaimScope(options.message, assignment);
+  closed(message, ["type", "intent_id", "parameters", "claim_handle"], [], "queue control readback message");
+  if (!Object.values(TYPES).includes(message.type)) throw new Error("work_queue_control_receipt_scope_invalid");
+  if (options.claim_handle !== undefined && message.claim_handle !== options.claim_handle) throw new Error("work_queue_control_receipt_scope_invalid");
+  if (!isTrustedClaimQueueControlInventory(options.inventory, assignment, message.claim_handle)) throw new Error("work_queue_control_inventory_untrusted");
+  if (message.type !== "work_queue_dispatch_next") return false;
+  const facts = inventories.get(options.inventory);
+  const parameters = normalizeDispatchParameters(message.parameters, facts.state.policy, 4096);
+  const request = requestForIntent(facts.context, message.intent_id, "dispatch_next", parameters);
+  return !facts.state.requests.has(request.id);
+}
+
 async function verifyClaimQueueControl(options) {
   const assignment = normalizeAssignment(options.assignment);
   const message = normalizeClaimScope(options.message, assignment);
@@ -105,7 +136,7 @@ async function verifyClaimQueueControl(options) {
   if (!kind || (options.claim_handle !== undefined && message.claim_handle !== options.claim_handle)) throw new Error("work_queue_control_receipt_scope_invalid");
   const inventory = options.inventory === undefined ? await readClaimQueueControls({ ...options, assignment, claim_handle: message.claim_handle }) : options.inventory;
   const facts = inventories.get(inventory);
-  if (!facts || canonical(facts.assignment) !== canonical(assignment) || inventory.claim_handle !== message.claim_handle) throw new Error("work_queue_control_inventory_untrusted");
+  if (!facts || !isTrustedClaimQueueControlInventory(inventory, assignment, message.claim_handle)) throw new Error("work_queue_control_inventory_untrusted");
   const id = requestIdForIntent(facts.context, message.intent_id);
   const prior = facts.state.requests.get(id);
   const receipt = inventory.controls.find(control => control.request_id === id);
@@ -120,4 +151,10 @@ async function verifyClaimQueueControl(options) {
   return { verified: true, claim_handle: message.claim_handle, resource: { kind: "queue_commit", repository: facts.context.repository, id: prior.id }, evidence: receipt };
 }
 
-module.exports = { controlReceiptForRequest, claimControlReceipts, readClaimQueueControls, verifyClaimQueueControl };
+function claimQueueControlRun(inventory) {
+  const facts = inventory && inventories.get(inventory);
+  if (!facts) throw new Error("work_queue_control_inventory_untrusted");
+  return JSON.parse(canonical(facts.state.dispatches.get(facts.assignment.dispatch_id).run));
+}
+
+module.exports = { controlReceiptForRequest, claimControlReceipts, readClaimQueueControls, isTrustedClaimQueueControlInventory, isUncommittedClaimDispatchNext, verifyClaimQueueControl, claimQueueControlRun };

@@ -88,15 +88,26 @@ func (state Projection) completedWorkerScope(actor Actor) (*ClaimState, *WorkSta
 	return claim, work, nil
 }
 
-func AuthorizeEffect(state Projection, actor Actor) error {
-	_, work, err := state.completedWorkerScope(actor)
+func (state Projection) workerContinuationScope(actor Actor) (*ClaimState, *WorkState, error) {
+	claim, work, err := state.completedWorkerScope(actor)
+	if err != nil {
+		return nil, nil, err
+	}
+	if work.Barrier != "pending" {
+		return nil, nil, queueError("claim_effects_unauthorized", "a terminal delivery barrier cannot authorize new queue controls")
+	}
+	return claim, work, nil
+}
+
+func AuthorizeEffect(state Projection, actor Actor, target EffectResource) error {
+	claim, work, err := state.completedWorkerScope(actor)
 	if err != nil {
 		return err
 	}
 	if work.Barrier != "pending" {
 		return queueError("claim_effects_unauthorized", "a terminal delivery barrier cannot authorize effects again")
 	}
-	return nil
+	return authorizeEffectResource(state, claim, work, target)
 }
 
 func authorizeWorkerQueueRequest(state Projection, actor Actor, request Request) error {
@@ -104,7 +115,7 @@ func authorizeWorkerQueueRequest(state Projection, actor Actor, request Request)
 		(request.Kind != "submit" && request.Kind != "dispatch_next" && request.Kind != "observe") {
 		return nil
 	}
-	_, parent, err := state.completedWorkerScope(actor)
+	_, parent, err := state.workerContinuationScope(actor)
 	if err != nil {
 		return err
 	}
@@ -115,8 +126,8 @@ func authorizeWorkerQueueRequest(state Projection, actor Actor, request Request)
 			return err
 		}
 		for _, node := range params.Nodes {
-			if node.Pool != parent.Pool || node.Priority != parent.Priority || node.FairnessKey != parent.FairnessKey {
-				return queueError("child_entitlement", "worker children must inherit their parent's pool, priority and account")
+			if err := state.validateSubmissionEntitlement(actor, node); err != nil {
+				return err
 			}
 		}
 	case "dispatch_next":
@@ -170,6 +181,25 @@ func terminalEvidence(state Projection, dispatch *DispatchState, evidence Eviden
 		return queueError("terminal_evidence_required", "exact native run/attempt terminal evidence is required")
 	}
 	return nil
+}
+
+func releaseEvidence(state Projection, dispatch *DispatchState, evidence Evidence, at int64) error {
+	if err := evidenceFits(state, dispatch, evidence, at); err != nil {
+		return err
+	}
+	if dispatch.State == "reserved" {
+		if evidence.Kind != "prelaunch" || evidence.Source != "trusted_publisher" {
+			return queueError("nonlaunch_evidence_required", "prelaunch release must race start through CAS")
+		}
+		return nil
+	}
+	if dispatch.State == "rejected" {
+		if evidence.Kind != "nonlaunch" || evidence.Source != "github_api" {
+			return queueError("nonlaunch_evidence_required", "definitive rejection required")
+		}
+		return nil
+	}
+	return terminalEvidence(state, dispatch, evidence, at)
 }
 
 func (state Projection) applyCompletion(op Operation, commit QueueCommit) error {
@@ -251,13 +281,18 @@ func (state Projection) cancelClaim(op Operation, commit QueueCommit) error {
 		for _, operation := range commit.Operations {
 			if operationKind(operation) == "Release" {
 				var release struct {
-					Evidence Evidence `json:"evidence"`
+					DispatchID string   `json:"dispatch_id"`
+					Evidence   Evidence `json:"evidence"`
 				}
 				_ = json.Unmarshal(operation, &release)
-				if release.Evidence.Kind == "terminal_run" || release.Evidence.Kind == "nonlaunch" ||
-					release.Evidence.Kind == "prelaunch" {
-					backoffOrigin = min(backoffOrigin, release.Evidence.CheckedAt)
+				if release.DispatchID != claim.DispatchID {
+					continue
 				}
+				if err := releaseEvidence(state, state.Dispatches[claim.DispatchID], release.Evidence, commit.At); err != nil {
+					return err
+				}
+				backoffOrigin = release.Evidence.CheckedAt
+				break
 			}
 		}
 	}
@@ -291,10 +326,17 @@ func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
 	}
 	if commit.Actor.Role == "worker" {
 		claim, err := state.scopedClaim(commit.Actor, "", "")
-		if err != nil || claim.WorkID != work.WorkID || claim.State != "cancelled" ||
+		if err != nil || claim == nil || claim.WorkID != work.WorkID || claim.State != "cancelled" ||
+			!slices.Contains([]string{"available", "cancelled"}, work.State) ||
 			work.Attempts < state.Policy.Pools[work.Pool].Retry.MaxAttempts ||
-			commit.Request.Kind != "finish" {
+			commit.Request.Kind != "finish" || cancellation.Reason != "attempts_exhausted" {
 			return queueError("ownership_unauthorized", "worker may terminally cancel only its exhausted scoped retry")
+		}
+		var parameters FinishParameters
+		if err := json.Unmarshal(commit.Request.Parameters, &parameters); err != nil ||
+			parameters.Outcome != "cancelled" || parameters.DispatchID != claim.DispatchID ||
+			parameters.ClaimHandle != claim.Handle {
+			return queueError("request_invalid", "exhausted Work closure must match the cancelled original finish scope")
 		}
 	}
 	if work.State == "cancelled" {
@@ -342,7 +384,7 @@ func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
 		if commit.Actor.Role != "dispatcher" || dispatch.State != "reserved" ||
 			lifecycle.Sender == nil || !sameJSON(lifecycle.Sender, commit.Actor) ||
 			commit.Actor.Workflow == "" || !decimalIdentity(commit.Actor.RunID) ||
-			commit.Actor.RunAttempt < 1 || lifecycle.Run != nil {
+			commit.Actor.RunAttempt < 1 || lifecycle.Run != nil || lifecycle.Evidence != nil {
 			return queueError("launch_started", "only one authenticated sender may record a start marker")
 		}
 		dispatch.State, dispatch.Sender = "started", lifecycle.Sender
@@ -420,18 +462,7 @@ func (state Projection) release(op Operation, commit QueueCommit) error {
 	if dispatch.Released {
 		return nil
 	}
-	if err := evidenceFits(state, dispatch, release.Evidence, commit.At); err != nil {
-		return err
-	}
-	if dispatch.State == "reserved" {
-		if release.Evidence.Kind != "prelaunch" || release.Evidence.Source != "trusted_publisher" {
-			return queueError("nonlaunch_evidence_required", "prelaunch release must race start through CAS")
-		}
-	} else if dispatch.State == "rejected" {
-		if release.Evidence.Kind != "nonlaunch" || release.Evidence.Source != "github_api" {
-			return queueError("nonlaunch_evidence_required", "definitive rejection required")
-		}
-	} else if err := terminalEvidence(state, dispatch, release.Evidence, commit.At); err != nil {
+	if err := releaseEvidence(state, dispatch, release.Evidence, commit.At); err != nil {
 		return err
 	}
 	for _, member := range dispatch.Claims {

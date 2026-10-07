@@ -539,7 +539,7 @@ Fairness within a class is not automatically fairness for a tenant's total workl
 
 ### 7.2 Immutable Work metadata and trusted policy
 
-Define one new current `QueueCommit` transaction protocol with closed, typed operations for both runtime and operator queues. At the examined revision, version 3 would be the next workflow version, but the final version number MUST be allocated against the implementation branch. Readers MUST accept only the current supported envelope and operation shapes; earlier, unversioned, standalone old facts, and unknown records MUST be rejected without codemods, automatic upgrades, or compatibility aliases.
+Define one current version-3 `QueueCommit` transaction protocol with closed, typed operations for both runtime and operator queues. Readers MUST accept only the current supported envelope and operation shapes; earlier, unversioned, standalone old facts, and unknown records MUST be rejected without codemods, automatic upgrades, or compatibility aliases.
 
 | Field | Proposed semantics |
 |---|---|
@@ -1541,6 +1541,22 @@ Unassigned dispatchers may propose compiler-authorized queue-control intents
 is the trusted dispatcher role/request; this narrow control path cannot carry
 arbitrary GitHub mutation payloads or be selected by an agent to bypass Claim
 attribution. A worker-originated control intent still carries its Claim scope.
+Fresh worker queue controls require that member's completed Work to retain a
+pending delivery barrier. Publish and verify its declared controls before
+publishing Result. Result closes fresh control authority as well as ordinary
+effects; an already accepted logical request remains recoverable without
+republishing or granting new authority. A still-pending sibling cannot lend its
+authority to a completed member.
+
+```mermaid
+flowchart LR
+    Completion["Same-Claim Completion"] --> Pending["Delivery pending"]
+    Pending --> Controls["Publish and verify scoped controls"]
+    Controls --> Result["Verified Result"]
+    Result --> Closed["Reject fresh controls and effects"]
+    Accepted["Already accepted request"] --> Recovery["Recover original receipt only"]
+    Closed --> Recovery
+```
 
 ```mermaid
 flowchart TD
@@ -2315,7 +2331,7 @@ Disposable Python models exercise the unit-grant rule, first with exact `Fractio
 | Inject a Claim for a Work other than the prefix's selected winner | Rejected by the disposable replay model |
 | Release an unbound launch using the dispatcher's terminal run | Rejected; binding the actual worker run permits the modeled release |
 
-The causal/late-binding checks use a small disposable model, not a complete implementation of actor authorization, all operation variants, or external APIs. These results support the example ratios and basic prefix semantics. They do not establish a short-window error bound under changing eligibility or solve real publication/dispatch races. Live weight changes are deliberately excluded from version 1.
+The causal/late-binding checks use a small disposable model, not a complete implementation of actor authorization, all operation variants, or external APIs. These results support the example ratios and basic prefix semantics. They do not establish a short-window error bound under changing eligibility or solve real publication/dispatch races. Live weight changes are deliberately excluded from the current protocol.
 
 ### 8.2 Required automated acceptance cases
 
@@ -2541,11 +2557,11 @@ and explicitly deferred deployment requirements.
 | Surface | Expected work |
 |---|---|
 | `specs/work-queue/transactions.tsp` and emitted schemas | One current-only QueueCommit contract with Work edges/trust/replacement metadata, Result/DeliveryFailure/Observation/Control evidence, and stable request semantics |
-| `work_queue_codemods.cjs` and protocol-upgrade documentation | Remove old-record loading/automatic upgrades from operational paths; document explicit unsupported-protocol failures |
+| Current-only loaders and protocol-upgrade documentation | Remove old-record loading/automatic upgrades and their unused shims; document explicit unsupported-protocol failures |
 | `work_queue_replay.cjs` | Causal-prefix and validated incremental replay, cycle/reference checks, ready-frontier/result/delivery predicates, one pure selector/explanation engine, exact ticks |
 | `work_queue_store.cjs` | One checked QueueCommit publication path, regenerated atomic batches, stable request recovery |
 | `dispatch_workflow.cjs` or new trusted queue-dispatch handler | Policy-selected Work/target, reserved dispatch, binding/reconciliation |
-| `work_queue_issues_store.cjs` | Reject queue operation until the backend can enforce equivalent mandatory scheduling serialization |
+| Git-only storage validation | Reject Issues queue storage and remove its unused implementation until an equivalent mandatory serialization contract exists |
 | `work_queue_mcp_server.cjs` and snapshots | Bounded read/explain plus staged submit/dispatch-next intents; explicit snapshot/staged provenance |
 | Queue policy initialization and submission defaults | Mandatory policy with one default class/key, no implicit producer grouping, and oldest-available default grants |
 | Worker finish/reconciliation and compiler integration | Automatic one-Claim / enforced explicit multi-Claim attribution on every safe-output type, bounded trust-compatible arrays, mixed outcomes, independent gates/Result or DeliveryFailure, actual run/attempt binding |
@@ -2574,7 +2590,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 
 | Requirement | Implementation/evidence status |
 |---|---|
-| Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented native contract; captured full Go suite and source-hashed 100-case exact conformance passes exist; current producer-cancellation regression and final combined rerun remain integration gates |
+| Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented native contract and strict literal conformance fixtures; captured passes describe their recorded source versions. Final combined-source parity and authorization regressions remain integration gates |
 | Exact fairness, FIFO defaults, deterministic fair-prefix packing and CAS recovery | In progress |
 | Work/Issue/PR DAG, observations, Result/DeliveryFailure and replacements | In progress |
 | Immutable arrays, actual run binding and conservative native recovery | In progress |
@@ -2582,10 +2598,12 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Compiler/MCP/operator/explain/trace and workflow examples | In progress |
 | Independent service-deviation and eventual-service evidence | Bounded sibling model: 30 fixed + 60,360 dynamic states exhausted; four exact negative controls; full hierarchy/runtime refinement still outstanding |
 | Complete lifecycle/runtime refinement and supported-host integration | Bounded lifecycle safety: 208,108 exhausted states, eleven exact negative controls and three witnesses; full runtime/host refinement remains unverified |
-| Retained-history, contention and recovery-headroom operating envelope | Newer source-hashed local benchmark artifacts pass 30 rows including JS 16/64/80 MiB retained histories; earlier depth failures are historical. Final-source, closure-envelope, contention/host/API measurements and deployment SLOs remain outstanding |
+| Retained-history, contention and recovery-headroom operating envelope | Captured local operating-envelope artifacts include JS 16/64/80 MiB histories and bounded assignment/headroom checks; later source edits invalidate their use as final-source evidence. Mock CAS contention is not live Git/network contention. Final-source, supported-host/API measurements and deployment SLOs remain outstanding |
 | Existing `FairDAGGitHub` and `QueueOrdering` exhaustive searches | Incomplete; no observed violation is not a pass |
-| Full JS typecheck/existing dependency-based tests | Declared tools and locked type dependencies restored; parent scoped Vitest passes 355 tests/27 files and session schema drift passes. Normal TypeScript checking still fails new queue-source/check-file diagnostics; the isolated published baseline has one unrelated existing diagnostic. Full locked Vite installation remains separately blocked on `source-map-js@1.2.2` |
-| TypeSpec schema generation | Dependency-free subset emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass; semantic equivalence of the native and official emitted schemas remains unverified |
+| Full JS typecheck/existing dependency-based tests | Genuine declared tools and type dependencies restored. Current normal TypeScript reports only the unchanged baseline `create_project.cjs:253` diagnostic; new queue diagnostics are cleared. Source-stable combined runtime tests and final formatting/lint gates remain required |
+| TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 41 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
+| Protected launch credentials, immutable effect targets and native delivery verification | Required functional trust boundaries; remaining integration failures are tracked independently of branch-writer deployment automation |
+| Workflow administrator bootstrap and live native-dispatch host compatibility | Automatic workflow bootstrap is unsupported: initialize Policy through an explicitly authenticated operator/trusted host. Hosted immutable-SHA dispatch and the pinned run-details response remain unverified live compatibility gates; injected SDK checks are not hosted evidence |
 | Automated verification/provisioning of queue-branch writer restrictions | **Deferred by user direction; not implemented** |
 
 The writer-restriction deferral does not relax the normative trust requirement
@@ -2616,13 +2634,13 @@ The recommendation is concrete, but several items require implementation-specifi
 1. Native wire/runtime implementations and bounded successor/lifecycle checks now exist. Complete refinement of dynamic graph admission, replacements, writer provenance, resource budgets, JSON validation, actual cross-repo identity/permissions/freshness, packing, transport and compaction remains an obligation, not a consequence of bounded passes.
 2. The current Git backend's freshness/ref semantics must be validated under actual concurrent publication, including ambiguous responses.
 3. The pinned run-details API and authenticated activation-binding recovery require integration tests against each supported host. Unknown launch outcomes can require intervention even with that mechanism; older response-only dispatch contracts are unsupported.
-4. The proposed dynamic-key, integer-tick hierarchy, and eligibility rules need independent deviation/liveness evidence and conformance checks and are not covered wholesale by the original stride algorithm's theorems; live weight rebasing is outside version 1.
+4. The proposed dynamic-key, integer-tick hierarchy, and eligibility rules need independent deviation/liveness evidence and conformance checks and are not covered wholesale by the original stride algorithm's theorems; live weight rebasing is outside the current protocol.
 5. Resource fairness cannot be promised until trusted resource measurements and enforceable capacities exist.
 6. There is no evidence here that the suggested class weights or outstanding defaults are optimal for gh-aw workloads.
 7. Staged intents cannot return durable grants to the agent in the same turn under the current job topology; a live acquire-response design would be a different execution boundary.
 8. Existing OTLP plumbing supplies correlation but not the exact grant-span context; causal span links may need a small separate helper extension if later required.
 9. Cross-repository dependency reads are not atomic with queue publication; the stated freshness/admission semantics must not be marketed as global live consistency.
-10. The retained-log admission watermark and proposed size defaults need operating-envelope benchmarks and a concrete worst-case lifecycle reserve calculation; version 1 cannot promise indefinite growth.
+10. The retained-log admission watermark and proposed size defaults need operating-envelope benchmarks and a concrete worst-case lifecycle reserve calculation; the current protocol cannot promise indefinite growth.
 11. Daily fresh model checks do not accumulate search progress across runs. Checkpoint recovery and post-upload failure signaling remain verification-infrastructure follow-ups, not protocol proof.
 
 Primary manuals and open author/institutional papers were preferred. Publisher metadata was checked for key bibliographic identities. Several initial search results contained incorrect DOI/arXiv associations; these were corrected before inclusion. Some publisher full text was inaccessible. HEFT, EASY, and the Mu'alem/Feitelson article are used through verified bibliographic identities and corroborating system/survey material; the report does not claim to have rerun their published experiments.
@@ -2630,10 +2648,10 @@ Primary manuals and open author/institutional papers were preferred. Publisher m
 The live Temporal and Slurm manuals may change. HTCondor links use the verified 23.0 manual because the corresponding `latest` URLs did not resolve during retrieval. This versioned manual is evidence for the documented mechanisms, not a claim about every subsequent HTCondor release.
 
 No GitHub Actions workflow was triggered and no scheduler/evaluator results were
-rewritten. Runtime/compiler implementation remains unchanged. The existing
-successor TLA+ model and formal runner cover the scope recorded in section 8.2;
-this review revision adds only the focused Claim-scope/mixed-outcome model to
-that evidence, not the other previously unmodeled lifecycle refinements.
+rewritten. Native engines, compiler integration and focused service/lifecycle
+models are implemented in this PR. Their recorded evidence has distinct source
+identities and scopes; neither a historical pass nor a bounded model result
+discharges the remaining integrated runtime, hosted API or deployment gates.
 
 ## 11. Sources
 

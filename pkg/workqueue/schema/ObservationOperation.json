@@ -95,16 +95,7 @@
           ]
         }
       },
-      "required": [
-        "kind",
-        "observation_id",
-        "resource",
-        "condition",
-        "state",
-        "observed_at",
-        "credential_generation",
-        "read_status"
-      ],
+      "required": ["kind", "observation_id", "resource", "condition", "state", "observed_at", "credential_generation", "read_status"],
       "type": "object"
     },
     "Resource": {
@@ -136,14 +127,7 @@
           "$ref": "#/$defs/Decimal"
         }
       },
-      "required": [
-        "kind",
-        "host",
-        "repository",
-        "repository_id",
-        "resource_id",
-        "number"
-      ],
+      "required": ["kind", "host", "repository", "repository_id", "resource_id", "number"],
       "type": "object"
     },
     "Timestamp": {

@@ -50,7 +50,6 @@ func TestMaximumStartedDispatchFitsLifecycleReservedBytes(t *testing.T) {
 	request, err := NewRequest(strings.Repeat("\\", 256), "dispatch", actor, OperationsParameters{
 		Operations: []Operation{Op(map[string]any{
 			"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": actor,
-			"evidence": maximumClosureEvidence(t, state, assignment, false),
 		})},
 	})
 	if err != nil {
@@ -69,6 +68,7 @@ func TestMaximumStartedDispatchFitsLifecycleReservedBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	discharged := remainingHeadroom(state) - remainingHeadroom(started)
+	t.Logf("valid start canonical bytes=%d discharged reserve=%d", len(data)+1, discharged)
 	if int64(len(data)+1) > discharged {
 		t.Fatalf("maximum valid start marker uses %d bytes but lifecycle reservation discharges only %d", len(data)+1, discharged)
 	}
@@ -121,14 +121,36 @@ func TestMaximumNativeReleaseFitsFinalReservedBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	discharged := remainingHeadroom(state) - remainingHeadroom(closed)
+	t.Logf("maximum Release canonical bytes=%d discharged reserve=%d", len(data)+1, discharged)
 	if int64(len(data)+1) > discharged {
 		t.Fatalf("maximum valid Release uses %d bytes but final native reservation discharges only %d", len(data)+1, discharged)
 	}
 }
 
 func TestMaximumResultFitsIndependentDeliveryReservedBytes(t *testing.T) {
+	testMaximumResultFitsDeliveryReserve(t, false)
+}
+
+func TestReleasedPendingCompletionMaximumResultFitsDeliveryReservedBytes(t *testing.T) {
+	testMaximumResultFitsDeliveryReserve(t, true)
+}
+
+func testMaximumResultFitsDeliveryReserve(t *testing.T, releaseNative bool) {
+	t.Helper()
 	commits, assignment := boundAssignment(t)
 	commits = finishMember(t, commits, assignment, 0, "completed")
+	if releaseNative {
+		for member := 1; member < len(assignment.Claims); member++ {
+			commits = finishMember(t, commits, assignment, member, "completed")
+		}
+		state, err := Replay(commits)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commits = testOperations(t, commits, testActor("reconciler"), "native-release", "release", Op(map[string]any{
+			"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminalFor(state, assignment),
+		}))
+	}
 	state, err := Replay(commits)
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +181,32 @@ func TestMaximumResultFitsIndependentDeliveryReservedBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	discharged := remainingHeadroom(state) - remainingHeadroom(closed)
+	t.Logf("maximum Result released=%t canonical bytes=%d discharged delivery reserve=%d", releaseNative, len(data)+1, discharged)
 	if int64(len(data)+1) > discharged {
 		t.Fatalf("maximum valid Result uses %d bytes but delivery reservation discharges only %d", len(data)+1, discharged)
+	}
+}
+
+func TestStartMarkerCannotCarryPrematureNativeEvidence(t *testing.T) {
+	commits, assignment := boundAssignment(t)
+	commits = commits[:3]
+	state, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := testActor("dispatcher")
+	actor.Workflow, actor.RunID, actor.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
+	request, err := NewRequest("start-with-evidence", "dispatch", actor, OperationsParameters{
+		Operations: []Operation{Op(map[string]any{
+			"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": actor,
+			"evidence": terminalFor(state, assignment),
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := BuildCandidate(commits, actor, request, 4000); err == nil ||
+		!strings.HasPrefix(err.Error(), "launch_started:") {
+		t.Fatalf("unbound start marker accepted premature native evidence: %v", err)
 	}
 }

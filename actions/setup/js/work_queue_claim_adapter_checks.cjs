@@ -3,9 +3,8 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
-const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput } = require("./work_queue_claim_adapters.cjs");
+const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
 const { prepareAdapterContext } = require("./work_queue_prepare_claim_adapter.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
@@ -96,7 +95,7 @@ function registerTests({ describe, it }) {
     });
 
     it("supports declared custom REST effects with complete independent native field verification, not job success", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-rest-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-rest");
       const configured = {
         mode: "prepared",
         "effect-type": "github_rest",
@@ -109,6 +108,7 @@ function registerTests({ describe, it }) {
       const scoped = assignment();
       const effects = [];
       const message = { type: "custom", claim_handle: "h1", check_name: "claimed-check", revision: "a".repeat(40) };
+      scoped.claims[0].work.effect_contract.outputs[0].verification = { verifier_id: "custom", expected: { name: message.check_name, head_sha: message.revision, status: "completed", conclusion: "success" } };
       let observed;
       let writes = 0;
       let cancelled = false;
@@ -146,6 +146,7 @@ function registerTests({ describe, it }) {
             results: [{ messageIndex: 0, success: true, result }],
             github: source,
             verifyOutput: input => verifyClaimAdapterOutput({ ...input, adapter: configured }),
+            verifyDeclaredOutput: createDeclaredAdapterVerifier({ custom: configured }),
           };
           assert.equal((await verifyClaimDelivery(verification)).verification, "verified");
           assert.equal((await verifyClaimAdapterOutput({ claim: scoped.claims[0], result: structuredClone(result), adapter: configured, github: source })).verified, false);
@@ -177,7 +178,7 @@ function registerTests({ describe, it }) {
     });
 
     it("prepares only original scoped inputs without Completion or shrinking immutable assignment", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-adapter-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter");
       try {
         const messages = [
           { type: "custom", claim_handle: "h1", number: 42, content: "one" },
@@ -204,7 +205,7 @@ function registerTests({ describe, it }) {
     });
 
     it("applies prepared data only through fresh guarded effects and never accepts job success or uploaded receipts", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-adapter-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter");
       const scoped = assignment();
       const effects = [];
       const message = { type: "custom", claim_handle: "h1", number: 42, content: "original" };
@@ -261,7 +262,7 @@ function registerTests({ describe, it }) {
     });
 
     it("rejects foreign/malformed prepared artifacts before effects while valid sibling adapters can settle", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-adapter-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter");
       const scoped = assignment();
       let writes = 0;
       const authorize = async request => ({ claim_handle: request.claim_handle, authorized: true });
@@ -291,7 +292,7 @@ function registerTests({ describe, it }) {
       }
     });
     it("publishes isolated assets with exact immutable git evidence and never trusts copied receipts", async () => {
-      const root = path.resolve(".queue-validation-cache", `claim-assets-${randomUUID()}`);
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-assets");
       const scoped = assignment();
       const sourcePath = "image.png";
       const content = Buffer.from("claim-only-asset");

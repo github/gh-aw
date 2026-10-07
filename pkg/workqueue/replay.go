@@ -33,6 +33,11 @@ func remainingHeadroom(state Projection) int64 {
 	return reserve
 }
 
+// RecoveryHeadroom reports the outstanding closure reservation for a replayed projection.
+func RecoveryHeadroom(state Projection) int64 {
+	return remainingHeadroom(state)
+}
+
 func Replay(commits []QueueCommit) (Projection, error) {
 	state := newProjection()
 	ordered, err := causalOrder(commits)

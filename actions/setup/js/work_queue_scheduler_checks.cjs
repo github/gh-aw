@@ -74,10 +74,13 @@ function registerTests({ describe, it }) {
       state.clocks.set("default", schedule);
       const before = diagnostics(schedule);
       const decision = planNext(state, "default", 2);
+      assert.ok(decision.nextClock);
+      const retained = decision.nextClock.keys.get(2);
+      assert.ok(retained);
       assert.equal(state.works.get(decision.work_id).priority, 1);
-      assert.deepEqual(decision.nextClock.keys.get(2), child);
-      assert.equal(decision.nextClock.keys.get(2).passes.has(""), false);
-      assert.equal(decision.nextClock.keys.get(2).active.has("stale"), true);
+      assert.deepEqual(retained, child);
+      assert.equal(retained.passes.has(""), false);
+      assert.equal(retained.active.has("stale"), true);
       assert.equal(decision.nextClock.keys.has(1), true);
       assert.deepEqual(diagnostics(schedule), before);
     });

@@ -55,13 +55,7 @@
             "accounting_weights": {
               "": 1
             },
-            "class_weights": [
-              8,
-              4,
-              2,
-              1,
-              1
-            ],
+            "class_weights": [8, 4, 2, 1, 1],
             "limits": {
               "assignment_bytes": 49152,
               "evidence_bytes": 1024,
@@ -78,9 +72,7 @@
             "mode": "weighted-priority",
             "pools": {
               "default": {
-                "allowed_repositories": [
-                  "owner/repo"
-                ],
+                "allowed_repositories": ["owner/repo"],
                 "default_profile": "default",
                 "logical_limit": 16,
                 "max_observation_age_ms": 60000,
@@ -109,19 +101,9 @@
             },
             "producers": {
               "1001": {
-                "fairness_keys": [
-                  ""
-                ],
-                "pools": [
-                  "default"
-                ],
-                "priorities": [
-                  1,
-                  2,
-                  3,
-                  4,
-                  5
-                ]
+                "fairness_keys": [""],
+                "pools": ["default"],
+                "priorities": [1, 2, 3, 4, 5]
               }
             }
           }
@@ -142,13 +124,7 @@
                 "accounting_weights": {
                   "": 1
                 },
-                "class_weights": [
-                  8,
-                  4,
-                  2,
-                  1,
-                  1
-                ],
+                "class_weights": [8, 4, 2, 1, 1],
                 "limits": {
                   "assignment_bytes": 49152,
                   "evidence_bytes": 1024,
@@ -165,9 +141,7 @@
                 "mode": "weighted-priority",
                 "pools": {
                   "default": {
-                    "allowed_repositories": [
-                      "owner/repo"
-                    ],
+                    "allowed_repositories": ["owner/repo"],
                     "default_profile": "default",
                     "logical_limit": 16,
                     "max_observation_age_ms": 60000,
@@ -196,19 +170,9 @@
                 },
                 "producers": {
                   "1001": {
-                    "fairness_keys": [
-                      ""
-                    ],
-                    "pools": [
-                      "default"
-                    ],
-                    "priorities": [
-                      1,
-                      2,
-                      3,
-                      4,
-                      5
-                    ]
+                    "fairness_keys": [""],
+                    "pools": ["default"],
+                    "priorities": [1, 2, 3, 4, 5]
                   }
                 }
               }
@@ -530,9 +494,7 @@
           "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
           "handle": "h2",
           "kind": "Claim",
-          "observations": [
-            "o1"
-          ],
+          "observations": ["o1"],
           "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60"
         },
         {
@@ -1137,13 +1099,7 @@
             "accounting_weights": {
               "": 1
             },
-            "class_weights": [
-              8,
-              4,
-              2,
-              1,
-              1
-            ],
+            "class_weights": [8, 4, 2, 1, 1],
             "limits": {
               "assignment_bytes": 49152,
               "evidence_bytes": 1024,
@@ -1160,9 +1116,7 @@
             "mode": "weighted-priority",
             "pools": {
               "default": {
-                "allowed_repositories": [
-                  "owner/repo"
-                ],
+                "allowed_repositories": ["owner/repo"],
                 "default_profile": "default",
                 "logical_limit": 16,
                 "max_observation_age_ms": 60000,
@@ -1191,19 +1145,9 @@
             },
             "producers": {
               "1001": {
-                "fairness_keys": [
-                  ""
-                ],
-                "pools": [
-                  "default"
-                ],
-                "priorities": [
-                  1,
-                  2,
-                  3,
-                  4,
-                  5
-                ]
+                "fairness_keys": [""],
+                "pools": ["default"],
+                "priorities": [1, 2, 3, 4, 5]
               }
             }
           }
@@ -1224,13 +1168,7 @@
                 "accounting_weights": {
                   "": 1
                 },
-                "class_weights": [
-                  8,
-                  4,
-                  2,
-                  1,
-                  1
-                ],
+                "class_weights": [8, 4, 2, 1, 1],
                 "limits": {
                   "assignment_bytes": 49152,
                   "evidence_bytes": 1024,
@@ -1247,9 +1185,7 @@
                 "mode": "weighted-priority",
                 "pools": {
                   "default": {
-                    "allowed_repositories": [
-                      "owner/repo"
-                    ],
+                    "allowed_repositories": ["owner/repo"],
                     "default_profile": "default",
                     "logical_limit": 16,
                     "max_observation_age_ms": 60000,
@@ -1278,19 +1214,9 @@
                 },
                 "producers": {
                   "1001": {
-                    "fairness_keys": [
-                      ""
-                    ],
-                    "pools": [
-                      "default"
-                    ],
-                    "priorities": [
-                      1,
-                      2,
-                      3,
-                      4,
-                      5
-                    ]
+                    "fairness_keys": [""],
+                    "pools": ["default"],
+                    "priorities": [1, 2, 3, 4, 5]
                   }
                 }
               }

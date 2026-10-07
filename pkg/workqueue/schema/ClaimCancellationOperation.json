@@ -19,13 +19,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "reason",
-        "retry_not_before"
-      ],
+      "required": ["kind", "work_id", "claim_id", "reason", "retry_not_before"],
       "type": "object"
     },
     "Identity": {

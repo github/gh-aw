@@ -45,15 +45,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id",
-        "claim_id",
-        "completion_id",
-        "reason",
-        "disposition",
-        "evidence"
-      ],
+      "required": ["kind", "work_id", "claim_id", "completion_id", "reason", "disposition", "evidence"],
       "type": "object"
     },
     "Evidence": {
@@ -141,15 +133,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "source",
-        "repository",
-        "workflow",
-        "ref",
-        "principal",
-        "checked_at"
-      ],
+      "required": ["kind", "source", "repository", "workflow", "ref", "principal", "checked_at"],
       "type": "object"
     },
     "Identity": {

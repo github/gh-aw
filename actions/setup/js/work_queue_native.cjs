@@ -24,7 +24,9 @@ function nativeAttempt(value) {
 }
 
 function hasDispatchToken(title, dispatchId) {
-  return typeof title === "string" && typeof dispatchId === "string" && dispatchId.length > 0 && title.split(/\s+/u).includes(dispatchId);
+  if (typeof title !== "string" || typeof dispatchId !== "string" || !dispatchId.length) return false;
+  const escaped = dispatchId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^A-Za-z0-9_])${escaped}(?:$|[^A-Za-z0-9_])`, "u").test(title);
 }
 
 function resourceURL(value, expected) {
@@ -53,18 +55,33 @@ function dispatchResponse(response, destination) {
   };
 }
 
-// An agent's assignment and run name are correlation hints, never proof.
-async function fetchNativeRun(githubClient, repository, runId) {
+async function fetchNativeRepository(githubClient, repository) {
   const [owner, repo, extra] = repository.split("/");
   if (!owner || !repo || extra) throw new TypeError("native run repository is invalid");
+  if (typeof githubClient?.rest?.repos?.get !== "function") throw new Error("native_repository_api_missing");
+  const response = await githubClient.rest.repos.get({ owner, repo, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, timeout: 15000 } });
+  if (response.status !== 200 || typeof response.data?.full_name !== "string" || response.data.full_name.toLowerCase() !== repository.toLowerCase()) throw new Error("native_repository_identity_mismatch");
+  return { repository: response.data.full_name, repository_id: nativeId(response.data.id, "native repository ID") };
+}
+
+function canonicalNativeRepository(run, verified) {
+  if (typeof run?.repository?.full_name !== "string" || run.repository.full_name.toLowerCase() !== verified.repository.toLowerCase()) throw new Error("run_repository_mismatch");
+  if (nativeId(run.repository.id, "run repository ID") !== verified.repository_id) throw new Error("run_repository_identity_mismatch");
+  return { ...run, repository: { ...run.repository, full_name: verified.repository } };
+}
+
+// An agent's assignment and run name are correlation hints, never proof.
+async function fetchNativeRun(githubClient, repository, runId) {
+  const verified = await fetchNativeRepository(githubClient, repository);
+  const [owner, repo] = verified.repository.split("/");
   const response = await githubClient.rest.actions.getWorkflowRun({ owner, repo, run_id: nativeId(runId), headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, timeout: 15000 } });
   if (response.status !== undefined && response.status !== 200) throw new Error("native run API read was not successful");
-  return response.data;
+  return canonicalNativeRepository(response.data, verified);
 }
 
 async function fetchNativeRunAttempt(githubClient, repository, runId) {
-  const [owner, repo, extra] = repository.split("/");
-  if (!owner || !repo || extra) throw new TypeError("native run repository is invalid");
+  const verified = await fetchNativeRepository(githubClient, repository);
+  const [owner, repo] = verified.repository.split("/");
   const response = await githubClient.rest.actions.getWorkflowRunAttempt({
     owner,
     repo,
@@ -74,7 +91,7 @@ async function fetchNativeRunAttempt(githubClient, repository, runId) {
     request: { retries: 0, timeout: 15000 },
   });
   if (response.status !== undefined && response.status !== 200) throw new Error("native run attempt API read was not successful");
-  return response.data;
+  return canonicalNativeRepository(response.data, verified);
 }
 
 function validateNativeRun(run, expected) {
@@ -92,7 +109,7 @@ function validateNativeRun(run, expected) {
   if (expected.dispatch_id !== undefined && !hasDispatchToken(run?.display_title, expected.dispatch_id)) throw new Error("run_correlation_mismatch");
   const status = run.status;
   const terminal = status === "completed" && typeof run.conclusion === "string" && run.conclusion.length > 0;
-  return { run_id: runId, run_attempt: 1, terminal, status, conclusion: terminal ? run.conclusion : null };
+  return { run_id: runId, run_attempt: 1, repository: run.repository.full_name, terminal, status, conclusion: terminal ? run.conclusion : null };
 }
 
 async function postQueueDispatch(githubClient, destination, inputs) {
@@ -120,7 +137,8 @@ function publisherContextForRun(options, run) {
   const actualAttempt = nativeAttempt(run?.run_attempt);
   if (actualAttempt !== attempt || (options.role === "worker" && actualAttempt !== 1)) throw new Error("rerun_not_authorized");
   const workflowRef = options.workflowRef ?? process.env.GITHUB_WORKFLOW_REF;
-  if (typeof workflowRef !== "string" || !workflowRef.startsWith(`${repository}/.github/workflows/`) || !workflowRef.includes("@")) throw new Error("publisher_workflow_context_missing");
+  if (typeof workflowRef !== "string" || workflowRef.slice(0, repository.length).toLowerCase() !== repository.toLowerCase() || !workflowRef.slice(repository.length).startsWith("/.github/workflows/") || !workflowRef.includes("@"))
+    throw new Error("publisher_workflow_context_missing");
   const workflow = workflowRef.slice(repository.length + 1).split("@")[0];
   const ref = immutableRef(context.sha ?? process.env.GITHUB_SHA);
   if (
@@ -135,7 +153,8 @@ function publisherContextForRun(options, run) {
   if (context.payload?.repository?.id !== undefined && nativeId(run.repository.id) !== nativeId(context.payload.repository.id)) throw new Error("publisher_repository_identity_mismatch");
   const principal = nativeId(run.actor?.id, "publisher principal ID");
   if (context.actorId !== undefined && nativeId(context.actorId) !== principal) throw new Error("publisher_principal_mismatch");
-  const actor = { role: options.role, principal, repository, workflow, run_id: runId, run_attempt: attempt };
+  /** @type {{role: string, principal: string, repository: string, workflow: string, run_id: string, run_attempt: number, dispatch_id?: string, claim_handle?: string}} */
+  const actor = { role: options.role, principal, repository: run.repository.full_name, workflow, run_id: runId, run_attempt: attempt };
   if (options.dispatch_id !== undefined) actor.dispatch_id = options.dispatch_id;
   if (options.claim_handle !== undefined) actor.claim_handle = options.claim_handle;
   return { ...actor, authenticated: true, roles: [options.role], ref, event: run.event, created_at: Date.parse(run.created_at), native_run: run };
@@ -176,7 +195,10 @@ async function authenticateIntentPublisher(options) {
       request: { retries: 0, timeout: 15000 },
     });
     if (response.status !== undefined && response.status !== 200) throw new Error("work_queue_intent_origin_read_failed");
-    source = publisherContextForRun({ ...options, context: { ...options.context, runAttempt: attempt } }, response.data);
+    source = publisherContextForRun(
+      { ...options, context: { ...options.context, runAttempt: attempt } },
+      canonicalNativeRepository(response.data, { repository: current.repository, repository_id: nativeId(current.native_run.repository.id) })
+    );
   }
   const actor = actorFromContext(source);
   if (!Object.hasOwn(origin, "claim_handle")) delete actor.claim_handle;

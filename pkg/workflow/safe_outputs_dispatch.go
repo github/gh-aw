@@ -30,7 +30,7 @@ func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
 	if data.SafeOutputs == nil || data.SafeOutputs.DispatchWorkflow == nil {
 		return
 	}
-	data.SafeOutputs.WorkQueueEnabled = isWorkQueueEnabled(data)
+	data.SafeOutputs.WorkQueueEnabled = isWorkQueueParticipant(data)
 
 	if len(data.SafeOutputs.DispatchWorkflow.Workflows) == 0 {
 		return

@@ -1,2 +1,4 @@
-const { registerTests } = require("./work_queue_control_adapter_checks.cjs");
-registerTests({ describe, it });
+import { describe, it } from "vitest";
+import checks from "./work_queue_control_adapter_checks.cjs";
+
+checks.registerTests({ describe, it });

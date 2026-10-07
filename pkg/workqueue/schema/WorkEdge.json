@@ -17,10 +17,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "kind",
-        "work_id"
-      ],
+      "required": ["kind", "work_id"],
       "type": "object"
     }
   },

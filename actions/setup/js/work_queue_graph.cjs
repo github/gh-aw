@@ -3,7 +3,7 @@
 
 const { canonical, canonicalBytes, closed, digest, identity, integer, queueError, utf8Compare } = require("./work_queue_codec.cjs");
 const { boundedBytes } = require("./work_queue_limits.cjs");
-const { decimal, poolPolicy, workerContinuationAuthority } = require("./work_queue_policy.cjs");
+const { decimal, poolPolicy, validateRequestRole, validateSubmissionEntitlement, workerContinuationAuthority } = require("./work_queue_policy.cjs");
 
 function nodeId(graph_id, node_key) {
   return digest({ graph_id, node_key });
@@ -15,10 +15,10 @@ function gateKey(resource, condition) {
 
 function validateResource(resource) {
   closed(resource, ["kind", "host", "repository", "repository_id", "resource_id", "number"], [], "resource");
-  if (!["issue", "pull_request"].includes(resource.kind)) throw queueError("dependency_invalid", "resource kind must be Issue or Pull Request");
+  if (!["issue", "pull_request"].includes(resource.kind)) throw queueError("resource_invalid", "resource kind must be Issue or Pull Request");
   for (const field of ["host", "repository"]) identity(resource[field], field);
-  if (resource.host !== "github.com" || !/^[^/\s]+\/[^/\s]+$/.test(resource.repository)) throw queueError("dependency_invalid", "resource host/repository must be approved normalized GitHub coordinates");
-  for (const field of ["repository_id", "resource_id", "number"]) decimal(resource[field], field);
+  if (resource.host !== "github.com" || !/^[^/\s]+\/[^/\s]+$/.test(resource.repository)) throw queueError("resource_unauthorized", "resource host/repository must be approved normalized GitHub coordinates");
+  for (const field of ["repository_id", "resource_id", "number"]) decimal(resource[field], field, "resource_invalid");
   return resource;
 }
 
@@ -54,8 +54,18 @@ function newWork(payload, graph_id, node_key, pool, policy, at) {
   };
 }
 
+function newChildWork(state, actor, payload, node_key, at) {
+  validateRequestRole(actor, "submit");
+  const { work: parent } = workerContinuationAuthority(state, actor);
+  return {
+    ...newWork(payload, parent.graph_id, node_key, parent.pool, state.policy, at),
+    priority: parent.priority,
+    fairness_key: parent.fairness_key,
+  };
+}
+
 function validateWork(node, state, actor) {
-  closed(node, ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"], ["subject", "replacement_of"], "Work");
+  closed(node, ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"], ["subject", "replacement_of"], "Work", "unsupported_protocol");
   if (node.kind !== "Work") throw queueError("unsupported_protocol", "graph admission requires Work operations");
   for (const field of ["work_id", "graph_id", "node_key", "pool", "worker_profile", "batch_trust_domain"]) identity(node[field], field);
   if (node.work_id !== nodeId(node.graph_id, node.node_key)) throw queueError("work_identity_invalid", "Work identity must bind graph_id/node_key");
@@ -63,15 +73,9 @@ function validateWork(node, state, actor) {
   identity(node.fairness_key, "fairness key", true, 128);
   integer(node.enqueued, 0, Number.MAX_SAFE_INTEGER, "enqueue timestamp");
   const pool = poolPolicy(state, node.pool);
+  validateSubmissionEntitlement(state, node, actor);
   const profile = pool.profiles[node.worker_profile];
-  if (!profile || profile.trust_domain !== node.batch_trust_domain || !Object.hasOwn(state.policy.accounting_weights, node.fairness_key)) throw queueError("work_unauthorized", "unapproved routing, trust domain, or accounting key");
-  if (actor.role === "worker") {
-    const { work: parent } = workerContinuationAuthority(state, actor);
-    if (node.pool !== parent.pool || node.priority !== parent.priority || node.fairness_key !== parent.fairness_key) throw queueError("work_unauthorized", "children preserve trusted parent priority and accounting scope");
-  } else {
-    const rule = state.policy.producers[actor.principal];
-    if (!rule || !rule.pools.includes(node.pool) || !rule.priorities.includes(node.priority) || !rule.fairness_keys.includes(node.fairness_key)) throw queueError("work_unauthorized", "producer lacks immutable submission entitlement");
-  }
+  if (!profile || profile.trust_domain !== node.batch_trust_domain || !Object.hasOwn(state.policy.accounting_weights, node.fairness_key)) throw queueError("work_invalid", "unapproved routing, trust domain, or accounting key");
   if (!node.payload || typeof node.payload !== "object" || Array.isArray(node.payload)) throw queueError("work_invalid", "payload must be a JSON object");
   boundedBytes(node.payload, state.policy.limits.payload_bytes, "Work payload");
   if (!Array.isArray(node.depends_on) || node.depends_on.length > state.policy.limits.predecessors) throw queueError("resource_limit", "predecessor count exceeds policy");
@@ -81,11 +85,11 @@ function validateWork(node, state, actor) {
     const key = dependency.kind === "work" ? `work:${dependency.work_id}` : `gate:${gateKey(dependency.resource, dependency.condition)}`;
     if (edges.has(key)) throw queueError("dependency_invalid", "duplicate predecessor");
     edges.add(key);
-    if (dependency.kind !== "work" && !pool.allowed_repositories.includes(dependency.resource.repository)) throw queueError("dependency_unauthorized", "external repository is not allowlisted");
+    if (dependency.kind !== "work" && !pool.allowed_repositories.includes(dependency.resource.repository)) throw queueError("resource_unauthorized", "external repository is not allowlisted");
   }
   if (Object.hasOwn(node, "subject")) {
     validateResource(node.subject);
-    if (!pool.allowed_repositories.includes(node.subject.repository)) throw queueError("dependency_unauthorized", "subject repository is not allowlisted");
+    if (!pool.allowed_repositories.includes(node.subject.repository)) throw queueError("resource_unauthorized", "subject repository is not allowlisted");
   }
   if (Object.hasOwn(node, "replacement_of")) {
     closed(node.replacement_of, ["work_id", "disposition", "evidence"], [], "replacement");
@@ -98,6 +102,8 @@ function validateWork(node, state, actor) {
   }
   // Provenance and declared Result inputs also consume the host input budget.
   const worstIdentity = "\\".repeat(256);
+  /** @type {Array<{work_id: string, result_commit_id: string, descriptor: object}>} */
+  const resultRefs = [];
   const minimal = {
     version: 3,
     dispatch_id: "d".repeat(70),
@@ -106,7 +112,7 @@ function validateWork(node, state, actor) {
     policy_epoch: state.policy_epoch,
     pool: node.pool,
     worker_profile: node.worker_profile,
-    claims: [{ handle: "h16", claim_id: "c".repeat(70), work_id: node.work_id, work: node.payload, result_refs: [] }],
+    claims: [{ handle: "h16", claim_id: "c".repeat(70), work_id: node.work_id, work: node.payload, result_refs: resultRefs }],
   };
   let resultBytes = 0;
   for (const edge of node.depends_on)
@@ -212,4 +218,4 @@ function resultReferences(state, work) {
     });
 }
 
-module.exports = { dependencyStatus, gateKey, newWork, nodeId, observationSatisfies, resultReferences, validateDependency, validateGraphAdmission, validateResource, validateWork, workDefinition };
+module.exports = { dependencyStatus, gateKey, newChildWork, newWork, nodeId, observationSatisfies, resultReferences, validateDependency, validateGraphAdmission, validateResource, validateWork, workDefinition };

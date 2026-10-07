@@ -11,6 +11,7 @@ import (
 )
 
 var workQueueAdapterFieldPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z_0-9]*$`)
+var workQueueAdapterVerifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$`)
 
 // WorkQueueClaimAdapter binds custom output semantics to a trusted, independently
 // verified effect. Delegated code prepares data; only the guarded handler applies it.
@@ -18,6 +19,7 @@ type WorkQueueClaimAdapter struct {
 	Mode       string                 `json:"mode" yaml:"mode"`
 	EffectType string                 `json:"effect-type" yaml:"effect-type"`
 	TargetRepo string                 `json:"target-repo" yaml:"target-repo"`
+	VerifierID string                 `json:"verifier-id,omitempty" yaml:"verifier-id,omitempty"`
 	FieldMap   map[string]string      `json:"field-map,omitempty" yaml:"field-map,omitempty"`
 	Expected   map[string]any         `json:"expected,omitempty" yaml:"expected,omitempty"`
 	Request    *WorkQueueRestRequest  `json:"request,omitempty" yaml:"request,omitempty"`
@@ -70,6 +72,7 @@ func parseWorkQueueClaimAdapters(raw map[string]any) map[string]*WorkQueueClaimA
 		adapter.Mode, _ = fields["mode"].(string)
 		adapter.EffectType, _ = fields["effect-type"].(string)
 		adapter.TargetRepo, _ = fields["target-repo"].(string)
+		adapter.VerifierID, _ = fields["verifier-id"].(string)
 		adapter.Expected, _ = fields["expected"].(map[string]any)
 		if raw, ok := fields["graphql"].(map[string]any); ok {
 			adapter.GraphQL = &WorkQueueGraphQL{}
@@ -130,14 +133,50 @@ func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 		return nil
 	}
 	effects := []string{"create_issue", "update_issue", "close_issue", "add_comment", "add_labels", "remove_labels", "replace_label", "github_rest", "git_tree", "github_graphql"}
-	fields := []string{"title", "body", "labels", "assignees", "milestone", "state", "status", "state_reason", "item_number", "issue_number", "pull_request_number", "label_to_add", "label_to_remove"}
+	builtinFields := map[string][]string{
+		"create_issue":  {"title", "body", "labels", "assignees", "milestone"},
+		"update_issue":  {"title", "body", "labels", "assignees", "milestone", "state", "status", "state_reason"},
+		"close_issue":   {"state_reason"},
+		"add_comment":   {"body"},
+		"add_labels":    {"labels"},
+		"remove_labels": {"labels"},
+		"replace_label": {"label_to_add", "label_to_remove"},
+	}
+	nativeVerifiers := map[string]bool{
+		"create_issue":  data.SafeOutputs.CreateIssues != nil,
+		"update_issue":  data.SafeOutputs.UpdateIssues != nil,
+		"close_issue":   data.SafeOutputs.CloseIssues != nil,
+		"add_comment":   data.SafeOutputs.AddComments != nil,
+		"add_labels":    data.SafeOutputs.AddLabels != nil,
+		"remove_labels": data.SafeOutputs.RemoveLabels != nil,
+		"replace_label": data.SafeOutputs.ReplaceLabel != nil,
+	}
+	verifierIDs := make(map[string]string)
 	for name, adapter := range data.SafeOutputs.ClaimAdapters {
 		if adapter == nil || !slices.Contains([]string{"prepared", "script"}, adapter.Mode) || !slices.Contains(effects, adapter.EffectType) {
 			return fmt.Errorf("work-queue: claim-adapters.%s requires a supported mode and independently verifiable effect-type", name)
 		}
+		fields := builtinFields[adapter.EffectType]
+		if fields != nil && adapter.EffectType != "create_issue" {
+			fields = append(slices.Clone(fields), "item_number", "issue_number", "pull_request_number")
+		}
 		if !repoSlugPattern.MatchString(adapter.TargetRepo) || strings.Contains(adapter.TargetRepo, "${{") {
 			return fmt.Errorf("work-queue: claim-adapters.%s.target-repo requires a fixed approved repository", name)
 		}
+		if adapter.VerifierID != "" && !workQueueAdapterVerifierPattern.MatchString(adapter.VerifierID) {
+			return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id requires a bounded independently verified native effect identifier", name)
+		}
+		id := adapter.VerifierID
+		if id == "" {
+			id = stringutil.NormalizeSafeOutputIdentifier(name)
+		}
+		if nativeVerifiers[id] && name != id && data.SafeOutputs.ClaimAdapters[id] == nil {
+			return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id conflicts with the enabled native %s verifier", name, id)
+		}
+		if prior, exists := verifierIDs[id]; exists {
+			return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id conflicts with claim-adapters.%s; verifier identifiers must be unique", name, prior)
+		}
+		verifierIDs[id] = name
 		if adapter.EffectType == "github_rest" {
 			if err := validateWorkQueueRestAdapter(name, adapter); err != nil {
 				return err

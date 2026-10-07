@@ -86,7 +86,7 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 	}
 
 	// Add custom job tools from SafeOutputs.Jobs
-	if isWorkQueueEnabled(data) && len(data.SafeOutputs.Steps) > 0 {
+	if isWorkQueueParticipant(data) && len(data.SafeOutputs.Steps) > 0 {
 		dynamicTools = append(dynamicTools, generateCustomJobToolDefinition("raw_steps", &SafeJobConfig{
 			Description: "Prepare the configured trusted custom steps for one immutable Claim; effects require independent declared delivery verification.",
 		}))
