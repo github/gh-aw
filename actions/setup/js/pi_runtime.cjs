@@ -90,6 +90,7 @@ function nativePiProvider(provider) {
 /** @param {Record<string, any>} config */
 function preparePiRuntime(config = parsePiConfig()) {
   const agentDir = process.env.PI_CODING_AGENT_DIR || DEFAULT_AGENT_DIR;
+  const routingSelection = readPiModelRoutingSelection(agentDir);
   const settingsPath = path.join(agentDir, "settings.json");
   let installedSettings = {};
   try {
@@ -113,6 +114,10 @@ function preparePiRuntime(config = parsePiConfig()) {
     },
     defaultProjectTrust: "never",
   };
+  if (routingSelection) {
+    if (routingSelection.mapped_effort) settings.defaultThinkingLevel = routingSelection.mapped_effort;
+    else delete settings.defaultThinkingLevel;
+  }
   writeSecureOutput(settingsPath, JSON.stringify(settings, null, 2));
 
   const gatewayPath = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json");
@@ -130,7 +135,27 @@ function preparePiRuntime(config = parsePiConfig()) {
 
   const skillsDir = "/tmp/gh-aw/.pi/skills";
   if (fs.existsSync(skillsDir)) fs.cpSync(skillsDir, path.join(agentDir, "skills"), { recursive: true, dereference: false });
-  return { agentDir, settings, config };
+  return { agentDir, settings, config, routingSelection };
+}
+
+/**
+ * @param {string} agentDir
+ * @returns {{wire_model: string, mapped_effort: string|null}|null}
+ */
+function readPiModelRoutingSelection(agentDir) {
+  if (process.env.GH_AW_MODEL_ROUTING !== "1") return null;
+  const selectionPath = path.join(agentDir, "model-routing-selection.json");
+  let selection;
+  try {
+    selection = JSON.parse(fs.readFileSync(selectionPath, "utf8"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`AWF model routing selection is unavailable to Pi: ${message}`);
+  }
+  if (typeof selection?.wire_model !== "string" || !selection.wire_model) {
+    throw new Error("AWF model routing selection has no wire model; refusing to start Pi");
+  }
+  return { wire_model: selection.wire_model, mapped_effort: typeof selection.mapped_effort === "string" ? selection.mapped_effort : null };
 }
 
 async function main() {
@@ -145,4 +170,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parsePiConfig, loadPiSDK, resolvePiPackageFile, nativePiProvider, preparePiRuntime, verifyPiVersion, DEFAULT_AGENT_DIR, DEFAULT_SESSION_DIR };
+module.exports = { parsePiConfig, loadPiSDK, resolvePiPackageFile, nativePiProvider, preparePiRuntime, readPiModelRoutingSelection, verifyPiVersion, DEFAULT_AGENT_DIR, DEFAULT_SESSION_DIR };

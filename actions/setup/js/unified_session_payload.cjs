@@ -88,6 +88,11 @@ const MESSAGE_FIELDS = {
   sessionId: ["sessionId", "session_id"],
   agentId: ["agentId"],
   parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
+  model: ["model"],
+  apiCallId: ["apiCallId"],
+  interactionId: ["interactionId"],
+  turnId: ["turnId"],
+  parentToolCallId: ["parentToolCallId"],
 };
 
 /** @type {Fields} */
@@ -106,7 +111,7 @@ const EVENT_FIELDS = {
   ...COPILOT_WORKFLOW_EVENT_FIELDS,
   "session.format": { version: ["version"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
-  "session.init": { sourceEngine: ["sourceEngine"], model: ["model"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"] },
+  "session.init": { sourceEngine: ["sourceEngine"], model: ["model", "selectedModel"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"], reasoningEffort: ["reasoningEffort"] },
   "user.message": { content: ["content"] },
   "prompt.system": { content: ["content"] },
   "prompt.user": { content: ["content"] },
@@ -136,6 +141,7 @@ const EVENT_FIELDS = {
     sourceType: ["sourceType"],
     errors: ["errors"],
     permissionDenials: ["permissionDenials", "permission_denials"],
+    agentMetrics: ["agentMetrics"],
   },
   "mcp.rpc.request": MCP_FIELDS,
   "mcp.rpc.response": MCP_FIELDS,

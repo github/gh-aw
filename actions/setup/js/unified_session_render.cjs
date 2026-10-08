@@ -75,7 +75,7 @@ function fields(value, keys) {
 function eventDetail(event) {
   const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
   if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
-    return fields({ ...data, agentId: event.agentId, ...(event.parentId !== undefined ? { parentId: event.parentId } : {}) }, ["agentId", ...Object.keys(COPILOT_WORKFLOW_EVENT_FIELDS[event.type])]);
+    return fields({ ...data, agentId: event.agentId }, ["agentId", ...Object.keys(COPILOT_WORKFLOW_EVENT_FIELDS[event.type])]);
   }
   if (Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES).includes(event.type)) {
     if (event.type === DYNAMIC_WORKFLOW_EVENT_TYPES.background_tasks_changed) {
@@ -216,7 +216,7 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
   if (headers.length > 1) throw new Error(`${ERR_VALIDATION}: Unified session file contains multiple collector format headers`);
   const redacted = redactManifestValue(events, collectArtifactSecretValues());
   if (!Array.isArray(redacted)) throw new Error(`${ERR_VALIDATION}: Expected unified session events`);
-  const lines = ["=== Unified session ==="];
+  const lines = markdown ? [] : ["=== Unified session ==="];
   if (headers.length) lines.push(`File format version: ${headers[0].data.version}`);
   const counts = new Map();
   for (const event of redacted) {
@@ -244,7 +244,7 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
     const time = typeof observedTime === "number" && Number.isFinite(observedTime) && Math.abs(observedTime) <= 8640000000000000 ? new Date(observedTime).toISOString() : "untimed";
     lines.push(`[${index + 1}] ${event.type === "session.format" && component === "collector" ? "file metadata" : time} ${inline(component)}/${inline(phase)} ${inline(event.type)} ${detail.trim()}`);
   }
-  const preamble = markdown ? "### Unified session\n\n<details><summary>Unified trace details</summary>\n\n" : "";
+  const preamble = markdown ? "<details><summary>Unified session</summary>\n\n" : "";
   const tail = markdown ? "\n\n</details>" : "";
   const bodyBudget = maxBytes - Buffer.byteLength(preamble + tail, "utf8") - 2 * (maxLineBytes + 1) - 3;
   if (bodyBudget < 128) return markdown ? "Unified session summary omitted: remaining step-summary byte limit reached.\n" : "Unified session summary omitted: byte limit reached.\n";

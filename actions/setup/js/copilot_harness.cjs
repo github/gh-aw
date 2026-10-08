@@ -92,6 +92,7 @@ const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness
 const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { isRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
+const { resolveAWFModelRoutingSelection, isModelAvailableInReflectData } = require("./awf_model_routing.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
@@ -488,41 +489,6 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
 }
 
 /**
- * Resolve the task-level AWF model selection when routing is enabled.
- * @param {any} reflectData
- * @param {boolean} routingRequired
- * @returns {{selection: {provider: string, model: string, wire_model: string, effort: string|null, endpoint: string}|null, error: string|null}}
- */
-function resolveAWFModelRoutingSelection(reflectData, routingRequired = false) {
-  const routing = reflectData && typeof reflectData === "object" ? reflectData.routing : null;
-  if (routing == null) {
-    return routingRequired ? { selection: null, error: "AWF /reflect did not return the required model-routing selection" } : { selection: null, error: null };
-  }
-  if (routing.status !== "selected") {
-    const failure = typeof routing.failure_code === "string" ? ` (${routing.failure_code})` : "";
-    return { selection: null, error: `AWF model routing is ${String(routing.status || "pending")}${failure}` };
-  }
-  const selection = routing.selection;
-  if (!selection || typeof selection !== "object") {
-    return { selection: null, error: "AWF /reflect reported selected routing without a selection object" };
-  }
-  const provider = typeof selection.provider === "string" ? selection.provider.trim().toLowerCase() : "";
-  const wireModel = typeof selection.wire_model === "string" ? selection.wire_model.trim() : "";
-  const endpoint = typeof selection.endpoint === "string" ? selection.endpoint.trim() : "";
-  if (!["copilot", "github-copilot", "github"].includes(provider) || !wireModel || !endpoint) {
-    return { selection: null, error: "AWF /reflect returned an incomplete or unsupported Copilot routing selection" };
-  }
-  if (!isModelAvailableInReflectData(wireModel, reflectData)) {
-    return { selection: null, error: `AWF /reflect selected unavailable Copilot wire model ${wireModel}` };
-  }
-  const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
-  if (effort && !isRoutingReasoningEffort(effort)) {
-    return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort}` };
-  }
-  return { selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint }, error: null };
-}
-
-/**
  * Apply the model and API endpoint selected by AWF, bypassing compile-time model resolution.
  * @param {{wire_model: string, effort: string|null, endpoint: string}} selection
  * @param {(msg: string) => void} [logger]
@@ -562,30 +528,6 @@ function applyCopilotRoutingArgs(args, selection) {
   routedArgs.push("--model", selection.wire_model);
   if (selection.effort) routedArgs.push("--reasoning-effort", selection.effort);
   return routedArgs;
-}
-
-/**
- * Check whether a model is present in AWF /reflect endpoint data.
- * @param {string} model
- * @param {unknown} reflectData
- * @returns {boolean}
- */
-function isModelAvailableInReflectData(model, reflectData) {
-  const normalizedModel = typeof model === "string" ? model.trim() : "";
-  if (!normalizedModel) return false;
-  if (!reflectData || typeof reflectData !== "object") return false;
-
-  // TypeScript needs explicit 'in' check or cast before property access on narrowed object type
-  const endpoints = "endpoints" in reflectData && Array.isArray(reflectData.endpoints) ? reflectData.endpoints : [];
-  for (const endpoint of endpoints) {
-    if (!endpoint || endpoint.configured !== true || !Array.isArray(endpoint.models)) {
-      continue;
-    }
-    if (endpoint.models.includes(normalizedModel)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**
@@ -1243,7 +1185,7 @@ async function main() {
     }
   }
 
-  const routingResult = resolveAWFModelRoutingSelection(awfReflectData, modelRoutingRequired);
+  const routingResult = resolveAWFModelRoutingSelection(awfReflectData, modelRoutingRequired, ["/responses", "/chat/completions"]);
   if (routingResult.error) {
     log(`unexpected error: AWF model routing failed: ${routingResult.error}; refusing to start Copilot`);
     process.exit(1);

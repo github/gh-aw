@@ -168,6 +168,24 @@ const DEFAULT_MCP_CALL_WATCHDOG_MS = 120_000;
  */
 const MCP_CALL_TRANSPORT_GRACE_MS = 60_000;
 
+/**
+ * Maximum number of prior runs to check when restoring the AIC scan cache.
+ * @type {number}
+ */
+const MAX_RESTORE_RUNS = 10;
+
+/**
+ * Maximum number of repository history pages to search when restoring the AIC scan cache.
+ * @type {number}
+ */
+const MAX_RESTORE_PAGES = 25;
+
+/**
+ * Time window searched when restoring the AIC scan cache.
+ * @type {number}
+ */
+const SCAN_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 module.exports = {
   AGENT_OUTPUT_FILENAME,
   TMP_GH_AW_PATH,
@@ -189,4 +207,7 @@ module.exports = {
   DETECTION_RESULT_FILENAME,
   DEFAULT_MCP_CALL_WATCHDOG_MS,
   MCP_CALL_TRANSPORT_GRACE_MS,
+  MAX_RESTORE_RUNS,
+  MAX_RESTORE_PAGES,
+  SCAN_WINDOW_MS,
 };

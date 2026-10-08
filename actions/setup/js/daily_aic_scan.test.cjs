@@ -397,6 +397,86 @@ describe("business response circuit breaker", () => {
 });
 
 describe("trusted artifact fallback without writable Actions cache", () => {
+  it("restores required-workflow observations from repository history after workflow history returns 404", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
+    const producer = { ...current, id: 50, event: "push", head_branch: "main", repository: { full_name: repository }, head_repository: { full_name: repository } };
+    const listWorkflowRunsForRepo = vi.fn(async ({ page }) =>
+      response({ workflow_runs: page === 1 ? Array.from({ length: 100 }, (_, id) => ({ ...producer, id: id + 100, path: "other.yml" })) : [{ ...producer, id: 51, workflow_id: 8 }, { ...producer, id: 52, head_branch: "topic" }, producer] })
+    );
+    const listWorkflowRunArtifacts = vi.fn(async () => response({ artifacts: [{ id: 100, name: "aic-usage-scan-v2", expired: false }] }));
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        actions: {
+          getWorkflowRun: async () => response(current),
+          listWorkflowRuns: vi.fn(async () => {
+            throw apiError(404, {}, "workflow not found");
+          }),
+          listWorkflowRunsForRepo,
+          listWorkflowRunArtifacts,
+        },
+      },
+    };
+    const downloadArtifact = vi.fn(async (_id, options) => {
+      fs.writeFileSync(path.join(options.path, path.basename(AIC_SCAN_CACHE_FILE_PATH)), JSON.stringify(scanCacheEntry(run(1), 2, repository, 7, now)));
+      return { downloadPath: options.path };
+    });
+    await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
+    expect(global.github.rest.actions.listWorkflowRuns).toHaveBeenCalledWith({ owner: "example", repo: "project", workflow_id: 7, per_page: 10 });
+    expect(listWorkflowRunsForRepo).toHaveBeenCalledTimes(2);
+    expect(listWorkflowRunsForRepo).toHaveBeenCalledWith({ owner: "example", repo: "project", status: "completed", created: ">=2025-02-02T12:00:00.000Z", per_page: 100, page: 1 });
+    expect(listWorkflowRunArtifacts).toHaveBeenCalledOnce();
+    expect(listWorkflowRunArtifacts).toHaveBeenCalledWith({ owner: "example", repo: "project", run_id: 50, per_page: 100 });
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("GitHub API rate limit level:"));
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"remaining":4000'));
+    expect((await scanDailyAIC(fixture([run(1)]))).cacheHits).toBe(1);
+  });
+
+  it("bounds required-workflow history searches when no trusted producer exists", async () => {
+    const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
+    const listWorkflowRunsForRepo = vi.fn(async () => response({ workflow_runs: Array.from({ length: 100 }, (_, id) => ({ ...current, id, event: "pull_request", repository: { full_name: repository } })) }));
+    const listWorkflowRunArtifacts = vi.fn();
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        actions: {
+          getWorkflowRun: async () => response(current),
+          listWorkflowRuns: async () => {
+            throw apiError(404, {}, "workflow not found");
+          },
+          listWorkflowRunsForRepo,
+          listWorkflowRunArtifacts,
+        },
+      },
+    };
+    await restore(cachePath);
+    expect(listWorkflowRunsForRepo).toHaveBeenCalledTimes(25);
+    expect(listWorkflowRunArtifacts).not.toHaveBeenCalled();
+    expect(fs.existsSync(cachePath)).toBe(false);
+  });
+
+  it("does not fall back to repository history for non-404 workflow errors", async () => {
+    const listWorkflowRunsForRepo = vi.fn();
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    global.github = {
+      rest: {
+        actions: {
+          getWorkflowRun: async () => response({ workflow_id: 7, path: ".github/workflows/example.yml" }),
+          listWorkflowRuns: async () => {
+            throw apiError(403, {}, "forbidden");
+          },
+          listWorkflowRunsForRepo,
+        },
+      },
+    };
+    await expect(restore(cachePath)).rejects.toMatchObject({ status: 403 });
+    expect(listWorkflowRunsForRepo).not.toHaveBeenCalled();
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("GitHub API rate limit level:"));
+  });
+
   it.each([401, 403, 429])("stops fallback fan-out on HTTP %i", async status => {
     const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
     const producer = id => ({ ...current, id, event: "pull_request_target", repository: { full_name: repository } });
@@ -429,6 +509,7 @@ describe("trusted artifact fallback without writable Actions cache", () => {
         actions: {
           getWorkflowRun: async () => response(current),
           listWorkflowRuns: async () => response({ workflow_runs: [producer] }),
+          listWorkflowRunsForRepo: vi.fn(),
           listWorkflowRunArtifacts: vi.fn(async () => response({ artifacts: [{ id: 100, name: "aic-usage-scan-v2", expired: false }] })),
         },
       },
@@ -440,10 +521,13 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     // An old prefix cache may exist; it does not suppress the verified artifact.
     writeEntries([{ run_id: 1, aic: 1 }]);
     await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Querying workflow-specific run history"));
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Workflow-specific run history returned candidates"));
     const f = fixture();
     expect((await scanDailyAIC(f)).cacheHits).toBe(3);
     expect(f.getRunAIC).not.toHaveBeenCalled();
     expect(downloadArtifact).toHaveBeenCalledOnce();
+    expect(global.github.rest.actions.listWorkflowRunsForRepo).not.toHaveBeenCalled();
   });
 
   it("rejects contributor workflow artifacts and non-default-branch dispatch snapshots", () => {

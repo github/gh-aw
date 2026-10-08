@@ -8,6 +8,7 @@ import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
 import { runWithCopilotSDK } from "./copilot_sdk_session.cjs";
 import { projectSessionResult } from "./agent_session.cjs";
+import { createSessionValidator } from "./scripts/validate_session.cjs";
 
 const runId = "dynamic-smoke-run";
 const nativePath = "sandbox/agent/logs/copilot-session-state/root/events.jsonl";
@@ -39,6 +40,60 @@ describe("Copilot dynamic workflow sessions", () => {
     directories.push(root);
     return root;
   };
+
+  it("collects exact per-agent accounting and attribution metadata into the unified file", () => {
+    const root = temporaryRoot();
+    const modelMetric = (count, totalNanoAiu) => ({
+      requests: { count, cost: 0 },
+      usage: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 20, cacheWriteTokens: 30 },
+      totalNanoAiu,
+    });
+    const agentMetrics = {
+      main: { totalNanoAiu: 389122000000, modelMetrics: { opus: modelMetric(41, 389122000000) } },
+      research: { agentName: "research", agentDisplayName: "routing-research", totalNanoAiu: 494207000000, modelMetrics: { opus: modelMetric(45, 494207000000) } },
+      explore: { agentName: "explore", agentDisplayName: "routing-explore", totalNanoAiu: 9141000000, modelMetrics: { opus: modelMetric(3, 9141000000) } },
+    };
+    const native = [
+      { type: "session.start", data: { sessionId: "root", selectedModel: "opus", reasoningEffort: "xhigh" } },
+      {
+        type: "subagent.started",
+        agentId: "research",
+        data: {
+          toolCallId: "research-call",
+          agentName: "research",
+          agentDisplayName: "routing-research",
+          agentType: "built-in",
+          model: "opus",
+          modelSelectionSource: "agent_definition_default",
+          executionMode: "background",
+          agentDescription: "PRIVATE_PROMPT",
+        },
+      },
+      { type: "subagent.configured", agentId: "research", data: { model: "opus", reasoningEffort: "xhigh" } },
+      { type: "subagent.started", agentId: "explore", data: { parentId: "research", toolCallId: "explore-call", agentName: "explore", agentDisplayName: "routing-explore", model: "opus", executionMode: "sync" } },
+      { type: "subagent.configured", agentId: "explore", data: { model: "opus", reasoningEffort: "low" } },
+      { type: "session.model_change", agentId: "explore", data: { newModel: "opus", reasoningEffort: "low", source: "agent" } },
+      { type: "assistant.message", agentId: "explore", data: { content: "Done", model: "opus", apiCallId: "api-1", interactionId: "interaction-1", turnId: "turn-1", parentToolCallId: "explore-call", toolRequests: [] } },
+      { type: "subagent.completed", agentId: "explore", data: { model: "opus", firstDispatchedModel: "opus", totalTokens: 110, totalToolCalls: 1, durationMs: 100 } },
+      { type: "session.shutdown", data: { agentMetrics } },
+    ];
+    const parsed = parseCopilotLog(serialize(native)).logEntries;
+    expect(parsed.find(event => event.type === "session.result").data.agentMetrics).toEqual(agentMetrics);
+    const file = path.join(root, nativePath);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, serialize(native));
+    const events = JSON.parse(JSON.stringify(collectUnifiedSession({ rootDir: root, engine: "copilot" }).events));
+    expect(events.find(event => event.type === "session.init").data).toMatchObject({ model: "opus", reasoningEffort: "xhigh" });
+    expect(events.find(event => event.type === "subagent.started" && event.agentId === "research").data).toMatchObject({ agentType: "built-in", modelSelectionSource: "agent_definition_default", executionMode: "background" });
+    expect(events.find(event => event.type === "subagent.started" && event.agentId === "explore").data.parentId).toBe("research");
+    expect(events.find(event => event.type === "subagent.configured" && event.agentId === "explore").data.reasoningEffort).toBe("low");
+    expect(events.find(event => event.type === "assistant.message").data).toMatchObject({ model: "opus", apiCallId: "api-1", interactionId: "interaction-1", turnId: "turn-1", parentToolCallId: "explore-call" });
+    expect(events.find(event => event.type === "subagent.completed").data.firstDispatchedModel).toBe("opus");
+    expect(events.find(event => event.type === "session.result").data.agentMetrics).toEqual(agentMetrics);
+    expect(events.find(event => event.type === "subagent.started").data).not.toHaveProperty("agentDescription");
+    const validate = createSessionValidator("unified").event;
+    for (const event of events) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+  });
 
   it("retains native lifecycle signals and correlates subagents without conflating workflow accounting with session usage", () => {
     const original = structuredClone(lifecycle);

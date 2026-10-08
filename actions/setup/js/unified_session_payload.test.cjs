@@ -104,7 +104,7 @@ describe("essential unified session payloads", () => {
     };
     const original = structuredClone(message);
     const compact = normalizeUnifiedSessionEvent(message);
-    expect(compact).toEqual({ type: "assistant.message", id: "message", parentId: null, timestamp: message.timestamp, data: { content } });
+    expect(compact).toEqual({ type: "assistant.message", id: "message", parentId: null, timestamp: message.timestamp, data: { content, model: "duplicated" } });
     expect(Buffer.byteLength(JSON.stringify(compact))).toBeLessThan(Buffer.byteLength(JSON.stringify(message)) / 2);
     expect(message).toEqual(original);
     expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);

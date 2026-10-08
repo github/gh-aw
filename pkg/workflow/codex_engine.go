@@ -260,7 +260,7 @@ func (e *CodexEngine) GetHarnessScriptName() string {
 
 // GetExecutionSteps returns the GitHub Actions steps for executing Codex
 func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string) []GitHubActionStep {
-	modelConfigured := workflowData.Model != ""
+	modelConfigured := workflowData.Model != "" && !isModelRoutingEnabled(workflowData)
 	firewallEnabled := isFirewallEnabled(workflowData)
 	codexEngineLog.Printf("Building Codex execution steps: workflow=%s, modelConfigured=%v, firewall=%v",
 		workflowData.Name, modelConfigured, firewallEnabled)
@@ -315,6 +315,9 @@ func (e *CodexEngine) codexHarnessScriptName(workflowData *WorkflowData) string 
 
 func (e *CodexEngine) buildCodexCommand(workflowData *WorkflowData, commandName, harnessScriptName string, firewallEnabled bool, modelEnvVar, structuredOutputParam string) string {
 	modelParam := fmt.Sprintf(`${%s:+ --model "$%s"}`, modelEnvVar, modelEnvVar)
+	if isModelRoutingEnabled(workflowData) {
+		modelParam = ""
+	}
 	if workflowData.EngineConfig != nil && codexArgsSelectModel(workflowData.EngineConfig.Args) {
 		modelParam = ""
 	}
@@ -485,23 +488,31 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	applyOptionalEngineToolTimeouts(env, workflowData)
 	applyEngineMaxTurnsEnv(env, workflowData)
 	applyEngineHarnessRetryEnv(env, workflowData)
-	if modelConfigured {
-		if containsExpression(workflowData.Model) {
-			env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpression(modelEnvVar, compilerenv.DefaultModelCodex, constants.CodexDefaultModel)
-		}
-		model := codexModelID(workflowData.Model)
-		codexEngineLog.Printf("Setting %s env var for model: %s", modelEnvVar, model)
-		env[modelEnvVar] = model
-	} else {
-		env[modelEnvVar] = compilerenv.BuildModelOverrideExpression(modelEnvVar, compilerenv.DefaultModelCodex, constants.CodexDefaultModel)
-	}
+	applyCodexModelEnv(env, workflowData, modelConfigured, modelEnvVar)
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, codexEngineLog)
 	if !firewallEnabled && provider == LLMProviderOpenAI && workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != "" {
 		env["OPENAI_BASE_URL"] = "https://" + path.Join(workflowData.EngineConfig.APITarget, "v1")
 	}
 	applyMCPScriptsSecretEnv(env, workflowData)
+	applyModelRoutingEnv(env, workflowData)
 	return env
+}
+
+func applyCodexModelEnv(env map[string]string, workflowData *WorkflowData, modelConfigured bool, modelEnvVar string) {
+	if isModelRoutingEnabled(workflowData) {
+		return
+	}
+	if modelConfigured {
+		if containsExpression(workflowData.Model) {
+			env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)
+		}
+		model := codexModelID(workflowData.Model)
+		codexEngineLog.Printf("Setting %s env var for model: %s", modelEnvVar, model)
+		env[modelEnvVar] = model
+		return
+	}
+	env[modelEnvVar] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)
 }
 
 func (e *CodexEngine) buildCodexExecutionStep(workflowData *WorkflowData, command string, env map[string]string) GitHubActionStep {
