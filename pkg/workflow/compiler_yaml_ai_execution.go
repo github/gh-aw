@@ -572,6 +572,13 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 	// dependencies that the gateway may reference when it starts.
 	c.generatePreAgentSteps(yaml, data)
 
+	for _, step := range generateNVXRuntimeSetupSteps(data) {
+		for _, line := range step {
+			yaml.WriteString(line)
+			yaml.WriteByte('\n')
+		}
+	}
+
 	// Add MCP setup
 	if err := c.generateMCPSetup(yaml, data.Tools, engine, data); err != nil {
 		return nil, fmt.Errorf("MCP setup could not be generated, expected valid tool configuration in the 'tools' section: %w", err)
@@ -643,6 +650,13 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// Add AI execution step using the agentic engine
 	compilerYamlLog.Printf("Generating engine execution steps for %s", engine.GetID())
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)
+
+	if step := generateNVXRuntimeCleanupStep(data); step != nil {
+		for _, line := range step {
+			yaml.WriteString(line)
+			yaml.WriteByte('\n')
+		}
+	}
 
 	// Stop CLI proxy after AWF execution (always runs to ensure cleanup)
 	c.generateStopCliProxyStep(yaml, data)

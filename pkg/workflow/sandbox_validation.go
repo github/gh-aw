@@ -151,6 +151,9 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 	if err := validateSandboxRuntimeProfile(workflowData, agentConfig); err != nil {
 		return err
 	}
+	if err := validateNVXRuntimeConfig(workflowData, agentConfig); err != nil {
+		return err
+	}
 
 	// Validate cloud-hypervisor runtime compatibility
 	if agentConfig != nil && agentConfig.Runtime == AgentRuntimeCloudHypervisor {
