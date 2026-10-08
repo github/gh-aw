@@ -429,6 +429,8 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(listWorkflowRunsForRepo).toHaveBeenCalledWith({ owner: "example", repo: "project", status: "completed", created: ">=2025-02-02T12:00:00.000Z", per_page: 100, page: 1 });
     expect(listWorkflowRunArtifacts).toHaveBeenCalledOnce();
     expect(listWorkflowRunArtifacts).toHaveBeenCalledWith({ owner: "example", repo: "project", run_id: 50, per_page: 100 });
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("GitHub API rate limit level:"));
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"remaining":4000'));
     expect((await scanDailyAIC(fixture([run(1)]))).cacheHits).toBe(1);
   });
 
@@ -472,6 +474,7 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     };
     await expect(restore(cachePath)).rejects.toMatchObject({ status: 403 });
     expect(listWorkflowRunsForRepo).not.toHaveBeenCalled();
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("GitHub API rate limit level:"));
   });
 
   it.each([401, 403, 429])("stops fallback fan-out on HTTP %i", async status => {

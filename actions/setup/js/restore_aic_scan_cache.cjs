@@ -44,8 +44,7 @@ async function listRecentWorkflowRuns(owner, repo, current, repository, defaultB
   return response.data.workflow_runs;
 }
 
-async function mainWithPaths(cachePath = AIC_SCAN_CACHE_FILE_PATH, options = {}) {
-  const budget = createAPIBudget();
+async function restoreWithBudget(cachePath, options, budget) {
   const client = options.createArtifactClient?.() || new DefaultArtifactClient({ onResponse: budget.observe });
   const { owner, repo } = context.repo;
   const repository = `${owner}/${repo}`;
@@ -85,6 +84,15 @@ async function mainWithPaths(cachePath = AIC_SCAN_CACHE_FILE_PATH, options = {})
     }
   }
   core.info("[daily-aic-cache] No trusted scan snapshot found; resolve the complete window from usage artifacts.");
+}
+
+async function mainWithPaths(cachePath = AIC_SCAN_CACHE_FILE_PATH, options = {}) {
+  const budget = createAPIBudget();
+  try {
+    await restoreWithBudget(cachePath, options, budget);
+  } finally {
+    core.info(`[daily-aic-cache] GitHub API rate limit level: ${JSON.stringify(budget.snapshot())}`);
+  }
 }
 
 async function main() {
