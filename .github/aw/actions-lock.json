@@ -177,6 +177,11 @@
       "repo": "safedep/pmg",
       "version": "v1",
       "sha": "5ac0f275b83d9d5a9342c6aae977ec32fa330daa"
+    },
+    "super-linter/super-linter@v9": {
+      "repo": "super-linter/super-linter",
+      "version": "v9",
+      "sha": "2da136927bd4a73596db63044b504547c62cb854"
     }
   },
   "containers": {
