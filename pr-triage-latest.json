@@ -1,9 +1,9 @@
 {
-  "run_date": "2026-10-08T01:04:12Z",
-  "run_id": 37710817767,
+  "run_date": "2026-10-08T06:43:37Z",
+  "run_id": 37738956564,
   "source": "pr-triage-agent",
   "eligible_total": 2,
-  "cooldown_skipped": 2,
+  "cooldown_skipped": 0,
   "category_counts": {
     "bug": 2
   },
@@ -22,10 +22,7 @@
     "fast_track": 1
   },
   "batches": [],
-  "selected_candidates": [
-    56568,
-    66678
-  ],
+  "selected_candidates": [56568, 66678],
   "prs": [
     {
       "number": 56568,
