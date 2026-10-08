@@ -166,7 +166,7 @@ async function writeSkillSummary(skillDir, skills, installedSkillCount, failures
     }
   }
   const openAttr = failures.length > 0 ? " open" : "";
-  core.summary.addRaw(`### Frontmatter skills installed\n\n<details${openAttr}>\n<summary>Skill install details</summary>\n\n${body}\n</details>\n\n`);
+  core.summary.addRaw(`<details${openAttr}>\n<summary>Skill install details</summary>\n\n${body}\n</details>\n\n`);
   await core.summary.write();
 }
 
