@@ -90,6 +90,7 @@ post-steps:
       CONFORMANCE_EXECUTION: ${{ steps.agentic_execution.outcome }}
       CONFORMANCE_ROOT: /tmp/gh-aw/agent/engine-conformance
       CONFORMANCE_STATE: ${{ runner.temp }}/engine-conformance
+      CONFORMANCE_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
     run: |
       set -euo pipefail
       node <<'JS'
@@ -149,6 +150,13 @@ post-steps:
         assert.equal(receipt.fileNonce, expected.fileNonce);
         assert.match(receipt.toolNonce, /^[a-f0-9]{48}$/);
         assert.equal(result.toolNonce, receipt.toolNonce);
+      });
+      check("staged-safe-output", () => {
+        const file = process.env.CONFORMANCE_SAFE_OUTPUTS;
+        assert.ok(file, "Safe-output evidence path is required");
+        assert.deepEqual(read(path.dirname(file), path.basename(file)), {
+          type: "noop", message: "Conformance probes completed",
+        });
       });
       const passed = checks.every(item => item.status === "passed");
       const report = { engine: process.env.CONFORMANCE_ENGINE, status: passed ? "passed" : "failed", checks };

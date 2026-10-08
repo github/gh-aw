@@ -88,7 +88,8 @@ function parseAgyLog(content) {
         }
       }
     } else {
-      const usage = {};
+      const previous = results.get(conversation)?.data;
+      const usage = { ...previous?.usage };
       for (const [native, canonical] of [
         ["input_tokens", "input_tokens"],
         ["output_tokens", "output_tokens"],
@@ -110,8 +111,8 @@ function parseAgyLog(content) {
       const data = {
         status: completed ? "completed" : ["CANCELED", "INTERRUPTED"].includes(body.status) ? "interrupted" : "error",
         nativeStatus: body.status,
-        ...(isTokenCount(body.num_turns) ? { numTurns: body.num_turns } : {}),
-        ...(isMetric(body.duration_seconds) ? { durationMs: body.duration_seconds * 1000 } : {}),
+        ...(isTokenCount(body.num_turns) ? { numTurns: body.num_turns } : previous?.numTurns !== undefined ? { numTurns: previous.numTurns } : {}),
+        ...(isMetric(body.duration_seconds) ? { durationMs: body.duration_seconds * 1000 } : previous?.durationMs !== undefined ? { durationMs: previous.durationMs } : {}),
         ...(Object.keys(usage).length ? { usage } : {}),
         ...(errors.length ? { errors } : {}),
       };

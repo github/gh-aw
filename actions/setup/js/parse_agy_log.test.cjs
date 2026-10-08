@@ -70,4 +70,27 @@ describe("native Agy session parser", () => {
     expect(terminal[0].data).toMatchObject({ status: "error", numTurns: 2, usage: { input_tokens: 100, output_tokens: 20, reasoning_output_tokens: 8 } });
     expect(parsed.logEntries.some(event => event.type === "session.error")).toBe(true);
   });
+
+  it.each([{}, { usage: { output_tokens: 25, input_tokens: -1, thinking_tokens: "invalid" } }])("carries forward each valid cumulative metric when a later error omits or invalidates it: %j", snapshot => {
+    const parsed = parseAgyLog(jsonl([init, result({ num_turns: 2, duration_seconds: 1.5, usage }), result({ status: "ERROR", error: "latest failure", num_turns: -1, duration_seconds: -1, ...snapshot })]));
+    const terminal = parsed.logEntries.filter(event => event.type === "session.result");
+    expect(terminal).toHaveLength(1);
+    expect(terminal[0].data).toMatchObject({
+      status: "error",
+      nativeStatus: "ERROR",
+      errors: ["latest failure"],
+      numTurns: 2,
+      durationMs: 1500,
+      usage: { input_tokens: 100, output_tokens: snapshot.usage?.output_tokens ?? 20, reasoning_output_tokens: 8, cache_read_input_tokens: 30, total_tokens: 120 },
+    });
+  });
+
+  it("does not carry usage across conversations or carry errors into later successes", () => {
+    const parsed = parseAgyLog(jsonl([init, result({ usage, error: "old error", status: "ERROR" }), result({ usage: { input_tokens: 110 } }), { ...result({}), conversation_id: "other" }]));
+    const terminals = parsed.logEntries.filter(event => event.type === "session.result");
+    expect(terminals).toHaveLength(2);
+    expect(terminals[0].data).toMatchObject({ status: "completed", usage: { input_tokens: 110, output_tokens: 20 } });
+    expect(terminals[0].data).not.toHaveProperty("errors");
+    expect(terminals[1].data).not.toHaveProperty("usage");
+  });
 });

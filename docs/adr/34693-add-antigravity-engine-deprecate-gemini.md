@@ -33,6 +33,8 @@ Initial support is native Linux x64 v1.3.1, with a checksum-verified archive and
 executable-version verification. A custom executable must report the same
 verified version. Other static version pins fail rather than silently running
 v1.3.1. The initial model is the native slug `gemini-3.8-flash-medium`.
+Custom commands are separately trusted executables: version validation applies,
+but the default installer's archive checksum does not attest their bytes.
 
 Authentication requires `GEMINI_API_KEY` and private per-run
 `~/.gemini/antigravity-cli/settings.json` containing `modelProvider: gemini`.
@@ -47,7 +49,9 @@ Existing Gemini target names, endpoints, ports and authentication remain intact.
 
 The harness sends literal NDJSON input on stdin, invokes the native binary with
 an argument array, isolates settings, and bounds execution with the native
-timeout, a watchdog and signal escalation. Missing or unsuccessful results,
+timeout, a watchdog and signal escalation.
+Native execution uses an isolated process group with bounded pipe draining so
+descendants cannot prevent settings cleanup. Missing or unsuccessful results,
 denials, interruption, pending tools and missing positive inference evidence
 fail execution even if the native exit code is zero.
 
@@ -63,7 +67,8 @@ security boundary. Unsupported command restrictions, disabled native tools and
 overrides of the verified headless profile must fail explicitly. Native events
 are normalized by the same parser for Actions and embedded local CLI
 reconstruction. Repeated cumulative result usage must not be added together,
-and absent metrics must remain absent.
+and each field retains its latest valid value across partial/error snapshots.
+Never-reported metrics remain absent; status and errors remain current.
 
 ## Gemini compatibility and release gate
 
@@ -90,6 +95,9 @@ CLI-mounted MCP and staged safe outputs. The manual
 Credentials Check calls the feature-branch `agy-conformance-reusable.lock.yml`.
 Both entry points import `shared/agy-conformance.md`, preserving one copy of the
 native/shared probes and prompt without importing a trigger-bearing workflow.
+Both checkers require the exact staged noop receipt. The Gemini-key-only gate
+disables the unrelated Copilot threat-detection job directly in each entry point;
+its native/shared checks and execution budgets remain mandatory.
 Production conformance
 has not passed; no Gemini deprecation notice or release changeset is enabled by
 this implementation checkpoint.

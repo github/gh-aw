@@ -152,12 +152,31 @@ engine:
             "--print-timeout", "5m", "--model", model, "--dangerously-skip-permissions"];
           log(`verified experimental Agy ${version}`);
           await new Promise((resolve, reject) => {
-            const child = spawn(binary, args, { cwd: env.GH_AW_ENGINE_CWD || workspace, env, stdio: ["pipe", "pipe", "pipe"] });
-            let buffer = "", stderrTail = "", result, invalid = false, denied = false, interrupted = false, timedOut = false, escalation;
+            const child = spawn(binary, args, { cwd: env.GH_AW_ENGINE_CWD || workspace, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+            let buffer = "", stderrTail = "", result, invalid = false, denied = false, interrupted = false, timedOut = false, settled = false, escalation, drain;
             const pendingTools = new Set();
+            const signalGroup = signal => {
+              if (!child.pid) return;
+              try { process.kill(-child.pid, signal); }
+              catch (error) {
+                if (error.code !== "ESRCH") {
+                  invalid = true;
+                  log(`Agy process group termination failed (${error.code})`);
+                  child.kill(signal);
+                }
+              }
+            };
             const terminate = signal => {
-              child.kill(signal);
-              escalation ??= setTimeout(() => child.kill("SIGKILL"), 1000);
+              if (settled) return;
+              signalGroup(signal);
+              escalation ??= setTimeout(() => signalGroup("SIGKILL"), 1000);
+              drain ??= setTimeout(() => {
+                invalid = true;
+                child.stdin.destroy();
+                child.stdout.destroy();
+                child.stderr.destroy();
+                complete(child.exitCode, child.signalCode);
+              }, 1500);
             };
             const onInterrupt = () => { interrupted = true; terminate("SIGINT"); };
             const onTerminate = () => { interrupted = true; terminate("SIGTERM"); };
@@ -192,15 +211,21 @@ engine:
               if (/soft[- ]denied|permission[^\n]*denied|requires approval/i.test(stderrTail)) denied = true;
               process.stderr.write(chunk);
             });
-            child.stdin.on("error", error => { if (error.code !== "EPIPE") terminate("SIGTERM"); });
+            child.stdin.on("error", error => {
+              if (error.code !== "EPIPE") { invalid = true; terminate("SIGTERM"); }
+            });
             const cleanup = () => {
+              signalGroup("SIGKILL");
               clearTimeout(timer);
               clearTimeout(escalation);
+              clearTimeout(drain);
               process.removeListener("SIGINT", onInterrupt);
               process.removeListener("SIGTERM", onTerminate);
             };
-            child.once("error", () => { cleanup(); reject(new Error("Agy executable could not be started")); });
-            child.once("close", (code, signal) => {
+            child.once("error", () => { if (settled) return; settled = true; cleanup(); reject(new Error("Agy executable could not be started")); });
+            const complete = (code, signal) => {
+              if (settled) return;
+              settled = true;
               cleanup();
               line(buffer);
               const inferred = Number.isSafeInteger(result?.num_turns) && result.num_turns > 0 &&
@@ -212,7 +237,9 @@ engine:
                 }
                 reject(new Error("Agy run failed, was denied, interrupted, or lacked completed inference"));
               } else resolve();
-            });
+            };
+            child.once("exit", () => terminate("SIGTERM"));
+            child.once("close", complete);
             child.stdin.end(JSON.stringify({ event: "user", message: { content: prompt } }) + "\n");
           });
         } finally {

@@ -47,12 +47,17 @@ Other releases and architectures are not supported. A custom `engine.command`
 must report the same verified version. Installation and settings are temporary
 and removed after execution; no inherited user authentication profile is used.
 
+The archive checksum applies to the default installer only. `engine.command`
+selects a separately trusted executable; its version is checked, but its bytes
+are not attested by that archive checksum.
+
 ## Tools, configuration and limits
 
 Agy consumes native streaming JSON input from stdin, keeping prompts out of
 command arguments. Native streaming events are normalized into session artifacts;
 repeated cumulative usage snapshots are not added together. Missing metrics
-remain absent.
+retain their last valid value when a later result omits them; metrics never
+reported remain absent. Status and errors come from the current result.
 
 Configured HTTP MCP servers are translated from the gh-aw gateway into
 owner-only `.agents/mcp_config.json`, using native `serverUrl` entries and
@@ -67,6 +72,8 @@ not as the security boundary. Per-command bash restrictions, `bash: false`,
 empty bash allowlists, and disabling native editing or web tools are rejected
 rather than silently ignored. The fixed native timeout is five minutes, with
 a wrapper watchdog and the Actions step timeout as additional bounds.
+Cancellation and timeout signal the isolated native process group, escalate to
+SIGKILL, and bound pipe draining so tool descendants cannot stall cleanup.
 Permission denials, pending tool executions, interruption and non-success
 native results fail execution even when the CLI exits zero. Successful execution
 also requires a completed native turn with positive input and output token usage.
@@ -93,6 +100,10 @@ outputs. It remains dispatch-only; Credentials Check calls the feature-branch
 `agy-conformance-reusable.lock.yml`, compiled from the same shared probes and
 prompt. Release and Gemini deprecation are gated on that production path, not
 on mocked tests or native authentication alone.
+
+Both checkers require the exact staged noop receipt, not an empty output file.
+The Agy gate explicitly disables the separate Copilot threat-detection job;
+it forwards only the Gemini key and retains its own bounded, read-only checks.
 
 See the [engine reference](/gh-aw/reference/engines/) and
 [authentication reference](/gh-aw/reference/auth/).

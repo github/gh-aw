@@ -91,6 +91,12 @@ func TestEngineConformanceJavaScript(t *testing.T) {
 		{name: "modified fixture", execution: "success", mutate: `fs.writeFileSync(path.join(root, "input.json"), "{}");`, wantFailed: "fixtures"},
 		{name: "oversized result", execution: "success", mutate: `fs.writeFileSync(resultPath, " ".repeat(16385));`, wantFailed: "result-schema"},
 		{name: "symlink result", execution: "success", mutate: `fs.renameSync(resultPath, resultPath + ".real"); fs.symlinkSync(resultPath + ".real", resultPath);`, wantFailed: "result-schema"},
+		{name: "missing safe output", execution: "success", mutate: `fs.unlinkSync(process.env.CONFORMANCE_SAFE_OUTPUTS);`, wantFailed: "staged-safe-output"},
+		{name: "empty safe-output placeholder", execution: "success", mutate: `fs.writeFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, "");`, wantFailed: "staged-safe-output"},
+		{name: "wrong safe-output type", execution: "success", mutate: `fs.writeFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, JSON.stringify({ type: "missing_tool", message: "Conformance probes completed" }));`, wantFailed: "staged-safe-output"},
+		{name: "wrong noop message", execution: "success", mutate: `fs.writeFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, JSON.stringify({ type: "noop", message: "guessed" }));`, wantFailed: "staged-safe-output"},
+		{name: "duplicate noop", execution: "success", mutate: `fs.appendFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, fs.readFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS));`, wantFailed: "staged-safe-output"},
+		{name: "symlink safe output", execution: "success", mutate: `fs.renameSync(process.env.CONFORMANCE_SAFE_OUTPUTS, process.env.CONFORMANCE_SAFE_OUTPUTS + ".real"); fs.symlinkSync(process.env.CONFORMANCE_SAFE_OUTPUTS + ".real", process.env.CONFORMANCE_SAFE_OUTPUTS);`, wantFailed: "staged-safe-output"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -102,6 +108,7 @@ func TestEngineConformanceJavaScript(t *testing.T) {
 				"CONFORMANCE_STATE=" + host, "CONFORMANCE_EXECUTION=" + test.execution,
 				"ENGINE_CONFORMANCE_SENTINEL=conformance-copilot",
 				"GITHUB_STEP_SUMMARY=" + filepath.Join(directory, "summary.md"),
+				"CONFORMANCE_SAFE_OUTPUTS=" + filepath.Join(host, "safeoutputs.jsonl"),
 			}
 			output, err := runConformanceNode(t, env, "-e", prepare)
 			require.NoError(t, err, "%s", output)
@@ -125,6 +132,10 @@ async function execute(file_nonce) {
   const resultPath = path.join(root, "result.json");
   const save = () => fs.writeFileSync(resultPath, JSON.stringify(result));
   save();
+  const { createHandlers } = require("../../actions/setup/js/safe_outputs_handlers.cjs");
+  const { createAppendFunction } = require("../../actions/setup/js/safe_outputs_append.cjs");
+  createHandlers({ debug() {} }, createAppendFunction(process.env.CONFORMANCE_SAFE_OUTPUTS))
+    .defaultHandler("noop")({ message: "Conformance probes completed" });
   ` + test.mutate + `
 })().catch(error => { console.error(error); process.exitCode = 1; });
 `
@@ -141,7 +152,7 @@ async function execute(file_nonce) {
 				} `json:"checks"`
 			}
 			require.NoError(t, json.Unmarshal(reportContent, &report))
-			require.Len(t, report.Checks, 7)
+			require.Len(t, report.Checks, 8)
 			if test.wantFailed == "" {
 				require.NoError(t, err, "%s", output)
 				require.Equal(t, "passed", report.Status)
@@ -155,6 +166,53 @@ async function execute(file_nonce) {
 					}
 				}
 				require.True(t, found, "%s should fail: %s", test.wantFailed, reportContent)
+			}
+		})
+	}
+}
+
+func TestAgyNativeConformanceRequiresStagedNoop(t *testing.T) {
+	var suite conformanceSuite
+	readConformanceFrontmatter(t, "../../.github/workflows/shared/agy-conformance.md", &suite)
+	verify := conformanceNodeScript(t, suite.PostSteps[0].Run)
+	for _, item := range []struct {
+		name, output string
+		passed       bool
+	}{
+		{"exact noop", `{"type":"noop","message":"Conformance probes completed"}` + "\n", true},
+		{"empty placeholder", "", false},
+		{"wrong type", `{"type":"missing_tool","message":"Conformance probes completed"}`, false},
+		{"wrong message", `{"type":"noop","message":"guessed"}`, false},
+		{"duplicate noop", `{"type":"noop","message":"Conformance probes completed"}` + "\n" + `{"type":"noop","message":"Conformance probes completed"}`, false},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			dir := t.TempDir()
+			logPath := filepath.Join(dir, "native.jsonl")
+			outputPath := filepath.Join(dir, "outputs.jsonl")
+			for name, content := range map[string]string{
+				"expected.json":       `{"fileNonce":"fixture"}`,
+				"native-receipt.json": `{"fileNonce":"fixture","toolNonce":"` + strings.Repeat("a", 48) + `"}`,
+				"outputs.jsonl":       item.output,
+				"native.jsonl": `{"event":"init","init":{"model":"gemini-3.8-flash-medium"}}
+	{"event":"step_update","step_update":{"step_type":"tool","tool_info":{"name":"agy_native_native_challenge"}}}
+	{"event":"result","result":{"status":"SUCCESS","num_turns":1,"usage":{"input_tokens":10,"output_tokens":2}}}`,
+			} {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
+			}
+			encodedPath, err := json.Marshal(logPath)
+			require.NoError(t, err)
+			script := strings.ReplaceAll(verify, `"/tmp/gh-aw/agent-stdio.log"`, string(encodedPath))
+			out, err := runConformanceNode(t, []string{"CONFORMANCE_STATE=" + dir, "CONFORMANCE_SAFE_OUTPUTS=" + outputPath}, "-e", script)
+			reportPath := filepath.Join(dir, "native-report.json")
+			if item.passed {
+				require.NoError(t, err, "%s", out)
+				report, readErr := os.ReadFile(reportPath)
+				require.NoError(t, readErr)
+				require.Contains(t, string(report), `"stagedSafeOutputs": true`)
+			} else {
+				require.Error(t, err, "%s", out)
+				_, statErr := os.Stat(reportPath)
+				require.True(t, os.IsNotExist(statErr), "invalid noop evidence must not produce a passing native report")
 			}
 		})
 	}

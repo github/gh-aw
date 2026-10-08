@@ -22,6 +22,7 @@ engine:
     ENGINE_CONFORMANCE_SENTINEL: conformance-agy
 safe-outputs:
   staged: true
+  threat-detection: false
   activation-comments: false
   report-failure-as-issue: false
   report-failed-jobs: false

@@ -52,6 +52,7 @@ func TestAgyCompilerSelectionAndRestrictions(t *testing.T) {
 	}{
 		{"short form", "agy", "bash: [\"*\"]", ""},
 		{"object form", "\n  id: agy\n  model: gemini-3.8-flash-medium", "bash: [\"*\"]", ""},
+		{"custom trusted executable", "\n  id: agy\n  command: /opt/trusted/agy", "bash: [\"*\"]", ""},
 		{"WIF", "\n  id: agy\n  auth:\n    type: github-oidc\n    provider: gcp\n    workload-identity-provider: projects/1/locations/global/workloadIdentityPools/test/providers/test\n    service-account: test@example.iam.gserviceaccount.com", "bash: [\"*\"]", "Retain engine: gemini"},
 		{"extra CLI arguments", "\n  id: agy\n  args: [\"--prompt\", \"override\"]", "bash: [\"*\"]", "headless profile"},
 		{"custom harness", "\n  id: agy\n  harness: custom.cjs", "bash: [\"*\"]", "engine.harness"},
@@ -82,6 +83,10 @@ func TestAgyCompilerSelectionAndRestrictions(t *testing.T) {
 			assert.Contains(t, string(lock), "GH_AW_AGY_MODEL: gemini-3.8-flash-medium")
 			assert.Contains(t, string(lock), "--exclude-env GEMINI_API_KEY")
 			assert.Contains(t, string(lock), `"gemini"`)
+			if tt.name == "custom trusted executable" {
+				assert.Contains(t, string(lock), "agy_harness.cjs /opt/trusted/agy")
+				assert.NotContains(t, string(lock), "agy_harness.cjs agy'")
+			}
 		})
 	}
 }
@@ -103,6 +108,20 @@ func TestAgyUsesExistingGeminiProviderTarget(t *testing.T) {
 	assert.Equal(t, []string{"gemini-proxy.example"}, getEngineAPIHosts(data, engine))
 	assert.Equal(t, DefaultGeminiAPITarget, GetGeminiAPITarget(data, "gemini"), "Agy endpoint configuration must not change Gemini behavior")
 	assert.Equal(t, DefaultGeminiAPITarget, GetGeminiAPITarget(nil, "agy"))
+}
+
+func TestBehaviorDefinedUnknownInferenceHostsPreservePriorBehavior(t *testing.T) {
+	definition := *agyDefinition(t)
+	behaviors := *definition.Behaviors
+	behaviors.SecretStrategy = behaviorSecretStrategyUniversalLLMConsumer
+	definition.Behaviors = &behaviors
+	engine, err := NewBehaviorDefinedEngine(&definition)
+	require.NoError(t, err)
+	assert.Nil(t, getEngineAPIHosts(nil, engine), "installation and infrastructure domains are not inference hosts")
+	data := &WorkflowData{EngineConfig: &EngineConfig{APITarget: "explicit.example"}}
+	assert.Equal(t, []string{"explicit.example"}, getEngineAPIHosts(data, engine))
+	assert.IsType(t, &PiEngine{}, NewPiEngine(), "Pi retains its dedicated runtime")
+	assert.Nil(t, getEngineAPIHosts(nil, NewPiEngine()), "Pi's unknown-host behavior is unchanged")
 }
 
 func TestAgyCLIOverrideUsesBuiltInDefaults(t *testing.T) {
@@ -170,7 +189,8 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 			assert.Contains(t, string(lock), `"maxAiCredits":5`)
 			assert.Contains(t, string(lock), `"maxCacheMisses":12`)
 			assert.Contains(t, string(lock), `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
-			assert.Contains(t, string(lock), `"threat_detection":{"mode":"enabled"}`)
+			assert.Contains(t, string(lock), `"threat_detection":{"mode":"disabled"}`)
+			assert.NotContains(t, callee.Jobs, "detection")
 			assertAgyConformanceProbes(t, callee)
 		})
 	}

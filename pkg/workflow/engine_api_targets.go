@@ -313,6 +313,8 @@ func getEngineAPIHosts(data *WorkflowData, engine CodingAgentEngine) []string {
 		if typedEngine.behavior().SecretStrategy == behaviorSecretStrategyGeminiAPIKey {
 			return []string{GetGeminiAPITarget(data, engine.GetID())}
 		}
+		// Preserve unknown-host behavior for other strategies: declarative network
+		// defaults include installation/infrastructure hosts, not just inference.
 		return nil
 	case *CopilotEngine:
 		// Return the full set of known Copilot inference endpoints so that any variant

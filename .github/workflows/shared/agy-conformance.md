@@ -34,6 +34,7 @@ post-steps:
     if: always()
     env:
       CONFORMANCE_STATE: ${{ runner.temp }}/engine-conformance
+      CONFORMANCE_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
     run: |
       set -euo pipefail
       node <<'JS'
@@ -57,6 +58,13 @@ post-steps:
       assert.ok(terminal?.usage?.input_tokens > 0);
       assert.ok(terminal?.usage?.output_tokens > 0);
       assert.ok(entries.some(entry => entry.event === "init" && entry.init?.model === "gemini-3.8-flash-medium"));
+      const outputs = process.env.CONFORMANCE_SAFE_OUTPUTS;
+      assert.ok(outputs, "Safe-output evidence path is required");
+      const outputStat = fs.lstatSync(outputs);
+      assert.ok(outputStat.isFile() && !outputStat.isSymbolicLink() && outputStat.size <= 16384);
+      assert.deepEqual(JSON.parse(fs.readFileSync(outputs, "utf8")), {
+        type: "noop", message: "Conformance probes completed",
+      });
       const usage = {};
       for (const name of ["input_tokens", "output_tokens", "thinking_tokens", "cache_read_tokens", "total_tokens"]) {
         const count = terminal.usage[name];
@@ -66,7 +74,7 @@ post-steps:
         }
       }
       fs.writeFileSync(path.join(host, "native-report.json"),
-        JSON.stringify({ status: "passed", nativeMCP: true, inference: true, usage }, null, 2),
+        JSON.stringify({ status: "passed", nativeMCP: true, inference: true, stagedSafeOutputs: true, usage }, null, 2),
         { mode: 0o600 });
       JS
   - name: Upload native Agy conformance evidence

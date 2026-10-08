@@ -64,17 +64,38 @@ function summarizeEvents(events) {
 
 function runCLI({ binary, args, input = "", env, cwd, timeoutMs = 50000 }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, args, { env, cwd, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(binary, args, { env, cwd, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "",
       stderr = "",
       bytes = 0,
       timedOut = false,
       outputLimit = false,
-      interrupted = false;
-    let escalation;
+      interrupted = false,
+      settled = false;
+    let escalation, drain;
+    const signalGroup = signal => {
+      if (!child.pid) return;
+      try {
+        process.kill(-child.pid, signal);
+      } catch (error) {
+        if (error.code !== "ESRCH") {
+          interrupted = true;
+          process.stderr.write(`Native process group termination failed (${error.code})\n`);
+          child.kill(signal);
+        }
+      }
+    };
     const terminate = signal => {
-      child.kill(signal);
-      escalation ??= setTimeout(() => child.kill("SIGKILL"), 1000);
+      if (settled) return;
+      signalGroup(signal);
+      escalation ??= setTimeout(() => signalGroup("SIGKILL"), 1000);
+      drain ??= setTimeout(() => {
+        timedOut = true;
+        child.stdin.destroy();
+        child.stdout.destroy();
+        child.stderr.destroy();
+        complete(child.exitCode, child.signalCode);
+      }, 1500);
     };
     const onInterrupt = () => {
       interrupted = true;
@@ -103,21 +124,32 @@ function runCLI({ binary, args, input = "", env, cwd, timeoutMs = 50000 }) {
     child.stdout.setEncoding("utf8").on("data", chunk => collect("stdout", chunk));
     child.stderr.setEncoding("utf8").on("data", chunk => collect("stderr", chunk));
     const cleanup = () => {
+      signalGroup("SIGKILL");
       clearTimeout(timer);
       clearTimeout(escalation);
+      clearTimeout(drain);
       process.removeListener("SIGINT", onInterrupt);
       process.removeListener("SIGTERM", onTerminate);
     };
     child.once("error", () => {
+      if (settled) return;
+      settled = true;
       cleanup();
       reject(new ProbeError("Native executable could not be started"));
     });
-    child.once("close", (code, signal) => {
+    const complete = (code, signal) => {
+      if (settled) return;
+      settled = true;
       cleanup();
       resolve({ code, signal, stdout, stderr, timedOut, outputLimit, interrupted });
-    });
+    };
+    child.once("exit", () => terminate("SIGTERM"));
+    child.once("close", complete);
     child.stdin.on("error", error => {
-      if (error.code !== "EPIPE") terminate("SIGTERM");
+      if (error.code !== "EPIPE") {
+        interrupted = true;
+        terminate("SIGTERM");
+      }
     });
     child.stdin.end(input);
   });

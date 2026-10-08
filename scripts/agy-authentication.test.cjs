@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
+const { spawnSync } = require("node:child_process");
 const { VERSION, parseEvents, summarizeEvents, runCLI, runProbe } = require("./agy-authentication.cjs");
 
 const eventResult = result => JSON.stringify({ event: "result", result }) + "\n";
@@ -114,3 +115,46 @@ test("child runner bounds hung processes and oversized output", async () => {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+for (const detached of [false, true]) {
+  for (const earlyExit of [false, true]) {
+    test(`child runner bounds inherited output pipes (${detached ? "escaped group" : "native process group"}, ${earlyExit ? "parent exited" : "parent hung"})`, async () => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), "agy-descendant-test-"));
+      const receipt = path.join(directory, "descendant.json");
+      let pid;
+      try {
+        const body = `
+        const { spawn } = require("node:child_process");
+        const fs = require("node:fs");
+        const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"], {
+          detached: ${detached}, stdio: ["ignore", "inherit", "inherit"]
+        });
+        fs.writeFileSync(${JSON.stringify(receipt)}, JSON.stringify({ pid: child.pid }));
+        process.on("SIGTERM", () => {});
+        ${earlyExit ? "process.exit(0);" : ""}
+        setInterval(() => {}, 1000);
+      `;
+        const start = Date.now();
+        const result = await runCLI({ binary: process.execPath, args: ["-e", body], env: {}, cwd: directory, timeoutMs: 250 });
+        pid = JSON.parse(fs.readFileSync(receipt, "utf8")).pid;
+        assert.equal(result.timedOut, !earlyExit || detached);
+        assert.ok(Date.now() - start < 2500, "A pipe holder must not extend the wall-time bound");
+        if (earlyExit) assert.equal(result.code, 0);
+        else assert.notEqual(result.code, 0);
+        if (!detached) {
+          const state = spawnSync("ps", ["-p", String(pid), "-o", "stat="], { encoding: "utf8" }).stdout.trim();
+          assert.ok(!state || state.startsWith("Z"), "The native process group must have no live descendant");
+        }
+      } finally {
+        if (pid) {
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch (error) {
+            if (error.code !== "ESRCH") throw error;
+          }
+        }
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  }
+}

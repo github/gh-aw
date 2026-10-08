@@ -9,7 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -138,6 +140,81 @@ process.kill(process.ppid, "SIGINT");`
 		require.Contains(t, string(out), `"input_tokens":10`)
 		require.Contains(t, string(out), "session.error")
 	})
+}
+
+func TestAgyHarnessBoundsDescendantPipes(t *testing.T) {
+	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
+	for _, detached := range []bool{false, true} {
+		for _, earlyExit := range []bool{false, true} {
+			t.Run("detached="+strconv.FormatBool(detached)+"/early-exit="+strconv.FormatBool(earlyExit), func(t *testing.T) {
+				exit := ""
+				if earlyExit {
+					exit = `console.log(JSON.stringify({event:"result",result:{status:"SUCCESS",num_turns:1,usage:{input_tokens:10,output_tokens:2}}}));
+process.exit(0);`
+				}
+				body := `const { spawn } = require("node:child_process");
+const fs = require("node:fs");
+const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"],
+  { detached: ` + strconv.FormatBool(detached) + `, stdio: ["ignore", "inherit", "inherit"] });
+fs.writeFileSync(process.env.GITHUB_WORKSPACE + "/descendant.json", JSON.stringify({ pid: child.pid, home: process.env.HOME }));
+process.on("SIGTERM", () => {});
+` + exit + `
+setInterval(() => {}, 1000);`
+				cmd, dir := agyHarnessCommand(t, body, validReflect)
+				shim := filepath.Join(dir, "bounded-watchdog.cjs")
+				require.NoError(t, os.WriteFile(shim, []byte(`const original = global.setTimeout;
+global.setTimeout = (callback, delay, ...args) => original(callback, delay === 305000 ? 250 : delay === 1000 ? 50 : delay === 1500 ? 150 : delay, ...args);
+`), 0o600))
+				cmd.Args = slices.Insert(cmd.Args, 1, "--require", shim)
+				start := time.Now()
+				out, err := cmd.CombinedOutput()
+				if earlyExit && !detached {
+					require.NoError(t, err, "%s", out)
+				} else {
+					require.Error(t, err)
+					assert.Contains(t, string(out), "session.error")
+				}
+				var receipt struct {
+					PID  int    `json:"pid"`
+					Home string `json:"home"`
+				}
+				data, readErr := os.ReadFile(filepath.Join(dir, "descendant.json"))
+				require.NoError(t, readErr)
+				require.NoError(t, json.Unmarshal(data, &receipt))
+				t.Cleanup(func() { _ = syscall.Kill(receipt.PID, syscall.SIGKILL) })
+				assert.Less(t, time.Since(start), 3*time.Second)
+				_, err = os.Stat(receipt.Home)
+				assert.True(t, os.IsNotExist(err), "bounded completion must clean the private settings home")
+				if !detached {
+					state, _ := exec.Command("ps", "-p", strconv.Itoa(receipt.PID), "-o", "stat=").Output()
+					assert.True(t, len(strings.TrimSpace(string(state))) == 0 || strings.HasPrefix(strings.TrimSpace(string(state)), "Z"), "descendant must be terminated")
+				}
+			})
+		}
+	}
+}
+
+func TestAgyHarnessRejectsWrongCustomExecutableVersion(t *testing.T) {
+	cmd, _ := agyHarnessCommand(t, `console.log("must not execute");`, `{"ok":false}`)
+	require.NoError(t, os.WriteFile(cmd.Args[2], []byte("#!/usr/bin/env node\nconsole.log('0.0.0');\n"), 0o700))
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "Agy executable does not match engine.version")
+	assert.NotContains(t, string(out), "must not execute")
+}
+
+func TestAgyEmbeddedScriptsHaveValidSyntax(t *testing.T) {
+	for name, script := range map[string]string{
+		"harness": agyDefinition(t).Behaviors.HarnessScript,
+		"adapter": agyDefinition(t).Behaviors.MCP.ConfigAdapter,
+	} {
+		t.Run(name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), name+".cjs")
+			require.NoError(t, os.WriteFile(file, []byte(script), 0o600))
+			out, err := exec.Command("node", "--check", file).CombinedOutput()
+			require.NoError(t, err, "%s", out)
+		})
+	}
 }
 
 func TestAgyMCPConfigurationAdapter(t *testing.T) {
