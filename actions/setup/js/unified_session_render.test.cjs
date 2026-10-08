@@ -98,7 +98,10 @@ describe("unified session publication views", () => {
     expect(trace).toEqual(original);
     const markdown = generateCopilotCliStyleSummary(trace);
     expect(markdown).toContain("Done &lt;details&gt;");
-    expect(markdown).toContain("<details><summary>Unified trace details</summary>");
+    expect(markdown).toContain("<details><summary>Unified session</summary>");
+    expect(markdown).not.toContain("### Unified session");
+    expect(markdown).not.toContain("=== Unified session ===");
+    expect(markdown).not.toContain("| Time |");
   });
 
   it.each(["completed", "failed", "stopped"])("distinguishes a Workflow launch from task status %s and renders progress without embedded prompts", status => {
@@ -341,7 +344,7 @@ describe("unified session publication views", () => {
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("mcp.tool_call"));
     const output = fs.readFileSync(summary, "utf8");
     expect(output.startsWith("Earlier summary\n")).toBe(true);
-    expect(output).toContain("### Unified session");
+    expect(output.match(/<summary>Unified session<\/summary>/g)).toHaveLength(1);
     expect(output).toContain("mcp.tool_call");
   });
 

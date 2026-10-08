@@ -46,7 +46,7 @@ describe("Session CLI adapter", () => {
     ]);
     const file = write("usage/aw_session.jsonl", sessionCLI(["reconstruct", root]));
     const markdown = sessionCLI(["markdown", file]);
-    expect(markdown).toContain("### Unified session");
+    expect(markdown).toContain("<summary>Unified session</summary>");
     expect(markdown).toContain("Visible assistant response");
     expect(markdown).toContain("tool.execution_start");
     expect(markdown).not.toContain("private user prompt");
