@@ -1433,6 +1433,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Documentation Updater"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-doc-updater.md"
           GH_AW_TRACKER_ID: "daily-doc-updater"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-6-astra"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "true"
@@ -1481,6 +1483,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Documentation Updater"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-doc-updater.md"
           GH_AW_TRACKER_ID: "daily-doc-updater"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-6-astra"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1499,6 +1503,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Documentation Updater"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-doc-updater.md"
           GH_AW_TRACKER_ID: "daily-doc-updater"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-6-astra"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

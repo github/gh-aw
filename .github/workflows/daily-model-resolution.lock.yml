@@ -1354,6 +1354,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Sub-Agent Model Resolution Audit"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-model-resolution.md"
           GH_AW_TRACKER_ID: "daily-model-resolution"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: "gpt-5.4-mini"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1399,6 +1401,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Sub-Agent Model Resolution Audit"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-model-resolution.md"
           GH_AW_TRACKER_ID: "daily-model-resolution"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: "gpt-5.4-mini"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1417,6 +1421,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Sub-Agent Model Resolution Audit"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-model-resolution.md"
           GH_AW_TRACKER_ID: "daily-model-resolution"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: "gpt-5.4-mini"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

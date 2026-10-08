@@ -1392,6 +1392,8 @@ jobs:
           GH_AW_NOOP_MAX: "2"
           GH_AW_WORKFLOW_NAME: "Windows Runner Integration Test"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/windows.md"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.6-terra"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1436,6 +1438,8 @@ jobs:
           GH_AW_MISSING_TOOL_TITLE_PREFIX: "[missing tool]"
           GH_AW_WORKFLOW_NAME: "Windows Runner Integration Test"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/windows.md"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.6-terra"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1453,6 +1457,8 @@ jobs:
           GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE: "true"
           GH_AW_WORKFLOW_NAME: "Windows Runner Integration Test"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/windows.md"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.6-terra"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
