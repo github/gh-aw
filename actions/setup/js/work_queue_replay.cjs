@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("replay");
 
 const { createHash } = require("node:crypto");
 const { canonical, canonicalBytes, closed, fingerprint, identity, integer, parseStrictJSON, queueError, utf8Compare, validateReason } = require("./work_queue_codec.cjs");
@@ -755,6 +756,7 @@ function serializeProjection(state) {
 }
 
 function replayTransactionLog(contents) {
+  log.debug("ledger.replay.start");
   if (typeof contents !== "string" || Buffer.byteLength(contents, "utf8") > 80 * 1024 * 1024) throw queueError("resource_limit", "ledger exceeds cold parser bound");
   if (!contents || !contents.endsWith("\n")) throw queueError("ledger_invalid", "queue log must be nonempty and newline terminated");
   const lines = contents.split("\n");
@@ -764,7 +766,9 @@ function replayTransactionLog(contents) {
     if (Buffer.byteLength(line, "utf8") > 8 * 1024 * 1024) throw queueError("resource_limit", `commit line ${index + 1} exceeds parser bound`);
     return parseStrictJSON(line);
   });
-  return replayTransactions(commits);
+  const state = replayTransactions(commits);
+  log.debug("ledger.replay.complete", { transactions: commits.length, works: state.works.size, claims: state.claims.size });
+  return state;
 }
 
 function parseTransactionLog(contents) {
@@ -781,18 +785,21 @@ function compactTransactions(transactions) {
 }
 
 function appendCommit(transactions, commit) {
+  log.debug("commit.append.start", { transactions: transactions.length });
   validateCommit(commit);
   const ordered = causalChain(transactions);
   if (ordered.some(transaction => transaction.request.id === commit.request.id)) {
     const before = replayOrdered(ordered);
     const prior = before.requests.get(commit.request.id);
     if (prior.request.fingerprint !== commit.request.fingerprint || canonical(prior.actor) !== canonical(commit.actor)) throw queueError("request_reused", "stable request identity has different validated meaning");
+    log.debug("commit.append.reused");
     return { transactions: before.transactions, state: before, commit: prior, idempotent: true };
   }
   if (commit.previous !== (ordered.at(-1)?.id ?? null)) throw queueError("ledger_invalid", "append does not extend checked causal tip");
   if (ordered.some(transaction => transaction.id === commit.id)) throw queueError("ledger_invalid", "conflicting duplicate commit ID");
   if (ordered.length >= 1000000) throw queueError("resource_limit", "ledger commit count exceeded");
   const state = replayOrdered([...ordered, commit]);
+  log.debug("commit.append.complete", { transactions: state.transactions.length, operations: commit.operations.length });
   return { transactions: state.transactions, state, commit, idempotent: false };
 }
 

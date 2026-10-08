@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("scheduler");
 
 const { createHash } = require("node:crypto");
 const { canonicalBytes, closed, integer, utf8Compare, queueError } = require("./work_queue_codec.cjs");
@@ -107,10 +108,16 @@ function planNext(state, pool, at) {
   const { poolPolicy, policyScales } = require("./work_queue_policy.cjs");
   const policy = poolPolicy(state, pool);
   integer(at, 0, Number.MAX_SAFE_INTEGER, "decision timestamp");
-  if (state.grants_paused) return { reason: "grants_paused", observations: [] };
+  if (state.grants_paused) {
+    log.debug("selection.grants_paused");
+    return { reason: "grants_paused", observations: [] };
+  }
   const indexes = indexesFor(state);
   const capacity = reservationSnapshot(state, pool, indexes);
-  if (capacity.logical >= policy.logical_limit) return { reason: "capacity_blocked", observations: [] };
+  if (capacity.logical >= policy.logical_limit) {
+    log.debug("selection.capacity_blocked", { reservations: capacity.logical });
+    return { reason: "capacity_blocked", observations: [] };
+  }
   const buckets = new Map();
   let pending = 0;
   for (const id of indexes.available.get(pool) || []) {
@@ -124,7 +131,10 @@ function planNext(state, pool, at) {
     if (!oldest || fifoCompare(work, oldest.work) < 0) keys.set(work.fairness_key, { work, dependency });
     buckets.set(priority, keys);
   }
-  if (!buckets.size) return { reason: pending ? "no_eligible_work" : "no_work", observations: [] };
+  if (!buckets.size) {
+    log.debug("selection.no_grant", { pending, ineligible: pending > 0 });
+    return { reason: pending ? "no_eligible_work" : "no_work", observations: [] };
+  }
   const schedule = copySchedule(state.clocks.get(pool) ?? { classes: clock(), keys: new Map() });
   const scales = policyScales(state.policy);
   const classWeights = new Map(state.policy.class_weights.map((weight, index) => [index + 1, weight]));
@@ -205,6 +215,7 @@ function applyScheduledClaim(state, operation, selection, commit) {
 }
 
 function planDispatch(state, parameters, { requestId, commitId, at, precedingOperations = 0 }) {
+  log.debug("dispatch.plan.start", { works: state.works.size, preceding_operations: precedingOperations });
   validateDispatchParameters(parameters, state);
   integer(precedingOperations, 0, state.policy.limits.operations, "preceding operation count");
   const working = schedulingState(state);
@@ -235,10 +246,12 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
     }
     if (!group) {
       if (groups.length >= parameters.max_dispatches) {
+        log.debug("dispatch.plan.dispatch_budget_blocked", { assignments: groups.length });
         reason = "dispatch_budget_blocked";
         break;
       }
       if (reservationCounts(working, parameters.pool, "").native >= policy.native_limit) {
+        log.debug("dispatch.plan.native_capacity_blocked");
         reason = "native_capacity_blocked";
         break;
       }
@@ -246,6 +259,7 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
       claim = { kind: "Claim", work_id: work.work_id, claim_id: claimId, dispatch_id: dispatchId, handle: "h1", observations: next.observations };
       group = { version: 3, dispatch_id: dispatchId, request_id: requestId, commit_id: commitId, policy_epoch: state.policy_epoch, pool: work.pool, worker_profile: work.worker_profile, claims: [assignmentClaim(working, work, claim)] };
       if (canonicalBytes(group) > Math.min(parameters.max_bytes, state.policy.limits.assignment_bytes)) {
+        log.debug("dispatch.plan.assignment_bytes_blocked");
         reason = "assignment_bytes_blocked";
         break;
       }
@@ -256,6 +270,7 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
       applyScheduledClaim(working, claim, next, commit);
     }
     operations.push(claim);
+    log.debug("dispatch.plan.claim_selected", { claims: operations.length, assignments: groups.length });
     lastSelection = next;
     next = planNext(working, parameters.pool, at);
     reason = next.reason;
@@ -264,6 +279,7 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
     reason = limit ? (limit === parameters.max_claims ? "claim_budget_reached" : "operation_budget_reached") : "operation_budget_blocked";
     next = lastSelection;
   } else if (operations.length && reason === "no_work") reason = "prefix_complete";
+  log.debug("dispatch.plan.complete", { claims: operations.length, assignments: groups.length, no_grant: operations.length === 0, budget_reached: operations.length === limit });
   return { tip: state.tip, operations, assignments: groups.map(group => structuredClone(assignmentOnly(group))), reason, next: selectionOnly(next) };
 }
 
