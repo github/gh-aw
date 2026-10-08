@@ -148,10 +148,9 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     justify-content: center;
     flex: 1;
     min-height: 0;
-    margin: 1rem;
     overflow: hidden;
   }
-  .slideshow-stage { position: relative; flex: none; }
+  .slideshow-stage { position: relative; width: 100%; height: 100%; flex: none; }
   dialog[open] .slideshow-stage { view-transition-name: aw-slide; }
   .slideshow-ink {
     position: absolute;
@@ -170,12 +169,19 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     position: absolute;
     top: 0;
     left: 0;
-    width: 72rem;
+    width: var(--aw-slide-width, 72rem);
     transform-origin: top left;
   }
   dialog :global([data-slideshow-slides] > section) {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: var(--aw-slide-height, 0px);
     margin: 0;
     padding-block: 2rem;
+  }
+  dialog :global([data-slideshow-slides] > section > :is(.aw-container, [data-variant-group])) {
+    width: 100%;
   }
   dialog :global([data-slideshow-slides] > section[hidden]) { display: none; }
   :global(#landing-slideshow[open] [data-slideshow-hide]) { display: none !important; }
@@ -194,12 +200,12 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     flex: none;
     padding: 0.375rem 0.5rem;
     border: 1px solid var(--aw-color-divider);
-    border-radius: var(--aw-radius-pill);
+    border-radius: 1rem;
     background: color-mix(in srgb, var(--aw-color-bg) 55%, transparent);
     backdrop-filter: blur(12px);
     box-shadow: var(--aw-shadow-raised);
     font-size: 0.75rem;
-    opacity: 0.12;
+    opacity: 0.65;
     transition: opacity 180ms ease, background-color 180ms ease;
   }
   .slideshow-controls:hover,
@@ -244,8 +250,8 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
 </style>
 
 <style is:global>
-  html[data-slideshow-direction='forward'] { --aw-slide-offset: 3rem; }
-  html[data-slideshow-direction='backward'] { --aw-slide-offset: -3rem; }
+  html[data-slideshow-direction='forward'] { --aw-slide-offset: 100vw; }
+  html[data-slideshow-direction='backward'] { --aw-slide-offset: -100vw; }
   html[data-slideshow-direction]::view-transition { pointer-events: none; }
   html[data-slideshow-direction]::view-transition-old(root),
   html[data-slideshow-direction]::view-transition-new(root) { animation: none; }
@@ -254,17 +260,17 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     animation-timing-function: ease;
   }
   html[data-slideshow-direction]::view-transition-old(aw-slide) {
-    animation: aw-slide-out 200ms ease-in both;
+    animation: aw-slide-out 280ms ease-in-out both;
   }
   html[data-slideshow-direction]::view-transition-new(aw-slide) {
-    animation: aw-slide-in 280ms ease-out both;
+    animation: aw-slide-in 280ms ease-in-out both;
   }
   @keyframes aw-slide-out {
-    to { opacity: 0; transform: translateX(calc(-1 * var(--aw-slide-offset))) scale(0.98); }
+    to { transform: translateX(calc(-1 * var(--aw-slide-offset))); }
   }
   @keyframes aw-slide-in {
-    from { opacity: 0; transform: translateX(var(--aw-slide-offset)) scale(0.98); }
-    to { opacity: 1; transform: translateX(0) scale(1); }
+    from { transform: translateX(var(--aw-slide-offset)); }
+    to { transform: translateX(0); }
   }
   @media (prefers-reduced-motion: reduce) {
     html[data-slideshow-direction]::view-transition-group(aw-slide),
