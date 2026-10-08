@@ -121,6 +121,8 @@ var ClaudeDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["c
 // GeminiDefaultDomains are the default domains required for Google Gemini CLI authentication and operation.
 var GeminiDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["gemini"])
 
+var AgyDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["agy"])
+
 // PiBaseDefaultDomains are the base domains required for the Pi CLI to operate,
 // independent of the chosen LLM provider. When a model uses provider/model format,
 // provider-specific API domains are added on top via GetDefaultDomainsForEngine.
@@ -647,6 +649,7 @@ var engineDefaultDomains = map[constants.EngineName][]string{
 	constants.ClaudeEngine:  ClaudeDefaultDomains,
 	constants.CodexEngine:   CodexDefaultDomains,
 	constants.GeminiEngine:  GeminiDefaultDomains,
+	constants.AgyEngine:     AgyDefaultDomains,
 }
 
 // GetDefaultDomainsForEngine returns the engine's default required domains.

@@ -60,7 +60,7 @@ const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 
 const CODEX_ROUTING_ENDPOINTS = ["/responses"];
 
@@ -515,12 +515,19 @@ function applyCodexRoutingEffort(args, effort) {
  */
 function resolveCodexModelRouting(reflectData, args) {
   const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_ENDPOINTS, true);
-  if (result.error || !result.selection) return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
+  if (result.error || !result.selection) {
+    recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
+    return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
+  }
   const mappedEffort = mapAWFRoutingEffort("codex", result.selection.effort);
-  if (mappedEffort.error) return { selection: null, model: "", args, error: mappedEffort.error };
+  if (mappedEffort.error) {
+    recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort", detail: mappedEffort.error });
+    return { selection: null, model: "", args, error: mappedEffort.error };
+  }
   let routedArgs = removeCodexRoutingOverrides(args);
   routedArgs = injectModelFlagAfterExec(routedArgs, result.selection.wire_model);
   if (mappedEffort.effort) routedArgs = applyCodexRoutingEffort(routedArgs, mappedEffort.effort);
+  recordAWFModelRoutingOutcome({ status: "selected", wire_model: result.selection.wire_model, effort: result.selection.effort, applied_effort: mappedEffort.effort });
   return { selection: result.selection, model: result.selection.wire_model, args: routedArgs, error: null };
 }
 

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func validateAgyEngineConfig(config *EngineConfig) error {
@@ -33,8 +35,8 @@ func validateAgyEngineConfig(config *EngineConfig) error {
 	if config.MaxTurns != "" || config.MaxContinuations > 0 {
 		return errors.New("experimental agy does not support max-turns or max-continuations; use max-turn-cache-misses, max-ai-credits and timeout-minutes to bound execution")
 	}
-	if config.Version != "" && config.Version != "1.3.1" && !strings.Contains(config.Version, "${{") {
-		return fmt.Errorf("experimental agy has a verified native archive for version 1.3.1 only; requested engine.version %q is not supported", config.Version)
+	if config.Version != "" && config.Version != string(constants.DefaultAgyVersion) && !strings.Contains(config.Version, "${{") {
+		return fmt.Errorf("experimental agy has a verified native archive for version %s only; requested engine.version %q is not supported", constants.DefaultAgyVersion, config.Version)
 	}
 	return nil
 }

@@ -162,6 +162,9 @@ const (
 	// AWFAPIProxyContainerIP is the fixed api-proxy sidecar address inside the AWF sandbox network.
 	AWFAPIProxyContainerIP = "172.30.0.30"
 
+	// AWFAPIProxyHostname is the api-proxy sidecar's DNS alias inside the AWF sandbox network.
+	AWFAPIProxyHostname = "api-proxy"
+
 	// DefaultMCPGatewayPort is the default port for the MCP gateway HTTP service
 	DefaultMCPGatewayPort = 8080
 
@@ -239,11 +242,17 @@ const AWFDefaultCommand CommandPrefix = "awf"
 // sudo supplies SUDO_UID and SUDO_GID for AWF to recover the invoking identity.
 const AWFCloudHypervisorCommand = "sudo --preserve-env awf"
 
+// AWFNVXCommand runs AWF with the host privileges required to create NVX microVMs.
+const AWFNVXCommand = "sudo --preserve-env awf"
+
 // DefaultCloudHypervisorVCPUs and DefaultCloudHypervisorMemoryMiB are the
 // minimum viable guest sizing defaults for the Cloud Hypervisor agent runtime.
 const (
 	DefaultCloudHypervisorVCPUs     = 2
 	DefaultCloudHypervisorMemoryMiB = 4096
+	DefaultNVXMemoryMiB             = 512
+	DefaultNVXMemoryMaxBytes        = 536870912
+	DefaultNVXPidsMax               = 128
 )
 
 // AWFLegacySecurityCommand runs the trusted system AWF binary with the runner's

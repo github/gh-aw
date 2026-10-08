@@ -40,7 +40,6 @@ Workers must require an assignment:
 ```yaml title="Worker frontmatter"
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
 ```

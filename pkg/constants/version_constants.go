@@ -50,6 +50,10 @@ const DefaultCodexVersion Version = "0.159.3"
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.62.0"
 
+const DefaultAgyVersion Version = "1.3.1"
+
+const AgyDefaultModel = "gemini-3.8-flash-medium"
+
 // DefaultPiVersion is the default version of the Pi CLI
 const DefaultPiVersion Version = "1.0.0"
 
@@ -125,6 +129,9 @@ const AWFArcDindMinVersion Version = "v0.27.20"
 // AWFCloudHypervisorMinVersion is the minimum AWF version that supports the
 // cloud-hypervisor preview runtime and its release assets.
 const AWFCloudHypervisorMinVersion Version = "v0.28.11"
+
+// AWFNVXMinVersion is the minimum AWF release with the fail-closed NVX runtime.
+const AWFNVXMinVersion Version = "v0.28.49"
 
 // AWFEnclaveCloudHypervisorMinVersion is the minimum AWF version supporting
 // the release-attested Cloud Hypervisor enclave executor preview.

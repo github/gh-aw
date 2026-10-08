@@ -82,6 +82,71 @@ type ModelRoutingSummary struct {
 	EndpointOnlyDeviationNormalized bool                    `json:"endpoint_only_deviation_normalized,omitempty"`
 }
 
+type effectiveModelAttribution struct {
+	Model          string
+	RequestedModel string
+	Effort         string
+	RoutingStatus  string
+}
+
+func resolveEffectiveModelAttribution(info *AwInfo, routing *ModelRoutingSummary, usage *TokenUsageSummary) effectiveModelAttribution {
+	var result effectiveModelAttribution
+	if info == nil {
+		return result
+	}
+	result.RequestedModel = info.RequestedModel
+	if info.ModelRouting != nil {
+		result.RoutingStatus = info.ModelRouting.Status
+		result.Effort = firstNonEmpty(info.ModelRouting.AppliedEffort, info.ModelRouting.Effort)
+	}
+	if routing != nil {
+		if result.RoutingStatus == "" || result.RoutingStatus == "not_routed" {
+			result.RoutingStatus = routing.Status
+		}
+		if result.Effort == "" {
+			result.Effort = routing.SelectedEffort
+		}
+	}
+	if result.RequestedModel == "" && (info.ModelRouting != nil || (routing != nil && routing.Status != "" && routing.Status != "not_routed")) {
+		result.RequestedModel = info.Model
+	}
+
+	primaryModel := primaryTokenUsageModel(usage)
+	routingActive := (info.ModelRouting != nil && info.ModelRouting.Status != "" && info.ModelRouting.Status != "not_routed") ||
+		(routing != nil && routing.Status != "" && routing.Status != "not_routed")
+	switch {
+	case info.FallbackModel != "":
+		result.Model = info.FallbackModel
+	case info.ModelRouting != nil && info.ModelRouting.Status == "selected":
+		result.Model = firstNonEmpty(info.ModelRouting.WireModel, info.ModelRouting.Model)
+	case routing != nil && routing.Status == "selected":
+		result.Model = firstNonEmpty(routing.WireModel, routing.SelectedModel)
+	case primaryModel != "" && routingActive && result.RoutingStatus == "selected":
+		result.Model = primaryModel
+	case !routingActive:
+		result.Model = info.Model
+	}
+	return result
+}
+
+func primaryTokenUsageModel(usage *TokenUsageSummary) string {
+	if usage == nil {
+		return ""
+	}
+	bestModel := ""
+	bestAIC := float64(-1)
+	for model, details := range usage.ByModel {
+		if details == nil || model == "" || model == "unknown" {
+			continue
+		}
+		if details.AIC > bestAIC || (details.AIC == bestAIC && (bestModel == "" || model < bestModel)) {
+			bestModel = model
+			bestAIC = details.AIC
+		}
+	}
+	return bestModel
+}
+
 type modelRoutingRecord struct {
 	Schema           string `json:"_schema"`
 	Stage            string `json:"stage"`

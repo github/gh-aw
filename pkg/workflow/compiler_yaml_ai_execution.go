@@ -255,7 +255,7 @@ func (c *Compiler) generateObservabilitySummary(yaml *strings.Builder, data *Wor
 // OTEL_EXPORTER_OTLP_ENDPOINT env var into workflowData.Env, which is the authoritative
 // result of OTLP detection after all frontmatter (main + imports) has been processed.
 func isOTLPEnabled(data *WorkflowData) bool {
-	if data == nil {
+	if data == nil || data.DryRun {
 		return false
 	}
 	return strings.Contains(data.Env, "OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -329,9 +329,17 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 	yaml.WriteString("        if: always()\n")
 	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseTokenUsageStepID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        continue-on-error: true\n")
-	if isArcDindTopology(data) {
+	if isArcDindTopology(data) || isModelRoutingEnabled(data) {
 		yaml.WriteString("        env:\n")
+	}
+	if isArcDindTopology(data) {
 		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
+	}
+	if isModelRoutingEnabled(data) {
+		yaml.WriteString("          GH_AW_MODEL_ROUTING_ENABLED: \"true\"\n")
+		if data.EngineConfig != nil {
+			fmt.Fprintf(yaml, "          GH_AW_ENGINE_ID: %q\n", data.EngineConfig.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		}
 	}
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")
@@ -564,6 +572,13 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 	// dependencies that the gateway may reference when it starts.
 	c.generatePreAgentSteps(yaml, data)
 
+	for _, step := range generateNVXRuntimeSetupSteps(data) {
+		for _, line := range step {
+			yaml.WriteString(line)
+			yaml.WriteByte('\n')
+		}
+	}
+
 	// Add MCP setup
 	if err := c.generateMCPSetup(yaml, data.Tools, engine, data); err != nil {
 		return nil, fmt.Errorf("MCP setup could not be generated, expected valid tool configuration in the 'tools' section: %w", err)
@@ -635,6 +650,13 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// Add AI execution step using the agentic engine
 	compilerYamlLog.Printf("Generating engine execution steps for %s", engine.GetID())
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)
+
+	if step := generateNVXRuntimeCleanupStep(data); step != nil {
+		for _, line := range step {
+			yaml.WriteString(line)
+			yaml.WriteByte('\n')
+		}
+	}
 
 	// Stop CLI proxy after AWF execution (always runs to ensure cleanup)
 	c.generateStopCliProxyStep(yaml, data)

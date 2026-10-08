@@ -1281,6 +1281,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Refactoring Cadence"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/refactoring-cadence.md"
           GH_AW_TRACKER_ID: "refactoring-cadence"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.6-terra"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "true"
@@ -1326,6 +1328,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Refactoring Cadence"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/refactoring-cadence.md"
           GH_AW_TRACKER_ID: "refactoring-cadence"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.6-terra"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1344,6 +1348,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Refactoring Cadence"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/refactoring-cadence.md"
           GH_AW_TRACKER_ID: "refactoring-cadence"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.6-terra"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

@@ -23,7 +23,7 @@ func agyHarnessCommand(t *testing.T, body string, reflectJSON string) (*exec.Cmd
 	t.Helper()
 	dir := t.TempDir()
 	harness := filepath.Join(dir, "agy_harness.cjs")
-	require.NoError(t, os.WriteFile(harness, []byte(agyDefinition(t).Behaviors.HarnessScript), 0o600))
+	require.NoError(t, os.WriteFile(harness, agyRuntimeScript(t, "agy_harness.cjs"), 0o600))
 	actionsDir, err := filepath.Abs("../../actions/setup/js")
 	require.NoError(t, err)
 	module, err := json.Marshal(filepath.Join(actionsDir, "awf_reflect.cjs"))
@@ -45,6 +45,13 @@ func agyHarnessCommand(t *testing.T, body string, reflectJSON string) (*exec.Cmd
 		"AWF_REFLECT_ENABLED=1", "AGY_TEST_REFLECT=" + reflectJSON,
 	}
 	return cmd, dir
+}
+
+func agyRuntimeScript(t *testing.T, name string) []byte {
+	t.Helper()
+	script, err := os.ReadFile(filepath.Join("../../actions/setup/js", name))
+	require.NoError(t, err)
+	return script
 }
 
 func TestAgyHarnessPrivateConfigurationAndLiteralInput(t *testing.T) {
@@ -142,6 +149,33 @@ process.kill(process.ppid, "SIGINT");`
 	})
 }
 
+func TestAgyHarnessStdoutBufferGuard(t *testing.T) {
+	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
+	for _, tt := range []struct {
+		name    string
+		size    int
+		failure bool
+	}{
+		{"below limit", 2*1024*1024 - 1024, false},
+		{"above limit", 2*1024*1024 + 1024, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			body := `const result = () => console.log(JSON.stringify({event:"result",result:{status:"SUCCESS",num_turns:1,usage:{input_tokens:10,output_tokens:2}}}));
+process.stdout.write(JSON.stringify({event:"init",padding:"x".repeat(` + strconv.Itoa(tt.size) + `)}) + "\n", result);`
+			cmd, _ := agyHarnessCommand(t, body, validReflect)
+			out, err := cmd.CombinedOutput()
+			if tt.failure {
+				require.Error(t, err)
+				assert.Contains(t, string(out), "session.error")
+			} else {
+				require.NoError(t, err)
+				assert.NotContains(t, string(out), "session.error")
+				assert.Contains(t, string(out), `"status":"SUCCESS"`)
+			}
+		})
+	}
+}
+
 func TestAgyHarnessBoundsDescendantPipes(t *testing.T) {
 	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
 	for _, detached := range []bool{false, true} {
@@ -203,14 +237,14 @@ func TestAgyHarnessRejectsWrongCustomExecutableVersion(t *testing.T) {
 	assert.NotContains(t, string(out), "must not execute")
 }
 
-func TestAgyEmbeddedScriptsHaveValidSyntax(t *testing.T) {
-	for name, script := range map[string]string{
-		"harness": agyDefinition(t).Behaviors.HarnessScript,
-		"adapter": agyDefinition(t).Behaviors.MCP.ConfigAdapter,
+func TestAgyRuntimeScriptsHaveValidSyntax(t *testing.T) {
+	for name, script := range map[string][]byte{
+		"harness": agyRuntimeScript(t, "agy_harness.cjs"),
+		"adapter": agyRuntimeScript(t, "convert_gateway_config_agy.cjs"),
 	} {
 		t.Run(name, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), name+".cjs")
-			require.NoError(t, os.WriteFile(file, []byte(script), 0o600))
+			require.NoError(t, os.WriteFile(file, script, 0o600))
 			out, err := exec.Command("node", "--check", file).CombinedOutput()
 			require.NoError(t, err, "%s", out)
 		})
@@ -232,7 +266,7 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			adapter := filepath.Join(dir, "adapter.cjs")
-			require.NoError(t, os.WriteFile(adapter, []byte(agyDefinition(t).Behaviors.MCP.ConfigAdapter), 0o600))
+			require.NoError(t, os.WriteFile(adapter, agyRuntimeScript(t, "convert_gateway_config_agy.cjs"), 0o600))
 			shared, err := filepath.Abs("../../actions/setup/js/convert_gateway_config_shared.cjs")
 			require.NoError(t, err)
 			require.NoError(t, os.Symlink(shared, filepath.Join(dir, "convert_gateway_config_shared.cjs")))

@@ -42,6 +42,15 @@
             "engine_id": {
               "type": "string"
             },
+            "requested_model": {
+              "type": "string"
+            },
+            "model_effort": {
+              "type": "string"
+            },
+            "model_routing_status": {
+              "type": "string"
+            },
             "status": {
               "type": "string"
             },
@@ -3036,6 +3045,15 @@
                       "type": "string"
                     },
                     "model": {
+                      "type": "string"
+                    },
+                    "requested_model": {
+                      "type": "string"
+                    },
+                    "model_effort": {
+                      "type": "string"
+                    },
+                    "model_routing_status": {
                       "type": "string"
                     },
                     "version": {
@@ -6163,6 +6181,63 @@
                 },
                 "model": {
                   "type": "string"
+                },
+                "requested_model": {
+                  "type": "string"
+                },
+                "fallback_model": {
+                  "type": "string"
+                },
+                "model_routing": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "wire_model": {
+                      "type": "string"
+                    },
+                    "effort": {
+                      "type": "string"
+                    },
+                    "applied_effort": {
+                      "type": "string"
+                    },
+                    "endpoint": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "selected_id": {
+                      "type": "string"
+                    },
+                    "router_version": {
+                      "type": "string"
+                    },
+                    "failure_code": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
                 },
                 "version": {
                   "type": "string"

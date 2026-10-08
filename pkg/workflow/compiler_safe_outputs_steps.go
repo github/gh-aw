@@ -132,15 +132,6 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	}
 	c.addSafeOutputTokenEnvVars(&steps, data)
 	steps = append(steps, fmt.Sprintf("          GH_AW_GITHUB_TOKEN_SOURCE: %s\n", c.safeOutputGitHubTokenSource(data)))
-	if workQueueStorage(data) == "issues" &&
-		data.SafeOutputs != nil &&
-		data.SafeOutputs.DispatchWorkflow != nil &&
-		len(data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows) > 0 {
-		steps = append(steps,
-			"          GH_AW_WORK_QUEUE_STORAGE: issues\n",
-			"          WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}\n",
-		)
-	}
 
 	// With section for github-token
 	// Use the standard safe-outputs token for the shared github-script client.

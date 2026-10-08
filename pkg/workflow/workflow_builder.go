@@ -53,6 +53,7 @@ func (c *Compiler) buildInitialWorkflowData(
 	if docs == "" {
 		docs = importsResult.MergedMetadataDocs
 	}
+	dailyCredits, dailyCreditsExplicit := resolveMaxDailyAICWithSource(result.Frontmatter, importsResult.MergedMaxDailyAICredits)
 
 	workflowData := &WorkflowData{
 		Name:                       toolsResult.workflowName,
@@ -68,7 +69,8 @@ func (c *Compiler) buildInitialWorkflowData(
 		Source:                     c.extractSource(result.Frontmatter),
 		Redirect:                   c.extractRedirect(result.Frontmatter),
 		TrackerID:                  toolsResult.trackerID,
-		MaxDailyAICredits:          resolveMaxDailyAIC(result.Frontmatter, importsResult.MergedMaxDailyAICredits),
+		MaxDailyAICredits:          dailyCredits,
+		MaxDailyAICreditsExplicit:  dailyCreditsExplicit,
 		MaxDailyAICreditsGitHubApp: extractMaxDailyAICGitHubApp(result.Frontmatter),
 		MaxDailyAICContinueOnError: resolveMaxDailyAICContinueOnError(result.Frontmatter, importsResult.MergedMaxDailyAICredits),
 		ImportedFiles:              importsResult.ImportedFiles,

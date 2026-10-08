@@ -354,7 +354,7 @@ func getOTLPIfMissingMode(config *FrontmatterConfig, frontmatter map[string]any)
 // This indicates that header masking is needed so that authentication tokens in
 // the header value do not leak into GitHub Actions runner logs.
 func isOTLPHeadersPresent(data *WorkflowData) bool {
-	if data == nil {
+	if data == nil || data.DryRun {
 		return false
 	}
 	return strings.Contains(data.Env, "OTEL_EXPORTER_OTLP_HEADERS") ||
@@ -410,7 +410,7 @@ func generateOTLPDefaultCredentialsCheckStep() string {
 // value masking is needed so that user-supplied values do not leak into
 // GitHub Actions runner logs.
 func isOTLPAttributesPresent(data *WorkflowData) bool {
-	if data == nil {
+	if data == nil || data.DryRun {
 		return false
 	}
 	return strings.Contains(data.Env, "GH_AW_OTLP_ATTRIBUTES")

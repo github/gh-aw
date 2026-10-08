@@ -34,7 +34,6 @@ network:
     - node
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
   cli-proxy: true
