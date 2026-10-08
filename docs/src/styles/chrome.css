@@ -44,6 +44,10 @@ body:has(.aw-hero) .sl-container {
    under it, and centres the content column in the space left by the sidebars.
    Here the title and body read as one unit, and the column sits left-aligned a
    fixed gutter from the sidebar, with a narrower "On this page" column on the right. */
+body:not(:has(.aw-hero)) {
+  --sl-content-width: 100%;
+}
+
 :root {
   --aw-toc-width: 15rem;
   --aw-content-gutter: 3.5rem;
