@@ -283,7 +283,7 @@ func writeSubagentModelDeclarations(yaml *strings.Builder, data *WorkflowData, e
 		model = RewriteActivationOutputsToLocalStepOutputs(model, data.Experiments)
 		declarations = append(declarations, map[string]any{
 			"name": agent.Name, "model": model,
-			"patterns": expandModelPatterns(agent.Model, data.ModelMappings, provider),
+			"patterns": expandSubagentModelPatterns(agent.Model, data, provider),
 		})
 	}
 	encoded, err := json.Marshal(declarations)
