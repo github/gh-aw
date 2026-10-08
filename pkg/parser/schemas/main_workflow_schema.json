@@ -14595,7 +14595,7 @@
             },
             "model-routing": {
               "type": "object",
-              "description": "Experimental per-run Copilot model and reasoning-effort selection from the task text; requires the AWF firewall and ignores fixed model and effort settings. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "description": "Experimental per-run GitHub Copilot model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines; requires the AWF firewall and ignores fixed model and effort settings. See https://github.github.com/gh-aw/reference/model-routing/.",
               "required": ["goal", "mode", "allowed-models"],
               "additionalProperties": false,
               "properties": {

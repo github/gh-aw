@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/require"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -66,6 +67,7 @@ func TestThreatDetectionDoesNotUseModelRouting(t *testing.T) {
 	routing := &CopilotModelRoutingConfig{
 		Goal: "cost", Mode: "balanced", AllowedModels: []string{"gpt-5.4-mini"},
 	}
+
 	for _, override := range []bool{false, true} {
 		name := "inherited"
 		if override {
@@ -288,9 +290,68 @@ func TestValidateModelRoutingRequiresMinimumAWFVersion(t *testing.T) {
 			Firewall: &FirewallConfig{Enabled: true, Version: "v0.28.28"},
 		},
 	}
-
 	err := validateModelRouting(data, "copilot")
 	require.ErrorContains(t, err, "requires AWF v0.28.29 or newer")
+}
+
+func TestValidateModelRoutingEngineCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		engine    string
+		provider  LLMProvider
+		model     string
+		wantError string
+	}{
+		{name: "Copilot accepts any Copilot model", engine: "copilot", model: "gpt-5.4"},
+		{name: "Claude accepts Claude models", engine: "claude", provider: LLMProviderGitHub, model: "claude-sonnet-5"},
+		{name: "Codex accepts GPT models", engine: "codex", provider: LLMProviderGitHub, model: "gpt-5.6-sol"},
+		{name: "pi accepts Claude models", engine: "pi", provider: LLMProviderGitHub, model: "claude-sonnet-5"},
+		{name: "Claude rejects GPT models", engine: "claude", provider: LLMProviderGitHub, model: "gpt-5.6-sol", wantError: "native Messages API"},
+		{name: "Codex rejects Claude models", engine: "codex", provider: LLMProviderGitHub, model: "claude-sonnet-5", wantError: "Responses API"},
+		{name: "Claude rejects non-Copilot provider", engine: "claude", provider: LLMProviderAnthropic, model: "claude-sonnet-5", wantError: "requires GitHub Copilot inference"},
+		{name: "Codex rejects non-Copilot provider", engine: "codex", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
+		{name: "pi rejects non-Copilot provider", engine: "pi", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
+		{name: "unknown engine rejected", engine: "gemini", model: "gpt-5.6-sol", wantError: "supported only by Copilot, Claude, Codex, and pi"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{
+					ID:           tc.engine,
+					LLMProvider:  tc.provider,
+					ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "balanced", AllowedModels: []string{tc.model}},
+				},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true, Version: "v0.28.37"}},
+			}
+			err := validateModelRouting(data, tc.engine)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestWarnRoutedModelOverrides(t *testing.T) {
+	compiler := NewCompiler()
+	output := testutil.CaptureStderr(t, func() {
+		compiler.warnRoutedModelOverrides(&WorkflowData{
+			Model: "fixed-model",
+			EngineConfig: &EngineConfig{
+				ID:           "pi",
+				ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "balanced"},
+				Env: map[string]string{
+					"GH_AW_PI_MODEL":             "fixed-model",
+					"GH_AW_CUSTOM_MODELING_FLAG": "value",
+					"CUSTOM_SETTING":             "value",
+				},
+				Config: `{"settings":{"defaultThinkingLevel":"high"}}`,
+			},
+		})
+	})
+	require.Contains(t, output, "model, engine.env.GH_AW_PI_MODEL, engine.config.settings.defaultThinkingLevel")
+	require.NotContains(t, output, "GH_AW_CUSTOM_MODELING_FLAG")
+	require.Equal(t, 1, compiler.GetWarningCount())
 }
 
 func TestGenerateModelRoutingConversationStep(t *testing.T) {
@@ -452,4 +513,87 @@ func TestCopilotModelRoutingDoesNotEmitCompileTimeModel(t *testing.T) {
 	}, true, "GH_AW_MODEL")
 
 	require.NotContains(t, env, "COPILOT_MODEL")
+}
+
+func TestInheritedDetectionModelStaysUnsetForRoutedEnginesWithoutAModel(t *testing.T) {
+	tests := []struct {
+		engineID          string
+		detectionEngineID string
+		model             string
+	}{
+		{engineID: "copilot", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+		{engineID: "claude", detectionEngineID: "claude", model: "claude-opus-5"},
+		{engineID: "codex", detectionEngineID: "codex", model: "gpt-5.6-sol"},
+		{engineID: "pi", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{
+					ID:          tc.engineID,
+					LLMProvider: LLMProviderGitHub,
+					ModelRouting: &CopilotModelRoutingConfig{
+						Goal: "cost", Mode: "balanced", AllowedModels: []string{tc.model},
+					},
+				},
+			}
+
+			require.Empty(t, data.Model)
+			require.Empty(t, inheritedDetectionModel(data, tc.detectionEngineID))
+			detectionData := buildExternalDetectorWorkflowData(data, tc.detectionEngineID)
+			require.Empty(t, detectionData.Model)
+			require.Nil(t, detectionData.EngineConfig.ModelRouting)
+		})
+	}
+}
+
+func TestRoutedEnginesDoNotRouteThreatDetection(t *testing.T) {
+	tests := []struct {
+		engineID          string
+		detectionEngineID string
+		model             string
+	}{
+		{engineID: "copilot", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+		{engineID: "claude", detectionEngineID: "claude", model: "claude-opus-5"},
+		{engineID: "codex", detectionEngineID: "codex", model: "gpt-5.6-sol"},
+		{engineID: "pi", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: tc.engineID,
+				EngineConfig: &EngineConfig{
+					ID:          tc.engineID,
+					LLMProvider: LLMProviderGitHub,
+					ModelRouting: &CopilotModelRoutingConfig{
+						Goal: "cost", Mode: "balanced", AllowedModels: []string{tc.model},
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+				SafeOutputs:        &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			}
+			detectionData := buildExternalDetectorWorkflowData(data, tc.detectionEngineID)
+			configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName: tc.detectionEngineID, WorkflowData: detectionData,
+			})
+			require.NoError(t, err)
+			var config map[string]any
+			require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+			require.NotContains(t, config["apiProxy"].(map[string]any), "routing")
+			require.NotContains(t, config["container"].(map[string]any)["images"].(map[string]any), awfImageRoleRouter)
+
+			compiler := NewCompiler()
+			for name, build := range map[string]func(*WorkflowData) []string{
+				"external": compiler.buildExternalDetectorExecutionStep,
+				"inline":   compiler.buildDetectionEngineExecutionStep,
+			} {
+				t.Run(name, func(t *testing.T) {
+					steps := strings.Join(build(data), "")
+					require.NotContains(t, steps, "GH_AW_MODEL_ROUTING")
+					require.NotContains(t, steps, "candidateModels")
+					require.NotContains(t, steps, awfImageRoleRouter)
+				})
+			}
+		})
+	}
 }

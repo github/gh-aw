@@ -60,6 +60,9 @@ const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
+
+const CODEX_ROUTING_ENDPOINTS = ["/responses"];
 
 // Pattern to detect OpenAI rate-limit errors.
 // Matches the JSON error type field ("rate_limit_exceeded"), the HTTP status code
@@ -469,6 +472,59 @@ function getCodexModelEnvVar(env = process.env) {
 }
 
 /**
+ * Remove fixed model and reasoning-effort settings before applying a routed selection.
+ * @param {string[]} args
+ * @returns {string[]}
+ */
+function removeCodexRoutingOverrides(args) {
+  const result = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--model" || arg === "-m") {
+      i++;
+      continue;
+    }
+    if (arg.startsWith("--model=") || arg.startsWith("-m=")) continue;
+    if ((arg === "-c" || arg === "--config") && /^model_reasoning_effort\s*=/.test(args[i + 1] || "")) {
+      i++;
+      continue;
+    }
+    if (/^--config=model_reasoning_effort\s*=/.test(arg)) continue;
+    result.push(arg);
+  }
+  return result;
+}
+
+/**
+ * Inject the router-selected Codex reasoning effort as a CLI config override.
+ * @param {string[]} args
+ * @param {string} effort
+ * @returns {string[]}
+ */
+function applyCodexRoutingEffort(args, effort) {
+  const execIndex = args.indexOf("exec");
+  const index = execIndex < 0 ? args.length : execIndex + 1;
+  return [...args.slice(0, index), "-c", `model_reasoning_effort="${effort}"`, ...args.slice(index)];
+}
+
+/**
+ * Resolve and apply AWF's selection to a Codex invocation.
+ * @param {any} reflectData
+ * @param {string[]} args
+ * @returns {{selection: any, model: string, args: string[], error: string|null}}
+ */
+function resolveCodexModelRouting(reflectData, args) {
+  const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_ENDPOINTS);
+  if (result.error || !result.selection) return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
+  const mappedEffort = mapAWFRoutingEffort("codex", result.selection.effort);
+  if (mappedEffort.error) return { selection: null, model: "", args, error: mappedEffort.error };
+  let routedArgs = removeCodexRoutingOverrides(args);
+  routedArgs = injectModelFlagAfterExec(routedArgs, result.selection.wire_model);
+  if (mappedEffort.effort) routedArgs = applyCodexRoutingEffort(routedArgs, mappedEffort.effort);
+  return { selection: result.selection, model: result.selection.wire_model, args: routedArgs, error: null };
+}
+
+/**
  * Build child process environment for Codex execution.
  * Preserve API keys captured at harness startup, even if the parent environment
  * is sanitized later in the run.
@@ -808,13 +864,33 @@ async function main() {
 
   const codexModelEnvVar = getCodexModelEnvVar(process.env);
   const modelOptions = { env: process.env, logger: log };
-  const resolvedModel = normalizeCodexModel(codexModelEnvVar ? applyModelFallback(process.env, codexModelEnvVar, log) : "", process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
+  const modelRoutingRequired = process.env.GH_AW_MODEL_ROUTING === "1";
+  /** @type {any} */
+  let reflectData = null;
+  if (process.env.AWF_REFLECT_ENABLED === "1" || modelRoutingRequired) {
+    const reflectResult = await fetchAWFReflect({ logger: log });
+    if (reflectResult.ok && reflectResult.reflectData) reflectData = reflectResult.reflectData;
+  }
+  let resolvedModel;
+  if (modelRoutingRequired) {
+    const result = resolveCodexModelRouting(reflectData, resolvedArgs);
+    if (result.error || !result.selection) {
+      log(`fatal: ${result.error || "AWF model routing selection is missing"}; refusing to start Codex`);
+      process.exit(1);
+      return;
+    }
+    resolvedModel = result.model;
+    resolvedArgs = result.args;
+    log(`inference routing: mode=awf-routed model=${resolvedModel} effort=${result.selection.effort || "(unset)"}`);
+  } else {
+    resolvedModel = normalizeCodexModel(codexModelEnvVar ? applyModelFallback(process.env, codexModelEnvVar, log) : "", process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
+    resolvedArgs = normalizeCodexModelArgs(resolvedArgs, process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
+    resolvedArgs = injectModelFlagAfterExec(resolvedArgs, resolvedModel);
+  }
   if (codexModelEnvVar && resolvedModel) {
     process.env[codexModelEnvVar] = resolvedModel;
     codexChildEnv[codexModelEnvVar] = resolvedModel;
   }
-  resolvedArgs = normalizeCodexModelArgs(resolvedArgs, process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
-  resolvedArgs = injectModelFlagAfterExec(resolvedArgs, resolvedModel);
 
   // Prompts remain on stdin; use a placeholder in the argument diagnostic.
   const hadPromptFile = args.includes("--prompt-file");
@@ -824,12 +900,6 @@ async function main() {
   // Codex output machine-readable in CI without affecting the stderr progress stream.
   resolvedArgs = injectJsonFlag(resolvedArgs);
 
-  // Fetch AWF API proxy reflection data before running the agent to capture initial proxy state.
-  // This is best-effort: failures are logged but do not affect the agent run.
-  // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. no api-proxy running in sandbox or test mode).
-  if (process.env.AWF_REFLECT_ENABLED === "1") {
-    await fetchAWFReflect({ logger: log });
-  }
   const codexHome = process.env.CODEX_HOME || "";
   let codexEnv = codexChildEnv;
   const providerConfig = configureCodexProviderFromReflect({
@@ -1199,6 +1269,9 @@ if (typeof module !== "undefined" && module.exports) {
     resolveRetryConfig,
     applyModelFallback,
     injectModelFlagAfterExec,
+    removeCodexRoutingOverrides,
+    applyCodexRoutingEffort,
+    resolveCodexModelRouting,
     getCodexModelEnvVar,
     resolvePostResultWatchdogIdleTimeoutMs,
     createMCPCallWatchdog,
