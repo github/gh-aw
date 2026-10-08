@@ -166,6 +166,7 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 	for _, entry := range []struct{ id, trigger string }{
 		{"engine-conformance-agy", "workflow_dispatch"},
 		{"agy-conformance-reusable", "workflow_call"},
+		{"smoke-agy", "workflow_dispatch"},
 	} {
 		t.Run(entry.id, func(t *testing.T) {
 			lock, err := os.ReadFile("../../.github/workflows/" + entry.id + ".lock.yml")
@@ -197,21 +198,28 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 }
 
 func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
-	var canonical, reusable map[string]any
+	var canonical map[string]any
 	readConformanceFrontmatter(t, "../../.github/workflows/engine-conformance-agy.md", &canonical)
-	readConformanceFrontmatter(t, "../../.github/workflows/agy-conformance-reusable.md", &reusable)
-	for key, trigger := range map[string]string{"canonical": "workflow_dispatch", "reusable": "workflow_call"} {
-		source := canonical
-		if key == "reusable" {
-			source = reusable
-		}
-		assert.Equal(t, map[string]any{trigger: nil}, source["on"])
-		assert.Equal(t, []any{"shared/agy-conformance.md"}, source["imports"])
-		delete(source, "name")
-		delete(source, "description")
-		delete(source, "on")
+	assert.Equal(t, map[string]any{"workflow_dispatch": nil}, canonical["on"])
+	assert.Equal(t, []any{"shared/agy-conformance.md"}, canonical["imports"])
+	delete(canonical, "name")
+	delete(canonical, "description")
+	delete(canonical, "on")
+	for _, entry := range []struct{ id, trigger string }{
+		{"agy-conformance-reusable", "workflow_call"},
+		{"smoke-agy", "workflow_dispatch"},
+	} {
+		t.Run(entry.id, func(t *testing.T) {
+			var source map[string]any
+			readConformanceFrontmatter(t, "../../.github/workflows/"+entry.id+".md", &source)
+			assert.Equal(t, map[string]any{entry.trigger: nil}, source["on"])
+			assert.Equal(t, []any{"shared/agy-conformance.md"}, source["imports"])
+			delete(source, "name")
+			delete(source, "description")
+			delete(source, "on")
+			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
+		})
 	}
-	assert.Equal(t, canonical, reusable, "both compilation paths must retain identical gate configuration")
 }
 
 func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {

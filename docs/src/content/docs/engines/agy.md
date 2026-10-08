@@ -101,6 +101,12 @@ outputs. It remains dispatch-only; Credentials Check calls the feature-branch
 prompt. Release and Gemini deprecation are gated on that production path, not
 on mocked tests or native authentication alone.
 
+`smoke-agy.md` provides a manual-only smoke test using the same shared conformance
+suite. It checks file reads and writes, shell execution and environment forwarding,
+inference accounting, native and CLI-mounted MCP round trips, and staged safe
+outputs. Runs are bounded to ten minutes and five AI credits; results are recorded
+in the step summary and conformance artifacts, not published as issues or comments.
+
 Both checkers require the exact staged noop receipt, not an empty output file.
 The Agy gate explicitly disables the separate Copilot threat-detection job;
 it forwards only the Gemini key and retains its own bounded, read-only checks.
