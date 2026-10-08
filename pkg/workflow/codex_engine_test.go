@@ -737,7 +737,7 @@ func TestCodexEngineExecutionPassesModelEnvVarIntoAWFStep(t *testing.T) {
 			}
 
 			stepContent := strings.Join([]string(steps[0]), "\n")
-			expectedEnvLine := tt.expectedModelEnv + ": ${{ vars." + tt.expectedModelEnv + " || vars.GH_AW_DEFAULT_MODEL_CODEX || '" + constants.CodexDefaultModel + "' }}"
+			expectedEnvLine := tt.expectedModelEnv + ": ${{ vars." + tt.expectedModelEnv + " || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}"
 			if !strings.Contains(stepContent, expectedEnvLine) {
 				t.Errorf("Expected model env var to be included in AWF step env:\n%s", stepContent)
 			}

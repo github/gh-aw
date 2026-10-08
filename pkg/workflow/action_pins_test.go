@@ -967,12 +967,12 @@ func TestGetActionPinWithData_V7Fallback(t *testing.T) {
 
 	t.Logf("Result: %s", result)
 
-	if !strings.HasSuffix(result, "# v7.0.1") {
+	if !strings.HasSuffix(result, "# v7.0.2") {
 		t.Errorf("Expected single resolved version comment in result, got: %s", result)
 	}
 
-	// Check the SHA matches v7 (resolves to v7.0.1 pin)
-	expectedSHA := "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+	// Check the SHA matches v7.0.2.
+	expectedSHA := "cf430e030ddbb5b0abf93d22962f4752f3646cd9"
 	if !strings.Contains(result, expectedSHA) {
 		t.Errorf("Expected SHA %s in result, got: %s", expectedSHA, result)
 	}
@@ -1071,14 +1071,14 @@ func TestFallbackVersionUsesResolvedVersionInComment(t *testing.T) {
 			name:            "v8 falls back to v9 and comment records v9",
 			repo:            "actions/github-script",
 			requestedVer:    "v8",
-			expectedComment: "# v9",
+			expectedComment: "# v9.0.0",
 			expectedSHA:     "3a2844b7e9c422d3c10d287c895573f7108da1b3",
 		},
 		{
 			name:            "v7 falls back to v9 and comment records v9",
 			repo:            "actions/github-script",
 			requestedVer:    "v7",
-			expectedComment: "# v9",
+			expectedComment: "# v9.0.0",
 			expectedSHA:     "3a2844b7e9c422d3c10d287c895573f7108da1b3",
 		},
 	}
