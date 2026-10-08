@@ -116,24 +116,11 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
   } else {
     const reflectRouting = reflectData?.routing;
     if (reflectRouting?.status === "selected") {
-      const engine = String(env.GH_AW_ENGINE_ID || "").toLowerCase();
-      const checked = resolveAWFModelRoutingSelection(reflectData, true, MODEL_ROUTING_ENDPOINTS[engine] || []);
-      if (checked.error || !checked.selection) {
-        routing = { status: "rejected", failure_code: "invalid_selection", detail: checked.error };
-      } else {
-        const selection = checked.selection;
-        routing = {
-          status: "selected",
-          provider: selection.provider,
-          model: selection.model,
-          wire_model: selection.wire_model,
-          effort: selection.effort,
-          endpoint: selection.endpoint,
-          mode: reflectRouting.mode,
-          selected_id: reflectRouting.selection?.id,
-          router_version: reflectRouting.router?.version,
-        };
-      }
+      routing = {
+        status: "rejected",
+        failure_code: "uncorroborated_selection",
+        detail: "AWF /reflect selection has no corroborating proxy model-routing record",
+      };
     } else {
       routing = reflectRouting
         ? {

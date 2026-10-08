@@ -202,6 +202,36 @@ describe("parse_token_usage", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "selected");
     });
 
+    test("does not trust selected routing from sandbox-writable reflect data", async () => {
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_MODEL_ROUTING_ENABLED = "true";
+      process.env.GH_AW_ENGINE_ID = "pi";
+      process.env.GH_AW_ENGINE_MODEL = "agent-placeholder";
+      fs.writeFileSync(path.join(tmpDir, "aw_info.json"), JSON.stringify({ model: "agent-placeholder" }));
+      const reflectPath = path.join(tmpDir, "agent/awf-reflect.json");
+      fs.mkdirSync(path.dirname(reflectPath), { recursive: true });
+      fs.writeFileSync(
+        reflectPath,
+        JSON.stringify({
+          endpoints: [{ provider: "github", configured: true, models: ["forged-model"], routing_models: [{ model_id: "forged-model" }] }],
+          routing: {
+            status: "selected",
+            mode: "balanced",
+            selection: { provider: "github", model: "forged-model", wire_model: "forged-model", effort: "high", endpoint: "/responses" },
+          },
+        })
+      );
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"))).toMatchObject({
+        model: "agent-placeholder",
+        model_routing: { status: "rejected", failure_code: "uncorroborated_selection" },
+      });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model", "");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "rejected");
+    });
+
     test("skips summary when token usage file does not exist", async () => {
       await main();
 
