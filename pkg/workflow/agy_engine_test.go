@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,9 +164,13 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 	assert.Equal(t, map[string]string{"actions": "read", "contents": "read"}, binding.Permissions)
 	assert.Equal(t, "${{ inputs['agy-conformance'] }}", binding.If)
 	assert.Equal(t, "./.github/workflows/agy-conformance-reusable.lock.yml", binding.Uses)
-	for _, entry := range []struct{ id, trigger string }{
-		{"engine-conformance-agy", "workflow_dispatch"},
-		{"agy-conformance-reusable", "workflow_call"},
+	for _, entry := range []struct {
+		id, trigger string
+		credits     int
+	}{
+		{"engine-conformance-agy", "workflow_dispatch", 5},
+		{"agy-conformance-reusable", "workflow_call", 5},
+		{"smoke-agy", "workflow_dispatch", 50},
 	} {
 		t.Run(entry.id, func(t *testing.T) {
 			lock, err := os.ReadFile("../../.github/workflows/" + entry.id + ".lock.yml")
@@ -179,14 +184,20 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 				assert.Contains(t, callee.Concurrency["group"], "${{ github.run_id }}")
 			}
 			for name, config := range callee.Jobs {
+				allowedPermissions := binding.Permissions
+				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
+					allowedPermissions = map[string]string{
+						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
+					}
+				}
 				for permission, level := range config.Permissions {
-					assert.NotEqual(t, "write", level, "%s must not grant %s write permission", name, permission)
-					assert.Equal(t, level, binding.Permissions[permission], "caller must allow %s required by %s", permission, name)
+					assert.Equal(t, "read", level, "%s must not grant %s write permission", name, permission)
+					assert.Equal(t, allowedPermissions[permission], level, "%s must allow only scoped %s permission", name, permission)
 				}
 			}
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
 			assert.Equal(t, 2, callee.Jobs["safe_outputs"].TimeoutMinutes)
-			assert.Contains(t, string(lock), `"maxAiCredits":5`)
+			assert.Contains(t, string(lock), fmt.Sprintf(`"maxAiCredits":%d,`, entry.credits))
 			assert.Contains(t, string(lock), `"maxCacheMisses":12`)
 			assert.Contains(t, string(lock), `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
 			assert.Contains(t, string(lock), `"threat_detection":{"mode":"disabled"}`)
@@ -197,21 +208,69 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 }
 
 func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
-	var canonical, reusable map[string]any
+	var canonical map[string]any
 	readConformanceFrontmatter(t, "../../.github/workflows/engine-conformance-agy.md", &canonical)
-	readConformanceFrontmatter(t, "../../.github/workflows/agy-conformance-reusable.md", &reusable)
-	for key, trigger := range map[string]string{"canonical": "workflow_dispatch", "reusable": "workflow_call"} {
-		source := canonical
-		if key == "reusable" {
-			source = reusable
-		}
-		assert.Equal(t, map[string]any{trigger: nil}, source["on"])
-		assert.Equal(t, []any{"shared/agy-conformance.md"}, source["imports"])
-		delete(source, "name")
-		delete(source, "description")
-		delete(source, "on")
+	assert.Equal(t, map[string]any{"workflow_dispatch": nil}, canonical["on"])
+	assert.Equal(t, []any{"shared/agy-conformance.md"}, canonical["imports"])
+	assert.EqualValues(t, 5, canonical["max-ai-credits"])
+	delete(canonical, "name")
+	delete(canonical, "description")
+	delete(canonical, "on")
+	delete(canonical, "max-ai-credits")
+	for _, entry := range []struct {
+		id, trigger string
+		credits     int
+	}{
+		{"agy-conformance-reusable", "workflow_call", 5},
+		{"smoke-agy", "workflow_dispatch", 50},
+	} {
+		t.Run(entry.id, func(t *testing.T) {
+			var source map[string]any
+			readConformanceFrontmatter(t, "../../.github/workflows/"+entry.id+".md", &source)
+			expectedTriggers := map[string]any{entry.trigger: nil}
+			if entry.id == "smoke-agy" {
+				expectedTriggers["slash_command"] = map[string]any{
+					"name":     "smoke-agy",
+					"strategy": "centralized",
+					"events":   []any{"issues", "issue_comment", "pull_request", "pull_request_comment"},
+				}
+				expectedTriggers["label_command"] = map[string]any{
+					"name":         "smoke",
+					"events":       []any{"pull_request"},
+					"remove_label": false,
+				}
+				expectedTriggers["reaction"] = "none"
+				expectedTriggers["status-comment"] = false
+			}
+			assert.Equal(t, expectedTriggers, source["on"])
+			assert.Equal(t, []any{"shared/agy-conformance.md"}, source["imports"])
+			assert.EqualValues(t, entry.credits, source["max-ai-credits"])
+			delete(source, "name")
+			delete(source, "description")
+			delete(source, "on")
+			delete(source, "max-ai-credits")
+			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
+		})
 	}
-	assert.Equal(t, canonical, reusable, "both compilation paths must retain identical gate configuration")
+}
+
+func TestAgySmokeSlashCommandIsCentrallyRouted(t *testing.T) {
+	router, err := os.ReadFile("../../.github/workflows/agentic_commands.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(router), `"smoke-agy":[{"workflow":"smoke-agy","events":["issue_comment","issues","pull_request","pull_request_comment"]}]`)
+	lock, err := os.ReadFile("../../.github/workflows/smoke-agy.lock.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(lock), `GH_AW_COMMANDS: "[\"smoke-agy\"]"`)
+}
+
+func TestAgySmokeLabelCommandIsCentrallyRouted(t *testing.T) {
+	router, err := os.ReadFile("../../.github/workflows/agentic_commands.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(router), `"smoke":[{"workflow":"smoke-agy","events":["pull_request"]}`)
+	lock, err := os.ReadFile("../../.github/workflows/smoke-agy.lock.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(lock), `fromJSON(github.event.inputs.aw_context || '{}').trigger_label == 'smoke'`)
+	assert.NotContains(t, string(lock), "remove_trigger_label")
 }
 
 func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {
