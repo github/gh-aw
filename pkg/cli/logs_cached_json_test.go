@@ -43,6 +43,18 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 	assert.Equal(t, "cached-workflow", runs.runs[42].WorkflowName)
 }
 
+func TestBuildCachedLogsJSONLRunDataUsesEffectiveRoutedModel(t *testing.T) {
+	routing := &ModelRoutingSummary{Status: "selected", SelectedModel: "gpt-5.6-luna", WireModel: "gpt-5.6-luna", SelectedEffort: "high"}
+	info := &AwInfo{Model: "auto", RequestedModel: "auto"}
+	runData := RunData{awInfo: info}
+	data := buildCachedLogsJSONLRunData(ProcessedRun{ModelRouting: routing}, runData)
+	require.Equal(t, "gpt-5.6-luna", data.Model)
+	require.Equal(t, "gpt-5.6-luna", data.RunData.Model)
+	require.Equal(t, "high", data.ModelEffort)
+	require.Equal(t, "selected", data.ModelRoutingStatus)
+	require.Equal(t, "auto", data.RequestedModel)
+}
+
 func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.jsonl")
 	require.NoError(t, os.WriteFile(path, []byte("{\"schema_version\":4,\"kind\":\"run\",\"run\":{\"run_id\":42}}\n"), 0o600))

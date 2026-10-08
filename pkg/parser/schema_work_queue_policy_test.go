@@ -9,13 +9,13 @@ import (
 )
 
 func TestWorkQueuePolicySchema(t *testing.T) {
-	for _, tool := range []any{true, nil, map[string]any{"worker": true}, map[string]any{"storage": "git"}} {
+	for _, tool := range []any{true, nil, map[string]any{}, map[string]any{"worker": true}} {
 		require.NoError(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 			"on": "workflow_dispatch", "tools": map[string]any{"work-queue": tool},
 		}, "worker.md"))
 	}
 
-	for _, tool := range []any{false, map[string]any{"storage": "issues"}, map[string]any{"scheduler": false}} {
+	for _, tool := range []any{false, map[string]any{"storage": "git"}, map[string]any{"storage": "issues"}, map[string]any{"storage": nil}, map[string]any{"scheduler": false}} {
 		require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 			"on": "workflow_dispatch", "tools": map[string]any{"work-queue": tool},
 		}, "worker.md"))

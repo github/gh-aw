@@ -1576,6 +1576,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Documentation Healer"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-doc-healer.md"
           GH_AW_TRACKER_ID: "daily-doc-healer"
+          GH_AW_ENGINE_ID: "claude"
+          GH_AW_ENGINE_MODEL: "${{ needs.activation.outputs.model_size }}"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "true"
@@ -1624,6 +1626,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Documentation Healer"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-doc-healer.md"
           GH_AW_TRACKER_ID: "daily-doc-healer"
+          GH_AW_ENGINE_ID: "claude"
+          GH_AW_ENGINE_MODEL: "${{ needs.activation.outputs.model_size }}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1642,6 +1646,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Documentation Healer"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-doc-healer.md"
           GH_AW_TRACKER_ID: "daily-doc-healer"
+          GH_AW_ENGINE_ID: "claude"
+          GH_AW_ENGINE_MODEL: "${{ needs.activation.outputs.model_size }}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

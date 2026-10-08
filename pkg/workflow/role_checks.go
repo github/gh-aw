@@ -356,6 +356,9 @@ func rolesAreAll(roles []string) bool {
 
 // needsRoleCheck determines if the workflow needs permission checks with full context
 func (c *Compiler) needsRoleCheck(data *WorkflowData, frontmatter map[string]any) bool {
+	if data.DryRun {
+		return true
+	}
 	// If user explicitly specified "roles: all", no permission checks needed
 	if rolesAreAll(data.Roles) {
 		roleLog.Print("Role check not needed: roles set to 'all'")

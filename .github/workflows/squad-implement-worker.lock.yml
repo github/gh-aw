@@ -1488,6 +1488,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Squad Implement Worker"
           GH_AW_WORKFLOW_SOURCE: "bradygaster/squad/workflows/squad-implement-worker.md@a70c752010f8adfb33f06c7aafb32db09aab1060"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/bradygaster/squad/blob/a70c752010f8adfb33f06c7aafb32db09aab1060/workflows/squad-implement-worker.md"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1533,6 +1535,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Squad Implement Worker"
           GH_AW_WORKFLOW_SOURCE: "bradygaster/squad/workflows/squad-implement-worker.md@a70c752010f8adfb33f06c7aafb32db09aab1060"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/bradygaster/squad/blob/a70c752010f8adfb33f06c7aafb32db09aab1060/workflows/squad-implement-worker.md"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1551,6 +1555,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Squad Implement Worker"
           GH_AW_WORKFLOW_SOURCE: "bradygaster/squad/workflows/squad-implement-worker.md@a70c752010f8adfb33f06c7aafb32db09aab1060"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/bradygaster/squad/blob/a70c752010f8adfb33f06c7aafb32db09aab1060/workflows/squad-implement-worker.md"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

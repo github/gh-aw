@@ -1536,6 +1536,9 @@ jobs:
           GH_AW_NOOP_MAX: "2"
           GH_AW_WORKFLOW_NAME: "Engine Conformance Agy (Experimental)"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/engine-conformance-agy.md"
+          GH_AW_ENGINE_ID: "agy"
+          GH_AW_ENGINE_VERSION: "1.3.1"
+          GH_AW_ENGINE_MODEL: "gemini-3.8-flash-medium"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1560,6 +1563,9 @@ jobs:
           GH_AW_MISSING_TOOL_TITLE_PREFIX: "[missing tool]"
           GH_AW_WORKFLOW_NAME: "Engine Conformance Agy (Experimental)"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/engine-conformance-agy.md"
+          GH_AW_ENGINE_ID: "agy"
+          GH_AW_ENGINE_VERSION: "1.3.1"
+          GH_AW_ENGINE_MODEL: "gemini-3.8-flash-medium"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1577,6 +1583,9 @@ jobs:
           GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE: "true"
           GH_AW_WORKFLOW_NAME: "Engine Conformance Agy (Experimental)"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/engine-conformance-agy.md"
+          GH_AW_ENGINE_ID: "agy"
+          GH_AW_ENGINE_VERSION: "1.3.1"
+          GH_AW_ENGINE_MODEL: "gemini-3.8-flash-medium"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

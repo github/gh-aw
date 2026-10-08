@@ -8,7 +8,7 @@ Work queues can also use lightweight
 [issue-backed queue patterns](/gh-aw/patterns/workqueue-ops/). Those patterns
 use GitHub read tools and safe outputs, but do not provide native fair
 scheduling, Claim authority, or verified dependency graphs. Native version-3
-`tools.work-queue` accepts only `storage: git`.
+`tools.work-queue` always uses Git; no storage selector is available.
 
 Before you begin, prepare a trusted producer identity and an approved worker.
 The producer submits tasks; the dispatcher requests assignments; the worker
@@ -25,7 +25,6 @@ the Claims that authorize its work:
 ```yaml title="Worker frontmatter"
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
 ```

@@ -238,6 +238,9 @@ func TestCopilotEngineLLMProviderAnthropicAutoBYOK(t *testing.T) {
 		NetworkPermissions: &NetworkPermissions{
 			Firewall: &FirewallConfig{Enabled: true},
 		},
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{ID: "awf"},
+		},
 	}
 
 	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
@@ -252,12 +255,36 @@ func TestCopilotEngineLLMProviderAnthropicAutoBYOK(t *testing.T) {
 	if !strings.Contains(stepContent, "COPILOT_PROVIDER_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}") {
 		t.Errorf("Expected COPILOT_PROVIDER_API_KEY derived from Anthropic secret, got:\n%s", stepContent)
 	}
-	expectedBaseURL := "COPILOT_PROVIDER_BASE_URL: http://host.docker.internal:" + strconv.Itoa(constants.ClaudeLLMGatewayPort)
+	expectedBaseURL := "COPILOT_PROVIDER_BASE_URL: http://api-proxy:" + strconv.Itoa(constants.ClaudeLLMGatewayPort)
 	if !strings.Contains(stepContent, expectedBaseURL) {
 		t.Errorf("Expected COPILOT_PROVIDER_BASE_URL for anthropic gateway, got:\n%s", stepContent)
 	}
 	if strings.Contains(stepContent, "COPILOT_GITHUB_TOKEN:") {
 		t.Errorf("COPILOT_GITHUB_TOKEN should be omitted in auto-BYOK mode, got:\n%s", stepContent)
+	}
+}
+
+func TestCopilotEngineLLMProviderOpenAIAutoBYOKUsesIsolatedGateway(t *testing.T) {
+	engine := NewCopilotEngine()
+	workflowData := &WorkflowData{
+		Name: "test-workflow",
+		EngineConfig: &EngineConfig{
+			LLMProvider: LLMProviderOpenAI,
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+		SandboxConfig:      &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+	}
+
+	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
+	if len(steps) != 1 {
+		t.Fatalf("Expected 1 execution step, got %d", len(steps))
+	}
+	stepContent := strings.Join([]string(steps[0]), "\n")
+	if !strings.Contains(stepContent, "COPILOT_PROVIDER_BASE_URL: http://api-proxy:"+strconv.Itoa(constants.CodexLLMGatewayPort)) {
+		t.Errorf("Expected isolated OpenAI gateway URL, got:\n%s", stepContent)
+	}
+	if !strings.Contains(stepContent, "COPILOT_PROVIDER_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}") {
+		t.Errorf("Expected OpenAI provider credentials to be preserved, got:\n%s", stepContent)
 	}
 }
 

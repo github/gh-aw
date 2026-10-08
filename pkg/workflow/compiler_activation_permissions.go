@@ -141,9 +141,6 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 	if isWorkQueueWorker(ctx.data) {
 		permsMap[PermissionContents] = PermissionWrite
 	}
-	if isWorkQueueEnabled(ctx.data) && workQueueStorage(ctx.data) == "issues" {
-		permsMap[PermissionIssues] = PermissionRead
-	}
 	if isWorkQueueEnabled(ctx.data) || !ctx.data.StaleCheckDisabled || hasMaxDailyAICGuardrail(ctx.data) || operationalValueGraderEnabled(ctx.data) {
 		permsMap[PermissionActions] = PermissionRead
 	}

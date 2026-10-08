@@ -54,11 +54,12 @@ function matchesWorkflowId(body, workflowId) {
  * @returns {string} XML comment marker with workflow metadata
  */
 function generateXMLMarker(workflowName, runUrl) {
-  const { getFallbackModel, validateModelIdentifier } = require("./model_attribution.cjs");
+  const { resolveEffectiveModel, validateModelIdentifier } = require("./model_attribution.cjs");
   // Read engine metadata from environment variables
   const engineId = process.env.GH_AW_ENGINE_ID || "";
   const engineVersion = process.env.GH_AW_ENGINE_VERSION || "";
-  const engineModel = getFallbackModel() || validateModelIdentifier(process.env.GH_AW_ENGINE_MODEL);
+  const attribution = resolveEffectiveModel();
+  const engineModel = attribution.model || (attribution.routing ? attribution.requestedModel : validateModelIdentifier(process.env.GH_AW_ENGINE_MODEL));
   const trackerId = process.env.GH_AW_TRACKER_ID || "";
   const runId = process.env.GITHUB_RUN_ID || "";
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
@@ -87,6 +88,12 @@ function generateXMLMarker(workflowName, runUrl) {
   // Add model if available
   if (engineModel) {
     parts.push(`model: ${engineModel}`);
+  }
+  if (attribution.routing?.status === "selected") {
+    if (attribution.effort) parts.push(`effort: ${attribution.effort}`);
+    parts.push("routed: true");
+  } else if (attribution.routing) {
+    parts.push(`routed: ${attribution.routing.status}`);
   }
 
   // Add numeric run ID if available

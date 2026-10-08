@@ -1370,6 +1370,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily A/B Testing Advisor"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/ab-testing-advisor.md"
           GH_AW_TRACKER_ID: "ab-testing-advisor"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1416,6 +1418,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily A/B Testing Advisor"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/ab-testing-advisor.md"
           GH_AW_TRACKER_ID: "ab-testing-advisor"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1434,6 +1438,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily A/B Testing Advisor"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/ab-testing-advisor.md"
           GH_AW_TRACKER_ID: "ab-testing-advisor"
+          GH_AW_ENGINE_ID: "codex"
+          GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

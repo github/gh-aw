@@ -182,10 +182,11 @@ func (e *UniversalLLMConsumerEngine) ApplyUniversalProviderEnv(env map[string]st
 	}
 	if firewallEnabled {
 		universalLLMConsumerLog.Printf("Setting %s to gateway port %d", profile.baseURLEnvName, profile.gatewayPort)
-		env[profile.baseURLEnvName] = fmt.Sprintf("http://host.docker.internal:%d", profile.gatewayPort)
+		baseURL := llmGatewayBaseURL(profile.gatewayPort, workflowData)
+		env[profile.baseURLEnvName] = baseURL
 		if profile.extraURLEnvName != "" {
 			universalLLMConsumerLog.Printf("Setting extra URL env %s to gateway port %d", profile.extraURLEnvName, profile.gatewayPort)
-			env[profile.extraURLEnvName] = fmt.Sprintf("http://host.docker.internal:%d", profile.gatewayPort)
+			env[profile.extraURLEnvName] = baseURL
 		}
 	}
 }

@@ -11,7 +11,6 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { formatAIC } = require("./model_costs.cjs");
-const { reduceModelNameToIdentifier } = require("./model_aliases.cjs");
 const { buildNoopConclusionSummary } = require("./conclusion_summary.cjs");
 /**
  * Search for or create the parent issue for all agentic workflow no-op runs
@@ -108,7 +107,7 @@ function buildAICSuffix() {
   const agentAIC = parsePositiveAIC(process.env.GH_AW_AIC);
   const detectionAIC = parsePositiveAIC(process.env.GH_AW_THREAT_DETECTION_AIC);
   const evalsAIC = parsePositiveAIC(process.env.GH_AW_EVALS_AIC);
-  const compressedModelName = reduceModelNameToIdentifier(require("./model_attribution.cjs").getFallbackModel() || process.env.GH_AW_PRIMARY_MODEL || process.env.GH_AW_ENGINE_MODEL);
+  const compressedModelName = require("./model_attribution.cjs").getEffectiveModelLabel();
   const agentSuffix = buildAICEntry("", agentAIC, compressedModelName);
   const detectionSuffix = buildAICEntry("⌖", detectionAIC);
   const evalsSuffix = buildAICEntry("◇", evalsAIC);

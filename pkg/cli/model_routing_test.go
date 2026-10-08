@@ -146,6 +146,31 @@ func TestBuildAuditComparisonCandidateFromLegacySummary(t *testing.T) {
 	}
 }
 
+func TestResolveEffectiveModelAttributionSuppressesUnselectedRouteModels(t *testing.T) {
+	info := &AwInfo{
+		Model: "auto",
+		ModelRouting: &AwInfoModelRouting{
+			Status: "failed",
+		},
+	}
+	usage := &TokenUsageSummary{
+		ByModel: map[string]*ModelTokenUsage{
+			"router-classifier": {AIC: 1},
+		},
+	}
+
+	attribution := resolveEffectiveModelAttribution(info, nil, usage)
+	if attribution.Model != "" {
+		t.Fatalf("failed routing must not attribute classifier usage as the agent model: %+v", attribution)
+	}
+
+	legacyInfo := &AwInfo{Model: "configured-alias"}
+	attribution = resolveEffectiveModelAttribution(legacyInfo, nil, usage)
+	if attribution.Model != "configured-alias" {
+		t.Fatalf("non-routed workflows must retain configured model attribution: %+v", attribution)
+	}
+}
+
 func TestModelRoutingComparisonDetectsRouteChanges(t *testing.T) {
 	before := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2"}
 	after := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "high", Mode: "economy", RouterVersion: "0.1.3"}

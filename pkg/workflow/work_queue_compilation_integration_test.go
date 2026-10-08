@@ -37,7 +37,7 @@ func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
 			require.NoError(t, os.MkdirAll(dir, 0o700))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "worker.md"), []byte("---\non: workflow_dispatch\ntools:\n  work-queue:\n    worker: true\n---\nProcess queue work.\n"), 0o600))
 			filename := filepath.Join(dir, "dispatcher.md")
-			source := "---\non: workflow_dispatch\nengine: claude\ntools:\n  work-queue:\n    storage: git\nsafe-outputs:\n" +
+			source := "---\non: workflow_dispatch\nengine: claude\ntools:\n  work-queue: true\nsafe-outputs:\n" +
 				entry.global + "  dispatch-workflow:\n    workflows: [worker]\n" + entry.dispatch + "---\nProcess queue work.\n"
 			require.NoError(t, os.WriteFile(filename, []byte(source), 0o600))
 			compiler := NewCompiler(WithVersion("integration"))
@@ -106,7 +106,6 @@ name: Work Queue Worker Integration
 engine: claude
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
 safe-outputs:
@@ -130,6 +129,8 @@ Compile each work-queue workflow phase.
 	require.NoError(t, err)
 	assertWorkQueueProtectedOriginTransport(t, lockContent)
 	compiled := string(lockContent)
+	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_STORAGE")
+	require.NotContains(t, compiled, "WORK_QUEUE_HMAC_SECRET")
 	require.Contains(t, compiled, `GH_AW_WORK_QUEUE_ROLE: "worker"`)
 	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_POLICY:")
 	require.Contains(t, compiled, "work_queue_assignment:")
@@ -338,27 +339,31 @@ func TestWorkQueueRepositoryObserverCompilation(t *testing.T) {
 	}
 }
 
-func TestIssueWorkQueueCompilationPhases(t *testing.T) {
-	dir := testutil.TempDir(t, "work-queue-issues-")
-	workflowPath := filepath.Join(dir, "issue-worker.md")
-	workflow := `---
+func TestWorkQueueStorageFieldRejected(t *testing.T) {
+	for _, storage := range []string{"git", "issues", "null"} {
+		t.Run(storage, func(t *testing.T) {
+			dir := testutil.TempDir(t, "work-queue-storage-")
+			workflowPath := filepath.Join(dir, "worker.md")
+			workflow := `---
 on: workflow_dispatch
-name: Issue Work Queue Worker
 engine: claude
 tools:
   work-queue:
-    storage: issues
+    storage: ` + storage + `
     worker: true
 ---
 
 Read and finish assigned work.
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
-	issueCompiler := NewCompiler(WithVersion("integration"))
-	issueCompiler.SetApprove(true)
-	require.Error(t, issueCompiler.CompileWorkflow(workflowPath))
-	_, err := os.Stat(filepath.Join(dir, "issue-worker.lock.yml"))
-	require.True(t, os.IsNotExist(err), "unsupported Issues backend must not produce a lock file")
+			require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
+			compiler := NewCompiler(WithVersion("integration"))
+			compiler.SetApprove(true)
+			err := compiler.CompileWorkflow(workflowPath)
+			require.ErrorContains(t, err, "storage")
+			_, err = os.Stat(filepath.Join(dir, "worker.lock.yml"))
+			require.True(t, os.IsNotExist(err), "removed storage field must not produce a lock file")
+		})
+	}
 }
 
 func TestWorkQueueCustomAndStandaloneAdapterCompilation(t *testing.T) {
@@ -537,7 +542,6 @@ on:
   workflow_dispatch:
 tools:
   work-queue:
-    storage: git
     worker: true
 ---
 Process the assigned work.
@@ -546,8 +550,7 @@ Process the assigned work.
 	require.NoError(t, os.WriteFile(dispatcherPath, []byte(`---
 on: workflow_dispatch
 tools:
-  work-queue:
-    storage: git
+  work-queue: true
 safe-outputs:
   dispatch-workflow:
     workflows: [worker]

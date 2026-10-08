@@ -38,6 +38,13 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	if isFirewallEnabled(data) || engine.GetID() == string(constants.CopilotEngine) {
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.TokenUsageFilename.String())
 	}
+	if isModelRoutingEnabled(data) {
+		// The post-run parser patches this runner-side copy with the AWF selection.
+		// Keep it in the agent artifact; activation's separate "info" artifact remains
+		// the compile-time snapshot for compatibility with existing downloads.
+		paths = append(paths, constants.TmpGhAwDirSlash+"agent/aw_info.json")
+		paths = append(paths, constants.TmpGhAwDirSlash+"agent/awf-routing-outcome.json")
+	}
 	if engine.GetID() == string(constants.CopilotEngine) {
 		paths = append(paths, constants.TmpGhAwDirSlash+"agent_usage.jsonl")
 	}

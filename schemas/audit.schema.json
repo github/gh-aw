@@ -1123,6 +1123,15 @@
             "model": {
               "type": "string"
             },
+            "requested_model": {
+              "type": "string"
+            },
+            "model_effort": {
+              "type": "string"
+            },
+            "model_routing_status": {
+              "type": "string"
+            },
             "version": {
               "type": "string"
             },

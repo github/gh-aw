@@ -37,7 +37,7 @@ func TestDryRunWorkflowMutationControls(t *testing.T) {
 	enabled := true
 	data := &WorkflowData{
 		AIReaction: "eyes", StatusComment: &enabled, LockForAgent: true, LabelCommandRemoveLabel: true,
-		Tools:             map[string]any{"work-queue": map[string]any{"storage": "issues"}, "github": true},
+		Tools:             map[string]any{"work-queue": true, "github": true},
 		ParsedTools:       &Tools{GitHub: &GitHubToolConfig{}},
 		CacheMemoryConfig: &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default"}}},
 		DriveMemoryConfig: &DriveMemoryConfig{Drives: []DriveMemoryEntry{{ID: "default"}}},
@@ -189,7 +189,6 @@ on: workflow_dispatch
 engine: copilot
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
 ---
