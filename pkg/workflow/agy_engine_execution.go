@@ -31,8 +31,8 @@ func (e *AgyEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string
 
 func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, engineCommand string, firewallEnabled bool) string {
 	if !firewallEnabled {
-		return fmt.Sprintf("set -o pipefail\nexport no_proxy=\"${NO_PROXY:-}\"\nprintf '%%s' \"$(date +%%s%%3N)\" > %s\n%s 2>&1 | tee -a %s",
-			AgentCLIStartMsPath, engineCommand, logFile)
+		return fmt.Sprintf("set -o pipefail\nexport no_proxy=\"${NO_PROXY:-}\"\nprintf '%%s' \"$(date +%%s%%3N)\" > %s\ntouch %s\n%s 2>&1 | tee -a %s",
+			AgentCLIStartMsPath, AgentStepSummaryPath, engineCommand, logFile)
 	}
 	engineCommand = fmt.Sprintf("export no_proxy=\"${NO_PROXY:-}\" && %s && %s", GetNpmBinPathSetup(), engineCommand)
 	if cliPath := GetMicroVMNpmCLIPathSetup(workflowData); cliPath != "" {
@@ -47,6 +47,7 @@ func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, e
 		LogFile:            logFile,
 		WorkflowData:       workflowData,
 		UsesTTY:            false,
+		PathSetup:          "touch " + AgentStepSummaryPath,
 		AllowedDomains:     mergeDomainsWithNetworkToolsAndRuntimes(AgyDefaultDomains, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes),
 		ExcludeEnvVarNames: ComputeAWFExcludeEnvVarNames(workflowData, e.GetRequiredSecretNames(workflowData)),
 	})
@@ -56,6 +57,7 @@ func (e *AgyEngine) buildExecutionEnv(workflowData *WorkflowData, firewallEnable
 	env := map[string]string{
 		"GH_AW_PROMPT":         constants.AwPromptsFile,
 		"GITHUB_WORKSPACE":     "${{ github.workspace }}",
+		"GITHUB_STEP_SUMMARY":  AgentStepSummaryPath,
 		"NO_PROXY":             constants.AWFNoProxyHosts,
 		"RUNNER_TEMP":          "${{ runner.temp }}",
 		"GH_AW_AGY_MODEL":      constants.AgyDefaultModel,

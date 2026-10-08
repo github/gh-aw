@@ -66,6 +66,9 @@ repeated cumulative usage snapshots are not added together. Missing metrics
 retain their last valid value when a later result omits them; metrics never
 reported remain absent. Status and errors come from the current result.
 
+Agent writes to `GITHUB_STEP_SUMMARY` use an isolated file that is appended to
+the runner's step summary only after secret redaction, matching other built-in engines.
+
 Configured HTTP MCP servers are translated from the gh-aw gateway into
 owner-only `.agents/mcp_config.json`, using native `serverUrl` entries and
 validated headers. CLI-mounted infrastructure tools, including `safeoutputs`

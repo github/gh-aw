@@ -108,6 +108,52 @@ func TestAgyExperimentalDiagnosticIsInformational(t *testing.T) {
 	assert.Zero(t, compiler.GetWarningCount())
 }
 
+func TestAgyInstallationDoesNotMutateOptionalConfiguration(t *testing.T) {
+	engine := NewAgyEngine()
+	for _, tt := range []struct {
+		name string
+		data *WorkflowData
+	}{
+		{"nil workflow", nil},
+		{"nil engine config", &WorkflowData{AI: "agy"}},
+		{"empty version", &WorkflowData{AI: "agy", EngineConfig: &EngineConfig{ID: "agy"}}},
+		{"explicit version", &WorkflowData{AI: "agy", EngineConfig: &EngineConfig{ID: "agy", Version: "1.3.1"}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var version string
+			if tt.data != nil && tt.data.EngineConfig != nil {
+				version = tt.data.EngineConfig.Version
+			}
+			steps := engine.GetInstallationSteps(tt.data)
+			require.NotEmpty(t, steps)
+			assert.Equal(t, GenerateNodeJsSetupStep(), steps[0])
+			if tt.data != nil {
+				assert.Equal(t, "1.3.1", getInstallationVersion(tt.data, engine, NewEngineRegistry()))
+				if tt.data.EngineConfig != nil {
+					assert.Equal(t, version, tt.data.EngineConfig.Version)
+				}
+			}
+		})
+	}
+}
+
+func TestAgyStepSummaryIsolation(t *testing.T) {
+	for _, firewallEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("firewall=%t", firewallEnabled), func(t *testing.T) {
+			data := &WorkflowData{
+				AI:                 "agy",
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: firewallEnabled}},
+			}
+			steps := NewAgyEngine().GetExecutionSteps(data, "agent-stdio.log")
+			require.Len(t, steps, 1)
+			content := strings.Join(steps[0], "\n")
+			assert.Contains(t, content, "GITHUB_STEP_SUMMARY: "+AgentStepSummaryPath)
+			assert.Contains(t, content, "touch "+AgentStepSummaryPath)
+			assert.Less(t, strings.Index(content, "touch "+AgentStepSummaryPath), strings.Index(content, "agy_harness.cjs"))
+		})
+	}
+}
+
 func TestAgyUsesExistingGeminiProviderTarget(t *testing.T) {
 	data := &WorkflowData{AI: "agy", EngineConfig: &EngineConfig{
 		Env: map[string]string{"GOOGLE_GEMINI_BASE_URL": "https://gemini-proxy.example/api"},

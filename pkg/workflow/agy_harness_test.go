@@ -149,6 +149,33 @@ process.kill(process.ppid, "SIGINT");`
 	})
 }
 
+func TestAgyHarnessStdoutBufferGuard(t *testing.T) {
+	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
+	for _, tt := range []struct {
+		name    string
+		size    int
+		failure bool
+	}{
+		{"below limit", 2*1024*1024 - 1024, false},
+		{"above limit", 2*1024*1024 + 1024, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			body := `const result = () => console.log(JSON.stringify({event:"result",result:{status:"SUCCESS",num_turns:1,usage:{input_tokens:10,output_tokens:2}}}));
+process.stdout.write(JSON.stringify({event:"init",padding:"x".repeat(` + strconv.Itoa(tt.size) + `)}) + "\n", result);`
+			cmd, _ := agyHarnessCommand(t, body, validReflect)
+			out, err := cmd.CombinedOutput()
+			if tt.failure {
+				require.Error(t, err)
+				assert.Contains(t, string(out), "session.error")
+			} else {
+				require.NoError(t, err)
+				assert.NotContains(t, string(out), "session.error")
+				assert.Contains(t, string(out), `"status":"SUCCESS"`)
+			}
+		})
+	}
+}
+
 func TestAgyHarnessBoundsDescendantPipes(t *testing.T) {
 	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
 	for _, detached := range []bool{false, true} {

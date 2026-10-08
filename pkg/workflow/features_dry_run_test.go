@@ -25,6 +25,7 @@ func TestValidateDryRunFeatures(t *testing.T) {
 		{"string value", map[string]any{"dangerously-example": "enabled"}, "features.dangerously-example"},
 		{"case insensitive", map[string]any{"Dangerously-example": true}, "features.Dangerously-example"},
 		{"deterministic order", map[string]any{"dangerously-z": true, "dangerously-a": true}, "features.dangerously-a, features.dangerously-z"},
+		{"mixed case lexical order", map[string]any{"dangerously-a": true, "Dangerously-z": true, "dangerously-z": true}, "features.Dangerously-z, features.dangerously-a, features.dangerously-z"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateDryRunFeatures(tt.features)

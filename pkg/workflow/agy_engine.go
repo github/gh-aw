@@ -81,8 +81,5 @@ func (e *AgyEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHubAc
 
 func (e *AgyEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
 	agyLog.Print("Generating Agy runtime installation steps")
-	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Version == "" {
-		workflowData.EngineConfig.Version = string(constants.DefaultAgyVersion)
-	}
 	return BuildNpmEngineInstallStepsWithAWF([]GitHubActionStep{GenerateNodeJsSetupStep()}, workflowData)
 }

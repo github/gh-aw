@@ -1,14 +1,16 @@
 # ADR-66998: Implement Agy as a Native Go Engine and Scope Dry-Run Dangerous-Feature Checks to Authored Configuration
 
-**Date**: 2026-10-09
-**Status**: Draft
-**Deciders**: pelikhan (PR #66998 author) [TODO: verify additional deciders]
+**Date**: 2026-10-08
+**Status**: Proposed
+**Deciders**: pelikhan (PR #66998 author and requester of the engine migration and dry-run scope)
 
 ---
 
 ### Context
 
-The Agy (Google Antigravity CLI) engine was defined primarily through the Markdown engine catalog entry `pkg/workflow/data/engines/agy.md`, which carried roughly 254 lines of executable runtime behavior (harness logic and gateway configuration) inside a catalog document. Every other first-class engine in the compiler — Gemini, Claude, Copilot — is implemented as a Go type in `pkg/workflow` with its runtime scripts shipped in `actions/setup/js/`. Keeping executable behavior in the catalog meant Agy bypassed the compiler's shared engine plumbing (version/model defaults, API-key routing, AWF isolation defaults, protected agent manifests, MCP configuration, log parsing) and that its behavior was invisible to Go tests and type checking. Separately, the compiler's strict dry-run validation rejected `dangerously-*` flags without distinguishing between features authored by workflow authors in Markdown and flags set internally by trusted built-in engine implementations; the native Agy harness legitimately needs `--dangerously-skip-permissions` inside the AWF sandbox to preserve its existing unattended execution profile.
+The Agy (Google Antigravity CLI) engine was defined through the Markdown engine catalog entry `pkg/workflow/data/engines/agy.md`, which carried roughly 254 lines of executable runtime behavior. It used the compiler's behavior-defined engine infrastructure and already had Go-driven harness tests, but JavaScript embedded in Markdown was outside setup-action type checking. The requester asked for a first-class Go engine similar to Gemini, with explicit engine interfaces and shared compiler defaults rather than executable catalog content.
+
+During development, an Agy-specific dry-run refusal was added because the harness passes `--dangerously-skip-permissions`. The requester subsequently clarified that the dangerous-feature filter should apply only to entries authored in workflow Markdown, not built-in engine implementation flags. Agy supports headless scoped permission grants; the bypass is not intrinsically required for headless mode, but preserves this integration's existing unattended execution profile.
 
 ### Decision
 
@@ -18,11 +20,11 @@ We will register Agy as a native Go engine (`AgyEngine` in `pkg/workflow/agy_eng
 
 #### Alternative 1: Keep Agy as a Markdown-only catalog engine
 
-Leave the harness and gateway logic in `pkg/workflow/data/engines/agy.md` and continue to special-case Agy in the compiler. This was the status quo and required no migration of the three Agy workflow locks. Rejected because the catalog entry had grown into a parallel, untested engine implementation: shared behavior (Gemini API-key routing, AWF isolation defaults, protected manifests, MCP config, streaming log parsing) had to be re-expressed there, and regressions were only observable at lock-generation time rather than in Go unit tests.
+Keep the behavior-defined engine and embedded harness/gateway logic in `pkg/workflow/data/engines/agy.md`. This avoids migrating the three Agy workflow locks and retains existing tests. Rejected because the requester explicitly chose the native Go engine architecture, and shipping runtime scripts through the setup action brings them under existing JavaScript tooling.
 
 #### Alternative 2: Reject all `dangerously-*` flags during dry-run, including engine-internal ones
 
-Keep the dry-run check as a blanket prohibition and change the native Agy harness to avoid `--dangerously-skip-permissions`. This is the strictest option and was a close call. Rejected for this PR because the alternative requires translating workflow tool restrictions into Agy's native scoped permission rules, which is not implemented yet; blanket rejection would have made the experimental Agy harness undryrunnable without delivering any additional real safety, since the flag is confined to the AWF sandbox. [TODO: verify intent to follow up with scoped permission-rule translation]
+Retain the development-time Agy refusal and replace the native blanket approval flag with scoped permission grants. Rejected for this PR because the requester explicitly scoped the filter to authored Markdown entries and requested preservation of the engine migration. Translating workflow tool restrictions into native permission rules would be a separate behavior change requiring verified mappings and conformance coverage; no follow-up commitment is made here. AWF isolation does not by itself prove that all uses of blanket approvals are safe.
 
 #### Alternative 3: Scope the dry-run check by engine allow-list rather than by authorship
 
@@ -32,14 +34,14 @@ Permit `dangerously-*` only for a named list of engines. Rejected because it cou
 
 #### Positive
 
-- Agy gains the compiler's shared engine behavior for free (version/model defaults, API-key routing, AWF isolation, protected manifests, MCP configuration, log parsing) and is now covered by Go unit tests (`agy_engine_test.go`, `agy_harness_test.go`, `features_dry_run_test.go`).
+- Agy's version/model defaults, API-key routing, AWF defaults, protected manifests, MCP configuration and log parsing are explicitly wired through native engine interfaces. Existing harness tests are retained and native-engine and dry-run regression coverage is added.
 - The three Agy workflow locks shrink substantially (~256 removed lines each in `smoke-agy`, `engine-conformance-agy`, `agy-conformance-reusable`) because the runtime logic now lives in the setup action instead of being inlined per workflow.
 - Dry-run validation now gives workflow authors an actionable error naming the exact `features.<name>` entries to remove, including those contributed by merged imports.
 
 #### Negative
 
 - Agy behavior is now split across three locations (Go engine, setup-action JS harness, metadata catalog entry), so a change to its runtime may require coordinated edits in all three.
-- Permitting trusted built-in engine flags weakens the dry-run gate's blanket guarantee: `--dangerously-skip-permissions` still reaches the Agy harness, and safety now depends on AWF isolation plus reviewer scrutiny of built-in engine code rather than on a single validation rule.
+- The authored-feature filter is not a guarantee that generated runtime commands contain no dangerous flags. `--dangerously-skip-permissions` still reaches Agy; runtime isolation, credential flows and reachable effects require separate review.
 - Translating workflow tool restrictions into Agy's native scoped permission rules remains unimplemented, leaving a known gap behind the experimental engine.
 
 #### Neutral
@@ -51,4 +53,4 @@ Permit `dangerously-*` only for a named list of engines. Rejected because it cou
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Proposed for acceptance with PR #66998. Implementation-internal flags remain subject to runtime security review, and successful compilation does not authorize dispatch.*
