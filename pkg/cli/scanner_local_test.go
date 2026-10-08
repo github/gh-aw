@@ -16,10 +16,20 @@ import (
 func installTestScanner(t *testing.T, dir, name, version string) string {
 	t.Helper()
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte("#!/bin/sh\necho '"+version+"'\n"), 0o755); err != nil {
+	script := "#!/bin/sh\n" +
+		"case \"${0##*/}\" in\n" +
+		"  zizmor) [ \"$#\" -eq 1 ] && [ \"$1\" = \"--version\" ] || exit 2 ;;\n" +
+		"  poutine) [ \"$#\" -eq 2 ] && [ \"$1\" = \"version\" ] && [ \"$2\" = \"--disable-version-check\" ] || exit 2 ;;\n" +
+		"esac\n" +
+		"printf '%s\\n' '" + version + "'\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return path
+	resolvedPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolvedPath
 }
 
 func TestLocalScannerPathVersionSelection(t *testing.T) {
@@ -88,7 +98,10 @@ func TestLocalScannerCommandsAndDockerFallback(t *testing.T) {
 	if err := os.Remove(poutine); err != nil {
 		t.Fatal(err)
 	}
+	path := os.Getenv("PATH")
+	t.Setenv("PATH", dir)
 	cmd, args, err = buildPoutineCommand(root)
+	t.Setenv("PATH", path)
 	if err != nil || cmd.Path != docker || cmd.Dir != root || !strings.Contains(strings.Join(args, " "), PoutineImage) {
 		t.Fatalf("docker poutine command: %v, %v, %v", cmd, args, err)
 	}

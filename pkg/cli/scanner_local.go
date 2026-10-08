@@ -37,7 +37,11 @@ func localScannerPath(ctx context.Context, name string) string {
 	}
 	versionCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	output, err := exec.CommandContext(versionCtx, path, "--version").CombinedOutput()
+	versionArgs := []string{"--version"}
+	if name == "poutine" {
+		versionArgs = []string{"version", "--disable-version-check"}
+	}
+	output, err := exec.CommandContext(versionCtx, path, versionArgs...).CombinedOutput()
 	if err != nil {
 		return ""
 	}
