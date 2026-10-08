@@ -290,8 +290,8 @@ function redactStepSummaryContent(content) {
 }
 
 /**
- * Makes processed files writable by subsequent custom redactors, including
- * container-owned logs that did not contain any built-in secret matches.
+ * Writes redacted content or prepares unchanged files for configured custom
+ * redactors. Called only when content changed or custom preparation is required.
  * @param {string} filePath
  * @param {string} content
  * @param {boolean} changed
