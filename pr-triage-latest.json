@@ -1,17 +1,16 @@
 {
-  "run_date": "2026-10-08T06:43:37Z",
-  "run_id": 37738956564,
+  "run_date": "2026-10-08T12:39:16Z",
+  "run_id": 37778097015,
   "source": "pr-triage-agent",
-  "eligible_total": 2,
+  "eligible_total": 1,
   "cooldown_skipped": 0,
   "category_counts": {
-    "bug": 2
+    "bug": 1
   },
   "risk_counts": {
-    "high": 2
+    "high": 1
   },
   "priority_counts": {
-    "high": 1,
     "medium": 1
   },
   "action_counts": {
@@ -19,10 +18,10 @@
     "batch_review": 1,
     "close": 0,
     "defer": 0,
-    "fast_track": 1
+    "fast_track": 0
   },
   "batches": [],
-  "selected_candidates": [56568, 66678],
+  "selected_candidates": [56568],
   "prs": [
     {
       "number": 56568,
@@ -40,23 +39,6 @@
       "batch": null,
       "ci_status": "unknown",
       "review_status": "changes_requested"
-    },
-    {
-      "number": 66678,
-      "title": "Avoid GHES masking of cross-job workflow outputs",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "score": 78,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 25,
-        "quality": 13
-      },
-      "action": "fast_track",
-      "batch": null,
-      "ci_status": "unknown",
-      "review_status": "commented"
     }
   ]
 }
