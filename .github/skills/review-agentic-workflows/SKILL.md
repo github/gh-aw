@@ -144,6 +144,14 @@ Recommend minimal, safe optimizations that keep or improve security posture.
 
 ## Review output contract
 
+Always provide a short user-visible result sentence for each security review and
+dry-run attempt, including failed, blocked, or unavailable checks. State the
+artifact/scope, outcome, what was actually checked, and any material finding or
+coverage gap. Do not leave results only in logs, artifacts, or subagent replies.
+Keep security-review and dry-run results separate; neither implies live execution
+or authorization. Follow the shared [review result](../../aw/debug-security-review.md#user-visible-result)
+and [dry-run result](../../aw/debug-agentic-workflow.md#user-visible-dry-run-result) rules.
+
 Return findings in three sections:
 
 1. **Security regressions (must-fix)** — high-confidence weakening changes.

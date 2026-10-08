@@ -24,6 +24,13 @@ dispatch retries. Missing readiness metadata alone is not a safety finding.
 Declared credential flows, authorized destinations, permissions, source/lock
 review, and human live-validation gates remain in scope.
 
+Always provide separate short user-visible result sentences for each security
+review and dry-run attempt, including failed, blocked, or unavailable outcomes.
+Name the artifact/scope, checks actually performed, and material findings or
+coverage gaps; do not leave the result only in logs or artifacts or imply live
+execution. Follow the shared [review result](../../aw/debug-security-review.md#user-visible-result)
+and [dry-run result](../../aw/debug-agentic-workflow.md#user-visible-dry-run-result) rules.
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)

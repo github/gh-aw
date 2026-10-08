@@ -141,6 +141,19 @@ commands, external MCP servers, and custom credentials remain unverified.
 The runtime explicitly warns about this scope; review their side effects before
 live testing, even after a successful dry-run compilation.
 
+## User-Visible Dry-Run Result
+
+After every dry-run attempt, always give the user one short result sentence
+naming the emitted artifact, passed/failed/blocked/unavailable outcome, checks
+actually run, and any material error, warning, or missing coverage. If no lock
+was emitted, say so. Never describe unrequested or unavailable scanners as passed,
+or imply that compilation executed the workflow or granted execution approval.
+Keep this separate from the security-review result and include it in the handoff,
+not only in logs or private artifacts.
+
+Example: "Dry-run passed source validation, model checks, and shellcheck for the
+telemetry-free emitted lock; no workflow was executed."
+
 ## Collect Existing Evidence
 
 Use cached evidence or the workflow name/run URL already supplied. Without

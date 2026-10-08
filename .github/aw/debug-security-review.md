@@ -163,3 +163,15 @@ Absent path: YES only with code-grounded not-applicable explanation.
   never commit raw logs.
 - Intent/code/import/dependency/lock changes invalidate affected verdicts. Review new
   revision, including fixes, before execution/upload.
+
+## User-Visible Result
+
+After every security-review attempt, always give the user one short result
+sentence naming the reviewed artifact/scope, PASS/BLOCKED/UNAVAILABLE outcome,
+controls actually examined, and any confirmed finding or material unresolved gap.
+Report this even when nothing was found; incomplete coverage is not a clean bill
+of health. Include it in the user handoff, not only in private artifacts or judge
+replies, and do not imply that review authorizes execution.
+
+Example: "Security review passed for the emitted dry-run lock: credential flows,
+executable provenance, and sandbox controls were checked, with no confirmed issues."
