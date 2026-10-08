@@ -43,6 +43,25 @@ implementation coverage, and the
 [formal verification reference](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md)
 for executable models, contracts and reproduction instructions.
 
+## Runtime debug logging
+
+The JavaScript runtime uses the shared logger framework to write opt-in,
+timestamped debug events to stderr. `DEBUG=work-queue:*` enables all queue
+namespaces. `DEBUG=work-queue:store,work-queue:dispatch` selects components;
+`DEBUG=work-queue:*,-work-queue:replay` excludes replay events. Namespace
+patterns support `*`, with comma or whitespace separators.
+`ACTIONS_RUNNER_DEBUG=true` or `RUNNER_DEBUG=1` enables all queue events,
+including when a GitHub Actions run is re-run with debug logging.
+
+Namespaces cover `store`, `replay`, `scheduler`, `native`, `dispatch`,
+`reconciler`, `claims`, `delivery`, `effects`, `memory`, `intents`, and `mcp`. Events describe
+publication attempts, conflicts, recovery, capacity and packing limits,
+native launch and binding, independent verification, and durable settlement.
+Metadata contains only counts, flags, retry delays, and HTTP status codes.
+Payloads, identifiers, repository names, paths, URLs, tokens, raw API responses,
+error messages, and stack traces are not logged. Debug events do not grant
+authority or replace durable queue receipts.
+
 ## Workflow roles and intent tools
 
 `tools.work-queue` gives the agent an immutable snapshot of the queue at
