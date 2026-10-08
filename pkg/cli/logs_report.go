@@ -166,6 +166,10 @@ type RunData struct {
 	Agent              string `json:"agent,omitempty" console:"header:Agent,omitempty"`
 	Engine             string `json:"engine,omitempty" console:"-"`
 	EngineID           string `json:"engine_id,omitempty" console:"-"`
+	Model              string `json:"model,omitempty" console:"header:Model,omitempty"`
+	RequestedModel     string `json:"requested_model,omitempty" console:"-"`
+	ModelEffort        string `json:"model_effort,omitempty" console:"header:Effort,omitempty"`
+	ModelRoutingStatus string `json:"model_routing_status,omitempty" console:"-"`
 	Status             string `json:"status" console:"header:Status"`
 	Conclusion         string `json:"conclusion,omitempty" console:"-"`
 	Classification     string `json:"classification" console:"-"`
@@ -428,7 +432,7 @@ type runEngineInfo struct {
 // aw_context, falling back to the processed run's context when unavailable.
 func extractRunEngineInfo(pr ProcessedRun) runEngineInfo {
 	var info runEngineInfo
-	awInfoPath := filepath.Join(pr.Run.LogsPath, "aw_info.json")
+	awInfoPath := findAwInfoPath(pr.Run.LogsPath)
 	if parsed, err := parseAwInfo(awInfoPath, false); err == nil && parsed != nil {
 		info.awInfo = parsed
 		info.engineID = parsed.EngineID
@@ -569,6 +573,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 // newRunData assembles the base RunData fields for a processed run.
 func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutputChainMetrics, comparison *AuditComparisonData, failureKind string, gitHubAPICalls int) RunData {
 	run := pr.Run
+	modelAttribution := resolveEffectiveModelAttribution(engineInfo.awInfo, pr.ModelRouting, pr.TokenUsage)
 	runData := RunData{
 		RunID:                      run.DatabaseID,
 		Number:                     run.Number,
@@ -577,6 +582,10 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		Agent:                      engineInfo.engineID,
 		Engine:                     engineInfo.engineName,
 		EngineID:                   engineInfo.engineID,
+		Model:                      modelAttribution.Model,
+		RequestedModel:             modelAttribution.RequestedModel,
+		ModelEffort:                modelAttribution.Effort,
+		ModelRoutingStatus:         modelAttribution.RoutingStatus,
 		Status:                     run.Status,
 		Conclusion:                 run.Conclusion,
 		Classification:             deriveRunClassification(comparison),

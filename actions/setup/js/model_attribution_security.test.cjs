@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { validateModelIdentifier, recordFallbackModelFromUsage, getFallbackModel } = require("./model_attribution.cjs");
+const { validateModelIdentifier, recordFallbackModelFromUsage, getFallbackModel, recordModelRouting } = require("./model_attribution.cjs");
 const footers = [require("./generate_footer.cjs"), require("./messages_footer.cjs")];
 
 const invalidModels = [
@@ -85,6 +85,39 @@ describe("model attribution trust boundaries", () => {
   it("validates nested fallback model evidence too", () => {
     expect(recordFallbackModelFromUsage(JSON.stringify({ _schema: "token-usage/v0.28.44", model_fallback: { model: "gpt-5 -->" } }), {}, infoPath)).toBe("");
     expect(recordFallbackModelFromUsage(JSON.stringify({ _schema: "token-usage/v0.28.44", model_fallback: { model: "gpt-5.4" } }), {}, infoPath)).toBe("gpt-5.4");
+  });
+
+  it.each(["gpt-5\nworkflow_id: forged", "gpt-5, run: forged", "gpt-5 -->", "a".repeat(129)])("rejects forged routed model identifiers %j", model => {
+    expect(recordModelRouting({ status: "selected", wire_model: model, effort: "high" }, {}, infoPath)).toBeNull();
+    expect(fs.existsSync(infoPath)).toBe(false);
+  });
+
+  it.each(["high\nrouted: false", "high, workflow_id: forged", "a".repeat(129)])("rejects forged routed effort %j", effort => {
+    expect(recordModelRouting({ status: "selected", wire_model: "gpt-5.4", effort }, {}, infoPath)).toBeNull();
+    expect(fs.existsSync(infoPath)).toBe(false);
+  });
+
+  it("keeps a failed routed status but never promotes its model", () => {
+    fs.writeFileSync(infoPath, JSON.stringify({ model: "auto" }));
+    recordModelRouting({ status: "rejected", wire_model: "not-a-model", failure_code: "unsupported_effort" }, {}, infoPath);
+    expect(JSON.parse(fs.readFileSync(infoPath, "utf8"))).toMatchObject({
+      model: "auto",
+      requested_model: "auto",
+      model_routing: { status: "rejected", source: "awf-routing" },
+    });
+  });
+
+  it("adds routed effort metadata to markers and retains only a safe failure status", () => {
+    fs.writeFileSync(infoPath, JSON.stringify({ model: "auto" }));
+    recordModelRouting({ status: "selected", wire_model: "gpt-5.6-luna", effort: "xhigh" }, {}, infoPath);
+    for (const footer of footers) {
+      expect(footer.generateXMLMarker("Workflow", "https://github.com/run")).toContain("model: gpt-5.6-luna, effort: xhigh, routed: true");
+    }
+    recordModelRouting({ status: "failed", failure_code: "no_route" }, {}, infoPath);
+    for (const footer of footers) {
+      expect(footer.generateXMLMarker("Workflow", "https://github.com/run")).toContain("model: auto, routed: failed");
+      expect(footer.generateXMLMarker("Workflow", "https://github.com/run")).not.toContain("model: auto, engine:");
+    }
   });
 
   it.each(invalidModels.filter(model => typeof model === "string" && !model.includes("\u0000")))("prevents footer marker breakout and spoofing from metadata or env: %j", model => {

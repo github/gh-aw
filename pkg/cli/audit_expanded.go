@@ -21,16 +21,19 @@ var auditExpandedLog = logger.New("cli:audit_expanded")
 
 // AuditEngineConfig represents the engine configuration extracted from aw_info.json
 type AuditEngineConfig struct {
-	EngineID        string   `json:"engine_id" console:"header:Engine ID"`
-	EngineName      string   `json:"engine_name,omitempty" console:"header:Engine Name,omitempty"`
-	Model           string   `json:"model,omitempty" console:"header:Model,omitempty"`
-	Version         string   `json:"version,omitempty" console:"header:Version,omitempty"`
-	CLIVersion      string   `json:"cli_version,omitempty" console:"header:CLI Version,omitempty"`
-	FirewallVersion string   `json:"firewall_version,omitempty" console:"header:Firewall Version,omitempty"`
-	MCPServers      []string `json:"mcp_servers,omitempty"`
-	TriggerEvent    string   `json:"trigger_event,omitempty" console:"header:Trigger Event,omitempty"`
-	Repository      string   `json:"repository,omitempty" console:"header:Repository,omitempty"`
-	DryRun          bool     `json:"dry_run" console:"header:Dry Run"`
+	EngineID           string   `json:"engine_id" console:"header:Engine ID"`
+	EngineName         string   `json:"engine_name,omitempty" console:"header:Engine Name,omitempty"`
+	Model              string   `json:"model,omitempty" console:"header:Model,omitempty"`
+	RequestedModel     string   `json:"requested_model,omitempty" console:"header:Requested Model,omitempty"`
+	ModelEffort        string   `json:"model_effort,omitempty" console:"header:Model Effort,omitempty"`
+	ModelRoutingStatus string   `json:"model_routing_status,omitempty" console:"header:Model Routing,omitempty"`
+	Version            string   `json:"version,omitempty" console:"header:Version,omitempty"`
+	CLIVersion         string   `json:"cli_version,omitempty" console:"header:CLI Version,omitempty"`
+	FirewallVersion    string   `json:"firewall_version,omitempty" console:"header:Firewall Version,omitempty"`
+	MCPServers         []string `json:"mcp_servers,omitempty"`
+	TriggerEvent       string   `json:"trigger_event,omitempty" console:"header:Trigger Event,omitempty"`
+	Repository         string   `json:"repository,omitempty" console:"header:Repository,omitempty"`
+	DryRun             bool     `json:"dry_run" console:"header:Dry Run"`
 }
 
 // PromptAnalysis represents analysis of the input prompt
@@ -161,6 +164,7 @@ type MCPSlowestToolCall struct {
 // The activation artifact may or may not have been flattened to the root directory.
 func findAwInfoPath(logsPath string) string {
 	candidates := []string{
+		filepath.Join(logsPath, "agent", "aw_info.json"),
 		filepath.Join(logsPath, "aw_info.json"),
 		filepath.Join(logsPath, "activation", "aw_info.json"),
 	}
@@ -198,16 +202,21 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 		return nil
 	}
 
+	routing := analyzeModelRouting(logsPath)
+	attribution := resolveEffectiveModelAttribution(awInfo, routing, nil)
 	config := &AuditEngineConfig{
-		EngineID:        awInfo.EngineID,
-		EngineName:      awInfo.EngineName,
-		Model:           awInfo.Model,
-		Version:         awInfo.Version,
-		CLIVersion:      awInfo.CLIVersion,
-		FirewallVersion: awInfo.GetFirewallVersion(),
-		TriggerEvent:    awInfo.EventName,
-		Repository:      awInfo.Repository,
-		DryRun:          awInfo.DryRun,
+		EngineID:           awInfo.EngineID,
+		EngineName:         awInfo.EngineName,
+		Model:              attribution.Model,
+		RequestedModel:     attribution.RequestedModel,
+		ModelEffort:        attribution.Effort,
+		ModelRoutingStatus: attribution.RoutingStatus,
+		Version:            awInfo.Version,
+		CLIVersion:         awInfo.CLIVersion,
+		FirewallVersion:    awInfo.GetFirewallVersion(),
+		TriggerEvent:       awInfo.EventName,
+		Repository:         awInfo.Repository,
+		DryRun:             awInfo.DryRun,
 	}
 
 	// Extract MCP server names from aw_info.json steps metadata

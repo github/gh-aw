@@ -3,6 +3,8 @@
 "use strict";
 
 const { REFLECT_PROVIDER_ALIASES, normalizeReflectProviderName } = require("./awf_reflect.cjs");
+const fs = require("fs");
+const path = require("path");
 
 const ROUTING_REASONING_EFFORTS = Object.freeze(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
@@ -21,6 +23,10 @@ function isRoutingReasoningEffort(effort) {
  */
 function mapAWFRoutingEffort(engine, effort) {
   if (effort === null) return { effort: null, error: null };
+  if (!isRoutingReasoningEffort(effort)) {
+    return { effort: null, error: `AWF model routing effort "${effort}" is not supported by the ${engine} engine` };
+  }
+  if (engine === "copilot") return { effort, error: null };
   const supported = {
     claude: new Set(["low", "medium", "high", "xhigh", "max"]),
     codex: new Set(["minimal", "low", "medium", "high", "xhigh"]),
@@ -72,6 +78,31 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   return { selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint }, error: null };
 }
 
+function recordAWFModelRoutingOutcome(outcome, env = process.env, filePath = path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", "agent", "awf-routing-outcome.json")) {
+  if (env.GH_AW_MODEL_ROUTING !== "1" || !outcome || !["selected", "failed", "rejected"].includes(outcome.status)) return false;
+  const wireModel = typeof outcome.wire_model === "string" && outcome.wire_model.length <= 128 && /^[A-Za-z0-9._/:@-]+$/.test(outcome.wire_model) ? outcome.wire_model : "";
+  if (outcome.status === "selected" && !wireModel) return false;
+  const effort = outcome.effort == null ? null : isRoutingReasoningEffort(outcome.effort) ? outcome.effort : null;
+  if (outcome.effort != null && effort === null) return false;
+  const appliedEffort = outcome.applied_effort == null ? null : outcome.applied_effort === "off" || isRoutingReasoningEffort(outcome.applied_effort) ? outcome.applied_effort : null;
+  if (outcome.applied_effort != null && appliedEffort === null) return false;
+  const record = {
+    status: outcome.status,
+    ...(wireModel ? { wire_model: wireModel } : {}),
+    ...(effort ? { effort } : {}),
+    ...(appliedEffort ? { applied_effort: appliedEffort } : {}),
+    ...(typeof outcome.failure_code === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(outcome.failure_code) ? { failure_code: outcome.failure_code } : {}),
+    ...(typeof outcome.detail === "string" ? { detail: outcome.detail.slice(0, 512) } : {}),
+  };
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(record) + "\n");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Check whether a model is present in AWF /reflect endpoint data.
  * @param {string} model
@@ -94,4 +125,5 @@ module.exports = {
   mapAWFRoutingEffort,
   resolveAWFModelRoutingSelection,
   isModelAvailableInReflectData,
+  recordAWFModelRoutingOutcome,
 };

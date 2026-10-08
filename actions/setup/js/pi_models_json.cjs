@@ -38,7 +38,7 @@ const { loadModelsJson } = require("./model_costs.cjs");
 const { loadPiSDK, nativePiProvider, parsePiConfig, stagePiArtifacts } = require("./pi_runtime.cjs");
 const { preparePiSubagents } = require("./pi_subagent_config.cjs");
 const { buildCatalogFromReflect } = require("./resolve_model_alias.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const PI_ROUTING_ENDPOINT_APIS = Object.freeze({
@@ -285,9 +285,16 @@ function resolvePiReasoningForModel({ provider, modelId, reflectData }) {
  */
 function resolvePiModelRouting(reflectData) {
   const result = resolveAWFModelRoutingSelection(reflectData, true, PI_ROUTING_ENDPOINTS);
-  if (result.error || !result.selection) return { selection: null, api: "", error: result.error || "AWF model routing selection is missing" };
+  if (result.error || !result.selection) {
+    recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
+    return { selection: null, api: "", error: result.error || "AWF model routing selection is missing" };
+  }
   const mappedEffort = mapAWFRoutingEffort("pi", result.selection.effort);
-  if (mappedEffort.error) return { selection: null, api: "", error: mappedEffort.error };
+  if (mappedEffort.error) {
+    recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort", detail: mappedEffort.error });
+    return { selection: null, api: "", error: mappedEffort.error };
+  }
+  recordAWFModelRoutingOutcome({ status: "selected", wire_model: result.selection.wire_model, effort: result.selection.effort, applied_effort: mappedEffort.effort });
   return {
     selection: { ...result.selection, mapped_effort: mappedEffort.effort },
     api: PI_ROUTING_ENDPOINT_APIS[result.selection.endpoint],

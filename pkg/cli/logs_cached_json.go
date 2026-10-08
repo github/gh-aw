@@ -539,16 +539,22 @@ func (w *cachedLogsJSONLWriter) appendSafeOutputItems(runID int64, items []Creat
 func buildCachedLogsJSONLRunData(run ProcessedRun, runData RunData) *cachedLogsJSONLRunData {
 	data := &cachedLogsJSONLRunData{
 		RunData:      runData,
+		Model:        runData.Model,
 		JobDetails:   projectCachedLogsJSONLJobs(run.JobDetails),
 		MCPToolUsage: projectCachedLogsJSONLMCPToolUsage(run.MCPToolUsage),
 	}
 	if info := runData.awInfo; info != nil {
+		attribution := resolveEffectiveModelAttribution(info, run.ModelRouting, run.TokenUsage)
 		data.EngineVersion = info.Version
-		data.Model = info.Model
+		data.Model = attribution.Model
 		data.GhAwVersion = info.CLIVersion
 		data.AgentRuntime = info.AgentRuntime
 		data.FirewallVersion = info.GetFirewallVersion()
 		data.GatewayVersion = info.AwmgVersion
+		data.RunData.Model = attribution.Model
+		data.RunData.ModelEffort = attribution.Effort
+		data.RunData.ModelRoutingStatus = attribution.RoutingStatus
+		data.RunData.RequestedModel = attribution.RequestedModel
 	}
 	return data
 }

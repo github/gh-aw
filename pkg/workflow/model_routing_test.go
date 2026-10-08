@@ -424,6 +424,7 @@ func TestModelRoutingConversationPromptFallback(t *testing.T) {
 	var steps []struct {
 		Run string
 	}
+
 	require.NoError(t, yamlv3.Unmarshal([]byte(yaml.String()), &steps))
 	require.Len(t, steps, 1)
 
@@ -479,6 +480,35 @@ func TestModelRoutingConversationPromptFallback(t *testing.T) {
 			info, err := os.Stat(conversationPath)
 			require.NoError(t, err)
 			require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+		})
+	}
+}
+
+func TestModelRoutingModelAttributionOutputs(t *testing.T) {
+	for _, engineID := range []string{"copilot", "claude", "codex", "pi"} {
+		t.Run(engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI:           engineID,
+				Model:        "must-not-be-baked-in",
+				EngineConfig: &EngineConfig{ID: engineID, ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "balanced"}},
+			}
+			outputs := buildMainJobCoreOutputs(data)
+			require.Contains(t, outputs["model"], "steps.parse-token-usage.outputs.model")
+			require.Contains(t, outputs["model"], "needs.activation.outputs.model")
+			require.Equal(t, "${{ steps.parse-token-usage.outputs.model_effort }}", outputs["model_effort"])
+			require.Equal(t, "${{ steps.parse-token-usage.outputs.model_routing_status }}", outputs["model_routing_status"])
+
+			jobEnv := make(map[string]string)
+			addJobLevelEngineMetadata(jobEnv, data)
+			require.Equal(t, "${{ needs.agent.outputs.model }}", jobEnv["GH_AW_ENGINE_MODEL"])
+			require.Equal(t, "${{ needs.agent.outputs.model_effort }}", jobEnv["GH_AW_ENGINE_MODEL_EFFORT"])
+			require.Equal(t, "${{ needs.agent.outputs.model_routing_status }}", jobEnv["GH_AW_MODEL_ROUTING_STATUS"])
+			env := buildEngineMetadataEnvVars(data.EngineConfig, data.Model)
+			require.NotContains(t, strings.Join(env, ""), "must-not-be-baked-in")
+			require.Contains(t, strings.Join(env, ""), "GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}")
+			require.Contains(t, strings.Join(env, ""), "GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}")
+			require.Contains(t, strings.Join(env, ""), "GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}")
+			require.Equal(t, 3, len(buildModelRoutingOutputEnvVars(data.EngineConfig, "agent")))
 		})
 	}
 }

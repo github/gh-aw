@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "module";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 const require = createRequire(import.meta.url);
-const { ROUTING_REASONING_EFFORTS, mapAWFRoutingEffort, resolveAWFModelRoutingSelection } = require("./awf_model_routing.cjs");
+const { ROUTING_REASONING_EFFORTS, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, resolveAWFModelRoutingSelection } = require("./awf_model_routing.cjs");
 
 const reflectData = {
   endpoints: [{ provider: "github", configured: true, models: ["claude-opus-5", "gpt-5.6-sol"] }],
@@ -41,6 +44,31 @@ describe("awf_model_routing.cjs", () => {
     ["max", "max"],
   ])("maps Pi effort %s to %s", (input, expected) => {
     expect(mapAWFRoutingEffort("pi", input)).toEqual({ effort: expected, error: null });
+  });
+
+  it.each(ROUTING_REASONING_EFFORTS)("preserves the %s effort for Copilot", effort => {
+    expect(mapAWFRoutingEffort("copilot", effort)).toEqual({ effort, error: null });
+  });
+
+  it("records successful and refused harness outcomes only when routing is enabled", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "awf-routing-outcome-"));
+    const env = { GH_AW_MODEL_ROUTING: "1", GH_AW_TMP_DIR: tmpDir };
+    const recordPath = path.join(tmpDir, "agent", "awf-routing-outcome.json");
+    try {
+      expect(recordAWFModelRoutingOutcome({ status: "selected", wire_model: "gpt-5.6-luna", effort: "high", applied_effort: "high" }, env)).toBe(true);
+      expect(JSON.parse(fs.readFileSync(recordPath, "utf8"))).toMatchObject({
+        status: "selected",
+        wire_model: "gpt-5.6-luna",
+        effort: "high",
+        applied_effort: "high",
+      });
+      expect(recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort" }, env)).toBe(true);
+      expect(JSON.parse(fs.readFileSync(recordPath, "utf8"))).toMatchObject({ status: "rejected", failure_code: "unsupported_effort" });
+      expect(recordAWFModelRoutingOutcome({ status: "selected", wire_model: "gpt-5.6-luna\nrouted: false" }, env)).toBe(false);
+      expect(recordAWFModelRoutingOutcome({ status: "selected", wire_model: "gpt-5.6-luna" }, { ...env, GH_AW_MODEL_ROUTING: "0" })).toBe(false);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it.each([
