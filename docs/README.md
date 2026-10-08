@@ -74,6 +74,9 @@ Click a code snippet, prompt, or example output to expand it to a full-window
 view with larger type. Enter/Space also expand a focused snippet. The view
 zooms and fades smoothly (unless reduced motion is enabled); Escape or its
 close button returns focus to the snippet without changing slides.
+Code in the expanded view is editable as plain text for live demonstrations.
+Edits affect only the expanded copy and are discarded when it closes; opening
+the snippet again restores its original contents.
 
 ## ⚠️ Known Dev-Mode Limitations
 

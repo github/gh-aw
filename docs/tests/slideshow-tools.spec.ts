@@ -177,6 +177,68 @@ test("expands snippets with larger type and smooth transitions without changing 
   await expect(page.locator("main .va")).toHaveAttribute("aria-hidden", "true");
 });
 
+test("edits enlarged code as plain text without changing the original slide", async ({ page }) => {
+  await openPresentation(page);
+  const source = page.getByRole("button", { name: "Expand daily-issue-summary.md", exact: true });
+  const original = await source.locator("pre").evaluate(element => element.outerHTML);
+  await source.click();
+  const zoom = page.getByRole("dialog", { name: "daily-issue-summary.md", exact: true });
+  const editor = zoom.getByRole("textbox", { name: "Edit daily-issue-summary.md", exact: true });
+  await expect(editor).toHaveAttribute("contenteditable", "plaintext-only");
+  await expect(editor).toHaveAttribute("aria-multiline", "true");
+  await expect(zoom.locator("[data-snippet-edit-hint]")).toBeVisible();
+  const text = "on: daily\n\n# <strong>Live demo</strong>\ngh aw compile";
+  await editor.fill(text);
+  await expect.poll(() => editor.innerText()).toBe(text);
+  await expect(editor.locator("strong")).toHaveCount(0);
+  await editor.press("ControlOrMeta+End");
+  await editor.press("Enter");
+  await page.keyboard.insertText("# edited live");
+  await expect(editor).toContainText("# edited live");
+  await editor.press("ArrowUp");
+  await editor.press("Home");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("1 / 9");
+  await editor.press("ControlOrMeta+z");
+  await expect(editor).not.toContainText("# edited live");
+  await expect(zoom).toBeVisible();
+  await editor.press("Escape");
+  await expect(zoom).not.toBeVisible();
+  await expect(source).toBeFocused();
+  expect(await source.locator("pre").evaluate(element => element.outerHTML)).toBe(original);
+  await expect(source.locator("[contenteditable]")).toHaveCount(0);
+  await source.press("Enter");
+  await expect(editor).toContainText("safe-outputs:");
+  await expect(editor).not.toContainText("Live demo");
+});
+
+test("makes standalone code editable and leaves non-code expanded content read-only", async ({ page }) => {
+  await openPresentation(page);
+  await page.keyboard.press("PageDown");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("2 / 9");
+  await page.getByRole("button", { name: "Expand repo-assist output", exact: true }).click();
+  const zoom = page.locator("[data-slideshow-snippet-dialog]");
+  await expect(zoom).toBeVisible();
+  await expect(zoom.getByRole("textbox")).toHaveCount(0);
+  await expect(zoom.locator("[data-snippet-edit-hint]")).not.toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Exit slideshow", exact: true }).focus();
+  await page.keyboard.press("PageDown");
+  await page.keyboard.press("PageDown");
+  await page.keyboard.press("PageDown");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("5 / 9");
+  const inlineCode = page.getByRole("button", { name: "Expand gh aw compile", exact: true });
+  await inlineCode.click();
+  const editor = zoom.getByRole("textbox");
+  await expect(editor).toHaveCount(1);
+  await expect(editor).toHaveAttribute("contenteditable", "plaintext-only");
+  await editor.fill("gh aw compile demo.md");
+  await expect(editor).toHaveText("gh aw compile demo.md");
+  await zoom.getByRole("button", { name: "Close expanded snippet" }).click();
+  await expect(inlineCode).toHaveText("gh aw compile");
+  await inlineCode.click();
+  await expect(editor).toHaveText("gh aw compile");
+});
+
 test("expands output mocks and terminal snippets and respects reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await openPresentation(page);

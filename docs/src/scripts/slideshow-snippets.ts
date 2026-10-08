@@ -3,8 +3,9 @@ export function initializeSlideshowSnippets(): () => void {
   const dialog = presentation?.querySelector<HTMLDialogElement>("[data-slideshow-snippet-dialog]");
   const content = dialog?.querySelector<HTMLElement>("[data-snippet-content]");
   const title = dialog?.querySelector<HTMLElement>("#slideshow-snippet-title");
+  const editHint = dialog?.querySelector<HTMLElement>("[data-snippet-edit-hint]");
   const close = dialog?.querySelector<HTMLButtonElement>("[data-snippet-close]");
-  if (!presentation || !dialog || !content || !title || !close) return () => {};
+  if (!presentation || !dialog || !content || !title || !editHint || !close) return () => {};
   const controller = new AbortController();
   const { signal } = controller;
   const attributes = new Map<HTMLElement, Map<string, string | null>>();
@@ -54,6 +55,19 @@ export function initializeSlideshowSnippets(): () => void {
       content.replaceChildren(clone);
     }
     title.textContent = element.dataset.slideshowSnippet || "Expanded snippet";
+    let editorCount = 0;
+    for (const editor of content.querySelectorAll<HTMLElement>("pre, code")) {
+      if (editor.tagName === "CODE" && editor.closest("pre")) continue;
+      editor.setAttribute("contenteditable", "plaintext-only");
+      editor.setAttribute("role", "textbox");
+      editor.setAttribute("aria-label", `Edit ${title.textContent}${editorCount ? ` (${editorCount + 1})` : ""}`);
+      editor.setAttribute("aria-multiline", "true");
+      editor.setAttribute("aria-describedby", editHint.id);
+      editor.setAttribute("data-snippet-editor", "");
+      editor.tabIndex = 0;
+      editorCount++;
+    }
+    editHint.hidden = editorCount === 0;
     dialog.showModal();
     close.focus({ preventScroll: true });
   };
