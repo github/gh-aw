@@ -250,3 +250,61 @@ different target.
 Go and JavaScript protocol tests cover these administrator extensions. The
 existing fixed-priority TLA+ models do not model arbitrary operator
 reprioritization.
+
+## Workflow examples
+
+### Linter Factory
+
+The [Linter Factory](/gh-aw/patterns/linter-factory/) routes eligible Work to
+three worker profiles. This diagram shows the default singleton assignment
+shape: one original Claim per Work item and worker assignment. The profiles
+are not an automatic miner-to-refiner-to-monster dependency chain.
+
+```mermaid
+flowchart LR
+    subgraph Work["Independently admitted Work"]
+        MW["Mine an ESLint rule"]
+        RW["Refine ESLint diagnostics"]
+        OW["Arrange remediation"]
+    end
+    MW --> MC["Miner Claim"] --> M["Miner worker"]
+    RW --> RC["Refiner Claim"] --> R["Refiner worker"]
+    OW --> OC["Monster Claim"] --> O["Monster worker"]
+    M --> MO["Rule PR or permitted noop"]
+    R --> RO["Issues, discussion, memory snapshot"]
+    O --> OO["Issue updates, Copilot assignments, discussion or permitted noop"]
+```
+
+Each worker attributes its outputs and finish intent to its original Claim.
+Outputs depend on the installed contract; trusted processing publishes
+Completion before delivery and Result only after independent verification.
+Compatible multi-Claim batching requires explicit Policy.
+
+### Daily Report Portfolio
+
+The [Daily Report Portfolio](/gh-aw/patterns/daily-report-portfolio/) admits
+three of ten reporting profiles per daily activation. The three Work items
+share a date-keyed graph but are independent roots, with no dependency edges
+between them.
+
+```mermaid
+flowchart LR
+    P["Daily planner: select three of ten profiles"]
+    subgraph Work["Date-keyed graph: three independent Work items"]
+        WA["Report Work A"]
+        WB["Report Work B"]
+        WC["Report Work C"]
+    end
+    P --> WA
+    P --> WB
+    P --> WC
+    WA --> CA["Claim A"] --> RA["Report worker A"] --> DA["Verified Discussion A"]
+    WB --> CB["Claim B"] --> RB["Report worker B"] --> DB["Verified Discussion B"]
+    WC --> CC["Claim C"] --> RC["Report worker C"] --> DC["Verified Discussion C"]
+```
+
+The diagram illustrates successful singleton assignments, not guaranteed
+launches or publications. The dispatcher requests at most three Claims and
+three dispatches; the native scheduler selects eligible Work from fresh queue
+state, so older cohorts may win first. Each Discussion belongs to its worker's
+original Claim and requires independently verified delivery before Result.
