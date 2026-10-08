@@ -1,1 +1,2 @@
 {"date":"2026-05-22","pr_count":38,"avg_sentiment":0.026,"sentiment_std":0.214,"positive_prs":20,"neutral_prs":10,"negative_prs":8,"top_keywords":["bin","workflow","test","command","block"],"clusters":5,"discussion_comments":0,"note":"Zero-comment pattern - all PRs merged without discussion"}
+{"date":"2026-10-08","pr_count":178,"avg_sentiment":-0.011,"top_topic":"workflow_failure_validation","discussion_comments":0}
