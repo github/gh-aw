@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/require"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -288,9 +289,65 @@ func TestValidateModelRoutingRequiresMinimumAWFVersion(t *testing.T) {
 			Firewall: &FirewallConfig{Enabled: true, Version: "v0.28.28"},
 		},
 	}
-
 	err := validateModelRouting(data, "copilot")
 	require.ErrorContains(t, err, "requires AWF v0.28.29 or newer")
+}
+
+func TestValidateModelRoutingEngineCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		engine    string
+		provider  LLMProvider
+		model     string
+		wantError string
+	}{
+		{name: "Copilot accepts any Copilot model", engine: "copilot", model: "gpt-5.4"},
+		{name: "Claude accepts Claude models", engine: "claude", provider: LLMProviderGitHub, model: "claude-sonnet-5"},
+		{name: "Codex accepts GPT models", engine: "codex", provider: LLMProviderGitHub, model: "gpt-5.6-sol"},
+		{name: "pi accepts Claude models", engine: "pi", provider: LLMProviderGitHub, model: "claude-sonnet-5"},
+		{name: "Claude rejects GPT models", engine: "claude", provider: LLMProviderGitHub, model: "gpt-5.6-sol", wantError: "native Messages API"},
+		{name: "Codex rejects Claude models", engine: "codex", provider: LLMProviderGitHub, model: "claude-sonnet-5", wantError: "Responses API"},
+		{name: "Claude rejects non-Copilot provider", engine: "claude", provider: LLMProviderAnthropic, model: "claude-sonnet-5", wantError: "requires GitHub Copilot inference"},
+		{name: "Codex rejects non-Copilot provider", engine: "codex", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
+		{name: "unknown engine rejected", engine: "gemini", model: "gpt-5.6-sol", wantError: "supported only by Copilot, Claude, Codex, and pi"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{
+					ID:           tc.engine,
+					LLMProvider:  tc.provider,
+					ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "balanced", AllowedModels: []string{tc.model}},
+				},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true, Version: "v0.28.37"}},
+			}
+			err := validateModelRouting(data, tc.engine)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestWarnRoutedModelOverrides(t *testing.T) {
+	compiler := NewCompiler()
+	output := testutil.CaptureStderr(t, func() {
+		compiler.warnRoutedModelOverrides(&WorkflowData{
+			Model: "fixed-model",
+			EngineConfig: &EngineConfig{
+				ID:           "pi",
+				ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "balanced"},
+				Env: map[string]string{
+					"GH_AW_PI_MODEL": "fixed-model",
+					"CUSTOM_SETTING": "value",
+				},
+				Config: `{"settings":{"defaultThinkingLevel":"high"}}`,
+			},
+		})
+	})
+	require.Contains(t, output, "model, engine.env.GH_AW_PI_MODEL, engine.config.settings.defaultThinkingLevel")
+	require.Equal(t, 1, compiler.GetWarningCount())
 }
 
 func TestGenerateModelRoutingConversationStep(t *testing.T) {
