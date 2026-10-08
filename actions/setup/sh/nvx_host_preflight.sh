@@ -153,6 +153,7 @@ if ! "${trusted_tools[gh]}" attestation verify "${stage_dir}/manifest.json" \
   echo "::error::NVX manifest offline attestation verification failed; no unsigned or hash-only fallback is permitted."
   exit 1
 fi
+verified_manifest="${stage_dir}/manifest.json"
 
 # shellcheck disable=SC2016
 if ! "${trusted_tools[jq]}" -e \
@@ -180,7 +181,7 @@ if ! "${trusted_tools[jq]}" -e \
     and .artifacts.kernel.sizeBytes <= 536870912
     and .artifacts.initramfs.sizeBytes <= 1073741824
     and ([.artifacts[] | (.sha256 | type == "string" and test("^[a-f0-9]{64}$"))] | all)
-  ' "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE" >/dev/null; then
+  ' "$verified_manifest" >/dev/null; then
   echo "::error::NVX artifact manifest does not match the trusted AWF release and pinned upstream artifact contract."
   exit 1
 fi
@@ -191,8 +192,8 @@ for name in openvmm kernel initramfs; do
     kernel) source="$GH_AW_NVX_KERNEL_SOURCE"; role="kernel" ;;
     initramfs) source="$GH_AW_NVX_INITRAMFS_SOURCE"; role="initramfs" ;;
   esac
-  expected_size="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sizeBytes" "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE")"
-  expected_digest="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sha256" "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE")"
+  expected_size="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sizeBytes" "$verified_manifest")"
+  expected_digest="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sha256" "$verified_manifest")"
   source_size="$(tool stat -c '%s' -- "$source")"
   source_digest="$(tool sha256sum -- "$source")"
   source_digest="${source_digest%% *}"
