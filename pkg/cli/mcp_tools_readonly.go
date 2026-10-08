@@ -184,8 +184,12 @@ Returns JSON array with validation results for each workflow:
 					// compile without the Docker-based tools and surface a warning so
 					// the caller knows static analysis was skipped.
 					dockerUnavailableWarning = err.Error()
-					args.Zizmor = false
-					args.Poutine = false
+					if localScannerPath(ctx, "zizmor") == "" {
+						args.Zizmor = false
+					}
+					if localScannerPath(ctx, "poutine") == "" {
+						args.Poutine = false
+					}
 					args.Actionlint = false
 					args.RunnerGuard = false
 					args.Syft = false
