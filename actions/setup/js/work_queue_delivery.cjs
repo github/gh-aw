@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("delivery");
 
 const { canonicalResourceTarget, resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 
@@ -83,10 +84,14 @@ function isTrustedClaimDelivery(delivery, assignment, claim_handle) {
  * @returns {Promise<Record<string, any>>}
  */
 async function verifyClaimDelivery(member, verification) {
+  log.debug("delivery.verify.start", { protected_readback: verification !== undefined });
   if (verification === undefined) return inspectClaimDelivery(member);
   const pending = { verified: false, effects: "unknown" };
   const trusted = deliveryVerifier.getStore();
-  if (!trusted) return pending;
+  if (!trusted) {
+    log.debug("delivery.verify.trusted_context_missing");
+    return pending;
+  }
   verification.signal?.throwIfAborted();
   const assignment = normalizeAssignment(verification.assignment);
   const original = assignment.claims.find(claim => claim.handle === member.handle);
@@ -131,10 +136,12 @@ async function verifyClaimDelivery(member, verification) {
     controls_digest: record.controls_digest,
   };
   deliveryAttestations.set(proof, Object.freeze({ delivery_digest: digest(proof), assignment_digest: digest(assignment), claim_handle: original.handle }));
+  log.debug("delivery.verify.attested");
   return proof;
 }
 
 async function readDeliveryControlInventory(options) {
+  log.debug("controls.readback.start");
   options.signal?.throwIfAborted();
   const assignment = normalizeAssignment(options.assignment);
   const member = assignment.claims.find(claim => claim.handle === options.claim_handle);
@@ -144,6 +151,7 @@ async function readDeliveryControlInventory(options) {
   options.signal?.throwIfAborted();
   if (typeof inventory?.controls_digest !== "string" || !/^[0-9a-f]{64}$/.test(inventory.controls_digest)) throw new Error("Independent queue-control inventory requires its exact readback digest, including zero controls");
   controlInventories.set(inventory, { assignment: canonical(assignment), claim_handle: member.handle, run: controls.claimQueueControlRun(inventory) });
+  log.debug("controls.readback.complete", { controls: inventory.controls.length });
   return inventory;
 }
 
@@ -203,6 +211,7 @@ function validateDeliveryContract(value) {
  * @param {Record<string, any>} options
  */
 async function inspectClaimDelivery(options) {
+  log.debug("delivery.inspect.start");
   options.signal?.throwIfAborted();
   const { claim_handle, messages = [], results = [], verifyOutput } = options;
   let binding;
@@ -229,12 +238,16 @@ async function inspectClaimDelivery(options) {
   try {
     await assertClaimAuthorized({ type: "work_queue_result", claim_handle }, { authorize, context: options.context, github: options.github, requireCompletion: !options.staged });
   } catch (error) {
+    log.failure("delivery.authorize.failed", error);
     if (error.suppressed && error.state === "cancelled") return { ...receipt, verification: "cancelled", disposition: "none" };
     if (error.suppressed && error.state === "result") return { ...receipt, verification: "result", reason: "Durable Result already settled; effects were not replayed" };
     return { ...receipt, reason: error.message };
   }
   options.signal?.throwIfAborted();
-  if (options.staged) return { ...receipt, verification: "staged_preview" };
+  if (options.staged) {
+    log.debug("delivery.inspect.staged");
+    return { ...receipt, verification: "staged_preview" };
+  }
   let controlInventory;
   if (options.readControlInventory) {
     try {
@@ -243,18 +256,22 @@ async function inspectClaimDelivery(options) {
       const provenance = controlInventories.get(controlInventory);
       if (!provenance || provenance.assignment !== canonical(assignment) || provenance.claim_handle !== claim_handle) return { ...receipt, reason: "Independent durable queue-control inventory is unavailable or untrusted" };
     } catch (error) {
+      log.failure("controls.readback.failed", error);
       return { ...receipt, reason: `Independent queue-control readback failed: ${error.message}` };
     }
   } else if (options.requireControlInventory) {
+    log.debug("controls.readback.required");
     return { ...receipt, reason: "Independent durable queue-control inventory is required" };
   }
   let contract;
   try {
     contract = validateDeliveryContract(claim.work.effect_contract);
   } catch (error) {
+    log.failure("delivery.contract.invalid", error);
     return { ...receipt, reason: error.message };
   }
   const known = new Set(contract.outputs.map(output => output.type));
+  log.debug("delivery.contract.checked", { outputs: contract.outputs.length, messages: normalized.length, no_writes: contract.no_writes === true });
   if (normalized.some(message => !known.has(message.type) && !(contract.no_writes === true && NO_WRITE_TYPES.has(message.type)))) {
     return { ...receipt, reason: "Undeclared output type in immutable effect_contract" };
   }
@@ -270,10 +287,12 @@ async function inspectClaimDelivery(options) {
   const verifiedResources = [];
   const verifiedControls = new Set();
   for (let index = 0; index < normalized.length; index++) {
+    log.debug("delivery.output.verify.start", { index });
     options.signal?.throwIfAborted();
     const message = normalized[index];
     const outcome = results.find(result => result.messageIndex === index);
     if (!outcome || !outcome.success || outcome.delegated || outcome.deferred || outcome.skipped || outcome.cancelled) {
+      log.debug("delivery.output.receipt_missing", { index });
       return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Missing exact nondelegated delivery receipt" };
     }
     if (outcome.claim_handle && outcome.claim_handle !== claim_handle) throw new Error("Foreign Claim delivery receipt");
@@ -290,6 +309,7 @@ async function inspectClaimDelivery(options) {
     const proof = await verify({ claim, message, result: outcome.result, context: options.context, github: options.github, signal: options.signal, ...(verification === undefined ? {} : { verification }) });
     options.signal?.throwIfAborted();
     if (!proof || proof.verified !== true || proof.claim_handle !== claim_handle || !proof.resource || typeof proof.resource !== "object" || Array.isArray(proof.resource) || !proof.evidence) {
+      log.debug("delivery.output.proof_invalid", { index });
       return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Independent scoped resource verification failed" };
     }
     if (proof.effect_resources !== undefined && !Array.isArray(proof.effect_resources)) return { ...receipt, reason: "Independent effect metadata requires a complete resource array" };
@@ -337,6 +357,7 @@ async function inspectClaimDelivery(options) {
       }
     }
     outputs.push({ type: message.type, resource: proof.resource, evidence: proof.evidence });
+    log.debug("delivery.output.verify.complete", { index });
     verifiedResources.push(proof.resource, ...(proof.effect_resources || []));
   }
   const descriptor = { version: 1, outputs };
@@ -363,6 +384,7 @@ async function inspectClaimDelivery(options) {
   };
   options.signal?.throwIfAborted();
   recordClaimDelivery(delivery, assignment, claim, binding, controlInventory, options);
+  log.debug("delivery.inspect.complete", { outputs: outputs.length, no_effects: delivery.disposition === "none" });
   return delivery;
 }
 

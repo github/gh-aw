@@ -21,7 +21,6 @@ tracker-id: daily-regulatory
 max-ai-credits: 1000
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
   cli-proxy: true

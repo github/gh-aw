@@ -209,7 +209,7 @@ func TestWorkQueueMandatoryPolicy(t *testing.T) {
 	require.Equal(t, 1, worker.WorkQueuePolicy.Policy.Pools["default"].Profiles["default"].MaxClaims)
 	require.Equal(t, 1, worker.WorkQueuePolicy.Policy.AccountingWeights[""])
 	require.Equal(t, "${{ github.actor_id }}", worker.WorkQueuePolicy.Policy.Pools["default"].Profiles["default"].Principal)
-	for _, value := range []any{false, map[string]any{"storage": "issues"}, map[string]any{"worker": true, "require-assignment": false}} {
+	for _, value := range []any{false, map[string]any{"worker": true, "require-assignment": false}} {
 		require.Error(t, validateWorkQueueConfiguration(&WorkflowData{Tools: map[string]any{"work-queue": value}}))
 	}
 

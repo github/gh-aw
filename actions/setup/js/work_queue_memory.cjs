@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("memory");
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -120,6 +121,7 @@ function validateMemoryValue(value, schema, location = "memory") {
  * @param {{assignment?: unknown}} [options]
  */
 function prepareMemorySnapshot(message, config, options = {}) {
+  log.debug("memory.prepare.start");
   closed(config, ["path", "schema", "max_bytes"], [], "declarative memory configuration");
   integer(config.max_bytes, 1, 262144, "memory max_bytes");
   if (
@@ -151,6 +153,7 @@ function prepareMemorySnapshot(message, config, options = {}) {
   if (Object.hasOwn(memory, "work_id") && memory.work_id !== member.work_id) throw new Error("Memory work_id conflicts with its original Claim");
   const content = JSON.stringify(memory) + "\n";
   if (Buffer.byteLength(content, "utf8") > config.max_bytes) throw new Error("Memory snapshot exceeds max-bytes");
+  log.debug("memory.prepare.complete", { bytes: Buffer.byteLength(content, "utf8") });
   return { files: [{ path: config.path, content }] };
 }
 

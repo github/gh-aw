@@ -3,6 +3,7 @@
 
 const { TextDecoder } = require("node:util");
 const { createHash } = require("node:crypto");
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("store");
 const { canonical, digest, identity, integer, queueError } = require("./work_queue_codec.cjs");
 const { actorFromContext, defaultPolicy, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
 const { assignmentsForRequest } = require("./work_queue_scheduler.cjs");
@@ -28,11 +29,7 @@ const LEGACY_BRANCHES = ["dispatch-coordinator", "gh-aw-work-queue"];
 const LEGACY_LOGS = ["dispatch-work-coordinator.jsonl"];
 const DEFAULT_MAX_RETRIES = 5;
 
-/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, storage?: string, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
-
-function storageSupported(storage = process.env.GH_AW_WORK_QUEUE_STORAGE || "git") {
-  if (storage !== "git") throw queueError("unsupported_backend", "only the mandatory fair Git queue backend is supported");
-}
+/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
 
 function validateBranch(branch) {
   identity(branch, "queue branch");
@@ -66,14 +63,17 @@ function ambiguousWrite(error) {
 }
 
 async function verifyRepository(githubClient, owner, repo) {
+  log.debug("repository.verify.start");
   let response;
   try {
     response = await githubClient.rest.repos.get({ owner, repo });
   } catch (error) {
+    log.failure("repository.verify.failed", error);
     throw queueError("repository_unavailable", `cannot establish queue repository visibility (${httpStatus(error) ?? "transport"})`);
   }
   if (!response?.data || typeof response.data.full_name !== "string" || response.data.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("repository_unavailable", "repository identity does not match the queue");
   if (response.data.permissions?.pull === false) throw queueError("repository_unavailable", "caller lacks queue repository read visibility");
+  log.debug("repository.verify.complete");
   return response.data;
 }
 
@@ -88,20 +88,23 @@ async function initializationPolicy({ githubClient, owner, repo, actor, policyPr
 }
 
 async function readRef(githubClient, owner, repo, branch) {
+  log.debug("ref.read.start");
   try {
     const response = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
     const sha = response?.data?.object?.sha;
     if (typeof sha !== "string" || !sha) throw queueError("ledger_invalid", "queue branch returned no commit identity");
+    log.debug("ref.read.complete");
     return sha;
   } catch (error) {
+    log.failure("ref.read.failed", error);
     if (httpStatus(error) === 404) return null;
     throw error;
   }
 }
 
 /** @param {QueueReadOptions} options */
-async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, storage = undefined, core: coreApi = undefined }) {
-  storageSupported(storage);
+async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
+  log.debug("ledger.read.start");
   validateBranch(branch);
   const repository = await verifyRepository(githubClient, owner, repo);
   const sha = await readRef(githubClient, owner, repo, branch);
@@ -112,6 +115,7 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
     if (branch === WORK_QUEUE_BRANCH) {
       for (const legacy of LEGACY_BRANCHES) if (await readRef(githubClient, owner, repo, legacy)) throw queueError("unsupported_protocol", "a legacy queue exists; no implicit storage migration is permitted");
     }
+    log.debug("ledger.read.absent");
     return { sha: null, treeSha: null, transactions: [], state: newState(), branch, logPath: WORK_QUEUE_LOG_PATH };
   }
   const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha });
@@ -144,6 +148,7 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
   const transactions = state.transactions;
   if (transactions.some(transaction => transaction.actor.repository.toLowerCase() !== repository.full_name.toLowerCase())) throw queueError("actor_unauthorized", "queue log contains an actor from another repository");
   coreApi?.info(`Work queue: validated ${transactions.length} causal commits`);
+  log.debug("ledger.read.complete", { bytes: bytes.length, transactions: transactions.length, works: state.works.size, claims: state.claims.size });
   return { sha, treeSha, transactions, state, branch, logPath: WORK_QUEUE_LOG_PATH };
 }
 
@@ -153,6 +158,7 @@ function stableRequestResult(current, request, actor) {
   if (commit.request.fingerprint !== request.fingerprint || canonical(commit.request.parameters) !== canonical(request.parameters) || canonical(commit.actor) !== canonical(actor) || commit.request.kind !== request.kind)
     throw queueError("request_reused", "stable request identity has different actor/kind/validated semantics");
   const assignments = assignmentsForRequest(current.state, request.id);
+  log.debug("request.recovered", { assignments: assignments.length, operations: commit.operations.length });
   return { ...current, commit, assignments, operations: commit.operations, publishedNow: false, reused: true, persisted: false, recovered: true, idempotent: true, rejected: [] };
 }
 
@@ -164,8 +170,7 @@ function validateExtendingPrefix(previous, current, message) {
  * @param {QueueReadOptions & {context: Parameters<typeof actorFromContext>[0]}} options
  * @returns {(resource: unknown) => Promise<ReturnType<typeof validateClaimAuthority>>}
  */
-function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, storage = undefined, core: coreApi = undefined }) {
-  storageSupported(storage);
+function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
   validateBranch(branch);
   const actor = actorFromContext(context);
   const trusted = validateTrustedContext(context, actor);
@@ -175,24 +180,30 @@ function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUE
   const protectedContext = Object.freeze({ ...trusted, authenticated: true, roles: Object.freeze([actor.role]) });
   let observedPrefix = [];
   return async resource => {
+    log.debug("effect.authorize.start");
     const target = validateEffectResource(resource);
-    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
     validateExtendingPrefix(observedPrefix, current.transactions, "queue history was rewritten during effect authorization");
     observedPrefix = current.transactions;
     const member = current.state.dispatches.get(actor.dispatch_id)?.claims.find(candidate => candidate.handle === actor.claim_handle);
     if (!member) throw queueError("claim_scope_invalid", "effect target has no original immutable assignment member");
-    return structuredClone(validateClaimAuthority(current.state, member.claim_id, protectedContext, { requireCompletion: true, resource: target }));
+    const authority = structuredClone(validateClaimAuthority(current.state, member.claim_id, protectedContext, { requireCompletion: true, resource: target }));
+    log.debug("effect.authorize.complete");
+    return authority;
   };
 }
 
 async function writeCandidate({ githubClient, owner, repo, current, transactions }) {
   // appendCommit already checked this candidate; never replay its history again.
   const content = transactions.map(commit => canonical(commit)).join("\n") + "\n";
+  log.debug("candidate.write.start", { transactions: transactions.length, bytes: Buffer.byteLength(content, "utf8"), initialized: !!current.sha });
   const blob = await githubClient.rest.git.createBlob({ owner, repo, content, encoding: "utf-8" });
   const tree = await githubClient.rest.git.createTree({ owner, repo, ...(current.treeSha ? { base_tree: current.treeSha } : {}), tree: [{ path: WORK_QUEUE_LOG_PATH, mode: "100644", type: "blob", sha: blob.data.sha }] });
   const commit = await githubClient.rest.git.createCommit({ owner, repo, message: "Publish checked fair work queue request", tree: tree.data.sha, parents: current.sha ? [current.sha] : [] });
+  log.debug("candidate.ref.publish.start", { initialized: !!current.sha });
   if (current.sha) await githubClient.rest.git.updateRef({ owner, repo, ref: `heads/${current.branch}`, sha: commit.data.sha, force: false });
   else await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${current.branch}`, sha: commit.data.sha });
+  log.debug("candidate.write.complete");
   return commit.data.sha;
 }
 
@@ -215,7 +226,6 @@ async function publishWorkQueueRequest({
   owner,
   repo,
   branch = WORK_QUEUE_BRANCH,
-  storage = undefined,
   request,
   context,
   actor = actorFromContext(context),
@@ -231,7 +241,7 @@ async function publishWorkQueueRequest({
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
   core: coreApi = undefined,
 }) {
-  storageSupported(storage);
+  log.debug("request.publish.start", { max_retries: maxRetries, initialize_only: initializeOnly });
   validateBranch(branch);
   integer(maxRetries, 0, 10, "publication retries");
   validateTrustedContext(context, actor);
@@ -246,7 +256,8 @@ async function publishWorkQueueRequest({
   let observedPrefix = [];
   let lastConflict;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    let current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+    log.debug("request.publish.attempt", { attempt: attempt + 1 });
+    let current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
     validateExtendingPrefix(observedPrefix, current.transactions, "refreshed queue history does not extend the previously validated prefix");
     observedPrefix = current.transactions;
     const recovered = stableRequestResult(current, stable, stableActor);
@@ -255,6 +266,7 @@ async function publishWorkQueueRequest({
     if (!current.sha) {
       if (stableActor.role === "worker") throw queueError("claim_scope_invalid", "a worker cannot have effective Claim authority in an uninitialized queue");
       if (stable.kind !== "policy") {
+        log.debug("request.genesis.required");
         // Genuine genesis only: separate explicit Policy request, never overlay an
         // installed epoch with a compiled proposal after a publication conflict.
         const genesisContext = initializationContext || (context.role === "administrator" ? context : null);
@@ -265,8 +277,8 @@ async function publishWorkQueueRequest({
         const seed = createHash("sha256").update(stable.id, "utf8").digest("hex");
         const policyOperation = { kind: "Policy", epoch: `epoch_${seed}`, policy: installed };
         const initRequest = newRequest(`init_${seed}`, "policy", genesisActor, { operations: [policyOperation] });
-        await publishWorkQueueRequest({ githubClient, owner, repo, branch, storage, request: initRequest, actor: genesisActor, context: genesisContext, initializeOnly: true, maxRetries, now, commitId, sleepFn, core: coreApi });
-        current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+        await publishWorkQueueRequest({ githubClient, owner, repo, branch, request: initRequest, actor: genesisActor, context: genesisContext, initializeOnly: true, maxRetries, now, commitId, sleepFn, core: coreApi });
+        current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
         observedPrefix = current.transactions;
       }
     }
@@ -293,22 +305,28 @@ async function publishWorkQueueRequest({
     const generated = await generateOperations(generateOperations === generateRequestOperations ? current.state : structuredClone(current.state), structuredClone(stable), structuredClone(stableActor), at, id, structuredClone(observations));
     const decision = Array.isArray(generated) ? { operations: generated } : generated;
     if (!decision || !Array.isArray(decision.operations)) throw queueError("request_invalid", "candidate generator must return operations");
-    if (!decision.operations.length)
+    log.debug("request.candidate.generated", { operations: decision.operations.length, observations: observations.length });
+    if (!decision.operations.length) {
+      log.debug("request.publish.no_operations");
       return { ...decision, ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: "idempotent" in decision && decision.idempotent === true, rejected: [] };
+    }
     if (observations.length && canonical(decision.operations.slice(0, observations.length)) !== canonical(observations)) throw queueError("request_invalid", "candidate must bind every refreshed observation before its Claim prefix");
     const policyOp = decision.operations.find(operation => operation.kind === "Policy");
     const candidate = { version: 3, id, previous: current.state.tip || null, request: stable, actor: stableActor, policy_epoch: policyOp?.epoch ?? current.state.policy_epoch, at, operations: decision.operations };
     const checked = appendCommit(current.transactions, candidate);
+    log.debug("request.candidate.checked", { operations: checked.commit.operations.length });
     if (policyOp) await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
     let sha;
     try {
       sha = await writeCandidate({ githubClient, owner, repo, current, transactions: checked.transactions });
     } catch (error) {
+      log.failure("request.publish.write_failed", error);
+      log.debug("request.publish.recovery", { conflict: refConflict(error), ambiguous: ambiguousWrite(error), retry_available: attempt < maxRetries });
       if (!refConflict(error) && !ambiguousWrite(error)) throw new Error("Failed to publish checked work queue request", { cause: error });
       lastConflict = error;
       // A lost response is not permission to choose another request. Refresh
       // before another candidate, and at exhaustion before reporting uncertainty.
-      const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+      const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
       validateExtendingPrefix(observedPrefix, refreshed.transactions, "queue history was rewritten during publication");
       const committed = stableRequestResult(refreshed, stable, stableActor);
       if (committed) {
@@ -316,13 +334,19 @@ async function publishWorkQueueRequest({
         return committed;
       }
       observedPrefix = refreshed.transactions;
-      if (attempt < maxRetries) await sleepFn(Math.min(1000, 50 * 2 ** attempt));
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000, 50 * 2 ** attempt);
+        log.debug("request.publish.backoff", { delay_ms: delay });
+        await sleepFn(delay);
+      }
       continue;
     }
     coreApi?.info(`Work queue: published checked request (${decision.operations.length} operations)`);
     await writeWorkQueueUpdateSummary(coreApi, checked.state, checked.commit);
+    log.debug("request.publish.complete", { operations: decision.operations.length, attempt: attempt + 1 });
     return { ...decision, ...checked, assignments: assignmentsForRequest(checked.state, stable.id), sha, publishedNow: true, reused: false, persisted: true, recovered: false, rejected: [] };
   }
+  log.debug("request.publish.exhausted", { attempts: maxRetries + 1 });
   throw new Error("publication_unresolved: queue CAS retries exhausted without a committed stable request", { cause: lastConflict });
 }
 
@@ -338,6 +362,7 @@ function applyAndPublishWorkQueueTransactions(options) {
 }
 
 async function initializeWorkQueue(options) {
+  log.debug("queue.initialize.start");
   const actor = actorFromContext(options.context);
   if (actor.role !== "administrator") throw queueError("actor_unauthorized", "trusted Policy initialization requires administrator credentials");
   const branch = options.branch || WORK_QUEUE_BRANCH;
@@ -354,4 +379,4 @@ async function initializeWorkQueue(options) {
   return publishWorkQueueRequest({ ...options, actor, request, initializeOnly: true });
 }
 
-module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, freshAuthorizer, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, storageSupported, verifyRepository };
+module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, freshAuthorizer, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, verifyRepository };

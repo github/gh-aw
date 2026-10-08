@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("reconciler");
 
 const { canonical, digest, integer } = require("./work_queue_codec.cjs");
 const { assignmentForDispatch } = require("./work_queue_replay.cjs");
@@ -25,6 +26,7 @@ function cancellationOperations(state, assignment, at, reason) {
 }
 
 async function releaseAssignment(options, assignment, evidence) {
+  log.debug("release.start");
   if (isStagedMode(options) || isStagedMode(options.config)) return { state: "staged_preview", released: false };
   const latest = await loadQueue(options);
   const validated = validateStoredAssignment(latest.projection, assignment, { allowReleased: true });
@@ -37,15 +39,18 @@ async function releaseAssignment(options, assignment, evidence) {
   try {
     await publishOperations(options, trustedContext, ["release", assignment.dispatch_id, digest(evidence)], "release", operations);
   } catch (error) {
+    log.failure("release.publish.failed", error);
     const refreshed = await loadQueue(options);
     if (!refreshed.projection.dispatches.get(assignment.dispatch_id)?.released) throw error;
   }
   const final = await loadQueue(options);
   if (!final.projection.dispatches.get(assignment.dispatch_id)?.released) throw new Error("work_queue_release_not_durable");
+  log.debug("release.persisted", { operations: operations.length });
   return { state: "released", released: true };
 }
 
 async function discoverRuns(options, expected) {
+  log.debug("discovery.start");
   const [owner, repo] = expected.repository.split("/");
   const candidates = new Map();
   let conflict = false;
@@ -64,12 +69,14 @@ async function discoverRuns(options, expected) {
     if (response.status !== undefined && response.status !== 200) throw new Error("native_discovery_unavailable");
     const runs = response.data?.workflow_runs;
     if (!Array.isArray(runs)) throw new Error("native_discovery_invalid");
+    log.debug("discovery.page", { page, runs: runs.length });
     for (const run of runs) {
       if (!hasDispatchToken(run?.display_title, expected.dispatch_id)) continue;
       let runId;
       try {
         runId = nativeId(run.id);
-      } catch {
+      } catch (error) {
+        log.failure("discovery.identity_invalid", error);
         return { candidates: [...candidates.values()], conflict: true };
       }
       if (candidates.has(runId)) continue;
@@ -77,14 +84,19 @@ async function discoverRuns(options, expected) {
       try {
         const proof = validateNativeRun(original, { ...expected, run_id: runId });
         candidates.set(proof.run_id, proof);
-      } catch {
+      } catch (error) {
+        log.failure("discovery.proof_invalid", error);
         return { candidates: [...candidates.values()], conflict: true };
       }
-      if (candidates.size > 1) return { candidates: [...candidates.values()], conflict: true };
+      if (candidates.size > 1) {
+        log.debug("discovery.multiple_candidates", { candidates: candidates.size });
+        return { candidates: [...candidates.values()], conflict: true };
+      }
     }
     if (runs.length < 50) break;
     if (page === 2) conflict = true;
   }
+  log.debug("discovery.complete", { candidates: candidates.size, conflict });
   return { candidates: [...candidates.values()], conflict };
 }
 
@@ -97,9 +109,11 @@ function returnedRunHint(state, dispatchId) {
 }
 
 async function reconcileDispatch(options) {
+  log.debug("dispatch.reconcile.start");
   if (isStagedMode(options) || isStagedMode(options.config)) return { state: "staged_preview", released: false };
   const initial = await loadQueue(options);
   const { assignment, dispatch, profile } = validateStoredAssignment(initial.projection, options.assignment, { allowReleased: true });
+  log.debug("dispatch.reconcile.checked", { released: dispatch.released, reserved: dispatch.state === "reserved", bound: !!dispatch.run });
   if (dispatch.released) return { state: "released", released: true };
   if (dispatch.state === "reserved") return { state: "reserved", released: false };
   const trustedContext = await authenticatePublisher({ ...options, role: "reconciler" });
@@ -107,10 +121,12 @@ async function reconcileDispatch(options) {
   const expected = expectedWorkerRun(assignment, profile, options.context, repository);
   if (dispatch.run) {
     const proof = validateNativeRun(await fetchNativeRunAttempt(options.githubClient, repository, dispatch.run.run_id), { ...expected, run_id: dispatch.run.run_id });
+    log.debug("dispatch.reconcile.native_checked", { terminal: proof.terminal });
     if (!proof.terminal) {
       if (options.requestCancellation === true) {
         const [owner, repo] = repository.split("/");
         await options.githubClient.rest.actions.cancelWorkflowRun({ owner, repo, run_id: proof.run_id, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, timeout: 15000 } });
+        log.debug("dispatch.cancellation.requested");
       }
       return { state: options.requestCancellation ? "cancellation_requested" : "bound", run_id: proof.run_id, released: false };
     }
@@ -123,6 +139,7 @@ async function reconcileDispatch(options) {
   let hint = options.returnedRunId || returnedRunHint(initial.projection, assignment.dispatch_id);
   let conflict = false;
   for (; attempts < policy.max_attempts; attempts++) {
+    log.debug("dispatch.reconcile.attempt", { attempt: attempts + 1, run_hint: !!hint });
     try {
       const current = await loadQueue(options);
       const observed = current.projection.dispatches.get(assignment.dispatch_id);
@@ -135,6 +152,7 @@ async function reconcileDispatch(options) {
       const discovered = await discoverRuns(options, expected);
       candidates = [...new Map([...candidates, ...discovered.candidates].map(candidate => [candidate.run_id, candidate])).values()];
       conflict ||= discovered.conflict;
+      log.debug("dispatch.reconcile.candidates", { candidates: candidates.length, conflict });
       if (candidates.length > 1 || conflict) return { state: "run_binding_conflict", released: false };
       if (candidates.length === 1) {
         const proof = candidates[0];
@@ -144,14 +162,17 @@ async function reconcileDispatch(options) {
         const latest = await loadQueue(options);
         const bound = latest.projection.dispatches.get(assignment.dispatch_id)?.run;
         if (!bound || canonical(bound) !== canonical(binding)) throw new Error("run_binding_conflict");
+        log.debug("dispatch.reconcile.binding.persisted");
         return reconcileDispatch({ ...options, assignment, returnedRunId: undefined });
       }
     } catch (error) {
+      log.failure("dispatch.reconcile.attempt_failed", error);
       if (error?.code === "run_binding_conflict" || error?.message === "run_binding_conflict") return { state: "run_binding_conflict", released: false };
       // Missing discovery, deadlines and API failures do not establish nonlaunch.
     }
     hint = null;
     if (Date.now() - started >= policy.deadline_ms) {
+      log.debug("dispatch.reconcile.deadline_reached", { attempts: attempts + 1 });
       attempts++;
       break;
     }
@@ -171,14 +192,17 @@ async function reconcileDispatch(options) {
           if (!current || !["started", "uncertain"].includes(current.state) || current.run || current.released) throw new Error("work_queue_resolution_already_recorded");
         }
       );
-    } catch {
+    } catch (error) {
+      log.failure("dispatch.reconcile.unresolved_marker_failed", error);
       // Retain the previous start/uncertain marker when reconciliation cannot write.
     }
   }
+  log.debug("dispatch.reconcile.unresolved", { attempts });
   return { state: "launch_unresolved", released: false, attempts, next_action: "Restore API access and reconcile authenticated worker or positive terminal/nonlaunch evidence." };
 }
 
 async function cancelBeforeLaunch(options) {
+  log.debug("dispatch.cancel_before_launch.start");
   const latest = await loadQueue(options);
   const { assignment, dispatch, profile } = validateStoredAssignment(latest.projection, options.assignment, { allowReleased: true });
   if (dispatch.released) return { state: "released", released: true };
@@ -202,21 +226,25 @@ function reconciliationCandidates(projection, pool, limit, runNumber) {
 }
 
 async function reconcileQueue(options) {
+  log.debug("queue.reconcile.start");
   if (isStagedMode(options) || isStagedMode(options.config)) return { version: 3, status: "staged_preview", reconciled: 0, results: [] };
   const limit = options.maxReconciliations ?? 16;
   integer(limit, 1, 16, "native reconciliation batch limit");
   const latest = await loadQueue(options);
   const candidates = reconciliationCandidates(latest.projection, options.pool, limit, options.context?.runNumber);
+  log.debug("queue.reconcile.selected", { candidates: candidates.length, limit });
   const results = [];
   for (const dispatch of candidates) {
     const assignment = assignmentForDispatch(latest.projection, dispatch.dispatch_id);
     try {
       if (typeof options.verifyEffects === "function") await require("./finish_work_queue_claim.cjs").finalizeWorkerResults({ ...options, assignment });
       results.push({ dispatch_id: dispatch.dispatch_id, ...(await reconcileDispatch({ ...options, assignment })) });
-    } catch {
+    } catch (error) {
+      log.failure("queue.reconcile.dispatch_failed", error);
       results.push({ dispatch_id: dispatch.dispatch_id, state: "launch_unresolved", released: false });
     }
   }
+  log.debug("queue.reconcile.complete", { reconciled: results.length });
   return { version: 3, reconciled: results.length, results };
 }
 
