@@ -60,7 +60,7 @@ sequenceDiagram
     P->>L: Work admission with immutable contract
     D->>L: Replay current head and request fair prefix
     D->>L: CAS Claim operations and immutable assignment
-    Note over D,L: Each durable Claim is charged once; no refunds
+    Note over D,L: Each durable Claim is charged once with no refunds
     D->>L: CAS Dispatch started with one sender
     D->>G: Launch approved immutable worker revision
     D->>L: Dispatch bound to verified run and attempt 1
@@ -77,7 +77,7 @@ sequenceDiagram
             T->>L: CAS Result
             Note over L: Only verified Result releases Work successors
         else Readback unavailable or inconclusive
-            Note over T,L: Barrier stays pending; API success is not Result
+            Note over T,L: Barrier stays pending. API success is not Result
             T->>L: DeliveryFailure after bounded verification exhaustion and terminal evidence
         end
     else Cancelled or terminal run missing finish intent
