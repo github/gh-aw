@@ -95,11 +95,14 @@ func declaredSessionModelRow(model declaredSubagentModel, requests []SubagentMod
 }
 
 func combineSubagentEffort(current, next string) string {
+	if current == "mixed" || next == "mixed" {
+		return "mixed"
+	}
 	if current == "" {
 		return next
 	}
 	if next != "" && current != next {
-		return ""
+		return "mixed"
 	}
 	return current
 }

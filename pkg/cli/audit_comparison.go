@@ -42,7 +42,7 @@ type AuditComparisonRoute struct {
 	Effort        string                  `json:"effort,omitempty"`
 	Mode          string                  `json:"mode,omitempty"`
 	RouterVersion string                  `json:"router_version,omitempty"`
-	MainAgentCost ModelRoutingCost        `json:"main_agent_cost,omitempty"`
+	MainAgentCost ModelRoutingCost        `json:"main_agent_cost,omitzero"`
 	SubagentCosts []ModelRoutingAgentCost `json:"subagent_costs,omitempty"`
 }
 

@@ -97,6 +97,50 @@ func TestModelIdentityResolverFoldsAliasAndDatedIDs(t *testing.T) {
 	require.ElementsMatch(t, []string{"small", "gpt-5.4-mini"}, actuals[0].ServedModels)
 }
 
+func TestResolveAgentUsagePrefersPerAgentModelEvidence(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(`{"sub_agent_models":[{"name":"worker","model":"small","patterns":["copilot/gpt-5.4-mini"]}]}`), 0600))
+	agents := []AgentUsageBreakdown{{
+		AgentName: "worker", AgentType: "subagent", RequestedModels: []string{"small"},
+		Models: []AgentModelUsage{
+			{Model: "small", Requests: 4, TokenCoreMetrics: TokenCoreMetrics{InputTokens: 40}},
+			{Model: "gpt-5.4-mini", AIC: 1.144},
+		},
+	}}
+
+	resolved := resolveAgentUsageModels(agents, newModelIdentityResolver(dir), "claude-haiku-4.5", "gpt-5.4-mini-2026-03-17")
+	require.Len(t, resolved[0].Models, 1)
+	require.Equal(t, "gpt-5.4-mini", resolved[0].Models[0].Model)
+	require.Equal(t, 4, resolved[0].Models[0].Requests)
+	require.Equal(t, 40, resolved[0].Models[0].InputTokens)
+	require.InDelta(t, 1.144, resolved[0].Models[0].AIC, 0.000001)
+	require.Contains(t, resolved[0].ServedModels, "gpt-5.4-mini-2026-03-17")
+	require.NotContains(t, resolved[0].ServedModels, "claude-haiku-4.5")
+}
+
+func TestSubagentAttributionDoesNotBorrowAnotherAgentsModel(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(`{"sub_agent_models":[{"name":"worker","model":"small","patterns":["copilot/gpt-5.4-mini"]}]}`), 0600))
+	session := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"subagent.started","agentId":"worker","data":{"agentDisplayName":"worker","model":"small"}}`) +
+		subagentSessionRecord(`{"type":"session.shutdown","data":{"agentMetrics":{"main":{"modelMetrics":{"claude-haiku-4.5":{"requests":{"count":1}}}},"worker":{"agentDisplayName":"worker","modelMetrics":{"small":{"requests":{"count":4},"usage":{"inputTokens":40}},"gpt-5.4-mini":{"requests":{"count":0},"totalNanoAiu":1144000000}}}}}}`)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-session.jsonl"), []byte(session), 0600))
+	summary := &TokenUsageSummary{ByModel: map[string]*ModelTokenUsage{
+		"claude-haiku-4.5": {Provider: "github-copilot", Requests: 1},
+	}}
+
+	augmentSubagentModelAttribution(dir, summary)
+	require.Len(t, summary.SubagentModelRequests, 1)
+	require.Equal(t, "gpt-5.4-mini", summary.SubagentModelRequests[0].EffectiveModel)
+	require.NotContains(t, summary.SubagentModelRequests[0].ServedModels, "claude-haiku-4.5")
+	require.Len(t, summary.SubagentModelActuals, 1)
+	require.Equal(t, "gpt-5.4-mini", summary.SubagentModelActuals[0].Model)
+	require.Equal(t, 4, summary.SubagentModelActuals[0].Requests)
+	require.Equal(t, 40, summary.SubagentModelActuals[0].InputTokens)
+	require.InDelta(t, 1.144, summary.SubagentModelActuals[0].AIC, 0.000001)
+}
+
 func TestPiStructuredSubagentModelAttribution(t *testing.T) {
 	dir := t.TempDir()
 	session := `{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}` + "\n" +
@@ -181,10 +225,38 @@ func TestReconcileAgentUsageCreditsNamesEndpoint(t *testing.T) {
 		AICFound: true, TotalAIC: 2.576, endpoint: "/responses",
 		AgentUsage: []AgentUsageBreakdown{{AgentName: "main", AIC: 2.743}},
 	}
-	reconcileAgentUsageCredits(summary)
+	reconcileAgentUsageCredits(summary, nil)
 	require.Len(t, summary.Warnings, 1)
 	require.Contains(t, summary.Warnings[0], "/responses")
-	require.Contains(t, summary.Warnings[0], "differ from proxy total")
+	require.Contains(t, summary.Warnings[0], "differ from non-classifier proxy total")
+}
+
+func TestPiFailedSubagentsStillAttributeMainAgentCredits(t *testing.T) {
+	entries := []TokenUsageEntry{
+		{Model: "gpt-5.4-mini", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10}, AICreditsThisResponse: json.RawMessage(`1.2`)},
+		{Purpose: "routing_classification", Model: "gpt-5.4-mini", AICreditsThisResponse: json.RawMessage(`0.5`)},
+	}
+	summary := &TokenUsageSummary{
+		AICFound: true, TotalAIC: 1.7,
+		AgentUsage: []AgentUsageBreakdown{{
+			AgentName: "reader", AgentType: "subagent", SourceEngine: "pi", FailedCount: 1,
+		}},
+	}
+
+	matchPiAgentUsageCredits(summary, entries, newModelIdentityResolver(""))
+	require.Len(t, summary.AgentUsage, 2)
+	require.Equal(t, "main", summary.AgentUsage[1].AgentType)
+	require.Equal(t, 1, summary.AgentUsage[1].Requests)
+	require.InDelta(t, 1.2, summary.AgentUsage[1].AIC, 0.000001)
+	reconcileAgentUsageCredits(summary, entries)
+	require.Empty(t, summary.Warnings)
+	require.InDelta(t, 1.7, summary.TotalAIC, 0.000001)
+}
+
+func TestCombineSubagentEffortKeepsMixedState(t *testing.T) {
+	require.Equal(t, "mixed", combineSubagentEffort(combineSubagentEffort("low", "high"), "high"))
+	require.Equal(t, "mixed", combineSubagentEffort(combineSubagentEffort("high", "low"), "low"))
+	require.Equal(t, "mixed", combineSubagentEffort("mixed", "low"))
 }
 
 func TestSubagentDispatchLine(t *testing.T) {

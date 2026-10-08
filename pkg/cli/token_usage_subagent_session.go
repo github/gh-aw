@@ -114,11 +114,6 @@ func validateSubagentSessionSource(path string) error {
 	return nil
 }
 
-func parseSessionSubagentFile(path string, unified bool) (requests []SubagentModelRequest, actuals []SubagentModelActual, found bool, err error) {
-	requests, actuals, _, found, err = parseSessionSubagentFileDetailed(path, unified)
-	return
-}
-
 func parseSessionSubagentFileDetailed(path string, unified bool) (requests []SubagentModelRequest, actuals []SubagentModelActual, agentUsage []AgentUsageBreakdown, found bool, err error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -133,12 +128,14 @@ func parseSessionSubagentFileDetailed(path string, unified bool) (requests []Sub
 }
 
 type subagentSessionModels struct {
-	agents       map[string]*SubagentModelRequest
-	actualCounts map[string]map[string]int
-	actualModels map[string]map[string]SubagentModelActual
-	agentUsage   map[string]*AgentUsageBreakdown
-	sourceEngine string
-	found        bool
+	agents         map[string]*SubagentModelRequest
+	actualCounts   map[string]map[string]int
+	actualModels   map[string]map[string]SubagentModelActual
+	agentUsage     map[string]*AgentUsageBreakdown
+	legacyPiActive map[string]string
+	legacyPiCount  map[string]int
+	sourceEngine   string
+	found          bool
 }
 
 func parseSessionSubagentModels(input io.Reader, unified bool) ([]SubagentModelRequest, []SubagentModelActual, bool, error) {
@@ -230,8 +227,9 @@ func (sessions *subagentSessionSelection) observe(event sessionSubagentEvent) er
 	if models == nil {
 		models = &subagentSessionModels{
 			agents: make(map[string]*SubagentModelRequest), actualCounts: make(map[string]map[string]int),
-			actualModels: make(map[string]map[string]SubagentModelActual),
-			agentUsage:   make(map[string]*AgentUsageBreakdown),
+			actualModels:   make(map[string]map[string]SubagentModelActual),
+			agentUsage:     make(map[string]*AgentUsageBreakdown),
+			legacyPiActive: make(map[string]string), legacyPiCount: make(map[string]int),
 		}
 		sessions.scopes[scope] = models
 		if len(sessions.scopes) == 1 {
@@ -282,6 +280,8 @@ func (models *subagentSessionModels) observe(event sessionSubagentEvent) error {
 			models.actualCounts = make(map[string]map[string]int)
 			models.actualModels = make(map[string]map[string]SubagentModelActual)
 			models.agentUsage = make(map[string]*AgentUsageBreakdown)
+			models.legacyPiActive = make(map[string]string)
+			models.legacyPiCount = make(map[string]int)
 		}
 		models.found = true
 	}
@@ -437,6 +437,7 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 			models.agentUsage[identity] = agentUsage
 		}
 		agentUsage.InstanceCount = 1
+		agentUsage.IncompleteCount = max(agentUsage.IncompleteCount, 1)
 		agentUsage.RequestedModels = appendUnique(agentUsage.RequestedModels, data.Model)
 		agentUsage.Effort = data.ReasoningEffort
 	}
@@ -468,30 +469,28 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 }
 
 func (models *subagentSessionModels) observePiDispatch(event sessionSubagentEvent, data sessionSubagentData) error {
-	identity := data.InvocationID
-	if identity == "" {
-		identity = event.AgentID
-	}
-	if identity == "" {
-		return errors.New("missing pi sub-agent invocation identity")
-	}
+	identity := models.piInvocationIdentity(event, data, true)
+	agentName := firstNonEmptyModel(data.Agent, "unknown")
 	row := models.agents[identity]
 	if row == nil {
 		row = &SubagentModelRequest{InvocationCount: 1, IncompleteCount: 1}
 		models.agents[identity] = row
+	} else {
+		row.IncompleteCount = max(row.IncompleteCount, 1)
 	}
-	row.AgentName = data.Agent
+	row.AgentName = agentName
 	row.RequestedModel = data.RequestedModel
 	row.ResolvedModel = data.ResolvedModel
 	agentUsage := models.agentUsage[identity]
 	if agentUsage == nil {
-		agentUsage = &AgentUsageBreakdown{AgentName: data.Agent, AgentType: "subagent"}
+		agentUsage = &AgentUsageBreakdown{AgentName: agentName, AgentType: "subagent"}
 		models.agentUsage[identity] = agentUsage
 	}
-	agentUsage.AgentName = data.Agent
+	agentUsage.AgentName = agentName
 	agentUsage.AgentType = "subagent"
 	agentUsage.SourceEngine = models.sourceEngine
 	agentUsage.InstanceCount = 1
+	agentUsage.IncompleteCount = max(agentUsage.IncompleteCount, 1)
 	agentUsage.RequestedModels = appendUnique(agentUsage.RequestedModels, data.RequestedModel)
 	agentUsage.ResolvedModels = appendUnique(agentUsage.ResolvedModels, data.ResolvedModel)
 	agentUsage.Effort = data.ReasoningEffort
@@ -517,12 +516,21 @@ func (models *subagentSessionModels) observePiUsage(event sessionSubagentEvent, 
 	if err := json.Unmarshal(data.Event, &payload); err != nil {
 		return err
 	}
-	identity := data.InvocationID
-	if identity == "" {
-		identity = event.AgentID
+	identity := models.piInvocationIdentity(event, data, false)
+	agentName := firstNonEmptyModel(data.Agent, "unknown")
+	row := models.agents[identity]
+	if row == nil {
+		row = &SubagentModelRequest{AgentName: agentName, InvocationCount: 1, IncompleteCount: 1}
+		models.agents[identity] = row
 	}
-	if identity == "" {
-		return errors.New("missing pi sub-agent invocation identity")
+	failed := payload.Message.StopReason == "error" || payload.Message.StopReason == "aborted" || payload.Message.ErrorMessage != ""
+	if failed {
+		row.Error = sanitizeSubagentError(firstNonEmptyModel(payload.Message.ErrorMessage, payload.Message.StopReason))
+	}
+	models.found = true
+	usage := payload.Message.Usage
+	if failed && usage.Input == 0 && usage.Output == 0 && usage.CacheRead == 0 && usage.CacheWrite == 0 {
+		return nil
 	}
 	model := firstNonEmptyModel(payload.Message.ResponseModel, payload.Message.Model)
 	if model == "" {
@@ -540,13 +548,13 @@ func (models *subagentSessionModels) observePiUsage(event sessionSubagentEvent, 
 	actual.OutputTokens += payload.Message.Usage.Output
 	actual.CacheReadTokens += payload.Message.Usage.CacheRead
 	actual.CacheWriteTokens += payload.Message.Usage.CacheWrite
-	byModel[payload.Message.Model] = actual
+	byModel[model] = actual
 	agentUsage := models.agentUsage[identity]
 	if agentUsage == nil {
-		agentUsage = &AgentUsageBreakdown{AgentName: data.Agent, AgentType: "subagent", InstanceCount: 1}
+		agentUsage = &AgentUsageBreakdown{AgentName: agentName, AgentType: "subagent", InstanceCount: 1, IncompleteCount: 1}
 		models.agentUsage[identity] = agentUsage
 	}
-	agentUsage.AgentName = firstNonEmptyModel(agentUsage.AgentName, data.Agent)
+	agentUsage.AgentName = firstNonEmptyModel(agentUsage.AgentName, agentName)
 	agentUsage.AgentType = "subagent"
 	agentUsage.SourceEngine = models.sourceEngine
 	agentUsage.Requests++
@@ -575,29 +583,18 @@ func (models *subagentSessionModels) observePiUsage(event sessionSubagentEvent, 
 		models.actualCounts[identity] = counts
 	}
 	counts[model] = actual.Requests
-	if payload.Message.StopReason == "error" || payload.Message.StopReason == "aborted" || payload.Message.ErrorMessage != "" {
-		if row := models.agents[identity]; row != nil {
-			row.Error = sanitizeSubagentError(firstNonEmptyModel(payload.Message.ErrorMessage, payload.Message.StopReason))
-		}
-	}
-	models.found = true
 	return nil
 }
 
 func (models *subagentSessionModels) observePiResult(event sessionSubagentEvent, data sessionSubagentData) error {
-	identity := data.InvocationID
-	if identity == "" {
-		identity = event.AgentID
-	}
-	if identity == "" {
-		return errors.New("missing pi sub-agent invocation identity")
-	}
+	identity := models.piInvocationIdentity(event, data, false)
+	agentName := firstNonEmptyModel(data.Agent, "unknown")
 	row := models.agents[identity]
 	if row == nil {
-		row = &SubagentModelRequest{InvocationCount: 1}
+		row = &SubagentModelRequest{AgentName: agentName, InvocationCount: 1}
 		models.agents[identity] = row
 	}
-	row.IncompleteCount = 0
+	row.IncompleteCount = max(0, row.IncompleteCount-1)
 	if data.Outcome == "failed" || data.Error != "" || data.ErrorMessage != "" {
 		row.FailedCount = 1
 		row.Error = sanitizeSubagentError(firstNonEmptyModel(data.Error, data.ErrorMessage))
@@ -606,17 +603,42 @@ func (models *subagentSessionModels) observePiResult(event sessionSubagentEvent,
 	}
 	agentUsage := models.agentUsage[identity]
 	if agentUsage == nil {
-		agentUsage = &AgentUsageBreakdown{AgentName: data.Agent, AgentType: "subagent", InstanceCount: 1}
+		agentUsage = &AgentUsageBreakdown{AgentName: agentName, AgentType: "subagent", InstanceCount: 1}
 		models.agentUsage[identity] = agentUsage
 	}
-	agentUsage.AgentName = firstNonEmptyModel(agentUsage.AgentName, data.Agent)
+	agentUsage.AgentName = firstNonEmptyModel(agentUsage.AgentName, agentName)
 	if row.FailedCount > 0 {
 		agentUsage.FailedCount++
 	} else {
 		agentUsage.CompletedCount++
 	}
-	agentUsage.IncompleteCount = 0
+	agentUsage.IncompleteCount = max(0, agentUsage.IncompleteCount-1)
+	if models.legacyPiActive[data.Agent] == identity {
+		delete(models.legacyPiActive, data.Agent)
+	}
 	return nil
+}
+
+func (models *subagentSessionModels) piInvocationIdentity(event sessionSubagentEvent, data sessionSubagentData, dispatch bool) string {
+	if identity := firstNonEmptyModel(data.InvocationID, event.AgentID); identity != "" {
+		return identity
+	}
+	agent := firstNonEmptyModel(data.Agent, "unknown")
+	if models.legacyPiActive == nil {
+		models.legacyPiActive = make(map[string]string)
+	}
+	if !dispatch {
+		if identity := models.legacyPiActive[agent]; identity != "" {
+			return identity
+		}
+	}
+	if models.legacyPiCount == nil {
+		models.legacyPiCount = make(map[string]int)
+	}
+	models.legacyPiCount[agent]++
+	identity := fmt.Sprintf("legacy:%s:%d", agent, models.legacyPiCount[agent])
+	models.legacyPiActive[agent] = identity
+	return identity
 }
 
 func sanitizeSubagentError(message string) string {
@@ -635,9 +657,10 @@ func sanitizeSubagentError(message string) string {
 
 func (models *subagentSessionModels) rows() ([]SubagentModelRequest, []SubagentModelActual) {
 	grouped := make(map[subagentModelKey]SubagentModelRequest)
+	effectiveModels := make(map[subagentModelKey]map[string]struct{})
 	for agentID, row := range models.agents {
 		if row.AgentName != "" {
-			row.EffectiveModel = ""
+			effectiveModel := ""
 			observedModels := make([]string, 0, len(models.actualCounts[agentID]))
 			for model := range models.actualCounts[agentID] {
 				observedModels = append(observedModels, model)
@@ -645,34 +668,48 @@ func (models *subagentSessionModels) rows() ([]SubagentModelRequest, []SubagentM
 			slices.Sort(observedModels)
 			for _, model := range observedModels {
 				if models.actualCounts[agentID][model] > 0 {
-					row.EffectiveModel = model
+					effectiveModel = model
 					break
 				}
 			}
 			key := subagentModelKey{agent: row.AgentName, model: row.RequestedModel}
+			if effectiveModel != "" {
+				if effectiveModels[key] == nil {
+					effectiveModels[key] = make(map[string]struct{})
+				}
+				effectiveModels[key][effectiveModel] = struct{}{}
+			}
+			current := *row
+			current.EffectiveModel = ""
+			current.ReasonCode = ""
 			combined := grouped[key]
 			if combined.InvocationCount == 0 {
-				combined = *row
+				combined = current
 			} else {
-				combined.InvocationCount += row.InvocationCount
-				combined.CompletedCount += row.CompletedCount
-				combined.FailedCount += row.FailedCount
-				combined.IncompleteCount += row.IncompleteCount
-				if combined.Effort != row.Effort {
-					combined.Effort = ""
+				combined.InvocationCount += current.InvocationCount
+				combined.CompletedCount += current.CompletedCount
+				combined.FailedCount += current.FailedCount
+				combined.IncompleteCount += current.IncompleteCount
+				combined.Effort = combineSubagentEffort(combined.Effort, current.Effort)
+				if combined.Error == "" && current.Error != "" {
+					combined.Error = current.Error
 				}
-				if combined.EffectiveModel != "" && row.EffectiveModel != "" && combined.EffectiveModel != row.EffectiveModel {
-					combined.EffectiveModel = ""
-				}
-				if combined.Error == "" && row.Error != "" {
-					combined.Error = row.Error
-				}
-			}
-			if combined.EffectiveModel == "" && combined.FailedCount > 0 && combined.CompletedCount == 0 {
-				combined.ReasonCode = modelMismatchReasonSubagentFailed
 			}
 			grouped[key] = combined
 		}
+	}
+	for key, row := range grouped {
+		switch len(effectiveModels[key]) {
+		case 1:
+			for model := range effectiveModels[key] {
+				row.EffectiveModel = model
+			}
+		case 0:
+			if row.FailedCount > 0 && row.CompletedCount == 0 {
+				row.ReasonCode = modelMismatchReasonSubagentFailed
+			}
+		}
+		grouped[key] = row
 	}
 	requests := make([]SubagentModelRequest, 0, len(models.agents))
 	for _, row := range grouped {

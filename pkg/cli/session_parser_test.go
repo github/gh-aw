@@ -223,7 +223,10 @@ func TestSessionParserCopilotSubagentAttribution(t *testing.T) {
 				{AgentName: "ghaw-issues", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "low"},
 				{AgentName: "subagent-research", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "xhigh"},
 			}, summary.SubagentModelRequests)
-			require.Equal(t, []SubagentModelActual{{Model: "opus", Requests: 60}}, summary.SubagentModelActuals)
+			require.Equal(t, []SubagentModelActual{{
+				Model: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, Requests: 60,
+				TokenCoreMetrics: TokenCoreMetrics{InputTokens: 6000, OutputTokens: 600, CacheReadTokens: 60, CacheWriteTokens: 120},
+			}}, summary.SubagentModelActuals)
 			require.Zero(t, summary.MismatchCount)
 			require.Empty(t, summary.Warnings)
 			require.Contains(t, summary.ByModel, "proxy-only-model")

@@ -122,6 +122,7 @@ type SubagentModelActual struct {
 	TokenCoreMetrics
 	AIC             float64 `json:"aic,omitempty"`
 	TotalDurationMs int     `json:"total_duration_ms,omitempty"`
+	agentName       string
 }
 
 type AgentUsageBreakdown struct {

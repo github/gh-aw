@@ -107,7 +107,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
           if (["error", "aborted"].includes(event.message.stopReason))
             failure = typeof event.message.errorMessage === "string" && event.message.errorMessage ? event.message.errorMessage : `Pi sub-agent ended with ${event.message.stopReason}`;
           // Preserve child telemetry without mixing it with the parent's session events.
-          process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_event", invocation_id: invocationId, agent: agent.name, event }) + "\n");
+          process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_event", timestamp: new Date().toISOString(), invocation_id: invocationId, agent: agent.name, event }) + "\n");
         }
       };
       child.stdout.on("data", data => {

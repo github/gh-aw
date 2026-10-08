@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -284,12 +285,12 @@ func TestSessionAgentUsageIncludesMainAndSubagents(t *testing.T) {
 	require.Len(t, requests, 1)
 	require.Len(t, agents, 2)
 	require.Equal(t, "main", agents[0].AgentType)
-	require.Equal(t, 1.599, agents[0].AIC)
+	require.InDelta(t, 1.599, agents[0].AIC, 0.000001)
 	require.Equal(t, "quick-checker", agents[1].AgentName)
 	require.Equal(t, 1, agents[1].CompletedCount)
 	require.Equal(t, "low", agents[1].Effort)
 	require.Equal(t, 4, agents[1].Requests)
-	require.Equal(t, 1.144, agents[1].AIC)
+	require.InDelta(t, 1.144, agents[1].AIC, 0.000001)
 	resolver := newModelIdentityResolver(dir)
 	modelID := "gpt-5.4-mini-2026-03-17"
 	requests = resolveSubagentRequestModels(requests, actuals, resolver, modelID)
@@ -299,9 +300,122 @@ func TestSessionAgentUsageIncludesMainAndSubagents(t *testing.T) {
 	require.Contains(t, requests[0].ServedModels, modelID)
 	require.Len(t, actuals, 1)
 	require.Equal(t, 4, actuals[0].Requests)
-	require.Equal(t, 1.144, actuals[0].AIC)
+	require.InDelta(t, 1.144, actuals[0].AIC, 0.000001)
 	require.Contains(t, actuals[0].ServedModels, modelID)
 	require.Len(t, agents[1].Models, 1)
 	require.Equal(t, "gpt-5.4-mini", agents[1].Models[0].Model)
 	require.Contains(t, agents[1].ServedModels, modelID)
+}
+
+func TestPiLegacySubagentEventsCorrelateByAgent(t *testing.T) {
+	usageEvent := subagentSessionRecord(`{"type":"pi.subagent_event","data":{"agent":"reader","event":{"message":{"model":"gpt-5.4-mini","usage":{"input":10,"output":2}}}}}`)
+	usageEvent = strings.Replace(usageEvent, `"data":`, `"timestamp":"2026-10-08T10:00:00Z","data":`, 1)
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"agent":"reader","requestedModel":"small","resolvedModel":"gpt-5.4-mini"}}`) +
+		usageEvent
+
+	requests, actuals, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, []SubagentModelRequest{{
+		AgentName: "reader", RequestedModel: "small", ResolvedModel: "gpt-5.4-mini",
+		InvocationCount: 1, IncompleteCount: 1, EffectiveModel: "gpt-5.4-mini",
+	}}, requests)
+	require.Equal(t, []SubagentModelActual{{
+		Model: "gpt-5.4-mini", Requests: 1, TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10, OutputTokens: 2},
+	}}, actuals)
+	require.Len(t, agents, 1)
+	require.Equal(t, 1, agents[0].IncompleteCount)
+	require.Equal(t, 1, agents[0].Requests)
+	require.Equal(t, "2026-10-08T10:00:00Z", agents[0].requestUsages[0].Timestamp.Format(time.RFC3339))
+
+	completedContent := content +
+		subagentSessionRecord(`{"type":"pi.subagent_result","data":{"agent":"reader","outcome":"completed"}}`)
+	requests, _, agents, found, err = parseSessionSubagentModelsDetailed(strings.NewReader(completedContent), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, 1, requests[0].CompletedCount)
+	require.Zero(t, requests[0].IncompleteCount)
+	require.Equal(t, 1, agents[0].CompletedCount)
+	require.Zero(t, agents[0].IncompleteCount)
+}
+
+func TestCopilotSubagentUsageRetainsIncompleteOutcome(t *testing.T) {
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"subagent.started","agentId":"child","data":{"agentDisplayName":"reader","model":"small"}}`)
+
+	requests, _, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, 1, requests[0].IncompleteCount)
+	require.Equal(t, 1, agents[0].IncompleteCount)
+}
+
+func TestPiFailedZeroTokenMessageDoesNotCountAsServed(t *testing.T) {
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"invocationId":"call-1","agent":"reader","requestedModel":"small","resolvedModel":"gpt-5.4-mini"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_event","data":{"invocationId":"call-1","agent":"reader","event":{"message":{"model":"gpt-5.4-mini","stopReason":"error","errorMessage":"connection failed","usage":{"input":0,"output":0}}}}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_result","data":{"invocationId":"call-1","agent":"reader","outcome":"failed","error":"connection failed"}}`)
+
+	requests, actuals, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Empty(t, actuals)
+	require.Equal(t, 1, requests[0].FailedCount)
+	require.Zero(t, requests[0].CompletedCount)
+	require.Equal(t, modelMismatchReasonSubagentFailed, requests[0].ReasonCode)
+	require.Empty(t, requests[0].EffectiveModel)
+	require.Equal(t, 0, requests[0].IncompleteCount)
+	require.Equal(t, "connection failed", requests[0].Error)
+	require.Equal(t, 1, agents[0].FailedCount)
+	require.Zero(t, agents[0].IncompleteCount)
+	require.Zero(t, agents[0].Requests)
+}
+
+func TestPiResponseModelAccumulatesUsageAcrossMessages(t *testing.T) {
+	message := `{"model":"gpt-5.4-mini","responseModel":"gpt-5.4-mini-2026-03-17","usage":{"input":10,"output":2}}`
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"invocationId":"call-1","agent":"reader","requestedModel":"small","resolvedModel":"gpt-5.4-mini"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_event","data":{"invocationId":"call-1","agent":"reader","event":{"message":`+message+`}}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_event","data":{"invocationId":"call-1","agent":"reader","event":{"message":`+message+`}}}`)
+
+	requests, actuals, _, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, requests, 1)
+	require.Equal(t, "gpt-5.4-mini-2026-03-17", requests[0].EffectiveModel)
+	require.Len(t, actuals, 1)
+	require.Equal(t, "gpt-5.4-mini-2026-03-17", actuals[0].Model)
+	require.Equal(t, 2, actuals[0].Requests)
+	require.Equal(t, 20, actuals[0].InputTokens)
+	require.Equal(t, 4, actuals[0].OutputTokens)
+}
+
+func TestSubagentGroupEffectiveModelIsIndependentOfIterationOrder(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		metrics := subagentSessionRecord(`{"type":"session.shutdown","data":{"agentMetrics":{"completed":{"modelMetrics":{"gpt-5.4-mini":{"requests":{"count":1}}}}}}}`)
+		startFailed := subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"invocationId":"failed","agent":"worker","requestedModel":"small"}}`)
+		startCompleted := subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"invocationId":"completed","agent":"worker","requestedModel":"small"}}`)
+		fail := subagentSessionRecord(`{"type":"pi.subagent_result","data":{"invocationId":"failed","agent":"worker","outcome":"failed","error":"unavailable"}}`)
+		complete := subagentSessionRecord(`{"type":"pi.subagent_result","data":{"invocationId":"completed","agent":"worker","outcome":"completed"}}`)
+		if reverse {
+			startFailed, startCompleted = startCompleted, startFailed
+			fail, complete = complete, fail
+		}
+		content := subagentSessionHeader +
+			subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}`) +
+			startFailed + startCompleted + fail + complete + metrics
+		requests, _, found, err := parseSessionSubagentModels(strings.NewReader(content), true)
+		require.NoError(t, err)
+		require.True(t, found)
+		require.Len(t, requests, 1)
+		require.Equal(t, 1, requests[0].FailedCount)
+		require.Equal(t, 1, requests[0].CompletedCount)
+		require.Equal(t, "gpt-5.4-mini", requests[0].EffectiveModel)
+		require.Empty(t, requests[0].ReasonCode)
+	}
 }

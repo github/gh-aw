@@ -91,7 +91,7 @@ type ModelRoutingSummary struct {
 	ClassifierCost                  ModelRoutingCost        `json:"classifier_cost"`
 	SelectedModelCost               ModelRoutingCost        `json:"selected_model_cost"`
 	DeviatedTrafficCost             ModelRoutingCost        `json:"deviated_traffic_cost"`
-	MainAgentCost                   ModelRoutingCost        `json:"main_agent_cost,omitempty"`
+	MainAgentCost                   ModelRoutingCost        `json:"main_agent_cost,omitzero"`
 	SubagentCosts                   []ModelRoutingAgentCost `json:"subagent_costs,omitempty"`
 	EndpointOnlyDeviationNormalized bool                    `json:"endpoint_only_deviation_normalized,omitempty"`
 }

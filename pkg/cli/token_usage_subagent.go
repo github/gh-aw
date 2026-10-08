@@ -36,11 +36,16 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	if found {
 		resolver := newModelIdentityResolver(runDir)
 		modelCandidates := tokenUsageModelCandidates(summary)
-		summary.SubagentModelRequests = resolveSubagentRequestModels(requests, actuals, resolver, modelCandidates...)
-		summary.SubagentModelActuals = resolveSubagentActualModels(actuals, resolver, modelCandidates...)
+		entries := tokenUsageEntriesForRun(runDir)
 		summary.AgentUsage = resolveAgentUsageModels(agentUsage, resolver, modelCandidates...)
-		matchPiAgentUsageCredits(summary, tokenUsageEntriesForRun(runDir), resolver)
-		reconcileAgentUsageCredits(summary)
+		agentActuals := subagentActualsFromAgentUsage(summary.AgentUsage)
+		if len(agentActuals) == 0 {
+			agentActuals = actuals
+		}
+		summary.SubagentModelRequests = resolveSubagentRequestModels(requests, agentActuals, resolver, modelCandidates...)
+		summary.SubagentModelActuals = resolveSubagentActualModels(agentActuals, resolver, modelCandidates...)
+		matchPiAgentUsageCredits(summary, entries, resolver)
+		reconcileAgentUsageCredits(summary, entries)
 		summary.MismatchCount = 0
 		augmentDeclaredSubagentModels(runDir, summary)
 		return
@@ -53,6 +58,22 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 		return
 	}
 	augmentHeuristicSubagentModelAttribution(requests, summary, newModelIdentityResolver(runDir))
+}
+
+func subagentActualsFromAgentUsage(agents []AgentUsageBreakdown) []SubagentModelActual {
+	var actuals []SubagentModelActual
+	for _, agent := range agents {
+		if agent.AgentType != "subagent" {
+			continue
+		}
+		for _, model := range agent.Models {
+			actuals = append(actuals, SubagentModelActual{
+				Model: model.Model, ResolvedModel: model.ResolvedModel, Requests: model.Requests,
+				TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC, agentName: agent.AgentName,
+			})
+		}
+	}
+	return actuals
 }
 
 func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, summary *TokenUsageSummary, resolver *modelIdentityResolver) {
@@ -123,18 +144,37 @@ func filterSubagentActualModels(actuals []SubagentModelActual, requests []Subage
 }
 
 func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []SubagentModelActual, resolver *modelIdentityResolver, candidates ...string) []SubagentModelRequest {
-	observed := append([]string(nil), candidates...)
-	for _, actual := range actuals {
-		observed = append(observed, actual.Model)
-		observed = append(observed, actual.ServedModels...)
-	}
 	for i := range requests {
 		row := &requests[i]
-		row.ResolvedModel = resolver.resolve(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), "", observed)
+		localObserved := make([]string, 0)
+		for _, actual := range actuals {
+			if actual.agentName != "" && !strings.EqualFold(actual.agentName, row.AgentName) {
+				continue
+			}
+			localObserved = append(localObserved, actual.Model)
+			localObserved = append(localObserved, actual.ServedModels...)
+		}
+		slices.Sort(localObserved)
+		requested := firstNonEmptyModel(row.ResolvedModel, row.RequestedModel)
+		row.ResolvedModel = resolver.resolve(requested, "", localObserved)
 		if row.EffectiveModel != "" {
-			row.EffectiveModel = resolver.resolve(row.EffectiveModel, "", observed)
-			for _, candidate := range observed {
+			row.EffectiveModel = resolver.resolve(row.EffectiveModel, "", localObserved)
+			for _, candidate := range localObserved {
 				if resolver.matches(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), candidate, "") {
+					row.ServedModels = appendUnique(row.ServedModels, candidate)
+				}
+			}
+		} else {
+			row.EffectiveModel = firstMatchingObservedModel(requested, localObserved, resolver)
+			for _, candidate := range localObserved {
+				if resolver.matches(requested, candidate, "") {
+					row.ServedModels = appendUnique(row.ServedModels, candidate)
+				}
+			}
+		}
+		if row.EffectiveModel != "" {
+			for _, candidate := range candidates {
+				if resolver.matches(row.EffectiveModel, candidate, "") {
 					row.ServedModels = appendUnique(row.ServedModels, candidate)
 				}
 			}
@@ -144,6 +184,15 @@ func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []Sub
 		}
 	}
 	return requests
+}
+
+func firstMatchingObservedModel(requested string, observed []string, resolver *modelIdentityResolver) string {
+	for _, model := range observed {
+		if resolver.matches(requested, model, "") {
+			return normalizeModelIdentity(modelNameWithoutProvider(model))
+		}
+	}
+	return ""
 }
 
 func firstNonEmptyModel(values ...string) string {
@@ -156,14 +205,18 @@ func firstNonEmptyModel(values ...string) string {
 }
 
 func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelIdentityResolver, candidates ...string) []SubagentModelActual {
-	observed := append([]string(nil), candidates...)
+	observedByAgent := make(map[string][]string)
 	for _, actual := range actuals {
-		observed = append(observed, actual.Model)
-		observed = append(observed, actual.ServedModels...)
+		observedByAgent[actual.agentName] = append(observedByAgent[actual.agentName], actual.Model)
+		observedByAgent[actual.agentName] = append(observedByAgent[actual.agentName], actual.ServedModels...)
+	}
+	for agent := range observedByAgent {
+		slices.Sort(observedByAgent[agent])
 	}
 	grouped := make(map[string]SubagentModelActual, len(actuals))
 	for _, actual := range actuals {
-		resolved := resolver.resolve(actual.Model, actual.Provider, observed)
+		localObserved := observedByAgent[actual.agentName]
+		resolved := resolver.resolve(actual.Model, actual.Provider, localObserved)
 		if resolved == "" {
 			resolved = normalizeModelIdentity(actual.Model)
 		}
@@ -171,6 +224,7 @@ func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelI
 		combined.Model = resolved
 		combined.ResolvedModel = resolved
 		combined.Provider = actual.Provider
+		combined.agentName = ""
 		combined.Requests += actual.Requests
 		combined.InputTokens += actual.InputTokens
 		combined.OutputTokens += actual.OutputTokens
@@ -183,8 +237,13 @@ func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelI
 		for _, model := range actual.ServedModels {
 			combined.ServedModels = appendUnique(combined.ServedModels, model)
 		}
-		for _, candidate := range observed {
+		for _, candidate := range localObserved {
 			if resolver.matches(actual.Model, candidate, actual.Provider) {
+				combined.ServedModels = appendUnique(combined.ServedModels, candidate)
+			}
+		}
+		for _, candidate := range candidates {
+			if resolver.matches(resolved, candidate, actual.Provider) {
 				combined.ServedModels = appendUnique(combined.ServedModels, candidate)
 			}
 		}
@@ -208,7 +267,7 @@ func appendUnique(values []string, value string) []string {
 func resolveAgentUsageModels(agents []AgentUsageBreakdown, resolver *modelIdentityResolver, candidates ...string) []AgentUsageBreakdown {
 	for i := range agents {
 		agent := &agents[i]
-		observed := append([]string(nil), candidates...)
+		observed := make([]string, 0, len(agent.Models))
 		actuals := make([]SubagentModelActual, 0, len(agent.Models))
 		for _, model := range agent.Models {
 			observed = append(observed, model.Model)
@@ -216,16 +275,18 @@ func resolveAgentUsageModels(agents []AgentUsageBreakdown, resolver *modelIdenti
 				Model: model.Model, Requests: model.Requests, TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC,
 			})
 		}
-		resolved := resolveSubagentActualModels(actuals, resolver, observed...)
+		resolved := resolveSubagentActualModels(actuals, resolver)
 		agent.Models = make([]AgentModelUsage, 0, len(resolved))
 		for _, model := range resolved {
 			agent.Models = append(agent.Models, AgentModelUsage{
 				Model: model.Model, ResolvedModel: model.ResolvedModel, Requests: model.Requests,
 				TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC,
 			})
-			for _, served := range model.ServedModels {
+			for _, served := range append(model.ServedModels, candidates...) {
 				if model.Requests > 0 {
-					agent.ServedModels = appendUnique(agent.ServedModels, served)
+					if resolver.matches(firstNonEmptyModel(model.ResolvedModel, model.Model), served, "") {
+						agent.ServedModels = appendUnique(agent.ServedModels, served)
+					}
 				}
 			}
 		}
@@ -251,7 +312,7 @@ func tokenUsageModelCandidates(summary *TokenUsageSummary) []string {
 	return models
 }
 
-func reconcileAgentUsageCredits(summary *TokenUsageSummary) {
+func reconcileAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsageEntry) {
 	if summary == nil || !summary.AICFound || len(summary.AgentUsage) == 0 {
 		return
 	}
@@ -259,14 +320,20 @@ func reconcileAgentUsageCredits(summary *TokenUsageSummary) {
 	for _, agent := range summary.AgentUsage {
 		attributed += agent.AIC
 	}
-	if attributed == 0 || math.Abs(attributed-summary.TotalAIC) <= 0.01 {
+	expected := summary.TotalAIC
+	for _, entry := range entries {
+		if entry.Purpose == "routing_classification" {
+			expected -= tokenUsageEntryCredits(entry)
+		}
+	}
+	if attributed == 0 || math.Abs(attributed-expected) <= 0.01 {
 		return
 	}
 	endpoint := summary.endpoint
 	if endpoint == "" {
 		endpoint = "unknown endpoint"
 	}
-	addTokenUsageWarning(summary, fmt.Sprintf("per-agent AI credits (%.3f) differ from proxy total (%.3f) for endpoint %s", attributed, summary.TotalAIC, endpoint))
+	addTokenUsageWarning(summary, fmt.Sprintf("per-agent AI credits (%.3f) differ from non-classifier proxy total (%.3f) for endpoint %s", attributed, expected, endpoint))
 }
 
 func matchPiAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsageEntry, resolver *modelIdentityResolver) {
@@ -289,7 +356,16 @@ func matchPiAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsageEn
 			requests = append(requests, indexedRequest{agentIndex: i, usage: request})
 		}
 	}
-	if len(piAgents) == 0 || len(requests) == 0 {
+	confirmedZeroUsageFailures := len(piAgents) > 0 && len(requests) == 0
+	if confirmedZeroUsageFailures {
+		for _, index := range piAgents {
+			if summary.AgentUsage[index].FailedCount == 0 {
+				confirmedZeroUsageFailures = false
+				break
+			}
+		}
+	}
+	if len(piAgents) == 0 || (len(requests) == 0 && !confirmedZeroUsageFailures) {
 		return
 	}
 	slices.SortFunc(requests, func(a, b indexedRequest) int {

@@ -87,8 +87,10 @@ describe("Pi managed delegation", () => {
     expect(process.stdout.write).toHaveBeenCalledWith(expect.stringContaining('"resolved_model":"claude-haiku-4.5"'));
     const records = process.stdout.write.mock.calls.map(([line]) => JSON.parse(line));
     const dispatch = records.find(record => record.type === "gh_aw_subagent_dispatch");
+    const usage = records.find(record => record.type === "gh_aw_subagent_event");
     const resultEvent = records.find(record => record.type === "gh_aw_subagent_result");
     expect(dispatch.invocation_id).toBeTruthy();
+    expect(Number.isNaN(Date.parse(usage.timestamp))).toBe(false);
     expect(resultEvent).toMatchObject({ invocation_id: dispatch.invocation_id, outcome: "completed", agent: "reader" });
     expect(launch.mock.calls[0][2]).toMatchObject({ shell: false, cwd: dir });
     expect(fs.existsSync(launch.mock.calls[0][1].at(-1))).toBe(false);
