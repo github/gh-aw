@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-06-19",
-    "workflow_name": "Glossary Maintainer",
-    "workflow_file": "glossary-maintainer",
-    "total_aic_analyzed": 2215.87,
-    "runs_audited": 4,
-    "recommendations_count": 4,
-    "subagent_candidates": 1,
-    "estimated_aic_savings_per_run": 270
-  },
-  {
     "date": "2026-06-22",
     "workflow_name": "PR Code Quality Reviewer",
     "workflow_file": "pr-code-quality-reviewer",
@@ -289,5 +279,15 @@
     "recommendations_count": 5,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 30
+  },
+  {
+    "date": "2026-10-08",
+    "workflow_name": "Design Decision Gate \ud83c\udfd7\ufe0f",
+    "workflow_file": "design-decision-gate",
+    "total_aic_analyzed": 102.14,
+    "runs_audited": 6,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 12
   }
 ]
