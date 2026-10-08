@@ -34,6 +34,28 @@ func TestWorkQueuePolicySchema(t *testing.T) {
 	}, "worker.md"))
 }
 
+func TestWorkQueueStorageRemovalMessage(t *testing.T) {
+	for _, storage := range []any{"git", "issues", nil, false} {
+		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+			"on": "workflow_dispatch",
+			"tools": map[string]any{"work-queue": map[string]any{
+				"storage": storage, "worker": true,
+			}},
+		}, "worker.md")
+		require.ErrorContains(t, err, "tools.work-queue.storage has been removed")
+		require.ErrorContains(t, err, "Git is the only supported backend")
+		require.ErrorContains(t, err, "Remove storage from tools.work-queue")
+		require.ErrorContains(t, err, "work-queue: true")
+		require.NotContains(t, err.Error(), "experiments")
+		require.ErrorContains(t, ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{
+			"tools": map[string]any{"work-queue": map[string]any{"storage": storage}},
+		}, "shared.md"), "tools.work-queue.storage has been removed")
+	}
+	require.NoError(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+		"on": "workflow_dispatch", "experiments": map[string]any{"storage": "repo"},
+	}, "experiments.md"))
+}
+
 func TestWorkQueueMemorySchema(t *testing.T) {
 	memory := map[string]any{"path": "memory.json", "target-repo": "owner/repo", "base-revision": strings.Repeat("a", 40), "branch-prefix": "memory/runs", "schema": map[string]any{"type": "object"}}
 	validate := func(config map[string]any) error {

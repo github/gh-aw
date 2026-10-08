@@ -5225,6 +5225,7 @@
           "description": "Read the immutable version-3 activation snapshot. Nonworkers without approved dispatch targets are read-only observers; workers and approved dispatchers may stage scoped queue intents. The installed ledger Policy is authoritative. Only Git storage is supported.",
           "oneOf": [
             {
+              "type": "boolean",
               "const": true,
               "description": "Enable read-only queue observation, or queue-control intents when approved worker dispatch targets are configured."
             },

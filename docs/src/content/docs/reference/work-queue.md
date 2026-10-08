@@ -9,6 +9,9 @@ Git storage. Lightweight issue checklists and sub-issue queues use
 outputs. This reference describes the native version-3 protocol. Git is the only
 backend, and `tools.work-queue` has no `storage` field. The compiler rejects that
 field for every value, including `git`; remove it from existing workflows.
+The runtime also rejects a supplied `storage` option or
+`GH_AW_WORK_QUEUE_STORAGE` environment variable for every value, including
+`git`. Remove stale selectors and recompile instead of switching queues implicitly.
 
 The native queue enforces fair scheduling, immutable task dependency graphs,
 and worker effects authorized by individual Claims. Its only source of

@@ -502,6 +502,11 @@ One scheduling **pool** is one durable decision domain with a fixed worker-capab
 
 The protocol uses the **Git backend** exclusively. `tools.work-queue` MUST NOT expose a `storage` selector; the compiler MUST reject that field for every value, including `git`, without legacy compatibility or automatic migration. The Git backend MUST enforce the full scheduler contract; advisory display, unscheduled FIFO operation, or weakened consistency is not a permitted fallback.
 
+The runtime MUST reject a supplied `storage` option or
+`GH_AW_WORK_QUEUE_STORAGE` environment variable for every value before reading,
+publishing, initializing, or authorizing queue effects. Stale selectors MUST NOT
+silently switch the authoritative queue to Git.
+
 Support exactly these scheduling modes:
 
 | Mode | Selection |

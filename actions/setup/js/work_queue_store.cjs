@@ -31,6 +31,11 @@ const DEFAULT_MAX_RETRIES = 5;
 
 /** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
 
+function rejectStorageSelector(options) {
+  if (Object.hasOwn(options, "storage") || Object.hasOwn(process.env, "GH_AW_WORK_QUEUE_STORAGE"))
+    throw queueError("unsupported_backend", "work-queue storage selectors have been removed. Git is the only supported backend; remove the storage option and GH_AW_WORK_QUEUE_STORAGE environment variable");
+}
+
 function validateBranch(branch) {
   identity(branch, "queue branch");
   if (LEGACY_BRANCHES.includes(branch)) throw queueError("unsupported_protocol", "legacy queue branches are unsupported; explicit new queue initialization is required");
@@ -103,7 +108,9 @@ async function readRef(githubClient, owner, repo, branch) {
 }
 
 /** @param {QueueReadOptions} options */
-async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
+async function readWorkQueueLog(options) {
+  rejectStorageSelector(options);
+  const { githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined } = options;
   log.debug("ledger.read.start");
   validateBranch(branch);
   const repository = await verifyRepository(githubClient, owner, repo);
@@ -170,7 +177,9 @@ function validateExtendingPrefix(previous, current, message) {
  * @param {QueueReadOptions & {context: Parameters<typeof actorFromContext>[0]}} options
  * @returns {(resource: unknown) => Promise<ReturnType<typeof validateClaimAuthority>>}
  */
-function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
+function freshAuthorizer(options) {
+  rejectStorageSelector(options);
+  const { githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined } = options;
   validateBranch(branch);
   const actor = actorFromContext(context);
   const trusted = validateTrustedContext(context, actor);
@@ -221,26 +230,28 @@ async function writeCandidate({ githubClient, owner, repo, current, transactions
  * commitId?: typeof proposedCommitId, sleepFn?: (delay: number) => Promise<void>
  * }} options
  */
-async function publishWorkQueueRequest({
-  githubClient,
-  owner,
-  repo,
-  branch = WORK_QUEUE_BRANCH,
-  request,
-  context,
-  actor = actorFromContext(context),
-  generateOperations = generateRequestOperations,
-  refreshObservations = undefined,
-  remediationVerifier = undefined,
-  policyProposal = undefined,
-  initializationContext = undefined,
-  initializeOnly = false,
-  maxRetries = DEFAULT_MAX_RETRIES,
-  now = Date.now,
-  commitId = proposedCommitId,
-  sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
-  core: coreApi = undefined,
-}) {
+async function publishWorkQueueRequest(options) {
+  rejectStorageSelector(options);
+  const {
+    githubClient,
+    owner,
+    repo,
+    branch = WORK_QUEUE_BRANCH,
+    request,
+    context,
+    actor = actorFromContext(context),
+    generateOperations = generateRequestOperations,
+    refreshObservations = undefined,
+    remediationVerifier = undefined,
+    policyProposal = undefined,
+    initializationContext = undefined,
+    initializeOnly = false,
+    maxRetries = DEFAULT_MAX_RETRIES,
+    now = Date.now,
+    commitId = proposedCommitId,
+    sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
+    core: coreApi = undefined,
+  } = options;
   log.debug("request.publish.start", { max_retries: maxRetries, initialize_only: initializeOnly });
   validateBranch(branch);
   integer(maxRetries, 0, 10, "publication retries");
@@ -362,6 +373,7 @@ function applyAndPublishWorkQueueTransactions(options) {
 }
 
 async function initializeWorkQueue(options) {
+  rejectStorageSelector(options);
   log.debug("queue.initialize.start");
   const actor = actorFromContext(options.context);
   if (actor.role !== "administrator") throw queueError("actor_unauthorized", "trusted Policy initialization requires administrator credentials");

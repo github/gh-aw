@@ -192,6 +192,30 @@ function nativeTarget(number = "7") {
 
 function registerTests({ describe, it }) {
   describe("checked current-only Git queue CAS store", () => {
+    it("rejects every removed storage option or environment selector before reading or publishing a queue", async () => {
+      const fake = fakeGitHub([genesis()]);
+      const request = newRequest("removed-storage", "control", administrator, { operations: [{ kind: "Control", control: "grants_paused", value: true, reason: "maintenance" }] });
+      const input = options(fake, request, administrator);
+      const check = async candidate => {
+        await assert.rejects(readWorkQueueLog(candidate), { code: "unsupported_backend" });
+        await assert.rejects(publishWorkQueueRequest(candidate), { code: "unsupported_backend" });
+        await assert.rejects(initializeWorkQueue(candidate), { code: "unsupported_backend" });
+        assert.throws(() => freshAuthorizer(candidate), { code: "unsupported_backend" });
+        assert.deepEqual(fake.state.calls, []);
+        assert.equal(fake.state.updates, 0);
+      };
+      for (const storage of ["git", "issues", "", null, undefined, false]) await check({ ...input, storage });
+      const previous = process.env.GH_AW_WORK_QUEUE_STORAGE;
+      try {
+        for (const storage of ["git", "issues", ""]) {
+          process.env.GH_AW_WORK_QUEUE_STORAGE = storage;
+          await check(input);
+        }
+      } finally {
+        if (previous === undefined) delete process.env.GH_AW_WORK_QUEUE_STORAGE;
+        else process.env.GH_AW_WORK_QUEUE_STORAGE = previous;
+      }
+    });
     it("validates canonical trusted principals before no-op generation or any queue API probe", async () => {
       const parameters = { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 };
       const request = newRequest("principal-no-op", "dispatch_next", dispatcher, parameters);
