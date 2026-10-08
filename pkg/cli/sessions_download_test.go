@@ -143,7 +143,7 @@ func TestSessionsDownloadReconstructs(t *testing.T) {
 					require.Contains(t, output, `"type":"session.collection"`)
 					require.Contains(t, output, `"absentComponents"`)
 				} else {
-					require.Contains(t, output, "### Unified session")
+					require.Contains(t, output, "<summary>Unified session</summary>")
 				}
 				commands, err := os.ReadFile(calls)
 				require.NoError(t, err)
@@ -219,7 +219,7 @@ func TestSessionsDownloadPreviousVersions(t *testing.T) {
 					require.NoError(t, validateSessionJSONL([]byte(output)))
 					require.Contains(t, output, `"component":"agent"`)
 				} else {
-					require.Contains(t, output, "### Unified session")
+					require.Contains(t, output, "<summary>Unified session</summary>")
 				}
 			}
 			commands, err := os.ReadFile(calls)
@@ -245,7 +245,7 @@ func TestSessionsDownloadMarkdownAndOutput(t *testing.T) {
 			if format == "jsonl" {
 				require.Equal(t, content, string(written))
 			} else {
-				require.Contains(t, string(written), "### Unified session")
+				require.Contains(t, string(written), "<summary>Unified session</summary>")
 				require.Contains(t, string(written), "Session download works.")
 				require.NotContains(t, string(written), "private prompt")
 			}

@@ -1345,7 +1345,8 @@ jobs:
                     "required": true,
                     "type": "string",
                     "sanitize": true,
-                    "maxLength": 128
+                    "maxLength": 128,
+                    "allowEmpty": true
                   },
                   "rationale": {
                     "type": "string",

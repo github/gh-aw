@@ -26,6 +26,32 @@ const {
 } = require("./parse_mcp_gateway_log.cjs");
 
 describe("parse_mcp_gateway_log", () => {
+  test("flushes gateway diagnostics without appending a duplicate unified timeline", async () => {
+    const existsSync = fs.existsSync;
+    const readFileSync = fs.readFileSync;
+    const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(file => String(file).startsWith("/tmp/gh-aw/") || existsSync(file));
+    const readSpy = vi
+      .spyOn(fs, "readFileSync")
+      .mockImplementation((file, options) => (String(file).startsWith("/tmp/gh-aw/") ? JSON.stringify({ timestamp: "2026-01-01T00:00:00Z", event: "tool_call", tool_name: "lookup" }) + "\n" : readFileSync(file, options)));
+    const coreObj = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warning: vi.fn(),
+      exportVariable: vi.fn(),
+      setOutput: vi.fn(),
+      summary: { addRaw: vi.fn(), write: vi.fn().mockResolvedValue(undefined) },
+    };
+    try {
+      await writeStepSummaryWithTokenUsage(coreObj);
+      expect(coreObj.summary.addRaw).not.toHaveBeenCalled();
+      expect(coreObj.summary.write).toHaveBeenCalledOnce();
+      expect(readSpy.mock.calls.filter(([file]) => String(file).startsWith("/tmp/gh-aw/"))).toHaveLength(1);
+    } finally {
+      existsSpy.mockRestore();
+      readSpy.mockRestore();
+    }
+  });
+
   // Note: The main() function now checks for gateway.md first before falling back to log files.
   // If gateway.md exists, its content is written directly to the step summary.
   // These tests focus on the fallback generateGatewayLogSummary function used when gateway.md is not present.

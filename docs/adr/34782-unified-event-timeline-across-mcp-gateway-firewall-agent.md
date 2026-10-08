@@ -1,8 +1,30 @@
 # ADR-34782: Unified Event Timeline Across MCP Gateway, AWF Firewall, and Agent Logs
 
 **Date**: 2026-05-25
-**Status**: Draft
+**Status**: Draft; JavaScript step-summary portion superseded
 **Deciders**: Unknown
+
+---
+
+## JavaScript step-summary supersession (2026-10-08)
+
+The unified session collector and publication views described in
+[the unified agent session specification](../src/content/docs/specs/unified-agent-session-specification.md#85-unified-file-publication-views)
+supersede this ADR's JavaScript timeline design. The conclusion collector writes
+`aw_session.jsonl`, and `unified_session_render.cjs` publishes one collapsible
+`Unified session` section with a fenced CLI-style transcript. Gateway diagnostics
+no longer append a second timeline table.
+
+The retired `unified_timeline.cjs` renderer and its dedicated tests have been
+removed. Copilot SDK events remain collected by `unified_session.cjs`. This
+eliminates the duplicate JavaScript collection/rendering implementation and its
+Go/JavaScript synchronization cost.
+
+The Go audit, logs, and view consumers of `gateway_logs_timeline.go` and
+`gateway_logs_timeline_render.go` remain supported and unchanged. The historical
+decision and requirements below are retained for context, but requirements for
+the JavaScript renderer, dual-language parity, and the
+`writeStepSummaryWithTokenUsage` integration no longer apply.
 
 ---
 
