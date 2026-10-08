@@ -50,9 +50,9 @@ func TestBuildCachedLogsJSONLRunDataUsesEffectiveRoutedModel(t *testing.T) {
 	data := buildCachedLogsJSONLRunData(ProcessedRun{ModelRouting: routing}, runData)
 	require.Equal(t, "gpt-5.6-luna", data.Model)
 	require.Equal(t, "gpt-5.6-luna", data.RunData.Model)
-	require.Equal(t, "high", data.RunData.ModelEffort)
-	require.Equal(t, "selected", data.RunData.ModelRoutingStatus)
-	require.Equal(t, "auto", data.RunData.RequestedModel)
+	require.Equal(t, "high", data.ModelEffort)
+	require.Equal(t, "selected", data.ModelRoutingStatus)
+	require.Equal(t, "auto", data.RequestedModel)
 }
 
 func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {

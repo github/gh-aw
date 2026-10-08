@@ -50,6 +50,7 @@ function getUsageOutputPath(envName, defaultPath) {
   return configured && configured.trim() ? configured.trim() : defaultPath;
 }
 
+/** @returns {any|null} */
 function readJSONIfExists(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -58,8 +59,10 @@ function readJSONIfExists(filePath) {
   }
 }
 
+/** @returns {any|null} */
 function readModelRoutingRecord(ghAwDir) {
   const paths = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
+  /** @type {any|null} */
   let result = null;
   for (const relativePath of paths) {
     let lines;
@@ -81,6 +84,7 @@ function readModelRoutingRecord(ghAwDir) {
   return result;
 }
 
+/** @returns {any|null} */
 function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_DIR || DEFAULT_GH_AW_DIR) {
   if (env.GH_AW_MODEL_ROUTING_ENABLED !== "true") return null;
   const record = readModelRoutingRecord(ghAwDir);
@@ -114,19 +118,22 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
     if (reflectRouting?.status === "selected") {
       const engine = String(env.GH_AW_ENGINE_ID || "").toLowerCase();
       const checked = resolveAWFModelRoutingSelection(reflectData, true, MODEL_ROUTING_ENDPOINTS[engine] || []);
-      routing = checked.error
-        ? { status: "rejected", failure_code: "invalid_selection", detail: checked.error }
-        : {
-            status: "selected",
-            provider: checked.selection.provider,
-            model: checked.selection.model,
-            wire_model: checked.selection.wire_model,
-            effort: checked.selection.effort,
-            endpoint: checked.selection.endpoint,
-            mode: reflectRouting.mode,
-            selected_id: reflectRouting.selection?.id,
-            router_version: reflectRouting.router?.version,
-          };
+      if (checked.error || !checked.selection) {
+        routing = { status: "rejected", failure_code: "invalid_selection", detail: checked.error };
+      } else {
+        const selection = checked.selection;
+        routing = {
+          status: "selected",
+          provider: selection.provider,
+          model: selection.model,
+          wire_model: selection.wire_model,
+          effort: selection.effort,
+          endpoint: selection.endpoint,
+          mode: reflectRouting.mode,
+          selected_id: reflectRouting.selection?.id,
+          router_version: reflectRouting.router?.version,
+        };
+      }
     } else {
       routing = reflectRouting
         ? {
@@ -157,6 +164,7 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
   return routing;
 }
 
+/** @returns {{routing: any, effective: any}|null} */
 function recordModelRoutingFromArtifacts(env = process.env, ghAwDir = env.GH_AW_TMP_DIR || DEFAULT_GH_AW_DIR) {
   const routing = resolveModelRoutingOutcome(env, ghAwDir);
   if (!routing) return null;
@@ -453,6 +461,7 @@ async function appendStepSummarySection(title, markdown, workingSet = null) {
  * Main function to parse token usage and write the step summary.
  */
 async function main(copilotSessionStateDir = getGhAwPath("sandbox/agent/logs/copilot-session-state")) {
+  /** @type {{routing: any, effective: any}|null} */
   let routedAttribution = null;
   try {
     routedAttribution = recordModelRoutingFromArtifacts();

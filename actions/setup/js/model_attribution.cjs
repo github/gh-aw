@@ -22,9 +22,7 @@ function readFallbackMetadata(filePath) {
 }
 
 function resolveAwInfoPath(infoPath) {
-  const fs = require("fs");
-  const agentInfoPath = require("path").join(require("path").dirname(infoPath), "agent", "aw_info.json");
-  return fs.existsSync(agentInfoPath) ? agentInfoPath : infoPath;
+  return infoPath;
 }
 
 function recordFallbackModel(model, env, infoPath) {
@@ -121,7 +119,7 @@ function getModelRouting(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"
 
 function resolveEffectiveModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
   let routing = getModelRouting(infoPath, phase);
-  if (!routing && ROUTING_STATUSES.has(env.GH_AW_MODEL_ROUTING_STATUS)) {
+  if (!routing && typeof env.GH_AW_MODEL_ROUTING_STATUS === "string" && ROUTING_STATUSES.has(env.GH_AW_MODEL_ROUTING_STATUS)) {
     routing = {
       status: env.GH_AW_MODEL_ROUTING_STATUS,
       wire_model: env.GH_AW_MODEL_ROUTING_STATUS === "selected" ? validateModelIdentifier(env.GH_AW_ENGINE_MODEL) : "",

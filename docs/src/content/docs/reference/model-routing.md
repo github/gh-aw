@@ -26,7 +26,7 @@ All three fields are required:
 |---|---|---|
 | `goal` | `cost`, `cost-speed` | `cost` prefers the cheapest model-and-effort choice that meets the quality bar. `cost-speed` also weighs execution time. |
 | `mode` | `economy`, `balanced`, `robust`, `auto` | `economy`, `balanced`, and `robust` set increasing quality bars, generally with increasing cost. `auto` lets the classifier recommend one of these three profiles for the task. |
-| `allowed-models` | Non-empty list of Copilot model IDs | Models routing may choose from and the routed task may call. Claude accepts Claude models only; Codex accepts GPT models served on `/responses`; pi accepts any Copilot model. The organization must have access to them, and the routing tables must cover them for selection. |
+| `allowed-models` | Non-empty list of Copilot model IDs | Models routing may choose from and the routed task may call. Claude accepts Claude models only; Codex accepts GPT models; pi accepts any Copilot model. Each runtime verifies that the selected model advertises support for its API. The organization must have access to the models, and the routing tables must cover them for selection. |
 
 ```aw wrap
 engine:
@@ -44,7 +44,7 @@ Candidate lists from imported workflows using the same engine are merged. Routin
 
 ## Requirements
 
-Routing requires the AWF firewall enabled and GitHub Copilot inference. It supports `copilot`, `claude`, `codex`, and `pi`; the compiler rejects other engines, non-Copilot providers, and incompatible literal model candidates. Claude Code uses the native Messages API and Codex uses the Responses API, so their candidate lists are restricted by model family. Expressions in `allowed-models` cannot be checked by the compiler; each runtime verifies the selected model is advertised and the selected endpoint matches its API.
+Routing requires the AWF firewall enabled and GitHub Copilot inference. It supports `copilot`, `claude`, `codex`, and `pi`; the compiler rejects other engines, non-Copilot providers, and incompatible literal model candidates. Claude Code uses the native Messages API and Codex uses the Responses API, so their candidate lists are restricted by model family. Expressions in `allowed-models` cannot be checked by the compiler. For non-Copilot engines, AWF's selected endpoint is advisory: Claude and Codex verify through `/reflect` `routing_models.supported_endpoints` that the selected model supports the engine's API, then use that API. Pi resolves its API from the Pi/AWF model catalog and verifies the corresponding endpoint against the same reflected metadata. These checks fail closed when candidate metadata is incomplete or the model does not advertise a compatible endpoint.
 
 | AWF version | Capability |
 |---|---|
@@ -90,16 +90,16 @@ It records classification labels and mode, ranked choices, the selection, router
 
 The adjacent `token-usage.jsonl` contains credits per request. Classifier usage is marked with `purpose: "routing_classification"` and joined to routing requests by `request_id`.
 
-Each built-in engine logs the selected model and effort before starting inference:
+Claude, Codex, and pi log the selected model, effort, and effective endpoint before starting inference. When a runtime uses its own API instead of AWF's selected endpoint, `selected_endpoint` records AWF's original choice. Copilot CLI retains its existing model-and-effort log:
 
 | Engine | Example log line |
 |---|---|
 | Copilot | `inference routing: mode=awf-routed model=gpt-5.6-sol effort=high` |
-| Claude | `inference routing: mode=awf-routed model=claude-opus-5 effort=xhigh` |
-| Codex | `inference routing: mode=awf-routed model=gpt-5.6-sol effort=high` |
-| pi | `inference routing: mode=awf-routed model=claude-haiku-4.5 effort=none` |
+| Claude | `inference routing: mode=awf-routed model=claude-opus-5 effort=xhigh endpoint=/v1/messages selected_endpoint=/chat/completions` |
+| Codex | `inference routing: mode=awf-routed model=gpt-5.6-sol effort=high endpoint=/responses` |
+| pi | `inference routing: mode=awf-routed model=claude-haiku-4.5 effort=none endpoint=/v1/messages selected_endpoint=/chat/completions` |
 
-Effort support and runtime mapping are engine-specific. Unsupported efforts fail closed rather than being clamped or replaced:
+Effort support and runtime mapping are engine-specific. AWF currently ranks its model-and-effort choices without filtering efforts by engine, so a routed choice the runtime cannot represent still fails closed rather than being clamped or replaced. Engine-specific pre-ranking effort filtering requires an AWF configuration capability; the runtime check remains the backstop:
 
 | Engine | Accepted routed efforts | Runtime setting |
 |---|---|---|
@@ -125,6 +125,8 @@ The per-run audit JSON includes `model_routing` with the same decision, request,
 | Exit code `78` | Routing failed, rather than silently falling back to a fixed model. The audit routing section shows failure `code` and `detail`; check for `no_route`, unavailable classifier/router, or configuration errors. |
 | `degraded_reason` | The audit routing section reports why classification degraded and whether the router continued with fallback classification or failed. |
 | `routed: "deviated"` | Audit shows request counts and the requested/selected models and efforts for deviations. An allowed sub-agent using its declared model can be a normal deviation; deviation is not itself a policy violation. For records from AWF before v0.28.39, an endpoint-only deviation is counted as selected-model traffic and the report notes this normalization. |
+| `model ... advertises endpoints [...], none compatible with this engine API [...]` | The selected model does not advertise the Messages or Responses API required by Claude or Codex. Check the `/reflect` routing model metadata and remove the incompatible model from `allowed-models`. |
+| `candidate metadata is incomplete` | AWF `/reflect` did not provide complete routing endpoint metadata. The runtime refuses to guess an API; upgrade AWF to a version that returns complete candidate metadata. |
 | Upstream HTTP or stream error | Inspect `sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl` in the `agent` artifact alongside the routing log. In particular, a sub-agent HTTP 400 can indicate the API-family mismatch rather than a model-policy rejection. |
 
 Use the [API proxy sidecar reference](https://github.com/github/gh-aw-firewall/blob/main/docs/api-proxy-sidecar.md) and [AWF configuration specification](https://github.com/github/gh-aw-firewall/blob/main/docs/awf-config-spec.md) for the upstream contracts and failure details.

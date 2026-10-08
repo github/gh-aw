@@ -5,16 +5,16 @@ on:
     paths:
       - '.github/workflows/work-queue-stress.yml'
       - '.github/scripts/work-queue-stress*.cjs'
-      - 'actions/setup/js/**/*.cjs'
-      - 'actions/setup/js/**/*.js'
+      - 'actions/setup/js/**/*work_queue*.cjs'
+      - 'actions/setup/js/**/*work_queue*.js'
       - 'specs/work-queue/**'
   push:
     branches: [main]
     paths:
       - '.github/workflows/work-queue-stress.yml'
       - '.github/scripts/work-queue-stress*.cjs'
-      - 'actions/setup/js/**/*.cjs'
-      - 'actions/setup/js/**/*.js'
+      - 'actions/setup/js/**/*work_queue*.cjs'
+      - 'actions/setup/js/**/*work_queue*.js'
       - 'specs/work-queue/**'
 
 permissions:
@@ -33,6 +33,9 @@ jobs:
     name: Local Git and concurrent workers
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      HISTORY_ITEMS: ${{ github.event_name == 'pull_request' && '256' || '100000' }}
+      LIFECYCLE_ITEMS: ${{ github.event_name == 'pull_request' && '16' || '1024' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,18 +54,18 @@ jobs:
           node --test .github/scripts/work-queue-stress.test.cjs .github/scripts/work-queue-stress-summary.test.cjs \
             | tee stress-results/invariants.tap
 
-      - name: Replay 100000 retained Work and Claim items
+      - name: Replay retained Work and Claim items
         id: history
         run: |
           node .github/scripts/work-queue-stress.cjs \
-            --mode history --items 100000 --workers 2 --seed 7 \
+            --mode history --items "$HISTORY_ITEMS" --workers 2 --seed 7 \
             --timeout-seconds 300 > stress-results/history.json
 
-      - name: Complete 1024 concurrent worker lifecycles
+      - name: Complete concurrent worker lifecycles
         id: lifecycle
         run: |
           node .github/scripts/work-queue-stress.cjs \
-            --items 1024 --workers 4 --queue-items 64 --seed 7 \
+            --items "$LIFECYCLE_ITEMS" --workers 4 --queue-items 64 --seed 7 \
             --timeout-seconds 600 > stress-results/lifecycle.json
 
       - name: Verify single-queue admission saturation

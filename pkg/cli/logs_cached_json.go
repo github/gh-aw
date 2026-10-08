@@ -552,9 +552,9 @@ func buildCachedLogsJSONLRunData(run ProcessedRun, runData RunData) *cachedLogsJ
 		data.FirewallVersion = info.GetFirewallVersion()
 		data.GatewayVersion = info.AwmgVersion
 		data.RunData.Model = attribution.Model
-		data.RunData.ModelEffort = attribution.Effort
-		data.RunData.ModelRoutingStatus = attribution.RoutingStatus
-		data.RunData.RequestedModel = attribution.RequestedModel
+		data.ModelEffort = attribution.Effort
+		data.ModelRoutingStatus = attribution.RoutingStatus
+		data.RequestedModel = attribution.RequestedModel
 	}
 	return data
 }
@@ -641,7 +641,7 @@ func (w *cachedLogsJSONLWriter) AppendRateLimit(report GitHubAPIRateLimitReport)
 	return w.appendRecord(record)
 }
 
-func (w *cachedLogsJSONLWriter) appendRecord(record []byte) error {
+func (w *cachedLogsJSONLWriter) appendRecord(record []byte) (err error) {
 	var compact bytes.Buffer
 	if err := json.Compact(&compact, record); err != nil {
 		return fmt.Errorf("failed to encode cached logs JSONL record: %w", err)
@@ -657,7 +657,11 @@ func (w *cachedLogsJSONLWriter) appendRecord(record []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to open cached logs JSONL: %w", err)
 	}
-	defer func() { _ = file.Close() }()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to close cached logs JSONL: %w", closeErr))
+		}
+	}()
 	if _, err := file.Write(record); err != nil {
 		return fmt.Errorf("failed to append cached logs JSONL: %w", err)
 	}

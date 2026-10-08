@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { validateModelIdentifier, recordFallbackModelFromUsage, getFallbackModel, recordModelRouting } = require("./model_attribution.cjs");
+const { validateModelIdentifier, recordFallbackModelFromUsage, getFallbackModel, getModelRouting, resolveEffectiveModel, recordModelRouting } = require("./model_attribution.cjs");
 const footers = [require("./generate_footer.cjs"), require("./messages_footer.cjs")];
 
 const invalidModels = [
@@ -105,6 +105,29 @@ describe("model attribution trust boundaries", () => {
       requested_model: "auto",
       model_routing: { status: "rejected", source: "awf-routing" },
     });
+  });
+
+  it("reads routing attribution only from runner-controlled aw_info.json", () => {
+    const agentInfoPath = path.join(dir, "agent", "aw_info.json");
+    fs.mkdirSync(path.dirname(agentInfoPath), { recursive: true });
+    fs.writeFileSync(
+      infoPath,
+      JSON.stringify({
+        fallback_model: "runner-fallback",
+        model_routing: { status: "selected", wire_model: "runner-model", effort: "high" },
+      })
+    );
+    fs.writeFileSync(
+      agentInfoPath,
+      JSON.stringify({
+        fallback_model: "forged-fallback",
+        model_routing: { status: "selected", wire_model: "forged-model", effort: "max" },
+      })
+    );
+
+    expect(getFallbackModel(infoPath)).toBe("runner-fallback");
+    expect(getModelRouting(infoPath)).toMatchObject({ wire_model: "runner-model", effort: "high" });
+    expect(resolveEffectiveModel(infoPath).model).toBe("runner-fallback");
   });
 
   it("adds routed effort metadata to markers and retains only a safe failure status", () => {

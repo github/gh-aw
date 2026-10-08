@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("dispatch");
 
 const { canonical, closed, digest, integer } = require("./work_queue_codec.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
@@ -65,6 +66,7 @@ function staleEdges(state, pool, at) {
 }
 
 async function refreshDependencies(options, state, pool, trustedContext) {
+  log.debug("dependencies.refresh.start");
   if (trustedContext.role === "worker") {
     if (validateWorkerContinuation(state, trustedContext).work.pool !== pool) throw new Error("work_queue_control_pool_not_authorized");
     return [];
@@ -75,6 +77,7 @@ async function refreshDependencies(options, state, pool, trustedContext) {
   if (budget === 0) return [];
   const at = options.now ?? Date.now();
   const edges = staleEdges(state, pool, at).slice(0, budget);
+  log.debug("dependencies.refresh.budget", { budget, stale_edges: edges.length });
   if (!edges.length) return [];
   const operations = [];
   const readable = [];
@@ -98,10 +101,12 @@ async function refreshDependencies(options, state, pool, trustedContext) {
     operations.push({ ...operation, observation_id: `observation:${digest(operation)}` });
   }
   if (readable.length) operations.push(...(await resolveExternalEdges(readable, { ...resolver, now: at, maxResources: 128, maxReads: 256 })).operations);
+  log.debug("dependencies.refresh.complete", { readable: readable.length, observations: operations.length });
   return operations;
 }
 
 async function resolveAdmissionResources(options, state, parameters, trustedContext) {
+  log.debug("admission.resolve.start");
   assertRemediationBackend(state, parameters, options.remediationVerifier);
   const references = [];
   for (const node of parameters.nodes) {
@@ -113,6 +118,7 @@ async function resolveAdmissionResources(options, state, parameters, trustedCont
     if (node.subject) references.push({ target: node, field: "subject", resource: { ...node.subject, condition: node.subject.kind === "issue" ? "completed" : "merged" } });
   }
   if (!references.length) return parameters;
+  log.debug("admission.resolve.references", { references: references.length });
   const resolver = options.dependencyResolver;
   if (!resolver || !resolver.scopes.every(scope => scope.access_generation === state.credential_generation)) throw new Error("external_read_credentials_missing");
   const at = options.now ?? Date.now();
@@ -134,6 +140,7 @@ async function resolveAdmissionResources(options, state, parameters, trustedCont
     const { condition, ...identity } = verified;
     reference.target[reference.field] = identity;
   }
+  log.debug("admission.resolve.complete", { observations: resolved.observations.length });
   return parameters;
 }
 
@@ -153,9 +160,11 @@ function rejectionReceipt(error, destination) {
 }
 
 async function launchAssignment(options, supplied) {
+  log.debug("launch.start");
   assertQueueControlRole(options);
   let latest = await loadQueue(options);
   const { assignment, dispatch, profile } = validateStoredAssignment(latest.projection, supplied, { allowReleased: true });
+  log.debug("launch.assignment.checked", { claims: assignment.claims.length, released: dispatch.released, reserved: dispatch.state === "reserved", staged: isStagedMode(options) || isStagedMode(options.config) });
   if (isStagedMode(options) || isStagedMode(options.config)) return { state: "staged_preview", released: false, dispatched: false };
   if (dispatch.released) return { state: "released", released: true, dispatched: false };
   if (dispatch.state !== "reserved") return { ...(await reconcileDispatch({ ...options, assignment })), dispatched: false };
@@ -164,6 +173,7 @@ async function launchAssignment(options, supplied) {
   const credential = await options.validateDispatchCredential({ assignment, profile });
   if (credential?.principal !== profile.principal) throw new Error("work_queue_dispatch_credential_principal_mismatch");
   if (!isDispatchCredentialProof(credential, options.dispatchClient || options.githubClient, profile)) throw new Error("work_queue_dispatch_credential_proof_invalid");
+  log.debug("launch.credential.checked");
   const destinationMetadata = options.destination || {};
   closed(destinationMetadata, [], ["host", "api_host"], "work_queue_native_destination");
   const trustedContext = await authenticatePublisher({ ...options, role: "dispatcher" });
@@ -172,31 +182,39 @@ async function launchAssignment(options, supplied) {
   let published;
   try {
     published = await publishOperations(options, trustedContext, ["start", assignment.dispatch_id], "dispatch", [start]);
-  } catch {
+  } catch (error) {
+    log.failure("launch.start_marker.failed", error);
     return { ...(await reconcileDispatch({ ...options, assignment })), dispatched: false };
   }
   if (published.publishedNow !== true || published.reused !== false || published.persisted !== true || published.recovered !== false || published.idempotent !== false)
     return { ...(await reconcileDispatch({ ...options, assignment })), dispatched: false };
   latest = await loadQueue(options);
+  log.debug("launch.start_marker.persisted");
   const started = latest.projection.dispatches.get(assignment.dispatch_id);
   if (!started || started.state !== "started" || started.run || started.released || canonical(started.sender) !== canonical(sender)) return { state: "launch_unresolved", released: false, dispatched: false };
   const destination = { ...destinationMetadata, repository: sender.repository, workflow: profile.workflow, ref: profile.ref };
   let returned;
   try {
+    log.debug("launch.post.start");
     returned = await postQueueDispatch(options.dispatchClient || options.githubClient, destination, { work_queue_assignment: canonical(assignment) });
+    log.debug("launch.post.complete");
   } catch (error) {
+    log.failure("launch.post.failed", error);
     const checkedAt = options.now ?? Date.now();
     const receipt = rejectionReceipt(error, destination);
     if (receipt) {
+      log.debug("launch.post.definitive_rejection");
       const evidence = lifecycleEvidence(assignment, profile, sender.repository, "nonlaunch", "github_api", checkedAt, { receipt });
       await publishOperations(options, trustedContext, ["reject", assignment.dispatch_id, receipt], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "rejected", evidence }]);
       return { ...(await releaseAssignment(options, assignment, evidence)), dispatched: true };
     }
     try {
       await publishOperations(options, trustedContext, ["uncertain", assignment.dispatch_id], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "uncertain", reason: "post_response_unconfirmed" }]);
-    } catch {
+    } catch (error) {
+      log.failure("launch.uncertain_marker.failed", error);
       // A durable start marker alone already fences every possible resend.
     }
+    log.debug("launch.unresolved");
     return { state: "launch_unresolved", released: false, dispatched: true };
   }
   try {
@@ -207,11 +225,14 @@ async function launchAssignment(options, supplied) {
     await publishOperations(options, trustedContext, ["bind", assignment.dispatch_id, proof.run_id], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "bound", run: binding, evidence }]);
     latest = await loadQueue(options);
     if (canonical(latest.projection.dispatches.get(assignment.dispatch_id)?.run) !== canonical(binding)) throw new Error("run_binding_conflict");
+    log.debug("launch.binding.persisted");
     return { state: "bound", released: false, dispatched: true, run_id: returned.run_id, html_url: returned.html_url };
-  } catch {
+  } catch (error) {
+    log.failure("launch.binding.failed", error);
     try {
       await publishOperations(options, trustedContext, ["uncertain", assignment.dispatch_id, returned.run_id], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "uncertain", reason: "binding_unconfirmed" }]);
-    } catch {
+    } catch (error) {
+      log.failure("launch.binding_uncertain_marker.failed", error);
       // Authenticated activation can recover binding publication without POST.
     }
     return { state: "launch_unresolved", released: false, dispatched: true, run_id: returned.run_id };
@@ -302,6 +323,7 @@ function dispatchesByOrigin(state, origin, exceptRequestId) {
 }
 
 async function dispatchQueueIntent(options) {
+  log.debug("intent.dispatch.start");
   const runtime = assertQueueControlRole(options);
   const message = options.message;
   closed(message, ["type", "intent_id", "pool", "max_claims", "max_dispatches"], ["claim_handle"], "work_queue_dispatch_next");
@@ -323,6 +345,7 @@ async function dispatchQueueIntent(options) {
   latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
   const stableId = requestIdForIntent(trustedContext, message.intent_id);
   const prior = latest.projection.requests.get(stableId);
+  log.debug("intent.dispatch.recovery", { prior_request: !!prior });
   const runBudget = options.runDispatchBudget ?? options.config?.max ?? options.maxDispatches ?? options.remainingDispatches;
   const remaining = Math.min(options.remainingDispatches, Math.max(0, runBudget - dispatchesByOrigin(latest.projection, trustedContext, stableId)));
   const parameters = prior ? prior.request.parameters : normalizeDispatchParameters(requested, latest.projection.policy, remaining);
@@ -370,8 +393,10 @@ async function dispatchQueueIntent(options) {
     core: configured.core,
   });
   const groups = assignmentsForRequest(published.state, request.id);
+  log.debug("intent.dispatch.published", { assignments: groups.length, recovered: published.recovered === true });
   const launches = [];
   for (const assignment of groups) launches.push({ dispatch_id: assignment.dispatch_id, ...(await launchAssignment(configured, assignment)) });
+  log.debug("intent.dispatch.complete", { assignments: groups.length, launches: launches.length });
   return { success: true, status: groups.length ? "durable" : "no_grant", request_id: request.id, reason: published.reason, dispatches: groups.length, launches, control: controlReceiptForRequest(published.state, request.id) };
 }
 
@@ -382,10 +407,12 @@ async function processWorkQueueIntents(options) {
 }
 
 async function processParsedWorkQueueIntents(options, runtime, intents, errors) {
+  log.debug("intents.process.start", { intents: intents.length, parse_errors: errors.length });
   let remaining = options.maxDispatches ?? 1;
   /** @type {Array<{status: string, intent_id?: string, reason?: string, line?: number, claim_handle?: string, request_id?: string, commit_id?: string, success?: boolean, staged?: boolean, dispatches?: number, recovered?: boolean, launches?: object[], acknowledgement_only?: boolean, control?: object | null}>} */
   const receipts = errors.map(error => ({ ...error, status: "blocked" }));
   for (const intent of intents) {
+    log.debug("intent.process.start", { dispatch: intent.kind === "dispatch_next", submit: intent.kind === "submit" });
     try {
       if (intent.kind === "finish") throw new Error("work_queue_control_intent_invalid");
       const normalized = normalizeControlIntentScope(options, intent, runtime);
@@ -436,11 +463,14 @@ async function processParsedWorkQueueIntents(options, runtime, intents, errors) 
           core: options.core,
         });
         receipts.push({ intent_id: intent.intent_id, request_id: request.id, status: "durable", commit_id: result.commit?.id, control: controlReceiptForRequest(result.state, request.id) });
+        log.debug("intent.submit.persisted", { recovered: result.recovered === true });
       }
-    } catch {
+    } catch (error) {
+      log.failure("intent.process.blocked", error);
       receipts.push({ intent_id: intent.intent_id, status: "blocked", reason: "queue_control_authority_or_publication_failed" });
     }
   }
+  log.debug("intents.process.complete", { receipts: receipts.length, remaining_dispatches: remaining });
   return { version: 3, receipts, remaining_dispatches: remaining };
 }
 
@@ -454,6 +484,7 @@ function configuredDispatchBudget(options) {
 }
 
 async function main(options = {}) {
+  log.debug("controls.start");
   const coreApi = options.core || global.core;
   const githubClient = options.githubClient || options.github || global.github;
   const context = options.context || global.context;
@@ -473,13 +504,15 @@ async function main(options = {}) {
       intents,
       errors
     );
-  } catch {
+  } catch (error) {
+    log.failure("controls.blocked", error);
     result = { version: 3, receipts: [{ status: "blocked", reason: "staged_queue_intents_invalid" }], remaining_dispatches: 0 };
   }
   const durable = result.receipts.filter(receipt => receipt.status === "durable").length;
   const blocked = result.receipts.filter(receipt => receipt.status === "blocked").length;
   const unresolved = result.receipts.reduce((count, receipt) => count + (receipt.launches || []).filter(launch => !["bound", "released", "staged_preview"].includes(launch.state)).length, 0);
   const recoveryRequired = blocked > 0 || unresolved > 0;
+  log.debug("controls.complete", { durable, blocked, unresolved, recovery_required: recoveryRequired });
   const status = recoveryRequired ? "recovery_required" : "ok";
   const summary = ["## Work queue controls", "", `Status: **${recoveryRequired ? "Recovery required" : "Complete"}**`, "", `- Durable requests: ${durable}`, `- Blocked intents: ${blocked}`, `- Unresolved launches: ${unresolved}`].join(
     "\n"

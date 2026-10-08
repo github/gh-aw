@@ -514,7 +514,7 @@ function applyCodexRoutingEffort(args, effort) {
  * @returns {{selection: any, model: string, args: string[], error: string|null}}
  */
 function resolveCodexModelRouting(reflectData, args) {
-  const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_ENDPOINTS);
+  const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_ENDPOINTS, true);
   if (result.error || !result.selection) {
     recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
     return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
@@ -888,7 +888,8 @@ async function main() {
     }
     resolvedModel = result.model;
     resolvedArgs = result.args;
-    log(`inference routing: mode=awf-routed model=${resolvedModel} effort=${result.selection.effort || "(unset)"}`);
+    const endpointOverride = result.selection.selected_endpoint && result.selection.selected_endpoint !== result.selection.endpoint ? ` selected_endpoint=${result.selection.selected_endpoint}` : "";
+    log(`inference routing: mode=awf-routed model=${resolvedModel} effort=${result.selection.effort || "(unset)"} endpoint=${result.selection.endpoint}${endpointOverride}`);
   } else {
     resolvedModel = normalizeCodexModel(codexModelEnvVar ? applyModelFallback(process.env, codexModelEnvVar, log) : "", process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
     resolvedArgs = normalizeCodexModelArgs(resolvedArgs, process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);

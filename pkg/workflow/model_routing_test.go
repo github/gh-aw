@@ -508,7 +508,7 @@ func TestModelRoutingModelAttributionOutputs(t *testing.T) {
 			require.Contains(t, strings.Join(env, ""), "GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}")
 			require.Contains(t, strings.Join(env, ""), "GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.agent.outputs.model_effort }}")
 			require.Contains(t, strings.Join(env, ""), "GH_AW_MODEL_ROUTING_STATUS: ${{ needs.agent.outputs.model_routing_status }}")
-			require.Equal(t, 3, len(buildModelRoutingOutputEnvVars(data.EngineConfig, "agent")))
+			require.Len(t, buildModelRoutingOutputEnvVars(data.EngineConfig, "agent"), 3)
 		})
 	}
 }

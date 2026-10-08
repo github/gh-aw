@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("mcp");
 
 const fs = require("fs");
 const path = require("path");
@@ -24,6 +25,7 @@ function parseSnapshotEnvelope(text) {
 }
 
 function loadWorkQueueSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPSHOT || DEFAULT_SNAPSHOT_PATH) {
+  log.debug("snapshot.load.start");
   const stat = fs.statSync(snapshotPath);
   if (!stat.isFile() || stat.size > MAX_SNAPSHOT_PARSE_BYTES) throw new TypeError("work queue snapshot exceeds its bounded input limit");
   const snapshot = parseSnapshotEnvelope(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(fs.readFileSync(snapshotPath)));
@@ -37,6 +39,7 @@ function loadWorkQueueSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPS
   const projection = absent ? queue.newState() : queue.replayTransactions(queue.parseTransactionLog(snapshot.transactionLog));
   if (!projection.policy && !(role === "observer" && snapshot.sha === null && snapshot.transactionLog === "")) throw new Error("work_queue_policy_missing");
   if (snapshot.visible_work_ids !== undefined && (!Array.isArray(snapshot.visible_work_ids) || snapshot.visible_work_ids.some(id => typeof id !== "string"))) throw new TypeError("work queue snapshot visibility is invalid");
+  log.debug("snapshot.load.complete", { bytes: stat.size, works: projection.works.size, worker: !!worker, absent });
   return Object.freeze({ sha: snapshot.sha, worker, role, captured_at: snapshot.captured_at, origin: snapshot.origin, visible_work_ids: snapshot.visible_work_ids, projection });
 }
 
@@ -57,6 +60,7 @@ function validateSort(sort) {
 }
 
 function readWorkQueueState(snapshot, args = {}) {
+  log.debug("snapshot.read.start");
   closed(args, [], ["work", "pool", "limit", "offset", "sort"], "work_queue_read");
   if (args.work !== undefined) identity(args.work, "Work ID");
   const limit = args.limit ?? 32;
@@ -88,6 +92,7 @@ function readWorkQueueState(snapshot, args = {}) {
   const barriers = Object.create(null);
   for (const work of works) barriers[work.barrier] = (barriers[work.barrier] || 0) + 1;
   const reservations = [...state.dispatches.values()].filter(dispatch => dispatch.pool === pool && !dispatch.released && dispatch.claims.some(member => selectedWorks.has(member.work_id)));
+  log.debug("snapshot.read.complete", { total: works.length, offset, limit, reservations: reservations.length });
   return {
     view: "activation_snapshot",
     snapshot_sha: snapshot.sha,
@@ -152,6 +157,7 @@ function createWorkQueueExplainTool(snapshot) {
     description: "Explain readiness, dependencies, capacity and fairness using the same activation-snapshot engine. This does not reserve or dispatch Work.",
     inputSchema: { type: "object", properties: { work: { type: "string", minLength: 1, maxLength: 256 }, pool: { type: "string", minLength: 1, maxLength: 256 } }, required: ["work"], additionalProperties: false },
     handler: args => {
+      log.debug("snapshot.explain.start");
       closed(args, ["work"], ["pool"], "work_queue_explain");
       identity(args.work, "Work ID");
       if (snapshot.visible_work_ids && !snapshot.visible_work_ids.includes(args.work)) throw new Error("work_queue_read_scope_denied");
@@ -160,12 +166,14 @@ function createWorkQueueExplainTool(snapshot) {
       const explanation = work
         ? queue.explainWork(snapshot.projection, args.work, snapshot.captured_at)
         : { work_id: args.work, state: "absent", ready: false, reason: snapshot.projection.policy ? "work_absent" : "queue_uninitialized", authoritative: false };
+      log.debug("snapshot.explain.complete", { present: !!work });
       return text({ view: "activation_snapshot", snapshot_sha: snapshot.sha, captured_at: snapshot.captured_at, explanation });
     },
   };
 }
 
 function stageToolIntent(snapshot, kind, parameters, options) {
+  log.debug("tool.intent.stage.start", { finish: kind === "finish", submit: kind === "submit", dispatch: kind === "dispatch_next" });
   if (snapshotRuntimeRole(snapshot) === "observer") throw new Error("work_queue_observer_read_only");
   const scope = snapshot.worker ? normalizeClaimScope(parameters, snapshot.worker) : parameters;
   const { claim_handle, ...body } = scope;
@@ -174,11 +182,13 @@ function stageToolIntent(snapshot, kind, parameters, options) {
     const previous = readStagedIntents(outputPath).find(intent => intent.kind === "finish" && intent.claim_handle === claim_handle);
     if (previous) {
       if (previous.parameters.outcome !== body.outcome) throw new Error("work_queue_finish_conflict");
+      log.debug("tool.intent.stage.reused");
       return text({ intent_id: previous.intent_id, status: "staged", claim_handle });
     }
   }
   const intent = { version: 3, intent_id: (options.createIntentId || (() => `intent:${randomUUID()}`))(), kind, parameters: body, ...(claim_handle === undefined ? {} : { claim_handle }) };
   stageIntent(outputPath, intent);
+  log.debug("tool.intent.stage.complete");
   return text({ intent_id: intent.intent_id, status: "staged", ...(claim_handle === undefined ? {} : { claim_handle }) });
 }
 
@@ -257,16 +267,20 @@ function createWorkQueueTools(snapshot, options = {}) {
 }
 
 function startWorkQueueServer(options = {}) {
+  log.debug("server.start");
   const snapshot = loadWorkQueueSnapshot(options.snapshotPath);
   const server = createServer({ name: "work-queue", version: "3.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
-  for (const tool of createWorkQueueTools(snapshot, options)) registerTool(server, tool);
+  const tools = createWorkQueueTools(snapshot, options);
+  for (const tool of tools) registerTool(server, tool);
+  log.debug("server.tools.registered", { tools: tools.length });
   start(server);
 }
 
 if (require.main === module) {
   try {
     startWorkQueueServer();
-  } catch {
+  } catch (error) {
+    log.failure("server.start.failed", error);
     console.error("Error starting work queue MCP server: current activation snapshot is unavailable or invalid");
     process.exit(1);
   }

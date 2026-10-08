@@ -39,7 +39,9 @@ All commands are run from the root of the project, from a terminal:
 ## Homepage slideshow
 
 On desktop, select the presentation icon in the homepage header to present the
-landing page as a nine-slide deck. The slideshow runtime, drawing tools, and
+landing page as an eleven-slide deck. The security trifecta and its six
+defence layers, and the cost dashboard and budget guardrails, have separate
+slides. The slideshow runtime, drawing tools, and
 snippet expansion JavaScript are loaded on demand on the first click, not
 when browsing the page. Slides fill the window edge to edge and retain their
 interactive examples. Use the previous/next buttons, arrow keys or Page Up/Page

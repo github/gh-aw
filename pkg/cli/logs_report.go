@@ -582,10 +582,6 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		Agent:                      engineInfo.engineID,
 		Engine:                     engineInfo.engineName,
 		EngineID:                   engineInfo.engineID,
-		Model:                      modelAttribution.Model,
-		RequestedModel:             modelAttribution.RequestedModel,
-		ModelEffort:                modelAttribution.Effort,
-		ModelRoutingStatus:         modelAttribution.RoutingStatus,
 		Status:                     run.Status,
 		Conclusion:                 run.Conclusion,
 		Classification:             deriveRunClassification(comparison),
@@ -633,8 +629,16 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		SafeOutputs:                pr.SafeOutputs,
 		WorkQueue:                  pr.WorkQueue,
 	}
+	applyModelAttributionToRunData(&runData, modelAttribution)
 	applyGitHubMetadataToRunData(&runData, run)
 	return runData
+}
+
+func applyModelAttributionToRunData(runData *RunData, attribution effectiveModelAttribution) {
+	runData.Model = attribution.Model
+	runData.RequestedModel = attribution.RequestedModel
+	runData.ModelEffort = attribution.Effort
+	runData.ModelRoutingStatus = attribution.RoutingStatus
 }
 
 func runAmbientContext(pr ProcessedRun) *AmbientContextMetrics {
