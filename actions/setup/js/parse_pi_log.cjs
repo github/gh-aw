@@ -12,7 +12,7 @@ const {
   parseLogEntries,
 } = require("./log_parser_shared.cjs");
 const { transformFlatSessionEntries, projectSessionResult, selectSessionResult, reconcileSessionUsage } = require("./agent_session.cjs");
-const { transformPiV3Entries, computePiV3Stats } = require("./pi_session.cjs");
+const { transformPiV3Entries, computePiV3Stats, isPiSessionEntry } = require("./pi_session.cjs");
 
 const main = createEngineLogParser({
   parserName: "Pi",
@@ -21,7 +21,7 @@ const main = createEngineLogParser({
 });
 
 /**
- * Parse Pi CLI JSONL streaming log output and format as markdown.
+ * Parse Pi CLI streaming logs or persisted session JSONL and format as markdown.
  * Pi CLI emits one JSON object per line (JSONL) with typed events:
  * - type "init":        session initialization with model and session_id
  * - type "assistant":   agent message content (delta:true for streaming chunks)
@@ -53,7 +53,8 @@ function parsePiLog(logContent) {
   }
 
   // Pi CLI's `--mode json` output schema changed over time. Current builds emit a
-  // v3 streaming schema (session, turn_start, turn_end, tool_execution_start/end, agent_end)
+  // streaming schema (session, turn_start, turn_end, tool_execution_start/end, agent_end)
+  // or persisted session-tree entries (message, compaction, model_change, ...),
   // while older builds emitted a flat init/assistant/tool_use/tool_result/result schema.
   // Detect which schema this log uses and transform accordingly so the step summary
   // renders the conversation and token stats for both.
@@ -117,14 +118,14 @@ function transformPiEntries(rawEntries) {
 }
 
 /**
- * Detects whether the raw Pi entries use the v3 streaming schema.
+ * Detects current Pi streaming records or persisted session entries.
  *
  * The v3 schema emits envelope events (session, turn_end, tool_execution_start/end, agent_end)
  * that the legacy flat schema (init/assistant/tool_use/tool_result/result) never uses.
  * A single marker event is enough to distinguish the two.
  *
  * @param {Array<any>} rawEntries - Raw parsed JSONL entries
- * @returns {boolean} True when the log uses the v3 streaming schema
+ * @returns {boolean} True when the log uses the current Pi adapter
  */
 function isPiV3Schema(rawEntries) {
   for (const e of rawEntries) {
@@ -132,6 +133,7 @@ function isPiV3Schema(rawEntries) {
       continue;
     }
     if (
+      isPiSessionEntry(e) ||
       e.type === "turn_end" ||
       e.type === "turn_start" ||
       e.type === "agent_end" ||
@@ -142,7 +144,7 @@ function isPiV3Schema(rawEntries) {
       e.type === "message_update" ||
       e.type === "message_start" ||
       e.type === "message_end" ||
-      (e.type === "session" && typeof e.version === "number")
+      (e.type === "session" && (typeof e.version === "number" || typeof e.id === "string"))
     ) {
       return true;
     }
