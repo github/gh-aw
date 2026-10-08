@@ -252,6 +252,54 @@ describe("workflow permission scope", () => {
 });
 
 describe("runWithCopilotSDK compiler-owned catalog", () => {
+  it.each([true, false])("keeps native tasks visible before inference when tasks enabled=%s", async enabled => {
+    const metadata = { name: "tasks-run_task", mcpServerName: "tasks", mcpToolName: "run_task", deferLoading: false };
+    const initializeAndValidate = vi.fn().mockResolvedValue(undefined);
+    const getCurrentMetadata = vi.fn().mockResolvedValue({ tools: [metadata] });
+    const update = vi.fn().mockResolvedValue({ success: true });
+    const sendAndWait = vi.fn().mockImplementation(async () => {
+      expect(initializeAndValidate).toHaveBeenCalledTimes(enabled ? 2 : 0);
+      expect(update).toHaveBeenCalledTimes(enabled ? 1 : 0);
+      return { data: { content: "ok" } };
+    });
+    const createSession = vi.fn().mockResolvedValue({
+      sessionId: `session-tasks-contract-${enabled}`,
+      rpc: { tools: { initializeAndValidate, getCurrentMetadata }, options: { update } },
+      on: () => {},
+      sendAndWait,
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    });
+    class FakeCopilotClient {
+      start = vi.fn().mockResolvedValue(undefined);
+      createSession = createSession;
+      stop = vi.fn().mockResolvedValue(undefined);
+    }
+    const toolConfig = validToolConfig({ permissions: { allowedTools: ["read", "web_fetch", ...(enabled ? ["tasks(run_task)"] : [])] } });
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test prompt",
+      logger: () => {},
+      permissionConfig: toolConfig.permissions,
+      toolConfig,
+      ...(enabled ? { mcpServers: { tasks: { type: "http", url: "http://127.0.0.1:1234/mcp", tools: ["run_task"] } } } : {}),
+      sdkModule: {
+        ...fakeSDKTools,
+        CopilotClient: FakeCopilotClient,
+        RuntimeConnection: { forUri: vi.fn(() => ({})) },
+        approveAll: () => ({ kind: "approve-once" }),
+      },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(sendAndWait).toHaveBeenCalledOnce();
+    const sessionConfig = createSession.mock.calls[0][0];
+    expect(sessionConfig.toolSearch).toEqual(enabled ? { enabled: false } : undefined);
+    if (enabled) {
+      expect(update.mock.calls[0][0].availableTools).toContain("mcp:tasks-run_task");
+      expect(update.mock.calls[0][0].availableTools).not.toContain("mcp:*");
+      expect(sessionConfig.onPermissionRequest({ kind: "mcp", serverName: "tasks", toolName: "tasks-run_task" }).kind).toBe("approve-once");
+    }
+  });
+
   it.each([true, false])("wires workflow visibility and approvals into the session when enabled=%s", async enabled => {
     const createSession = vi.fn().mockResolvedValue({
       sessionId: `session-workflow-contract-${enabled}`,

@@ -346,6 +346,7 @@ async function runWithCopilotSDK({
       providers,
       models: providerModels,
       ...(mcpServers ? { mcpServers } : {}),
+      ...(mcpServers?.tasks ? { toolSearch: { enabled: false } } : {}),
       onPermissionRequest,
       ...(toolCallBudget ? { hooks: { onPreToolUse: toolCallBudget.onPreToolUse } } : {}),
       ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
