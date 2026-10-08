@@ -82,6 +82,41 @@ func TestSharedExtractSecretsFromValue(t *testing.T) {
 			},
 		},
 		{
+			name:  "compact secret expression",
+			value: "${{secrets.TOKEN}}",
+			expected: map[string]string{
+				"TOKEN": "${{secrets.TOKEN}}",
+			},
+		},
+		{
+			name:  "mixed-case context and secret name",
+			value: "${{ Secrets.Token }}",
+			expected: map[string]string{
+				"Token": "${{ Secrets.Token }}",
+			},
+		},
+		{
+			name:  "lowercase secret name",
+			value: "${{ secrets.lowercase_token }}",
+			expected: map[string]string{
+				"lowercase_token": "${{ secrets.lowercase_token }}",
+			},
+		},
+		{
+			name:  "secret after variable fallback",
+			value: "${{ vars.A || secrets.B }}",
+			expected: map[string]string{
+				"B": "${{ vars.A || secrets.B }}",
+			},
+		},
+		{
+			name:  "secret after github token fallback",
+			value: "${{ github.token || secrets.X }}",
+			expected: map[string]string{
+				"X": "${{ github.token || secrets.X }}",
+			},
+		},
+		{
 			name:  "secret with default value",
 			value: "${{ secrets.DD_SITE || 'datadoghq.com' }}",
 			expected: map[string]string{

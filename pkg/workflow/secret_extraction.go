@@ -14,7 +14,7 @@ var secretLog = logger.New("workflow:secret_extraction")
 // Pre-compiled regex patterns for ExtractSecretsFromValue (performance optimization)
 var (
 	// secretsNamePattern extracts the secret variable name from an expression
-	secretsNamePattern = regexp.MustCompile(`secrets\.([A-Z_][A-Z0-9_]*)`)
+	secretsNamePattern = regexp.MustCompile(`(?i)secrets\.([a-z_][a-z0-9_]*)`)
 
 	// jobOutputBodyDotPattern matches needs.JOB.outputs.OUTPUT anywhere within an expression body
 	// using dot notation. The word boundary ensures we don't match partial identifiers.
