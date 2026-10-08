@@ -461,7 +461,7 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 		env["GH_AW_LLM_PROVIDER_EXPLICIT"] = "1"
 	}
 	if isFirewallEnabled(workflowData) && provider != LLMProviderAnthropic {
-		env["ANTHROPIC_BASE_URL"] = llmProviderGatewayBaseURL(provider)
+		env["ANTHROPIC_BASE_URL"] = llmProviderGatewayBaseURL(provider, workflowData)
 	}
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	phase := workflowRunPhase(workflowData)

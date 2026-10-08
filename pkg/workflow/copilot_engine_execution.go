@@ -578,7 +578,7 @@ func (e *CopilotEngine) buildCopilotBaseStepEnv(workflowData *WorkflowData, llmP
 	// Auto-configure Copilot BYOK routing when engine.model-provider selects a non-GitHub provider.
 	// Explicit engine.env values still win later via maps.Copy.
 	if llmProvider != LLMProviderGitHub && isFirewallEnabled(workflowData) {
-		env[constants.CopilotProviderBaseURL] = llmProviderGatewayBaseURL(llmProvider)
+		env[constants.CopilotProviderBaseURL] = llmProviderGatewayBaseURL(llmProvider, workflowData)
 		env[constants.CopilotProviderAPIKey] = llmProviderSecretExpression(llmProvider, workflowData)
 	}
 	// Inject the GitHub token only when not in BYOK mode. The engine.env merge that

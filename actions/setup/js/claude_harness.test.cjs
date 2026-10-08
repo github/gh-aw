@@ -115,7 +115,7 @@ describe("claude_harness.cjs", () => {
     });
 
     it.each(["github", "copilot", "github-copilot", "github_models"])("routes Claude's native Messages API to the reflected Copilot endpoint for %s", async provider => {
-      const env = { GH_AW_LLM_PROVIDER: provider, ANTHROPIC_MODEL: "copilot/claude-haiku-4.5", ANTHROPIC_API_KEY: "sandbox-placeholder" };
+      const env = { GH_AW_LLM_PROVIDER: provider, ANTHROPIC_MODEL: "copilot/claude-haiku-4.5", ANTHROPIC_API_KEY: "sandbox-placeholder", ANTHROPIC_BASE_URL: "http://host.docker.internal:10002" };
       const child = await buildClaudeChildEnv(reflectData, env, () => {});
       expect(child.ANTHROPIC_BASE_URL).toBe("http://api-proxy:43123");
       expect(child.ANTHROPIC_MODEL).toBe("claude-haiku-4.5");

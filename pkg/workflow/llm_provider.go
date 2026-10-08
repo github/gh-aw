@@ -1,7 +1,8 @@
 package workflow
 
 import (
-	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -124,9 +125,17 @@ func llmProviderSecretExpression(provider LLMProvider, workflowData *WorkflowDat
 	}
 }
 
-func llmProviderGatewayBaseURL(provider LLMProvider) string {
+func llmProviderGatewayBaseURL(provider LLMProvider, workflowData *WorkflowData) string {
 	profile := llmProviderProfileFor(provider)
-	return fmt.Sprintf("http://host.docker.internal:%d", profile.gatewayPort)
+	return llmGatewayBaseURL(profile.gatewayPort, workflowData)
+}
+
+func llmGatewayBaseURL(port int, workflowData *WorkflowData) string {
+	host := "host.docker.internal"
+	if isAWFNetworkIsolationEnabled(workflowData) {
+		host = "api-proxy"
+	}
+	return "http://" + net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 func llmProviderDocsURL(provider LLMProvider) string {
