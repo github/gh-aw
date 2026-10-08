@@ -16,5 +16,14 @@
     "experiment_name": "retry_policy_v1",
     "pr_or_issue": "issue",
     "decision": null
+  },
+  {
+    "date": "2026-10-08",
+    "workflow_id": "go-fan",
+    "primary_dimension": "generation control",
+    "subtype": "prompt_tightening",
+    "experiment_name": "prompt_tightening_v1",
+    "pr_or_issue": "issue",
+    "decision": null
   }
 ]
