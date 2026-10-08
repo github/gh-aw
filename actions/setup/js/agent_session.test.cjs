@@ -271,6 +271,7 @@ describe("Unified Agent Session 1.0.0 conformance", () => {
   it.each([
     ["input_tokens", "inputTokens"],
     ["output_tokens", "outputTokens"],
+    ["reasoning_output_tokens", "reasoningOutputTokens"],
     ["cache_creation_input_tokens", "cacheCreationInputTokens"],
     ["cache_read_input_tokens", "cacheReadInputTokens"],
   ])("keeps overflowed %s unavailable after further %s contributions", (key, alias) => {

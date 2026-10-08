@@ -284,8 +284,7 @@ describe("essential unified session payloads", () => {
       expect(normalizeUnifiedSessionEvent(event).data).toEqual(event.data);
     }
     expect(events.find(event => event.type === "assistant.message").data).toEqual({ content: " Child answer.\n", messageId: "message", sessionId: "child", parentSessionId: "parent", agentId: "child" });
-    expect(selectSessionResult(events)).toMatchObject({ status: "completed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 } });
-    expect(selectSessionResult(events).errors).toBeUndefined();
+    expect(selectSessionResult(events)).toMatchObject({ status: "failed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 }, errors: [{ message: "Child-only error." }] });
   });
 
   it("retains grader decisions and safe-output errors without evaluator scripts", () => {

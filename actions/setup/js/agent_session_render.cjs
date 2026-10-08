@@ -15,6 +15,7 @@ function sessionSourceScope(source) {
     source.provenance?.phase,
     source.provenance?.path,
     source.session_id ?? source.sessionId ?? source.data?.sessionId ?? source.data?.session_id,
+    source.parentSessionId ?? source.data?.parentSessionId,
     source.agentId ?? source.data?.agentId,
     source.parent_tool_use_id ?? source.data?.parentToolUseId ?? source.data?.parent_tool_use_id,
   ]);
@@ -73,7 +74,7 @@ function collapseStreamedMessages(events) {
     const key = JSON.stringify([scope, type, messageId ?? claude?.id, claude?.sequence, position]);
     const previousText = previous?.legacy ? previous.entry.message.content[0][previous.field] : previous?.entry.data.content;
     const geminiContinuation = previous?.key === key && geminiSnapshot?.scope === scope && geminiSnapshot.id === messageId && redactManifestValue(previousText + text, secrets) === redactManifestValue(geminiSnapshot.content, secrets);
-    const continuation = (native && ["content_block_start", "content_block_delta"].includes(native.type)) || claudeContinuation || geminiContinuation;
+    const continuation = source.data?.delta !== false && ((native && ["content_block_start", "content_block_delta"].includes(native.type)) || claudeContinuation || geminiContinuation);
     const streamed = delta || continuation || (partial && messageId !== undefined);
     geminiSnapshot = undefined;
     if (!["assistant.message", "assistant.reasoning"].includes(type) || typeof text !== "string" || (!streamed && !(messageId !== undefined && previous?.key === key))) {

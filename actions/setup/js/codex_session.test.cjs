@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { normalizeCodexSession } from "./codex_session.cjs";
 import { parseCodexLog, isCodexJsonlFormat } from "./parse_codex_log.cjs";
-import { projectSessionInitialization, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
+import { projectSessionInitialization, projectSessionResult, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
 import { convertCopilotEventsToLegacyLogEntries } from "./log_parser_shared.cjs";
 
 const fixture = name => readFileSync(new URL(`./test_data/${name}.jsonl`, import.meta.url), "utf8");
@@ -376,6 +376,30 @@ describe("Codex native tools and nested sessions", () => {
     expect(selectSessionResult(events)).toBeUndefined();
   });
 
+  it("does not infer descendant ancestry from started or failed spawns", () => {
+    const events = normalizeCodexSession([
+      { type: "item.started", item: { id: "spawn", type: "collab_tool_call", tool: "spawn_agent", sender_thread_id: "parent", receiver_thread_ids: ["child"] } },
+      { type: "item.completed", item: { id: "spawn", type: "collab_tool_call", tool: "spawn_agent", sender_thread_id: "parent", receiver_thread_ids: ["child"], status: "failed" } },
+      { type: "thread.started", thread_id: "child", model: "child-model" },
+      { type: "item.completed", thread_id: "child", item: { id: "answer", type: "agent_message", text: "Observed child session." } },
+    ]);
+    expect(events.find(event => event.type === "session.init" && event.data.sessionId === "child").data.parentSessionId).toBeUndefined();
+    expect(events.find(event => event.type === "assistant.message").data).toMatchObject({ sessionId: "child", content: "Observed child session." });
+    expect(events.find(event => event.type === "assistant.message").data.parentSessionId).toBeUndefined();
+  });
+
+  it("preserves descendant failures without replacing parent accounting or initialization", () => {
+    const events = [
+      { type: "session.init", data: { sourceEngine: "codex", sessionId: "parent", model: "parent-model" } },
+      { type: "session.init", data: { sessionId: "child", parentSessionId: "parent", model: "child-model" } },
+      { type: "session.result", data: { sourceEngine: "codex", sessionId: "parent", status: "completed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 } } },
+      { type: "session.result", data: { sessionId: "child", parentSessionId: "parent", status: "failed", numTurns: 9, usage: { input_tokens: 100, output_tokens: 20 }, errors: ["child failed"] } },
+    ];
+    expect(selectSessionResult(events)).toMatchObject({ status: "failed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 }, errors: ["child failed"] });
+    expect(projectSessionResult(events)).toMatchObject({ status: "failed", num_turns: 1, errors: ["child failed"], usage: { input_tokens: 10, output_tokens: 2 } });
+    expect(projectSessionInitialization(events)).toMatchObject({ model: "parent-model", session_id: "parent" });
+  });
+
   it("starts observed receivers without requiring an agent-state snapshot and keeps revised final messages", () => {
     const collab = (id, tool, states) => ({ type: "item.completed", item: { id, type: "collab_tool_call", tool, sender_thread_id: "parent", receiver_thread_ids: ["child"], agents_states: states, status: "completed" } });
     const events = normalizeCodexSession([collab("spawn", "spawn_agent", {}), collab("wait", "wait", { child: { status: "completed", message: "" } }), collab("wait", "wait", { child: { status: "completed", message: "Revised.\n" } })]);
@@ -434,8 +458,7 @@ describe("Codex native tools and nested sessions", () => {
       ["child", 1, 50],
       ["parent", 1, 10],
     ]);
-    expect(selectSessionResult(events)).toMatchObject({ status: "completed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 } });
-    expect(selectSessionResult(events).errors).toBeUndefined();
+    expect(selectSessionResult(events)).toMatchObject({ status: "failed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 }, errors: [{ message: "child-only error" }] });
     expect(events.find(event => event.type === "assistant.message" && event.data.sessionId === "grandchild")).toMatchObject({ agentId: "grandchild", data: { parentSessionId: "child", messageId: "item_0" } });
     expect(records).toEqual(original);
     expect(normalizeCodexSession(events)).toEqual(events);
@@ -458,8 +481,9 @@ describe("Codex native tools and nested sessions", () => {
 
   it("retains incomplete tool invocations and partial message identity", () => {
     const events = normalizeCodexSession([
-      { type: "item.started", item: { id: "call", type: "mcp_tool_call", tool: "lookup" } },
+      { type: "item.started", item: { id: "call", type: "mcp_tool_call" } },
       { type: "item.updated", item: { id: "call", type: "mcp_tool_call", arguments: false } },
+      { type: "item.updated", item: { id: "call", type: "mcp_tool_call", tool: "lookup" } },
       { type: "item.completed", item: { id: "call", type: "mcp_tool_call", result: 0, status: "completed" } },
       { type: "item.updated", item: { id: "message", type: "agent_message", text: " observed " } },
       { type: "item.completed", item: { id: "declined", type: "command_execution", command: "example", status: "declined" } },

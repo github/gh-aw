@@ -6,7 +6,18 @@ const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const createLogParserFormatters = require("./log_parser_format.cjs");
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
-const { isSessionEvent, normalizeAgentSession, normalizeSessionUsage, projectSessionResult, projectSessionInitialization, sessionOutputText, sessionToolSuccess, sessionTokenTotal, isMetric } = require("./agent_session.cjs");
+const {
+  isSessionEvent,
+  normalizeAgentSession,
+  normalizeSessionUsage,
+  projectSessionResult,
+  projectSessionInitialization,
+  sessionOutputText,
+  sessionToolSuccess,
+  sessionTokenTotal,
+  isMetric,
+  isSingleNestedSession,
+} = require("./agent_session.cjs");
 const { sessionSourceScope, escapeSummaryText, toolInventoryName, displayArgument } = require("./agent_session_render.cjs");
 
 /**
@@ -673,8 +684,8 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   const normalizedEntries = [];
   const pendingByToolCallId = new Map();
   const pendingIdsByToolName = new Map();
-  const scopedDisplayIds = new Map();
-  const claimedNativeIds = new Map();
+  const displayIdsByCall = new Map();
+  const claimedDisplayIds = new Set();
   let toolCounter = 0;
   const usedToolIds = new Set(logEntries.filter(e => typeof e.data?.toolCallId === "string").map(e => e.data.toolCallId));
   const displayToolId = () => {
@@ -685,15 +696,13 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     usedToolIds.add(id);
     return id;
   };
-  const scopedToolId = (scope, id) => {
-    if (id === null) return displayToolId();
-    const key = JSON.stringify([scope, id]);
-    if (!scopedDisplayIds.has(key)) {
-      const claimed = claimedNativeIds.has(id) && claimedNativeIds.get(id) !== scope;
-      scopedDisplayIds.set(key, claimed ? displayToolId() : id);
-      claimedNativeIds.set(id, scope);
+  const scopedDisplayId = (key, nativeId) => {
+    if (!displayIdsByCall.has(key)) {
+      const id = claimedDisplayIds.has(nativeId) ? displayToolId() : nativeId;
+      displayIdsByCall.set(key, id);
+      claimedDisplayIds.add(id);
     }
-    return scopedDisplayIds.get(key);
+    return displayIdsByCall.get(key);
   };
 
   const addPendingId = (toolName, toolId) => {
@@ -762,6 +771,10 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     const { includeCommand = true } = options;
     const base = Object.hasOwn(data, "input") ? data.input : data.parameters;
     if (base && typeof base === "object" && !Array.isArray(base)) {
+      if (!data.mcpServerName && ["Agent", "Task"].includes(data.toolName)) {
+        const { prompt, ...publicInput } = base;
+        return publicInput;
+      }
       if (includeCommand && base.command === undefined && typeof data.command === "string") {
         return { ...base, command: data.command };
       }
@@ -823,9 +836,9 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       case "tool.execution_start": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
         const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
-        const resolvedToolId = scopedToolId(scope, toolCallId);
         const callKey = JSON.stringify([scope, toolCallId]);
         const nameKey = JSON.stringify([scope, toolName]);
+        const resolvedToolId = toolCallId === null ? displayToolId() : scopedDisplayId(callKey, toolCallId);
         if (toolCallId !== null) {
           pendingByToolCallId.set(callKey, { id: resolvedToolId, name: nameKey });
         }
@@ -859,7 +872,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
           resolvedToolId = shiftPendingId(nameKey);
         }
         if (resolvedToolId === null) {
-          resolvedToolId = scopedToolId(scope, toolCallId);
+          resolvedToolId = toolCallId === null ? displayToolId() : scopedDisplayId(callKey, toolCallId);
           normalizedEntries.push({
             type: "assistant",
             message: {
@@ -903,8 +916,9 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     }
   }
 
-  const result = projectSessionResult(logEntries);
-  const init = projectSessionInitialization(logEntries);
+  const options = { includeNested: isSingleNestedSession(logEntries) };
+  const result = projectSessionResult(logEntries, options);
+  const init = projectSessionInitialization(logEntries, options);
   if (init) normalizedEntries.unshift(init);
   if (result) normalizedEntries.push(result);
 

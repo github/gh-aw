@@ -319,6 +319,23 @@ describe("redact_secrets.cjs", () => {
         expect(fs.readFileSync(artifact, "utf8")).toBe('{"token":"***REDACTED***"}');
         expect(mockCore.setFailed).not.toHaveBeenCalled();
       });
+      it("redacts decoded keys and values in nested Claim diagnostics using agent runtime masks", async () => {
+        const directory = path.join(tempDir, "claims", "original-claim");
+        fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+        const secret = 'runtime"\\opaque\nsecond-line';
+        const encodedMask = secret.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+        fs.writeFileSync(path.join(tempDir, "agent-stdio.log"), `::add-mask::${encodedMask}\n`);
+        const filenames = ["safe-output-items.jsonl", "temporary-id-map.json", "safe-output-errors.json"];
+        for (const filename of filenames) fs.writeFileSync(path.join(directory, filename), JSON.stringify({ [secret]: { value: secret } }) + "\n", { mode: 0o600 });
+        const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
+        await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+        for (const filename of filenames) {
+          const file = path.join(directory, filename);
+          expect(JSON.parse(fs.readFileSync(file, "utf8"))).toEqual({ "***\n***": { value: "***\n***" } });
+          expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+        }
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+      });
       (it("should scan for built-in patterns even when GH_AW_SECRET_NAMES is not set", async () => {
         (await eval(`(async () => { ${redactScript}; await main(); })()`),
           expect(mockCore.info).toHaveBeenCalledWith(`Starting secret redaction in /tmp/gh-aw and ${process.env.RUNNER_TEMP}/gh-aw directories`),

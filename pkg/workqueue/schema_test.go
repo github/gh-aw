@@ -2,89 +2,63 @@ package workqueue
 
 import (
 	"encoding/json"
+	"os/exec"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func TestWorkQueueStorageNames(t *testing.T) {
-	if FileName != "work-queue.jsonl" || DefaultBranch != "gh-aw-work-queue" {
-		t.Fatalf("unexpected work queue storage names: file=%q branch=%q", FileName, DefaultBranch)
+	if FileName != "work-queue.jsonl" || DefaultBranch != "work-queue" || Version != 3 {
+		t.Fatal("native and runtime must use one current-only authority")
 	}
 }
 
-func TestWorkQueueWorkflowSchemas(t *testing.T) {
-	compiler := jsonschema.NewCompiler()
-	entries, err := schemas.ReadDir("schema")
-	if err != nil {
-		t.Fatal(err)
+func TestContractGenerationIsReproducible(t *testing.T) {
+	command := exec.Command("python3", "../../specs/work-queue/generate_contract.py", "--check")
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("contract generation/check: %v\n%s", err, output)
 	}
-	for _, entry := range entries {
-		data, err := schemas.ReadFile("schema/" + entry.Name())
+}
+
+func TestClosedAssignmentAndFinishSchemas(t *testing.T) {
+	compiler := jsonschema.NewCompiler()
+	for _, name := range []string{"WorkQueueAssignment", "WorkQueueFinishIntent"} {
+		data, err := schemas.ReadFile("schema/" + name + ".json")
 		if err != nil {
 			t.Fatal(err)
 		}
-		var resource any
-		if err := json.Unmarshal(data, &resource); err != nil {
-			t.Fatal(err)
-		}
-		if err := compiler.AddResource(entry.Name(), resource); err != nil {
+		var schema any
+		_ = json.Unmarshal(data, &schema)
+		if err := compiler.AddResource(name+".json", schema); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	tests := []struct {
-		name    string
-		schema  string
-		record  string
-		invalid bool
+		Schema string
+		JSON   string
+		Valid  bool
 	}{
-		{"work", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null}`, false},
-		{"work enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`, false},
-		{"zero enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":0}`, false},
-		{"maximum enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":9007199254740991}`, false},
-		{"negative enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":-1}`, true},
-		{"unsafe enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":9007199254740992}`, true},
-		{"fractional enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":0.5}`, true},
-		{"string enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":"123"}`, true},
-		{"null enqueue time", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":null}`, true},
-		{"enqueue time only on work", "WorkQueueTransaction", `{"version":2,"kind":"Claim","work":"w","claim":"c","attempt":null,"enqueued":123}`, true},
-		{"claim", "WorkQueueTransaction", `{"version":2,"kind":"Claim","work":"w","claim":"c","attempt":null}`, false},
-		{"cancel claim", "WorkQueueTransaction", `{"version":2,"kind":"ClaimCancellation","work":"w","claim":"c","attempt":null}`, false},
-		{"cancel work", "WorkQueueTransaction", `{"version":2,"kind":"WorkCancellation","work":"w","claim":null,"attempt":null}`, false},
-		{"completion", "WorkQueueTransaction", `{"version":2,"kind":"Completion","work":"w","claim":"c","attempt":"a"}`, false},
-		{"legacy requires upgrade", "WorkQueueTransaction", `{"kind":"Work","work":"w","claim":null,"attempt":null}`, true},
-		{"version zero requires upgrade", "WorkQueueTransaction", `{"version":0,"kind":"Work","work":"w","claim":null,"attempt":null}`, true},
-		{"version one requires upgrade", "WorkQueueTransaction", `{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null}`, true},
-		{"version one cannot carry enqueue time", "WorkQueueTransaction", `{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`, true},
-		{"unknown version", "WorkQueueTransaction", `{"version":3,"kind":"Work","work":"w","claim":null,"attempt":null}`, true},
-		{"missing nullable field", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null}`, true},
-		{"empty identity", "WorkQueueTransaction", `{"version":2,"kind":"Claim","work":"w","claim":"","attempt":null}`, true},
-		{"completion without attempt", "WorkQueueTransaction", `{"version":2,"kind":"Completion","work":"w","claim":"c","attempt":null}`, true},
-		{"unexpected authority", "WorkQueueTransaction", `{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"run_id":"run"}`, true},
-		{"operator record", "WorkQueueTransaction", `{"kind":"Claim","work_id":"w","claim_id":"c","run_id":"run"}`, true},
-		{"assignment", "WorkQueueAssignment", `{"work_id":"w","claim_id":"c","work":{"task":"test"}}`, false},
-		{"empty assignment identity", "WorkQueueAssignment", `{"work_id":"","claim_id":"c","work":{}}`, true},
-		{"assignment without payload", "WorkQueueAssignment", `{"work_id":"w","claim_id":"c"}`, true},
-		{"assignment array payload", "WorkQueueAssignment", `{"work_id":"w","claim_id":"c","work":[]}`, true},
-		{"finish completed", "WorkQueueFinishIntent", `{"outcome":"completed"}`, false},
-		{"finish cancelled", "WorkQueueFinishIntent", `{"outcome":"cancelled"}`, false},
-		{"invalid finish outcome", "WorkQueueFinishIntent", `{"outcome":"failed"}`, true},
-		{"finish cannot select claim", "WorkQueueFinishIntent", `{"outcome":"completed","claim_id":"c"}`, true},
+		{"WorkQueueFinishIntent", `{"outcome":"completed"}`, true},
+		{"WorkQueueFinishIntent", `{"outcome":"cancelled","claim_handle":"h1"}`, true},
+		{"WorkQueueFinishIntent", `{"outcome":"completed","claim_handle":null}`, false},
+		{"WorkQueueFinishIntent", `{"outcome":"completed","claim_handle":""}`, false},
+		{"WorkQueueFinishIntent", `{"outcome":"finished"}`, false},
+		{"WorkQueueFinishIntent", `{"outcome":"completed","claim_id":"c1"}`, false},
+		{"WorkQueueAssignment", `{"work_id":"w","claim_id":"c","work":{}}`, false},
+		{"WorkQueueAssignment", `{"version":3,"dispatch_id":"d","request_id":"r","commit_id":"q","policy_epoch":"e","pool":"p","worker_profile":"x","claims":[{"handle":"h1","claim_id":"c1","work_id":"w1","work":{},"result_refs":[]}]}`, true},
+		{"WorkQueueAssignment", `{"version":3,"dispatch_id":"d","request_id":"r","commit_id":"q","policy_epoch":"e","pool":"p","worker_profile":"x","claims":[]}`, false},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			schema, err := compiler.Compile(test.schema + ".json")
-			if err != nil {
-				t.Fatal(err)
-			}
-			var record any
-			if err := json.Unmarshal([]byte(test.record), &record); err != nil {
-				t.Fatal(err)
-			}
-			if err := schema.Validate(record); (err != nil) != test.invalid {
-				t.Fatalf("invalid=%t, validation error: %v", test.invalid, err)
-			}
-		})
+		var value any
+		_ = json.Unmarshal([]byte(test.JSON), &value)
+		schema, err := compiler.Compile(test.Schema + ".json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := schema.Validate(value); (err == nil) != test.Valid {
+			t.Errorf("schema %s valid=%v record=%s error=%v", test.Schema, test.Valid, test.JSON, err)
+		}
 	}
 }

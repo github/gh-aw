@@ -1,0 +1,233 @@
+{
+  "version": 3,
+  "authority": "work-queue.jsonl",
+  "default_branch": "work-queue",
+  "schema": "pkg/workqueue/schema/QueueCommit.json",
+  "assignment_schema": "pkg/workqueue/schema/WorkQueueAssignment.json",
+  "canonical_json": {
+    "object_order": "UTF-8 byte order",
+    "strings": "Unescaped valid Unicode except JSON controls, quote and backslash; no HTML or U+2028/U+2029 escaping",
+    "numbers": "Canonical base-10 integer tokens in -9007199254740991..9007199254740991, excluding negative zero, fractions and exponent notation; applies recursively to every wire value including payloads",
+    "typed_numbers": "Finite safe-integer values only; typed negative zero is rejected rather than normalized",
+    "typed_fixture": "specs/work-queue/fixtures/canonical-typed.json; construct literal descriptors as real typed values before serialization",
+    "typed_native_api": "github.com/github/gh-aw/pkg/workqueue.CanonicalValue",
+    "numeric_rationale": "Avoid cross-engine rounding before equality, request fingerprints and resource accounting; ensure a unique accepted integer representation",
+    "payload_preservation": "Retain all accepted fields and decoded values recursively; no numeric/string coercion or Unicode normalization. Canonical formatting is not source-format preservation. Other exact quantities require explicitly supplied strings",
+    "big_integers": "Canonical nonnegative decimal strings",
+    "duplicate_keys": "Rejected recursively",
+    "nesting_limit": 64,
+    "array_member_limit": 16384,
+    "parser_bytes": 83886080,
+    "line_bytes": 8388608,
+    "truncated_final_line": "Rejected",
+    "blank_records": "Rejected"
+  },
+  "codec_errors": {
+    "unpaired_surrogate": "invalid_unicode",
+    "decoded_duplicate_key": "duplicate_key",
+    "noncanonical_numeric_token": "noncanonical_number",
+    "noncanonical_typed_number": "noncanonical_number",
+    "fixture": "specs/work-queue/fixtures/canonical.json#error_codes",
+    "comparison": "Error codes are canonical; diagnostic wording and parser offsets may differ between engines"
+  },
+  "delivery_verification": {
+    "exhaustion": "evidence.attempts >= reconciliation.max_attempts OR commit.at - original Completion commit.at >= reconciliation.deadline_ms",
+    "deadline_origin": "The first effective Completion commit timestamp; restarting reconciliation never resets the deadline",
+    "required_proof": "Exact original native run/attempt terminal evidence is independently required; elapsed time never proves terminal state, nonlaunch, no effects or native release",
+    "disposition": "Must equal evidence.effects, which defaults to unknown; none additionally requires a positive receipt",
+    "fixture": "specs/work-queue/fixtures/delivery-deadlines.json"
+  },
+  "embedded_effect_contract": {
+    "location": "Work payload.effect_contract; separate versioned intent namespace, not a QueueCommit or WorkDefinition field",
+    "schema": "specs/work-queue/effect-contract.schema.json",
+    "forms": "Closed {kind:none} alias or {version:1,outputs:[{type,min,max,verification?}],no_writes?}",
+    "verification": "Closed {verifier_id:ReasonCode,expected:canonical JSON object}; both fields required when present",
+    "bounds": "At most 128 unique output types, safe-integer 0 <= min <= max <= 128; no_writes:true requires no outputs",
+    "authority": "Payload metadata is intent only. verifier_id must exactly reference the trusted compiled claim-adapters[output.type].verifier.id from the approved immutable worker configuration",
+    "compiled_aliases": "Base v1 type/cardinality contracts also support trusted compiler-only safe-outputs.claim-adapters mappings from custom type to an independently verifiable built-in effect type. Prepared custom code never receives arbitrary write credentials; the central trusted broker produces real native receipts while retaining logical custom-type attribution",
+    "mapping_scope": "Compiled target-repo is resolved and checked by immutable host/repository ID and approved scope. field-map accepts only built-in business fields, never Claim/run/routing/credential/proof fields; conflicts with fixed expected fields reject rather than silently override",
+    "expected": "Must also satisfy the declared verifier's closed kind-specific schema; cannot choose transport, credentials, code, callbacks or widen approved effect scope",
+    "execution": "Arbitrary custom code runs in isolated credential-free preparation; actual writes use the freshly authorized trusted per-Claim intent broker. AsyncLocal context alone is not a credential boundary",
+    "delivery": "Independent receipt/resource proof under the original Claim and native attempt 1 is required; job success, effect-contract validity and no-write strings are not proof",
+    "queue_engines": "Native queue codecs/replay retain opaque payloads losslessly; the compiler and lifecycle adapters own embedded interpretation and trusted verifier configuration"
+  },
+  "embedded_resource_scope": {
+    "location": "Work payload.resource_scope; optional separate version 1 namespace, no QueueCommit or Assignment fields",
+    "schema": "specs/work-queue/resource-scope.schema.json",
+    "fixtures": "specs/work-queue/fixtures/resource-scope.json",
+    "shape": "Closed {version:1,resources:[selectors]}; at most 128 unique selectors; empty denies all writes",
+    "selector": "Closed required repository plus optional kind, host, repository_id, resource_id, number, comment_id, run_id, ref, path; every supplied field matches exactly and conjunctively",
+    "default": "Absent namespace inherits frozen and installed profile scope; explicit null, unknown fields, malformed IDs, duplicates and unsafe paths reject",
+    "intersection": "Selector alternatives never widen frozen or installed profile.effect_scope. Existing Issue/PR targets also match the complete immutable Work.subject when present. Native run targets match the original worker run",
+    "trusted_target": "The compiled per-Claim broker supplies complete actual SDK target fields, including authenticated parent identities for comments. Agent target metadata cannot replace stored Work scope",
+    "native": "AuthorizeEffect requires one closed EffectResource target after current original Claim Completion and pending delivery; queue continuation remains independently authorized"
+  },
+  "schema_generation": {
+    "source": "specs/work-queue/transactions.tsp",
+    "checked_in_emitter": "Dependency-free fail-closed TypeSpec-subset generator; not the official emitter",
+    "generate_command": "python3 specs/work-queue/generate_contract.py",
+    "official_equivalence_command": "python3 specs/work-queue/verify_official_contract.py --official-dir <sealed-TypeSpec-JSON-output>",
+    "official_equivalence": "Resolve local/external references and compare all 41 validation graphs, preserving bounds, closure, required fields, union alternatives and runtime extensions. Only redundant constant types, annotation metadata, ordering and plain-object unevaluatedProperties representations are canonicalized; unsupported shapes fail closed",
+    "drift_command": "python3 specs/work-queue/generate_contract.py --check",
+    "official_validation": "Separate genuine @typespec/compiler@1.16.0 and @typespec/json-schema@1.16.0 compile/emission with file-type=json and seal-object-schemas=true",
+    "schema_equivalence": "Semantic equivalence of official emitted schemas and checked-in subset-generated schemas is not verified"
+  },
+  "projection": {
+    "comparison": "Exact equality of every serialized projection field; no field trimming or projection-equivalence normalization. Only separate performance measurements may differ",
+    "repository": "Normalized queue repository from the authenticated genesis Actor",
+    "dispatch": "Includes the frozen approved profile and lifecycle_writes counter, in addition to immutable original membership and independent native reservation state",
+    "claim": "Terminal Claims include terminal_commit_id from the causal Completion or cancellation commit",
+    "observation_writes": "Keys are canonical({condition,host,kind,repository_id,resource_id}); display repository/number coordinates never change gate identity or its budget",
+    "fixture": "specs/work-queue/fixtures/canonical-prefix.json"
+  },
+  "fingerprint": "SHA256 hexadecimal of canonical({actor,kind,parameters}); excludes request ID, predecessor, timestamp, trace and tentative winners",
+  "node_identity": "SHA256 hexadecimal of canonical({graph_id,node_key})",
+  "independent_root_defaults": {
+    "graph_id": "SHA256 hexadecimal of UTF8 canonical(payload), not NodeID(payload text, root)",
+    "node_key": "root",
+    "enqueued": "Trusted first ingestion timestamp; resubmission reuses stored immutable enqueued before exact definition comparison, never the newer source run timestamp",
+    "distinct_nodes": "Callers explicitly choose another graph_id or node_key; no source run ID or mutable clock is mixed into default identity",
+    "example": {
+      "payload": { "a": 1, "b": 2 },
+      "graph_id": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+      "node_key": "root",
+      "work_id": "e41927adc7ede48a4d9ebae45074bbfd55f7714af750a3fe5b3734bc6c1ed62e"
+    }
+  },
+  "production_genesis": {
+    "placeholder": "DefaultPolicy zero40 revision is a pure constructor/fixture placeholder, never a production worker revision",
+    "default_route": "Authenticated native repository default-branch head plus exact approved worker workflow file at that immutable revision; requires work_queue_assignment string input and active exact Actions registration",
+    "explicit_policy": "Authenticated administrator Policy proposal initializes a genuine genesis using its original request ID/epoch and exact approved policy; no unrelated default route or synthetic installed policy",
+    "authority": "Worker principal and credential/effect scopes come from the approved installed profile; producer/PR checkout SHA is never substituted for another worker route",
+    "installed_policy": "Existing Policy is never automatically rewritten or reprovisioned during an ordinary publish or stable-request acknowledgment"
+  },
+  "dispatch_refresh": {
+    "grant": "Fresh native Observations may precede the maximal Claim prefix in one atomic commit, consuming the same operation budget",
+    "automatic_read_budget": "At most min(128, installed operations limit minus 1) distinct resources per fresh CAS prefix, with at most two typed native API reads per resource; retain one operation slot for an independent Claim",
+    "budget_helper": "Read-only ObservationRefreshBudget(state, requested) accepts integers in 0..255 and reserves one Claim operation with min(requested, installed operations minus 1); invalid helper arguments reject with ledger_invalid. This adapter argument is not a QueueCommit request field. Native automatic refresh requests 128. Grants pause or ledger_bytes at/above installed ledger_bytes watermark returns zero before any dependency read; exact append and recovery reservations remain independently authoritative",
+    "budget_fixture": "specs/work-queue/fixtures/observation-refresh-budget.json",
+    "missing_read_scope": "Per-resource unknown without a foreign API call, never a global authorization denial for independent ready Work",
+    "decision_clock": "Capture the trusted dispatch decision time after refreshing native dependency evidence",
+    "no_grant": "Tentative Observations are discarded with zero Claims; no derived observe request, Git write, counter, identity or fairness mutation is permitted",
+    "cas_loser": "Losing tentative observations and grants are discarded; refresh native evidence and recompute from the winning prefix",
+    "durable_observation": "Only an independently explicit authenticated observe/reconcile request may durably record evidence without a Claim grant"
+  },
+  "release_retry_backoff": {
+    "proof": "Only the same-commit Release matching the cancelled Claim's dispatch_id may anchor retry backoff; validate its exact approved scope and native run/kind first",
+    "origin": "The matching Release evidence.checked_at, retained across delayed publication/CAS; another reservation's earlier proof never reduces this Claim's backoff",
+    "without_matching_release": "Use the cancellation commit timestamp, never an unrelated Release or proof",
+    "exhausted_worker_closure": "Only the original bound already-cancelled Claim's available/cancelled exhausted Work may receive attempts_exhausted through the same cancelled finish scope"
+  },
+  "identities": {
+    "max_utf8_bytes": 256,
+    "forbidden_characters": "ASCII C0 controls and DEL; opaque payload/descriptor text is not an identity",
+    "decimal_pattern": "^[1-9][0-9]*$",
+    "decimal_max_digits": 256,
+    "native_decimal_validation": "The same 1..256 positive canonical decimal bound applies before wire schemas to authenticated principals, exact native run reads, typed Actor origins, installed worker profiles and producer keys; oversized native run IDs reject before API probes",
+    "validation_fixture": "specs/work-queue/fixtures/identity-validation.json",
+    "claim": "c_ + SHA256(UTF8(request.id)) + _ + one-based fair-prefix index",
+    "dispatch": "d_ + SHA256(UTF8(request.id)) + _ + one-based earliest-compatible-group index",
+    "handle": "h + one-based member index in original immutable group",
+    "candidate_commit": "q_ + SHA256(UTF8(previous_tip + newline + request.id))",
+    "genesis_commit": "q_ + SHA256(UTF8(genesis request.id)); no predecessor or newline",
+    "auto_bootstrap_request": "init_ + SHA256(UTF8(originating publication request.id))",
+    "auto_bootstrap_epoch": "epoch_ + SHA256(UTF8(originating publication request.id))",
+    "publisher_generation_example": {
+      "publication_request_id": "submit",
+      "genesis_request_id": "init_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba",
+      "genesis_policy_epoch": "epoch_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba",
+      "genesis_commit_id": "q_50ddbfa08f7148bbb21046bd6c12fed643985baa93ecc09ae9a6d1c6366d1be7",
+      "publication_commit_id": "q_55c9db94408bb38dd5f1731f2adc022fcca54ea724b4b1f4db2424d7194d9294"
+    },
+    "commit_identity_validation": "Opaque unique ID; publisher naming conventions do not authenticate a commit or invalidate other accepted version-3 IDs"
+  },
+  "validation_layers": {
+    "structural": "Generated closed schemas enforce positive decimal ID strings of at most 256 digits and at most 64 unique Claim observation references",
+    "identity_bytes": "JSON Schema maxLength counts Unicode characters; both engines additionally enforce the declared x-utf8-max-bytes and identity control-character restrictions",
+    "actor_attempt": "Actor.run_attempt structurally permits 1..4096 logical source attempts; worker authority semantically requires original attempt 1, as do native binding, Completion and Evidence",
+    "trusted_context": "Schema acceptance is not authentication; normalized immutable principal IDs, role/repository/Claim scope, evidence, request fingerprint and policy/state-dependent limits are validated separately"
+  },
+  "defaults": {
+    "mode": "weighted-priority",
+    "class_weights": [8, 4, 2, 1, 1],
+    "priority": 3,
+    "fairness_key": "",
+    "accounting_weight": 1,
+    "max_claims_per_profile": 1,
+    "engineering_max_claims_per_dispatch": 16,
+    "logical_limit": 16,
+    "native_limit": 16,
+    "per_account_limit": "Absent; the default account can use all pool capacity",
+    "retry_max_attempts": 3,
+    "retry_backoff_ms": 30000,
+    "reconciliation_max_attempts": 5,
+    "reconciliation_deadline_ms": 300000,
+    "max_observation_age_ms": 60000,
+    "share_account_keys": false,
+    "enqueue_order": "First causal commit ordinal, then operation index; enqueued is diagnostic only"
+  },
+  "limits": {
+    "ledger_bytes": 67108864,
+    "recovery_bytes": 16777216,
+    "payload_bytes": 16384,
+    "graph_nodes": 4096,
+    "predecessors": 64,
+    "pending_nodes": 4096,
+    "operations": 256,
+    "assignment_bytes": 49152,
+    "result_bytes": 4096,
+    "evidence_bytes": 1024,
+    "observation_writes_per_gate_epoch": 4096
+  },
+  "reason_code": {
+    "max_ascii_characters": 128,
+    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+    "fixture": "specs/work-queue/fixtures/reason-validation.json"
+  },
+  "recovery_reservation": {
+    "all_writes": "Post-operation canonical ledger bytes plus remaining bounded closure/recovery reserve must fit ledger_bytes + recovery_bytes",
+    "new_admission": "Canonical ledger bytes must not exceed ledger_bytes; remaining reserve must not exceed recovery_bytes",
+    "optional_observations": "Must not exceed the ledger_bytes admission watermark",
+    "operational_controls": "May use unallocated recovery capacity, never consume outstanding Work/Dispatch closure reservations",
+    "genuine_closure": "Discharges only the reservations justified by its operation; the post-operation all_writes bound still applies",
+    "reserve_formula": {
+      "completed_pending_work": "2 * result_bytes + 2 * evidence_bytes + 8192",
+      "nonterminal_work": "remaining_future_attempts * (4 * evidence_bytes + 8192) + 2 * result_bytes + 2 * evidence_bytes + 8192",
+      "claimed_current_outcome": "Add 8192 only while Work is claimed; Completion or ClaimCancellation discharges this current-outcome escrow independently of future retries",
+      "unreleased_dispatch": "remaining_lifecycle_writes * (2 * evidence_bytes + 12288) + 2 * evidence_bytes + 8192",
+      "remaining_lifecycle_writes": "max(0, reconciliation.max_attempts + 4 - lifecycle_writes)",
+      "record_accounting": "Canonical bytes include the LF and duplicated request operations/evidence; reserved envelopes cover bounded escaped actor/request identities"
+    }
+  },
+  "packing": "Largest fair prefix; earliest compatible group includes byte fit; no skipped winner; preceding Observations count against operation budget",
+  "gate_identity": "canonical({host,repository_id,resource_id,kind,condition}); display coordinates do not change identity",
+  "request_parameters": {
+    "submit": "{nodes:[complete Work operations]} exactly matches persisted operations",
+    "dispatch_next": "{pool,max_claims,max_dispatches,max_bytes}; trusted observations and Claims regenerate after CAS loss",
+    "finish": "{dispatch_id,claim_handle,outcome}; one Completion or ClaimCancellation, with an additional scoped WorkCancellation only for exhausted retry",
+    "other": "{operations:[closed typed operations]} exactly matches persisted operations"
+  },
+  "request_roles": {
+    "administrator": ["policy", "control", "submit", "dispatch_next", "observe", "cancel_work"],
+    "producer": ["submit", "cancel_work"],
+    "dispatcher": ["submit", "dispatch_next", "observe", "dispatch"],
+    "worker": ["submit", "dispatch_next", "observe", "finish", "dispatch"],
+    "reconciler": ["observe", "dispatch", "release", "result", "delivery_failure", "cancel_claim", "cancel_work"]
+  },
+  "provenance": {
+    "actor": "Normalized authenticated trusted ingestion context; submitted strings and Git authors do not authenticate",
+    "principal": "Authenticated GitHub actor ID as a positive canonical decimal string; never mutable login. Policy worker principals and producer keys follow the same rule. Native launch actor.id is mandatory and triggering_actor.id, when present, matches the approved profile principal",
+    "native_correlation": "Original native attempt 1 API proof matches approved workflow, immutable revision, repository, event and actor. Display title contains the complete delimited dispatch ID, never a substring of another group ID",
+    "evidence": "Normalized authenticated API/activation/receipt verifier output; source strings do not authenticate",
+    "worker": "Original immutable member plus durable exact run binding, attempt 1 only",
+    "worker_effects": "Actual effects require the current Policy epoch, effective completed original Claim and a pending delivery barrier; verified Result or DeliveryFailure cannot authorize additional effects",
+    "logical_run_origin": "Optional run_id/run_attempt are paired; producer/dispatcher logical source attempts may be 1..4096, while worker/native binding/Completion/Evidence remain original attempt 1",
+    "no_op_origin": "Closed Actor/Request, fingerprint, repository, approved role and live scope validation precede fresh no-grant/idempotent previews; accepted stable request acknowledgment survives later scope closure",
+    "duplicate_node": "Exact immutable existing definitions consume no new operations, bytes, request identity, or reserve; fresh requests still require current producer entitlement",
+    "worker_queue_controls": "Fresh submit, dispatch_next and derived observations require the same current-epoch scoped verified Completion and a pending delivery barrier; verified Result and failed delivery deny new queue-control writes. Accepted identical requests recover before the fresh authority gate; read-only inventory remains available after Result/Release. Children inherit pool/priority/account, and dispatch_next cannot leave the parent pool",
+    "operator": "Native publisher resolves credential principal from user API numeric id and repository permissions, never from flags or mutable login",
+    "foreign_dependencies": "Explicit allowlist plus separately bound read client; the queue credential is not assumed sufficient",
+    "delivery": "Native publication requires a trusted read-only DeliveryVerifier capability, never a receipt asserted by operator flags",
+    "writer_ruleset_automation": "Explicitly deferred; trusted writer branch restriction remains a deployment precondition, not verified by this implementation"
+  }
+}

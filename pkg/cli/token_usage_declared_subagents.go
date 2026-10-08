@@ -5,8 +5,14 @@ import (
 	"maps"
 	"os"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
+)
+
+var (
+	effectiveModelDateSuffix     = regexp.MustCompile(`-[0-9]{4}(?:-[0-9]{2}-[0-9]{2}|[0-9]{4})$`)
+	claudeHyphenatedModelVersion = regexp.MustCompile(`^(claude-.+)-([0-9]+)-([0-9]+)$`)
 )
 
 func augmentDeclaredSubagentModels(runDir string, summary *TokenUsageSummary) {
@@ -98,7 +104,20 @@ func matchesDeclaredModel(pattern, observed, provider string) bool {
 		pattern = model
 	}
 	matched, err := path.Match(pattern, observed)
+	if err == nil && matched {
+		return true
+	}
+	normalized := normalizeEffectiveModelName(observed)
+	if normalized == observed {
+		return false
+	}
+	matched, err = path.Match(pattern, normalized)
 	return err == nil && matched
+}
+
+func normalizeEffectiveModelName(model string) string {
+	model = effectiveModelDateSuffix.ReplaceAllString(model, "")
+	return claudeHyphenatedModelVersion.ReplaceAllString(model, "$1-$2.$3")
 }
 
 func generateSubagentModelFindings(summary *TokenUsageSummary) []AuditFinding {

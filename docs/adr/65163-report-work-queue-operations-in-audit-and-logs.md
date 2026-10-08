@@ -39,8 +39,14 @@ Limiting the feature to `gh aw audit` would reduce the surface area of the chang
 - Downloading queue evidence for logs requires workflow logs in addition to activation and agent artifacts, which can increase report generation cost compared with usage-only logs.
 
 #### Neutral
-- The decision extends the existing work-queue architecture rather than changing queue authority or protocol semantics.
-- The report intentionally separates historical queue facts (`snapshot.transactions`) from run-specific operational diagnostics (`operations`), preserving the existing mental model for queue evidence.
+- The report remains diagnostic, not queue authority. Current snapshots carry the
+closed QueueCommit chain, immutable assignment provenance and per-Claim intents.
+Historical scalar/fact artifacts may still be displayed as historical evidence;
+that decoding cannot authorize current operations or upgrade an old queue.
+- The report separates activation-time observations, staged per-Claim requests,
+durable request/Claim references and run-specific diagnostics. Detailed traces
+can reconstruct the causal decision prefix, but a workflow log line or successful
+native conclusion does not establish a verified Result.
 
 ---
 

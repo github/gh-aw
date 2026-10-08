@@ -4,11 +4,14 @@ package cli
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func compactTestData() LogsData {
@@ -83,4 +86,45 @@ func TestRenderLogsCompactSkipsSkippedAndCancelledRuns(t *testing.T) {
 	assert.NotContains(t, out, "444")
 	assert.NotContains(t, out, "555")
 	assert.Equal(t, 1, strings.Count(out, "1234567"))
+}
+
+type failingCompactLogsWriter struct {
+	calls   int
+	failAt  int
+	failure error
+}
+
+func (w *failingCompactLogsWriter) Write(data []byte) (int, error) {
+	w.calls++
+	if w.calls == w.failAt {
+		return len(data) / 2, w.failure
+	}
+	return len(data), nil
+}
+
+func TestRenderLogsCompactPropagatesEveryWriterFailure(t *testing.T) {
+	t.Parallel()
+	data := compactTestData()
+	data.Runs[0].WorkQueue = &WorkQueueReport{FinishIntent: "completed"}
+	data.LogsLocation = "/logs"
+	failure := errors.New("diagnostic destination unavailable")
+	for name, render := range map[string]func(io.Writer, LogsData) error{
+		"compact": renderLogsCompactToWriter, "verbose": renderLogsCompactVerboseToWriter,
+	} {
+		t.Run(name, func(t *testing.T) {
+			success := &failingCompactLogsWriter{}
+			require.NoError(t, render(success, data))
+			for failAt := 1; failAt <= success.calls; failAt++ {
+				writer := &failingCompactLogsWriter{failAt: failAt, failure: failure}
+				require.ErrorIs(t, render(writer, data), failure)
+				assert.Equal(t, failAt, writer.calls, "no writes may follow the first failure")
+			}
+			short := &failingCompactLogsWriter{failAt: 1}
+			require.ErrorIs(t, render(short, data), io.ErrShortWrite)
+			assert.Equal(t, 1, short.calls)
+			empty := &failingCompactLogsWriter{failAt: 1, failure: failure}
+			require.ErrorIs(t, render(empty, LogsData{}), failure)
+			assert.Equal(t, 1, empty.calls)
+		})
+	}
 }

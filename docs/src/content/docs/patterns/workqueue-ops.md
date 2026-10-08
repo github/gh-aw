@@ -7,6 +7,15 @@ sidebar:
 
 WorkQueueOps is a pattern for systematically processing a large backlog of work items. Instead of processing everything at once, work is queued using issue checklists, [cache-memory](/gh-aw/reference/cache-memory/), or Discussions as durable backends, tracked, and consumed incrementally — surviving interruptions, rate limits, and multi-day horizons. Use it when operations are idempotent and progress visibility matters.
 
+These lightweight patterns are not the `tools.work-queue` protocol: they do not
+provide its authoritative fair scheduling, Claim-scoped effects, or verified
+DAG barriers. In that protocol, Issues and pull requests can be dependency
+vertices, but Issues are not a supported queue-storage backend. See the
+[work-queue protocol](/gh-aw/specs/work-queue-specification/)
+for its implementation coverage and explicitly deferred security requirements.
+The [Linter Factory](/gh-aw/patterns/linter-factory/) is an example of that
+feature, with ledger lifecycle, mixed-Claim, and recovery diagrams.
+
 ```mermaid
 flowchart LR
     queue[(Queue)] --> process[Process next N items]
