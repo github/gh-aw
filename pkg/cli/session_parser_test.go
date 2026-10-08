@@ -192,6 +192,176 @@ func TestSessionParserEngines(t *testing.T) {
 	}
 }
 
+func TestSessionParserCopilotSubagentAttribution(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	for _, source := range []string{
+		"sandbox/agent/logs/copilot-session-state/session/events.jsonl",
+		"agent-session.jsonl",
+		"agent-stdio.log",
+	} {
+		t.Run(source, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writeSessionTestFile(t, root, source, copilotSubagentIntegrationEvents(t))
+			session, err := runSessionParser(context.Background(), "reconstruct", root, "copilot")
+			require.NoError(t, err)
+			require.NoError(t, validateSessionJSONL(session))
+			requireCopilotSubagentIntegrationEvidence(t, session)
+
+			// Consume only the published artifact: neither native events nor
+			// bootstrap parser traces are available in the audit directory.
+			published := t.TempDir()
+			writeSessionTestFile(t, published, "usage/aw_session.jsonl", string(session))
+			writeSessionTestFile(t, published, "usage/agent_usage.json", `{"primary_model":"proxy-only-model","input_tokens":1000,"output_tokens":100,"ai_credits":933.447}`)
+			writeSessionTestFile(t, published, "agent-stdio.log", "● Fake(wrong-model) Must not override structured evidence\n[INFO] container(s)\nlen(d)\n")
+			summary, err := analyzeTokenUsage(published, false)
+			require.NoError(t, err)
+			require.NotNil(t, summary)
+			require.Equal(t, []SubagentModelRequest{
+				{AgentName: "awf-routing", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
+				{AgentName: "ghaw-issues", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
+				{AgentName: "subagent-research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
+			}, summary.SubagentModelRequests)
+			require.Equal(t, []SubagentModelActual{{Model: "opus", Requests: 60}}, summary.SubagentModelActuals)
+			require.Zero(t, summary.MismatchCount)
+			require.Empty(t, summary.Warnings)
+			require.Contains(t, summary.ByModel, "proxy-only-model")
+			require.InDelta(t, 933.447, summary.TotalAIC, 0.000001)
+		})
+	}
+}
+
+func requireCopilotSubagentIntegrationEvidence(t *testing.T, session []byte) {
+	t.Helper()
+	events := make(map[string]map[string]json.RawMessage)
+	for line := range strings.SplitSeq(string(session), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var event struct {
+			Type    string                     `json:"type"`
+			AgentID string                     `json:"agentId"`
+			Data    map[string]json.RawMessage `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &event))
+		events[event.Type+":"+event.AgentID] = event.Data
+	}
+	require.JSONEq(t, `"xhigh"`, string(events["session.init:"]["reasoningEffort"]))
+	require.JSONEq(t, `"built-in"`, string(events["subagent.started:research"]["agentType"]))
+	require.JSONEq(t, `"agent_definition_default"`, string(events["subagent.started:research"]["modelSelectionSource"]))
+	require.JSONEq(t, `"background"`, string(events["subagent.started:research"]["executionMode"]))
+	for _, id := range []string{"ghaw", "awf"} {
+		require.JSONEq(t, `"research"`, string(events["subagent.started:"+id]["parentId"]))
+		require.JSONEq(t, `"low"`, string(events["subagent.configured:"+id]["reasoningEffort"]))
+	}
+	require.JSONEq(t, `"opus"`, string(events["subagent.completed:awf"]["firstDispatchedModel"]))
+	message := events["assistant.message:awf"]
+	for key, expected := range map[string]string{"model": "opus", "apiCallId": "api-awf", "interactionId": "interaction-awf", "turnId": "turn-awf", "parentToolCallId": "call-awf"} {
+		require.JSONEq(t, `"`+expected+`"`, string(message[key]))
+	}
+	require.JSONEq(t, copilotSubagentIntegrationMetrics, string(events["session.result:"]["agentMetrics"]))
+	require.NotContains(t, events["subagent.started:research"], "agentDescription")
+}
+
+func TestSessionParserCopilotSubagentsWithoutAccounting(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	root := t.TempDir()
+	writeSessionTestFile(t, root, "sandbox/agent/logs/copilot-session-state/session/events.jsonl", copilotSubagentIntegrationLifecycle)
+	session, err := runSessionParser(context.Background(), "reconstruct", root, "copilot")
+	require.NoError(t, err)
+	require.NoError(t, validateSessionJSONL(session))
+	published := t.TempDir()
+	writeSessionTestFile(t, published, "usage/aw_session.jsonl", string(session))
+	writeSessionTestFile(t, published, "usage/agent_usage.json", `{"primary_model":"main-only-model","input_tokens":1000}`)
+	summary, err := analyzeTokenUsage(published, false)
+	require.NoError(t, err)
+	require.NotNil(t, summary)
+	require.Len(t, summary.SubagentModelRequests, 3)
+	require.Empty(t, summary.SubagentModelActuals, "missing subagent accounting must not use whole-run usage")
+	require.Empty(t, summary.Warnings)
+	require.Zero(t, summary.MismatchCount)
+}
+
+func TestSessionParserCopilotWithoutSubagents(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	root := t.TempDir()
+	writeSessionTestFile(t, root, "sandbox/agent/logs/copilot-session-state/session/events.jsonl",
+		`{"type":"session.start","data":{"sessionId":"main-only","selectedModel":"opus"}}`+"\n"+
+			`{"type":"assistant.message","data":{"content":"No delegation"}}`+"\n"+
+			`{"type":"session.shutdown","data":{"agentMetrics":{"main":{"modelMetrics":{"opus":{"requests":{"count":41}}}}}}}`+"\n")
+	session, err := runSessionParser(context.Background(), "reconstruct", root, "copilot")
+	require.NoError(t, err)
+	require.NoError(t, validateSessionJSONL(session))
+	published := t.TempDir()
+	writeSessionTestFile(t, published, "usage/aw_session.jsonl", string(session))
+	writeSessionTestFile(t, published, "usage/agent_usage.json", `{"primary_model":"opus","input_tokens":1000}`)
+	writeSessionTestFile(t, published, "agent-stdio.log", "● Fake(wrong-model) Quoted dispatch\n[INFO] container(s)\n")
+	summary, err := analyzeTokenUsage(published, false)
+	require.NoError(t, err)
+	require.NotNil(t, summary)
+	require.Empty(t, summary.SubagentModelRequests)
+	require.Empty(t, summary.SubagentModelActuals)
+	require.Empty(t, summary.Warnings)
+	require.Zero(t, summary.MismatchCount)
+}
+
+func TestSessionParserCopilotLegacySubagentFallback(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	for _, dispatch := range []string{"Research(opus)", "Research (model: opus)"} {
+		t.Run(dispatch, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writeSessionTestFile(t, root, "agent-stdio.log",
+				"[INFO] container(s)\nclass RoutingProfile(StrictModel)\nlen(d)\n● "+dispatch+" Research routing\n")
+			writeSessionTestFile(t, root, "agent_usage.json", `{"primary_model":"opus","input_tokens":1000}`)
+			require.NoError(t, parseAgentLog(root, workflow.NewCopilotEngine(), false))
+			markdown, err := os.ReadFile(filepath.Join(root, "log.md"))
+			require.NoError(t, err)
+			require.Contains(t, string(markdown), "Research")
+			summary, err := analyzeTokenUsage(root, false)
+			require.NoError(t, err)
+			require.NotNil(t, summary)
+			require.Equal(t, []SubagentModelRequest{
+				{AgentName: "Research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
+			}, summary.SubagentModelRequests)
+			require.Contains(t, summary.Warnings, subagentStdioWarning)
+			require.Zero(t, summary.MismatchCount)
+		})
+	}
+}
+
+const copilotSubagentIntegrationMetrics = `{
+	"main":{"totalNanoAiu":389122000000,"modelMetrics":{"opus":{"requests":{"count":41},"usage":{"inputTokens":4100,"outputTokens":410,"cacheReadTokens":41,"cacheWriteTokens":82}}}},
+	"research":{"agentName":"research","agentDisplayName":"subagent-research","totalNanoAiu":494207000000,"modelMetrics":{"opus":{"requests":{"count":45},"usage":{"inputTokens":4500,"outputTokens":450,"cacheReadTokens":45,"cacheWriteTokens":90}}}},
+	"ghaw":{"agentName":"explore","agentDisplayName":"ghaw-issues","totalNanoAiu":9141000000,"modelMetrics":{"opus":{"requests":{"count":3},"usage":{"inputTokens":300,"outputTokens":30,"cacheReadTokens":3,"cacheWriteTokens":6}}}},
+	"awf":{"agentName":"explore","agentDisplayName":"awf-routing","totalNanoAiu":40977000000,"modelMetrics":{"opus":{"requests":{"count":12},"usage":{"inputTokens":1200,"outputTokens":120,"cacheReadTokens":12,"cacheWriteTokens":24}}}}
+}`
+
+func copilotSubagentIntegrationEvents(t *testing.T) string {
+	t.Helper()
+	shutdown, err := json.Marshal(map[string]any{
+		"type": "session.shutdown",
+		"data": map[string]json.RawMessage{"agentMetrics": json.RawMessage(copilotSubagentIntegrationMetrics)},
+	})
+	require.NoError(t, err)
+	return copilotSubagentIntegrationLifecycle + string(shutdown) + "\n"
+}
+
+const copilotSubagentIntegrationLifecycle = `{"type":"session.start","data":{"sessionId":"root","selectedModel":"opus","reasoningEffort":"xhigh"}}
+{"type":"subagent.started","agentId":"research","data":{"toolCallId":"call-research","agentName":"research","agentDisplayName":"subagent-research","agentType":"built-in","model":"opus","modelSelectionSource":"agent_definition_default","executionMode":"background","agentDescription":"PRIVATE_DESCRIPTION"}}
+{"type":"subagent.configured","agentId":"research","data":{"model":"opus","reasoningEffort":"xhigh"}}
+{"type":"subagent.started","agentId":"ghaw","data":{"toolCallId":"call-ghaw","agentName":"explore","agentDisplayName":"ghaw-issues","parentId":"research","model":"opus","executionMode":"sync"}}
+{"type":"subagent.configured","agentId":"ghaw","data":{"model":"opus","reasoningEffort":"low"}}
+{"type":"subagent.started","agentId":"awf","data":{"toolCallId":"call-awf","agentName":"explore","agentDisplayName":"awf-routing","parentId":"research","model":"opus","executionMode":"sync"}}
+{"type":"subagent.configured","agentId":"awf","data":{"model":"opus","reasoningEffort":"low"}}
+{"type":"assistant.message","agentId":"awf","data":{"content":"Subagent findings","model":"opus","apiCallId":"api-awf","interactionId":"interaction-awf","turnId":"turn-awf","parentToolCallId":"call-awf"}}
+{"type":"subagent.completed","agentId":"awf","data":{"model":"opus","firstDispatchedModel":"opus","totalTokens":1320,"totalToolCalls":1,"durationMs":100}}
+`
+
 func TestSessionParserRejectsUnrecognizedAgent(t *testing.T) {
 	t.Parallel()
 	requireSessionTestNode(t)
