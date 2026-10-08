@@ -93,6 +93,21 @@ describe("Pi managed delegation", () => {
     await expect(runPiSubagent(agent, "Read.", { cwd: dir }, undefined, launcher({ stopReason: "error", errorMessage: "Model unavailable" }))).rejects.toThrow("Model unavailable");
   });
 
+  it("inherits workflow controls without making the child finalize the workflow", async () => {
+    const systemPath = path.join(dir, "workflow-system.txt");
+    fs.writeFileSync(systemPath, "Workflow instructions and tool restrictions.");
+    vi.stubEnv("GH_AW_PI_SYSTEM_PROMPT", systemPath);
+    const launch = launcher();
+    await runPiSubagent(agent, "Read.", { cwd: dir }, undefined, (...args) => {
+      const prompt = fs.readFileSync(args[1].at(-1), "utf8");
+      expect(prompt).toContain("Workflow instructions and tool restrictions.\n\nRead only.");
+      expect(prompt).toContain("The parent is responsible for finalizing the workflow");
+      expect(prompt).toContain("Do not emit noop safe outputs");
+      expect(prompt).toContain("Safe-output actions required to perform the delegated task remain permitted");
+      return launch(...args);
+    });
+  });
+
   it("propagates nonzero child exits", async () => {
     await expect(runPiSubagent(agent, "Read.", { cwd: dir }, undefined, launcher({}, 1))).rejects.toThrow();
   });

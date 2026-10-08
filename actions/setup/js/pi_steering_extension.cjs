@@ -60,8 +60,8 @@ function piSteeringExtension(pi) {
     process.stderr.write(`[gh-aw/steering] Session started. timeout=${config.timeoutMinutes}min, warn<${config.timeWarningMinutes}min, critical<${config.timeCriticalMinutes}min\n`);
   });
 
-  pi.on("turn_end", async (/** @type {any} */ _event, /** @type {any} */ ctx) => {
-    if (startTime === undefined) {
+  pi.on("turn_end", async (/** @type {any} */ event, /** @type {any} */ ctx) => {
+    if (startTime === undefined || event.message?.stopReason === "stop") {
       return;
     }
 

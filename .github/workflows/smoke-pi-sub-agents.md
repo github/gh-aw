@@ -62,30 +62,33 @@ Provider-qualified model IDs pin the exact models rather than resolving aliases.
 description: Returns the Haiku model identity for smoke testing
 model: copilot/claude-haiku-4.5
 ---
-When asked `who am i?`, reply with exactly:
+When asked `who am i?`, reply with this single plain-text line, without Markdown
+or backticks:
 
-`claude-haiku-4.5`
+claude-haiku-4.5
 
-No extra words, punctuation, or formatting.
+Do not call tools. No extra words, punctuation, or formatting.
 
 ## agent: `mini-whoami`
 ---
 description: Returns the GPT-5 mini model identity for smoke testing
 model: copilot/gpt-5-mini
 ---
-When asked `who am i?`, reply with exactly:
+When asked `who am i?`, reply with this single plain-text line, without Markdown
+or backticks:
 
-`gpt-5-mini`
+gpt-5-mini
 
-No extra words, punctuation, or formatting.
+Do not call tools. No extra words, punctuation, or formatting.
 
 ## agent: `compact-whoami`
 ---
 description: Returns the GPT-4o mini model identity for smoke testing
 model: copilot/gpt-4o-mini
 ---
-When asked `who am i?`, reply with exactly:
+When asked `who am i?`, reply with this single plain-text line, without Markdown
+or backticks:
 
-`gpt-4o-mini`
+gpt-4o-mini
 
-No extra words, punctuation, or formatting.
+Do not call tools. No extra words, punctuation, or formatting.

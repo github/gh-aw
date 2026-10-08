@@ -69,4 +69,15 @@ describe("Pi timeout steering", () => {
     expect(sendUserMessage).toHaveBeenCalledOnce();
     expect(sendUserMessage).toHaveBeenCalledWith(expect.stringContaining("CRITICAL"), { deliverAs: "steer" });
   });
+
+  it("does not reopen a completed answer, but still steers subsequent tool turns", async () => {
+    const { handlers, sendUserMessage } = harness();
+    await handlers.agent_start();
+    vi.advanceTimersByTime(9 * 60_000);
+    await handlers.turn_end({ message: { role: "assistant", stopReason: "stop" } }, {});
+    expect(sendUserMessage).not.toHaveBeenCalled();
+    await handlers.turn_end({ message: { role: "assistant", stopReason: "toolUse" } }, {});
+    expect(sendUserMessage).toHaveBeenCalledOnce();
+    expect(sendUserMessage).toHaveBeenCalledWith(expect.stringContaining("CRITICAL"), { deliverAs: "steer" });
+  });
 });
