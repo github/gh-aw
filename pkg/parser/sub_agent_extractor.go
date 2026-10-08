@@ -141,11 +141,11 @@ func validateSubAgentFrontmatterSyntax(agent InlineSubAgent) []string {
 // GetEngineSubAgentExt returns the file extension used for inline sub-agent files
 // for a given engine.
 //
-//	claude / codex / gemini → .md
+//	claude / codex / gemini / pi → .md
 //	others                  → .agent.md  (Copilot default)
 func GetEngineSubAgentExt(engineID string) string {
 	switch strings.ToLower(engineID) {
-	case "claude", "codex", "gemini":
+	case "claude", "codex", "gemini", "pi":
 		return ".md"
 	default:
 		return ".agent.md"

@@ -2,7 +2,8 @@
 private: true
 emoji: "📊"
 description: Daily observability report analyzing logging and telemetry coverage for AWF firewall and MCP Gateway across workflow runs
-on: daily
+on:
+  workflow_dispatch:
 permissions:
   contents: read
   actions: read
@@ -15,11 +16,16 @@ engine:
 strict: true
 tracker-id: daily-observability-report
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   agentic-workflows: true
 timeout-minutes: 45
 # Default AI credit budget for this workflow.
 max-ai-credits: 1500
 imports:
+  - shared/daily-report-worker.md
   - uses: shared/meta-analysis-base.md
     with:
       toolsets: [default, discussions, actions]

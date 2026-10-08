@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -15,6 +15,8 @@ import {
 } from "./intent_probe.cjs";
 
 const LARGE_CONTENT_BODY = "A".repeat(70000);
+const testScratchRoot = path.resolve(`.safe-outputs-handlers-${crypto.randomUUID()}`);
+const originalGitCeiling = process.env.GIT_CEILING_DIRECTORIES;
 
 // Mock the global objects that GitHub Actions provides
 const mockCore = {
@@ -47,6 +49,10 @@ describe("safe_outputs_handlers", () => {
   let handlers;
   let testWorkspaceDir;
 
+  afterAll(() => {
+    fs.rmSync(testScratchRoot, { recursive: true, force: true });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -58,8 +64,9 @@ describe("safe_outputs_handlers", () => {
 
     // Create temporary workspace directory
     const testId = Math.random().toString(36).substring(7);
-    testWorkspaceDir = `/tmp/test-handlers-workspace-${testId}`;
+    testWorkspaceDir = path.join(testScratchRoot, `test-handlers-workspace-${testId}`);
     fs.mkdirSync(testWorkspaceDir, { recursive: true });
+    process.env.GIT_CEILING_DIRECTORIES = fs.realpathSync(testScratchRoot);
 
     // Set environment variables
     process.env.GITHUB_WORKSPACE = testWorkspaceDir;
@@ -138,6 +145,8 @@ describe("safe_outputs_handlers", () => {
 
     // Clear environment variables
     delete process.env.GITHUB_WORKSPACE;
+    if (originalGitCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+    else process.env.GIT_CEILING_DIRECTORIES = originalGitCeiling;
     delete process.env.GITHUB_SERVER_URL;
     delete process.env.GITHUB_REPOSITORY;
     delete process.env.GH_AW_WORKFLOW_ID;
@@ -334,7 +343,7 @@ describe("safe_outputs_handlers", () => {
 
     beforeEach(() => {
       const testId = Math.random().toString(36).substring(7);
-      testRunnerTemp = `/tmp/test-runner-temp-${testId}`;
+      testRunnerTemp = path.join(testScratchRoot, `test-runner-temp-${testId}`);
       process.env.RUNNER_TEMP = testRunnerTemp;
     });
 
@@ -457,9 +466,17 @@ describe("safe_outputs_handlers", () => {
     it("should allow files in /tmp directory", () => {
       process.env.GH_AW_ASSETS_BRANCH = "test-branch";
 
-      // Create test file in /tmp
       const testFile = `/tmp/test-upload-${Date.now()}.png`;
-      fs.writeFileSync(testFile, "test content");
+      const localFile = path.join(testWorkspaceDir, "test-upload.png");
+      fs.writeFileSync(localFile, "test content");
+      const originalExistsSync = fs.existsSync;
+      const originalStatSync = fs.statSync;
+      const originalReadFileSync = fs.readFileSync;
+      const originalCopyFileSync = fs.copyFileSync;
+      const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(filePath => filePath === testFile || originalExistsSync(filePath));
+      const statSpy = vi.spyOn(fs, "statSync").mockImplementation((filePath, options) => originalStatSync(filePath === testFile ? localFile : filePath, options));
+      const readSpy = vi.spyOn(fs, "readFileSync").mockImplementation((filePath, options) => originalReadFileSync(filePath === testFile ? localFile : filePath, options));
+      const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation((source, destination, flags) => originalCopyFileSync(source === testFile ? localFile : source, destination, flags));
 
       try {
         const args = { path: testFile };
@@ -468,10 +485,10 @@ describe("safe_outputs_handlers", () => {
         expect(mockAppendSafeOutput).toHaveBeenCalled();
         expect(result.content[0].type).toBe("text");
       } finally {
-        // Clean up
-        if (fs.existsSync(testFile)) {
-          fs.unlinkSync(testFile);
-        }
+        existsSpy.mockRestore();
+        statSpy.mockRestore();
+        readSpy.mockRestore();
+        copySpy.mockRestore();
       }
     });
 
@@ -556,7 +573,7 @@ describe("safe_outputs_handlers", () => {
 
     beforeEach(() => {
       const testId = Math.random().toString(36).substring(7);
-      testStagingDir = `/tmp/test-staging-${testId}`;
+      testStagingDir = path.join(testScratchRoot, `test-staging-${testId}`);
       process.env.RUNNER_TEMP = testStagingDir;
     });
 
@@ -602,7 +619,7 @@ describe("safe_outputs_handlers", () => {
     });
 
     it("should throw when absolute-path file does not exist", () => {
-      expect(() => handlers.uploadArtifactHandler({ path: "/tmp/nonexistent-file.png" })).toThrow(expect.objectContaining({ message: expect.stringContaining("file not found") }));
+      expect(() => handlers.uploadArtifactHandler({ path: path.join(testWorkspaceDir, "nonexistent-file.png") })).toThrow(expect.objectContaining({ message: expect.stringContaining("file not found") }));
     });
 
     it("should throw when path is a symlink", () => {
@@ -747,7 +764,7 @@ describe("safe_outputs_handlers", () => {
     });
 
     it("should reject absolute path outside GITHUB_WORKSPACE and staging directory", () => {
-      const outsideDir = "/tmp/gh-aw-outside-handler-" + Math.random().toString(36).substring(7);
+      const outsideDir = path.join(testScratchRoot, "gh-aw-outside-handler-" + Math.random().toString(36).substring(7));
       try {
         fs.mkdirSync(outsideDir, { recursive: true });
         const outsideFile = path.join(outsideDir, "secret.json");
@@ -788,7 +805,9 @@ describe("safe_outputs_handlers", () => {
       })();
       if (!stat || stat.isSymbolicLink()) return;
 
-      expect(() => handlers.uploadArtifactHandler({ path: "/etc/hosts" })).toThrow(expect.objectContaining({ message: expect.stringContaining("system directory") }));
+      const canonicalPath = fs.realpathSync("/etc/hosts");
+      const rejectionReason = canonicalPath.startsWith("/etc/") ? "system directory" : "outside allowed source roots";
+      expect(() => handlers.uploadArtifactHandler({ path: "/etc/hosts" })).toThrow(expect.objectContaining({ code: -32602, message: expect.stringContaining(rejectionReason) }));
     });
 
     it("should set restrictive permissions (0o600) on staged files", () => {
@@ -809,7 +828,7 @@ describe("safe_outputs_handlers", () => {
 
     beforeEach(() => {
       const testId = Math.random().toString(36).substring(7);
-      testStagingDir = `/tmp/test-staging-${testId}`;
+      testStagingDir = path.join(testScratchRoot, `test-staging-${testId}`);
       process.env.RUNNER_TEMP = testStagingDir;
     });
 
@@ -843,7 +862,7 @@ describe("safe_outputs_handlers", () => {
     });
 
     it("should throw when absolute-path file does not exist", () => {
-      expect(() => handlers.uploadCodeCoverageHandler({ file: "/tmp/nonexistent-cobertura.xml", language: "Go", label: "l" })).toThrow(expect.objectContaining({ message: expect.stringContaining("file not found") }));
+      expect(() => handlers.uploadCodeCoverageHandler({ file: path.join(testWorkspaceDir, "nonexistent-cobertura.xml"), language: "Go", label: "l" })).toThrow(expect.objectContaining({ message: expect.stringContaining("file not found") }));
     });
 
     it("should throw when path is a symlink", () => {
@@ -906,7 +925,7 @@ describe("safe_outputs_handlers", () => {
     });
 
     it("should reject absolute path outside GITHUB_WORKSPACE and staging directory", () => {
-      const outsideDir = "/tmp/gh-aw-outside-coverage-" + Math.random().toString(36).substring(7);
+      const outsideDir = path.join(testScratchRoot, "gh-aw-outside-coverage-" + Math.random().toString(36).substring(7));
       try {
         fs.mkdirSync(outsideDir, { recursive: true });
         const outsideFile = path.join(outsideDir, "secret.xml");
@@ -3250,7 +3269,7 @@ describe("safe_outputs_handlers", () => {
 
     beforeEach(() => {
       const testId = Math.random().toString(36).substring(7);
-      memoryDir = `/tmp/test-repo-memory-${testId}`;
+      memoryDir = path.join(testScratchRoot, `test-repo-memory-${testId}`);
     });
 
     afterEach(() => {
@@ -3401,7 +3420,7 @@ describe("safe_outputs_handlers", () => {
       }
     });
 
-    it("should format and custom-validate only eligible JSON files", () => {
+    it.each(["canonical", "aliased"])("should format and custom-validate only eligible JSON files (%s temporary root)", temporaryRoot => {
       const legacyJson = JSON.stringify(Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`k${index}`, "x"])));
       const maxFileSize = Buffer.byteLength(legacyJson, "utf8") + 1;
       expect(Buffer.byteLength(`${JSON.stringify(JSON.parse(legacyJson), null, 2)}\n`, "utf8")).toBeGreaterThan(maxFileSize);
@@ -3415,7 +3434,7 @@ describe("safe_outputs_handlers", () => {
           script: `
             const jsonFiles = fs.readdirSync(memoryRoot).filter(file => file.endsWith(".json"));
             if (jsonFiles.length !== 1 || jsonFiles[0] !== "state.json") throw new Error("unexpected JSON files in validation view");
-            if (memoryRoot !== process.cwd()) throw new Error("validation working directory does not match memory root");
+            if (fs.realpathSync(memoryRoot) !== process.cwd()) throw new Error("validation working directory does not match memory root");
             JSON.parse(fs.readFileSync("state.json", "utf8"));
           `,
           timeout: 5,
@@ -3427,16 +3446,28 @@ describe("safe_outputs_handlers", () => {
       fs.writeFileSync(path.join(memoryDir, "legacy.json"), legacyJson);
       fs.writeFileSync(path.join(memoryDir, "malformed.json"), malformedJson);
 
-      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
-      const data = JSON.parse(result.content[0].text);
+      const validationTemp = path.join(testWorkspaceDir, "validation-tmp");
+      fs.mkdirSync(validationTemp);
+      const canonicalTemp = fs.realpathSync(validationTemp);
+      const aliasTemp = path.join(testWorkspaceDir, "validation-tmp-alias");
+      if (temporaryRoot === "aliased") fs.symlinkSync(canonicalTemp, aliasTemp, "junction");
+      const previousTemp = process.env.TMPDIR;
+      process.env.TMPDIR = temporaryRoot === "aliased" ? aliasTemp : canonicalTemp;
+      try {
+        const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+        const data = JSON.parse(result.content[0].text);
 
-      expect(result.isError).toBeUndefined();
-      expect(data.result).toBe("success");
-      expect(data.storage_validation.files).toBe(1);
-      expect(data.custom_validation.result).toBe("success");
-      expect(fs.readFileSync(path.join(memoryDir, "state.json"), "utf8")).toBe('{\n  "ok": true\n}\n');
-      expect(fs.readFileSync(path.join(memoryDir, "legacy.json"), "utf8")).toBe(legacyJson);
-      expect(fs.readFileSync(path.join(memoryDir, "malformed.json"), "utf8")).toBe(malformedJson);
+        expect(result.isError, data.custom_validation?.stderr || data.error).toBeUndefined();
+        expect(data.result).toBe("success");
+        expect(data.storage_validation.files).toBe(1);
+        expect(data.custom_validation.result).toBe("success");
+        expect(fs.readFileSync(path.join(memoryDir, "state.json"), "utf8")).toBe('{\n  "ok": true\n}\n');
+        expect(fs.readFileSync(path.join(memoryDir, "legacy.json"), "utf8")).toBe(legacyJson);
+        expect(fs.readFileSync(path.join(memoryDir, "malformed.json"), "utf8")).toBe(malformedJson);
+      } finally {
+        if (previousTemp === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = previousTemp;
+      }
     });
 
     it("should keep custom validation read-only when using the filtered view", () => {
@@ -4220,6 +4251,34 @@ describe("safe_outputs_handlers", () => {
   });
 
   describe("updateIssueHandler", () => {
+    it.each([undefined, null, {}, { issue_number: 42 }, { operation: "append" }, { secrecy: "public", integrity: "high" }, { status: "" }, { labels: " " }, { milestone: " \t\n" }])(
+      "should reject calls without update fields before recording an output: %j",
+      args => {
+        const wildcardHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
+          "update-issue": { target: "*" },
+        });
+        expect(() => wildcardHandlers.updateIssueHandler(args)).toThrow(
+          expect.objectContaining({
+            code: -32602,
+            message: expect.stringContaining("update_issue requires at least one of"),
+          })
+        );
+        expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([{ status: "open" }, { title: "Updated title" }, { body: "Updated body" }, { body: "" }, { labels: [] }, { assignees: [] }, { milestone: 1 }, { milestone: null }])(
+      "should accept each update field independently, including explicit clears: %j",
+      update => {
+        const wildcardHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
+          "update-issue": { target: "*" },
+        });
+        const result = wildcardHandlers.updateIssueHandler({ issue_number: 42, ...update });
+        expect(result.isError).toBeUndefined();
+        expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "update_issue", issue_number: 42, ...update });
+      }
+    );
+
     it("should return intent error when target is triggering (default) and not in issue context", () => {
       // global.context has eventName: "push" (not an issue context)
       const result = handlers.updateIssueHandler({ body: "Updated body" });

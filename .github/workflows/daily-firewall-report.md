@@ -5,9 +5,6 @@ description: Collects and reports on firewall log events to monitor network secu
 features:
   gh-aw-detection: true
 on:
-  schedule:
-    # Every day at 10am UTC
-    - cron: daily
   workflow_dispatch:
 
 max-daily-ai-credits: 10000
@@ -32,6 +29,10 @@ safe-outputs:
     close-older-discussions: true
     expires: 14
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   cli-proxy: true
   agentic-workflows:
   github:
@@ -42,6 +43,7 @@ tools:
     - "*"
   edit:
 imports:
+  - shared/daily-report-worker.md
   - shared/aw-logs-24h-fetch.md
   - shared/otlp.md
 evals:

@@ -363,7 +363,7 @@ func (e *PiEngine) buildPiArgs(workflowData *WorkflowData) []string {
 		piArgs = append(piArgs, "--no-session")
 	}
 	piArgs = append(piArgs, "--no-approve")
-	if hasBashFullyDisabled(workflowData.Tools) {
+	if workflowData.BashDisabled || hasBashFullyDisabled(workflowData.Tools) {
 		piArgs = append(piArgs, "--exclude-tools", "bash")
 	}
 	if workflowData.Tools["edit"] == false {
@@ -439,7 +439,7 @@ func (e *PiEngine) buildPiCommand(workflowData *WorkflowData, commandName string
 			modelArg = ` --model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`
 		}
 		piCommand = fmt.Sprintf(
-			`cat /tmp/gh-aw/aw-prompts/user.txt | %s%s %s%s --append-system-prompt /tmp/gh-aw/aw-prompts/system.txt --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_tool_policy.cjs" --extension builtin:mcp --extension builtin:codemode --extension builtin:tool-search 2>&1 | tee %s`,
+			`cat /tmp/gh-aw/aw-prompts/user.txt | %s%s %s%s --append-system-prompt /tmp/gh-aw/aw-prompts/system.txt --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_tool_policy.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_subagent_extension.cjs" --extension builtin:mcp --extension builtin:codemode --extension builtin:tool-search 2>&1 | tee %s`,
 			routingEnv, commandName, shellJoinArgs(piArgs), modelArg, PiStreamingLogFile)
 	}
 	if !driverConfigured && piSessionSettings(workflowData).Export {

@@ -214,7 +214,7 @@ Run the worker.
 	} {
 		queueClaimInput := ""
 		if name == "worker" {
-			queueClaimInput = `      work_queue_claim:
+			queueClaimInput = `      work_queue_assignment:
         type: string
 `
 		}

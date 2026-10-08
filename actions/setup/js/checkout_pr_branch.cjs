@@ -297,7 +297,9 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
     (context.payload.action === "opened" || context.payload.action === "synchronize") &&
     senderType === "Bot" &&
     context.payload.sender?.login === actor &&
-    Number.isSafeInteger(context.payload.repository?.id) &&
+    context.payload.repository !== undefined &&
+    context.payload.repository !== null &&
+    Number.isSafeInteger(context.payload.repository.id) &&
     context.payload.repository.id > 0 &&
     pullRequest?.head?.repo?.id === context.payload.repository.id &&
     pullRequest?.base?.repo?.id === context.payload.repository.id

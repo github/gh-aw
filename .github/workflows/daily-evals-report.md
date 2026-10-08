@@ -3,7 +3,6 @@ private: true
 emoji: "🧪"
 description: Daily data science report analyzing evals feature adoption, per-question pass rates, and quality trends across agentic workflows
 on:
-  schedule: daily around 8:00
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,10 +22,15 @@ features:
   gh-aw-detection: true
 timeout-minutes: 45
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   github:
     mode: local
 
 imports:
+  - shared/daily-report-worker.md
   - uses: shared/meta-analysis-base.md
     with:
       toolsets: [default, actions]
@@ -38,12 +42,6 @@ safe-outputs:
   mentions: false
   allowed-github-references: []
   max-bot-mentions: 1
-  create-issue:
-    title-prefix: "[evals] "
-    labels: [evals, automated-analysis]
-    close-older-issues: true
-    expires: 7d
-    max: 1
 evals:
   - id: evals_data_analyzed
     question: Did the agent analyze evals feature adoption and per-question pass rates across agentic workflows?
@@ -64,7 +62,7 @@ artifacts per run and persisted to dedicated `evals/<workflow-id>` git branches.
 
 Analyze the last 7 days of workflow runs that use the `evals` feature. Compute per-question
 YES/NO pass rates, identify workflows with failing evals, and produce a data science summary.
-When the evals feature is degraded or broken, produce an actionable issue to guide investigation.
+When the evals feature is degraded or broken, include actionable investigation steps in the discussion.
 
 ## Context
 
@@ -152,9 +150,9 @@ For each unique workflow:
 
 ## Phase 6: Generate Output
 
-### HEALTHY or DEGRADED — Create Issue with Data Science Summary
+### HEALTHY or DEGRADED — Create Discussion with Data Science Summary
 
-Create one GitHub issue.
+Create one GitHub discussion for the assigned completed UTC report date.
 
 **Title**: `[evals] Daily Evals Feature Report - YYYY-MM-DD` (date in UTC, ISO 8601 format, e.g. `2026-07-15`)
 
@@ -211,9 +209,9 @@ For each workflow, show a table:
 [Up to 3 run URLs as `[§<run-id>](<url>)` links]
 ```
 
-### BROKEN — Create Actionable Issue
+### BROKEN — Create Actionable Discussion
 
-When the evals feature is BROKEN (job success rate < 50% or zero results), the issue body
+When the evals feature is BROKEN (job success rate < 50% or zero results), the discussion body
 must include actionable investigation steps instead of the data science summary.
 
 > [!CAUTION]
@@ -241,15 +239,15 @@ noop("No evals-enabled workflow runs found in the last 7 days. The evals feature
 
 If workflows declared evals but zero results were produced:
 ```
-noop("Evals declared in N workflows but no evals.jsonl artifacts found. Use [evals-alert] issue.")
+noop("Evals declared in N workflows but no evals.jsonl artifacts found.")
 ```
-(Skip the noop and create the BROKEN issue instead in this case.)
+(Skip the noop and create the BROKEN discussion instead in this case.)
 
 ## Token Budget Guidelines
 
 - **One broad `logs` call** — do not enumerate workflows individually before calling logs.
 - **Cap at 40 runs** — stop analyzing once the cap is reached.
 - **Summarize, do not transcribe** — report statistics, not raw JSONL content.
-- **Stop after `create_issue` or `noop`** — no extra tool calls after publishing.
+- **Finish the original Claim after `create_discussion` or `noop`** — completed for a staged discussion, cancelled for a no-data report.
 
 Begin your analysis now. Download the logs, analyze evals results, and publish the report.

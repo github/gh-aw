@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
+import { normalizeSafeOutputToolArguments } from "./safe_outputs_mcp_arguments.cjs";
+import { normalizeClaimScope } from "./work_queue_claim_scope.cjs";
 
 const scriptPath = path.join(__dirname, "generate_safe_outputs_tools.cjs");
 
@@ -96,6 +98,74 @@ describe("generate_safe_outputs_tools", () => {
     expect(result.map((/** @type {{name: string}} */ t) => t.name)).toEqual(expect.arrayContaining(["create_issue", "add_comment"]));
     // missing_tool should NOT be included since it's not in config
     expect(result.map((/** @type {{name: string}} */ t) => t.name)).not.toContain("missing_tool");
+  });
+
+  it("preserves invalid explicit Claim selectors through argument normalization", () => {
+    fs.writeFileSync(configPath, JSON.stringify({ create_issue: { max: 1 } }));
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        work_queue_scoped: true,
+        dynamic_tools: [{ name: "custom_job", inputSchema: { type: "object", properties: { count: { type: "integer" } } } }],
+      })
+    );
+    runScript();
+    const tools = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    const assignment = count => ({
+      version: 3,
+      dispatch_id: "dispatch",
+      request_id: "request",
+      commit_id: "commit",
+      policy_epoch: "policy",
+      pool: "pool",
+      worker_profile: "worker",
+      claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })),
+    });
+    expect(tools.map(tool => tool.name)).toEqual(["create_issue", "custom_job"]);
+    for (const tool of tools) {
+      for (const claim_handle of ["", " ", "\t", null]) {
+        const normalized = normalizeSafeOutputToolArguments(tool.name, { claim_handle }, undefined, tool.inputSchema);
+        expect(normalized).toHaveProperty("claim_handle", claim_handle);
+        for (const count of [1, 2]) {
+          expect(() => normalizeClaimScope(normalized, assignment(count))).toThrow();
+        }
+      }
+      const selected = normalizeSafeOutputToolArguments(tool.name, { claim_handle: "h1" }, undefined, tool.inputSchema);
+      for (const count of [1, 2]) {
+        expect(normalizeClaimScope(selected, assignment(count)).claim_handle).toBe("h1");
+      }
+      const omitted = normalizeSafeOutputToolArguments(tool.name, {}, undefined, tool.inputSchema);
+      expect(normalizeClaimScope(omitted, assignment(1)).claim_handle).toBe("h1");
+      expect(() => normalizeClaimScope(omitted, assignment(2))).toThrow(/original multi-Claim/);
+    }
+    const custom = tools.find(tool => tool.name === "custom_job");
+    expect(normalizeSafeOutputToolArguments(custom.name, { count: "", claim_handle: "h1" }, undefined, custom.inputSchema)).toEqual({ claim_handle: "h1" });
+  });
+
+  it("does not inject Claim selectors into ordinary workflow tools", () => {
+    fs.writeFileSync(configPath, JSON.stringify({ create_issue: { max: 1 } }));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ work_queue_scoped: false }));
+    runScript();
+    const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(tool.inputSchema).toEqual(sampleSourceTools[0].inputSchema);
+  });
+
+  it("generates an Anthropic-compatible update_issue schema with update-field guidance", () => {
+    fs.copyFileSync(path.join(__dirname, "safe_outputs_tools.json"), toolsSourcePath);
+    fs.writeFileSync(configPath, JSON.stringify({ update_issue: { target: "*" } }));
+
+    runScript();
+
+    const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(tool.name).toBe("update_issue");
+    expect(tool.inputSchema.type).toBe("object");
+    expect(tool.inputSchema.additionalProperties).toBe(false);
+    for (const keyword of ["anyOf", "oneOf", "allOf"]) {
+      expect(tool.inputSchema).not.toHaveProperty(keyword);
+    }
+    expect(tool.description).toContain("REQUIRED: Provide at least one of: status, title, body, labels, assignees, or milestone.");
+    expect(tool.inputSchema.properties.milestone.type).toEqual(["number", "string", "null"]);
+    expect(tool.inputSchema.properties.milestone.description).toContain("Use null to clear.");
   });
 
   it("mounts dedicated built-in ledger tools without exposing the low-level append tool", () => {

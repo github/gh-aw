@@ -15,10 +15,13 @@ var safeScriptsLog = logger.New("workflow:safe_scripts")
 // Scripts run within the consolidated safe-outputs job as part of the handler manager,
 // unlike SafeJobConfig which creates a separate GitHub Actions job.
 type SafeScriptConfig struct {
-	Name        string                      `yaml:"name,omitempty"`
-	Description string                      `yaml:"description,omitempty"`
-	Inputs      map[string]*InputDefinition `yaml:"inputs,omitempty"`
-	Script      string                      `yaml:"script,omitempty"` // Inline JavaScript handler (must export a main factory function)
+	Name             string                      `yaml:"name,omitempty"`
+	Description      string                      `yaml:"description,omitempty"`
+	Inputs           map[string]*InputDefinition `yaml:"inputs,omitempty"`
+	Script           string                      `yaml:"script,omitempty"` // Inline JavaScript handler (must export a main factory function)
+	MemorySchema     map[string]any              `yaml:"-"`
+	MemoryDefinition string                      `yaml:"-"`
+	Max              int                         `yaml:"-"`
 }
 
 // parseSafeScriptsConfig parses safe-scripts configuration from a scripts map.
@@ -134,5 +137,13 @@ func generateCustomScriptToolDefinition(scriptName string, scriptConfig *SafeScr
 		Description: scriptConfig.Description,
 		Inputs:      scriptConfig.Inputs,
 	}
-	return generateCustomJobToolDefinition(scriptName, jobConfig)
+	tool := generateCustomJobToolDefinition(scriptName, jobConfig)
+	if scriptConfig.MemorySchema != nil {
+		tool["inputSchema"] = map[string]any{
+			"type": "object", "additionalProperties": false,
+			"properties": map[string]any{"memory": scriptConfig.MemorySchema},
+			"required":   []string{"memory"},
+		}
+	}
+	return tool
 }

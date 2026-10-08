@@ -1,10 +1,66 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const { default: policyExtension, isPiBashAllowed } = await import("./pi_tool_policy.cjs");
 
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Pi tool policy", () => {
+  it("blocks and aborts if the shared budget cannot be enforced", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-tool-budget-failure-"));
+    const root = path.join(dir, "not-a-directory");
+    fs.writeFileSync(root, "Fixture");
+    vi.stubEnv("GH_AW_PI_TOOL_BUDGET_DIR", root);
+    vi.stubEnv("GH_AW_MAX_TOOL_CALLS", "1");
+    const handlers = {};
+    policyExtension({ on: (name, handler) => (handlers[name] = handler) });
+    const ctx = { abort: vi.fn() };
+    const previousExitCode = process.exitCode;
+    try {
+      expect(handlers.tool_call({ toolName: "read" }, ctx)).toMatchObject({ block: true, reason: expect.stringContaining("Cannot enforce") });
+      expect(ctx.abort).toHaveBeenCalledOnce();
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = previousExitCode;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it("reserves finite budget slots atomically across concurrent processes", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-tool-budget-processes-"));
+    const script = `const { reservePiBudget } = require(${JSON.stringify(path.join(process.cwd(), "pi_tool_policy.cjs"))}); console.log(reservePiBudget("calls", 0, 3));`;
+    try {
+      const results = await Promise.all(Array.from({ length: 6 }, () => promisify(execFile)(process.execPath, ["-e", script], { env: { ...process.env, GH_AW_PI_TOOL_BUDGET_DIR: dir } })));
+      const reserved = results
+        .map(result => Number(result.stdout))
+        .filter(slot => slot <= 3)
+        .sort();
+      expect(reserved).toEqual([1, 2, 3]);
+      expect(results.filter(result => Number(result.stdout) === 4)).toHaveLength(3);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it("shares tool-call budget reservations between parent and child policies", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-tool-budget-"));
+    vi.stubEnv("GH_AW_PI_TOOL_BUDGET_DIR", dir);
+    vi.stubEnv("GH_AW_MAX_TOOL_CALLS", "2");
+    const parent = {};
+    const child = {};
+    policyExtension({ on: (name, handler) => (parent[name] = handler) });
+    policyExtension({ on: (name, handler) => (child[name] = handler) });
+    try {
+      expect(parent.tool_call({ toolName: "subagent" }, {})).toBeUndefined();
+      expect(child.tool_call({ toolName: "read" }, {})).toBeUndefined();
+      expect(parent.tool_call({ toolName: "read" }, {})).toMatchObject({ block: true });
+      expect(child.tool_call({ toolName: "read" }, {})).toMatchObject({ block: true });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
   it.each([
     "echo ok && curl example.test",
     "echo $(curl example.test)",
@@ -44,6 +100,21 @@ describe("Pi tool policy", () => {
     const handlers = {};
     policyExtension({ on: (event, handler) => (handlers[event] = handler) });
     for (const toolName of ["edit", "write"]) expect(handlers.tool_call({ toolName }, {})).toMatchObject({ block: true });
+  });
+
+  it("blocks child workflow-completion reporting without blocking task safe outputs", () => {
+    vi.stubEnv("GH_AW_PI_SUBAGENT_CHILD", "1");
+    const child = {};
+    policyExtension({ on: (event, handler) => (child[event] = handler) });
+    for (const toolName of ["noop", "safeoutputs__report_incomplete", "safeoutputs__create_report_incomplete_issue"]) {
+      expect(child.tool_call({ toolName }, {})).toMatchObject({ block: true, reason: expect.stringContaining("parent agent") });
+    }
+    expect(child.tool_call({ toolName: "safeoutputs__create_issue" }, {})).toBeUndefined();
+
+    vi.stubEnv("GH_AW_PI_SUBAGENT_CHILD", "");
+    const parent = {};
+    policyExtension({ on: (event, handler) => (parent[event] = handler) });
+    expect(parent.tool_call({ toolName: "safeoutputs__noop" }, {})).toBeUndefined();
   });
 
   it("aborts inference at the configured repeated-denial threshold", () => {

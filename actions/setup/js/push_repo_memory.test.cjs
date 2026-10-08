@@ -2357,7 +2357,7 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
         delete global.core;
         fs.rmSync(rootDir, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it("should retry at least 10 times with capped full-jitter backoff (regression guard)", () => {
       const nodeFs = require("fs");

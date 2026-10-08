@@ -37,6 +37,7 @@ const tools = require("./safe_outputs_tools.json");
 const { normalizeSafeOutputToolArguments } = require("./safe_outputs_mcp_arguments.cjs");
 const { validateField, validateItem, loadValidationConfig } = require("./safe_output_type_validator.cjs");
 const { validateArgumentsAgainstSchema, validateStringMinLengths } = require("./mcp_scripts_validation.cjs");
+const { createHandlers } = require("./safe_outputs_handlers.cjs");
 const config = loadValidationConfig();
 let checked = 0;
 for (const [type, { fields }] of Object.entries(config)) {
@@ -80,11 +81,37 @@ assert.equal(clear.normalizedItem.body, "");
 const blankUpdate = validateItem({ type: "update_issue", milestone: "" }, "update_issue", 1);
 assert.equal(blankUpdate.isValid, false, "blank fields must not satisfy requiresOneOf");
 const updateTool = tools.find(tool => tool.name === "update_issue");
-for (const field of ["status", "labels"]) {
-  const raw = { type: "update_issue", issue_number: 42, [field]: "" };
-  const normalized = normalizeSafeOutputToolArguments("update_issue", raw, undefined, updateTool.inputSchema);
-  assert.ok(validateArgumentsAgainstSchema(normalized, updateTool.inputSchema), "normalized update_issue must fail MCP cross-field validation: " + field);
-  assert.equal(validateItem(raw, raw.type, 1).isValid, false, "update_issue collector must reject a sole blank field: " + field);
+const recorded = [];
+const handlers = createHandlers({ debug() {} }, entry => recorded.push(entry), { update_issue: { target: "*" } });
+for (const field of ["status", "labels", "assignees", "milestone"]) {
+  for (const blank of ["", " \t\n"]) {
+    const raw = { issue_number: 42, [field]: blank };
+    const normalized = normalizeSafeOutputToolArguments("update_issue", raw, undefined, updateTool.inputSchema);
+    assert.deepEqual(normalized, { issue_number: 42 });
+    assert.equal(validateArgumentsAgainstSchema(normalized, updateTool.inputSchema), null);
+    assert.throws(() => handlers.updateIssueHandler(normalized), {
+      code: -32602,
+      message: "ERR_VALIDATION: update_issue requires at least one of: status, title, body, labels, assignees, milestone fields"
+    });
+    assert.deepEqual(validateItem({ type: "update_issue", ...raw }, "update_issue", 1), {
+      isValid: false,
+      error: "Line 1: update_issue requires at least one of: 'status', 'title', 'body', 'labels', 'assignees', 'milestone' fields"
+    });
+    assert.equal(recorded.length, 0, "blank-only updates must not be recorded");
+  }
+}
+for (const milestone of [null, 1, "1"]) {
+  const normalized = normalizeSafeOutputToolArguments("update_issue", { issue_number: 42, milestone }, undefined, updateTool.inputSchema);
+  assert.deepEqual(normalized, { issue_number: 42, milestone });
+  assert.equal(validateArgumentsAgainstSchema(normalized, updateTool.inputSchema), null);
+  const result = handlers.updateIssueHandler(normalized);
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(recorded.at(-1), { type: "update_issue", issue_number: 42, milestone });
+  const entry = JSON.parse(JSON.stringify(recorded.at(-1)));
+  assert.deepEqual(validateItem(entry, entry.type, 1), {
+    isValid: true,
+    normalizedItem: { type: "update_issue", issue_number: 42, milestone: milestone === null ? null : 1 }
+  });
 }
 const clearedIssueType = validateItem({ type: "set_issue_type", issue_type: "" }, "set_issue_type", 1);
 assert.equal(clearedIssueType.isValid, true, clearedIssueType.error);

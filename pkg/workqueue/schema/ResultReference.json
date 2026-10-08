@@ -1,0 +1,32 @@
+{
+  "$defs": {
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "ResultReference": {
+      "additionalProperties": false,
+      "properties": {
+        "descriptor": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "result_commit_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["work_id", "result_commit_id", "descriptor"],
+      "type": "object"
+    }
+  },
+  "$id": "ResultReference.json",
+  "$ref": "#/$defs/ResultReference",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResultReference"
+}

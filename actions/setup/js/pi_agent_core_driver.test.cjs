@@ -42,7 +42,7 @@ describe("Pi coding-agent SDK driver", () => {
     expect(sdk.DefaultResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({
         extensionFactories: ["codemode", "search", "mcp"],
-        additionalExtensionPaths: expect.arrayContaining([path.join(dir, "gh-aw/actions/pi_tool_policy.cjs")]),
+        additionalExtensionPaths: expect.arrayContaining([path.join(dir, "gh-aw/actions/pi_tool_policy.cjs"), path.join(dir, "gh-aw/actions/pi_subagent_extension.cjs")]),
       })
     );
     expect(sdk.createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model, resourceLoader, sessionManager: "in-memory" }));

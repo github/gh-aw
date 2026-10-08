@@ -3,7 +3,6 @@ private: true
 emoji: "⚖️"
 description: Daily regulatory workflow that monitors and cross-checks other daily report agents' outputs for data consistency and anomalies
 on:
-  schedule: daily
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +20,10 @@ strict: true
 tracker-id: daily-regulatory
 max-ai-credits: 1000
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   cli-proxy: true
   github:
     toolsets: [default, discussions]
@@ -32,6 +35,7 @@ safe-outputs:
     required-title-prefix: "[daily regulatory] "
 timeout-minutes: 30
 imports:
+  - shared/daily-report-worker.md
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[daily regulatory] "

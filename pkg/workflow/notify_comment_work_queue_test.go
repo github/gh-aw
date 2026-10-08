@@ -40,16 +40,49 @@ func TestConclusionWorkQueueSummary(t *testing.T) {
 	}
 }
 
-func TestConclusionWorkQueueSummaryPreservesWritePermissions(t *testing.T) {
+func TestConclusionWorkQueueSummaryDoesNotBorrowWriterPermissions(t *testing.T) {
 	data := &WorkflowData{
-		Tools: map[string]any{"work-queue": true},
+		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
 		SafeOutputs: &SafeOutputsConfig{
 			CreatePullRequests: &CreatePullRequestsConfig{},
 		},
 	}
 	level, ok := computeConclusionJobPermissions(data).Get(PermissionContents)
 	require.True(t, ok)
+	require.Equal(t, PermissionRead, level)
+	actions, ok := computeConclusionJobPermissions(data).Get(PermissionActions)
+	require.True(t, ok)
+	require.Equal(t, PermissionRead, actions)
+	data.RawFrontmatter = map[string]any{"observability": map[string]any{"otlp": map[string]any{"github-app": map[string]any{"audience": "https://otel.example.com"}}}}
+	oidc, ok := computeConclusionJobPermissions(data).Get(PermissionIdToken)
+	require.True(t, ok)
+	require.Equal(t, PermissionWrite, oidc)
+	delete(data.Tools, "work-queue")
+	level, ok = computeConclusionJobPermissions(data).Get(PermissionContents)
+	require.True(t, ok)
 	require.Equal(t, PermissionWrite, level)
+}
+
+func TestConclusionWorkQueueObserverPreservesOrdinaryPermissions(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		safeOutputs *SafeOutputsConfig
+		contents    PermissionLevel
+	}{
+		{"summary only", &SafeOutputsConfig{}, PermissionRead},
+		{"ordinary pull request", &SafeOutputsConfig{CreatePullRequests: &CreatePullRequestsConfig{}}, PermissionWrite},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &WorkflowData{
+				Tools:       map[string]any{"work-queue": true},
+				SafeOutputs: tc.safeOutputs,
+			}
+			require.False(t, isWorkQueueParticipant(data))
+			level, ok := computeConclusionJobPermissions(data).Get(PermissionContents)
+			require.True(t, ok)
+			require.Equal(t, tc.contents, level)
+		})
+	}
 }
 
 func TestConclusionWorkQueueSummaryArtifactPrefix(t *testing.T) {

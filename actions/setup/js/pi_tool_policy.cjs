@@ -3,6 +3,32 @@
 
 const { splitOnPipelineOperators, extractCommandName } = require("./bash_command_parser.cjs");
 const { parseMaxToolCalls } = require("./copilot_sdk_tool_budget.cjs");
+const fs = require("node:fs");
+const path = require("node:path");
+const { getErrorMessage } = require("./error_helpers.cjs");
+
+/** @param {string} kind @param {number} count @param {number|undefined} limit @returns {number} */
+function reservePiBudget(kind, count, limit) {
+  const root = process.env.GH_AW_PI_TOOL_BUDGET_DIR;
+  if (!root || limit === undefined) return count + 1;
+  const dir = path.join(root, kind);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (error) {
+    throw new Error(`Cannot initialize shared Pi ${kind} budget: ${getErrorMessage(error)}`, { cause: error });
+  }
+  // Exclusive creation reserves a slot atomically across the parent and all child processes.
+  for (let next = count + 1; next <= limit; next++) {
+    try {
+      const fd = fs.openSync(path.join(dir, String(next)), "wx", 0o600);
+      fs.closeSync(fd);
+      return next;
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") throw error;
+    }
+  }
+  return limit + 1;
+}
 
 /** @param {unknown} command @param {unknown} allowed @returns {boolean} */
 function isPiBashAllowed(command, allowed) {
@@ -38,20 +64,29 @@ function piToolPolicy(pi) {
   let callCount = 0;
   let denialCount = 0;
   pi.on("tool_call", (event, ctx) => {
-    callCount += 1;
-    let reason;
-    if (limit !== undefined && callCount > limit) reason = `Workflow tool-call budget exhausted (${limit} calls)`;
-    else if (event.toolName === "bash" && !isPiBashAllowed(event.input?.command, policy.bash)) reason = "Command is outside the workflow tools.bash allowlist";
-    else if (policy.edit === false && ["edit", "write"].includes(event.toolName)) reason = "File editing is disabled by the workflow";
-    if (!reason) return;
-    denialCount += 1;
-    process.stderr.write(`[gh-aw/pi-tool-policy] denied tool=${event.toolName} calls=${callCount} reason=${reason}\n`);
-    if (denialLimit !== undefined && denialCount >= denialLimit) {
+    try {
+      callCount = reservePiBudget("calls", callCount, limit);
+      let reason;
+      if (limit !== undefined && callCount > limit) reason = `Workflow tool-call budget exhausted (${limit} calls)`;
+      else if (process.env.GH_AW_PI_SUBAGENT_CHILD === "1" && /(?:^|[^a-z0-9])(?:noop|report_incomplete|create_report_incomplete_issue)$/i.test(event.toolName || "")) reason = "Workflow-completion reporting is owned by the parent agent";
+      else if (event.toolName === "bash" && !isPiBashAllowed(event.input?.command, policy.bash)) reason = "Command is outside the workflow tools.bash allowlist";
+      else if (policy.edit === false && ["edit", "write"].includes(event.toolName)) reason = "File editing is disabled by the workflow";
+      if (!reason) return;
+      denialCount = reservePiBudget("denials", denialCount, denialLimit);
+      process.stderr.write(`[gh-aw/pi-tool-policy] denied tool=${event.toolName} calls=${callCount} reason=${reason}\n`);
+      if (denialLimit !== undefined && denialCount >= denialLimit) {
+        ctx.abort();
+        process.exitCode = 1;
+      }
+      return { block: true, reason };
+    } catch (error) {
+      const reason = `Cannot enforce shared Pi tool budget: ${getErrorMessage(error)}`;
+      process.stderr.write(`[gh-aw/pi-tool-policy] denied tool=${event.toolName} reason=${reason}\n`);
       ctx.abort();
       process.exitCode = 1;
+      return { block: true, reason };
     }
-    return { block: true, reason };
   });
 }
 
-module.exports = Object.assign(piToolPolicy, { isPiBashAllowed });
+module.exports = Object.assign(piToolPolicy, { isPiBashAllowed, reservePiBudget });

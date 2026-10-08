@@ -64,6 +64,9 @@ func (c *Compiler) resolveToolsAndConfig(result *parser.FrontmatterResult, markd
 	}
 	c.warnDeprecatedFrontmatterFields(result.Frontmatter)
 	safeOutputs := c.extractSafeOutputsConfig(result.Frontmatter)
+	if safeOutputs != nil && safeOutputs.claimAdaptersParseError != nil {
+		return nil, safeOutputs.claimAdaptersParseError
+	}
 	secretMasking, err := c.resolveSecretMasking(result.Frontmatter, importsResult)
 	if err != nil {
 		return nil, err

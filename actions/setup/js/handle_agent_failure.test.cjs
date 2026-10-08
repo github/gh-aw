@@ -1,11 +1,21 @@
 // @ts-check
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { createRequire } from "module";
 import { syncRuntimePromptTemplates } from "./test_prompt_templates.js";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
+const previousRunnerTemp = process.env.RUNNER_TEMP;
+const promptRoot = mkdtempSync(join(realpathSync(process.cwd()), ".gh-aw-failure-prompts-"));
+process.env.RUNNER_TEMP = promptRoot;
 const { runtimePromptsDir } = syncRuntimePromptTemplates(import.meta.url);
+afterAll(() => {
+  if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
+  else process.env.RUNNER_TEMP = previousRunnerTemp;
+  rmSync(promptRoot, { recursive: true, force: true });
+});
 
 describe("handle_agent_failure", () => {
   let main;
@@ -102,6 +112,98 @@ describe("handle_agent_failure", () => {
         paginate: vi.fn(async (request, params) => (await request(params)).data.jobs),
         rest: { pulls: { get: getPR }, actions: { listJobsForWorkflowRun: listJobs }, issues: { create: vi.fn() } },
       };
+    });
+
+    it.each([0, 1, 2])("preserves native checkout invalidation reporting with %i queue Claims instead of using Work payload issue numbers", async count => {
+      const claims = Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: { issue_number: 999 }, result_refs: [] }));
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", count ? "true" : "false");
+      vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "failure");
+      global.context.payload.inputs = {
+        work_queue_assignment: count ? JSON.stringify({ version: 3, dispatch_id: "d1", request_id: "r1", commit_id: "commit1", policy_epoch: "e1", pool: "default", worker_profile: "worker", claims }) : "stray malformed assignment",
+      };
+      const loader = vi.spyOn(require("./load_agent_output.cjs"), "loadAgentOutput").mockReturnValue({ success: true, items: [] });
+      try {
+        await main();
+        expect(getPR).toHaveBeenCalledWith({ owner: "owner", repo: "repo", pull_number: 42 });
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+        expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("PR merge ref was invalidated"));
+      } finally {
+        loader.mockRestore();
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it.each(["42", null, undefined, {}, 42.5, Number.NaN])("does not resolve a native PR for non-integer numeric identity %j", async number => {
+      global.context.payload.pull_request.number = number;
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(getPR).not.toHaveBeenCalled();
+      expect(listJobs).not.toHaveBeenCalled();
+    });
+
+    it.each(["missing", "malformed"])("keeps trusted native failure reporting available when the queue snapshot is %s without accepting raw outputs", async state => {
+      const snapshot = join(promptRoot, `${state}.snapshot.json`);
+      const output = join(promptRoot, "untrusted-agent-output.json");
+      writeFileSync(output, JSON.stringify({ items: [{ type: "create_issue", title: "not an authorized effect" }] }));
+      if (state === "malformed") writeFileSync(snapshot, '{"version":');
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+      vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
+      vi.stubEnv("GH_AW_WORK_QUEUE_SNAPSHOT", snapshot);
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "failure");
+      try {
+        await main();
+        expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Unable to read queue-scoped agent output for failure diagnostics"));
+        expect(getPR).toHaveBeenCalledWith({ owner: "owner", repo: "repo", pull_number: 42 });
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+        expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("PR merge ref was invalidated"));
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("preserves main's disabled loader-exception behavior instead of inventing queue diagnostics", async () => {
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "false");
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "failure");
+      const loader = vi.spyOn(require("./load_agent_output.cjs"), "loadAgentOutput").mockImplementation(() => {
+        throw new Error("legacy loader exception");
+      });
+      try {
+        await main();
+        expect(global.core.warning).toHaveBeenCalledWith("Error in handle_agent_failure: legacy loader exception");
+        expect(getPR).not.toHaveBeenCalled();
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+      } finally {
+        loader.mockRestore();
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("reports a real native agent failure even when strict queue output parsing throws, without treating raw safe outputs as effects", async () => {
+      const snapshot = join(promptRoot, "failed-worker.snapshot.json");
+      const output = join(promptRoot, "failed-worker-output.json");
+      writeFileSync(snapshot, '{"version":');
+      writeFileSync(output, JSON.stringify({ items: [{ type: "create_issue", title: "untrusted safe output" }] }));
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+      vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
+      vi.stubEnv("GH_AW_WORK_QUEUE_SNAPSHOT", snapshot);
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "failure");
+      vi.stubEnv("GH_AW_WORKFLOW_NAME", "Queue worker");
+      vi.stubEnv("GH_AW_WORKFLOW_ID", "queue-worker");
+      vi.stubEnv("GH_AW_RUN_URL", "https://github.com/owner/repo/actions/runs/123");
+      getPR.mockResolvedValue({ data: { state: "open", closed_at: null } });
+      global.github.rest.search = { issuesAndPullRequests: vi.fn().mockResolvedValue({ data: { total_count: 0, items: [] } }) };
+      global.github.rest.issues.create.mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_native_failure" } });
+      try {
+        await main();
+        expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Unable to read queue-scoped agent output for failure diagnostics"));
+        expect(global.github.rest.issues.create).toHaveBeenCalledOnce();
+        expect(global.github.rest.issues.create).toHaveBeenCalledWith(expect.objectContaining({ owner: "owner", repo: "repo", title: expect.stringContaining("Queue worker") }));
+        expect(global.github.rest.issues.create.mock.calls[0][0].body).not.toContain("untrusted safe output");
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it("skips failure reporting when a PR closes before its merge-ref checkout fails", async () => {

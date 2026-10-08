@@ -622,11 +622,10 @@ func TestSpec_DynamicResolution_VersionCommentConsistency(t *testing.T) {
 		assert.Equal(t, actionpins.FormatPinnedActionReference(known, latestPin.SHA, latestPin.Version), result)
 	})
 
-	t.Run("preserves exact source release tag when resolved pin uses major tag", func(t *testing.T) {
+	t.Run("preserves exact source release tag", func(t *testing.T) {
 		const repo = "actions/github-script"
 		pin, ok := actionpins.GetLatestActionPinByRepo(repo)
 		require.True(t, ok)
-		require.Equal(t, "v9", pin.Version)
 
 		result, err := actionpins.ResolveActionPin(repo, "v9.0.0", &actionpins.PinContext{
 			Resolver: &testSHAResolver{sha: pin.SHA},

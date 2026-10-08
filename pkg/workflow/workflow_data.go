@@ -35,6 +35,7 @@ type SkipIfCheckFailingConfig struct {
 	AllowPending bool     // if true, pending/in-progress checks are not treated as failing (default: treat pending as failing)
 }
 type WorkflowData struct {
+	WorkQueuePolicy                *WorkQueuePolicyConfig
 	DryRun                         bool // Disable compiler-managed GitHub mutations while retaining local diagnostics
 	Name                           string
 	WorkflowID                     string           // workflow identifier derived from markdown filename (basename without extension)
@@ -96,12 +97,13 @@ type WorkflowData struct {
 	BashDisabled                   bool                       // true when tools.bash was fully and explicitly refused (bash: false, or bash: []) after default-tool resolution; used by engines that can fully disable shell execution (e.g. Codex's features.shell_tool=false), see EngineCapabilities.BashDisable
 	MarkdownContent                string
 	SubAgentModels                 []parser.SubAgentModel // models declared by inline and imported sub-agents
-	AI                             string                 // "claude" or "codex" (for backwards compatibility)
-	Model                          string                 // Top-level LLM model override (from frontmatter model: field or imports)
-	EngineConfig                   *EngineConfig          // Extended engine configuration
-	AgentFile                      string                 // Path to custom agent file (from imports)
-	AgentImportSpec                string                 // Original import specification for agent file (e.g., "owner/repo/path@ref")
-	RepositoryImports              []string               // Repository-only imports (format: "owner/repo@ref") for .github folder merging
+	SubAgents                      []parser.InlineSubAgent
+	AI                             string        // "claude" or "codex" (for backwards compatibility)
+	Model                          string        // Top-level LLM model override (from frontmatter model: field or imports)
+	EngineConfig                   *EngineConfig // Extended engine configuration
+	AgentFile                      string        // Path to custom agent file (from imports)
+	AgentImportSpec                string        // Original import specification for agent file (e.g., "owner/repo/path@ref")
+	RepositoryImports              []string      // Repository-only imports (format: "owner/repo@ref") for .github folder merging
 	StopTime                       string
 	Cooldown                       time.Duration                   // minimum time between completed runs that executed the agent job
 	SkipIfMatch                    *SkipIfMatchConfig              // skip-if-match configuration with query and max threshold

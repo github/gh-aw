@@ -37,6 +37,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 	// specific handlers at startup. Handler names are the reserved keys defined in handlerRegistry;
 	// non-handler keys ("mentions") are documented in safe_outputs_config_generation.go.
 	config := make(map[string]any)
+	addWorkQueueClaimAdapterRuntimeConfig(config, data)
 
 	// Collect engine-specific manifest files and path prefixes (AgentFileProvider interface).
 	// These are merged with the global runtime-derived lists so that engine-specific

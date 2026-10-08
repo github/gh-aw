@@ -7,10 +7,9 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Paths match what upload_artifact.cjs computes at runtime.
-// When RUNNER_TEMP is unset (test default), STAGING_DIR falls back to /tmp/gh-aw/.
-const STAGING_DIR = "/tmp/gh-aw/safeoutputs/upload-artifacts/";
-const RESOLVER_FILE = "/tmp/gh-aw/artifact-resolver.json";
+const TEST_ROOT = path.join(fs.realpathSync(process.cwd()), `.gh-aw-upload-artifact-${process.pid}`);
+const STAGING_DIR = path.join(TEST_ROOT, "gh-aw", "safeoutputs", "upload-artifacts") + path.sep;
+const RESOLVER_FILE = path.join(TEST_ROOT, "artifact-resolver.json");
 
 describe("upload_artifact.cjs", () => {
   let mockCore;
@@ -87,8 +86,10 @@ describe("upload_artifact.cjs", () => {
     originalEnv = { ...process.env };
 
     delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
-    // Clear RUNNER_TEMP so the handler falls back to /tmp, matching the test's STAGING_DIR
-    delete process.env.RUNNER_TEMP;
+    process.env.RUNNER_TEMP = TEST_ROOT;
+    process.env.GH_AW_ARTIFACT_RESOLVER_FILE = RESOLVER_FILE;
+    delete process.env.GH_AW_WORK_QUEUE_ENABLED;
+    delete process.env.GH_AW_WORK_QUEUE_ROLE;
 
     // Ensure staging dir exists and is clean
     if (fs.existsSync(STAGING_DIR)) {
@@ -105,6 +106,8 @@ describe("upload_artifact.cjs", () => {
   afterEach(() => {
     process.env = originalEnv;
     delete global.__createArtifactClient;
+    fs.rmSync(TEST_ROOT, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   describe("path-based upload", () => {
@@ -611,7 +614,7 @@ describe("upload_artifact.cjs", () => {
   });
 
   describe("auto-copy from outside staging directory", () => {
-    const WORKSPACE_DIR = "/tmp/gh-aw-test-workspace";
+    const WORKSPACE_DIR = path.join(TEST_ROOT, "workspace");
 
     beforeEach(() => {
       if (fs.existsSync(WORKSPACE_DIR)) {
@@ -727,7 +730,7 @@ describe("upload_artifact.cjs", () => {
   });
 
   describe("RUNNER_TEMP staging directory", () => {
-    const CUSTOM_TEMP = "/tmp/gh-aw-test-runner-temp";
+    const CUSTOM_TEMP = path.join(TEST_ROOT, "runner");
     const CUSTOM_STAGING = path.join(CUSTOM_TEMP, "gh-aw", "safeoutputs", "upload-artifacts");
 
     beforeEach(() => {
@@ -760,23 +763,17 @@ describe("upload_artifact.cjs", () => {
     });
 
     it("falls back to /tmp when RUNNER_TEMP is unset", async () => {
-      // Clear RUNNER_TEMP to verify the fallback
       delete process.env.RUNNER_TEMP;
-
-      writeStaging("fallback-report.json", '{"ok": true}');
-
+      const exists = fs.existsSync.bind(fs);
+      vi.spyOn(fs, "existsSync").mockImplementation(filename => (String(filename).startsWith("/tmp/gh-aw") ? false : exists(filename)));
       const results = await runHandler(buildConfig(), [{ type: "upload_artifact", path: "fallback-report.json" }]);
-
-      expect(mockCore.setFailed).not.toHaveBeenCalled();
-      expect(results[0].success).toBe(true);
-      const [, files, rootDir] = mockArtifactClient.uploadArtifact.mock.calls[0];
-      expect(files).toContain(path.join(STAGING_DIR, "fallback-report.json"));
-      expect(rootDir).toBe(STAGING_DIR);
+      expect(results[0].error).toContain("The staging directory is empty — did you forget to copy files to /tmp/gh-aw/safeoutputs/upload-artifacts/");
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
     });
   });
 
   describe("path validation (security)", () => {
-    const WORKSPACE_DIR = "/tmp/gh-aw-security-test-workspace";
+    const WORKSPACE_DIR = path.join(TEST_ROOT, "security-workspace");
 
     beforeEach(() => {
       if (fs.existsSync(WORKSPACE_DIR)) {
@@ -824,7 +821,7 @@ describe("upload_artifact.cjs", () => {
     });
 
     it("rejects an absolute path outside allowed roots (GITHUB_WORKSPACE, staging)", async () => {
-      const outsideDir = "/tmp/gh-aw-out-of-bounds-" + Math.random().toString(36).substring(7);
+      const outsideDir = path.join(TEST_ROOT, "outside");
       try {
         fs.mkdirSync(outsideDir, { recursive: true });
         const outsideFile = path.join(outsideDir, "data.json");

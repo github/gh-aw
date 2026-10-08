@@ -18,6 +18,98 @@ JSON Schema for validating agentic workflow frontmatter configuration
 
 ```yaml wrap
 ---
+# Version-3 scheduling policy proposal. Workers and dispatchers proposing Policy
+# require explicit approved worker-profiles or pools with fixed numeric launch
+# principals; a dispatcher actor ID does not identify an alternate dispatch
+# credential. Credential-only read bindings are separate adapter configuration.
+# The installed ledger Policy remains authoritative; scheduling cannot be
+# disabled.
+# (optional)
+work-queue-policy:
+  # (optional)
+  mode: "weighted-priority"
+
+  # (optional)
+  class-weights: []
+
+  # (optional)
+  accounting-weights:
+    {}
+
+  # (optional)
+  outstanding:
+    # (optional)
+    claims: 1
+
+    # (optional)
+    dispatches: 1
+
+    # (optional)
+    per-account-claims: 1
+
+  # (optional)
+  worker-profiles:
+    {}
+
+  # (optional)
+  pools:
+    {}
+
+  # (optional)
+  producers:
+    {}
+
+  # (optional)
+  dependencies:
+    # (optional)
+    repositories: []
+      # Array of strings
+
+    # (optional)
+    max-observation-age: "example-value"
+
+    # Separate read-only repository credentials, never part of a Policy proposal or
+    # snapshot. Credential-only configuration uses the installed Policy's allowed
+    # repositories.
+    # (optional)
+    read-credentials:
+      {}
+
+  # (optional)
+  limits:
+    # (optional)
+    ledger-bytes: 1
+
+    # (optional)
+    recovery-bytes: 1
+
+    # (optional)
+    payload-bytes: 1
+
+    # (optional)
+    graph-nodes: 1
+
+    # (optional)
+    predecessors: 1
+
+    # (optional)
+    pending-nodes: 1
+
+    # (optional)
+    operations: 1
+
+    # (optional)
+    assignment-bytes: 1
+
+    # (optional)
+    result-bytes: 1
+
+    # (optional)
+    evidence-bytes: 1
+
+    # (optional)
+    observation-writes: 1
+
 # Workflow name that appears in the GitHub Actions interface. If not specified,
 # defaults to the filename without extension.
 # (optional)
@@ -4328,14 +4420,15 @@ tools:
   # Format 2: Enable agentic-workflows tool with default settings (same as true)
   agentic-workflows: null
 
-  # Read work queue and claim state from the immutable activation snapshot. The
-  # snapshot can become stale while the agent runs. Issue storage requires the
-  # repository secret GH_AW_WORK_QUEUE_HMAC_SECRET; all accepted issue bodies and
-  # comments are signed.
+  # Read the immutable version-3 activation snapshot. Nonworkers without approved
+  # dispatch targets are read-only observers; workers and approved dispatchers may
+  # stage scoped queue intents. The installed ledger Policy is authoritative. Only
+  # Git storage is supported.
   # (optional)
   # Accepted formats:
 
-  # Format 1: Enable or disable the work-queue MCP server.
+  # Format 1: Enable read-only queue observation, or queue-control intents when
+  # approved worker dispatch targets are configured.
   work-queue: true
 
   # Format 2: Enable the work-queue MCP server.
@@ -4343,8 +4436,8 @@ tools:
 
   # Format 3: object
   work-queue:
-    # Queue storage backend; defaults to git. Choose issues to store queue records on
-    # GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret.
+    # Version-3 Git queue backend.
+    # (optional)
     storage: "git"
 
     # Fail closed and block safe outputs when no trusted inbound worker assignment is
@@ -4356,6 +4449,40 @@ tools:
     # claims.
     # (optional)
     worker: true
+
+    # Declare one schema-validated JSON memory snapshot per Claim. The compiler
+    # supplies credential-free preparation and protected immutable git-tree delivery.
+    # (optional)
+    memory:
+      # (optional)
+      name: "persist_work_queue_memory"
+
+      # Fixed relative JSON file path in the snapshot tree.
+      path: "memory.json"
+
+      # Fixed repository also authorized by the installed immutable Work scope.
+      target-repo: "owner/repo"
+
+      base-revision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+      branch-prefix: "memory/runs"
+
+      # (optional)
+      max-bytes: 262144
+
+      # Bounded inline typed JSON Schema subset: object
+      # properties/required/additionalProperties, array items, scalar enum, numeric
+      # ranges, and string/array length bounds. No references, regexes, or executable
+      # validators.
+      schema:
+        type: object
+
+  # `false` and `storage: "issues"` are invalid. Omit `work-queue` entirely for a
+  # workflow that does not use the queue. Frontmatter configures the workflow's
+  # compiler/runtime role; only authenticated installation of the queue Policy
+  # grants producer and worker-profile authority. Dispatch workers are additionally
+  # constrained by `safe-outputs.dispatch-workflow.workflows` and the installed
+  # profile's immutable workflow revision and principal.
 
   # Cache memory MCP configuration for persistent memory storage
   # (optional)
@@ -12011,6 +12138,11 @@ safe-outputs:
     # Security Scanner')
     # (optional)
     driver: "example-value"
+
+    # Trusted queue SARIF destination ref. It must independently resolve to the
+    # immutable worker revision before upload.
+    # (optional)
+    target-ref: "example-value"
 
     # GitHub token to use for this specific output type. Overrides global github-token
     # if specified.
@@ -20471,6 +20603,11 @@ safe-outputs:
   # Format 1: ⚠️ Experimental. Configuration for uploading a code coverage report
   # via actions/upload-code-coverage
   upload-code-coverage:
+    # Trusted queue coverage target; independently resolved to the immutable worker
+    # revision before upload.
+    # (optional)
+    target-ref: "example-value"
+
     # Fixed fail-on-error input passed to actions/upload-code-coverage (fixed; the
     # agent cannot override this value). When true (default), the upload job fails if
     # the upload or processing fails.
@@ -22007,6 +22144,13 @@ safe-outputs:
   # (e.g., 'send-notification' becomes 'send_notification').
   # (optional)
   jobs:
+    {}
+
+  # Queue-worker custom delivery adapters. Prepared jobs/actions/steps receive
+  # isolated Claim inputs without write credentials; effects are applied by the
+  # trusted handler and independently verified, never inferred from job success.
+  # (optional)
+  claim-adapters:
     {}
 
   # Inline JavaScript script handlers that run inside the consolidated safe-outputs

@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "schema": "specs/work-queue/effect-contract.schema.json",
+  "scope": "Embedded intent structure only. Valid contracts never establish verifier authority or verified delivery. Runtime validation additionally enforces unique output types and min <= max.",
+  "cases": [
+    {
+      "name": "no-write-alias",
+      "contract": { "kind": "none" },
+      "schema_valid": true,
+      "valid": true
+    },
+    {
+      "name": "explicit-no-write",
+      "contract": { "version": 1, "outputs": [], "no_writes": true },
+      "schema_valid": true,
+      "valid": true
+    },
+    {
+      "name": "existing-builtin-output",
+      "contract": { "version": 1, "outputs": [{ "type": "create_issue", "min": 1, "max": 1 }] },
+      "schema_valid": true,
+      "valid": true
+    },
+    {
+      "name": "declared-custom-verifier-reference",
+      "contract": {
+        "version": 1,
+        "outputs": [
+          {
+            "type": "custom",
+            "min": 1,
+            "max": 1,
+            "verification": {
+              "verifier_id": "IssueCreated.v1",
+              "expected": { "title": "expected title", "labels": ["queued"], "closed": false }
+            }
+          }
+        ]
+      },
+      "schema_valid": true,
+      "valid": true
+    },
+    {
+      "name": "bounded-optional-output",
+      "contract": {
+        "version": 1,
+        "outputs": [{ "type": "custom", "min": 0, "max": 128, "verification": { "verifier_id": "v1", "expected": {} } }],
+        "no_writes": false
+      },
+      "schema_valid": true,
+      "valid": true
+    },
+    {
+      "name": "unknown-version",
+      "contract": { "version": 2, "outputs": [], "no_writes": true },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "no-write-alias-extra-authority",
+      "contract": { "kind": "none", "verified": true },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "empty-without-explicit-no-write",
+      "contract": { "version": 1, "outputs": [] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "contradictory-no-write-and-output",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 1, "max": 1 }], "no_writes": true },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "missing-expected",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 1, "max": 1, "verification": { "verifier_id": "v1" } }] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "missing-verifier-id",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 1, "max": 1, "verification": { "expected": {} } }] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "inline-verifier-authority",
+      "contract": {
+        "version": 1,
+        "outputs": [{ "type": "custom", "min": 1, "max": 1, "verification": { "verifier_id": "v1", "expected": {}, "kind": "github-resource" } }]
+      },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "payload-selected-transport",
+      "contract": {
+        "version": 1,
+        "outputs": [{ "type": "custom", "min": 1, "max": 1, "verification": { "verifier_id": "v1", "expected": {}, "url": "https://invalid.example/resource" } }]
+      },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "scalar-expected",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 1, "max": 1, "verification": { "verifier_id": "v1", "expected": true } }] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "leading-punctuation-verifier-id",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 1, "max": 1, "verification": { "verifier_id": "_v1", "expected": {} } }] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "trailing-newline-verifier-id",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 1, "max": 1, "verification": { "verifier_id": "v1\n", "expected": {} } }] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "negative-count",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": -1, "max": 1 }] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "over-limit-count",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 0, "max": 129 }] },
+      "schema_valid": false,
+      "valid": false
+    },
+    {
+      "name": "inverted-range-runtime-rejection",
+      "contract": { "version": 1, "outputs": [{ "type": "custom", "min": 2, "max": 1 }] },
+      "schema_valid": true,
+      "valid": false
+    },
+    {
+      "name": "duplicate-type-runtime-rejection",
+      "contract": {
+        "version": 1,
+        "outputs": [
+          { "type": "custom", "min": 1, "max": 1 },
+          { "type": "custom", "min": 0, "max": 2 }
+        ]
+      },
+      "schema_valid": true,
+      "valid": false
+    }
+  ]
+}
