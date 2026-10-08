@@ -707,8 +707,12 @@ async function verifyCompiledDispatchIdentity(input) {
     let identityReads = 0;
     let posts = 0;
     let result;
+    const controlFailures = [];
     const core = {
       setOutput() {},
+      setFailed(message) {
+        controlFailures.push(message);
+      },
       info() {},
       warning() {},
       error() {},
@@ -827,6 +831,10 @@ async function verifyCompiledDispatchIdentity(input) {
       await new AsyncFunction("require", "core", "github", "context", "exec", "io", "getOctokit", input.script)(localRequire, core, fixture.githubClient, fixture.dispatcherContext, {}, {}, getOctokit);
       assert.equal(canonical(fixture.state.policy), canonical(input.policy));
       assert.ok(result, "compiled runtime must return its dispatch receipt");
+      assert.equal(controlFailures.length, mode === "verified" ? 0 : 1, JSON.stringify(result));
+      assert.equal(result.status, mode === "verified" ? "ok" : "recovery_required");
+      assert.equal(result.success, mode === "verified");
+      if (mode !== "verified") assert.match(controlFailures[0], /Work queue controls require recovery/);
       if (mode === "wrong-publisher") {
         assert.equal(identityReads, 0);
         assert.equal(posts, 0);
