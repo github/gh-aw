@@ -7,7 +7,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary, formatAICForOutput } = require("./parse_mcp_gateway_log.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
-const { mapAWFRoutingEffort, resolveAWFModelRoutingSelection } = require("./awf_model_routing.cjs");
+const { mapAWFRoutingEffort, resolveAWFModelRoutingSelection, getAWFModelRoutingPolicy } = require("./awf_model_routing.cjs");
 const { recordModelRouting, resolveEffectiveModel, validateModelIdentifier } = require("./model_attribution.cjs");
 
 const DEFAULT_GH_AW_DIR = "/tmp/gh-aw";
@@ -29,13 +29,6 @@ const AGENT_USAGE_PATH = path.join(DEFAULT_GH_AW_DIR, "agent_usage.json");
 const AGENT_USAGE_JSONL_PATH = path.join(DEFAULT_GH_AW_DIR, "agent_usage.jsonl");
 const COPILOT_SESSION_STATE_DIR = path.join(DEFAULT_GH_AW_DIR, "sandbox/agent/logs/copilot-session-state");
 const DEFAULT_SUMMARY_TITLE = "Token Usage";
-const MODEL_ROUTING_ENDPOINTS = {
-  copilot: ["/responses", "/chat/completions"],
-  claude: ["/v1/messages"],
-  codex: ["/responses"],
-  pi: ["/v1/messages", "/responses", "/chat/completions"],
-};
-
 function getGhAwPath(relativePath) {
   const root = process.env.GH_AW_TMP_DIR;
   return path.join(root && root.trim() ? root.trim() : DEFAULT_GH_AW_DIR, relativePath);
@@ -64,6 +57,7 @@ function readModelRoutingRecord(ghAwDir) {
   const paths = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
   /** @type {any|null} */
   let result = null;
+  const requestRecords = [];
   for (const relativePath of paths) {
     let lines;
     try {
@@ -76,19 +70,40 @@ function readModelRoutingRecord(ghAwDir) {
         const record = JSON.parse(line);
         if (typeof record?._schema !== "string" || !record._schema.startsWith("model-routing/")) continue;
         if (record.stage === "selection" || record.stage === "failure") result = record;
+        else if (record.stage === "request") requestRecords.push(record);
       } catch {
         // Skip incomplete proxy records.
       }
     }
   }
-  return result;
+  return result || requestRecords.length ? { record: result, requestRecords } : null;
+}
+
+function getModelRoutingRequestModel(record) {
+  for (const key of ["requested_model", "wire_model", "selected_model", "model"]) {
+    const model = validateModelIdentifier(record?.[key]);
+    if (model) return model;
+  }
+  return "";
+}
+
+function hasCorroboratedModelRoutingRequests(requestRecords, wireModel, endpoint) {
+  const requests = requestRecords.filter(record => getModelRoutingRequestModel(record) === wireModel);
+  return requests.length > 0 && requests.every(record => record.routed === "as_selected" && record.upstream_endpoint === endpoint && Array.isArray(record.deviations) && record.deviations.every(deviation => deviation === "endpoint"));
+}
+
+function getModelRoutingSelectionFailureCode(error) {
+  return /none compatible|not supported by this engine/.test(error) ? "unsupported_endpoint" : "invalid_selection";
 }
 
 /** @returns {any|null} */
 function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_DIR || DEFAULT_GH_AW_DIR) {
   if (env.GH_AW_MODEL_ROUTING_ENABLED !== "true") return null;
-  const record = readModelRoutingRecord(ghAwDir);
+  const proxyRecords = readModelRoutingRecord(ghAwDir);
+  const record = proxyRecords?.record;
+  const requestRecords = proxyRecords?.requestRecords || [];
   const reflectData = readJSONIfExists(path.join(ghAwDir, "agent", "awf-reflect.json"));
+  const advisory = readJSONIfExists(path.join(ghAwDir, "agent", "awf-routing-outcome.json"));
   let routing;
   if (record?.stage === "failure") {
     routing = { status: "failed", failure_code: record.code, detail: record.detail };
@@ -106,12 +121,43 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
       router_version: record.router?.version,
       failure_code: wireModel ? "" : "invalid_selection",
     };
-    const allowedEndpoints = MODEL_ROUTING_ENDPOINTS[String(env.GH_AW_ENGINE_ID || "").toLowerCase()] || [];
-    if (!allowedEndpoints.includes(routing.endpoint)) {
-      routing = { ...routing, status: "rejected", failure_code: "unsupported_endpoint", detail: `AWF model routing endpoint ${routing.endpoint || "(missing)"} is not supported by this engine` };
+    const policy = getAWFModelRoutingPolicy(String(env.GH_AW_ENGINE_ID || ""));
+    const endpointOverride = !policy.endpoints.includes(routing.endpoint);
+    const selectedAdvisory = advisory?.status === "selected" && (advisory.endpoint !== undefined || advisory.selected_endpoint !== undefined);
+    if (advisory?.status === "selected" && advisory.wire_model && advisory.wire_model !== wireModel) {
+      routing = { ...routing, status: "rejected", failure_code: "harness_selection_mismatch", detail: "Harness routing outcome did not match the proxy selection" };
+    } else if (["failed", "rejected", "pending", "unavailable"].includes(advisory?.status)) {
+      routing = { ...routing, status: advisory.status, failure_code: advisory.failure_code || routing.failure_code, detail: advisory.detail || routing.detail };
+    } else if (endpointOverride) {
+      const checked = resolveAWFModelRoutingSelection({ ...reflectData, routing: { status: "selected", selection: routing } }, true, policy.endpoints, policy.allowEndpointOverride);
+      if (checked.error || !checked.selection) {
+        const detail = checked.error || "AWF /reflect did not return a compatible model-routing selection";
+        routing = { ...routing, status: "rejected", failure_code: getModelRoutingSelectionFailureCode(detail), detail };
+      } else {
+        const effectiveEndpoint = selectedAdvisory ? advisory.endpoint : checked.selection.endpoint;
+        const selectedModelMatches = !selectedAdvisory || advisory.wire_model === wireModel;
+        const selectedEndpointMatches = !selectedAdvisory || advisory.selected_endpoint === routing.endpoint;
+        const endpointMatches = policy.endpoints.includes(effectiveEndpoint) && checked.selection.endpoint === effectiveEndpoint;
+        const requestsCorroborate = hasCorroboratedModelRoutingRequests(requestRecords, wireModel, effectiveEndpoint);
+        if (!selectedModelMatches || !selectedEndpointMatches || !endpointMatches || !requestsCorroborate) {
+          routing = {
+            ...routing,
+            status: "rejected",
+            failure_code: "uncorroborated_endpoint",
+            detail: "AWF model routing endpoint override was not corroborated by matching proxy request records",
+          };
+        } else {
+          routing = { ...routing, endpoint: effectiveEndpoint, selected_endpoint: routing.endpoint };
+        }
+      }
     } else if (reflectData?.endpoints) {
-      const checked = resolveAWFModelRoutingSelection({ ...reflectData, routing: { status: "selected", selection: routing } }, true, allowedEndpoints);
-      if (checked.error) routing = { ...routing, status: "rejected", failure_code: "invalid_selection", detail: checked.error };
+      const checked = resolveAWFModelRoutingSelection({ ...reflectData, routing: { status: "selected", selection: routing } }, true, policy.endpoints, policy.allowEndpointOverride);
+      if (checked.error || !checked.selection) {
+        const detail = checked.error || "AWF /reflect did not return a compatible model-routing selection";
+        routing = { ...routing, status: "rejected", failure_code: getModelRoutingSelectionFailureCode(detail), detail };
+      } else {
+        routing = { ...routing, endpoint: checked.selection.endpoint, selected_endpoint: routing.endpoint };
+      }
     }
   } else {
     const reflectRouting = reflectData?.routing;
@@ -132,10 +178,9 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
     }
   }
 
-  const advisory = readJSONIfExists(path.join(ghAwDir, "agent", "awf-routing-outcome.json"));
-  if (advisory && ["failed", "rejected", "pending", "unavailable"].includes(advisory.status)) {
+  if (record?.stage !== "selection" && advisory && ["failed", "rejected", "pending", "unavailable"].includes(advisory.status)) {
     routing = { ...routing, status: advisory.status, failure_code: advisory.failure_code || routing.failure_code, detail: advisory.detail || routing.detail };
-  } else if (advisory?.status === "selected" && advisory.wire_model && advisory.wire_model !== routing.wire_model) {
+  } else if (record?.stage !== "selection" && advisory?.status === "selected" && advisory.wire_model && advisory.wire_model !== routing.wire_model) {
     routing = { ...routing, status: "rejected", failure_code: "harness_selection_mismatch", detail: "Harness routing outcome did not match the proxy selection" };
   }
 

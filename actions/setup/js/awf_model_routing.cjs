@@ -7,6 +7,22 @@ const fs = require("fs");
 const path = require("path");
 
 const ROUTING_REASONING_EFFORTS = Object.freeze(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const ROUTING_ENDPOINTS = Object.freeze(["/v1/messages", "/responses", "/chat/completions"]);
+const AWF_MODEL_ROUTING_POLICIES = Object.freeze({
+  copilot: Object.freeze({ endpoints: Object.freeze(["/responses", "/chat/completions"]), allowEndpointOverride: false }),
+  claude: Object.freeze({ endpoints: Object.freeze(["/v1/messages"]), allowEndpointOverride: true }),
+  codex: Object.freeze({ endpoints: Object.freeze(["/responses"]), allowEndpointOverride: true }),
+  pi: Object.freeze({ endpoints: ROUTING_ENDPOINTS, allowEndpointOverride: true }),
+});
+const EMPTY_MODEL_ROUTING_POLICY = Object.freeze({ endpoints: Object.freeze([]), allowEndpointOverride: false });
+
+/**
+ * @param {string} engine
+ * @returns {{endpoints: string[], allowEndpointOverride: boolean}}
+ */
+function getAWFModelRoutingPolicy(engine) {
+  return AWF_MODEL_ROUTING_POLICIES[String(engine || "").toLowerCase()] || EMPTY_MODEL_ROUTING_POLICY;
+}
 
 /**
  * @param {unknown} effort
@@ -73,7 +89,7 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   if (routingModelAmbiguity) return { selection: null, error: routingModelAmbiguity };
   let effectiveEndpoint = endpoint;
   if (allowedEndpoints && !allowedEndpoints.includes(endpoint)) {
-    if (!allowEndpointOverride) {
+    if (!allowEndpointOverride || !ROUTING_ENDPOINTS.includes(endpoint)) {
       return { selection: null, error: `AWF /reflect selected endpoint ${endpoint}, which is not supported by this engine` };
     }
     const routingModel = getAWFRoutingModel(reflectData, wireModel);
@@ -142,6 +158,8 @@ function recordAWFModelRoutingOutcome(outcome, env = process.env, filePath = pat
   if (env.GH_AW_MODEL_ROUTING !== "1" || !outcome || !["selected", "failed", "rejected"].includes(outcome.status)) return false;
   const wireModel = typeof outcome.wire_model === "string" && outcome.wire_model.length <= 128 && /^[A-Za-z0-9._/:@-]+$/.test(outcome.wire_model) ? outcome.wire_model : "";
   if (outcome.status === "selected" && !wireModel) return false;
+  const endpoint = ROUTING_ENDPOINTS.includes(outcome.endpoint) ? outcome.endpoint : "";
+  const selectedEndpoint = ROUTING_ENDPOINTS.includes(outcome.selected_endpoint) ? outcome.selected_endpoint : "";
   const effort = outcome.effort == null ? null : isRoutingReasoningEffort(outcome.effort) ? outcome.effort : null;
   if (outcome.effort != null && effort === null) return false;
   const appliedEffort = outcome.applied_effort == null ? null : outcome.applied_effort === "off" || isRoutingReasoningEffort(outcome.applied_effort) ? outcome.applied_effort : null;
@@ -149,6 +167,8 @@ function recordAWFModelRoutingOutcome(outcome, env = process.env, filePath = pat
   const record = {
     status: outcome.status,
     ...(wireModel ? { wire_model: wireModel } : {}),
+    ...(endpoint ? { endpoint } : {}),
+    ...(selectedEndpoint ? { selected_endpoint: selectedEndpoint } : {}),
     ...(effort ? { effort } : {}),
     ...(appliedEffort ? { applied_effort: appliedEffort } : {}),
     ...(typeof outcome.failure_code === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(outcome.failure_code) ? { failure_code: outcome.failure_code } : {}),
@@ -181,6 +201,9 @@ function isModelAvailableInReflectData(model, reflectData, allowedProviders = nu
 
 module.exports = {
   ROUTING_REASONING_EFFORTS,
+  ROUTING_ENDPOINTS,
+  AWF_MODEL_ROUTING_POLICIES,
+  getAWFModelRoutingPolicy,
   isRoutingReasoningEffort,
   mapAWFRoutingEffort,
   resolveAWFModelRoutingSelection,

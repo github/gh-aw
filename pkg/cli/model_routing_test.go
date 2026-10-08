@@ -170,6 +170,16 @@ func TestResolveEffectiveModelAttributionSuppressesUnselectedRouteModels(t *test
 	}
 }
 
+func TestAwInfoModelRoutingPreservesSelectedEndpoint(t *testing.T) {
+	var info AwInfo
+	if err := json.Unmarshal([]byte(`{"model_routing":{"status":"selected","endpoint":"/v1/messages","selected_endpoint":"/chat/completions"}}`), &info); err != nil {
+		t.Fatalf("failed to unmarshal model routing metadata: %v", err)
+	}
+	if info.ModelRouting == nil || info.ModelRouting.Endpoint != "/v1/messages" || info.ModelRouting.SelectedEndpoint != "/chat/completions" {
+		t.Fatalf("model routing endpoints were not preserved: %+v", info.ModelRouting)
+	}
+}
+
 func TestModelRoutingComparisonDetectsRouteChanges(t *testing.T) {
 	before := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2"}
 	after := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "high", Mode: "economy", RouterVersion: "0.1.3"}
