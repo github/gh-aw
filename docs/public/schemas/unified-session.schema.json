@@ -15,7 +15,25 @@
       { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedMessageData" } } } },
       {
         "if": { "properties": { "type": { "const": "assistant.refusal" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CAssistantRefusalData%2C(%22reason%22%7C%22content%22%7C%22policyCategory%22%7C%22explanation%22%7C%22partial%22)%3E" } } }
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
+                "content": { "$ref": "#/definitions/JsonValue" },
+                "policyCategory": { "type": ["string", "null"] },
+                "explanation": { "type": ["string", "null"] },
+                "partial": { "type": "boolean", "description": "True for an observed streaming fragment, not a finalized refusal." }
+              },
+              "required": ["reason"]
+            }
+          }
+        }
       },
       { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.background_tasks_changed" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
@@ -52,26 +70,95 @@
       { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
       {
         "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22%7C%22reasoningEffort%22)%3E" } } }
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "type": ["string", "null"] },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "sourceEngine": { "type": "string" },
+                "model": { "type": "string" },
+                "cwd": { "type": "string" },
+                "reasoningEffort": { "type": "string" }
+              }
+            }
+          }
+        }
       },
       { "if": { "properties": { "type": { "const": "session.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedSessionResultData" } } } },
       {
         "if": { "properties": { "type": { "const": "session.start" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22%7C%22reasoningEffort%22)%3E" } } }
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "type": ["string", "null"] },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "sourceEngine": { "type": "string" },
+                "model": { "type": "string" },
+                "cwd": { "type": "string" },
+                "reasoningEffort": { "type": "string" }
+              }
+            }
+          }
+        }
       },
       {
         "if": { "properties": { "type": { "const": "tool.execution_complete" } }, "required": ["type"] },
         "then": {
           "properties": {
             "data": {
-              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22%7C%22taskId%22%7C%22taskType%22%7C%22workflowName%22%7C%22workflowRunId%22)%3E"
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "toolCallId": { "type": "string" },
+                "toolName": { "type": "string" },
+                "success": { "type": "boolean" },
+                "output": { "$ref": "#/definitions/JsonValue" },
+                "error": { "$ref": "#/definitions/JsonValue" },
+                "durationMs": { "$ref": "#/definitions/SessionMetric" },
+                "exitCode": { "type": "number" },
+                "status": { "type": "string" },
+                "mcpServerName": { "type": "string" },
+                "isError": { "type": "boolean" },
+                "taskId": { "type": "string" },
+                "taskType": { "type": "string" },
+                "workflowName": { "type": "string" },
+                "workflowRunId": { "type": "string" }
+              }
             }
           }
         }
       },
       {
         "if": { "properties": { "type": { "const": "tool.execution_start" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CToolExecutionStartData%2C(%22toolCallId%22%7C%22toolName%22%7C%22input%22%7C%22command%22%7C%22mcpServerName%22)%3E" } } }
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "toolCallId": { "type": "string" },
+                "toolName": { "type": "string" },
+                "input": { "$ref": "#/definitions/JsonValue" },
+                "command": { "type": "string" },
+                "mcpServerName": { "type": "string" }
+              }
+            }
+          }
+        }
       },
       { "if": { "properties": { "type": { "const": "usage.report" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
       { "if": { "properties": { "type": { "const": "user.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedMessageData" } } } },
@@ -334,49 +421,7 @@
       },
       "additionalProperties": false
     },
-    "Pick<AssistantRefusalData,(\"reason\"|\"content\"|\"policyCategory\"|\"explanation\"|\"partial\")>": {
-      "type": "object",
-      "properties": {
-        "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
-        "content": { "$ref": "#/definitions/JsonValue" },
-        "policyCategory": { "type": ["string", "null"] },
-        "explanation": { "type": ["string", "null"] },
-        "partial": { "type": "boolean", "description": "True for an observed streaming fragment, not a finalized refusal." }
-      },
-      "required": ["reason"],
-      "additionalProperties": false
-    },
     "Pick<MessageData,\"content\">": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": false },
-    "Pick<SessionInitData,(\"sourceEngine\"|\"model\"|\"sessionId\"|\"cwd\"|\"reasoningEffort\")>": {
-      "type": "object",
-      "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" }, "reasoningEffort": { "type": "string" } },
-      "additionalProperties": false
-    },
-    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\"|\"taskId\"|\"taskType\"|\"workflowName\"|\"workflowRunId\")>": {
-      "type": "object",
-      "properties": {
-        "toolCallId": { "type": "string" },
-        "toolName": { "type": "string" },
-        "success": { "type": "boolean" },
-        "output": { "$ref": "#/definitions/JsonValue" },
-        "error": { "$ref": "#/definitions/JsonValue" },
-        "durationMs": { "$ref": "#/definitions/SessionMetric" },
-        "exitCode": { "type": "number" },
-        "status": { "type": "string" },
-        "mcpServerName": { "type": "string" },
-        "isError": { "type": "boolean" },
-        "taskId": { "type": "string" },
-        "taskType": { "type": "string" },
-        "workflowName": { "type": "string" },
-        "workflowRunId": { "type": "string" }
-      },
-      "additionalProperties": false
-    },
-    "Pick<ToolExecutionStartData,(\"toolCallId\"|\"toolName\"|\"input\"|\"command\"|\"mcpServerName\")>": {
-      "type": "object",
-      "properties": { "toolCallId": { "type": "string" }, "toolName": { "type": "string" }, "input": { "$ref": "#/definitions/JsonValue" }, "command": { "type": "string" }, "mcpServerName": { "type": "string" } },
-      "additionalProperties": false
-    },
     "RuntimeObservationData": {
       "type": "object",
       "properties": {
@@ -469,6 +514,7 @@
     "UnifiedSessionResultData": {
       "type": "object",
       "properties": {
+        "sourceEngine": { "type": "string" },
         "numTurns": { "$ref": "#/definitions/SessionCount" },
         "durationMs": { "$ref": "#/definitions/SessionMetric" },
         "totalCostUsd": { "$ref": "#/definitions/SessionMetric" },
@@ -477,6 +523,9 @@
         "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "permissionDenials": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "agentMetrics": { "$ref": "#/definitions/JsonValue", "description": "Exact per-agent accounting snapshot supplied by the engine, not additive usage." },
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
         "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
       },
       "additionalProperties": false

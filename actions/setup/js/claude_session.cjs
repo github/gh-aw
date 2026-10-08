@@ -1,6 +1,18 @@
 // @ts-check
 
-const { isSessionEvent, createSessionEvent, normalizeAgentSession, normalizeSessionUsage, accumulateSessionUsage, reconcileSessionUsage, isMetric, isTokenCount, projectSessionResult } = require("./agent_session.cjs");
+const {
+  isSessionEvent,
+  createSessionEvent,
+  normalizeAgentSession,
+  normalizeSessionUsage,
+  accumulateSessionUsage,
+  reconcileSessionUsage,
+  isMetric,
+  isTokenCount,
+  projectSessionResult,
+  sessionContext,
+  sessionScopeKey,
+} = require("./agent_session.cjs");
 const { getMessageRefusal } = require("./provider_refusal.cjs");
 const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
@@ -46,16 +58,46 @@ function normalizeClaudeSession(records) {
   const streamedMessages = new Map();
   const responseUsage = new Map();
   const terminalResults = [];
+  const agentTasks = new Map();
+  const agentsByTool = new Map();
 
-  const channelKey = source => JSON.stringify([source.session_id, source.parent_tool_use_id]);
-  const messageKey = (source, id) => JSON.stringify([source.session_id, source.parent_tool_use_id, id]);
-  const toolKey = (source, id) => JSON.stringify([source.session_id, source.parent_tool_use_id, id]);
+  const channelKey = sessionScopeKey;
+  const messageKey = (source, id) => JSON.stringify([channelKey(source), id]);
+  const toolKey = messageKey;
+  const taskKey = (source, id) => JSON.stringify([sessionContext(source).sessionId, id]);
+  const registerAgent = (source, id, toolId, fields) => {
+    if (typeof id !== "string") return;
+    const key = taskKey(source, id);
+    agentTasks.set(key, { ...agentTasks.get(key), ...fields, task_id: id, ...(typeof toolId === "string" ? { tool_use_id: toolId } : {}) });
+    if (typeof toolId !== "string") return;
+    const tool = taskKey(source, toolId);
+    const ids = agentsByTool.get(tool) ?? new Set();
+    ids.add(id);
+    agentsByTool.set(tool, ids);
+  };
+  for (const record of records) {
+    if (record?.type === "system" && record.task_type === "local_agent") registerAgent(record, record.task_id, record.tool_use_id, sourceFields(record));
+    else if (record?.type === "subagent.started" && record.data?.task_type === "local_agent") registerAgent(record, record.agentId, record.data.toolCallId, record.data);
+    else if (typeof record?.tool_use_result?.agentId === "string") {
+      const block = record.message?.content?.find?.(block => block?.type === "tool_result");
+      registerAgent(record, record.tool_use_result.agentId, block?.tool_use_id, { model: record.tool_use_result.resolvedModel });
+    }
+  }
+  const parentAgent = source => {
+    const ids = agentsByTool.get(taskKey(source, sessionContext(source).parentToolUseId));
+    return ids?.size === 1 ? [...ids][0] : undefined;
+  };
   const emit = (source, type, data) => {
-    const event = createSessionEvent(source, type, data);
+    const event = createSessionEvent(source, type, { ...data, ...sessionContext(source) });
     events.push(event);
     return event;
   };
   const native = (source, type) => emit(source, type, sourceFields(source));
+  const emitSubagent = (source, type, task, fields) => {
+    const event = emit(source, type, { ...sourceFields(source), toolCallId: task.tool_use_id, ...fields });
+    event.agentId = task.task_id;
+    return event;
+  };
   const reportUsage = (source, id, usage) => {
     const normalized = claudeUsage(usage);
     if (id === undefined || !normalized) return;
@@ -83,7 +125,8 @@ function normalizeClaudeSession(records) {
       const start = block.tool_use_id !== undefined ? tools.get(toolKey(source, block.tool_use_id)) : undefined;
       const success = block.is_error === true || block.error != null ? false : block.is_error === false ? true : typeof block.success === "boolean" ? block.success : undefined;
       const workflow = source.tool_use_result?.taskType === "local_workflow" ? source.tool_use_result : undefined;
-      return emit(source, "tool.execution_complete", {
+      const agent = typeof source.tool_use_result?.agentId === "string" ? source.tool_use_result : undefined;
+      const event = emit(source, "tool.execution_complete", {
         ...data,
         toolCallId: block.tool_use_id,
         ...toolFields(block, start),
@@ -91,7 +134,10 @@ function normalizeClaudeSession(records) {
         output: block.content,
         durationMs: isMetric(block.duration_ms) ? block.duration_ms : undefined,
         ...(workflow ? { taskId: workflow.taskId, taskType: workflow.taskType, workflowName: workflow.workflowName, workflowRunId: workflow.runId, status: workflow.status } : {}),
+        ...(agent ? { taskId: agent.agentId, taskType: "local_agent", status: agent.status } : {}),
       });
+      if (agent && typeof agent.resolvedModel === "string") emitSubagent(source, "subagent.configured", { task_id: agent.agentId, tool_use_id: block.tool_use_id }, { model: agent.resolvedModel });
+      return event;
     }
     return emit(source, "claude.content_block", data);
   };
@@ -106,6 +152,8 @@ function normalizeClaudeSession(records) {
       if (mapped.type === "tool.execution_start" && mapped.data.toolCallId !== undefined) tools.set(toolKey(mapped, mapped.data.toolCallId), mapped.data);
       continue;
     }
+    const agentId = parentAgent(source);
+    if (source.agentId === undefined && agentId !== undefined) source.agentId = agentId;
     if (["message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"].includes(source.type)) {
       source = { ...source, type: "stream_event", event: source };
     }
@@ -257,10 +305,26 @@ function normalizeClaudeSession(records) {
       }
       terminalResults.push(emit(source, "session.result", data));
     } else if (source.type === "system" && typeof source.subtype === "string") {
-      native(source, Object.hasOwn(DYNAMIC_WORKFLOW_EVENT_TYPES, source.subtype) ? DYNAMIC_WORKFLOW_EVENT_TYPES[source.subtype] : "claude.system");
+      const task = agentTasks.get(taskKey(source, source.task_id));
+      if (task && source.subtype === "task_started") {
+        emitSubagent(source, "subagent.started", task, {
+          agentName: source.subagent_type,
+          agentType: source.subagent_type,
+          parentId: parentAgent(source),
+          executionMode: typeof source.is_backgrounded === "boolean" ? (source.is_backgrounded ? "background" : "sync") : undefined,
+          spawnDepth: isTokenCount(source.spawn_depth) ? source.spawn_depth : undefined,
+        });
+      } else if (task && source.subtype === "task_notification" && ["completed", "failed", "stopped"].includes(source.status)) {
+        emitSubagent(source, source.status === "failed" ? "subagent.failed" : "subagent.completed", task, {
+          durationMs: isMetric(source.usage?.duration_ms) ? source.usage.duration_ms : undefined,
+          totalTokens: isTokenCount(source.usage?.total_tokens) ? source.usage.total_tokens : undefined,
+          totalToolCalls: isTokenCount(source.usage?.tool_uses) ? source.usage.tool_uses : undefined,
+          ...(source.status === "stopped" ? { cancelled: true } : {}),
+        });
+      } else native(source, !task && Object.hasOwn(DYNAMIC_WORKFLOW_EVENT_TYPES, source.subtype) ? DYNAMIC_WORKFLOW_EVENT_TYPES[source.subtype] : "claude.system");
       if (source.subtype === "api_retry" && source.error != null) {
         reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
-      } else if (source.error != null) {
+      } else if (source.error != null && !task) {
         reportError(source, source.error);
       } else if (source.subtype !== "permission_denied") {
         const content = typeof source.message === "string" ? source.message : (source.message?.content ?? source.content);
@@ -277,18 +341,17 @@ function normalizeClaudeSession(records) {
   if (responseUsage.size > 0) {
     const sessions = new Map();
     for (const observation of responseUsage.values()) {
-      if (observation.source.parent_tool_use_id) continue;
-      const key = observation.source.session_id ?? "";
+      const key = channelKey(observation.source);
       const session = sessions.get(key) ?? { usage: {}, source: observation.source };
       accumulateSessionUsage(session.usage, observation.usage);
       sessions.set(key, session);
     }
-    for (const [id, session] of sessions) {
+    for (const [key, session] of sessions) {
       const observed = { ...session.usage, input_tokens_include_cache: false };
-      const terminal = [...terminalResults].reverse().find(event => !event.parent_tool_use_id && (event.session_id ?? "") === id);
+      const terminal = [...terminalResults].reverse().find(event => channelKey(event) === key);
       if (terminal) {
-        const snapshots = terminalResults.filter(event => !event.parent_tool_use_id && (event.session_id ?? "") === id);
-        terminal.data.usage = reconcileSessionUsage(observed, projectSessionResult(snapshots)?.usage);
+        const snapshots = terminalResults.filter(event => channelKey(event) === key);
+        terminal.data.usage = reconcileSessionUsage(observed, projectSessionResult(snapshots, { includeNested: true })?.usage);
       } else {
         emit(session.source, "session.result", { sourceEngine: "claude", usage: observed, partial: true });
       }

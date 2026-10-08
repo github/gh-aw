@@ -112,6 +112,7 @@ export interface SessionUsage {
 }
 
 export interface SessionResultData {
+  sourceEngine?: string;
   numTurns?: SessionCount;
   durationMs?: SessionMetric;
   totalCostUsd?: SessionMetric;
