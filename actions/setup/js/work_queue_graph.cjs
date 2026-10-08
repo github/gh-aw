@@ -4,6 +4,7 @@
 const { canonical, canonicalBytes, closed, digest, identity, integer, queueError, utf8Compare } = require("./work_queue_codec.cjs");
 const { boundedBytes } = require("./work_queue_limits.cjs");
 const { decimal, poolPolicy, validateRequestRole, validateSubmissionEntitlement, workerContinuationAuthority } = require("./work_queue_policy.cjs");
+const { externalVertex, indexesFor } = require("./work_queue_indexes.cjs");
 
 function nodeId(graph_id, node_key) {
   return digest({ graph_id, node_key });
@@ -134,51 +135,66 @@ function workDefinition(work) {
 }
 
 function validateGraphAdmission(state, nodes, actor) {
-  const all = new Map(state.works);
+  const indexes = indexesFor(state);
+  const admitted = new Map();
+  const candidate = id => admitted.get(id) || state.works.get(id);
   const seen = new Set();
   for (const node of nodes) {
     validateWork(node, state, actor);
     if (seen.has(node.work_id)) throw queueError("graph_invalid", "duplicate node key within one submission");
     seen.add(node.work_id);
-    const existing = all.get(node.work_id);
+    const existing = state.works.get(node.work_id);
     if (existing && canonical(workDefinition(existing)) !== canonical(node)) throw queueError("work_conflict", "immutable node definition differs");
     if (!existing && state.admission_paused) throw queueError("admission_paused", "new Work admission is paused");
-    if (!existing) all.set(node.work_id, node);
+    if (!existing) admitted.set(node.work_id, node);
   }
   const graphVertices = new Map();
   const graphPools = new Map();
-  const pending = new Map();
-  for (const node of all.values()) {
-    const vertices = graphVertices.get(node.graph_id) ?? new Set();
+  const pending = new Map(indexes.pending);
+  if (indexes.maxGraphVertices > state.policy.limits.graph_nodes) throw queueError("resource_limit", "graph counts Work and deduplicated Issue/PR gates");
+  for (const node of admitted.values()) {
+    const existingGraph = indexes.graphs.get(node.graph_id);
+    const vertices = graphVertices.get(node.graph_id) ?? new Set(existingGraph?.vertices);
     vertices.add(`work:${node.work_id}`);
     for (const edge of node.depends_on) {
       if (edge.kind === "work") {
-        const parent = all.get(edge.work_id);
+        const parent = candidate(edge.work_id);
         if (!parent || parent.graph_id !== node.graph_id || parent.pool !== node.pool || parent.work_id === node.work_id) throw queueError("dependency_invalid", `missing, foreign, or self predecessor of ${node.node_key}`);
-      } else vertices.add(`gate:${gateKey(edge.resource, edge.condition)}`);
+      } else vertices.add(externalVertex(edge));
     }
     graphVertices.set(node.graph_id, vertices);
-    if (graphPools.has(node.graph_id) && graphPools.get(node.graph_id) !== node.pool) throw queueError("graph_invalid", "graph must stay in one pool");
+    const graphPool = graphPools.get(node.graph_id) ?? existingGraph?.pool;
+    if (graphPool !== undefined && graphPool !== node.pool) throw queueError("graph_invalid", "graph must stay in one pool");
     graphPools.set(node.graph_id, node.pool);
     if (!["completed", "cancelled"].includes(node.state) || node.barrier === "pending") pending.set(node.pool, (pending.get(node.pool) ?? 0) + 1);
   }
   for (const vertices of graphVertices.values()) if (vertices.size > state.policy.limits.graph_nodes) throw queueError("resource_limit", "graph counts Work and deduplicated Issue/PR gates");
   for (const count of pending.values()) if (count > state.policy.limits.pending_nodes) throw queueError("resource_limit", "pool pending-node bound exceeded");
   const colors = new Map();
-  const path = [];
-  function visit(id) {
-    if (colors.get(id) === 2) return;
-    if (colors.get(id) === 1) {
-      const cycle = [...path.slice(path.indexOf(id)), id].map(id => all.get(id).node_key);
-      throw queueError("dependency_cycle", cycle.join(" -> "));
-    }
+  for (const id of [...admitted.keys()].sort(utf8Compare)) {
+    if (colors.get(id) === 2) continue;
+    const stack = [{ id, next: 0 }];
     colors.set(id, 1);
-    path.push(id);
-    for (const edge of all.get(id).depends_on) if (edge.kind === "work") visit(edge.work_id);
-    path.pop();
-    colors.set(id, 2);
+    while (stack.length) {
+      const frame = stack[stack.length - 1];
+      const edges = admitted.get(frame.id).depends_on;
+      if (frame.next === edges.length) {
+        colors.set(frame.id, 2);
+        stack.pop();
+        continue;
+      }
+      const edge = edges[frame.next++];
+      // An immutable accepted predecessor cannot point back into a new batch.
+      if (edge.kind !== "work" || !admitted.has(edge.work_id) || colors.get(edge.work_id) === 2) continue;
+      if (colors.get(edge.work_id) === 1) {
+        const start = stack.findIndex(frame => frame.id === edge.work_id);
+        const cycle = [...stack.slice(start).map(frame => frame.id), edge.work_id].map(id => candidate(id).node_key);
+        throw queueError("dependency_cycle", cycle.join(" -> "));
+      }
+      colors.set(edge.work_id, 1);
+      stack.push({ id: edge.work_id, next: 0 });
+    }
   }
-  for (const id of [...all.keys()].sort(utf8Compare)) visit(id);
   return nodes;
 }
 

@@ -3,6 +3,7 @@
 
 const { createHash } = require("node:crypto");
 const { canonicalBytes, closed, integer, utf8Compare, queueError } = require("./work_queue_codec.cjs");
+const { indexesFor, schedulingState, updateIndexes } = require("./work_queue_indexes.cjs");
 
 function gcd(a, b) {
   while (b !== 0n) [a, b] = [b, a % b];
@@ -68,18 +69,18 @@ function diagnostics(schedule) {
   return { classes: render(schedule.classes), keys: Object.fromEntries([...schedule.keys].sort(([a], [b]) => a - b).map(([priority, parent]) => [priority, render(parent)])) };
 }
 
-function reservationSnapshot(state, pool) {
+function reservationSnapshot(state, pool, indexes = indexesFor(state)) {
   let logical = 0;
   let native = 0;
   const accounts = new Map();
-  for (const claim of state.claims.values()) {
-    if (claim.state !== "open") continue;
+  for (const id of indexes.openClaims) {
+    const claim = state.claims.get(id);
     const work = state.works.get(claim.work_id);
     if (work.pool !== pool) continue;
     logical++;
     accounts.set(work.fairness_key, (accounts.get(work.fairness_key) || 0) + 1);
   }
-  for (const dispatch of state.dispatches.values()) if (dispatch.pool === pool && !dispatch.released) native++;
+  for (const id of indexes.reservations) if (state.dispatches.get(id).pool === pool) native++;
   return { logical, accounts, native };
 }
 
@@ -107,12 +108,13 @@ function planNext(state, pool, at) {
   const policy = poolPolicy(state, pool);
   integer(at, 0, Number.MAX_SAFE_INTEGER, "decision timestamp");
   if (state.grants_paused) return { reason: "grants_paused", observations: [] };
-  const capacity = reservationSnapshot(state, pool);
+  const indexes = indexesFor(state);
+  const capacity = reservationSnapshot(state, pool, indexes);
   if (capacity.logical >= policy.logical_limit) return { reason: "capacity_blocked", observations: [] };
   const buckets = new Map();
   let pending = 0;
-  for (const work of state.works.values()) {
-    if (work.pool !== pool || work.state !== "available") continue;
+  for (const id of indexes.available.get(pool) || []) {
+    const work = state.works.get(id);
     pending++;
     const dependency = eligibility(state, work, at, { logical: capacity.logical, account: capacity.accounts.get(work.fairness_key) || 0 });
     if (!dependency.ready) continue;
@@ -199,12 +201,13 @@ function applyScheduledClaim(state, operation, selection, commit) {
   work.claim_id = operation.claim_id;
   work.attempts++;
   state.clocks.set(work.pool, selection.nextClock);
+  updateIndexes(state, operation);
 }
 
 function planDispatch(state, parameters, { requestId, commitId, at, precedingOperations = 0 }) {
   validateDispatchParameters(parameters, state);
   integer(precedingOperations, 0, state.policy.limits.operations, "preceding operation count");
-  const working = structuredClone(state);
+  const working = schedulingState(state);
   const operations = [];
   const groups = [];
   const policy = state.policy.pools[parameters.pool];
@@ -261,7 +264,7 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
     reason = limit ? (limit === parameters.max_claims ? "claim_budget_reached" : "operation_budget_reached") : "operation_budget_blocked";
     next = lastSelection;
   } else if (operations.length && reason === "no_work") reason = "prefix_complete";
-  return { tip: state.tip, operations, assignments: groups.map(assignmentOnly), reason, next: selectionOnly(next) };
+  return { tip: state.tip, operations, assignments: groups.map(group => structuredClone(assignmentOnly(group))), reason, next: selectionOnly(next) };
 }
 
 function assignmentOnly(dispatch) {

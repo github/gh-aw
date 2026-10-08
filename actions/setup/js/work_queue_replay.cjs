@@ -4,6 +4,7 @@
 const { createHash } = require("node:crypto");
 const { canonical, canonicalBytes, closed, fingerprint, identity, integer, parseStrictJSON, queueError, utf8Compare, validateReason } = require("./work_queue_codec.cjs");
 const { boundedBytes, checkLedgerBudget } = require("./work_queue_limits.cjs");
+const { indexesFor, trackState, untrackState, updateIndexes } = require("./work_queue_indexes.cjs");
 const { validateEffectResourceAuthority } = require("./work_queue_resource_scope.cjs");
 const {
   actorFromContext,
@@ -529,8 +530,8 @@ function applyLifecycle(state, operation, commit) {
         )
           throw queueError("run_binding_conflict", "activation may bind only its authenticated actual run");
         if (dispatch.run && canonical(dispatch.run) !== canonical(run)) throw queueError("run_binding_conflict", "assignment already belongs to a different native run");
-        for (const existing of state.dispatches.values())
-          if (existing.dispatch_id !== dispatch.dispatch_id && existing.run?.run_id === run.run_id) throw queueError("run_binding_conflict", "native run is already bound to another assignment");
+        const existingBinding = indexesFor(state).runBindings.get(run.run_id);
+        if (existingBinding && existingBinding !== dispatch.dispatch_id) throw queueError("run_binding_conflict", "native run is already bound to another assignment");
         dispatch.run = run;
       } else if (operation.state === "rejected") {
         if (!operation.evidence || operation.run || operation.sender) throw queueError("evidence_invalid", "rejection requires positive nonlaunch evidence");
@@ -598,9 +599,13 @@ function validateRequestContext(state, request, actor) {
 }
 
 function replayTransactions(transactions) {
-  const ordered = causalChain(transactions);
+  return replayOrdered(causalChain(transactions));
+}
+
+function replayOrdered(ordered) {
   if (!ordered.length) throw queueError("policy_missing", "existing queue has no policy genesis");
   const state = newState();
+  trackState(state);
   const epochs = new Set();
   const generations = new Set(["initial"]);
   for (let ordinal = 0; ordinal < ordered.length; ordinal++) {
@@ -673,6 +678,7 @@ function replayTransactions(transactions) {
         default:
           applyLifecycle(state, operation, commit);
       }
+      updateIndexes(state, operation);
     }
     if (expected && claimIndex !== expected.operations.length) throw queueError("packing_invalid", "Claim commit omitted an admissible member of the fair prefix");
     if (!expected && commit.request.kind === "dispatch_next") throw queueError("request_invalid", "no-grant evaluation cannot consume a stable request identity");
@@ -696,6 +702,7 @@ function replayTransactions(transactions) {
   }
   if (!state.policy) throw queueError("policy_missing", "existing queue has no policy genesis");
   projectViews(state);
+  untrackState(state);
   return Object.assign(state, { policy: state.policy });
 }
 
@@ -747,7 +754,7 @@ function serializeProjection(state) {
   };
 }
 
-function parseTransactionLog(contents) {
+function replayTransactionLog(contents) {
   if (typeof contents !== "string" || Buffer.byteLength(contents, "utf8") > 80 * 1024 * 1024) throw queueError("resource_limit", "ledger exceeds cold parser bound");
   if (!contents || !contents.endsWith("\n")) throw queueError("ledger_invalid", "queue log must be nonempty and newline terminated");
   const lines = contents.split("\n");
@@ -757,7 +764,11 @@ function parseTransactionLog(contents) {
     if (Buffer.byteLength(line, "utf8") > 8 * 1024 * 1024) throw queueError("resource_limit", `commit line ${index + 1} exceeds parser bound`);
     return parseStrictJSON(line);
   });
-  return replayTransactions(commits).transactions;
+  return replayTransactions(commits);
+}
+
+function parseTransactionLog(contents) {
+  return replayTransactionLog(contents).transactions;
 }
 
 function serializeTransactionLog(transactions) {
@@ -771,14 +782,17 @@ function compactTransactions(transactions) {
 
 function appendCommit(transactions, commit) {
   validateCommit(commit);
-  const before = transactions.length ? replayTransactions(transactions) : newState();
-  const prior = before.requests.get(commit.request.id);
-  if (prior) {
+  const ordered = causalChain(transactions);
+  if (ordered.some(transaction => transaction.request.id === commit.request.id)) {
+    const before = replayOrdered(ordered);
+    const prior = before.requests.get(commit.request.id);
     if (prior.request.fingerprint !== commit.request.fingerprint || canonical(prior.actor) !== canonical(commit.actor)) throw queueError("request_reused", "stable request identity has different validated meaning");
     return { transactions: before.transactions, state: before, commit: prior, idempotent: true };
   }
-  if (commit.previous !== (before.tip || null)) throw queueError("ledger_invalid", "append does not extend checked causal tip");
-  const state = replayTransactions([...before.transactions, commit]);
+  if (commit.previous !== (ordered.at(-1)?.id ?? null)) throw queueError("ledger_invalid", "append does not extend checked causal tip");
+  if (ordered.some(transaction => transaction.id === commit.id)) throw queueError("ledger_invalid", "conflicting duplicate commit ID");
+  if (ordered.length >= 1000000) throw queueError("resource_limit", "ledger commit count exceeded");
+  const state = replayOrdered([...ordered, commit]);
   return { transactions: state.transactions, state, commit, idempotent: false };
 }
 
@@ -800,7 +814,7 @@ function generateRequestOperations(state, request, actor, at, commitId, observat
 function planDispatchWithObservations(state, request, actor, at, commitId, observations) {
   validateRequestContext(state, request, actor);
   if (request.kind !== "dispatch_next" || !Array.isArray(observations)) throw queueError("request_invalid", "atomic observed dispatch requires dispatch_next and an observation array");
-  const working = structuredClone(state);
+  const working = { ...state, observations: new Map(state.observations), observationsById: new Map(state.observationsById), observation_writes: new Map(state.observation_writes) };
   const commit = { at, actor };
   for (const observation of observations) {
     validateOperation(observation);
@@ -855,6 +869,7 @@ module.exports = {
   planNext,
   quiescent,
   replayTransactions,
+  replayTransactionLog,
   serializeProjection,
   serializeTransactionLog,
   validateClaimAuthority,

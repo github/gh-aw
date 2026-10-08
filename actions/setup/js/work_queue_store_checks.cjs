@@ -840,6 +840,15 @@ function registerTests({ describe, it }) {
         assert.equal(fake.state.updates, 0);
       }
     });
+    it("reads multi-MiB ledger blobs without overflowing the base64 validator", async () => {
+      const fake = fakeGitHub([genesis()]);
+      const content = canonical(genesis()) + " ".repeat(6 * 1024 * 1024) + "\n";
+      fake.state.badBlob = { encoding: "base64", content: Buffer.from(content).toString("base64") };
+      const current = await readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+      assert.equal(current.state.tip, "genesis");
+      assert.equal(current.transactions.length, 1);
+      assert.equal(fake.state.updates, 0);
+    });
     it("rejects missing logs, truncated trees, malformed UTF-8/base64, empty/policyless histories without writes", async () => {
       const fake = fakeGitHub([genesis()]);
       for (const property of ["missingLog", "truncated", "emptyLog"]) {
@@ -849,6 +858,9 @@ function registerTests({ describe, it }) {
       }
       for (const blob of [
         { encoding: "base64", content: "***" },
+        { encoding: "base64", content: "AA=A" },
+        { encoding: "base64", content: "A===" },
+        { encoding: "base64", content: "AAAA=" },
         { encoding: "base64", content: Buffer.from([0xff]).toString("base64") },
         { encoding: "utf8", content: "{}" },
       ]) {

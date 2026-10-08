@@ -143,6 +143,16 @@ function registerTests({ describe, it }) {
       assert.throws(() => replayTransactions([...log, { ...log[1], at: 2 }]), /duplicate commit/);
       assert.throws(() => parseTransactionLog(serializeTransactionLog(log) + "\n"), /empty|truncated/);
     });
+    it("appends once to canonical deduplicated history and rejects stale tips and reused commit IDs", () => {
+      const log = fixture(["a"]);
+      const operations = [{ kind: "Control", control: "grants_paused", value: true, reason: "stress_control" }];
+      const candidate = commit(log[1].id, "append-control", "control", administrator, { operations }, operations);
+      const appended = appendCommit([...log].reverse().concat(log), candidate);
+      assert.deepEqual(appended.transactions, [...log, candidate]);
+      assert.deepEqual(serializeProjection(appended.state), serializeProjection(replayTransactions([...log, candidate])));
+      assert.throws(() => appendCommit(log, { ...candidate, previous: log[0].id }), { code: "ledger_invalid" });
+      assert.throws(() => appendCommit(log, { ...candidate, id: log[0].id }), { code: "ledger_invalid" });
+    });
     it("binds a committed stable request to the same actor, kind and semantic parameters", () => {
       const log = fixture(["a"]);
       const existing = log[1];
