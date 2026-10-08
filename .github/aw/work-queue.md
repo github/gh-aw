@@ -12,8 +12,9 @@ Use `tools.work-queue` for durable fair scheduling, immutable Work DAGs and
 Claim-scoped effects. Treat the causal `work-queue.jsonl` log as the only
 authority. Defaults are FIFO-like; configured weights share Claim opportunities,
 not CPU time or successful completions. In this version-3 native protocol,
-Issues/PRs are dependency nodes; `storage: issues` is unsupported. Do not confuse
-that restriction with issue-backed WorkQueueOps.
+Issues/PRs are dependency nodes, not queue-storage backends. Git is always used;
+do not configure a `storage` field. Do not confuse this with
+issue-backed WorkQueueOps, which is a separate pattern.
 
 ## Select the role
 
@@ -37,7 +38,6 @@ Declare a worker with:
 ```yaml
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
 ```

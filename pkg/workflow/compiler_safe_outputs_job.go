@@ -180,11 +180,7 @@ func safeOutputsJobPermissions(data *WorkflowData) (*Permissions, bool) {
 		if data.SafeOutputs != nil && data.SafeOutputs.UploadCodeCoverage != nil && !isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), data.SafeOutputs.UploadCodeCoverage.Staged) {
 			permissions.Set(PermissionCodeQuality, PermissionWrite)
 		}
-		if workQueueStorage(data) == "issues" {
-			permissions.Set(PermissionIssues, PermissionWrite)
-		} else {
-			permissions.Set(PermissionContents, PermissionWrite)
-		}
+		permissions.Set(PermissionContents, PermissionWrite)
 	}
 	return permissions, IsDetectionJobEnabled(data.SafeOutputs)
 }
@@ -365,9 +361,6 @@ func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []s
 		}
 	}
 	steps = append(steps, policyEnv...)
-	if workQueueStorage(data) == "issues" {
-		steps = append(steps, "        env:\n", "          GH_AW_WORK_QUEUE_STORAGE: issues\n", "          WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}\n")
-	}
 	return append(steps,
 		"        with:\n",
 		"          script: |\n",

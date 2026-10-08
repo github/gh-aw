@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("claims");
 
 const { isProxy } = require("node:util").types;
 const queue = require("./work_queue_replay.cjs");
@@ -95,6 +96,7 @@ function runtimeOptions(options) {
 }
 
 async function authorizeWorkerClaim(options = {}) {
+  log.debug("claim.authorize.start");
   const configured = runtimeOptions(options);
   const assignment = normalizeAssignment(options.assignment);
   const normalized = normalizeClaimScope(Object.hasOwn(options, "message") ? options.message : Object.hasOwn(options, "claim_handle") ? { claim_handle: options.claim_handle } : {}, assignment);
@@ -130,15 +132,18 @@ async function authorizeWorkerClaim(options = {}) {
     requireCompletion: options.requireCompletion !== false,
     ...(resource === undefined ? {} : { resource }),
   });
+  log.debug("claim.authorize.complete", { require_completion: options.requireCompletion !== false });
   return { ...base, authorized: true, state: options.requireCompletion === false ? "open" : "completed" };
 }
 
 async function reconcileWorkerClaim(options = {}) {
+  log.debug("claims.reconcile.start");
   const configured = runtimeOptions(options);
   const supplied = options.assignment ?? (options.worker === undefined ? readWorkerSnapshot(options.snapshotPath) : options.worker);
   if (!supplied) return { version: 3, status: options.requireAssignment ? "missing" : "unassigned", claims: {}, errors: [] };
   const assignment = normalizeAssignment(supplied);
   const staged = readFinishIntent(options.finishIntentPath, assignment);
+  log.debug("claims.reconcile.intents", { claims: assignment.claims.length, intents: staged.intents.size, errors: staged.errors.length });
   const states = Object.create(null);
   if (isStagedMode(options) || isStagedMode(options.config)) {
     const latest = await loadQueue(configured);
@@ -189,9 +194,11 @@ async function reconcileWorkerClaim(options = {}) {
       latest = await loadQueue(configured);
       const verified = latest.projection.claims.get(member.claim_id);
       if (verified?.state !== outcome) throw new Error("work_queue_finish_not_durable");
+      log.debug("claim.finish.persisted", { completed: outcome === "completed", cancelled: outcome === "cancelled" });
       const authorized = outcome === "completed";
       states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: outcome, authorized };
-    } catch {
+    } catch (error) {
+      log.failure("claim.finish.blocked", error);
       states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: "blocked", authorized: false };
     }
   }
@@ -199,6 +206,7 @@ async function reconcileWorkerClaim(options = {}) {
   const completed = values.filter(state => ["completed", "result", "delivery_failed"].includes(state.state)).length;
   const cancelled = values.filter(state => state.state === "cancelled").length;
   const status = completed + cancelled !== values.length ? "pending" : completed && cancelled ? "completed_with_cancellations" : completed ? "completed" : "cancelled";
+  log.debug("claims.reconcile.complete", { completed, cancelled, pending: completed + cancelled !== values.length });
   return { version: 3, dispatch_id: assignment.dispatch_id, run_id: admitted.binding.run_id, run_attempt: 1, status, claims: states, errors: staged.errors };
 }
 
@@ -217,6 +225,7 @@ async function verifyWithinBudget(verifier, member, context, remainingMs) {
     const timeout = new Promise(resolve => {
       timer = setTimeout(
         () => {
+          log.debug("delivery.verifier.timed_out");
           controller.abort();
           resolve(null);
         },
@@ -230,6 +239,7 @@ async function verifyWithinBudget(verifier, member, context, remainingMs) {
 }
 
 async function finalizeWorkerResults(options = {}) {
+  log.debug("results.finalize.start");
   const configured = runtimeOptions(options);
   const assignment = normalizeAssignment(options.assignment || readWorkerSnapshot(options.snapshotPath));
   const initial = await loadQueue(configured);
@@ -284,14 +294,17 @@ async function finalizeWorkerResults(options = {}) {
       integer(work.completion_at, 0, Number.MAX_SAFE_INTEGER, "Completion timestamp");
       const remainingDeadline = policy.deadline_ms - Math.max(0, (options.now ?? verificationStarted) - work.completion_at);
       for (; attempts < policy.max_attempts && Date.now() - verificationStarted < remainingDeadline; attempts++) {
+        log.debug("delivery.verifier.attempt", { attempt: attempts + 1 });
         try {
           verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts + 1, run: dispatch.run }, remainingDeadline - (Date.now() - verificationStarted));
-        } catch {
+        } catch (error) {
+          log.failure("delivery.verifier.failed", error);
           verification = null;
         }
         const trustedDelivery = isTrustedClaimDelivery(verification, assignment, member.handle);
         if (verification?.verified === true && !trustedDelivery) verification = null;
         verified = contractSupported && trustedDelivery && verifiedClaimEffects(verification) ? verification : null;
+        log.debug("delivery.verifier.checked", { trusted: trustedDelivery, verified: !!verified });
         if (verified) {
           verifiedSnapshot = snapshotClaimDelivery(verified);
           break;
@@ -338,6 +351,7 @@ async function finalizeWorkerResults(options = {}) {
           if (digest(claimControlReceipts(state, assignment, member.handle)) !== verifiedSnapshot.controls_digest) throw new Error("work_queue_control_inventory_changed");
         });
         results[member.handle] = { state: "result", effects: verifiedSnapshot.effects };
+        log.debug("result.persisted");
       } else {
         let disposition = contractSupported && verificationReceipt && (verification?.effects === "none" || verification?.effects === "partial") ? verification.effects : "unknown";
         if (controls.length && disposition === "none") disposition = "partial";
@@ -363,13 +377,16 @@ async function finalizeWorkerResults(options = {}) {
         const operation = { kind: "DeliveryFailure", work_id: member.work_id, claim_id: member.claim_id, completion_id: work.completion_id, reason: "verification_exhausted", disposition, evidence };
         await publishOperations(configured, trustedContext, ["delivery_failure", assignment.dispatch_id, member.handle, work.completion_id], "delivery_failure", [operation]);
         results[member.handle] = { state: "delivery_failed", effects: disposition };
+        log.debug("delivery.failure.persisted", { attempts, unknown_effects: disposition === "unknown" });
       }
       latest = await loadQueue(configured);
       if (!["verified", "failed"].includes(latest.projection.works.get(member.work_id)?.barrier)) throw new Error("work_queue_result_not_durable");
-    } catch {
+    } catch (error) {
+      log.failure("result.verification.unresolved", error);
       results[member.handle] = { state: "pending", effects: "unknown", reason: "verification_unresolved" };
     }
   }
+  log.debug("results.finalize.complete", { claims: Object.keys(results).length });
   return { version: 3, dispatch_id: assignment.dispatch_id, claims: results };
 }
 
@@ -386,7 +403,8 @@ async function main(options = {}) {
     coreApi.info(`Work queue reconciliation: ${result.status}; authorization is per Claim`);
     await coreApi.summary.addRaw(renderSummary(result)).write();
     return result;
-  } catch {
+  } catch (error) {
+    log.failure("claims.reconcile.failed", error);
     coreApi.setOutput("claim_authorizations", JSON.stringify({ version: 3, status: "failed", claims: {} }));
     await coreApi.summary.addRaw(renderSummary({ claims: {} })).write();
     throw new Error("Work queue reconciliation failed; unverified Claim effects are blocked");

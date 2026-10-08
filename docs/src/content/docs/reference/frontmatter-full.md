@@ -889,6 +889,25 @@ on:
     forks: []
       # Array items: string
 
+    # Acknowledge elevated permissions and secret access to suppress only the
+    # strict-mode pull_request_target trigger warning. Checkout validation remains
+    # enforced.
+    # (optional)
+    acknowledge-risk: true
+
+    # Exact literal repository/ref pairs trusted by the maintainer in addition to the
+    # supported base-repository checkouts. Expressions, wildcards, omitted refs, and
+    # PR refs are not allowed.
+    # (optional)
+    allowed-checkouts: []
+      # Array items:
+        # Literal owner/repository slug. Matches exactly, including case.
+        repository: "example-value"
+
+        # Literal trusted branch, tag, or commit SHA; not a pull request ref. Prefer an
+        # immutable commit SHA.
+        ref: "example-value"
+
   # Pull request review event trigger that runs when a pull request review is
   # submitted, edited, or dismissed
   # (optional)
@@ -2706,8 +2725,16 @@ engine:
   # (optional)
   model: "example-value"
 
-  # Experimental per-run Copilot model and reasoning-effort selection from the task
-  # text; requires the AWF firewall and ignores fixed model and effort settings. See
+  # Ordered alternative models after model-specific failures, supported by engines
+  # with a built-in retry harness. Each model receives its own harness retry budget.
+  # Cannot be combined with model-routing or a custom driver or harness.
+  # (optional)
+  fallback-models: []
+    # Array of strings
+
+  # Experimental per-run GitHub Copilot model and reasoning-effort selection from
+  # the task text for Copilot, Claude, Codex, and pi engines; requires the AWF
+  # firewall and ignores fixed model and effort settings. See
   # https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   model-routing:
@@ -4436,10 +4463,6 @@ tools:
 
   # Format 3: object
   work-queue:
-    # Version-3 Git queue backend.
-    # (optional)
-    storage: "git"
-
     # Fail closed and block safe outputs when no trusted inbound worker assignment is
     # present.
     # (optional)
@@ -4455,34 +4478,27 @@ tools:
     # (optional)
     memory:
       # (optional)
-      name: "persist_work_queue_memory"
+      name: "My Workflow"
 
       # Fixed relative JSON file path in the snapshot tree.
-      path: "memory.json"
+      path: "example-value"
 
       # Fixed repository also authorized by the installed immutable Work scope.
-      target-repo: "owner/repo"
+      target-repo: "example-value"
 
-      base-revision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      base-revision: "example-value"
 
-      branch-prefix: "memory/runs"
+      branch-prefix: "example-value"
 
       # (optional)
-      max-bytes: 262144
+      max-bytes: 1
 
       # Bounded inline typed JSON Schema subset: object
       # properties/required/additionalProperties, array items, scalar enum, numeric
       # ranges, and string/array length bounds. No references, regexes, or executable
       # validators.
       schema:
-        type: object
-
-  # `false` and `storage: "issues"` are invalid. Omit `work-queue` entirely for a
-  # workflow that does not use the queue. Frontmatter configures the workflow's
-  # compiler/runtime role; only authenticated installation of the queue Policy
-  # grants producer and worker-profile authority. Dispatch workers are additionally
-  # constrained by `safe-outputs.dispatch-workflow.workflows` and the installed
-  # profile's immutable workflow revision and principal.
+        {}
 
   # Cache memory MCP configuration for persistent memory storage
   # (optional)
@@ -21233,8 +21249,16 @@ safe-outputs:
       # (optional)
       model: "example-value"
 
-      # Experimental per-run Copilot model and reasoning-effort selection from the task
-      # text; requires the AWF firewall and ignores fixed model and effort settings. See
+      # Ordered alternative models after model-specific failures, supported by engines
+      # with a built-in retry harness. Each model receives its own harness retry budget.
+      # Cannot be combined with model-routing or a custom driver or harness.
+      # (optional)
+      fallback-models: []
+        # Array of strings
+
+      # Experimental per-run GitHub Copilot model and reasoning-effort selection from
+      # the task text for Copilot, Claude, Codex, and pi engines; requires the AWF
+      # firewall and ignores fixed model and effort settings. See
       # https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
       model-routing:

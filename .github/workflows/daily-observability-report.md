@@ -17,7 +17,6 @@ strict: true
 tracker-id: daily-observability-report
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
   agentic-workflows: true

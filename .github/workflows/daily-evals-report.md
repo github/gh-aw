@@ -23,7 +23,6 @@ features:
 timeout-minutes: 45
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
   github:

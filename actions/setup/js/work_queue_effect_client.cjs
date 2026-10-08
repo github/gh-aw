@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("effects");
 
 const { assertClaimAuthorized, currentClaimHandle, recordClaimEffect, claimIdentity, assertClaimIdentity, currentClaimResourceEffects } = require("./work_queue_claim_scope.cjs");
 const { canonical, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
@@ -394,13 +395,20 @@ function wrapClaimEffectClient(client, options) {
     );
   };
   const mutate = async (target, receiver, args, repository, number, kind, body) => {
+    log.debug("effect.mutate.start", { graphql: false });
     const parameters = body && typeof body === "object" && !Array.isArray(body) ? requestObject(body) : {};
     const expected = {};
     for (const field of ["title", "body", "state", "state_reason", "milestone", "labels", "assignees"]) {
       if (Object.prototype.hasOwnProperty.call(parameters, field)) expected[field] = structuredClone(parameters[field]);
     }
     const effect = recordClaimEffect({ repository, number: number || null, kind, expected, outcome: "unknown" });
-    const response = await Reflect.apply(target, receiver, args);
+    let response;
+    try {
+      response = await Reflect.apply(target, receiver, args);
+    } catch (error) {
+      log.failure("effect.mutate.failed", error);
+      throw error;
+    }
     const data = response?.data;
     if (effect) {
       effect.outcome = "succeeded";
@@ -408,6 +416,7 @@ function wrapClaimEffectClient(client, options) {
       if (data?.id) effect.id = String(data.id);
       if (kind.startsWith("git_") && (data?.sha || data?.object?.sha)) effect.id = String(data.sha || data.object.sha);
     }
+    log.debug("effect.mutate.complete", { recorded: !!effect });
     return response;
   };
   const gateGraphMutation = async (query, variables) => {
@@ -556,12 +565,20 @@ function wrapClaimEffectClient(client, options) {
           if (/\bmutation\b/.test(query.replace(/#[^\n]*/g, ""))) {
             const immutableVariables = snapshot.variables;
             return gateGraphMutation(query, immutableVariables).then(async repositories => {
+              log.debug("effect.mutate.start", { graphql: true, repositories: repositories.size });
               const effect = recordClaimEffect({ repository: repositories.size === 1 ? [...repositories][0] : null, number: null, kind: "graphql", outcome: "unknown" });
-              const response = await Reflect.apply(snapshot.target, receiver, immutableArgs);
+              let response;
+              try {
+                response = await Reflect.apply(snapshot.target, receiver, immutableArgs);
+              } catch (error) {
+                log.failure("effect.mutate.failed", error);
+                throw error;
+              }
               if (effect) {
                 effect.id = graphEffectIdentity(query, immutableVariables, response);
                 effect.outcome = "succeeded";
               }
+              log.debug("effect.mutate.complete", { recorded: !!effect });
               return response;
             });
           }

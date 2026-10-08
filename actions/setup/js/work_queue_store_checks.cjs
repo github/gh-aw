@@ -223,28 +223,6 @@ function registerTests({ describe, it }) {
       assert.equal(fake.refs.get("work-queue"), sha);
       assert.equal(serializeTransactionLog(fake.log()), before);
     });
-    it("rejects explicit and environment-selected Issues storage before any queue read or publication API call", async () => {
-      const request = newRequest("unsupported-backend", "control", administrator, { operations: [{ kind: "Control", control: "grants_paused", value: true, reason: "maintenance" }] });
-      const githubClient = new Proxy(
-        {},
-        {
-          get: () => {
-            throw new Error("remote API must not be called");
-          },
-        }
-      );
-      await assert.rejects(readWorkQueueLog({ githubClient, owner: "owner", repo: "repo", storage: "issues" }), { code: "unsupported_backend" });
-      await assert.rejects(publishWorkQueueRequest({ githubClient, owner: "owner", repo: "repo", request, context: context(administrator), storage: "issues" }), { code: "unsupported_backend" });
-      const previous = process.env.GH_AW_WORK_QUEUE_STORAGE;
-      process.env.GH_AW_WORK_QUEUE_STORAGE = "issues";
-      try {
-        await assert.rejects(readWorkQueueLog({ githubClient, owner: "owner", repo: "repo" }), { code: "unsupported_backend" });
-        await assert.rejects(publishWorkQueueRequest({ githubClient, owner: "owner", repo: "repo", request, context: context(administrator) }), { code: "unsupported_backend" });
-      } finally {
-        if (previous === undefined) delete process.env.GH_AW_WORK_QUEUE_STORAGE;
-        else process.env.GH_AW_WORK_QUEUE_STORAGE = previous;
-      }
-    });
     it("freshly authorizes every independent frozen Work resource scope without publishing", async () => {
       assert.equal(resourceFixture.cases.length, 47);
       for (const test of resourceFixture.cases) {

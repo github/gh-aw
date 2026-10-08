@@ -23,6 +23,82 @@ describe("awf_model_routing.cjs", () => {
     expect(resolveAWFModelRoutingSelection(reflectData, true, ["/responses"]).error).toContain("not supported by this engine");
   });
 
+  it("uses an engine-compatible endpoint from complete routing metadata and preserves AWF's selection", () => {
+    const reflect = {
+      ...reflectData,
+      models_fetch_complete: true,
+      endpoints: [
+        {
+          ...reflectData.endpoints[0],
+          provider: "copilot",
+          routing_models: [
+            {
+              model_id: "claude-opus-5",
+              source: "provider",
+              supported_endpoints: ["/v1/messages", "/chat/completions"],
+              supported_reasoning_efforts: ["low", "medium", "high", "xhigh", "max"],
+              context_window_tokens: 1000000,
+              candidate_metadata_complete: true,
+            },
+            { model_id: "claude-haiku-4.5", source: "provider", supported_endpoints: ["/chat/completions", "/v1/messages"], supported_reasoning_efforts: [], context_window_tokens: 200000, candidate_metadata_complete: true },
+          ],
+        },
+      ],
+      routing: {
+        ...reflectData.routing,
+        selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" },
+      },
+    };
+    expect(resolveAWFModelRoutingSelection(reflect, true, ["/v1/messages"], true).selection).toMatchObject({
+      endpoint: "/v1/messages",
+      selected_endpoint: "/chat/completions",
+    });
+  });
+
+  it("fails closed when multiple configured GitHub endpoints list the routed model", () => {
+    const reflect = {
+      ...reflectData,
+      endpoints: [
+        {
+          provider: "copilot",
+          configured: true,
+          models: ["claude-opus-5"],
+          routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] }],
+        },
+        {
+          provider: "github",
+          configured: true,
+          models: ["claude-opus-5"],
+          routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] }],
+        },
+      ],
+    };
+    const result = resolveAWFModelRoutingSelection(reflect, true, ["/v1/messages"]);
+    expect(result.selection).toBeNull();
+    expect(result.error).toContain("model claude-opus-5");
+    expect(result.error).toContain("[copilot, github]");
+  });
+
+  it.each([
+    [[{ model_id: "claude-opus-5", candidate_metadata_complete: false, supported_endpoints: ["/v1/messages"] }], "metadata is incomplete"],
+    [
+      [
+        { model_id: "claude-opus-5", supported_endpoints: ["/v1/messages"] },
+        { model_id: "claude-haiku-4.5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] },
+      ],
+      "metadata is incomplete",
+    ],
+    [[{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/responses"] }], "advertises endpoints"],
+    [[], "metadata is incomplete"],
+  ])("fails closed when the model endpoint metadata cannot verify a compatible endpoint: %s", (routing_models, error) => {
+    const reflect = {
+      ...reflectData,
+      endpoints: [{ ...reflectData.endpoints[0], routing_models }],
+      routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" } },
+    };
+    expect(resolveAWFModelRoutingSelection(reflect, true, ["/v1/messages"], true).error).toContain(error);
+  });
+
   it("checks routed model availability only against configured GitHub provider aliases", () => {
     const mixedProviders = {
       ...reflectData,

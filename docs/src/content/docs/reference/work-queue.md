@@ -6,8 +6,8 @@ description: Git-backed work queue roles, Claim-scoped effects, operator command
 Work queues can be Git-backed or issue-backed. Native `tools.work-queue` uses
 Git storage. Lightweight issue checklists and sub-issue queues use
 [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) with GitHub read tools and safe
-outputs. This reference describes the native version-3 protocol, whose compiler
-and runtime reject `storage: issues`.
+outputs. This reference describes the native version-3 protocol. Git is the only
+backend, and `tools.work-queue` has no `storage` field.
 
 The native queue enforces fair scheduling, immutable task dependency graphs,
 and worker effects authorized by individual Claims. Its only source of
@@ -47,6 +47,25 @@ For workflow examples, see the [Linter Factory](/gh-aw/patterns/linter-factory/)
 for fair dispatch and Claim-scoped worker outputs, and the
 [Daily Report Portfolio](/gh-aw/patterns/daily-report-portfolio/) for a daily
 dispatcher coordinating reporting workers.
+
+## Runtime debug logging
+
+The JavaScript runtime uses the shared logger framework to write opt-in,
+timestamped debug events to stderr. `DEBUG=work-queue:*` enables all queue
+namespaces. `DEBUG=work-queue:store,work-queue:dispatch` selects components;
+`DEBUG=work-queue:*,-work-queue:replay` excludes replay events. Namespace
+patterns support `*`, with comma or whitespace separators.
+`ACTIONS_RUNNER_DEBUG=true` or `RUNNER_DEBUG=1` enables all queue events,
+including when a GitHub Actions run is re-run with debug logging.
+
+Namespaces cover `store`, `replay`, `scheduler`, `native`, `dispatch`,
+`reconciler`, `claims`, `delivery`, `effects`, `memory`, `intents`, and `mcp`. Events describe
+publication attempts, conflicts, recovery, capacity and packing limits,
+native launch and binding, independent verification, and durable settlement.
+Metadata contains only counts, flags, retry delays, and HTTP status codes.
+Payloads, identifiers, repository names, paths, URLs, tokens, raw API responses,
+error messages, and stack traces are not logged. Debug events do not grant
+authority or replace durable queue receipts.
 
 ## Workflow roles and intent tools
 

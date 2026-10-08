@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+func useDockerFallback(t *testing.T) {
+	t.Helper()
+	t.Setenv("PATH", t.TempDir())
+}
+
 func TestCheckAndPrepareDockerImages_NoToolsRequested(t *testing.T) {
 	// Reset state before test
 	ResetDockerPullState()
@@ -22,6 +27,7 @@ func TestCheckAndPrepareDockerImages_NoToolsRequested(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_ImageAlreadyDownloading(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 
@@ -138,6 +144,7 @@ func TestDockerImageConstants(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_MultipleImages(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 
@@ -169,6 +176,7 @@ func TestCheckAndPrepareDockerImages_MultipleImages(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_RetryMessageFormat(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 
@@ -203,6 +211,7 @@ func TestCheckAndPrepareDockerImages_RetryMessageFormat(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_StartedDownloadingMessage(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 
@@ -229,6 +238,7 @@ func TestCheckAndPrepareDockerImages_StartedDownloadingMessage(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_ImageAlreadyAvailable(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 
@@ -618,6 +628,7 @@ func TestStartDockerImageDownload_NilContext(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_DockerUnavailable(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 
@@ -656,6 +667,7 @@ func TestCheckAndPrepareDockerImages_DockerUnavailable(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_DockerUnavailable_MultipleTools(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 
@@ -751,6 +763,7 @@ func TestCheckAndPrepareDockerImages_DockerUnavailable_ReturnsTypedError(t *test
 }
 
 func TestCheckAndPrepareDockerImages_RunnerGuardImageDownloading(t *testing.T) {
+	useDockerFallback(t)
 	// Reset state before test
 	ResetDockerPullState()
 

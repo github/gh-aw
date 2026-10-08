@@ -142,7 +142,8 @@ describe("three-of-ten daily discussion-report portfolio", () => {
       expect(frontmatter).toMatch(/^  workflow_dispatch:/m);
       expect(frontmatter).not.toMatch(/^  schedule:/m);
       expect(frontmatter).toMatch(/^ *- shared\/daily-report-worker\.md$/m);
-      expect(frontmatter).toMatch(/work-queue:\n    storage: git\n    worker: true\n    require-assignment: true/);
+      expect(frontmatter).toMatch(/work-queue:\n    worker: true\n    require-assignment: true/);
+      expect(frontmatter).not.toMatch(/storage:/);
       expect(frontmatter).not.toContain("source:");
       const compiled = fs.readFileSync(new URL(`../../../.github/workflows/${profile}.lock.yml`, import.meta.url), "utf8");
       expect(compiled).toContain("work_queue_assignment:");
