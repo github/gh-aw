@@ -21,7 +21,7 @@ func TestEngineCatalog_IDs(t *testing.T) {
 	require.NotEmpty(t, ids, "IDs() should return a non-empty list")
 
 	// Verify all built-in engines are present
-	expectedIDs := []string{"claude", "codex", "copilot", "gemini", "pi"}
+	expectedIDs := []string{"agy", "claude", "codex", "copilot", "gemini", "pi"}
 	assert.Equal(t, expectedIDs, ids, "IDs() should return all built-in engines in sorted order")
 
 	// Verify the list is sorted

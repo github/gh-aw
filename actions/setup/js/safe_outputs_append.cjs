@@ -4,6 +4,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 const fs = require("fs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
+const { normalizeRuntimeMessage } = require("./work_queue_claim_scope.cjs");
 
 /**
  * Create an append function for the safe outputs file
@@ -24,6 +25,7 @@ function createAppendFunction(outputFile) {
     if (!outputFile) throw new Error(`${ERR_VALIDATION}: No output file configured`);
     // Normalize type to use underscores (convert any dashes to underscores)
     entry.type = entry.type.replace(/-/g, "_");
+    entry = normalizeRuntimeMessage(entry);
     // CRITICAL: Use JSON.stringify WITHOUT formatting parameters for JSONL format
     // Each entry must be on a single line, followed by a newline character
     const jsonLine = JSON.stringify(entry) + "\n";

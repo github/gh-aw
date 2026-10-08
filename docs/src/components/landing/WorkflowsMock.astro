@@ -11,7 +11,7 @@ interface Props {
 const { kind } = Astro.props;
 ---
 
-<div class="wf-stage" aria-hidden="true">
+<div class="wf-stage" aria-hidden="true" data-slideshow-snippet={`${kind} output`}>
   <div class={`gh gh-${kind}`}>
     {kind === 'repo-assist' && (<>
       <div class="gh-head">

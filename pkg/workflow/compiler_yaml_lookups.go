@@ -7,6 +7,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
@@ -59,6 +60,9 @@ func behaviorEngineDefaultVersion(engineID string, registry *EngineRegistry) str
 	behaviorEngine, ok := engine.(*BehaviorDefinedEngine)
 	if !ok {
 		return ""
+	}
+	if behaviorEngine.definition.Version != "" && parser.BuiltinVirtualFileExists(builtinEnginePath(engineID)) {
+		return behaviorEngine.definition.Version
 	}
 	behavior := behaviorEngine.behavior()
 	if behavior == nil || behavior.Installation == nil {
@@ -169,9 +173,11 @@ func versionToGitRef(version string) string {
 	clean := strings.TrimSuffix(version, "-dirty")
 	// If the version looks like `git describe` output with -N-gSHA, extract the SHA.
 	// Pattern: anything ending with -<digits>-g<hexchars>
-	if m := gitDescribeSHAPattern.FindStringSubmatch(clean); m != nil {
-		compilerYamlLookupsLog.Printf("Extracted SHA from git-describe version: %s -> %s", version, m[1])
-		return m[1]
+	for index, sha := range gitDescribeSHAPattern.FindStringSubmatch(clean) {
+		if index == 1 {
+			compilerYamlLookupsLog.Printf("Extracted SHA from git-describe version: %s -> %s", version, sha)
+			return sha
+		}
 	}
 	compilerYamlLookupsLog.Printf("Using version as git ref: %s -> %s", version, clean)
 	return clean

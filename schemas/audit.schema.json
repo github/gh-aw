@@ -3136,6 +3136,115 @@
                     ],
                     "additionalProperties": false
                   }
+                },
+                "current": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "policy_installed": {
+                      "type": "boolean"
+                    },
+                    "tip": {
+                      "type": "string"
+                    },
+                    "policy_epoch": {
+                      "type": "string"
+                    },
+                    "captured_at": {
+                      "type": "integer"
+                    },
+                    "commit_count": {
+                      "type": "integer"
+                    },
+                    "admission_paused": {
+                      "type": "boolean"
+                    },
+                    "grants_paused": {
+                      "type": "boolean"
+                    },
+                    "assignment": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "dispatch_id": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        },
+                        "commit_id": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "released": {
+                          "type": "boolean"
+                        },
+                        "claims": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "claim_handle": {
+                                "type": "string"
+                              },
+                              "claim_id": {
+                                "type": "string"
+                              },
+                              "work_id": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string"
+                              },
+                              "delivery_barrier": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "claim_handle",
+                              "claim_id",
+                              "work_id",
+                              "state",
+                              "delivery_barrier"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "dispatch_id",
+                        "request_id",
+                        "commit_id",
+                        "state",
+                        "released",
+                        "claims"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "policy_installed",
+                    "tip",
+                    "policy_epoch",
+                    "captured_at",
+                    "commit_count",
+                    "admission_paused",
+                    "grants_paused"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -3148,6 +3257,32 @@
             },
             "finish_intent": {
               "type": "string"
+            },
+            "finish_intents": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "intent_id": {
+                    "type": "string"
+                  },
+                  "claim_handle": {
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "intent_id",
+                  "claim_handle",
+                  "outcome"
+                ],
+                "additionalProperties": false
+              }
             },
             "operations": {
               "type": [

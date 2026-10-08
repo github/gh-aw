@@ -303,17 +303,30 @@ DuplicateRecord(t) ==
     /\ UNCHANGED <<dispatch, workers, compact, recovery, deadRuns,
                    authorizations, effects>>
 
+DispatchStep(d) ==
+    CASE dispatch[d].phase = "agent" ->
+              (\E t \in Intents : Stage(d, t)) \/ PrepareDispatch(d)
+      [] dispatch[d].phase = "prepared" -> PushDispatch(d) \/ RetryDispatch(d)
+      [] OTHER -> FALSE
+WorkerStep(a) ==
+    CASE workers[a].phase = "waiting" -> Activate(a)
+      [] workers[a].phase = "running" -> \E b \in BOOLEAN : EndAgent(a, b)
+      [] workers[a].phase = "ready" -> PrepareWorker(a)
+      [] workers[a].phase = "prepared" -> PushWorker(a) \/ RetryWorker(a)
+      [] workers[a].phase = "committed" -> VerifyCompletion(a)
+      [] workers[a].phase = "authorized" -> ExternalEffect(a)
+      [] OTHER -> FALSE
+MaintenanceStep(kind) ==
+    CASE Maintenance(kind).phase \in {"idle", "done"} -> PrepareMaintenance(kind)
+      [] Maintenance(kind).phase = "prepared" ->
+              PushMaintenance(kind) \/ RetryMaintenance(kind)
+      [] OTHER -> FALSE
 Next ==
-    \/ \E d \in Dispatchers :
-         (\E t \in Intents : Stage(d, t)) \/ PrepareDispatch(d)
-         \/ PushDispatch(d) \/ RetryDispatch(d)
-    \/ \E a \in Workers :
-         Activate(a) \/ (\E b \in BOOLEAN : EndAgent(a, b))
-         \/ PrepareWorker(a) \/ PushWorker(a) \/ RetryWorker(a)
-         \/ VerifyCompletion(a) \/ ExternalEffect(a)
+    \/ \E d \in Dispatchers : DispatchStep(d)
+    \/ \E a \in Workers : WorkerStep(a)
     \/ \E c \in Claims : RunTerminates(c)
     \/ \E kind \in {"compact", "recovery"} :
-         PrepareMaintenance(kind) \/ PushMaintenance(kind) \/ RetryMaintenance(kind)
+         MaintenanceStep(kind)
     \/ \E t \in AllFacts : DuplicateRecord(t)
 Spec == Init /\ [][Next]_vars
 WorkerOneShot ==

@@ -102,6 +102,7 @@ export interface SessionUsage {
   totalTokens?: SessionCount;
   inputTokens?: SessionCount;
   outputTokens?: SessionCount;
+  reasoningOutputTokens?: SessionCount;
   cacheCreationInputTokens?: SessionCount;
   cacheReadInputTokens?: SessionCount;
   input_tokens_include_cache?: boolean;
@@ -111,6 +112,7 @@ export interface SessionUsage {
 }
 
 export interface SessionResultData {
+  sourceEngine?: string;
   numTurns?: SessionCount;
   durationMs?: SessionMetric;
   totalCostUsd?: SessionMetric;

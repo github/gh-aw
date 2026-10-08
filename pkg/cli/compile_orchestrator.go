@@ -34,6 +34,12 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 	if err := validateCompileConfig(config); err != nil {
 		return nil, err
 	}
+	if config.DryRun {
+		config.dryRunReport = newDryRunCompileReport(config)
+		if !config.JSONOutput {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(dryRunScopeMessage))
+		}
+	}
 
 	if config.Watch && IsRunningInCI() {
 		return nil, errors.New("watch mode cannot be used in CI or Copilot coding agent environments")

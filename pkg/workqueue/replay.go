@@ -1,412 +1,550 @@
 package workqueue
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"embed"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
 	"slices"
-	"strings"
-	"sync"
-
-	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-const FileName = "work-queue.jsonl"
-const DefaultBranch = "gh-aw-work-queue"
-
-//go:embed schema/*.json
-var schemas embed.FS
-var transactionSchemas = sync.OnceValues(func() (map[string]*jsonschema.Schema, error) {
-	compiler := jsonschema.NewCompiler()
-	kinds := []string{"Work", "Claim", "ClaimCancellation", "WorkCancellation", "Completion"}
-	for _, kind := range kinds {
-		name := kind + "Transaction.json"
-		data, err := schemas.ReadFile("schema/" + name)
-		if err != nil {
-			return nil, err
-		}
-		var resource any
-		if err := json.Unmarshal(data, &resource); err != nil {
-			return nil, err
-		}
-		if err := compiler.AddResource(name, resource); err != nil {
-			return nil, err
+func remainingHeadroom(state Projection) int64 {
+	if state.Policy == nil {
+		return 0
+	}
+	limits := state.Policy.Limits
+	var reserve int64
+	for _, work := range state.Works {
+		if work.State == "completed" && work.Barrier == "pending" {
+			reserve += 2*limits.ResultBytes + 2*limits.EvidenceBytes + 8192
+		} else if work.State != "completed" && work.State != "cancelled" {
+			remaining := max(0, state.Policy.Pools[work.Pool].Retry.MaxAttempts-work.Attempts)
+			reserve += int64(remaining)*(4*limits.EvidenceBytes+8192) +
+				2*limits.ResultBytes + 2*limits.EvidenceBytes + 8192
+			if work.State == "claimed" {
+				// The current outcome must remain spendable even on the final retry.
+				reserve += 8192
+			}
 		}
 	}
-	result := make(map[string]*jsonschema.Schema)
-	for _, kind := range kinds {
-		schema, err := compiler.Compile(kind + "Transaction.json")
-		if err != nil {
-			return nil, err
+	for _, dispatch := range state.Dispatches {
+		if !dispatch.Released {
+			remaining := max(0, state.Policy.Pools[dispatch.Pool].Reconciliation.MaxAttempts+4-dispatch.LifecycleWrites)
+			reserve += int64(remaining)*(2*limits.EvidenceBytes+12288) + 2*limits.EvidenceBytes + 8192
 		}
-		result[kind] = schema
 	}
-	return result, nil
-})
-
-type Transaction struct {
-	Kind      string          `json:"kind"`
-	WorkID    string          `json:"work_id"`
-	Work      json.RawMessage `json:"work,omitempty"`
-	ClaimID   string          `json:"claim_id,omitempty"`
-	RunID     string          `json:"run_id,omitempty"`
-	AttemptID string          `json:"attempt_id,omitempty"`
-	Outcome   string          `json:"outcome,omitempty"`
-	Enqueued  int64           `json:"enqueued,omitempty"`
+	return reserve
 }
 
-type WorkState struct {
-	WorkID   string          `json:"work_id"`
-	Work     json.RawMessage `json:"work"`
-	State    string          `json:"state"`
-	Winner   string          `json:"winner,omitempty"`
-	Claims   []ClaimState    `json:"claims"`
-	Outcome  string          `json:"outcome,omitempty"`
-	Enqueued int64           `json:"enqueued"`
+// RecoveryHeadroom reports the outstanding closure reservation for a replayed projection.
+func RecoveryHeadroom(state Projection) int64 {
+	return remainingHeadroom(state)
 }
 
-type ClaimState struct {
-	ClaimID string `json:"claim_id"`
-	RunID   string `json:"run_id"`
-	State   string `json:"state"`
-}
-
-type Stats struct {
-	Work         int `json:"work"`
-	Available    int `json:"available"`
-	Claimed      int `json:"claimed"`
-	Completed    int `json:"completed"`
-	Cancelled    int `json:"cancelled"`
-	Claims       int `json:"claims"`
-	Transactions int `json:"transactions"`
-}
-
-type Projection struct {
-	Works     []WorkState `json:"works"`
-	Available []string    `json:"available"`
-	Stats     Stats       `json:"stats"`
-}
-
-func WorkID(payload []byte) (string, json.RawMessage, error) {
-	var value map[string]any
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.UseNumber()
-	if err := decoder.Decode(&value); err != nil || value == nil {
-		return "", nil, errors.New("work payload must be a JSON object")
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return "", nil, errors.New("work payload must be a JSON object")
-	}
-	canonical, err := json.Marshal(value)
+func Replay(commits []QueueCommit) (Projection, error) {
+	state := newProjection()
+	ordered, err := causalOrder(commits)
 	if err != nil {
-		return "", nil, err
+		return state, err
 	}
-	sum := sha256.Sum256(canonical)
-	return hex.EncodeToString(sum[:]), canonical, nil
+	epochs := identitySet{}
+	generations := identitySet{state.CredentialGeneration: {}}
+	for ordinal, commit := range ordered {
+		if err := state.replayCommit(commit, ordinal, epochs, generations); err != nil {
+			return state, err
+		}
+	}
+	state.updateReplayStats(len(ordered))
+	return state, nil
 }
 
-func validateTransaction(tx Transaction) error {
-	schemas, err := transactionSchemas()
+func (state *Projection) validateReplayCommit(commit QueueCommit, ordinal int) (bool, error) {
+	if ordinal == 0 {
+		state.Repository = commit.Actor.Repository
+	} else if commit.Actor.Repository != state.Repository {
+		return false, queueError("ledger_foreign", "commit originates from another queue repository")
+	}
+	if _, ok := state.Requests[commit.Request.ID]; ok {
+		return false, queueError("request_reuse", "request %s appears in multiple commits", commit.Request.ID)
+	}
+	if err := validateRequest(commit); err != nil {
+		return false, err
+	}
+	if err := authorizeWorkerQueueRequest(*state, commit.Actor, commit.Request); err != nil {
+		return false, err
+	}
+	only, unique := singleOperation(commit.Operations)
+	isPolicy := false
+	if unique {
+		kind, err := operationKind(only)
+		if err != nil {
+			return false, err
+		}
+		isPolicy = kind == "Policy"
+	}
+	if ordinal == 0 && !isPolicy {
+		return false, queueError("policy_missing", "genesis must install exactly one policy")
+	}
+	if !isPolicy && commit.PolicyEpoch != state.PolicyEpoch {
+		return false, queueError("policy_epoch_invalid", "commit names a non-current epoch")
+	}
+	if state.Policy != nil && len(commit.Operations) > state.Policy.Limits.Operations {
+		return false, queueError("operation_limit", "commit exceeds installed operation limit")
+	}
+	return isPolicy, nil
+}
+
+func (state *Projection) replayCommit(commit QueueCommit, ordinal int, epochs, generations identitySet) error {
+	isPolicy, err := state.validateReplayCommit(commit, ordinal)
 	if err != nil {
 		return err
 	}
-	if schema, ok := schemas[tx.Kind]; ok {
-		data, err := json.Marshal(tx)
+	hasAdmission := false
+	hasObservations := false
+	firstClaim := -1
+	for index, operation := range commit.Operations {
+		kind, err := operationKind(operation)
 		if err != nil {
 			return err
 		}
-		var value any
-		if err := json.Unmarshal(data, &value); err != nil {
+		if kind == "Claim" {
+			if firstClaim < 0 {
+				firstClaim = index
+			}
+			continue
+		}
+		if firstClaim >= 0 {
+			return queueError("packing_invalid", "observations must precede the atomic Claim prefix")
+		}
+		hasAdmission = hasAdmission || kind == "Work"
+		hasObservations = hasObservations || kind == "Observation"
+		if err := state.replayOperation(operation, kind, commit, Position{Commit: ordinal, Operation: index}, isPolicy, epochs, generations); err != nil {
 			return err
 		}
-		if err := schema.Validate(value); err != nil {
-			return fmt.Errorf("invalid %s transaction: %w", tx.Kind, err)
+	}
+	if hasAdmission {
+		if err := state.validateGraph(); err != nil {
+			return err
+		}
+	}
+	if firstClaim >= 0 {
+		if err := state.replayClaimPrefix(commit, firstClaim); err != nil {
+			return err
+		}
+		hasAdmission = true
+	} else if commit.Request.Kind == "dispatch_next" {
+		return queueError("request_invalid", "no-grant evaluation must not consume request identity")
+	}
+	if err := state.accountReplayCommit(commit, hasAdmission, hasObservations); err != nil {
+		return err
+	}
+	state.Tip = commit.ID
+	state.Requests[commit.Request.ID] = commit
+	return nil
+}
+
+func (state *Projection) replayOperation(operation Operation, kind string, commit QueueCommit, position Position, isPolicy bool, epochs, generations identitySet) error {
+	switch kind {
+	case "Policy":
+		return state.installReplayPolicy(operation, commit, isPolicy, epochs)
+	case "Control":
+		return state.applyReplayControl(operation, generations)
+	case "Work":
+		var node WorkDefinition
+		if err := json.Unmarshal(operation, &node); err != nil {
+			return err
+		}
+		return state.admitWork(node, commit, position)
+	case "Observation":
+		var observation Observation
+		if err := json.Unmarshal(operation, &observation); err != nil {
+			return err
+		}
+		return state.recordObservation(observation, commit)
+	case "Completion":
+		return state.applyCompletion(operation, commit)
+	case "ClaimCancellation":
+		return state.cancelClaim(operation, commit)
+	case "WorkCancellation":
+		return state.cancelWork(operation, commit)
+	case "WorkPriority":
+		return state.reprioritizeWork(operation)
+	case "Dispatch":
+		return state.applyDispatch(operation, commit)
+	case "Release":
+		return state.release(operation, commit)
+	case "Result", "DeliveryFailure":
+		return state.settleResult(operation, commit, kind == "DeliveryFailure")
+	default:
+		return queueError("unsupported_protocol", "unknown operation")
+	}
+}
+
+func (state *Projection) installReplayPolicy(op Operation, commit QueueCommit, isPolicy bool, epochs identitySet) error {
+	if !isPolicy || !state.quiescent() {
+		return queueError("policy_not_quiescent", "policy changes require queue-wide drain")
+	}
+	var operation struct {
+		Epoch  string `json:"epoch"`
+		Policy Policy `json:"policy"`
+	}
+	if err := json.Unmarshal(op, &operation); err != nil {
+		return err
+	}
+	if commit.PolicyEpoch != operation.Epoch || epochs.contains(operation.Epoch) {
+		return queueError("policy_epoch_invalid", "policy epoch is reused or inconsistent")
+	}
+	if err := validatePolicy(operation.Policy); err != nil {
+		return err
+	}
+	epochs.add(operation.Epoch)
+	state.Policy, state.PolicyEpoch = &operation.Policy, operation.Epoch
+	state.Clocks = map[string]PoolClocks{}
+	state.ObservationWrites = map[string]int{}
+	return nil
+}
+
+func (state *Projection) applyReplayControl(operation Operation, generations identitySet) error {
+	var control struct {
+		Control string          `json:"control"`
+		Value   json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(operation, &control); err != nil {
+		return err
+	}
+	if control.Control == "credential_generation" {
+		var generation string
+		if err := json.Unmarshal(control.Value, &generation); err != nil || generation == "" {
+			return queueError("control_invalid", "credential generation must be an opaque string")
+		}
+		if generation != state.CredentialGeneration && generations.contains(generation) {
+			return queueError("credential_generation_reused", "credential cutover cannot revive a stale observation generation")
+		}
+		generations.add(generation)
+		state.CredentialGeneration = generation
+	} else {
+		var paused bool
+		if err := json.Unmarshal(control.Value, &paused); err != nil {
+			return queueError("control_invalid", "pause controls require a boolean")
+		}
+		if control.Control == "admission_paused" {
+			state.AdmissionPaused = paused
+		} else {
+			state.GrantsPaused = paused
+		}
+	}
+	return nil
+}
+
+func (state *Projection) replayClaimPrefix(commit QueueCommit, firstClaim int) error {
+	var params DispatchParameters
+	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+		return err
+	}
+	expected, err := planDispatch(*state, params, commit.Request.ID, commit.ID, commit.At, state.Policy.Limits.Operations-firstClaim)
+	if err != nil {
+		return err
+	}
+	if firstClaim < 0 || firstClaim >= len(commit.Operations) {
+		return queueError("selection_invalid", "Claims do not match the maximal deterministic fair prefix")
+	}
+	actual := commit.Operations[firstClaim:]
+	if len(actual) == 0 || !sameJSON(expected.Operations, actual) {
+		return queueError("selection_invalid", "Claims do not match the maximal deterministic fair prefix")
+	}
+	for _, operation := range actual {
+		var claim ClaimOperation
+		if err := json.Unmarshal(operation, &claim); err != nil {
+			return err
+		}
+		selection, clocks, err := planNext(*state, params.Pool, commit.At)
+		if err != nil || selection.WorkID != claim.WorkID {
+			return queueError("selection_invalid", "Claim is not the next fair winner")
+		}
+		if _, ok := state.Claims[claim.ClaimID]; ok {
+			return queueError("claim_conflict", "Claim identity already exists")
+		}
+		if existing := state.Dispatches[claim.DispatchID]; existing != nil && existing.CommitID != commit.ID {
+			return queueError("assignment_immutable", "cannot extend an existing dispatch")
+		}
+		recordClaim(state, claim, commit, clocks)
+	}
+	return nil
+}
+
+func (state *Projection) accountReplayCommit(commit QueueCommit, hasAdmission, hasObservations bool) error {
+	for _, work := range state.Works {
+		if work.State == "available" && work.Attempts >= state.Policy.Pools[work.Pool].Retry.MaxAttempts {
+			return queueError("retry_exhausted", "cancel exhausted Work in the same recovery commit")
+		}
+	}
+	data, err := canonicalValue(commit)
+	if err != nil {
+		return err
+	}
+	state.LedgerBytes += int64(len(data) + 1)
+	if state.LedgerBytes > state.Policy.Limits.LedgerBytes+state.Policy.Limits.RecoveryBytes {
+		return queueError("ledger_limit", "total ledger capacity exhausted; preserve history")
+	}
+	headroom := remainingHeadroom(*state)
+	if headroom > state.Policy.Limits.LedgerBytes+state.Policy.Limits.RecoveryBytes-state.LedgerBytes {
+		return queueError("ledger_limit", "write would consume remaining bounded closure/recovery headroom")
+	}
+	if hasAdmission && (state.LedgerBytes > state.Policy.Limits.LedgerBytes ||
+		headroom > state.Policy.Limits.RecoveryBytes) {
+		return queueError("ledger_limit", "new admission would consume bounded closure/recovery headroom")
+	}
+	if hasObservations && state.LedgerBytes > state.Policy.Limits.LedgerBytes {
+		return queueError("ledger_limit", "optional observations cannot consume closure/recovery headroom")
+	}
+	return nil
+}
+
+func (state *Projection) updateReplayStats(transactions int) {
+	state.Stats.Transactions = transactions
+	state.Stats.Work, state.Stats.Claims = len(state.Works), len(state.Claims)
+	state.Stats.Nodes = state.nodeCount()
+	for _, work := range state.Works {
+		switch work.State {
+		case "available":
+			state.Stats.Available++
+		case "claimed":
+			state.Stats.Claimed++
+		case "completed":
+			state.Stats.Completed++
+		case "cancelled":
+			state.Stats.Cancelled++
+		}
+	}
+	for _, dispatch := range state.Dispatches {
+		if !dispatch.Released {
+			state.Stats.Dispatches++
+		}
+	}
+}
+
+func ProposedCommitID(state Projection, request Request) string {
+	return "q_" + hashBytes([]byte(state.Tip+"\n"+request.ID))
+}
+
+func BuildCandidate(commits []QueueCommit, actor Actor, request Request, at int64) ([]QueueCommit, *QueueCommit, Decision, error) {
+	return buildCandidateWithObservations(commits, actor, request, at, nil)
+}
+
+func buildCandidateWithObservations(commits []QueueCommit, actor Actor, request Request, at int64, observations []Observation) ([]QueueCommit, *QueueCommit, Decision, error) {
+	if err := validateRequestOrigin(actor, request); err != nil {
+		return nil, nil, Decision{}, err
+	}
+	state, err := Replay(commits)
+	if err != nil {
+		return nil, nil, Decision{}, err
+	}
+	if existing, ok := state.Requests[request.ID]; ok {
+		if existing.Request.Fingerprint != request.Fingerprint || !sameJSON(existing.Actor, actor) {
+			return nil, nil, Decision{}, queueError("request_reuse", "stable request was reused with different meaning")
+		}
+		decision, err := committedDecision(state, existing)
+		if err != nil {
+			return nil, nil, Decision{}, err
+		}
+		return commits, &existing, decision, nil
+	}
+	if actor.Repository != state.Repository {
+		return nil, nil, Decision{}, queueError("actor_unauthorized", "request originates from another queue repository")
+	}
+	if err := validateRequestRole(actor, request.Kind); err != nil {
+		return nil, nil, Decision{}, err
+	}
+	if err := authorizeWorkerQueueRequest(state, actor, request); err != nil {
+		return nil, nil, Decision{}, err
+	}
+	previous := state.Tip
+	commit := QueueCommit{
+		Version: Version, ID: ProposedCommitID(state, request), Previous: &previous,
+		Request: request, Actor: actor, PolicyEpoch: state.PolicyEpoch, At: at,
+	}
+	decision, unchanged, err := populateCandidate(state, &commit, observations)
+	if unchanged {
+		return commits, nil, decision, err
+	}
+	if err != nil {
+		return nil, nil, decision, err
+	}
+	next := append(slices.Clone(commits), commit)
+	if _, err := Replay(next); err != nil {
+		return nil, nil, decision, err
+	}
+	return next, &commit, decision, nil
+}
+
+func committedDecision(state Projection, existing QueueCommit) (Decision, error) {
+	decision := Decision{Tip: state.Tip, Reason: "already_committed", Operations: existing.Operations, Assignments: []Assignment{}}
+	seen := identitySet{}
+	for _, op := range existing.Operations {
+		kind, err := operationKind(op)
+		if err != nil {
+			return Decision{}, err
+		}
+		if kind != "Claim" {
+			continue
+		}
+		var claim ClaimOperation
+		if err := json.Unmarshal(op, &claim); err != nil {
+			return Decision{}, err
+		}
+		if !seen.contains(claim.DispatchID) {
+			decision.Assignments = append(decision.Assignments, state.Dispatches[claim.DispatchID].Assignment)
+			seen.add(claim.DispatchID)
+		}
+	}
+	return decision, nil
+}
+
+func populateCandidate(state Projection, commit *QueueCommit, observations []Observation) (Decision, bool, error) {
+	decision := Decision{Tip: state.Tip, Assignments: []Assignment{}}
+	switch commit.Request.Kind {
+	case "dispatch_next":
+		return populateDispatchCandidate(state, commit, observations, decision)
+	case "submit":
+		return populateSubmissionCandidate(state, commit, decision)
+	case "finish":
+		return populateFinishCandidate(state, commit, decision)
+	default:
+		return decision, false, populateOperationsCandidate(commit)
+	}
+}
+
+func populateDispatchCandidate(state Projection, commit *QueueCommit, observations []Observation, decision Decision) (Decision, bool, error) {
+	var params DispatchParameters
+	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+		return decision, false, err
+	}
+	working := cloneProjection(state)
+	for _, observation := range observations {
+		if err := working.recordObservation(observation, *commit); err != nil {
+			return decision, false, err
+		}
+	}
+	decision, err := planDispatch(working, params, commit.Request.ID, commit.ID, commit.At, state.Policy.Limits.Operations-len(observations))
+	if err != nil || len(decision.Operations) == 0 {
+		return decision, true, err
+	}
+	commit.Operations = []Operation{}
+	for _, observation := range observations {
+		if err := appendOperation(&commit.Operations, observation); err != nil {
+			return decision, false, err
+		}
+	}
+	commit.Operations = append(commit.Operations, decision.Operations...)
+	return decision, false, nil
+}
+
+func populateSubmissionCandidate(state Projection, commit *QueueCommit, decision Decision) (Decision, bool, error) {
+	var params SubmitParameters
+	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+		return decision, false, err
+	}
+	existing := len(params.Nodes) > 0
+	seen := identitySet{}
+	for _, node := range params.Nodes {
+		if seen.contains(node.WorkID) {
+			return decision, false, queueError("work_conflict", "submission repeats an immutable node identity")
+		}
+		seen.add(node.WorkID)
+		previous := state.Works[node.WorkID]
+		if previous == nil {
+			existing = false
+		} else if !sameJSON(previous.WorkDefinition, node) {
+			return decision, false, queueError("work_conflict", "immutable node differs from its accepted definition")
+		}
+	}
+	if existing {
+		for _, node := range params.Nodes {
+			if err := state.admitWork(node, *commit, Position{}); err != nil {
+				return decision, false, err
+			}
+		}
+		decision.Reason, decision.Operations = "already_submitted", []Operation{}
+		return decision, true, nil
+	}
+	commit.Operations = []Operation{}
+	for _, node := range params.Nodes {
+		if err := appendOperation(&commit.Operations, node); err != nil {
+			return decision, false, err
+		}
+	}
+	return decision, false, nil
+}
+
+func populateFinishCandidate(state Projection, commit *QueueCommit, decision Decision) (Decision, bool, error) {
+	var params FinishParameters
+	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+		return decision, false, err
+	}
+	claim, err := state.scopedClaim(commit.Actor, params.DispatchID, params.ClaimHandle)
+	if err != nil {
+		return decision, false, err
+	}
+	if claim.State == params.Outcome {
+		decision.Reason = "already_" + params.Outcome
+		return decision, true, nil
+	}
+	if params.Outcome == "completed" {
+		if err := appendOperation(&commit.Operations, map[string]any{
+			"kind": "Completion", "work_id": claim.WorkID, "claim_id": claim.ClaimID,
+			"dispatch_id": params.DispatchID, "claim_handle": params.ClaimHandle,
+			"run_id": commit.Actor.RunID, "run_attempt": 1,
+		}); err != nil {
+			return decision, false, err
 		}
 	} else {
-		return fmt.Errorf("unknown transaction kind %q", tx.Kind)
-	}
-	if tx.WorkID == "" || (tx.ClaimID == "" && (tx.Kind == "Claim" || tx.Kind == "ClaimCancellation" || tx.Kind == "Completion")) {
-		return errors.New("transaction identifiers cannot be empty")
-	}
-	if tx.Kind == "Claim" && tx.RunID == "" || tx.Kind == "Completion" && tx.AttemptID == "" {
-		return errors.New("transaction provenance cannot be empty")
-	}
-	if tx.Kind == "Work" {
-		id, _, err := WorkID(tx.Work)
-		if err != nil || id != tx.WorkID {
-			return errors.New("work_id does not match canonical work payload")
+		work := state.Works[claim.WorkID]
+		if err := appendOperation(&commit.Operations, map[string]any{
+			"kind": "ClaimCancellation", "work_id": claim.WorkID, "claim_id": claim.ClaimID,
+			"reason": "worker_cancelled", "retry_not_before": commit.At + state.Policy.Pools[work.Pool].Retry.BackoffMS,
+		}); err != nil {
+			return decision, false, err
 		}
+		if work.Attempts >= state.Policy.Pools[work.Pool].Retry.MaxAttempts {
+			if err := appendOperation(&commit.Operations, map[string]any{
+				"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "attempts_exhausted",
+			}); err != nil {
+				return decision, false, err
+			}
+		}
+	}
+	return decision, false, nil
+}
+
+func populateOperationsCandidate(commit *QueueCommit) error {
+	var params OperationsParameters
+	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+		return err
+	}
+	commit.Operations = params.Operations
+	if only, unique := singleOperation(commit.Operations); commit.Request.Kind == "policy" && unique {
+		var params struct {
+			Epoch string `json:"epoch"`
+		}
+		if err := json.Unmarshal(only, &params); err != nil {
+			return err
+		}
+		commit.PolicyEpoch = params.Epoch
 	}
 	return nil
 }
 
-func Parse(data []byte) ([]Transaction, error) {
-	var transactions []Transaction
-	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		var raw map[string]any
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		var tx Transaction
-		if err := json.Unmarshal([]byte(line), &tx); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		schemas, err := transactionSchemas()
-		if err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		schema, ok := schemas[tx.Kind]
-		if !ok {
-			return nil, fmt.Errorf("line %d: unknown transaction kind %q", i+1, tx.Kind)
-		}
-		if err := schema.Validate(raw); err != nil {
-			return nil, fmt.Errorf("line %d: invalid %s transaction: %w", i+1, tx.Kind, err)
-		}
-		if err := validateTransaction(tx); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		transactions = append(transactions, tx)
-	}
-	return transactions, nil
-}
-
-func Serialize(transactions []Transaction) ([]byte, error) {
-	var b strings.Builder
-	for _, tx := range transactions {
-		if err := validateTransaction(tx); err != nil {
-			return nil, err
-		}
-		line, err := json.Marshal(tx)
-		if err != nil {
-			return nil, err
-		}
-		b.Write(line)
-		b.WriteByte('\n')
-	}
-	return []byte(b.String()), nil
-}
-
-type replayFacts struct {
-	works           map[string]Transaction
-	claims          map[string]Transaction
-	cancelledClaims map[string]struct{}
-	cancelledWorks  map[string]struct{}
-	completions     map[string]Transaction
-}
-
-func collectFacts(transactions []Transaction) (replayFacts, int, error) {
-	f := replayFacts{
-		works: map[string]Transaction{}, claims: map[string]Transaction{},
-		cancelledClaims: map[string]struct{}{}, cancelledWorks: map[string]struct{}{},
-		completions: map[string]Transaction{},
-	}
-	facts := map[string]struct{}{}
-	for _, tx := range transactions {
-		if err := validateTransaction(tx); err != nil {
-			return f, 0, err
-		}
-		b, err := json.Marshal(tx)
-		if err != nil {
-			return f, 0, err
-		}
-		key := string(b)
-		if _, exists := facts[key]; exists {
-			continue
-		}
-		facts[key] = struct{}{}
-		switch tx.Kind {
-		case "Work":
-			if _, exists := f.works[tx.WorkID]; exists {
-				return f, 0, fmt.Errorf("conflicting Work %s", tx.WorkID)
-			}
-			f.works[tx.WorkID] = tx
-		case "Claim":
-			if _, exists := f.claims[tx.ClaimID]; exists {
-				return f, 0, fmt.Errorf("conflicting Claim %s", tx.ClaimID)
-			}
-			f.claims[tx.ClaimID] = tx
-		case "ClaimCancellation":
-			if _, exists := f.cancelledClaims[tx.ClaimID]; exists {
-				return f, 0, fmt.Errorf("conflicting cancellation %s", tx.ClaimID)
-			}
-			f.cancelledClaims[tx.ClaimID] = struct{}{}
-		case "WorkCancellation":
-			if _, exists := f.cancelledWorks[tx.WorkID]; exists {
-				return f, 0, fmt.Errorf("conflicting cancellation %s", tx.WorkID)
-			}
-			f.cancelledWorks[tx.WorkID] = struct{}{}
-		case "Completion":
-			if _, exists := f.completions[tx.WorkID]; exists {
-				return f, 0, fmt.Errorf("multiple completions for %s", tx.WorkID)
-			}
-			f.completions[tx.WorkID] = tx
-		}
-	}
-	return f, len(facts), validateReferences(f, transactions)
-}
-
-func validateReferences(f replayFacts, transactions []Transaction) error {
-	for _, tx := range transactions {
-		if tx.Kind != "Work" {
-			if _, ok := f.works[tx.WorkID]; !ok {
-				return fmt.Errorf("%s references missing Work %s", tx.Kind, tx.WorkID)
-			}
-		}
-		if tx.Kind == "ClaimCancellation" || tx.Kind == "Completion" {
-			claim, ok := f.claims[tx.ClaimID]
-			if !ok || claim.WorkID != tx.WorkID {
-				return fmt.Errorf("%s references missing Claim %s", tx.Kind, tx.ClaimID)
-			}
-		}
-	}
-	return nil
-}
-
-func Replay(transactions []Transaction) (Projection, error) {
-	result := Projection{Works: []WorkState{}, Available: []string{}}
-	f, count, err := collectFacts(transactions)
+func Genesis(actor Actor, policy Policy, requestID, epoch string, at int64) (QueueCommit, error) {
+	operation, err := Op(map[string]any{"kind": "Policy", "epoch": epoch, "policy": policy})
 	if err != nil {
-		return result, err
+		return QueueCommit{}, err
 	}
-	result.Stats.Transactions = count
-	for id, tx := range f.works {
-		state := WorkState{WorkID: id, Work: tx.Work, State: "available", Claims: []ClaimState{}, Enqueued: tx.Enqueued}
-		for _, claim := range f.claims {
-			if claim.WorkID != id {
-				continue
-			}
-			item := ClaimState{ClaimID: claim.ClaimID, RunID: claim.RunID, State: "superseded"}
-			if _, cancelled := f.cancelledClaims[claim.ClaimID]; cancelled {
-				item.State = "cancelled"
-			} else if state.Winner == "" || claim.ClaimID < state.Winner {
-				state.Winner = claim.ClaimID
-			}
-			state.Claims = append(state.Claims, item)
-		}
-		slices.SortFunc(state.Claims, func(a, b ClaimState) int { return strings.Compare(a.ClaimID, b.ClaimID) })
-		if completion, ok := f.completions[id]; ok {
-			_, cancelled := f.cancelledWorks[id]
-			if cancelled || state.Winner != completion.ClaimID {
-				return result, fmt.Errorf("completion for %s is not owned by the effective Claim", id)
-			}
-			state.State, state.Outcome = "completed", completion.Outcome
-		} else if _, cancelled := f.cancelledWorks[id]; cancelled {
-			state.State, state.Winner = "cancelled", ""
-		} else if state.Winner != "" {
-			state.State = "claimed"
-		}
-		updatedClaims := make([]ClaimState, 0, len(state.Claims))
-		for _, claim := range state.Claims {
-			if claim.ClaimID == state.Winner {
-				claim.State = "effective"
-			}
-			updatedClaims = append(updatedClaims, claim)
-		}
-		state.Claims = updatedClaims
-		result.Works = append(result.Works, state)
-		switch state.State {
-		case "available":
-			result.Stats.Available++
-		case "claimed":
-			result.Stats.Claimed++
-		case "completed":
-			result.Stats.Completed++
-		case "cancelled":
-			result.Stats.Cancelled++
-		}
-	}
-	slices.SortFunc(result.Works, func(a, b WorkState) int { return strings.Compare(a.WorkID, b.WorkID) })
-	result.Available = availableWorkIDs(result.Works)
-	result.Stats.Work, result.Stats.Claims = len(f.works), len(f.claims)
-	return result, nil
-}
-
-func Apply(transactions []Transaction, tx Transaction) ([]Transaction, bool, error) {
-	current, err := Replay(transactions)
+	operations := []Operation{operation}
+	request, err := NewRequest(requestID, "policy", actor, OperationsParameters{Operations: operations})
 	if err != nil {
-		return nil, false, err
+		return QueueCommit{}, err
 	}
-	if err := validateTransaction(tx); err != nil {
-		return nil, false, err
+	commit := QueueCommit{
+		Version: Version, ID: "q_" + hashBytes([]byte(requestID)), Previous: nil,
+		Request: request, Actor: actor, PolicyEpoch: epoch, At: at, Operations: operations,
 	}
-	for _, existing := range transactions {
-		a, err := json.Marshal(existing)
-		if err != nil {
-			return nil, false, err
-		}
-		b, err := json.Marshal(tx)
-		if err != nil {
-			return nil, false, err
-		}
-		if bytes.Equal(a, b) {
-			return transactions, false, nil
-		}
-	}
-	var state *WorkState
-	for _, work := range current.Works {
-		if work.WorkID == tx.WorkID {
-			state = &work
-			break
-		}
-	}
-	if tx.Kind == "Work" {
-		if state != nil {
-			return transactions, false, nil
-		}
-	} else if state == nil {
-		return nil, false, fmt.Errorf("work %s does not exist", tx.WorkID)
-	} else if state.State == "cancelled" || state.State == "completed" {
-		return nil, false, fmt.Errorf("work %s is terminal", tx.WorkID)
-	}
-	if tx.Kind == "ClaimCancellation" || tx.Kind == "Completion" {
-		found := false
-		for _, claim := range state.Claims {
-			if claim.ClaimID == tx.ClaimID {
-				found = true
-			}
-		}
-		if !found {
-			return nil, false, fmt.Errorf("claim %s does not exist on work %s", tx.ClaimID, tx.WorkID)
-		}
-	}
-	if tx.Kind == "Completion" && state.Winner != tx.ClaimID {
-		return nil, false, fmt.Errorf("claim %s is not effective", tx.ClaimID)
-	}
-	next := append(append([]Transaction(nil), transactions...), tx)
-	if _, err := Replay(next); err != nil {
-		return nil, false, err
-	}
-	return next, true, nil
-}
-
-func Compact(transactions []Transaction) ([]Transaction, error) {
-	if _, err := Replay(transactions); err != nil {
-		return nil, err
-	}
-	unique := map[string]Transaction{}
-	for _, tx := range transactions {
-		data, err := json.Marshal(tx)
-		if err != nil {
-			return nil, err
-		}
-		unique[string(data)] = tx
-	}
-	keys := make([]string, 0, len(unique))
-	for key := range unique {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	result := make([]Transaction, 0, len(keys))
-	for _, key := range keys {
-		result = append(result, unique[key])
-	}
-	return result, nil
+	_, err = Replay([]QueueCommit{commit})
+	return commit, err
 }

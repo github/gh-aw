@@ -124,6 +124,15 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
   it("includes the work queue replay module", () => {
     expect(safeOutputsFiles).toContain("work_queue_replay.cjs");
     expect(safeOutputsFiles).toContain("work_queue_store.cjs");
+    expect(safeOutputsFiles).toContain("work_queue_logging.cjs");
+  });
+
+  it("deploys Claim authority and worker route provisioning dependencies", () => {
+    expect(getDirectLocalRequires("safe_outputs_handlers.cjs")).toContain("work_queue_claim_scope.cjs");
+    expect(getDirectLocalRequires("work_queue_provisioning.cjs")).toContain("work_queue_yaml.cjs");
+    for (const file of ["work_queue_claim_scope.cjs", "finish_work_queue_claim.cjs", "work_queue_resource_scope.cjs", "work_queue_effect_client.cjs", "work_queue_yaml.cjs"]) {
+      expect(safeOutputsFiles).toContain(file);
+    }
   });
 
   it("contains all transitive local dependencies (including entry point safe-outputs-mcp-server.cjs)", () => {

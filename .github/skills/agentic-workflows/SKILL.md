@@ -31,6 +31,7 @@ Load these files from `github/gh-aw` (they are not available locally).
 - `.github/aw/create-agentic-workflow.md`
 - `.github/aw/create-shared-agentic-workflow.md`
 - `.github/aw/debug-agentic-workflow.md`
+- `.github/aw/debug-security-review.md`
 - `.github/aw/dependabot.md`
 - `.github/aw/deployment-status.md`
 - `.github/aw/designer-mappings.md`
@@ -106,9 +107,11 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Render compact markdown charts: `.github/aw/asciicharts.md`
 - Map CLI commands to MCP usage: `.github/aw/cli-commands.md`
 - Choose workflow architecture and patterns: `.github/aw/patterns.md`
-- Orchestrate durable work with a work queue (dispatcher/worker roles or queue inspection): `.github/aw/work-queue.md`
+- Design, deploy, inspect or recover a Git-backed work queue: `.github/aw/work-queue.md`
 - Optimize token usage and cost: `.github/aw/token-optimization.md`
 - Design long-running multi-agent research workflows: `.github/aw/multi-agent-research.md`
 - Add skills or agent plugins requested by the user (`skills:` / `plugins:` frontmatter, never on-the-fly installs): `.github/aw/skills.md`
 
 When the task involves OTEL, OTLP, traces, observability backends, or telemetry-driven analysis, also read and follow `skills/otel-queries/SKILL.md` after loading the matching workflow prompt or skill.
+
+When creating, updating, diagnosing or upgrading a workflow that uses `tools.work-queue`, also load `.github/aw/work-queue.md` after the primary prompt. Load deployment docs, operator reference or specification only when that task needs them.

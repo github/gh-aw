@@ -97,8 +97,12 @@ Pattern docs base path: `https://github.com/github/gh-aw/blob/main/docs/src/cont
 - **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/experimental/trial-ops.md
 
 ### WorkQueueOps
-- **Load when:** The user needs durable queue processing for many items via issues, sub-issues, discussions, or cache-memory.
+- **Load when:** The user needs lightweight backlog processing via issue checklists, sub-issues, discussions, or cache-memory, without native Claim authority or scheduling guarantees.
 - **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/workqueue-ops.md
+
+### Git-backed Work Queue
+- **Load when:** The user needs native fair scheduling, Work DAGs, Claim-scoped effects, or queue deployment/inspection/recovery.
+- **Instructions:** [work-queue.md](work-queue.md)
 
 ## Notes
 

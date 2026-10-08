@@ -230,6 +230,9 @@ func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 		outputs["output_types"] = "${{ steps.collect_output.outputs.output_types }}"
 		outputs["has_patch"] = "${{ steps.collect_output.outputs.has_patch }}"
 	}
+	if isWorkQueueParticipant(data) {
+		outputs["work_queue_origin"] = "${{ steps.work_queue_intent_origin.outputs.work_queue_origin }}"
+	}
 
 	// Add checkout_pr_success output to track PR checkout status only if the checkout-pr step will be generated
 	// This is used by the conclusion job to skip failure handling when checkout fails
@@ -262,6 +265,16 @@ func (c *Compiler) buildMainJobEnv(data *WorkflowData) map[string]string { //nol
 	if data != nil && data.EngineConfig != nil && data.EngineConfig.Version != "" {
 		env = make(map[string]string)
 		env["GH_AW_ENGINE_VERSION"] = fmt.Sprintf("%q", data.EngineConfig.Version)
+	}
+	if isWorkQueueEnabled(data) {
+		if env == nil {
+			env = make(map[string]string)
+		}
+		env["GH_AW_WORK_QUEUE_ENABLED"] = `"true"`
+		env["GH_AW_WORK_QUEUE_ROLE"] = fmt.Sprintf("%q", workQueueRuntimeRole(data))
+		if isWorkQueueParticipant(data) {
+			env["GH_AW_WORK_QUEUE_INTENT_ORIGIN"] = `"${{ needs.activation.outputs.work_queue_origin }}"`
+		}
 	}
 
 	// Disable the Chromium process sandbox for playwright CLI mode.
@@ -348,6 +361,11 @@ func (c *Compiler) buildMainJobEnv(data *WorkflowData) map[string]string { //nol
 func (c *Compiler) buildMainJobPermissions(data *WorkflowData) (string, error) {
 	permissions := augmentPermissionsForDevMode(c, data, filterJobLevelPermissions(data.Permissions, data.CachedPermissions))
 	permissions = augmentPermissionsForLedger(data, permissions)
+	if isWorkQueueParticipant(data) {
+		perms := NewPermissionsParser(permissions).ToPermissions()
+		perms.Set(PermissionActions, PermissionRead)
+		permissions = filterJobLevelPermissions(perms.RenderToYAML())
+	}
 
 	agentAllScripts := collectAgentJobScripts(data)
 	if len(agentAllScripts) == 0 {

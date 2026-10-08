@@ -976,7 +976,7 @@ func TestAddRemoteWorkflowRedirect(t *testing.T) {
 // that references dispatch-workflow dependencies, those dependency workflows are automatically
 // fetched alongside the main workflow.
 //
-// The test installs test-dispatcher.md from the main branch of github/gh-aw. That workflow
+// The test installs test-dispatcher.md from a pinned public revision of github/gh-aw. That workflow
 // has:
 //
 //	safe-outputs:
@@ -1065,11 +1065,12 @@ func TestAddWorkflowWithDispatchWorkflowFromSharedImport(t *testing.T) {
 	// workflow). The fetcher falls back to .yml when .md is 404, so both the main
 	// workflow and the dispatch-workflow dependency are written to disk.
 	//
-	// Pin to a revision that does not configure Copilot's native web-fetch tool,
-	// which is rejected during compilation in offline BYOK mode.
-	workflowSpec := "github/gh-aw/.github/workflows/smoke-copilot.md@ea6a6003e66a73f766df3d609ef4a8f97fc73184"
+	// Pin to a public revision before private: true was added in e8ca23ae1d.
+	// Compile with Codex because this revision uses web-fetch, which Copilot's
+	// offline BYOK mode rejects. This test exercises dependency fetching, not Copilot.
+	workflowSpec := "github/gh-aw/.github/workflows/smoke-copilot.md@6d18ddf01e820eca81031fe9c95bad265c940015"
 
-	cmd := exec.Command(setup.binaryPath, "add", workflowSpec, "--verbose")
+	cmd := exec.Command(setup.binaryPath, "add", workflowSpec, "--engine", "codex", "--verbose")
 	cmd.Dir = setup.tempDir
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)

@@ -46,7 +46,7 @@ func ensureMCPConfig(verbose bool) error {
 		Type:    "local",
 		Command: "gh",
 		Args:    []string{"aw", "mcp-server"},
-		Tools:   []string{"compile", "audit", "logs", "inspect", "status", "audit-diff"},
+		Tools:   []string{"compile", "audit", "logs", "inspect", "status", "audit-diff", "work-queue"},
 	}
 
 	// Check if file already exists

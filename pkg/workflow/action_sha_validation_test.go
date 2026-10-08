@@ -504,7 +504,7 @@ func TestCompiledWorkflowAppliesExactMappingsToGeneratedActions(t *testing.T) {
 		return string(lock)
 	}
 	baseline := compile()
-	pinLines := regexp.MustCompile(`(?m)^        uses: (actions/[A-Za-z0-9._/-]+)@([a-f0-9]{40}) # (\S+)`)
+	pinLines := regexp.MustCompile(`(?m)^        uses: (actions/[A-Za-z0-9._/-]+)@([a-f0-9]{40}) # (\S+)(?: \(source ([^)]+)\))?`)
 	matches := pinLines.FindAllStringSubmatch(baseline, -1)
 	if len(matches) == 0 {
 		t.Fatal("expected generated actions in baseline workflow")
@@ -512,6 +512,9 @@ func TestCompiledWorkflowAppliesExactMappingsToGeneratedActions(t *testing.T) {
 	mappings := make(map[string]string)
 	for _, match := range matches {
 		mappings[match[1]+"@"+match[3]] = "internal/" + strings.ReplaceAll(match[1], "/", "-") + "@" + match[2]
+		if match[4] != "" {
+			mappings[match[1]+"@"+match[4]] = mappings[match[1]+"@"+match[3]]
+		}
 	}
 	config, err := json.Marshal(map[string]any{"action_pins": mappings})
 	if err != nil {

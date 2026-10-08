@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/github/gh-aw/specs/work-queue/effect-contract.schema.json",
+  "title": "Embedded Work effect contract",
+  "description": "Optional versioned intent inside opaque Work payloads. Structural validity never grants effect or verifier authority. Canonical JSON restrictions and Work payload limits apply before this schema.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "none" }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "version": { "const": 1 },
+        "outputs": {
+          "type": "array",
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/output" }
+        },
+        "no_writes": { "type": "boolean" }
+      },
+      "required": ["version", "outputs"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "outputs": { "maxItems": 0 } },
+            "required": ["outputs"]
+          },
+          "then": {
+            "properties": { "no_writes": { "const": true } },
+            "required": ["no_writes"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "no_writes": { "const": true } },
+            "required": ["no_writes"]
+          },
+          "then": {
+            "properties": { "outputs": { "maxItems": 0 } }
+          }
+        }
+      ],
+      "$comment": "Runtime validation additionally rejects duplicate output.type values. Both the explicit no-write form and its alias require independent positive scoped no-effect-pass evidence."
+    }
+  ],
+  "$defs": {
+    "output": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "min": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "max": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "verification": { "$ref": "#/$defs/verification" }
+      },
+      "required": ["type", "min", "max"],
+      "additionalProperties": false,
+      "$comment": "Runtime validation additionally requires min <= max. Existing built-in output types do not require verification metadata."
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+          "not": { "pattern": "[^A-Za-z0-9_.:-]" }
+        },
+        "expected": { "$ref": "#/$defs/canonicalObject" }
+      },
+      "required": ["verifier_id", "expected"],
+      "additionalProperties": false,
+      "$comment": "verifier_id must match the trusted compiled claim-adapters[output.type].verifier.id. expected is untrusted declarative intent and must also pass that declared verifier's closed kind-specific schema. It cannot select transport, credentials, code, callbacks, or authority."
+    },
+    "canonicalObject": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/canonicalValue" }
+    },
+    "canonicalValue": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "string" },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        { "$ref": "#/$defs/canonicalObject" },
+        {
+          "type": "array",
+          "maxItems": 16384,
+          "items": { "$ref": "#/$defs/canonicalValue" }
+        }
+      ]
+    }
+  }
+}

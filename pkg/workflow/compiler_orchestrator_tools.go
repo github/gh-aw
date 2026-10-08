@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
@@ -63,6 +64,9 @@ func (c *Compiler) resolveToolsAndConfig(result *parser.FrontmatterResult, markd
 	}
 	c.warnDeprecatedFrontmatterFields(result.Frontmatter)
 	safeOutputs := c.extractSafeOutputsConfig(result.Frontmatter)
+	if safeOutputs != nil && safeOutputs.claimAdaptersParseError != nil {
+		return nil, safeOutputs.claimAdaptersParseError
+	}
 	secretMasking, err := c.resolveSecretMasking(result.Frontmatter, importsResult)
 	if err != nil {
 		return nil, err
@@ -384,6 +388,11 @@ func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, 
 	if capabilities.ToolsAllowlist || !capabilities.MCP {
 		return tools
 	}
+	// Agy's gateway enforces MCP configuration independently of its fixed
+	// native permission profile. Unsupported native restrictions fail below.
+	if agenticEngine.GetID() == string(constants.AgyEngine) {
+		return tools
+	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Using experimental %s support (engine: %s)", agenticEngine.GetDisplayName(), agenticEngine.GetID())))
 	c.IncrementWarningCount()
 	if _, hasTools := frontmatter["tools"]; hasTools {
@@ -394,6 +403,13 @@ func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, 
 }
 
 func (c *Compiler) validateEngineToolRequirements(frontmatter map[string]any, agenticEngine CodingAgentEngine, tools map[string]any) error {
+	if agenticEngine.GetID() == string(constants.AgyEngine) {
+		for _, name := range []string{"edit", "web-fetch", "web-search"} {
+			if disabled, ok := tools[name].(bool); ok && !disabled {
+				return fmt.Errorf("experimental agy cannot enforce tools.%s: false; its native permission profile enables tools inside the outer sandbox", name)
+			}
+		}
+	}
 	parsedTools := NewTools(tools)
 	if err := parsedTools.ParseError(); err != nil {
 		return err

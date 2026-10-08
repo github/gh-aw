@@ -5,6 +5,7 @@ package workflow
 import (
 	"testing"
 
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -118,6 +119,28 @@ func TestFormal_CTR001_WritePermissionsRejected(t *testing.T) {
 			err := validateDangerousPermissions(&WorkflowData{Permissions: "permissions: {}"}, perms)
 			require.Error(t, err)
 			require.ErrorContains(t, err, "write permissions")
+		})
+	}
+}
+
+func TestFormal_CTR001_IDTokenWriteIsInformational(t *testing.T) {
+	for name, strict := range map[string]bool{"strict": true, "non-strict": false} {
+		t.Run(name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.SetStrictMode(strict)
+			stderr := testutil.CaptureStderr(t, func() {
+				perms, err := compiler.validatePermissions(&WorkflowData{
+					Permissions: "permissions:\n  contents: read\n  id-token: write\n",
+				}, "workflow.md")
+				require.NoError(t, err)
+				level, exists := perms.Get(PermissionIdToken)
+				require.True(t, exists)
+				require.Equal(t, PermissionWrite, level)
+			})
+			require.Contains(t, stderr, "info: This workflow grants id-token: write permission")
+			require.Contains(t, stderr, "Ensure proper audience validation and trust policies are configured.")
+			require.NotContains(t, stderr, "warning: This workflow grants id-token: write permission")
+			require.Zero(t, compiler.GetWarningCount())
 		})
 	}
 }

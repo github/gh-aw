@@ -1,32 +1,94 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "WorkQueueAssignment.json",
-  "type": "object",
-  "properties": {
-    "work_id": {
-      "$ref": "#/$defs/WorkQueueIdentity"
-    },
-    "claim_id": {
-      "$ref": "#/$defs/WorkQueueIdentity"
-    },
-    "work": {
-      "$ref": "#/$defs/RecordUnknown"
-    }
-  },
-  "required": ["work_id", "claim_id", "work"],
-  "unevaluatedProperties": {
-    "not": {}
-  },
-  "description": "Trusted inbound assignment supplied as aw_context.work_queue.",
   "$defs": {
-    "WorkQueueIdentity": {
-      "type": "string",
-      "minLength": 1
+    "AssignmentClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "result_refs": {
+          "items": {
+            "$ref": "#/$defs/ResultReference"
+          },
+          "type": "array"
+        },
+        "work": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["handle", "claim_id", "work_id", "work", "result_refs"],
+      "type": "object"
     },
-    "RecordUnknown": {
-      "type": "object",
-      "properties": {},
-      "unevaluatedProperties": {}
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "ResultReference": {
+      "additionalProperties": false,
+      "properties": {
+        "descriptor": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "result_commit_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["work_id", "result_commit_id", "descriptor"],
+      "type": "object"
+    },
+    "WorkQueueAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/AssignmentClaim"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array"
+        },
+        "commit_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "policy_epoch": {
+          "$ref": "#/$defs/Identity"
+        },
+        "pool": {
+          "$ref": "#/$defs/Identity"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "version": {
+          "const": 3
+        },
+        "worker_profile": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["version", "dispatch_id", "request_id", "commit_id", "policy_epoch", "pool", "worker_profile", "claims"],
+      "type": "object"
     }
-  }
+  },
+  "$id": "WorkQueueAssignment.json",
+  "$ref": "#/$defs/WorkQueueAssignment",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkQueueAssignment"
 }

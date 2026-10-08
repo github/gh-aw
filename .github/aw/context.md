@@ -73,7 +73,7 @@ description: GitHub context expression variables and Handlebars-style template c
 - **`${{ steps.* }}`** - Any outputs from previous steps (e.g., `${{ steps.my-step.outputs.result }}`)
 - **`${{ github.event.inputs.* }}`** - Any workflow inputs when triggered by workflow_dispatch (e.g., `${{ github.event.inputs.environment }}`)
 
-`aw_context` is reserved and injected by the compiler into supported dispatch and reusable-workflow triggers; do not declare it as a user input. Workflows with `tools.work-queue` also receive a compiler-managed `work_queue_claim` dispatch input.
+`aw_context` is reserved and injected by the compiler into supported dispatch and reusable-workflow triggers; do not declare it as a user input. Workflows with `tools.work-queue` receive a compiler-managed `work_queue_assignment` dispatch input. It is a version-3 immutable assignment containing a `claims` array; do not declare or construct it as a user input.
 
 All other expressions are disallowed.
 

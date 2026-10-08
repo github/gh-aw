@@ -3,7 +3,7 @@ private: true
 emoji: "📊"
 description: Daily report of AI Credits (AIC) consumption across all agentic workflows using OTel telemetry from Sentry and Grafana
 on:
-  schedule: daily on weekdays
+  workflow_dispatch:
 permissions:
   contents: read
   issues: read
@@ -24,18 +24,17 @@ network:
     - github
     - node
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   bash: true
 safe-outputs:
   mentions: false
   allowed-github-references: []
-  create-issue:
-    title-prefix: "[token-consumption] "
-    labels: [automation, observability, telemetry]
-    close-older-issues: true
-    expires: 1d
-    max: 1
 timeout-minutes: 30
 imports:
+  - shared/daily-report-worker.md
   - shared/goose.md
   - shared/mcp/sentry.md
   - shared/mcp/grafana.md
@@ -73,7 +72,7 @@ You are an observability analyst. Generate a daily AI Credits (AIC) consumption 
 2. Aggregate AIC usage by workflow when available.
 3. Identify top AIC consumers and anomalous usage.
 4. Call out backend-specific AIC reporting gaps and likely causes.
-5. Publish a concise daily GitHub issue report.
+5. Publish a concise daily GitHub discussion report for the assigned completed UTC report date.
 
 ## Data Collection
 
@@ -172,7 +171,7 @@ For each workflow include:
 
 ## Report Output
 
-Create exactly one issue titled:
+Create exactly one discussion titled:
 
 `[token-consumption] Daily AIC Consumption Report - YYYY-MM-DD`
 
@@ -234,5 +233,5 @@ Use this body structure:
 ## Completion Requirement
 
 You must call one safe output tool before finishing:
-- `create_issue` for normal reporting.
-- `noop` only if no valid telemetry could be retrieved.
+- `create_discussion` for normal reporting, then finish the original Claim.
+- `noop` only if no valid telemetry could be retrieved, then finish the original Claim as cancelled.

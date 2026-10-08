@@ -229,7 +229,7 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 | `gh aw compile my-workflow` | Compile specific workflow |
 | `gh aw compile --verbose` | Enable verbose output |
 | `gh aw compile --strict` | Enhanced security validation |
-| `gh aw compile my-workflow --dry-run` | Compile for development testing with staging, all analysis tools, and warnings as errors |
+| `gh aw compile my-workflow --dry-run` | Compile for development testing with staging, mandatory validation/shellcheck/model checks, and warnings as errors; Docker scanners are opt-in |
 | `gh aw compile my-workflow --environment gh-aw-debug` | Replace the environment on every generated job |
 | `gh aw compile --no-emit` | Validate without generating files |
 | `gh aw compile --actionlint --zizmor --poutine --grant` | Run security scanners |
@@ -261,6 +261,9 @@ rather than silently skipping checks. Model checking uses the observed active
 model inventory; development compilation fails if that inventory is unavailable
 and the workflow declares `models` policies or `engine.models`. It does not prove
 live model availability.
+Observed-inventory refresh and collection warnings are also reported: they fail
+the dry-run gate even when cached observations remain available. Ordinary
+`--models` compilation reports them as warnings instead.
 
 Docker-based scanners and `--validate-images` remain opt-in. Docker unavailability
 does not block the dry-run gate; install native `shellcheck` for required run-step
@@ -314,6 +317,33 @@ safe-update baseline. It is distinct from `--action-mode dev`, does not change
 action reference mode, and does not upload, push, dispatch, or run workflows.
 Generated files remain available for inspection after failed checks and must not
 be treated as approved artifacts.
+
+#### Dry-run coverage output
+
+Compilation prints its limited effect scope before checks and a scanner-coverage
+summary afterward. With `--json`, the existing result array gains a batch-scoped
+`workflow: "dry-run"` entry containing `dry_run.gate`, forced `required_flags`,
+and a `scanners` map. Each scanner has `requested` and `status` fields:
+
+| Status | Meaning |
+|---|---|
+| `passed` | The scanner invocation completed successfully against emitted inputs |
+| `failed` | The invocation reported findings or an execution failure, including unavailable tooling |
+| `not_run` | The scanner was not requested, was not reached, or had no emitted inputs |
+
+This is invocation coverage, not per-script or per-image coverage. Optional image
+validation is identified separately by `validate_images_required`; the summary
+does not attest individual image checks. `model_inventory_available` indicates
+an observed inventory exists, not that runtime models are authorized or available.
+
+`dry_run.gate` reflects both workflow and batch failures. Check the command exit
+status and the entire result array, not only individual workflow `valid` fields.
+Preflight failures can stop compilation before this summary is emitted.
+`compile_only` is true and `execution_authorized` is false even when the gate
+passes. `unverified_effects` lists excluded surfaces, not a per-workflow effect
+inventory; custom code, hosted identity/approvals, live model availability, and
+diagnostic exports remain unverified. Ordinary compilation keeps its existing
+output shape.
 
 For diagnosis/patching versus active debugging, live-test review gates, and
 Codespaces/SAML triage, follow the

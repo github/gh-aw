@@ -35,6 +35,7 @@ type SkipIfCheckFailingConfig struct {
 	AllowPending bool     // if true, pending/in-progress checks are not treated as failing (default: treat pending as failing)
 }
 type WorkflowData struct {
+	WorkQueuePolicy                *WorkQueuePolicyConfig
 	DryRun                         bool // Disable compiler-managed GitHub mutations while retaining local diagnostics
 	Name                           string
 	WorkflowID                     string           // workflow identifier derived from markdown filename (basename without extension)

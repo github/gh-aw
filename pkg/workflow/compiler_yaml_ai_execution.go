@@ -170,9 +170,9 @@ func (c *Compiler) generateLogParsing(yaml *strings.Builder, data *WorkflowData,
 
 	yaml.WriteString("      - name: Parse agent logs for step summary\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        env:\n")
-	fmt.Fprintf(yaml, "          GH_AW_AGENT_OUTPUT: %s\n", logFileForParsing)
+	fmt.Fprintf(yaml, "          GH_AW_AGENT_OUTPUT: %s\n", logFileForParsing) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	// GH_AW_SAFE_OUTPUTS lets the log parser detect safe-output entries written by the agent
 	// so it can downgrade a "no structured log entries" failure to a warning when the agent
 	// demonstrably completed (e.g. emitted a noop). Without this, runs where the container
@@ -198,7 +198,7 @@ func (c *Compiler) generateMCPScriptsLogParsing(yaml *strings.Builder, data *Wor
 
 	yaml.WriteString("      - name: Parse MCP Scripts logs for step summary\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 
@@ -216,8 +216,8 @@ func (c *Compiler) generateMCPGatewayLogParsing(yaml *strings.Builder, data *Wor
 
 	yaml.WriteString("      - name: Parse MCP Gateway logs for step summary\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseMCPGatewayStepID)
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseMCPGatewayStepID)                     //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 
@@ -241,7 +241,7 @@ func (c *Compiler) generateObservabilitySummary(yaml *strings.Builder, data *Wor
 
 	yaml.WriteString("      - name: Generate observability summary\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
@@ -327,13 +327,13 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 
 	yaml.WriteString("      - name: Parse token usage for step summary\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseTokenUsageStepID)
+	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseTokenUsageStepID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        continue-on-error: true\n")
 	if isArcDindTopology(data) {
 		yaml.WriteString("        env:\n")
 		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
 	}
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
@@ -355,7 +355,7 @@ func (c *Compiler) generateAWFReflectSummary(yaml *strings.Builder, data *Workfl
 	yaml.WriteString("      - name: Print AWF reflect summary\n")
 	yaml.WriteString("        if: always()\n")
 	yaml.WriteString("        continue-on-error: true\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
@@ -379,27 +379,27 @@ func (c *Compiler) generateDetectAgentErrorsStep(yaml *strings.Builder, data *Wo
 
 	yaml.WriteString("      - name: Detect agent errors\n")
 	yaml.WriteString("        if: always()\n")
-	fmt.Fprintf(yaml, "        id: %s\n", constants.DetectAgentErrorsStepID)
+	fmt.Fprintf(yaml, "        id: %s\n", constants.DetectAgentErrorsStepID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        continue-on-error: true\n")
 	// The engine step outcome and its timeout-minutes budget allow the detection script to
 	// recognize a GitHub Actions step-level timeout ("The action '...' has timed out after N
 	// minutes."), which kills the engine without leaving a timeout signature in the agent log.
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_AGENTIC_EXECUTION_OUTCOME: ${{ steps.agentic_execution.outcome }}\n")
-	fmt.Fprintf(yaml, "          GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: %s\n", resolveStepTimeoutValue(data))
+	fmt.Fprintf(yaml, "          GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: %s\n", resolveStepTimeoutValue(data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	// Engines that write their own internal tracing/diagnostic logs to files (rather than
 	// stdout/stderr) can surface a directory here; the detection script tails the most recently
 	// modified log file under it into the step log when the execution step failed, so a bare
 	// non-zero exit with no console output still has diagnosable content.
 	if internalLogsDir := engine.GetInternalLogsDir(); internalLogsDir != "" {
-		fmt.Fprintf(yaml, "          GH_AW_ENGINE_INTERNAL_LOGS_DIR: %s\n", internalLogsDir)
+		fmt.Fprintf(yaml, "          GH_AW_ENGINE_INTERNAL_LOGS_DIR: %s\n", internalLogsDir) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
-	fmt.Fprintf(yaml, "            const { main } = require('%s/%s.cjs');\n", SetupActionDestination, scriptId)
+	fmt.Fprintf(yaml, "            const { main } = require('%s/%s.cjs');\n", SetupActionDestination, scriptId) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("            await main();\n")
 }
 
@@ -684,9 +684,19 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// The MCP gateway is always enabled, even when agent sandbox is disabled
 	c.generateStopMCPGateway(yaml, data)
 
+	if isWorkQueueEnabled(data) {
+		yaml.WriteString("      - name: Collect work queue intents\n")
+		yaml.WriteString("        if: always()\n")
+		fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		yaml.WriteString("        with:\n")
+		yaml.WriteString("          script: |\n")
+		yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/collect_work_queue_intents.cjs');\n")
+		yaml.WriteString("            main({ core });\n")
+	}
+
 	// Add secret redaction step BEFORE any artifact uploads
 	// This ensures all artifacts are scanned for secrets before being uploaded
-	if hasSafeJobArtifactPaths(data) {
+	if hasSafeJobArtifactPaths(data) || isWorkQueueEnabled(data) {
 		c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data)
 	} else {
 		c.generateSecretRedactionStep(yaml, yaml.String(), data)

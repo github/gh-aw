@@ -309,6 +309,19 @@ If the pull request is still open, verify that:
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
       });
 
+      it.each([null, undefined])("should preserve collaborator fallback when the bot event repository is %s", async repository => {
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: "automation[bot]", type: "Bot" };
+        mockContext.payload.action = "opened";
+        mockContext.payload.repository = repository;
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "automation[bot]" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+      });
+
       it.each(["pull_request", "pull_request_target"])("should allow a same-repository GitHub App PR on %s despite collaborator permission 'none'", async eventName => {
         mockContext.eventName = eventName;
         mockContext.actor = "automation[bot]";
