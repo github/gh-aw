@@ -13,16 +13,15 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
-// TestIdTokenWriteWarning tests that id-token: write permission emits a warning
-func TestIdTokenWriteWarning(t *testing.T) {
+func TestIdTokenWriteInfo(t *testing.T) {
 	tests := []struct {
 		name              string
 		content           string
-		expectWarning     bool
+		expectInfo        bool
 		expectCompileFail bool
 	}{
 		{
-			name: "id-token write produces warning",
+			name: "id-token write produces info",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -33,7 +32,7 @@ permissions:
 
 # Test Workflow
 `,
-			expectWarning: true,
+			expectInfo: true,
 		},
 		{
 			name: "id-token read is invalid and compilation fails",
@@ -47,11 +46,11 @@ permissions:
 
 # Test Workflow
 `,
-			expectWarning:     false,
+			expectInfo:        false,
 			expectCompileFail: true,
 		},
 		{
-			name: "no id-token does not produce warning",
+			name: "no id-token does not produce info",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -62,10 +61,10 @@ permissions:
 
 # Test Workflow
 `,
-			expectWarning: false,
+			expectInfo: false,
 		},
 		{
-			name: "id-token write with other permissions produces warning",
+			name: "id-token write with other permissions produces info",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -78,10 +77,10 @@ permissions:
 
 # Test Workflow
 `,
-			expectWarning: true,
+			expectInfo: true,
 		},
 		{
-			name: "id-token write only produces warning",
+			name: "id-token write only produces info",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -91,10 +90,10 @@ permissions:
 
 # Test Workflow
 `,
-			expectWarning: true,
+			expectInfo: true,
 		},
 		{
-			name: "no permissions does not produce warning",
+			name: "no permissions does not produce info",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -102,20 +101,20 @@ engine: copilot
 
 # Test Workflow
 `,
-			expectWarning: false,
+			expectInfo: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := testutil.TempDir(t, "idtoken-warning-test")
+			tmpDir := testutil.TempDir(t, "idtoken-info-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
 			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
 				t.Fatal(err)
 			}
 
-			// Capture stderr to check for warnings
+			// Capture stderr to check the diagnostic severity.
 			oldStderr := os.Stderr
 			r, w, _ := os.Pipe()
 			os.Stderr = w
@@ -152,40 +151,38 @@ engine: copilot
 				"trust policies",
 			}
 
-			if tt.expectWarning {
+			if tt.expectInfo {
 				for _, phrase := range expectedPhrases {
 					if !strings.Contains(stderrOutput, phrase) {
-						t.Errorf("Expected warning to contain '%s', got stderr:\n%s", phrase, stderrOutput)
+						t.Errorf("Expected info to contain '%s', got stderr:\n%s", phrase, stderrOutput)
 					}
 				}
-				// Check for warning indicator
-				if !strings.Contains(stderrOutput, "warning:") {
-					t.Errorf("Expected 'warning:' in stderr output, got:\n%s", stderrOutput)
+				if !strings.Contains(stderrOutput, "info: This workflow grants id-token: write permission") {
+					t.Errorf("Expected id-token info diagnostic in stderr output, got:\n%s", stderrOutput)
+				}
+				if strings.Contains(stderrOutput, "warning: This workflow grants id-token: write permission") {
+					t.Errorf("Did not expect id-token warning in stderr output, got:\n%s", stderrOutput)
 				}
 			} else {
-				// Should not contain any of the id-token specific warning phrases
 				for _, phrase := range expectedPhrases {
 					if strings.Contains(stderrOutput, phrase) {
-						t.Errorf("Did not expect warning containing '%s', but got stderr:\n%s", phrase, stderrOutput)
+						t.Errorf("Did not expect info containing '%s', but got stderr:\n%s", phrase, stderrOutput)
 					}
 				}
 			}
 
-			// Verify warning count
-			if tt.expectWarning {
+			if tt.expectInfo {
 				warningCount := compiler.GetWarningCount()
-				if warningCount == 0 {
-					t.Error("Expected warning count > 0 but got 0")
+				if warningCount != 0 {
+					t.Errorf("Expected info not to increment warning count, got %d warnings", warningCount)
 				}
 			}
 		})
 	}
 }
 
-// TestIdTokenWriteWarningMessageFormat tests that the warning message format
-// matches the specified format
-func TestIdTokenWriteWarningMessageFormat(t *testing.T) {
-	tmpDir := testutil.TempDir(t, "idtoken-warning-format-test")
+func TestIdTokenWriteInfoMessageFormat(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "idtoken-info-format-test")
 
 	content := `---
 on: workflow_dispatch
@@ -203,7 +200,7 @@ permissions:
 		t.Fatal(err)
 	}
 
-	// Capture stderr to check for warnings
+	// Capture stderr to check the diagnostic severity.
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
@@ -223,16 +220,15 @@ permissions:
 		t.Fatalf("Expected compilation to succeed but it failed: %v", err)
 	}
 
-	// Verify the exact warning format
 	expectedLines := []string{
-		"This workflow grants id-token: write permission",
+		"info: This workflow grants id-token: write permission",
 		"OIDC tokens can authenticate to cloud providers (AWS, Azure, GCP).",
 		"Ensure proper audience validation and trust policies are configured.",
 	}
 
 	for _, line := range expectedLines {
 		if !strings.Contains(stderrOutput, line) {
-			t.Errorf("Expected warning to contain line '%s', got stderr:\n%s", line, stderrOutput)
+			t.Errorf("Expected info to contain line '%s', got stderr:\n%s", line, stderrOutput)
 		}
 	}
 }

@@ -457,7 +457,7 @@ func TestPullRequestTargetPolicy(t *testing.T) { //nolint:largefunc // Table cov
 		{name: "acknowledged default base ref", policy: acknowledged, checkout: "checkout:\n  repository: ${{ github.repository }}\n"},
 		{name: "mixed trusted and allowed checkouts", policy: acknowledged + allowlist, checkout: externalCheckout + "  - repository: ${{ github.repository }}\n    ref: ${{ github.event.pull_request.base.ref }}\n    path: source\n"},
 		{name: "app authenticated external checkout", policy: acknowledged + allowlist, checkout: externalCheckout + "    github-app:\n      app-id: ${{ vars.DOCS_APP_ID }}\n      private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}\n"},
-		{name: "unrelated warning remains", policy: acknowledged + allowlist, checkout: externalCheckout, extraPermissions: "  id-token: write\n", warnings: 1},
+		{name: "id-token permission is informational", policy: acknowledged + allowlist, checkout: externalCheckout, extraPermissions: "  id-token: write\n"},
 		{name: "unrelated strict validation remains", policy: acknowledged + allowlist, checkout: externalCheckout, extraPermissions: "  contents: write\n", errorContains: "write"},
 		{name: "implicit checkout still rejected", policy: acknowledged + allowlist, errorContains: insecureCheckout},
 		{name: "unlisted repository", policy: acknowledged + allowlist, checkout: strings.ReplaceAll(externalCheckout, "dotnet/AspNetCore.Docs", "dotnet/aspnetcore"), errorContains: insecureCheckout},
