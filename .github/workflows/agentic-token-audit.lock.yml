@@ -1468,6 +1468,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Agentic Workflow AIC Usage Audit"
           GH_AW_WORKFLOW_SOURCE: "githubnext/agentic-ops@c611242a76866fb51d4f7d660c80badc504dd473"
           GH_AW_TRACKER_ID: "agentic-token-audit"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1514,6 +1516,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Agentic Workflow AIC Usage Audit"
           GH_AW_WORKFLOW_SOURCE: "githubnext/agentic-ops@c611242a76866fb51d4f7d660c80badc504dd473"
           GH_AW_TRACKER_ID: "agentic-token-audit"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1532,6 +1536,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Agentic Workflow AIC Usage Audit"
           GH_AW_WORKFLOW_SOURCE: "githubnext/agentic-ops@c611242a76866fb51d4f7d660c80badc504dd473"
           GH_AW_TRACKER_ID: "agentic-token-audit"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

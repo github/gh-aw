@@ -1566,6 +1566,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Cache directory setup"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-security-red-team.md"
           GH_AW_TRACKER_ID: "security-red-team"
+          GH_AW_ENGINE_ID: "opencode"
+          GH_AW_ENGINE_VERSION: "1.18.33"
+          GH_AW_ENGINE_MODEL: "copilot/auto"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1612,6 +1615,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Cache directory setup"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-security-red-team.md"
           GH_AW_TRACKER_ID: "security-red-team"
+          GH_AW_ENGINE_ID: "opencode"
+          GH_AW_ENGINE_VERSION: "1.18.33"
+          GH_AW_ENGINE_MODEL: "copilot/auto"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1630,6 +1636,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Cache directory setup"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-security-red-team.md"
           GH_AW_TRACKER_ID: "security-red-team"
+          GH_AW_ENGINE_ID: "opencode"
+          GH_AW_ENGINE_VERSION: "1.18.33"
+          GH_AW_ENGINE_MODEL: "copilot/auto"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

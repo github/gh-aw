@@ -1418,6 +1418,9 @@ jobs:
           GH_AW_NOOP_MAX: "2"
           GH_AW_WORKFLOW_NAME: "Engine Conformance DeepSeek Harness"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/engine-conformance-deepseek-harness.md"
+          GH_AW_ENGINE_ID: "deepseek-harness"
+          GH_AW_ENGINE_VERSION: "0.2.0-rc.2"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.4"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1441,6 +1444,9 @@ jobs:
           GH_AW_MISSING_TOOL_CREATE_ISSUE: "true"
           GH_AW_WORKFLOW_NAME: "Engine Conformance DeepSeek Harness"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/engine-conformance-deepseek-harness.md"
+          GH_AW_ENGINE_ID: "deepseek-harness"
+          GH_AW_ENGINE_VERSION: "0.2.0-rc.2"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.4"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1458,6 +1464,9 @@ jobs:
           GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE: "true"
           GH_AW_WORKFLOW_NAME: "Engine Conformance DeepSeek Harness"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/engine-conformance-deepseek-harness.md"
+          GH_AW_ENGINE_ID: "deepseek-harness"
+          GH_AW_ENGINE_VERSION: "0.2.0-rc.2"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-5.4"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

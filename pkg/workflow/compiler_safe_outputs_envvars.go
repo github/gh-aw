@@ -87,10 +87,14 @@ func addJobLevelEngineMetadata(envVars map[string]string, data *WorkflowData) {
 		}
 		// Prefer explicit compile-time model; fall back to the runtime model captured by the
 		// activation job so footers always show the actual model used for auditability.
-		if data.Model != "" {
+		if data.Model != "" && data.EngineConfig.ModelRouting == nil {
 			envVars["GH_AW_ENGINE_MODEL"] = fmt.Sprintf("%q", data.Model)
 		} else {
 			envVars["GH_AW_ENGINE_MODEL"] = fmt.Sprintf("${{ needs.%s.outputs.model }}", constants.AgentJobName)
+		}
+		if data.EngineConfig.ModelRouting != nil {
+			envVars["GH_AW_ENGINE_MODEL_EFFORT"] = fmt.Sprintf("${{ needs.%s.outputs.model_effort }}", constants.AgentJobName)
+			envVars["GH_AW_MODEL_ROUTING_STATUS"] = fmt.Sprintf("${{ needs.%s.outputs.model_routing_status }}", constants.AgentJobName)
 		}
 	}
 
