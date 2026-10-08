@@ -21,7 +21,7 @@ const incompleteOutput = JSON.stringify({
   collectorRetryCount: 0,
 });
 describe("collect_ndjson_output.cjs", () => {
-  let mockCore, collectScript;
+  let mockCore, collectScript, legacyPatchSpy;
   (beforeEach(() => {
     fs.rmSync("/tmp/gh-aw/mcp-cli-audit", { recursive: true, force: true });
     (fs.existsSync("/tmp/gh-aw") || fs.mkdirSync("/tmp/gh-aw", { recursive: !0 }),
@@ -57,6 +57,8 @@ describe("collect_ndjson_output.cjs", () => {
       (global.core = mockCore),
       (global.context = { eventName: "issues", actor: "test-actor", repo: { owner: "test-owner", repo: "test-repo" }, payload: {} }),
       (global.github = { rest: { repos: { listCollaborators: vi.fn().mockResolvedValue({ data: [] }) }, users: { getByUsername: vi.fn() } } }));
+    const readDirectory = fs.readdirSync;
+    legacyPatchSpy = vi.spyOn(fs, "readdirSync").mockImplementation((directory, ...options) => (directory === "/tmp/gh-aw" ? [] : Reflect.apply(readDirectory, fs, [directory, ...options])));
     const scriptPath = path.join(__dirname, "collect_ndjson_output.cjs");
     ((collectScript = fs.readFileSync(scriptPath, "utf8")),
       (global.fs = fs),
@@ -160,6 +162,7 @@ describe("collect_ndjson_output.cjs", () => {
       ));
   }),
     afterEach(() => {
+      legacyPatchSpy.mockRestore();
       ["/tmp/gh-aw/test-ndjson-output.txt", "/tmp/gh-aw/agent_output.json"].forEach(file => {
         try {
           fs.existsSync(file) && fs.unlinkSync(file);

@@ -59,7 +59,7 @@ describe("Copilot nested session normalization", () => {
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       expect(output).toContain("Agent conversation: agent/events.jsonl (sessionId=root agentId=research");
       expect(output).toContain("Agent conversation: agent/events.jsonl (sessionId=root agentId=left parentAgentId=research");
-      expect(output).toContain("assistant.message agentId=left parentAgentId=research parentToolCallId=spawn-left");
+      expect(output).toContain("assistant.message agentId=left parentAgentId=research parentToolUseId=spawn-left");
       expect(output).toContain("parentId=research");
       expect(output).toContain("status=completed");
       expect(output).toContain("research credits: 494.207");
@@ -116,15 +116,64 @@ describe("Copilot nested session normalization", () => {
       native("assistant.message", undefined, { parentToolCallId: "spawn", content: "legacy child" }),
       native("subagent.started", "other", { toolCallId: "spawn" }),
       native("assistant.message", undefined, { parentToolCallId: "spawn", content: "ambiguous child" }),
+      native("assistant.message", undefined, { parentToolCallId: "unknown-spawn", content: "unresolved child" }),
     ];
     const contexts = sessionEventContexts(events);
     expect(contexts[2].agentId).toBe("child");
     expect(contexts[4].agentId).toBeUndefined();
+    expect(contexts[5].agentId).toBeUndefined();
     const normalized = normalizeCopilotSession(events);
     expect(byType(normalized, "assistant.message")[0].agentId).toBe("child");
     expect(byType(normalized, "assistant.message")[0].data.agentId).toBe("child");
     expect(byType(normalized, "assistant.message")[1].data.agentId).toBeUndefined();
     stable(normalized);
+  });
+
+  it("resolves children that start before the root session is observed", () => {
+    const contexts = sessionEventContexts([
+      native("subagent.started", "child", { toolCallId: "spawn" }),
+      native("assistant.message", undefined, { parentToolCallId: "spawn", content: "child output" }),
+      native("session.start", undefined, { sessionId: "root" }),
+    ]);
+    expect(contexts[0].rootSessionId).toBe("root");
+    expect(contexts[1].rootSessionId).toBe("root");
+    expect(contexts[0].scope).toBe(contexts[1].scope);
+    expect(contexts[1].agentId).toBe("child");
+  });
+
+  it("retains unmatched and ambiguous subagent lifecycle events in unresolved groups", () => {
+    const ambiguous = native("subagent.completed", "reused", { success: true });
+    const groups = scopedAgentSessions([
+      native("session.start", undefined, { sessionId: "root" }),
+      native("subagent.started", "reused", { toolCallId: "spawn-left" }),
+      native("session.start", "reused", { sessionId: "left", parentToolCallId: "spawn-left" }),
+      native("subagent.started", "reused", { toolCallId: "spawn-right" }),
+      native("session.start", "reused", { sessionId: "right", parentToolCallId: "spawn-right" }),
+      ambiguous,
+    ]);
+    expect(groups.some(group => group.label.includes("unresolved subagent") && group.events.some(event => event.type === ambiguous.type && event.agentId === ambiguous.agentId))).toBe(true);
+    expect(groups.find(group => group.label === "agent").events.some(event => event.type === ambiguous.type && event.agentId === ambiguous.agentId)).toBe(true);
+
+    const unmatched = native("subagent.completed", "missing", { success: false });
+    expect(scopedAgentSessions([unmatched]).some(group => group.events.some(event => event.type === unmatched.type && event.agentId === unmatched.agentId))).toBe(true);
+  });
+
+  it("includes nested accounting only for a child-only log with one consistent scope", () => {
+    const childOnly = convertCopilotEventsToLegacyLogEntries([
+      native("session.start", "child", { sessionId: "child-session", parentToolCallId: "spawn" }),
+      native("session.result", "child", { parentToolCallId: "spawn", numTurns: 4, usage: { input_tokens: 12 } }),
+    ]);
+    expect(childOnly.find(event => event.type === "result")).toMatchObject({ num_turns: 4, usage: { input_tokens: 12 } });
+
+    const mixed = convertCopilotEventsToLegacyLogEntries([
+      native("session.start", undefined, { sessionId: "root" }),
+      native("session.result", undefined, { numTurns: 2 }),
+      native("session.result", "child", { parentToolCallId: "spawn", numTurns: 7 }),
+    ]);
+    expect(mixed.find(event => event.type === "result").num_turns).toBe(2);
+
+    const noAccounting = convertCopilotEventsToLegacyLogEntries([native("subagent.started", "child", { toolCallId: "spawn" })]);
+    expect(noAccounting.some(event => event.type === "result")).toBe(false);
   });
 
   it("preserves opaque child extensions and distinguishes identical parent/child summaries", () => {

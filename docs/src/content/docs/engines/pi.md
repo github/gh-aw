@@ -143,6 +143,8 @@ An omitted model inherits the parent's configured model. Bare model IDs use the 
 
 Children retain the workflow's inference gateway, MCP configuration, steering, bash allowlist, and edit restrictions. Tool-call and denial budgets are shared with the parent. Children use compiler-managed execution arguments rather than inheriting `engine.args` overrides. Optional automatically discovered extensions are disabled in children; only the managed infrastructure extensions are loaded. Custom drivers do not support this delegation path.
 
+Children return task results to the parent instead of emitting workflow-completion reports or `noop` safe outputs. Task-required safe-output actions remain available. Time-pressure steering applies to ongoing tool turns, not completed answers, so it does not reopen a finished child session.
+
 Dispatch logs record both the requested alias and resolved model. `gh aw audit` reports `subagent_model_not_observed` when usage evidence exists but no agent inference matches a declared model. This means the agent may not have run or its model was not honored; model presence alone does not prove delegation. Detection requests are not treated as agent-model evidence.
 
 ## Additional providers

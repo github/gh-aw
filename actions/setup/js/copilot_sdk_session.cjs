@@ -245,6 +245,7 @@ async function runWithCopilotSDK({
    * @type {Map<string, {toolName: string, mcpServerName: string}>}
    */
   const pendingToolCalls = new Map();
+  const agentByParentToolCallId = new Map();
 
   // Post-completion idle watchdog.
   // When the agent has produced output and all tracked tool calls have completed,
@@ -369,7 +370,7 @@ async function runWithCopilotSDK({
     function writeEvent(type, data, timestamp, native = {}) {
       const metadata = Object.fromEntries(["id", "parentId", "agentId", "ephemeral"].filter(key => Object.hasOwn(native, key)).map(key => [key, native[key]]));
       const correlation = Object.fromEntries(
-        ["sessionId", "messageId", "originatingMessageId", "reasoningId", "interactionId", "turnId", "apiCallId", "model", "parentToolCallId", "parentAgentTaskId"]
+        ["sessionId", "messageId", "originatingMessageId", "reasoningId", "interactionId", "turnId", "apiCallId", "model", "parentToolCallId", "parentAgentId", "parentAgentTaskId"]
           .filter(key => Object.hasOwn(native.data ?? {}, key))
           .map(key => [key, native.data[key]])
       );
@@ -379,9 +380,22 @@ async function runWithCopilotSDK({
       process.stderr.write(jsonl);
     }
 
+    function resolveToolOwner(event) {
+      const data = event.data ?? {};
+      let agentId = event.agentId ?? data.agentId;
+      const parentToolCallId = event.parentToolCallId ?? event.parentToolUseId ?? data.parentToolCallId ?? data.parentToolUseId;
+      if (agentId !== undefined && parentToolCallId !== undefined) agentByParentToolCallId.set(parentToolCallId, agentId);
+      if (event.type === "subagent.started" && agentId !== undefined && data.toolCallId !== undefined) {
+        agentByParentToolCallId.set(data.toolCallId, agentId);
+      }
+      agentId ??= parentToolCallId === undefined ? undefined : agentByParentToolCallId.get(parentToolCallId);
+      return { owner: agentId ?? parentToolCallId ?? "main", agentId };
+    }
+
     // Subscribe to all session events and serialise the ones we care about.
     session.on(event => {
-      const owner = event.agentId || event.data?.agentId || event.data?.parentToolCallId || "main";
+      const { owner, agentId: resolvedAgentId } = resolveToolOwner(event);
+      const native = resolvedAgentId !== undefined && event.agentId !== resolvedAgentId ? { ...event, agentId: resolvedAgentId } : event;
       const toolKey = JSON.stringify([owner, event.data?.toolCallId]);
       // Workflow lifecycle signals are ephemeral; without this copy they never reach the artifact.
       if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
@@ -412,10 +426,11 @@ async function runWithCopilotSDK({
             mcpServerName,
             ...(event.data?.mcpToolName ? { mcpToolName: event.data.mcpToolName } : {}),
             ...(toolCallId ? { toolCallId } : {}),
+            ...(resolvedAgentId === undefined ? {} : { agentId: resolvedAgentId }),
             ...(input === undefined ? {} : { input }),
             ...(command ? { command } : {}),
           };
-          writeEvent("tool.execution_start", eventData, event.timestamp, event);
+          writeEvent("tool.execution_start", eventData, event.timestamp, native);
           break;
         }
 
@@ -432,7 +447,7 @@ async function runWithCopilotSDK({
           const result = event.data?.result ?? undefined;
           // max-tool-denials intentionally tracks permission denials only.
           // Tool execution failures are still logged, but do not increment the guardrail counter.
-          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result }, event.timestamp, event);
+          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), ...(resolvedAgentId === undefined ? {} : { agentId: resolvedAgentId }), success, result }, event.timestamp, native);
           break;
         }
 

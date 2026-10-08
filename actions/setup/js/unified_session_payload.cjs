@@ -5,6 +5,9 @@
 const { computeInferenceAIC, findModelPricing } = require("./model_costs.cjs");
 const { COPILOT_WORKFLOW_EVENT_FIELDS } = require("./copilot_workflow_events.cjs");
 const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
+const { sessionContext } = require("./agent_session.cjs");
+
+const SCOPED_AGENT_TYPES = new Set(["session.init", "session.start", "user.message", "assistant.message", "assistant.reasoning", "assistant.refusal", "tool.execution_start", "tool.execution_complete", "session.result"]);
 
 /** @type {Fields} */
 const USAGE_FIELDS = {
@@ -150,6 +153,7 @@ const EVENT_FIELDS = {
   },
   "session.result": {
     ...CORRELATION_FIELDS,
+    sourceEngine: ["sourceEngine"],
     numTurns: ["numTurns", "num_turns"],
     durationMs: ["durationMs", "duration_ms"],
     totalCostUsd: ["totalCostUsd", "total_cost_usd"],
@@ -289,6 +293,9 @@ function normalizeUnifiedSessionEvent(event, phase) {
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (SCOPED_AGENT_TYPES.has(event.type) || (Object.hasOwn(COPILOT_WORKFLOW_EVENT_FIELDS, event.type) && event.type.startsWith("subagent."))) {
+    for (const [key, value] of Object.entries(sessionContext(event))) if (!Object.hasOwn(data, key)) data[key] = value;
+  }
   if (known && event.type.startsWith("dynamicWorkflows.")) {
     if (!Object.hasOwn(data, "status") && source.patch?.status !== undefined) data.status = structuredClone(source.patch.status);
     const usage = selectFields(source.usage, { totalTokens: ["totalTokens", "total_tokens"], toolUses: ["toolUses", "tool_uses"], durationMs: ["durationMs", "duration_ms"] });

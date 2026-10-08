@@ -213,8 +213,10 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	compilerActivationJobLog.Print("Adding activation-time work queue snapshot")
 	ctx.steps = append(ctx.steps,
 		"      - name: Snapshot work queue state\n",
+		"        id: work_queue_snapshot\n",
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)),
 	)
+	ctx.steps = append(ctx.steps, workQueuePolicyEnvironment(ctx.data)...)
 	if workQueueStorage(ctx.data) == "issues" {
 		ctx.steps = append(ctx.steps, "        env:\n", "          GH_AW_WORK_QUEUE_STORAGE: issues\n", "          WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}\n")
 	}
@@ -223,6 +225,7 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 		"          script: |\n",
 		generateGitHubScriptWithRequire("write_work_queue_snapshot.cjs"),
 	)
+	ctx.outputs["work_queue_origin"] = "${{ steps.work_queue_snapshot.outputs.work_queue_origin }}"
 }
 
 func workQueueStorage(data *WorkflowData) string {
@@ -256,7 +259,24 @@ func isWorkQueueWorker(data *WorkflowData) bool {
 	return ok && worker
 }
 
+func workQueueRuntimeRole(data *WorkflowData) string {
+	if workQueueRequiresAssignment(data) {
+		return "worker"
+	}
+	if data != nil && data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil && len(data.SafeOutputs.DispatchWorkflow.Workflows) > 0 {
+		return "dispatcher"
+	}
+	return "observer"
+}
+
+func isWorkQueueParticipant(data *WorkflowData) bool {
+	return isWorkQueueEnabled(data) && workQueueRuntimeRole(data) != "observer"
+}
+
 func workQueueRequiresAssignment(data *WorkflowData) bool {
+	if isWorkQueueWorker(data) {
+		return true
+	}
 	if data == nil || data.Tools == nil {
 		return false
 	}

@@ -9,8 +9,8 @@ const { getMessageRefusal, getProviderRefusals, normalizeOpenAIChatUsage } = req
 const USAGE_ALIASES = {
   input_tokens: "inputTokens",
   output_tokens: "outputTokens",
-  total_tokens: "totalTokens",
   reasoning_output_tokens: "reasoningOutputTokens",
+  total_tokens: "totalTokens",
   cache_creation_input_tokens: "cacheCreationInputTokens",
   cache_read_input_tokens: "cacheReadInputTokens",
 };
@@ -42,52 +42,158 @@ function isNestedSessionEvent(event) {
 }
 
 /**
+ * Subagent lifecycle envelope IDs identify the target, not the emitting caller.
+ * @param {any} event
+ * @returns {{sessionId?: string|null, parentToolUseId?: string|null, agentId?: string}}
+ */
+function sessionContext(event) {
+  const data = event?.data ?? {};
+  const sessionId = data.sessionId !== undefined ? data.sessionId : event?.sessionId !== undefined ? event.sessionId : event?.session_id !== undefined ? event.session_id : data.session_id;
+  const parentToolUseId =
+    data.parentToolUseId !== undefined
+      ? data.parentToolUseId
+      : event?.parentToolUseId !== undefined
+        ? event.parentToolUseId
+        : event?.parentToolCallId !== undefined
+          ? event.parentToolCallId
+          : event?.parent_tool_use_id !== undefined
+            ? event.parent_tool_use_id
+            : data.parent_tool_use_id !== undefined
+              ? data.parent_tool_use_id
+              : data.parentToolCallId;
+  const agentId = data.agentId ?? (typeof event?.type === "string" && event.type.startsWith("subagent.") ? undefined : event?.agentId);
+  return {
+    ...(typeof sessionId === "string" || sessionId === null ? { sessionId } : {}),
+    ...(typeof parentToolUseId === "string" || parentToolUseId === null ? { parentToolUseId } : {}),
+    ...(typeof agentId === "string" ? { agentId } : {}),
+  };
+}
+
+/** @param {any} event @returns {string} */
+function sessionScopeKey(event) {
+  const { sessionId, parentToolUseId, agentId } = sessionContext(event);
+  return JSON.stringify([sessionId, parentToolUseId, agentId]);
+}
+
+/** @param {Array<any>} events @returns {boolean} */
+function isSingleNestedSession(events) {
+  return events.length > 0 && events.every(event => !!sessionContext(event).parentToolUseId) && new Set(events.map(sessionScopeKey)).size === 1;
+}
+
+/**
+ * Resolve lifecycle-backed child identity without guessing when IDs are ambiguous.
+ * @param {any} event
+ * @param {string} sourceIdentity
+ * @param {string|undefined} rootSessionId
+ * @param {Map<string, Map<any, any>>} instancesByAgent
+ * @param {Map<string, Set<any>>} agentsBySpawningTool
+ */
+function resolveAgentIdentity(event, sourceIdentity, rootSessionId, instancesByAgent, agentsBySpawningTool) {
+  const data = event.data ?? {};
+  let agentId = event.agentId || data.agentId || undefined;
+  const parentToolUseId = sessionContext(event).parentToolUseId;
+  let parentToolCallId = event.parentToolCallId || data.parentToolCallId || event.parent_tool_use_id || event.parentToolUseId || data.parentToolUseId || data.parent_tool_use_id || parentToolUseId || undefined;
+
+  if (event.type === "subagent.started" && agentId !== undefined) {
+    parentToolCallId = data.toolCallId ?? parentToolCallId;
+    const agentIdentity = JSON.stringify([sourceIdentity, rootSessionId, agentId]);
+    const instances = instancesByAgent.get(agentIdentity) ?? new Map();
+    instances.set(parentToolCallId, { parentToolCallId, parentAgentId: data.parentAgentId ?? data.parentId });
+    instancesByAgent.set(agentIdentity, instances);
+    if (parentToolCallId !== undefined) {
+      const spawningToolIdentity = JSON.stringify([sourceIdentity, rootSessionId, parentToolCallId]);
+      const candidates = agentsBySpawningTool.get(spawningToolIdentity) ?? new Set();
+      candidates.add(agentId);
+      agentsBySpawningTool.set(spawningToolIdentity, candidates);
+    }
+  }
+
+  let ambiguous = false;
+  if (agentId === undefined && parentToolCallId !== undefined) {
+    const candidates = agentsBySpawningTool.get(JSON.stringify([sourceIdentity, rootSessionId, parentToolCallId]));
+    if (candidates?.size === 1) agentId = candidates.values().next().value;
+    else if (candidates && candidates.size > 1) ambiguous = true;
+  }
+
+  const instances = agentId === undefined ? undefined : instancesByAgent.get(JSON.stringify([sourceIdentity, rootSessionId, agentId]));
+  let agent;
+  if (instances) {
+    if (parentToolCallId !== undefined) agent = instances.get(parentToolCallId);
+    if (!agent && instances.size === 1) {
+      agent = instances.values().next().value;
+      parentToolCallId = agent.parentToolCallId;
+    } else if (!agent && instances.size > 1) ambiguous = true;
+  }
+
+  return {
+    agentId,
+    parentToolUseId,
+    parentToolCallId,
+    parentAgentId: data.parentAgentId ?? agent?.parentAgentId,
+    ambiguous,
+    instanceScoped: instances !== undefined,
+  };
+}
+
+/** @param {any} event @returns {string} */
+function sourceIdentity(event) {
+  return JSON.stringify([event.provenance?.component, event.provenance?.phase, event.provenance?.path]);
+}
+
+/** @param {Array<any>} events @returns {Array<string|undefined>} */
+function rootSessionIdsFor(events) {
+  const rootStartsBySource = new Map();
+  for (const [index, event] of events.entries()) {
+    const data = event.data ?? {};
+    const source = sourceIdentity(event);
+    const explicitSessionId = event.session_id ?? event.sessionId ?? data.sessionId ?? data.session_id;
+    if (["session.start", "session.init"].includes(event.type) && !isNestedSessionEvent(event) && explicitSessionId !== undefined) {
+      const starts = rootStartsBySource.get(source) ?? [];
+      starts.push({ index, sessionId: explicitSessionId });
+      rootStartsBySource.set(source, starts);
+    }
+  }
+  return events.map((event, index) => {
+    const starts = rootStartsBySource.get(sourceIdentity(event)) ?? [];
+    const active = [...starts].reverse().find(start => start.index <= index) ?? starts[0];
+    return active?.sessionId;
+  });
+}
+
+/**
  * An agent instance is authoritative; deprecated parent-tool markers are only
  * the identity fallback. Child initialization must not change the root session.
  * @param {Array<any>} events
  */
 function sessionEventContexts(events) {
-  const sessions = new Map();
-  const agents = new Map();
-  const spawningTools = new Map();
-  return events.map(event => {
+  const sessionIdsByOwner = new Map();
+  const instancesByAgent = new Map();
+  const agentsBySpawningTool = new Map();
+  const rootSessionIds = rootSessionIdsFor(events);
+  for (const [index, rootSessionId] of rootSessionIds.entries()) {
+    if (rootSessionId !== undefined) sessionIdsByOwner.set(JSON.stringify([sourceIdentity(events[index]), rootSessionId]), rootSessionId);
+  }
+  return events.map((event, index) => {
     const data = event.data ?? {};
-    const sourceKey = JSON.stringify([event.provenance?.component, event.provenance?.phase, event.provenance?.path]);
-    const rootKey = JSON.stringify([sourceKey]);
-    const rootSessionId = sessions.get(rootKey);
-    let agentId = event.agentId || data.agentId || undefined;
-    let parentToolCallId = event.parent_tool_use_id || event.parentToolUseId || event.parentToolCallId || data.parentToolUseId || data.parent_tool_use_id || data.parentToolCallId || undefined;
-    if (event.type === "subagent.started" && agentId !== undefined) {
-      const agentKey = JSON.stringify([sourceKey, rootSessionId, agentId]);
-      agents.set(agentKey, { parentToolCallId: data.toolCallId, parentAgentId: data.parentId });
-      if (data.toolCallId !== undefined) {
-        const toolKey = JSON.stringify([sourceKey, rootSessionId, data.toolCallId]);
-        const instances = spawningTools.get(toolKey) ?? new Set();
-        instances.add(agentId);
-        spawningTools.set(toolKey, instances);
-      }
-    }
-    if (agentId === undefined && parentToolCallId !== undefined) {
-      const instances = spawningTools.get(JSON.stringify([sourceKey, rootSessionId, parentToolCallId]));
-      if (instances?.size === 1) agentId = instances.values().next().value;
-    }
-    const agent = agents.get(JSON.stringify([sourceKey, rootSessionId, agentId]));
-    parentToolCallId ??= agent?.parentToolCallId;
-    const parentAgentId = data.parentAgentId ?? agent?.parentAgentId;
-    const ownerKey = agentId !== undefined ? ["agent", agentId] : parentToolCallId !== undefined ? ["tool", parentToolCallId] : [];
-    const sessionKey = JSON.stringify([sourceKey, ...ownerKey]);
+    const source = sourceIdentity(event);
+    const rootSessionId = rootSessionIds[index];
+    const rootIdentity = JSON.stringify([source, rootSessionId]);
     const explicitSessionId = event.session_id ?? event.sessionId ?? data.sessionId ?? data.session_id;
-    if (["session.start", "session.init"].includes(event.type) && explicitSessionId !== undefined) sessions.set(sessionKey, explicitSessionId);
-    const sessionId = explicitSessionId ?? sessions.get(sessionKey) ?? rootSessionId;
+    const { agentId, parentToolUseId, parentToolCallId, parentAgentId, ambiguous, instanceScoped } = resolveAgentIdentity(event, source, rootSessionId, instancesByAgent, agentsBySpawningTool);
+    const ownerIdentity = agentId !== undefined ? ["agent", agentId, ambiguous ? `unresolved-${index}` : instanceScoped ? parentToolCallId : undefined] : parentToolCallId !== undefined ? ["tool", parentToolCallId] : [];
+    const sessionIdentity = JSON.stringify([source, rootSessionId, ...ownerIdentity]);
+    if (["session.start", "session.init"].includes(event.type) && explicitSessionId !== undefined) sessionIdsByOwner.set(sessionIdentity, explicitSessionId);
+    const sessionId = explicitSessionId ?? sessionIdsByOwner.get(sessionIdentity) ?? rootSessionId;
     return {
-      sourceKey,
-      rootSessionId: sessions.get(rootKey),
+      sourceIdentity: source,
+      rootSessionId: sessionIdsByOwner.get(rootIdentity),
       sessionId,
       agentId,
+      parentToolUseId,
       parentAgentId,
       parentToolCallId,
       nested: agentId !== undefined || parentToolCallId !== undefined,
-      scope: JSON.stringify([sourceKey, sessionId, ...ownerKey]),
+      scope: JSON.stringify([source, sessionId, ...ownerIdentity]),
     };
   });
 }
@@ -398,13 +504,15 @@ function selectSessionResult(events, { includeNested = false } = {}) {
   const normalized = normalizeAgentSession(events);
   const claudeSessions = new Map();
   for (const event of normalized) {
-    if (event.type !== "session.result" || event.data.sourceEngine !== "claude" || isNestedSessionEvent(event) || typeof event.session_id !== "string") continue;
-    claudeSessions.set(event.session_id, [...(claudeSessions.get(event.session_id) ?? []), { ...event, session_id: undefined }]);
+    const context = sessionContext(event);
+    if (event.type !== "session.result" || event.data.sourceEngine !== "claude" || (!includeNested && isNestedSessionEvent(event)) || typeof context.sessionId !== "string") continue;
+    const key = sessionScopeKey(event);
+    claudeSessions.set(key, [...(claudeSessions.get(key) ?? []), event]);
   }
   if (claudeSessions.size > 1) {
     const aggregate = { usage: {} };
     for (const observations of claudeSessions.values()) {
-      const snapshot = selectSessionResult(observations);
+      const snapshot = selectSessionResult(observations, { includeNested });
       if (!snapshot) continue;
       accumulateSessionUsage(aggregate.usage, snapshot.usage);
       for (const key of ["numTurns", "durationMs", "totalCostUsd"]) {
@@ -415,7 +523,8 @@ function selectSessionResult(events, { includeNested = false } = {}) {
       }
     }
     for (const event of normalized) {
-      if (event.type !== "session.result" || event.data.sourceEngine !== "claude" || isNestedSessionEvent(event) || typeof event.session_id === "string") continue;
+      const context = sessionContext(event);
+      if (event.type !== "session.result" || event.data.sourceEngine !== "claude" || (!includeNested && isNestedSessionEvent(event)) || typeof context.sessionId === "string") continue;
       // Unassigned diagnostics are valid evidence, but their usage may overlap a named session.
       for (const key of ["errors", "permissionDenials"]) {
         if (Array.isArray(event.data[key])) aggregate[key] = [...(aggregate[key] ?? []), ...structuredClone(event.data[key])];
@@ -460,12 +569,12 @@ function projectSessionResult(events, options) {
   };
 }
 
-/** @param {Array<any>} events @returns {any|undefined} */
-function projectSessionInitialization(events) {
+/** @param {Array<any>} events @param {{includeNested?: boolean}} [options] @returns {any|undefined} */
+function projectSessionInitialization(events, { includeNested = false } = {}) {
   let data;
   for (const event of normalizeAgentSession(events)) {
     if (event.type !== "session.init" && event.type !== "session.start") continue;
-    if (isNestedSessionEvent(event)) continue;
+    if (!includeNested && isNestedSessionEvent(event)) continue;
     data ??= {};
     for (const [key, value] of Object.entries(event.data)) {
       if (value !== undefined) data = { ...data, [key]: structuredClone(value) };
@@ -593,11 +702,11 @@ function sessionTokenTotal(usage) {
   return isTokenCount(total) ? total : undefined;
 }
 
-/** @param {Array<any>} events @returns {string|undefined} */
-function observedSessionModel(events) {
+/** @param {Array<any>} events @param {{includeNested?: boolean}} [options] @returns {string|undefined} */
+function observedSessionModel(events, { includeNested = false } = {}) {
   let model;
   for (const event of events) {
-    if (isNestedSessionEvent(event)) continue;
+    if (!includeNested && isNestedSessionEvent(event)) continue;
     const value = event?.type === "system" && event.subtype === "init" ? event.model : ["session.init", "session.start", "pi.message_snapshot"].includes(event?.type) ? event.data?.model : undefined;
     if (typeof value === "string" && value.length) model = value;
   }
@@ -605,6 +714,9 @@ function observedSessionModel(events) {
 }
 
 module.exports = {
+  sessionContext,
+  sessionScopeKey,
+  isSingleNestedSession,
   isSessionEvent,
   isTokenCount,
   isMetric,

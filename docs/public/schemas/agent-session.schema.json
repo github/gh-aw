@@ -95,6 +95,7 @@
     "SessionResultData": {
       "type": "object",
       "properties": {
+        "sourceEngine": { "type": "string" },
         "numTurns": { "$ref": "#/definitions/SessionCount" },
         "durationMs": { "$ref": "#/definitions/SessionMetric" },
         "totalCostUsd": { "$ref": "#/definitions/SessionMetric" },

@@ -2,7 +2,8 @@
 private: true
 emoji: "📅"
 description: Daily report analyzing repository issues with clustering, metrics, and trend charts
-on: daily
+on:
+  workflow_dispatch:
 max-daily-ai-credits: 10000
 permissions:
   contents: read
@@ -22,6 +23,10 @@ sandbox:
   agent:
     id: awf
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   cli-proxy: true
   github:
     mode: gh-proxy
@@ -48,6 +53,7 @@ experiments:
     analysis_type: mann_whitney
     tags: [output, readability, engagement]
 imports:
+  - shared/daily-report-worker.md
   - shared/github-guard-policy.md
   - uses: shared/daily-audit-base.md
     with:

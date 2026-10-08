@@ -36,8 +36,9 @@ const SafeOutputsUploadCodeCoverageStagingArtifactName = "safe-outputs-upload-co
 // actions/upload-code-coverage from agent output.
 type UploadCodeCoverageConfig struct {
 	BaseSafeOutputConfig     `yaml:",inline"`
-	FailOnError              *bool `yaml:"fail-on-error,omitempty"`               // Fixed fail-on-error input for actions/upload-code-coverage (default: true); agent cannot override
-	WaitForProcessingTimeout int   `yaml:"wait-for-processing-timeout,omitempty"` // Fixed wait-for-processing-timeout in seconds (default: 160); agent cannot override
+	FailOnError              *bool  `yaml:"fail-on-error,omitempty"`               // Fixed fail-on-error input for actions/upload-code-coverage (default: true); agent cannot override
+	WaitForProcessingTimeout int    `yaml:"wait-for-processing-timeout,omitempty"` // Fixed wait-for-processing-timeout in seconds (default: 160); agent cannot override
+	TargetRef                string `yaml:"target-ref,omitempty"`
 }
 
 // parseUploadCodeCoverageConfig handles upload-code-coverage configuration
@@ -61,6 +62,9 @@ func (c *Compiler) parseUploadCodeCoverageConfig(outputMap map[string]any) *Uplo
 	}
 
 	if configMap, ok := configData.(map[string]any); ok {
+		if target, ok := configMap["target-ref"].(string); ok {
+			config.TargetRef = target
+		}
 		if failOnError, exists := configMap["fail-on-error"]; exists {
 			if b, ok := failOnError.(bool); ok {
 				config.FailOnError = &b
@@ -104,10 +108,10 @@ func generateSafeOutputsCodeCoverageStagingUpload(builder *strings.Builder, data
 	builder.WriteString("      # Upload safe-outputs upload-code-coverage staging for the upload_code_coverage job\n")
 	builder.WriteString("      - name: Upload upload-code-coverage staging\n")
 	builder.WriteString("        if: always()\n")
-	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
+	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	builder.WriteString("        with:\n")
-	fmt.Fprintf(builder, "          name: %s%s\n", prefix, SafeOutputsUploadCodeCoverageStagingArtifactName)
-	fmt.Fprintf(builder, "          path: %s\n", codeCoverageStagingDirExpr)
+	fmt.Fprintf(builder, "          name: %s%s\n", prefix, SafeOutputsUploadCodeCoverageStagingArtifactName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(builder, "          path: %s\n", codeCoverageStagingDirExpr)                                 //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	builder.WriteString("          retention-days: 1\n")
 	builder.WriteString("          if-no-files-found: ignore\n")
 }
@@ -133,12 +137,28 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 	if data.SafeOutputs == nil || data.SafeOutputs.UploadCodeCoverage == nil {
 		return nil, errors.New("safe-outputs.upload-code-coverage configuration is required")
 	}
-	cfg := data.SafeOutputs.UploadCodeCoverage
+	permissions := NewPermissionsContentsReadCodeQualityWritePRRead()
+	steps := c.buildUploadCodeCoverageSteps(data, permissions)
+	jobCondition := fmt.Sprintf("needs.%s.outputs.upload_code_coverage_file != ''", constants.SafeOutputsJobName)
+	job := &Job{
+		Name:           string(constants.UploadCodeCoverageJobName),
+		If:             jobCondition,
+		RunsOn:         c.formatFrameworkJobRunsOn(data),
+		Environment:    c.indentYAMLLines(resolveSafeOutputsEnvironment(data), "    "),
+		Permissions:    permissions.RenderToYAML(),
+		TimeoutMinutes: 10,
+		Steps:          steps,
+		Needs:          []string{mainJobName, string(constants.SafeOutputsJobName)},
+	}
+	publishCodeCoverageLog.Print("Built upload_code_coverage job")
+	return job, nil
+}
 
+func (c *Compiler) buildUploadCodeCoverageSteps(data *WorkflowData, permissions *Permissions) []string {
+	cfg := data.SafeOutputs.UploadCodeCoverage
 	// Artifact prefix for workflow_call context: this job depends directly on the agent job,
 	// so it must use the agent-job-relative prefix expression (mirrors upload_assets).
 	agentArtifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
-	permissions := NewPermissionsContentsReadCodeQualityWritePRRead()
 
 	var steps []string
 
@@ -164,6 +184,31 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 	}
 	waitForProcessingTimeout := cfg.WaitForProcessingTimeout
 
+	tokenSteps, coverageToken := c.buildUploadCodeCoverageToken(data, permissions)
+	steps = append(steps, tokenSteps...)
+
+	steps = append(steps, "      - name: Verify code coverage report\n")
+	steps = append(steps, "        env:\n")
+	steps = append(steps, fmt.Sprintf("          COVERAGE_FILE: %s\n", localCoveragePath))
+	steps = append(steps, "        run: |\n")
+	steps = append(steps, "          test -s \"$COVERAGE_FILE\"\n")
+	steps = append(steps, "      - name: Upload code coverage report\n")
+	steps = append(steps, fmt.Sprintf("        id: %s\n", constants.UploadCodeCoverageJobName))
+	steps = append(steps, fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-code-coverage")))
+	steps = append(steps, "        with:\n")
+	steps = append(steps, fmt.Sprintf("          file: %s\n", localCoveragePath))
+	steps = append(steps, fmt.Sprintf("          language: ${{ needs.%s.outputs.upload_code_coverage_language }}\n", constants.SafeOutputsJobName))
+	steps = append(steps, fmt.Sprintf("          label: ${{ needs.%s.outputs.upload_code_coverage_label }}\n", constants.SafeOutputsJobName))
+	steps = append(steps, fmt.Sprintf("          fail-on-error: %s\n", failOnError))
+	steps = append(steps, "          # Timeout is in seconds; 160 matches actions/upload-code-coverage's documented default.\n")
+	steps = append(steps, fmt.Sprintf("          wait-for-processing-timeout: %d\n", waitForProcessingTimeout))
+	steps = append(steps, fmt.Sprintf("          token: %s\n", coverageToken))
+	return steps
+}
+
+func (c *Compiler) buildUploadCodeCoverageToken(data *WorkflowData, permissions *Permissions) ([]string, string) {
+	cfg := data.SafeOutputs.UploadCodeCoverage
+	var steps []string
 	var coverageToken string
 	effectiveStaticToken := cfg.GitHubToken
 	if effectiveStaticToken == "" && data.SafeOutputs != nil {
@@ -198,37 +243,5 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 		}
 	}
 
-	steps = append(steps, "      - name: Verify code coverage report\n")
-	steps = append(steps, "        env:\n")
-	steps = append(steps, fmt.Sprintf("          COVERAGE_FILE: %s\n", localCoveragePath))
-	steps = append(steps, "        run: |\n")
-	steps = append(steps, "          test -s \"$COVERAGE_FILE\"\n")
-	steps = append(steps, "      - name: Upload code coverage report\n")
-	steps = append(steps, fmt.Sprintf("        id: %s\n", constants.UploadCodeCoverageJobName))
-	steps = append(steps, fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-code-coverage")))
-	steps = append(steps, "        with:\n")
-	steps = append(steps, fmt.Sprintf("          file: %s\n", localCoveragePath))
-	steps = append(steps, fmt.Sprintf("          language: ${{ needs.%s.outputs.upload_code_coverage_language }}\n", constants.SafeOutputsJobName))
-	steps = append(steps, fmt.Sprintf("          label: ${{ needs.%s.outputs.upload_code_coverage_label }}\n", constants.SafeOutputsJobName))
-	steps = append(steps, fmt.Sprintf("          fail-on-error: %s\n", failOnError))
-	steps = append(steps, "          # Timeout is in seconds; 160 matches actions/upload-code-coverage's documented default.\n")
-	steps = append(steps, fmt.Sprintf("          wait-for-processing-timeout: %d\n", waitForProcessingTimeout))
-	steps = append(steps, fmt.Sprintf("          token: %s\n", coverageToken))
-
-	// The job only runs when the safe_outputs job exported a non-empty coverage file path.
-	jobCondition := fmt.Sprintf("needs.%s.outputs.upload_code_coverage_file != ''", constants.SafeOutputsJobName)
-
-	job := &Job{
-		Name:           string(constants.UploadCodeCoverageJobName),
-		If:             jobCondition,
-		RunsOn:         c.formatFrameworkJobRunsOn(data),
-		Environment:    c.indentYAMLLines(resolveSafeOutputsEnvironment(data), "    "),
-		Permissions:    permissions.RenderToYAML(),
-		TimeoutMinutes: 10,
-		Steps:          steps,
-		Needs:          []string{mainJobName, string(constants.SafeOutputsJobName)},
-	}
-
-	publishCodeCoverageLog.Print("Built upload_code_coverage job")
-	return job, nil
+	return steps, coverageToken
 }

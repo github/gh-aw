@@ -142,6 +142,18 @@ func TestWorkQueueSnapshotIsPreparedAndUploaded(t *testing.T) {
 	uploadStep := extractWorkflowStepByName(t, steps, "Upload activation artifact")
 	assert.Contains(t, uploadStep, "/tmp/gh-aw/work-queue.snapshot.json")
 	assert.Contains(t, job.Permissions, "contents: read")
+	assert.Contains(t, job.Permissions, "actions: read")
+	assert.Equal(t, "${{ steps.work_queue_snapshot.outputs.work_queue_origin }}", job.Outputs["work_queue_origin"])
+}
+
+func TestWorkQueueWorkerActivationCanPublishOnlyTrustedBindingBeforeEffects(t *testing.T) {
+	data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true}}, StaleCheckDisabled: true}
+	require.NoError(t, validateWorkQueueConfiguration(data))
+	job, err := NewCompiler().buildActivationJob(data, false, "", "worker.lock.yml")
+	require.NoError(t, err)
+	assert.Contains(t, job.Permissions, "contents: write")
+	assert.Contains(t, job.Permissions, "actions: read")
+	assert.Contains(t, strings.Join(job.Steps, ""), `GH_AW_WORK_QUEUE_ROLE: "worker"`)
 }
 
 func TestActivationInfoArtifactUpload(t *testing.T) {

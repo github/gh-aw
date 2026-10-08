@@ -98,7 +98,11 @@ describe("Copilot dynamic workflow sessions", () => {
   it("retains native lifecycle signals and correlates subagents without conflating workflow accounting with session usage", () => {
     const original = structuredClone(lifecycle);
     const parsed = parseCopilotLog(serialize(lifecycle)).logEntries;
-    expect(parsed).toEqual(lifecycle);
+    expect(parsed.map(event => event.type)).toEqual(lifecycle.map(event => event.type));
+    expect(parsed[5]).toMatchObject({
+      ...lifecycle[5],
+      data: { ...lifecycle[5].data, agentId: "smoke-child", parentToolCallId: "child-call" },
+    });
     const merged = mergeSessionSources([{ component: "agent", phase: "agent", path: nativePath, events: parsed }]);
     expect(merged.map(event => event.type)).toEqual(lifecycle.map(event => event.type));
     expect(merged.filter(event => event.type === "workflow.run_updated").map(event => event.data.revision)).toEqual([0, 1]);
@@ -218,6 +222,6 @@ describe("Copilot dynamic workflow sessions", () => {
     expect(events.find(event => event.type === "subagent.started")).toEqual(lifecycle[3]);
     expect(events.find(event => event.type === "assistant.message")).toEqual(lifecycle[5]);
     expect(events.some(event => event.type === "assistant.message_delta")).toBe(false);
-    expect(setTimeoutSpy.mock.calls.filter(([, timeout]) => timeout === 1234)).toHaveLength(2);
+    expect(setTimeoutSpy.mock.calls.filter(([, timeout]) => timeout === 1234)).toHaveLength(0);
   });
 });

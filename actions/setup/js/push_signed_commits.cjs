@@ -270,6 +270,7 @@ async function lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken
 async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken }) {
   const pushArgs = pushRemoteUrl ? ["push", pushRemoteUrl, branch] : ["push", "origin", branch];
   const pushOnce = async () => {
+    await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: pushRemoteUrl || "origin", branch, cwd, gitAuthEnv });
     await exec.exec("git", pushArgs, {
       cwd,
       env: { ...process.env, ...(gitAuthEnv || {}) },
@@ -280,6 +281,7 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
     return pushOnce();
   }
 
+  await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: pushRemoteUrl, branch, cwd, gitAuthEnv });
   const githubServerUrl = (process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
   let previousExtraheaders = [];
   let overrideApplied = false;

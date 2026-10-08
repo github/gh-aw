@@ -690,6 +690,8 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   const normalizedEntries = [];
   const pendingByToolCallId = new Map();
   const pendingIdsByToolName = new Map();
+  const displayIdsByCall = new Map();
+  const claimedDisplayIds = new Set();
   let toolCounter = 0;
   const usedToolIds = new Set(logEntries.filter(e => typeof e.data?.toolCallId === "string").map(e => e.data.toolCallId));
   const allocatedToolIds = new Set();
@@ -773,6 +775,10 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     const { includeCommand = true } = options;
     const base = Object.hasOwn(data, "input") ? data.input : data.parameters;
     if (base && typeof base === "object" && !Array.isArray(base)) {
+      if (!data.mcpServerName && ["Agent", "Task"].includes(data.toolName)) {
+        const { prompt, ...publicInput } = base;
+        return publicInput;
+      }
       if (includeCommand && base.command === undefined && typeof data.command === "string") {
         return { ...base, command: data.command };
       }
@@ -854,13 +860,14 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       case "tool.execution_complete": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
         const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
+        const callKey = scopedId(toolCallId);
         /** @type {any} */
         let resolvedToolId = null;
 
-        if (toolCallId !== null && pendingByToolCallId.has(scopedId(toolCallId))) {
-          const pending = pendingByToolCallId.get(scopedId(toolCallId));
+        if (toolCallId !== null && pendingByToolCallId.has(callKey)) {
+          const pending = pendingByToolCallId.get(callKey);
           resolvedToolId = pending.id;
-          pendingByToolCallId.delete(scopedId(toolCallId));
+          pendingByToolCallId.delete(callKey);
           if (resolvedToolId !== null) {
             removePendingId(pending.name, resolvedToolId);
           }
@@ -924,8 +931,9 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
 
   const accountingContexts = contexts.filter((_, index) => !logEntries[index].type.startsWith("subagent."));
   const includeNested = accountingContexts.length > 0 && accountingContexts.every(context => context.nested && context.scope === accountingContexts[0].scope);
-  const result = projectSessionResult(logEntries, { includeNested });
-  const init = projectSessionInitialization(logEntries);
+  const options = { includeNested };
+  const result = projectSessionResult(logEntries, options);
+  const init = projectSessionInitialization(logEntries, options);
   if (init) normalizedEntries.unshift(init);
   if (result) normalizedEntries.push(result);
 

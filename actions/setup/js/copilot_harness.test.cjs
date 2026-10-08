@@ -162,7 +162,7 @@ describe("copilot_harness.cjs", () => {
             status: "selected",
             selection: { provider: "copilot", model: "github-copilot/gpt-5.4-mini", wire_model: "gpt-5.4-mini", effort: "xhigh", endpoint: "/responses" },
           },
-          endpoints: [{ configured: true, models: ["gpt-5.4-mini"] }],
+          endpoints: [{ provider: "copilot", configured: true, models: ["gpt-5.4-mini"] }],
         },
         true
       );
@@ -186,7 +186,7 @@ describe("copilot_harness.cjs", () => {
             status: "selected",
             selection: { provider: "copilot", model: "github-copilot/gpt-6-astra", wire_model: "gpt-6-astra", effort: ` ${effort.toUpperCase()} `, endpoint: "/responses" },
           },
-          endpoints: [{ configured: true, models: ["gpt-6-astra"] }],
+          endpoints: [{ provider: "copilot", configured: true, models: ["gpt-6-astra"] }],
         },
         true
       );
@@ -206,7 +206,7 @@ describe("copilot_harness.cjs", () => {
             status: "selected",
             selection: { provider: "copilot", model: "github-copilot/gpt-6-astra", wire_model: "gpt-6-astra", effort: "extreme", endpoint: "/responses" },
           },
-          endpoints: [{ configured: true, models: ["gpt-6-astra"] }],
+          endpoints: [{ provider: "copilot", configured: true, models: ["gpt-6-astra"] }],
         },
         true
       );

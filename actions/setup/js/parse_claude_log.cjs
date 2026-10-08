@@ -1,8 +1,8 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { createEngineLogParser, generateConversationMarkdown, generateInformationSection, buildStepSummaryDetailsSection, formatInitializationSummary, formatToolUse, parseLogEntries } = require("./log_parser_shared.cjs");
-const { projectSessionResult } = require("./agent_session.cjs");
+const { createEngineLogParser, generateConversationMarkdown, buildStepSummaryDetailsSection, formatInitializationSummary, formatToolUse, parseLogEntries } = require("./log_parser_shared.cjs");
+const { projectSessionResult, sessionContext } = require("./agent_session.cjs");
 const { normalizeClaudeSession } = require("./claude_session.cjs");
 
 const main = createEngineLogParser({
@@ -34,7 +34,7 @@ function parseClaudeLog(logContent) {
 
   // Generate conversation markdown using shared function
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
-    includeInformation: false,
+    includeInformation: true,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
     formatInitCallback: initEntry => {
       const result = formatInitializationSummary(initEntry, {
@@ -86,14 +86,11 @@ function parseClaudeLog(logContent) {
     },
   });
 
-  let markdown = conversationResult.markdown;
-
-  // Add Information section from the last entry with result metadata
+  const markdown = conversationResult.markdown;
   const lastEntry = projectSessionResult(canonicalLogEntries);
-  markdown += generateInformationSection(lastEntry);
 
   // Check if max-turns limit was hit
-  let maxTurnsHit = canonicalLogEntries.some(entry => entry.type === "session.result" && entry.data.subtype === "error_max_turns");
+  let maxTurnsHit = canonicalLogEntries.some(entry => entry.type === "session.result" && !sessionContext(entry).parentToolUseId && entry.data.subtype === "error_max_turns");
   const maxTurns = process.env.GH_AW_MAX_TURNS;
   if (maxTurns && lastEntry && lastEntry.num_turns !== undefined) {
     const configuredMaxTurns = parseInt(maxTurns, 10);

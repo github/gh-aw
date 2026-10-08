@@ -10,6 +10,10 @@ import (
 	"github.com/github/gh-aw/pkg/intent"
 )
 
+// SPEC_MISMATCH: README.md documents func ResolveRisk(rec IntentRecord) string,
+// but the intent package does not currently export that function. A behavioral
+// test cannot be compiled until the documented public API exists.
+
 // TestSpec tests derive from pkg/intent/README.md. They enforce the documented
 // public surface of the intent package without coupling to implementation internals.
 
@@ -211,4 +215,71 @@ func TestSpec_PublicAPI_ResolveIssue_NoLabelsUnlinked(t *testing.T) {
 		"issue with no labels should produce unlinked status")
 	assert.Equal(t, "no_supported_intent_source", record.Rule,
 		"issue with no labels should produce no_supported_intent_source rule")
+}
+
+// TestSpec_PublicAPI_AuthorizeTool validates deny precedence and the documented
+// nil-versus-empty allowlist contract.
+func TestSpec_PublicAPI_AuthorizeTool(t *testing.T) {
+	t.Parallel()
+	authorizer := intent.Authorizer{}
+	tests := []struct {
+		name   string
+		policy intent.ExecutionPolicy
+		tool   string
+		want   error
+	}{
+		{name: "nil allowlist is unrestricted", policy: intent.ExecutionPolicy{}, tool: "read"},
+		{name: "listed tool is allowed", policy: intent.ExecutionPolicy{AllowedTools: []string{"read"}}, tool: "read"},
+		{name: "unlisted tool is not allowed", policy: intent.ExecutionPolicy{AllowedTools: []string{"read"}}, tool: "write", want: intent.ErrToolNotAllowed},
+		{name: "non-nil empty allowlist denies all", policy: intent.ExecutionPolicy{AllowedTools: []string{}}, tool: "read", want: intent.ErrToolNotAllowed},
+		{name: "explicit denial wins over allowlist", policy: intent.ExecutionPolicy{AllowedTools: []string{"write"}, DeniedTools: []string{"write"}}, tool: "write", want: intent.ErrToolDenied},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := authorizer.AuthorizeTool(tt.policy, tt.tool)
+			if tt.want == nil {
+				assert.NoError(t, err, "AuthorizeTool should allow the tool for %s", tt.name)
+				return
+			}
+			assert.ErrorIs(t, err, tt.want, "AuthorizeTool should return the documented sentinel for %s", tt.name)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_PolicyCompilerConditions validates the documented matching
+// rules: empty fields are wildcards, label conditions use Labels, and Org may
+// match either the repository organization or owner.
+func TestSpec_PublicAPI_PolicyCompilerConditions(t *testing.T) {
+	t.Parallel()
+	compiler := intent.PolicyCompiler{Rules: []intent.PolicyRule{
+		{
+			ID:    "label-and-org",
+			Scope: "repository",
+			When:  intent.PolicyCondition{Domain: "security", Org: "octo-org"},
+			Set:   intent.ExecutionPolicy{Autonomy: "supervised", WriteScope: "feature_branch"},
+		},
+	}}
+
+	tests := []struct {
+		name string
+		repo intent.RepositoryContext
+	}{
+		{name: "organization matches", repo: intent.RepositoryContext{Org: "octo-org"}},
+		{name: "owner matches", repo: intent.RepositoryContext{Owner: "octo-org"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := compiler.Compile(intent.IntentRecord{Status: intent.AttributionMapped, Labels: []string{"security"}}, tt.repo)
+			assert.Contains(t, policy.RuleIDs, "label-and-org", "Compile should record the ID of a matching rule")
+			assert.Equal(t, "supervised", policy.Autonomy, "Compile should apply the matching policy fragment")
+		})
+	}
+
+	policy := compiler.Compile(intent.IntentRecord{
+		Status:  intent.AttributionMapped,
+		Domains: []string{"security"},
+	}, intent.RepositoryContext{Org: "octo-org"})
+	assert.NotContains(t, policy.RuleIDs, "label-and-org", "Domain conditions must match Labels, not IntentRecord.Domains")
 }

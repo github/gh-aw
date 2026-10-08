@@ -29,7 +29,7 @@ export interface UnifiedSessionUsage {
   overflowedTokens?: string[];
 }
 
-export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics">, UnifiedCorrelationData {
+export interface UnifiedSessionResultData extends Pick<SessionResultData, "sourceEngine" | "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics">, UnifiedCorrelationData {
   usage?: UnifiedSessionUsage | null;
 }
 
@@ -291,8 +291,8 @@ export interface CollectionData {
 export interface UnifiedSessionEventDataMap {
   "session.format": SessionFileFormatData;
   "agent.execution": AgentExecutionData;
-  "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
-  "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
+  "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedCorrelationData;
+  "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedCorrelationData;
   "user.message": UnifiedMessageData;
   "system.message": UnifiedSystemMessageData;
   "prompt.system": Pick<MessageData, "content">;

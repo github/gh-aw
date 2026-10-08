@@ -37,6 +37,7 @@ describe("copilot_sdk_driver.cjs", () => {
           apiCallId: "child-api",
           turnId: "0",
           parentToolCallId: "spawn-left",
+          parentAgentId: "parent-agent",
           toolRequests: [{ toolCallId: "same", name: "lookup", arguments: false }],
         },
       };
@@ -54,6 +55,10 @@ describe("copilot_sdk_driver.cjs", () => {
           onEvent({ type: "tool.execution_start", agentId: "right", data: { toolCallId: "same", toolName: "lookup", mcpServerName: "right-server" } });
           onEvent({ type: "tool.execution_complete", agentId: "right", data: { toolCallId: "same", success: true } });
           onEvent({ type: "tool.execution_complete", agentId: "left", data: { toolCallId: "same", success: true } });
+          onEvent({ type: "tool.execution_start", agentId: "left", data: { toolCallId: "parent-only-completion", parentToolCallId: "spawn-left", toolName: "lookup", mcpServerName: "parent-only-server" } });
+          onEvent({ type: "tool.execution_complete", data: { toolCallId: "parent-only-completion", parentToolCallId: "spawn-left", success: true } });
+          onEvent({ type: "tool.execution_start", data: { toolCallId: "agent-only-completion", parentToolCallId: "spawn-left", toolName: "lookup", mcpServerName: "agent-only-server" } });
+          onEvent({ type: "tool.execution_complete", agentId: "left", data: { toolCallId: "agent-only-completion", success: true } });
           onEvent({ type: "assistant.turn_end", agentId: "left", data: { turnId: "0", parentToolCallId: "spawn-left" } });
           onEvent({ type: "session.task_complete", agentId: "left", data: { success: true, summary: "Child answer" } });
           if (!rootOutput) return childMessage;
@@ -88,6 +93,8 @@ describe("copilot_sdk_driver.cjs", () => {
         expect(records.filter(event => event.type === "tool.execution_complete").map(event => [event.agentId, event.data.mcpServerName])).toEqual([
           ["right", "right-server"],
           ["left", "left-server"],
+          ["left", "parent-only-server"],
+          ["left", "agent-only-server"],
         ]);
         expect(records.find(event => event.type === "session.task_complete").agentId).toBe("left");
         expect(records.find(event => event.type === "assistant.turn_end").data).toMatchObject({ turnId: "0", parentToolCallId: "spawn-left" });

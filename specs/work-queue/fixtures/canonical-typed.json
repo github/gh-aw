@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "description": "Construct an actual typed number from each literal before applying the container and calling the typed canonical API; never JSON-round-trip the constructed value.",
+  "go_api": "github.com/github/gh-aw/pkg/workqueue.CanonicalValue",
+  "js_api": "actions/setup/js/work_queue_codec.cjs#canonical",
+  "containers": {
+    "root": "value",
+    "object": "{\"value\": value}",
+    "array": "[value]",
+    "nested": "{\"payload\":{\"numbers\":[value],\"sentinel\":\"9007199254740993\"}}"
+  },
+  "cases": [
+    { "name": "positive zero", "literal": "0", "container": "root", "expected": "0" },
+    { "name": "negative safe integer", "literal": "-1", "container": "root", "expected": "-1" },
+    { "name": "maximum safe integer", "literal": "9007199254740991", "container": "root", "expected": "9007199254740991" },
+    { "name": "minimum safe integer", "literal": "-9007199254740991", "container": "root", "expected": "-9007199254740991" },
+    { "name": "typed integral decimal value", "literal": "1.0", "container": "root", "expected": "1" },
+    { "name": "typed integral exponent value", "literal": "1e3", "container": "root", "expected": "1000" },
+    { "name": "object safe integer", "literal": "42", "container": "object", "expected": "{\"value\":42}" },
+    { "name": "array safe integer", "literal": "9007199254740991", "container": "array", "expected": "[9007199254740991]" },
+    { "name": "nested safe integer and explicit bigint string", "literal": "-9007199254740991", "container": "nested", "expected": "{\"payload\":{\"numbers\":[-9007199254740991],\"sentinel\":\"9007199254740993\"}}" },
+    { "name": "root negative zero", "literal": "-0", "container": "root", "code": "noncanonical_number" },
+    { "name": "object negative zero", "literal": "-0", "container": "object", "code": "noncanonical_number" },
+    { "name": "array negative zero", "literal": "-0", "container": "array", "code": "noncanonical_number" },
+    { "name": "nested negative zero", "literal": "-0", "container": "nested", "code": "noncanonical_number" },
+    { "name": "positive fraction", "literal": "1.25", "container": "root", "code": "noncanonical_number" },
+    { "name": "negative fraction", "literal": "-0.5", "container": "root", "code": "noncanonical_number" },
+    { "name": "unsafe positive integer", "literal": "9007199254740992", "container": "root", "code": "noncanonical_number" },
+    { "name": "unsafe negative integer", "literal": "-9007199254740992", "container": "root", "code": "noncanonical_number" },
+    { "name": "unsafe exponent value", "literal": "1e21", "container": "nested", "code": "noncanonical_number" },
+    { "name": "root NaN", "literal": "NaN", "container": "root", "code": "noncanonical_number" },
+    { "name": "object NaN", "literal": "NaN", "container": "object", "code": "noncanonical_number" },
+    { "name": "nested NaN", "literal": "NaN", "container": "nested", "code": "noncanonical_number" },
+    { "name": "root positive infinity", "literal": "+Infinity", "container": "root", "code": "noncanonical_number" },
+    { "name": "array positive infinity", "literal": "+Infinity", "container": "array", "code": "noncanonical_number" },
+    { "name": "root negative infinity", "literal": "-Infinity", "container": "root", "code": "noncanonical_number" },
+    { "name": "nested negative infinity", "literal": "-Infinity", "container": "nested", "code": "noncanonical_number" }
+  ]
+}

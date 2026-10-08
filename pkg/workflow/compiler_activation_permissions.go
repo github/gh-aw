@@ -138,10 +138,13 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 	permsMap := map[PermissionScope]PermissionLevel{
 		PermissionContents: PermissionRead,
 	}
+	if isWorkQueueWorker(ctx.data) {
+		permsMap[PermissionContents] = PermissionWrite
+	}
 	if isWorkQueueEnabled(ctx.data) && workQueueStorage(ctx.data) == "issues" {
 		permsMap[PermissionIssues] = PermissionRead
 	}
-	if !ctx.data.StaleCheckDisabled || hasMaxDailyAICGuardrail(ctx.data) || operationalValueGraderEnabled(ctx.data) {
+	if isWorkQueueEnabled(ctx.data) || !ctx.data.StaleCheckDisabled || hasMaxDailyAICGuardrail(ctx.data) || operationalValueGraderEnabled(ctx.data) {
 		permsMap[PermissionActions] = PermissionRead
 	}
 	if isSteeringIssueEnabled(ctx.data) {

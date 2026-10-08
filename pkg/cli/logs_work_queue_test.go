@@ -259,7 +259,7 @@ func TestWorkQueueReportPropagation(t *testing.T) {
 	assert.Equal(t, result.WorkQueue, processedRunFromCachedData(runData, &audit, dir).WorkQueue)
 
 	var output bytes.Buffer
-	renderWorkQueueToWriter(&output, result.WorkQueue)
+	require.NoError(t, renderWorkQueueToWriter(&output, result.WorkQueue))
 	assert.Contains(t, output.String(), "worker: work=w claim=c")
 	assert.Contains(t, output.String(), "requested, not a verified outcome")
 	output.Reset()
@@ -499,7 +499,7 @@ func TestWorkQueueEscapesReportText(t *testing.T) {
 		Operations: []WorkQueueOperation{{Timestamp: "now\r", Message: "Work queue: forged\x1b[2J"}},
 	}
 	var output bytes.Buffer
-	renderLogsWorkQueueToWriter(&output, []RunData{{RunID: 42, WorkflowName: "name\nforged", WorkQueue: report}})
+	require.NoError(t, renderLogsWorkQueueToWriter(&output, []RunData{{RunID: 42, WorkflowName: "name\nforged", WorkQueue: report}}))
 	assert.Contains(t, output.String(), `work=w\nforged=success claim=c\x1b[31m\tclaim`)
 	assert.Contains(t, output.String(), `workflow=name\nforged`)
 	assert.NotContains(t, output.String(), "\x1b")

@@ -786,13 +786,53 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Source signature | Canonical mapping |
 | --- | --- |
 | `type: "system", subtype: "init"` | `session.init`; map snake_case initialization names as in 4.1. |
-| `type: "assistant", message.content[]` with `text` blocks | `assistant.message`, `content` from each `text`. |
+| `type: "assistant", message.content[]` with `text` blocks | `assistant.message`, exact `content` from each `text`; preserve the message ID, model, and content-block position. |
 | Same envelope with `thinking` blocks | `assistant.reasoning`, `content` from `thinking`. |
-| Same envelope with `tool_use` blocks | `tool.execution_start`; `id` → `toolCallId`, `name` → `toolName`, `input` retained. |
+| Same envelope with `tool_use` blocks | `tool.execution_start`; `id` → `toolCallId`, `input` retained. MCP names `mcp__server__tool` map to `mcpServerName: "server"` and `toolName: "tool"`; the original name remains in the parser trace. |
 | `type: "user", message.content[]` with `text` blocks | `user.message`, not discarded because the user envelope also carries tool results. |
 | Same user envelope with `tool_result` blocks | `tool.execution_complete`; `tool_use_id`, `content`, `is_error`, `duration_ms` mapped. |
-| `type: "result"` with recognized accounting/diagnostic fields | `session.result`; preserve source result metadata. |
-| Recognized non-init system status with textual message/content | Retain status metadata; use the established assistant-text compatibility view only for actual status text, not user prompts or provider errors. |
+| Direct `type: "message", role: "assistant"` or `"user"` envelopes | The same content-block mappings as SDK assistant/user envelopes; only assistant usage contributes to session accounting. |
+| `type: "result"` with recognized accounting/diagnostic fields | `session.result`; preserve source result metadata, expose `sourceType: "result"` and the terminal subtype as `status`. Explicit `is_error` or an error subtype takes precedence and maps to `status: "error"`. |
+| `system/task_started` with `task_type: "local_agent"` | `subagent.started`; task ID identifies the target agent, with launcher tool, agent type, execution mode, and observed spawn depth. |
+| Agent launch tool result with `agentId` and `resolvedModel` | Retain the tool completion and emit `subagent.configured` for the observed target model. |
+| `system/task_notification` for an observed local agent | `subagent.completed` or `subagent.failed`; retain observed token/tool/duration counters, and mark stopped tasks as cancelled. Other local-agent statuses remain native observations rather than dynamic-workflow events. |
+| Recognized non-init system status with textual message/content | Retain status metadata; use the established assistant-text compatibility view only for actual status text, not user prompts, permission-denial notices, or provider errors. |
+
+Claude `usage.output_tokens_details.thinking_tokens` maps to
+`usage.reasoning_output_tokens` in parser traces and `usage.reasoningOutputTokens`
+in the unified projection. Reasoning tokens are a subset of output tokens, not
+an additional contribution to total tokens. Explicit canonical reasoning counts,
+including zero, take precedence over nested provider details.
+
+SDK assistant snapshots can contain a single finalized block rather than a full
+response. Streaming reconciliation matches that block to its observed type and
+tool identity when unambiguous, retaining its stream position, exact text, and
+thinking signature. A divergent final text snapshot remains a canonical
+non-delta observation; display views replace the preceding streamed text rather
+than concatenating it. User, assistant, and reasoning messages retain available
+attribution in the unified projection; user prompts remain omitted from default
+summaries. Structured tool-result content stays structured, and an absent tool
+outcome remains unknown.
+
+Nested SDK sessions can share the root `session_id`. Available `sessionId`,
+`parentToolUseId`, and caller `agentId` remain on messages, tools, initialization,
+refusals, and results in both representations. A subagent lifecycle envelope's
+`agentId` identifies its target; its payload context identifies the caller.
+Lifecycle observations fall back to stored start or launch context for omitted
+scope and launcher fields; incomplete observations do not erase known values.
+Explicit notification context wins, including a null root parent. A changed
+parent invalidates a stored caller unless the notification explicitly supplies it.
+Caller identity is inferred from launcher observations only when unambiguous.
+Message reconciliation and tool pairing use the complete caller scope, never
+display names or unscoped IDs. Native IDs remain unchanged; legacy display copies
+may allocate distinct IDs for collisions.
+
+Assistant response usage is retained per nested scope, with a partial result only
+when no terminal result was observed for that scope. Root accounting excludes
+child results and lifecycle counters; isolated child conversations display their
+own accounting. Nested initialization cannot replace the root model or metrics.
+Summaries label child conversations separately and omit agent-launch prompts from
+display copies without removing tool inputs from stored traces.
 
 ### 7.2 Copilot
 
@@ -1143,7 +1183,8 @@ and mark unavailable timestamps as untimed rather than fabricate a clock value.
 agent initialization, tool pairing, and accounting selection by provenance phase
 and source path. They MUST restore source-local event order before deriving those
 statistics. Coincident tool IDs in different source files MUST NOT pair across
-sources. Gateway, firewall, accounting, grader, and eval observations MUST NOT
+sources. Nested caller scopes within one source remain separate, including when
+session or tool IDs are reused. Gateway, firewall, accounting, grader, and eval observations MUST NOT
 be added to agent snapshots as additional session usage. Private correlation
 keys MAY remain internal until projection, but MUST NOT bypass final publication
 redaction.
@@ -1153,7 +1194,8 @@ both sinks after writing it. `generatePlainTextSummary`,
 `generateCopilotCliStyleSummary`, and `generateConversationMarkdown` recognize
 unified events. Their unified view shows file version, per-component record
 counts, per-source agent statistics and conversations, and a chronological trace. Existing
-agent-only inputs retain their earlier rendering behavior.
+agent-only inputs retain their earlier rendering behavior except that nested
+conversations are labeled separately.
 
 Actions publishes this view once in a plain-titled `Unified session` disclosure,
 using a fenced CLI-style transcript like the Claude conversation summary rather
@@ -1252,6 +1294,8 @@ payloads with harmless examples.
 | Engine | Workflow and existing run | Extracted session | Regression corpus |
 | --- | --- | --- | --- |
 | Claude | [Smoke Claude success](https://github.com/github/gh-aw/actions/runs/36812703027) and [failure](https://github.com/github/gh-aw/actions/runs/36762044297) | `agent-stdio.log` | `fixtures/claude_ci_sessions.cjs`, `claude_session.test.cjs` |
+| Claude | [Documentation review](https://github.com/github/gh-aw/actions/runs/37623157868), [dynamic workflow](https://github.com/github/gh-aw/actions/runs/37732499835), and [Smoke Claude](https://github.com/github/gh-aw/actions/runs/37089888775) | `agent-stdio.log` | `fixtures/claude_ci_normalization.cjs`, `claude_session_normalization.test.cjs`; direct API and streaming cases are synthetic |
+| Claude | [Documentation review](https://github.com/github/gh-aw/actions/runs/37623157868) | Two background-agent conversations sharing the root `session_id` in `agent-stdio.log` | `fixtures/claude_ci_subagents.cjs`, `claude_subagent_session.test.cjs`; reused IDs and grandchild depth are synthetic |
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Copilot | Smoke Copilot successes [37713903842](https://github.com/github/gh-aw/actions/runs/37713903842), [37470423256](https://github.com/github/gh-aw/actions/runs/37470423256), and failure [37553647085](https://github.com/github/gh-aw/actions/runs/37553647085) | Native `events.jsonl`, canonical `agent-session.jsonl`, and published `usage/aw_session.jsonl` | `fixtures/copilot_ci_messages.cjs`, `copilot_session_normalization.test.cjs` |

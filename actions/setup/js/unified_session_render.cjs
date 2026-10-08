@@ -212,13 +212,21 @@ function scopedAgentSessions(events) {
       const root = groups.find(group => !group.context.nested && group.context.sessionId === context.rootSessionId);
       if (root) root.events.push(event);
       const children = groups.filter(group => group.context.agentId === context.agentId && group.context.nested);
-      const child = children.find(group => group.context.scope === context.scope) ?? (children.length === 1 ? children[0] : undefined);
+      const child = children.find(group => group.context.parentToolCallId === context.parentToolCallId && context.parentToolCallId !== undefined) ?? (children.length === 1 ? children[0] : undefined);
       if (child) child.events.push(event);
+      else if (!root || children.length > 1) {
+        const unresolvedKey = JSON.stringify(["unresolved-subagent", context.scope]);
+        if (!conversations.has(unresolvedKey)) conversations.set(unresolvedKey, { context, events: [], unresolved: true });
+        conversations.get(unresolvedKey).events.push(event);
+      }
     }
     if (!conversations.size) return [{ label, events: entries.map(({ provenance, ...event }) => event) }];
     const multipleRoots = [...conversations.values()].filter(group => !group.context.nested).length > 1;
     return [...conversations.values()].map(group => ({
-      label: group.context.nested || multipleRoots ? `${label} (${fields(group.context, ["sessionId", "agentId", "parentAgentId", "parentToolCallId"])})` : label,
+      label:
+        group.unresolved || group.context.nested || multipleRoots
+          ? `${label} (${group.unresolved ? "unresolved subagent " : ""}${fields(group.context, ["sessionId", "agentId", "parentAgentId", "parentToolUseId", "parentToolCallId"])})`
+          : label,
       events: group.events.sort((left, right) => (left.provenance?.index ?? 0) - (right.provenance?.index ?? 0)).map(({ provenance, ...event }) => event),
     }));
   });

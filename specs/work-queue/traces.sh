@@ -20,14 +20,59 @@ RESULTS_DIR="${TLC_RESULTS_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/work-queue-traces.X
 mkdir -p "$RESULTS_DIR"
 RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 
-"$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
-    -workers 1 -seed 1 -fp 0 -simulate "file=$RESULTS_DIR/simulation,num=$TRACE_COUNT" \
-    -depth "$TRACE_DEPTH" -config "$SPEC_DIR/WorkQueue.cfg" \
-    -metadir "$RESULTS_DIR/simulation-meta" "$SPEC_DIR/WorkQueue.tla" \
-    >"$RESULTS_DIR/simulation.log" 2>&1 || {
-    cat "$RESULTS_DIR/simulation.log" >&2
-    exit 1
+hash_file() {
+    if command -v sha256sum >/dev/null; then
+        sha256sum "$1"
+    elif command -v shasum >/dev/null; then
+        shasum -a 256 "$1"
+    else
+        echo "sha256sum or shasum is required to bind traces to sources." >&2
+        return 1
+    fi
 }
+
+capture_sources() {
+    for model in WorkQueue FairWorkQueue ClaimScopedWorker QueueService QueueLifecycle; do
+        hash_file "$SPEC_DIR/$model.tla"
+    done
+    for config in WorkQueue FairBatch FairDAGGitHub ClaimScopeMixed ServiceDynamic LifecyclePacked \
+                  CompetingClaimsWitness RecoveryWitness ExternalEffectWitness WeakOrderingWitness \
+                  PartialCompletionWitness MixedClaimDAGWitness LifecycleMixedDAGWitness \
+                  LifecycleActivationWitness LifecycleConflictWitness; do
+        hash_file "$SPEC_DIR/$config.cfg"
+    done
+    hash_file "$SPEC_DIR/check.sh"
+    hash_file "$SPEC_DIR/traces.sh"
+    hash_file "$TLA2TOOLS_JAR"
+}
+
+capture_sources >"$RESULTS_DIR/sources-before.sha256"
+"$JAVA_BIN" -version >"$RESULTS_DIR/java-version.log" 2>&1
+printf 'workers=1 seed=1 fp=0 depth=%s traces=%s\n' "$TRACE_DEPTH" "$TRACE_COUNT" >"$RESULTS_DIR/simulation-settings.txt"
+
+for entry in "WorkQueue WorkQueue simulation" \
+             "FairWorkQueue FairBatch FairBatch" \
+             "FairWorkQueue FairDAGGitHub FairDAGGitHub" \
+             "ClaimScopedWorker ClaimScopeMixed ClaimScopeMixed" \
+             "QueueService ServiceDynamic ServiceDynamic" \
+             "QueueLifecycle LifecyclePacked LifecyclePacked"; do
+    read -r model config prefix <<<"$entry"
+    "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
+        -workers 1 -seed 1 -fp 0 -simulate "file=$RESULTS_DIR/$prefix,num=$TRACE_COUNT" \
+        -depth "$TRACE_DEPTH" -config "$SPEC_DIR/$config.cfg" \
+        -metadir "$RESULTS_DIR/$prefix-meta" "$SPEC_DIR/$model.tla" \
+        >"$RESULTS_DIR/$prefix.log" 2>&1 || {
+        cat "$RESULTS_DIR/$prefix.log" >&2
+        exit 1
+    }
+    if ! grep -q "Finished in" "$RESULTS_DIR/$prefix.log" || \
+       ! compgen -G "$RESULTS_DIR/${prefix}_*" >/dev/null; then
+        cat "$RESULTS_DIR/$prefix.log" >&2
+        echo "Expected completed simulation and emitted traces for $config." >&2
+        exit 1
+    fi
+    echo "$config: seeded simulation traces"
+done
 
 for entry in "CompetingClaimsWitness NoCompetingClaims" \
              "RecoveryWitness NoRecoveredOrphan" \
@@ -47,5 +92,25 @@ for entry in "CompetingClaimsWitness NoCompetingClaims" \
     echo "$config: expected $invariant counterexample"
 done
 
-echo "Simulation traces (at most $TRACE_DEPTH states, $TRACE_COUNT traces): $RESULTS_DIR/simulation_*"
+for entry in "FairWorkQueue PartialCompletionWitness" \
+             "ClaimScopedWorker MixedClaimDAGWitness" \
+             "QueueLifecycle LifecycleMixedDAGWitness" \
+             "QueueLifecycle LifecycleActivationWitness" \
+             "QueueLifecycle LifecycleConflictWitness"; do
+    read -r model config <<<"$entry"
+    TLC_MODEL_FILTER="$model" TLC_CONFIG_FILTER="$config" \
+        TLC_RESULTS_DIR="$RESULTS_DIR/current-witnesses" \
+        bash "$SPEC_DIR/check.sh"
+done
+
+capture_sources >"$RESULTS_DIR/sources-after.sha256"
+if ! cmp -s "$RESULTS_DIR/sources-before.sha256" "$RESULTS_DIR/sources-after.sha256"; then
+    echo "Trace sources changed during execution; evidence is not source-stable." >&2
+    exit 1
+fi
+
+echo "Historical simulation traces (at most $TRACE_DEPTH states, $TRACE_COUNT traces): $RESULTS_DIR/simulation_*"
+echo "Current abstraction traces: $RESULTS_DIR/{FairBatch,FairDAGGitHub,ClaimScopeMixed,ServiceDynamic,LifecyclePacked}_*"
 echo "Textual counterexample reports: $RESULTS_DIR/*Witness.log"
+echo "Current guarded witness reports: $RESULTS_DIR/current-witnesses/*Witness.log"
+echo "Source/tool hashes and execution settings: $RESULTS_DIR"

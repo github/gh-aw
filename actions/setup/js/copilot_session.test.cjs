@@ -149,6 +149,20 @@ describe("Copilot real CI shape projections", () => {
     expect(normalizeCopilotSession(JSON.parse(JSON.stringify(interleaved)))).toEqual(JSON.parse(JSON.stringify(interleaved)));
   });
 
+  it("keeps identical projected requests separate across agent scopes", () => {
+    const event = agentId => ({
+      type: "assistant.message",
+      id: "shared-message",
+      timestamp: "2026-10-08T00:00:00.000Z",
+      agentId,
+      data: { content: "", toolRequests: [{ toolCallId: "shared-call", name: "lookup", arguments: { query: "same" } }] },
+    });
+    const events = normalizeCopilotSession([event("left"), event("right")]);
+    const projected = events.filter(item => item.copilotProjection === "assistant.toolRequests");
+    expect(projected).toHaveLength(2);
+    expect(projected.map(item => item.agentId)).toEqual(["left", "right"]);
+  });
+
   it.each([undefined, 0])("retains separate unidentified projections with timestamp %j and matches existing ones by occurrence", timestamp => {
     const error = { type: "session.error", timestamp, data: { message: "same text" } };
     const records = [error, { type: "vendor.interleaved", data: {} }, error];

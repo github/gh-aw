@@ -36,9 +36,12 @@ function renderSubagentSummary(events) {
     const id = event.agentId ?? data.toolCallId;
     if (id === undefined) continue;
     const previous = agents.get(id) ?? {};
-    const fields = ["agentName", "agentDisplayName", "parentId", "model", "reasoningEffort", "executionMode"];
+    const fields = ["agentName", "agentDisplayName", "parentId", "model", "reasoningEffort", "executionMode", "spawnDepth"];
     for (const field of fields) if (data[field] !== undefined) previous[field] = data[field];
-    if (["subagent.started", "subagent.completed", "subagent.failed"].includes(event.type)) previous.status = event.type.slice("subagent.".length);
+    if (event.type === "subagent.completed") previous.status = data.cancelled === true ? "stopped" : "completed";
+    if (event.type === "subagent.failed") previous.status = "failed";
+    for (const field of ["totalTokens", "totalToolCalls"]) if (isTokenCount(data[field])) previous[field] = data[field];
+    if (isMetric(data.durationMs)) previous.durationMs = data.durationMs;
     agents.set(id, previous);
   }
   if (object(metrics)) {
@@ -52,10 +55,11 @@ function renderSubagentSummary(events) {
   const totalCredits = object(metrics) && Object.values(metrics).every(metric => isMetric(metric?.totalNanoAiu)) ? Object.values(metrics).reduce((sum, metric) => sum + metric.totalNanoAiu, 0) / 1e9 : undefined;
   if (object(metrics?.main)) lines.push(...agentUsageLines("main", metrics.main, totalCredits));
   for (const [id, agent] of agents) {
-    const metadata = ["agentName", "parentId", "model", "reasoningEffort", "executionMode", "status"].filter(field => agent[field] !== undefined).map(field => `${field}=${text(agent[field])}`);
+    const metadata = ["agentName", "parentId", "model", "reasoningEffort", "executionMode", "spawnDepth", "status"].filter(field => agent[field] !== undefined).map(field => `${field}=${text(agent[field])}`);
     lines.push(`  ${text(agent.agentDisplayName ?? agent.agentName ?? id)} (agentId=${text(id)}) ${metadata.join(" ")}`.trimEnd());
     const metric = metrics?.[id];
-    lines.push(...(object(metric) ? agentUsageLines(id, metric, totalCredits) : ["    Usage: unavailable"]));
+    const counters = ["totalTokens", "totalToolCalls", "durationMs"].filter(field => agent[field] !== undefined).map(field => `${field}=${agent[field]}`);
+    lines.push(...(object(metric) ? agentUsageLines(id, metric, totalCredits) : counters.length ? [`    Observed: ${counters.join(" ")}`] : ["    Usage: unavailable"]));
   }
   return lines;
 }

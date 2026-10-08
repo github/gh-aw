@@ -48,7 +48,7 @@ function normalizeCopilotSession(entries) {
   const turns = new Set();
   const tools = new Map();
   const projections = new Map();
-  const projectionKey = (label, event) => JSON.stringify([label, event.type, event.id, event.timestamp]);
+  const projectionKey = (scope, label, event) => JSON.stringify([scope, label, event.type, event.id, event.timestamp]);
   const projectionData = data => Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
   /** @param {unknown} value @returns {unknown} */
   const projectionProvenance = value => {
@@ -96,6 +96,8 @@ function normalizeCopilotSession(entries) {
       for (const key of ["sessionId", "agentId", "parentAgentId", "parentToolCallId"]) {
         if (!Object.hasOwn(event.data, key) && context[key] !== undefined) event.data[key] = context[key];
       }
+      const parentToolUseId = event.parentToolUseId ?? event.parent_tool_use_id ?? event.data.parentToolUseId ?? event.data.parent_tool_use_id;
+      if (!Object.hasOwn(event.data, "parentToolUseId") && parentToolUseId !== undefined) event.data.parentToolUseId = parentToolUseId;
     }
   }
   const originScopes = new Map();
@@ -105,7 +107,7 @@ function normalizeCopilotSession(entries) {
   const retainedSummaries = new Set();
   for (const [index, event] of source.entries()) {
     const context = contexts[index];
-    const originKey = JSON.stringify([context.sourceKey, context.agentId, context.agentId === undefined ? context.parentToolCallId : undefined, event.id, event.timestamp]);
+    const originKey = JSON.stringify([context.sourceIdentity, context.agentId, context.agentId === undefined ? context.parentToolCallId : undefined, event.id, event.timestamp]);
     const observedScope = context.scope;
     const scope = event.copilotProjection && event.id !== undefined ? (originScopes.get(originKey) ?? observedScope) : observedScope;
     summaryScopes[index] = scope;
@@ -153,9 +155,9 @@ function normalizeCopilotSession(entries) {
         (event.copilotProjection === "assistant.usage" && event.type === "session.result" && recordedUsage.has(usageSourceKey(summaryScopes[index], event)))
     )
   );
-  for (const event of source) {
+  for (const [index, event] of source.entries()) {
     if (!event.copilotProjection || supersededAccounting.has(event)) continue;
-    const key = projectionKey(event.copilotProjection, event);
+    const key = projectionKey(summaryScopes[index], event.copilotProjection, event);
     const bucket = projections.get(key) ?? [];
     bucket.push({ evidence: projectionEvidence(event), consumed: false });
     projections.set(key, bucket);
@@ -191,7 +193,7 @@ function normalizeCopilotSession(entries) {
      */
     const project = (type, fields, label = event.type) => {
       const projected = { ...createSessionEvent(event, type, fields), copilotProjection: label };
-      const key = projectionKey(label, projected);
+      const key = projectionKey(summaryScope, label, projected);
       const bucket = projections.get(key) ?? [];
       const identified = event.id !== undefined;
       const comparable = projectionEvidence(projected);
@@ -305,7 +307,8 @@ function normalizeCopilotSession(entries) {
       const identity = Object.fromEntries(
         Object.entries({ sessionId: context.sessionId, agentId: context.agentId, parentAgentId: context.parentAgentId, parentToolCallId: context.parentToolCallId }).filter(([, value]) => value !== undefined)
       );
-      events.push({ ...event, type: "session.result", data: { ...identity, numTurns: count }, copilotProjection: "finalized-turns" });
+      const retained = source.find((candidate, index) => candidate.copilotProjection === "finalized-turns" && summaryScopes[index] === scope && candidate.data.numTurns === count);
+      events.push(retained ?? { ...event, type: "session.result", data: { ...identity, numTurns: count }, copilotProjection: "finalized-turns" });
     }
   }
   return events;

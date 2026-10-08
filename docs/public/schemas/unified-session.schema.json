@@ -87,12 +87,54 @@
       { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
       {
         "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22%7C%22reasoningEffort%22)%3E" } } }
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "type": ["string", "null"] },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "parentAgentId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "model": { "type": "string" },
+                "apiCallId": { "$ref": "#/definitions/JsonValue" },
+                "interactionId": { "$ref": "#/definitions/JsonValue" },
+                "turnId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "sourceEngine": { "type": "string" },
+                "cwd": { "type": "string" },
+                "reasoningEffort": { "type": "string" }
+              }
+            }
+          }
+        }
       },
       { "if": { "properties": { "type": { "const": "session.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedSessionResultData" } } } },
       {
         "if": { "properties": { "type": { "const": "session.start" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22%7C%22reasoningEffort%22)%3E" } } }
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "type": ["string", "null"] },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "parentAgentId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "model": { "type": "string" },
+                "apiCallId": { "$ref": "#/definitions/JsonValue" },
+                "interactionId": { "$ref": "#/definitions/JsonValue" },
+                "turnId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "sourceEngine": { "type": "string" },
+                "cwd": { "type": "string" },
+                "reasoningEffort": { "type": "string" }
+              }
+            }
+          }
+        }
       },
       { "if": { "properties": { "type": { "const": "session.task_complete" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedTaskCompleteData" } } } },
       { "if": { "properties": { "type": { "const": "system.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedSystemMessageData" } } } },
@@ -421,11 +463,6 @@
       "additionalProperties": false
     },
     "Pick<MessageData,\"content\">": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": false },
-    "Pick<SessionInitData,(\"sourceEngine\"|\"model\"|\"sessionId\"|\"cwd\"|\"reasoningEffort\")>": {
-      "type": "object",
-      "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" }, "reasoningEffort": { "type": "string" } },
-      "additionalProperties": false
-    },
     "RuntimeObservationData": {
       "type": "object",
       "properties": {
@@ -580,6 +617,7 @@
         "interactionId": { "$ref": "#/definitions/JsonValue" },
         "turnId": { "$ref": "#/definitions/JsonValue" },
         "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+        "sourceEngine": { "type": "string" },
         "numTurns": { "$ref": "#/definitions/SessionCount" },
         "durationMs": { "$ref": "#/definitions/SessionMetric" },
         "totalCostUsd": { "$ref": "#/definitions/SessionMetric" },

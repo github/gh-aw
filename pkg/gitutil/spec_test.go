@@ -3,7 +3,10 @@
 package gitutil_test
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +14,98 @@ import (
 
 	"github.com/github/gh-aw/pkg/gitutil"
 )
+
+// TestSpec_PublicAPI_ValidateGitRef validates the unsafe ref forms explicitly
+// rejected by the README.md contract.
+func TestSpec_PublicAPI_ValidateGitRef(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		ref     string
+		wantErr bool
+	}{
+		{name: "ordinary branch name is accepted", ref: "feature/spec-tests"},
+		{name: "empty ref is rejected", ref: "", wantErr: true},
+		{name: "leading dash is rejected", ref: "--upload-pack=evil", wantErr: true},
+		{name: "NUL byte is rejected", ref: "main\x00evil", wantErr: true},
+		{name: "object traversal expression is rejected", ref: "main..other", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := gitutil.ValidateGitRef(tt.ref)
+			if tt.wantErr {
+				assert.Error(t, err, "ValidateGitRef(%q) should reject the documented unsafe form", tt.ref)
+				return
+			}
+			assert.NoError(t, err, "ValidateGitRef(%q) should accept an ordinary ref", tt.ref)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_ValidateGitPath validates the unsafe path forms explicitly
+// rejected by the README.md contract.
+func TestSpec_PublicAPI_ValidateGitPath(t *testing.T) {
+	t.Parallel()
+	absolutePath := "/repo/file.txt"
+	if runtime.GOOS == "windows" {
+		absolutePath = `C:\repo\file.txt`
+	}
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{name: "repository relative path is accepted", path: "docs/spec.md"},
+		{name: "empty path is rejected", path: "", wantErr: true},
+		{name: "leading dash is rejected", path: "--help", wantErr: true},
+		{name: "absolute path is rejected", path: absolutePath, wantErr: true},
+		{name: "parent directory is rejected", path: "..", wantErr: true},
+		{name: "leading traversal is rejected after cleaning", path: "safe/../../outside", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := gitutil.ValidateGitPath(tt.path)
+			if tt.wantErr {
+				assert.Error(t, err, "ValidateGitPath(%q) should reject the documented unsafe form", tt.path)
+				return
+			}
+			assert.NoError(t, err, "ValidateGitPath(%q) should accept a repository-relative path", tt.path)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_WorkingDirectories validates the successful behavior of
+// the os.Getwd wrapper and the documented UserHomeDir public signature.
+func TestSpec_PublicAPI_WorkingDirectories(t *testing.T) {
+	t.Parallel()
+
+	wantWorkingDirectory, err := os.Getwd()
+	require.NoError(t, err, "os.Getwd should establish the documented comparison value")
+	workingDirectory, err := gitutil.Getwd()
+	require.NoError(t, err, "Getwd should return the current working directory")
+	assert.Equal(t, wantWorkingDirectory, workingDirectory, "Getwd should behave like os.Getwd")
+
+	userHomeDir := gitutil.UserHomeDir
+	assert.NotNil(t, userHomeDir, "UserHomeDir should expose the documented public signature")
+}
+
+// TestSpec_ThreadSafety_Validators validates the README guarantee that exported
+// pure validation helpers are safe for concurrent use.
+func TestSpec_ThreadSafety_Validators(t *testing.T) {
+	t.Parallel()
+	const workers = 16
+	var waitGroup sync.WaitGroup
+	for range workers {
+		waitGroup.Go(func() {
+			assert.True(t, gitutil.IsHexString("aB01"), "concurrent IsHexString call should retain documented behavior")
+			assert.True(t, gitutil.IsValidFullSHA("da39a3ee5e6b4b0d3255bfef95601890afd80709"), "concurrent SHA validation should retain documented behavior")
+			assert.NoError(t, gitutil.ValidateGitRef("feature/spec"), "concurrent ref validation should remain safe")
+		})
+	}
+	waitGroup.Wait()
+}
 
 // TestSpec_PublicAPI_IsHexString validates the documented behavior of
 // IsHexString as described in the package README.md.
