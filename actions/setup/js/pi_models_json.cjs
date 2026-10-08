@@ -323,7 +323,8 @@ async function main(options = {}) {
     }
   }
 
-  let routingSelection = /** @type {any} */ null;
+  /** @type {any} */
+  let routingSelection = null;
   let routedApi;
   if (routingRequired) {
     const result = resolvePiModelRouting(reflectData);

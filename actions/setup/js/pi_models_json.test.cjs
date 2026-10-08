@@ -101,7 +101,7 @@ describe("pi_models_json.cjs", () => {
       ["/chat/completions", "openai-completions"],
     ])("maps routed endpoint %s to Pi API %s", (endpoint, api) => {
       const result = piModelsJson.resolvePiModelRouting({
-        endpoints: [{ configured: true, models: ["routed-model"] }],
+        endpoints: [{ provider: "github", configured: true, models: ["routed-model"] }],
         routing: {
           status: "selected",
           selection: { provider: "github", model: "github-copilot/routed-model", wire_model: "routed-model", effort: "none", endpoint },
@@ -115,8 +115,14 @@ describe("pi_models_json.cjs", () => {
     it.each([
       [null, "required model-routing selection"],
       [{ routing: { status: "pending" } }, "pending"],
-      [{ endpoints: [{ configured: true, models: ["other"] }], routing: { status: "selected", selection: { provider: "github", wire_model: "routed-model", effort: "high", endpoint: "/responses" } } }, "unavailable Copilot wire model"],
-      [{ endpoints: [{ configured: true, models: ["routed-model"] }], routing: { status: "selected", selection: { provider: "github", wire_model: "routed-model", effort: "high", endpoint: "/unknown" } } }, "not supported by this engine"],
+      [
+        { endpoints: [{ provider: "github", configured: true, models: ["other"] }], routing: { status: "selected", selection: { provider: "github", wire_model: "routed-model", effort: "high", endpoint: "/responses" } } },
+        "unavailable Copilot wire model",
+      ],
+      [
+        { endpoints: [{ provider: "github", configured: true, models: ["routed-model"] }], routing: { status: "selected", selection: { provider: "github", wire_model: "routed-model", effort: "high", endpoint: "/unknown" } } },
+        "not supported by this engine",
+      ],
     ])("fails closed for invalid routing selection: %s", (reflect, error) => {
       expect(piModelsJson.resolvePiModelRouting(reflect).error).toContain(error);
     });

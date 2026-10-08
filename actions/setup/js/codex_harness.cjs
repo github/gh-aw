@@ -865,7 +865,8 @@ async function main() {
   const codexModelEnvVar = getCodexModelEnvVar(process.env);
   const modelOptions = { env: process.env, logger: log };
   const modelRoutingRequired = process.env.GH_AW_MODEL_ROUTING === "1";
-  let reflectData = /** @type {any} */ null;
+  /** @type {any} */
+  let reflectData = null;
   if (process.env.AWF_REFLECT_ENABLED === "1" || modelRoutingRequired) {
     const reflectResult = await fetchAWFReflect({ logger: log });
     if (reflectResult.ok && reflectResult.reflectData) reflectData = reflectResult.reflectData;

@@ -346,6 +346,7 @@ func (e *PiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string)
 
 func (e *PiEngine) buildPiArgs(workflowData *WorkflowData) []string {
 	piArgs := []string{"--print", "--mode", "json"}
+	modelRouting := isModelRoutingEnabled(workflowData)
 	session := piSessionSettings(workflowData)
 	if session.Enabled {
 		piArgs = append(piArgs, "--session-dir", PiSessionDirectory)
@@ -372,7 +373,7 @@ func (e *PiEngine) buildPiArgs(workflowData *WorkflowData) []string {
 		piArgs = append(piArgs, "--no-context-files", "--no-skills", "--no-prompt-templates", "--no-extensions", "--no-themes")
 	}
 	if workflowData.EngineConfig != nil {
-		piArgs = append(piArgs, filterPiArgs(workflowData.EngineConfig.Args)...)
+		piArgs = append(piArgs, filterPiArgs(workflowData.EngineConfig.Args, modelRouting)...)
 	}
 	return piArgs
 }
@@ -584,15 +585,32 @@ const PiStreamingLogFile = "/tmp/gh-aw/pi-streaming.jsonl"
 
 const PiSessionDirectory = constants.TmpGhAwAgentDir + "pi-sessions"
 
-// filterPiArgs removes redundant Pi CLI flags that gh-aw should not pass through.
-// Pi runs in yolo mode by default, so explicit --yolo flags are ignored while all
-// other engine args are preserved in order.
-func filterPiArgs(args []string) []string {
+// filterPiArgs removes redundant Pi CLI flags and prevents fixed model or thinking
+// options from overriding a routed selection.
+func filterPiArgs(args []string, modelRouting bool) []string {
 	filtered := make([]string, 0, len(args))
+	skipValue := false
 	for _, arg := range args {
+		if skipValue {
+			skipValue = false
+			if !strings.HasPrefix(arg, "-") {
+				continue
+			}
+		}
 		if arg == "--yolo" || strings.HasPrefix(arg, "--yolo=") {
 			piLog.Printf("Pi: dropping redundant arg %q because Pi runs in yolo mode by default", arg)
 			continue
+		}
+		if modelRouting {
+			if arg == "--model" || arg == "--thinking" {
+				piLog.Printf("Pi: dropping routed override %q", arg)
+				skipValue = true
+				continue
+			}
+			if strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "--thinking=") {
+				piLog.Printf("Pi: dropping routed override %q", arg)
+				continue
+			}
 		}
 		filtered = append(filtered, arg)
 	}

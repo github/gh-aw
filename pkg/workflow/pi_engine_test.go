@@ -319,18 +319,23 @@ func TestPiEngine_GetExecutionSteps_IgnoresRedundantYoloArg(t *testing.T) {
 
 func TestFilterPiArgs(t *testing.T) {
 	t.Run("empty args", func(t *testing.T) {
-		require.Empty(t, filterPiArgs(nil))
-		require.Empty(t, filterPiArgs([]string{}))
+		require.Empty(t, filterPiArgs(nil, false))
+		require.Empty(t, filterPiArgs([]string{}, false))
 	})
 
 	t.Run("drops yolo variants only", func(t *testing.T) {
-		filtered := filterPiArgs([]string{"--yolo", "--custom-flag", "value", "--yolo=true", "--yolo=false"})
+		filtered := filterPiArgs([]string{"--yolo", "--custom-flag", "value", "--yolo=true", "--yolo=false"}, false)
 		assert.Equal(t, []string{"--custom-flag", "value"}, filtered)
 	})
 
 	t.Run("drops all redundant args", func(t *testing.T) {
-		filtered := filterPiArgs([]string{"--yolo", "--yolo=false"})
+		filtered := filterPiArgs([]string{"--yolo", "--yolo=false"}, false)
 		assert.Equal(t, []string{}, filtered)
+	})
+
+	t.Run("drops model and thinking overrides when routing", func(t *testing.T) {
+		filtered := filterPiArgs([]string{"--model", "fixed-model", "--thinking=high", "--custom-flag", "value"}, true)
+		assert.Equal(t, []string{"--custom-flag", "value"}, filtered)
 	})
 }
 
@@ -578,6 +583,7 @@ func TestPiEngine_GetExecutionSteps_ModelRouting(t *testing.T) {
 		EngineConfig: &EngineConfig{
 			ID:          "pi",
 			LLMProvider: LLMProviderGitHub,
+			Args:        []string{"--model", "fixed-model", "--thinking", "high", "--custom-flag", "kept"},
 			ModelRouting: &CopilotModelRoutingConfig{
 				Goal: "cost", Mode: "balanced", AllowedModels: []string{"gpt-5.6-sol"},
 			},
@@ -594,5 +600,8 @@ func TestPiEngine_GetExecutionSteps_ModelRouting(t *testing.T) {
 	assert.NotContains(t, step, "GH_AW_PI_NATIVE_PROVIDER:")
 	assert.NotContains(t, step, "GH_AW_PI_MODEL_ID=")
 	assert.NotContains(t, step, "--model aw-gateway/gpt-5.6-sol")
+	assert.NotContains(t, step, "--thinking high")
+	assert.NotContains(t, step, "--model fixed-model")
+	assert.Contains(t, step, "--custom-flag kept")
 	assert.Contains(t, step, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`)
 }

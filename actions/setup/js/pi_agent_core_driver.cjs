@@ -49,7 +49,7 @@ async function main(options = {}) {
   const settingsManager = sdk.SettingsManager.create(cwd, agentDir, { projectTrusted: false });
   settingsManager.applyOverrides(settings);
   const modelRuntime = await sdk.ModelRuntime.create({ authPath: path.join(agentDir, "auth.json"), modelsPath: path.join(agentDir, "models.json") });
-  const modelString = routingSelection ? process.env.GH_AW_PI_MODEL || "" : process.env.GH_AW_PI_MODEL || process.env.PI_MODEL || "";
+  const modelString = routingSelection ? `aw-gateway/${routingSelection.wire_model}` : process.env.GH_AW_PI_MODEL || process.env.PI_MODEL || "";
   const slash = modelString.indexOf("/");
   const provider = process.env.GH_AW_PI_NATIVE_PROVIDER || nativePiProvider(slash >= 0 ? modelString.slice(0, slash) : "copilot");
   const modelId = slash >= 0 ? modelString.slice(slash + 1) : modelString;

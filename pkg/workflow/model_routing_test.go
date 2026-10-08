@@ -310,6 +310,7 @@ func TestValidateModelRoutingEngineCompatibility(t *testing.T) {
 		{name: "Codex rejects Claude models", engine: "codex", provider: LLMProviderGitHub, model: "claude-sonnet-5", wantError: "Responses API"},
 		{name: "Claude rejects non-Copilot provider", engine: "claude", provider: LLMProviderAnthropic, model: "claude-sonnet-5", wantError: "requires GitHub Copilot inference"},
 		{name: "Codex rejects non-Copilot provider", engine: "codex", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
+		{name: "pi rejects non-Copilot provider", engine: "pi", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
 		{name: "unknown engine rejected", engine: "gemini", model: "gpt-5.6-sol", wantError: "supported only by Copilot, Claude, Codex, and pi"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -340,14 +341,16 @@ func TestWarnRoutedModelOverrides(t *testing.T) {
 				ID:           "pi",
 				ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "balanced"},
 				Env: map[string]string{
-					"GH_AW_PI_MODEL": "fixed-model",
-					"CUSTOM_SETTING": "value",
+					"GH_AW_PI_MODEL":             "fixed-model",
+					"GH_AW_CUSTOM_MODELING_FLAG": "value",
+					"CUSTOM_SETTING":             "value",
 				},
 				Config: `{"settings":{"defaultThinkingLevel":"high"}}`,
 			},
 		})
 	})
 	require.Contains(t, output, "model, engine.env.GH_AW_PI_MODEL, engine.config.settings.defaultThinkingLevel")
+	require.NotContains(t, output, "GH_AW_CUSTOM_MODELING_FLAG")
 	require.Equal(t, 1, compiler.GetWarningCount())
 }
 

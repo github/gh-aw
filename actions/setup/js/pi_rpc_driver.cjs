@@ -32,7 +32,7 @@ async function main(options = {}) {
     process.env.GH_AW_PI_MODEL = `aw-gateway/${routingSelection.wire_model}`;
     process.env.GH_AW_PI_NATIVE_PROVIDER = "aw-gateway";
   }
-  const configuredModel = routingSelection ? process.env.GH_AW_PI_MODEL || "" : process.env.GH_AW_PI_MODEL || "";
+  const configuredModel = process.env.GH_AW_PI_MODEL || "";
   const slash = configuredModel.indexOf("/");
   const provider = process.env.GH_AW_PI_NATIVE_PROVIDER || nativePiProvider(slash >= 0 ? configuredModel.slice(0, slash) : "copilot");
   const modelId = slash >= 0 ? configuredModel.slice(slash + 1) : configuredModel;

@@ -2,6 +2,8 @@
 
 "use strict";
 
+const { REFLECT_PROVIDER_ALIASES, normalizeReflectProviderName } = require("./awf_reflect.cjs");
+
 const ROUTING_REASONING_EFFORTS = Object.freeze(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 /**
@@ -60,7 +62,7 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   if (allowedEndpoints && !allowedEndpoints.includes(endpoint)) {
     return { selection: null, error: `AWF /reflect selected endpoint ${endpoint}, which is not supported by this engine` };
   }
-  if (!isModelAvailableInReflectData(wireModel, reflectData)) {
+  if (!isModelAvailableInReflectData(wireModel, reflectData, REFLECT_PROVIDER_ALIASES.github)) {
     return { selection: null, error: `AWF /reflect selected unavailable Copilot wire model ${wireModel}` };
   }
   const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
@@ -74,13 +76,16 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
  * Check whether a model is present in AWF /reflect endpoint data.
  * @param {string} model
  * @param {unknown} reflectData
+ * @param {Set<string>|null} [allowedProviders]
  * @returns {boolean}
  */
-function isModelAvailableInReflectData(model, reflectData) {
+function isModelAvailableInReflectData(model, reflectData, allowedProviders = null) {
   const normalizedModel = typeof model === "string" ? model.trim() : "";
   if (!normalizedModel || !reflectData || typeof reflectData !== "object") return false;
   const endpoints = "endpoints" in reflectData && Array.isArray(reflectData.endpoints) ? reflectData.endpoints : [];
-  return endpoints.some(endpoint => endpoint?.configured === true && Array.isArray(endpoint.models) && endpoint.models.includes(normalizedModel));
+  return endpoints.some(
+    endpoint => endpoint?.configured === true && (!allowedProviders || allowedProviders.has(normalizeReflectProviderName(endpoint.provider))) && Array.isArray(endpoint.models) && endpoint.models.includes(normalizedModel)
+  );
 }
 
 module.exports = {

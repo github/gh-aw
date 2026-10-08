@@ -241,7 +241,7 @@ func (c *Compiler) warnRoutedModelOverrides(data *WorkflowData) {
 	}
 	if data.EngineConfig != nil {
 		for key := range data.EngineConfig.Env {
-			if strings.Contains(strings.ToUpper(key), "MODEL") {
+			if isModelRoutingOverrideEnvKey(key) {
 				warnings = append(warnings, "engine.env."+key)
 			}
 		}
@@ -262,6 +262,18 @@ func (c *Compiler) warnRoutedModelOverrides(data *WorkflowData) {
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 		"model-routing selection overrides fixed model or effort settings: "+strings.Join(warnings, ", ")))
 	c.IncrementWarningCount()
+}
+
+func isModelRoutingOverrideEnvKey(key string) bool {
+	upperKey := strings.ToUpper(key)
+	return strings.EqualFold(key, "MODEL") ||
+		strings.HasSuffix(upperKey, "_MODEL") ||
+		strings.HasSuffix(upperKey, "_MODEL_ID") ||
+		strings.HasSuffix(upperKey, "_MODEL_NAME") ||
+		strings.HasPrefix(upperKey, "GH_AW_MODEL_AGENT_") ||
+		strings.HasPrefix(upperKey, "GH_AW_MODEL_DETECTION_") ||
+		strings.HasPrefix(upperKey, "GH_AW_MODEL_EVALS_") ||
+		strings.HasPrefix(upperKey, "GH_AW_DEFAULT_MODEL_")
 }
 
 func modelRoutingEngineSupportsModel(engineName, candidate string) bool {
@@ -351,8 +363,11 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 	if !isFirewallEnabled(workflowData) {
 		return NewValidationError("engine.model-routing", "", "task-level model routing requires the AWF firewall", "Enable the AWF firewall for this workflow.")
 	}
-	if engineName != "copilot" && modelRoutingProvider(engineName, workflowData) != LLMProviderGitHub {
-		return NewValidationError("engine.model-routing", string(modelRoutingProvider(engineName, workflowData)), "task-level model routing requires GitHub Copilot inference", "Configure the engine's provider to use GitHub Copilot inference.")
+	if engineName != "copilot" {
+		provider := modelRoutingProvider(engineName, workflowData)
+		if provider != LLMProviderGitHub {
+			return NewValidationError("engine.model-routing", string(provider), "task-level model routing requires GitHub Copilot inference", "Configure the engine's provider to use GitHub Copilot inference.")
+		}
 	}
 	if routing.Goal != "cost" && routing.Goal != "cost-speed" {
 		return NewValidationError("engine.model-routing.goal", routing.Goal, "unsupported model-routing goal", "Use cost or cost-speed.")

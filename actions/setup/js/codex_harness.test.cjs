@@ -134,7 +134,7 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 describe("codex_harness.cjs", () => {
   describe("AWF model routing", () => {
     const reflectData = {
-      endpoints: [{ configured: true, models: ["gpt-5.6-sol"] }],
+      endpoints: [{ provider: "github", configured: true, models: ["gpt-5.6-sol"] }],
       routing: {
         status: "selected",
         selection: { provider: "github", model: "github-copilot/gpt-5.6-sol", wire_model: "gpt-5.6-sol", effort: "xhigh", endpoint: "/responses" },
@@ -152,7 +152,7 @@ describe("codex_harness.cjs", () => {
       [null, "required model-routing selection"],
       [{ endpoints: reflectData.endpoints, routing: { status: "pending" } }, "pending"],
       [{ ...reflectData, routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/v1/messages" } } }, "not supported by this engine"],
-      [{ ...reflectData, endpoints: [{ configured: true, models: [] }] }, "unavailable Copilot wire model"],
+      [{ ...reflectData, endpoints: [{ provider: "github", configured: true, models: [] }] }, "unavailable Copilot wire model"],
     ])("fails closed when routing data is invalid: %s", (reflect, error) => {
       expect(resolveCodexModelRouting(reflect, ["exec", "--model", "fixed"]).error).toContain(error);
     });

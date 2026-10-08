@@ -461,7 +461,8 @@ async function main() {
   const reflection = await fetchAWFReflect({ logger: log });
   let childEnv;
   try {
-    let modelRoutingSelection = /** @type {any} */ null;
+    /** @type {any} */
+    let modelRoutingSelection = null;
     if (process.env.GH_AW_MODEL_ROUTING === "1") {
       const result = resolveAWFModelRoutingSelection(reflection.reflectData, true, CLAUDE_ROUTING_ENDPOINTS);
       if (result.error || !result.selection) {
