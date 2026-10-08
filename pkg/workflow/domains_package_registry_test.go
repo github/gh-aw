@@ -28,6 +28,7 @@ var allEngines = []constants.EngineName{
 	constants.ClaudeEngine,
 	constants.CodexEngine,
 	constants.GeminiEngine,
+	constants.AgyEngine,
 	constants.PiEngine,
 }
 

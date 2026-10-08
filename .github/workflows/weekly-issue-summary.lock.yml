@@ -1311,6 +1311,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Weekly Issue Summary"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/weekly-issue-summary.md"
           GH_AW_TRACKER_ID: "weekly-issue-summary"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/grok-4.6"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1356,6 +1358,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Weekly Issue Summary"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/weekly-issue-summary.md"
           GH_AW_TRACKER_ID: "weekly-issue-summary"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/grok-4.6"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1374,6 +1378,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Weekly Issue Summary"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/weekly-issue-summary.md"
           GH_AW_TRACKER_ID: "weekly-issue-summary"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/grok-4.6"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

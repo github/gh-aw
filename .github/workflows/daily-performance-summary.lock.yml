@@ -2010,6 +2010,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Project Performance Summary Generator (Using MCP Scripts)"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-performance-summary.md"
           GH_AW_TRACKER_ID: "daily-performance-summary"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-6-luna"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -2056,6 +2058,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Project Performance Summary Generator (Using MCP Scripts)"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-performance-summary.md"
           GH_AW_TRACKER_ID: "daily-performance-summary"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-6-luna"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2074,6 +2078,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Project Performance Summary Generator (Using MCP Scripts)"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-performance-summary.md"
           GH_AW_TRACKER_ID: "daily-performance-summary"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gpt-6-luna"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

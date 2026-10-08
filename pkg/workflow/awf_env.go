@@ -26,6 +26,15 @@ func applyDefaultMaxAICreditsEnvToMap(env map[string]string, workflowData *Workf
 	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.MaxAICredits != 0 {
 		return
 	}
+	if workflowData != nil && workflowData.DryRun {
+		if value, ok := workflowData.RawFrontmatter["max-ai-credits"].(string); ok && isExpression(value) {
+			if env[awfMaxAICreditsVarName] != value {
+				compilerDevelopmentLog.Printf("Dry-run mutation: set %s from max-ai-credits", awfMaxAICreditsVarName)
+			}
+			env[awfMaxAICreditsVarName] = value
+			return
+		}
+	}
 	if workflowData != nil && workflowData.IsEvalsRun {
 		env[awfMaxAICreditsVarName] = compilerenv.BuildDefaultEvalsMaxAICreditsExpression(strconv.FormatInt(constants.DefaultDetectionMaxAICredits, 10))
 		return

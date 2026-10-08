@@ -162,6 +162,9 @@ const (
 	// AWFAPIProxyContainerIP is the fixed api-proxy sidecar address inside the AWF sandbox network.
 	AWFAPIProxyContainerIP = "172.30.0.30"
 
+	// AWFAPIProxyHostname is the api-proxy sidecar's DNS alias inside the AWF sandbox network.
+	AWFAPIProxyHostname = "api-proxy"
+
 	// DefaultMCPGatewayPort is the default port for the MCP gateway HTTP service
 	DefaultMCPGatewayPort = 8080
 

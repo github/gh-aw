@@ -150,6 +150,11 @@ func (c *Compiler) validatePromptTmpPaths(workflowData *WorkflowData, markdownPa
 // validateFeatureConfig validates feature flags declared in the workflow frontmatter
 // and applies any action-mode override specified via the "action-mode" feature flag.
 func (c *Compiler) validateFeatureConfig(workflowData *WorkflowData, markdownPath string) error {
+	if c.dryRun {
+		if err := validateDryRunFeatures(workflowData.Features); err != nil {
+			return formatCompilerError(markdownPath, "error", err.Error(), err)
+		}
+	}
 	// Validate feature flags
 	workflowLog.Printf("Validating feature flags")
 	if err := validateFeatures(workflowData); err != nil {

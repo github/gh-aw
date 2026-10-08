@@ -255,7 +255,7 @@ func (c *Compiler) generateObservabilitySummary(yaml *strings.Builder, data *Wor
 // OTEL_EXPORTER_OTLP_ENDPOINT env var into workflowData.Env, which is the authoritative
 // result of OTLP detection after all frontmatter (main + imports) has been processed.
 func isOTLPEnabled(data *WorkflowData) bool {
-	if data == nil {
+	if data == nil || data.DryRun {
 		return false
 	}
 	return strings.Contains(data.Env, "OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -329,9 +329,17 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 	yaml.WriteString("        if: always()\n")
 	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseTokenUsageStepID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        continue-on-error: true\n")
-	if isArcDindTopology(data) {
+	if isArcDindTopology(data) || isModelRoutingEnabled(data) {
 		yaml.WriteString("        env:\n")
+	}
+	if isArcDindTopology(data) {
 		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
+	}
+	if isModelRoutingEnabled(data) {
+		yaml.WriteString("          GH_AW_MODEL_ROUTING_ENABLED: \"true\"\n")
+		if data.EngineConfig != nil {
+			fmt.Fprintf(yaml, "          GH_AW_ENGINE_ID: %q\n", data.EngineConfig.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		}
 	}
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        with:\n")

@@ -10,7 +10,14 @@ description: Configure the experimental Google Antigravity CLI engine with Gemin
 
 ## Selection and authentication
 
-Set `engine: agy`; no shared-engine import is required. Both selection forms work:
+Set `engine: agy`; no shared-engine import is required.
+
+Agy is a first-class Go engine in the compiler, like Gemini. Its embedded Markdown
+entry contains catalog metadata only; installation, execution, credentials and
+MCP configuration are implemented by `AgyEngine`. The setup action supplies the
+native harness, gateway configuration adapter and streaming log parser.
+
+Both selection forms work:
 
 ```yaml
 engine: agy
@@ -59,6 +66,9 @@ repeated cumulative usage snapshots are not added together. Missing metrics
 retain their last valid value when a later result omits them; metrics never
 reported remain absent. Status and errors come from the current result.
 
+Agent writes to `GITHUB_STEP_SUMMARY` use an isolated file that is appended to
+the runner's step summary only after secret redaction, matching other built-in engines.
+
 Configured HTTP MCP servers are translated from the gh-aw gateway into
 owner-only `.agents/mcp_config.json`, using native `serverUrl` entries and
 validated headers. CLI-mounted infrastructure tools, including `safeoutputs`
@@ -68,7 +78,13 @@ configuration is replaced by the explicitly configured gateway servers.
 and configuration surfaces.
 
 Native permissions use blanket approvals **inside the outer gh-aw sandbox**,
-not as the security boundary. Per-command bash restrictions, `bash: false`,
+not as the security boundary. This preserves the existing unattended execution
+profile; the bypass is not intrinsically required for headless mode. Agy supports
+scoped `permissions.allow` rules, but this integration does not yet translate
+workflow tool restrictions into that native policy. Without advance grants,
+approval-required tools are soft-denied in headless mode, which the gh-aw harness
+treats as a failure. See the [native headless permission documentation](https://antigravity.google/docs/cli/headless).
+Per-command bash restrictions, `bash: false`,
 empty bash allowlists, and disabling native editing or web tools are rejected
 rather than silently ignored. The fixed native timeout is five minutes, with
 a wrapper watchdog and the Actions step timeout as additional bounds.
@@ -85,6 +101,13 @@ Use `max-turn-cache-misses`, `max-ai-credits` and `timeout-minutes` for outer
 execution limits. Agent Plugins and native custom-agent selection are not
 supported. Agy-specific settings, skills and hooks are not interchangeable with
 Gemini settings.
+
+`gh aw compile --dry-run` permits the built-in Agy harness's internal
+`--dangerously-skip-permissions` flag. Its dangerous-feature filter applies to
+enabled `dangerously-*` entries authored in workflow Markdown configuration,
+including imports, not built-in engine implementation flags. Runtime sandbox
+and credential isolation remain separate security requirements. Dry-run
+compilation does not authorize live execution.
 
 ## Troubleshooting and conformance
 
@@ -112,6 +135,9 @@ outputs. Runs are bounded to ten minutes and fifty AI credits; results are recor
 in the step summary and conformance artifacts, not published as issues or comments.
 
 Both checkers require the exact staged noop receipt, not an empty output file.
+The native MCP allowlist uses `native_challenge`, matching the underscore-normalized
+name exposed by the MCP scripts server; the script's authored name remains
+`native-challenge`.
 The Agy gate explicitly disables the separate Copilot threat-detection job;
 it forwards only the Gemini key and retains its own bounded, read-only checks.
 

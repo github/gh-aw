@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var compileDevelopmentLog = logger.New("cli:compile_development")
 
 // DryRunRequiredBoolFlags lists checks that development compilation cannot disable.
 func DryRunRequiredBoolFlags() []string {
@@ -30,6 +33,17 @@ func ValidateDevelopmentCompileFlags(dev bool, flags map[string]bool) error {
 func applyDevelopmentCompileMode(config CompileConfig) CompileConfig {
 	if !config.DryRun {
 		return config
+	}
+	for _, flag := range []struct {
+		name    string
+		enabled bool
+	}{
+		{"strict", config.Strict}, {"staged", config.Staged}, {"validate", config.Validate},
+		{"shellcheck", config.Shellcheck}, {"models", config.Models},
+	} {
+		if !flag.enabled {
+			compileDevelopmentLog.Printf("Dry-run mutation: enable --%s", flag.name)
+		}
 	}
 	config.Strict = true
 	config.Staged = true
