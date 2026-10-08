@@ -50,6 +50,10 @@ const DefaultCodexVersion Version = "0.159.3"
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.62.0"
 
+const DefaultAgyVersion Version = "1.3.1"
+
+const AgyDefaultModel = "gemini-3.8-flash-medium"
+
 // DefaultPiVersion is the default version of the Pi CLI
 const DefaultPiVersion Version = "1.0.0"
 

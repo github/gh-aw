@@ -328,6 +328,7 @@
     "codex": ["172.30.0.1", "api.github.com", "api.openai.com", "chatgpt.com", "github.com", "host.docker.internal", "openai.com"],
     "copilot": ["api.github.com", "api.githubcopilot.com", "github.com", "host.docker.internal", "raw.githubusercontent.com"],
     "gemini": ["*.googleapis.com", "generativelanguage.googleapis.com", "github.com", "host.docker.internal", "raw.githubusercontent.com"],
+    "agy": ["host.docker.internal", "github.com", "api.github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"],
     "pi": ["api.githubcopilot.com", "host.docker.internal", "github.com", "raw.githubusercontent.com"],
     "pi-base": ["host.docker.internal", "github.com", "raw.githubusercontent.com"],
     "threat-detection": [

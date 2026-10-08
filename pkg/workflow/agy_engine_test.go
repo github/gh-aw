@@ -28,8 +28,11 @@ func agyDefinition(t *testing.T) *EngineDefinition {
 
 func TestAgyBuiltInRegistration(t *testing.T) {
 	def := agyDefinition(t)
-	engine, err := NewBehaviorDefinedEngine(def)
+	engine := NewAgyEngine()
+	assert.Nil(t, def.Behaviors)
+	registered, err := NewEngineRegistry().GetEngine("agy")
 	require.NoError(t, err)
+	assert.IsType(t, engine, registered)
 	assert.True(t, engine.IsExperimental())
 	assert.Equal(t, "1.3.1", def.Version)
 	assert.False(t, engine.GetCapabilities().BashCommandAllowlist)
@@ -83,7 +86,12 @@ func TestAgyCompilerSelectionAndRestrictions(t *testing.T) {
 			assert.Contains(t, string(lock), "GH_AW_ENGINE_VERSION: 1.3.1")
 			assert.Contains(t, string(lock), "GH_AW_AGY_MODEL: gemini-3.8-flash-medium")
 			assert.Contains(t, string(lock), "--exclude-env GEMINI_API_KEY")
-			assert.Contains(t, string(lock), `"gemini"`)
+			assert.Contains(t, string(lock), "convert_gateway_config_agy.cjs")
+			assert.Contains(t, string(lock), "parse_agy_log.cjs")
+			assert.NotContains(t, string(lock), "GHAW_HARNESS_SCRIPT")
+			assert.NotContains(t, string(lock), "GHAW_MCP_CONFIG_ADAPTER_SCRIPT")
+			assert.Contains(t, string(lock), "generativelanguage.googleapis.com")
+			assert.Contains(t, string(lock), `GH_AW_INFO_FIREWALL_ENABLED: "true"`)
 			if tt.name == "custom trusted executable" {
 				assert.Contains(t, string(lock), "agy_harness.cjs /opt/trusted/agy")
 				assert.NotContains(t, string(lock), "agy_harness.cjs agy'")
@@ -112,17 +120,57 @@ func TestAgyUsesExistingGeminiProviderTarget(t *testing.T) {
 }
 
 func TestBehaviorDefinedUnknownInferenceHostsPreservePriorBehavior(t *testing.T) {
-	definition := *agyDefinition(t)
-	behaviors := *definition.Behaviors
-	behaviors.SecretStrategy = behaviorSecretStrategyUniversalLLMConsumer
-	definition.Behaviors = &behaviors
-	engine, err := NewBehaviorDefinedEngine(&definition)
+	engine, err := NewBehaviorDefinedEngine(&EngineDefinition{
+		ID: "unknown-hosts",
+		Behaviors: &EngineBehaviorDefinition{
+			SecretStrategy: behaviorSecretStrategyUniversalLLMConsumer,
+		},
+	})
 	require.NoError(t, err)
 	assert.Nil(t, getEngineAPIHosts(nil, engine), "installation and infrastructure domains are not inference hosts")
 	data := &WorkflowData{EngineConfig: &EngineConfig{APITarget: "explicit.example"}}
 	assert.Equal(t, []string{"explicit.example"}, getEngineAPIHosts(data, engine))
 	assert.IsType(t, &PiEngine{}, NewPiEngine(), "Pi retains its dedicated runtime")
 	assert.Nil(t, getEngineAPIHosts(nil, NewPiEngine()), "Pi's unknown-host behavior is unchanged")
+}
+
+func TestAgyDryRunAllowsBuiltInNativePermissions(t *testing.T) {
+	for _, selection := range []string{"agy", "\n  id: agy", "\n  id: agy\n  command: /opt/trusted/agy"} {
+		t.Run(selection, func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "agy.md")
+			require.NoError(t, os.WriteFile(source, []byte("---\nstrict: false\non: workflow_dispatch\nengine: "+selection+"\n---\nSay hello.\n"), 0o600))
+			compiler := NewCompiler()
+			compiler.SetDryRun(true)
+			compiler.SetStrictMode(true)
+			require.NoError(t, compiler.CompileWorkflow(source))
+			content, err := os.ReadFile(filepath.Join(dir, "agy.lock.yml"))
+			require.NoError(t, err)
+			assert.Contains(t, string(content), "agy_harness.cjs")
+			assert.Contains(t, string(content), "awf --config")
+		})
+	}
+}
+
+func TestAgyNativeRuntimeDefaults(t *testing.T) {
+	engine := NewAgyEngine()
+	data := &WorkflowData{
+		AI:                 "agy",
+		EngineConfig:       &EngineConfig{ID: "agy"},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+	}
+	steps := engine.GetExecutionSteps(data, "/tmp/gh-aw/agent-stdio.log")
+	require.Len(t, steps, 1)
+	content := strings.Join(steps[0], "\n")
+	assert.Contains(t, content, "agy_harness.cjs agy")
+	assert.Contains(t, content, "awf --config")
+	assert.Contains(t, content, "AWF_REFLECT_ENABLED: 1")
+	assert.Contains(t, content, "GH_AW_ENGINE_VERSION: 1.3.1")
+	assert.Contains(t, content, "GH_AW_AGY_MODEL: gemini-3.8-flash-medium")
+	assert.Contains(t, content, "--exclude-env GEMINI_API_KEY")
+	assert.Equal(t, "parse_agy_log", engine.GetLogParserScriptId())
+	assert.Nil(t, engine.GetMCPConfigAdapterWriteStep())
+	assert.Equal(t, []string{"GEMINI_API_KEY"}, engine.GetRequiredSecretNames(nil))
 }
 
 func TestAgyCLIOverrideUsesBuiltInDefaults(t *testing.T) {
@@ -136,6 +184,42 @@ func TestAgyCLIOverrideUsesBuiltInDefaults(t *testing.T) {
 	assert.Contains(t, string(lock), "GH_AW_AGY_MODEL: gemini-3.8-flash-medium")
 	assert.Contains(t, string(lock), "agy_harness.cjs")
 	assert.NotContains(t, string(lock), "@google/gemini-cli")
+}
+
+func TestAgyNativeRuntimeConfiguration(t *testing.T) {
+	engine := NewAgyEngine()
+	data := &WorkflowData{
+		AI:    "agy",
+		Model: "gemini-3.8-pro-high",
+		EngineConfig: &EngineConfig{
+			ID:      "agy",
+			Command: "/opt/trusted/agy",
+			Version: "1.3.1",
+			Env:     map[string]string{"CONFORMANCE_MARKER": "agy"},
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{ID: "awf", Runtime: AgentRuntimeCloudHypervisor},
+		},
+	}
+	steps := engine.GetExecutionSteps(data, "/tmp/gh-aw/agent-stdio.log")
+	require.Len(t, steps, 1)
+	content := strings.Join(steps[0], "\n")
+	assert.Contains(t, content, "agy_harness.cjs /opt/trusted/agy")
+	assert.Contains(t, content, "engine-cli/bin:$PATH")
+	assert.Contains(t, content, "GH_AW_AGY_MODEL: gemini-3.8-pro-high")
+	assert.Contains(t, content, "CONFORMANCE_MARKER: agy")
+
+	data.NetworkPermissions.Firewall.Enabled = false
+	data.SandboxConfig.Agent.Disabled = true
+	steps = engine.GetExecutionSteps(data, "/tmp/gh-aw/agent-stdio.log")
+	require.Len(t, steps, 1)
+	content = strings.Join(steps[0], "\n")
+	assert.NotContains(t, content, "awf --config")
+	assert.NotContains(t, content, "AWF_REFLECT_ENABLED")
+	assert.Contains(t, content, "GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}")
+	assert.Contains(t, content, "agy_harness.cjs /opt/trusted/agy")
+	assert.Contains(t, content, "GH_AW_AGY_MODEL: gemini-3.8-pro-high")
 }
 
 type agyConformanceJob struct {

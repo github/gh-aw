@@ -10,7 +10,14 @@ description: Configure the experimental Google Antigravity CLI engine with Gemin
 
 ## Selection and authentication
 
-Set `engine: agy`; no shared-engine import is required. Both selection forms work:
+Set `engine: agy`; no shared-engine import is required.
+
+Agy is a first-class Go engine in the compiler, like Gemini. Its embedded Markdown
+entry contains catalog metadata only; installation, execution, credentials and
+MCP configuration are implemented by `AgyEngine`. The setup action supplies the
+native harness, gateway configuration adapter and streaming log parser.
+
+Both selection forms work:
 
 ```yaml
 engine: agy
@@ -68,7 +75,13 @@ configuration is replaced by the explicitly configured gateway servers.
 and configuration surfaces.
 
 Native permissions use blanket approvals **inside the outer gh-aw sandbox**,
-not as the security boundary. Per-command bash restrictions, `bash: false`,
+not as the security boundary. This preserves the existing unattended execution
+profile; the bypass is not intrinsically required for headless mode. Agy supports
+scoped `permissions.allow` rules, but this integration does not yet translate
+workflow tool restrictions into that native policy. Without advance grants,
+approval-required tools are soft-denied in headless mode, which the gh-aw harness
+treats as a failure. See the [native headless permission documentation](https://antigravity.google/docs/cli/headless).
+Per-command bash restrictions, `bash: false`,
 empty bash allowlists, and disabling native editing or web tools are rejected
 rather than silently ignored. The fixed native timeout is five minutes, with
 a wrapper watchdog and the Actions step timeout as additional bounds.
@@ -85,6 +98,13 @@ Use `max-turn-cache-misses`, `max-ai-credits` and `timeout-minutes` for outer
 execution limits. Agent Plugins and native custom-agent selection are not
 supported. Agy-specific settings, skills and hooks are not interchangeable with
 Gemini settings.
+
+`gh aw compile --dry-run` permits the built-in Agy harness's internal
+`--dangerously-skip-permissions` flag. Its dangerous-feature filter applies to
+enabled `dangerously-*` entries authored in workflow Markdown configuration,
+including imports, not built-in engine implementation flags. Runtime sandbox
+and credential isolation remain separate security requirements. Dry-run
+compilation does not authorize live execution.
 
 ## Troubleshooting and conformance
 

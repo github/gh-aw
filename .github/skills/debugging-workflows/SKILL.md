@@ -41,11 +41,12 @@ explain each concrete cause, link the reviewed source and lines, distinguish
 confirmed defects from incomplete evidence or authorization, and name the
 necessary resolution and its owner. Do not report disagreement alone as a code
 vulnerability.
-In dry-run mode, reject `dangerously-*` features, including engine harness flags,
+In dry-run mode, reject enabled `dangerously-*` entries in workflow Markdown
+configuration, including imported configuration,
 under the [strict security gate](../../aw/debug-security-review.md#dry-run-dangerous-features).
-An outer sandbox is not an exemption. If compilation emits them successfully,
-report the enforcement gap and link their executable source; do not claim strict
-validation rejected them when it did not.
+This filter does not reject implementation-internal flags used by trusted
+built-in engines. Review their runtime isolation separately. Link the authored
+field responsible for a refusal; do not claim compiler rejection when none occurred.
 
 ## Table of Contents
 

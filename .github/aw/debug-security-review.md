@@ -13,18 +13,18 @@ restrictions and human live-validation gates.
 
 ## Dry-Run Dangerous Features
 
-In dry-run mode, `dangerously-*` features are prohibited and must be refused by
-strict validation, including flags embedded in engine harnesses or imported
-executable payloads. An outer sandbox, unchanged engine defaults, or human
-authorization does not exempt them. Do not remove the flag without establishing
-that the engine can operate with the required permission protections.
+In dry-run mode, enabled `dangerously-*` entries authored in workflow Markdown
+configuration, including imported workflow configuration, are prohibited and
+must be refused by strict validation. Report the exact field, link the Markdown
+source that enables it, and explain which protection it disables. Do not silently
+strip the entry or downgrade strict validation to obtain a successful compile.
 
-If strict compilation succeeds but emits a prohibited feature, report an
-enforcement gap, not a passed security gate or a compiler rejection that did not
-occur. Block execution/upload and link the executable source that introduces
-the feature, naming the exact flag and the permission protection it bypasses.
-The agent owns investigation of a supported safe engine configuration or a
-compiler correction; never downgrade strict mode or bypass this prohibition.
+This filter does not inspect or prohibit implementation-internal flags supplied
+by trusted built-in engines, such as Agy's native permission-skipping flag.
+Do not reject an engine solely because its harness uses such a flag or call that
+an enforcement gap. Review the actual runtime sandbox, credential isolation and
+reachable effects separately; internal flags are not an exemption from those
+security checks. A passing dry-run still grants no live-dispatch permission.
 
 ## Agent Ownership
 
@@ -241,8 +241,8 @@ values from excerpts.
 Trace negative findings to executable behavior before calling source problematic.
 Metadata alone does not establish a missing firewall; inspect the actual AWF
 configuration and invocation. Distinguish unchanged intentional controls from
-new regressions, but apply the [dry-run dangerous-feature prohibition](#dry-run-dangerous-features)
-even to unchanged native permission-skipping defaults inside an outer sandbox.
+new regressions. Apply the [dry-run dangerous-feature filter](#dry-run-dangerous-features)
+to authored workflow configuration, not built-in engine implementation flags.
 Explain contradictory vote/reason pairs without silently changing votes or
 counting them as a passed gate.
 
