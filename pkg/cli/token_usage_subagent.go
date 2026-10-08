@@ -25,7 +25,7 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 		addTokenUsageWarning(summary, "failed to parse unified subagent information: "+err.Error())
 		tokenUsageSubagentLog.Printf("failed to parse unified subagent information: %v", err)
 	}
-	if found && err == nil {
+	if found {
 		summary.SubagentModelRequests = requests
 		summary.SubagentModelActuals = actuals
 		summary.MismatchCount = 0
