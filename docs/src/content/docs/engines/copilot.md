@@ -68,6 +68,8 @@ gh-aw's existing engine-config restoration snapshots the engine-declared folders
 
 The repository's [Copilot dynamic workflow smoke test](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-copilot-dynamic-workflow.md) invokes the packaged `smoke-copilot-dynamic-workflow` extension by name. It verifies a relative module import, a nested hidden support file, durable steps, and one structured subagent result. Run it with `gh aw run smoke-copilot-dynamic-workflow`, or dispatch **Smoke Trigger** with `dynamic-workflow: true` to exercise a feature branch before the new workflow is registered on the default branch.
 
+The main [Smoke Copilot workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-copilot.md) also enables dynamic workflows and checks the same packaged extension as test 17, recording its run ID, status, and verified result or error in the smoke report.
+
 Current Copilot CLI releases require `engine.args: ["--experimental"]` to expose the dynamic workflow tools. Loading an extension through the `EXTENSIONS` flag alone does not expose those tools.
 
 Omitting `engine.dynamic-workflows` or setting it to `false` disables the CLI's extension feature flag and project extension loading, denies workflow runs, and restores engine configuration only when PR checkout requires it:
