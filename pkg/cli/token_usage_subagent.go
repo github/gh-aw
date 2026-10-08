@@ -461,6 +461,7 @@ func isPiSubagentModel(entry TokenUsageEntry, models []string, resolver *modelId
 
 func accumulatePiMainUsage(main *AgentUsageBreakdown, entry TokenUsageEntry) {
 	credits := tokenUsageEntryCredits(entry)
+	servedModel := modelNameWithoutProvider(entry.Model)
 	main.Requests++
 	main.InputTokens += entry.InputTokens
 	main.OutputTokens += entry.OutputTokens
@@ -469,8 +470,9 @@ func accumulatePiMainUsage(main *AgentUsageBreakdown, entry TokenUsageEntry) {
 	main.ReasoningTokens += entry.ReasoningTokens
 	main.AIC += credits
 	main.TotalApiDurationMs += entry.DurationMs
+	main.ServedModels = appendUnique(main.ServedModels, servedModel)
 	main.Models = appendAgentModelUsage(main.Models, AgentModelUsage{
-		Model: entry.Model, ResolvedModel: normalizeModelIdentity(modelNameWithoutProvider(entry.Model)),
+		Model: entry.Model, ResolvedModel: normalizeModelIdentity(servedModel),
 		Requests: 1, TokenCoreMetrics: TokenCoreMetrics{
 			InputTokens: entry.InputTokens, OutputTokens: entry.OutputTokens,
 			CacheReadTokens: entry.CacheReadTokens, CacheWriteTokens: entry.CacheWriteTokens,

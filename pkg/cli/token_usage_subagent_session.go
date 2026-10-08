@@ -571,16 +571,24 @@ func (models *subagentSessionModels) observeMetrics(data sessionSubagentData) er
 }
 
 func (models *subagentSessionModels) observeAgentMetric(agentID string, metric sessionSubagentAgentMetric) error {
-	if agentID != "main" && models.agents[agentID] == nil && metric.AgentName != "" {
-		name := firstNonEmptyModel(metric.AgentDisplayName, metric.AgentName)
-		models.agents[agentID] = &SubagentModelRequest{AgentName: name, InvocationCount: 1}
-	}
 	name := firstNonEmptyModel(metric.AgentDisplayName, metric.AgentName)
 	role := "subagent"
 	if agentID == "main" {
 		name, role = "main", "main"
-	} else if name == "" && models.agents[agentID] != nil {
-		name = models.agents[agentID].AgentName
+	} else {
+		if name == "" {
+			name = agentID
+		}
+		row := models.agents[agentID]
+		if row == nil {
+			row = &SubagentModelRequest{AgentName: name}
+			models.agents[agentID] = row
+		} else if row.AgentName == "" {
+			row.AgentName = name
+		}
+		if row.RequestedModel == "" {
+			row.RequestedModel = agentMetricRequestedModel(metric)
+		}
 	}
 	agentUsage := models.agentUsage[agentID]
 	if agentUsage == nil {
@@ -600,6 +608,23 @@ func (models *subagentSessionModels) observeAgentMetric(agentID string, metric s
 	agentUsage.CacheReadTokens, agentUsage.CacheWriteTokens, agentUsage.ReasoningTokens = 0, 0, 0
 	agentUsage.Models = nil
 	return models.addAgentMetricModelUsage(agentID, metric, agentUsage)
+}
+
+func agentMetricRequestedModel(metric sessionSubagentAgentMetric) string {
+	models := make([]string, 0, len(metric.ModelMetrics))
+	for model := range metric.ModelMetrics {
+		models = append(models, model)
+	}
+	slices.Sort(models)
+	for _, model := range models {
+		if metric.ModelMetrics[model].Requests.Count != nil && *metric.ModelMetrics[model].Requests.Count > 0 {
+			return model
+		}
+	}
+	if len(models) > 0 {
+		return models[0]
+	}
+	return ""
 }
 
 func (models *subagentSessionModels) addAgentMetricModelUsage(agentID string, metric sessionSubagentAgentMetric, agentUsage *AgentUsageBreakdown) error {
@@ -1022,8 +1047,8 @@ func addSubagentRequestGroup(grouped map[subagentModelKey]SubagentModelRequest, 
 	current := *row
 	current.EffectiveModel = ""
 	current.ReasonCode = ""
-	combined := grouped[key]
-	if combined.InvocationCount == 0 {
+	combined, exists := grouped[key]
+	if !exists {
 		combined = current
 	} else {
 		combined.InvocationCount += current.InvocationCount

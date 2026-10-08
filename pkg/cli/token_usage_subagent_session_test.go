@@ -460,6 +460,43 @@ func TestCopilotUnifiedFixtureRetainsFailedCrossFamilySubagent(t *testing.T) {
 	require.Zero(t, summary.AgentUsage[1].AIC)
 }
 
+func TestCopilotAgentMetricsWithoutLifecycleRetainAttribution(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"metrics-only"}}`) +
+		subagentSessionRecord(`{"type":"session.shutdown","data":{"agentMetrics":`+strings.ReplaceAll(copilotSubagentIntegrationMetrics, "\n", "")+`}}`)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "usage", "aw_session.jsonl"), []byte(content), 0o644))
+
+	_, _, parsedAgents, found, err := readSessionSubagentModelsDetailed(root)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, parsedAgents, 4)
+	summary := &TokenUsageSummary{}
+	augmentSubagentModelAttribution(root, summary)
+
+	require.Len(t, summary.AgentUsage, 4)
+	agents := make(map[string]AgentUsageBreakdown, len(summary.AgentUsage))
+	for _, agent := range summary.AgentUsage {
+		agents[agent.AgentName] = agent
+	}
+	require.InDelta(t, 389.122, agents["main"].AIC, 0.000001)
+	require.InDelta(t, 494.207, agents["subagent-research"].AIC, 0.000001)
+	require.InDelta(t, 40.977, agents["awf-routing"].AIC, 0.000001)
+	require.InDelta(t, 9.141, agents["ghaw-issues"].AIC, 0.000001)
+	require.Len(t, summary.SubagentModelRequests, 3)
+	for _, request := range summary.SubagentModelRequests {
+		require.Zero(t, request.InvocationCount)
+		require.Zero(t, request.CompletedCount)
+		require.Zero(t, request.FailedCount)
+		require.Zero(t, request.IncompleteCount)
+		require.Equal(t, "opus", request.RequestedModel)
+	}
+	require.Len(t, summary.SubagentModelActuals, 1)
+	require.Equal(t, 60, summary.SubagentModelActuals[0].Requests)
+	require.Equal(t, TokenCoreMetrics{InputTokens: 6000, OutputTokens: 600, CacheReadTokens: 60, CacheWriteTokens: 120}, summary.SubagentModelActuals[0].TokenCoreMetrics)
+}
+
 func TestPiUnifiedFixtureAttributesInterleavedRequestsFromFirewallEvents(t *testing.T) {
 	fixture := filepath.Join("testdata", "subagent_attribution", "pi-interleaved")
 	_, actuals, agents, found, err := readSessionSubagentModelsDetailed(fixture)
@@ -483,9 +520,13 @@ func TestPiUnifiedFixtureAttributesInterleavedRequestsFromFirewallEvents(t *test
 
 	creditsByAgent := make(map[string]float64)
 	requestsByAgent := make(map[string]int)
+	var mainAgent *AgentUsageBreakdown
 	for _, agent := range summary.AgentUsage {
 		creditsByAgent[agent.AgentName] = agent.AIC
 		requestsByAgent[agent.AgentName] = agent.Requests
+		if agent.AgentType == "main" {
+			mainAgent = &agent
+		}
 	}
 	require.InDelta(t, 0.9, creditsByAgent["a-reader"], 0.000001)
 	require.InDelta(t, 1.2, creditsByAgent["z-reader"], 0.000001)
@@ -493,5 +534,7 @@ func TestPiUnifiedFixtureAttributesInterleavedRequestsFromFirewallEvents(t *test
 	require.Equal(t, 2, requestsByAgent["a-reader"])
 	require.Equal(t, 2, requestsByAgent["z-reader"])
 	require.Equal(t, 1, requestsByAgent["main"])
+	require.NotNil(t, mainAgent)
+	require.Equal(t, []string{"gpt-5.6-luna"}, mainAgent.ServedModels)
 	require.Empty(t, summary.Warnings)
 }
