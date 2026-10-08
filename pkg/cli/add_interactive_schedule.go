@@ -47,13 +47,16 @@ type scheduleDetection struct {
 // schedule/workflow_dispatch), IsMultiTrigger is set so the caller knows to update the
 // "schedule" sub-field rather than the entire "on:" field.
 func detectWorkflowScheduleInfo(content string) scheduleDetection {
+	scheduleWizardLog.Printf("Detecting schedule info from workflow content (%d bytes)", len(content))
 	result, err := parser.ExtractFrontmatterFromContent(content)
 	if err != nil || result.Frontmatter == nil {
+		scheduleWizardLog.Printf("No usable frontmatter found, schedule not detected: %v", err)
 		return scheduleDetection{}
 	}
 
 	onValue, exists := result.Frontmatter["on"]
 	if !exists {
+		scheduleWizardLog.Print("Workflow frontmatter has no \"on\" trigger, schedule not detected")
 		return scheduleDetection{}
 	}
 
@@ -68,6 +71,7 @@ func detectWorkflowScheduleInfo(content string) scheduleDetection {
 				IsOnMap:     false,
 			}
 		}
+		scheduleWizardLog.Printf("on: value %q is not a recognized schedule expression: %v", onStr, parseErr)
 		return scheduleDetection{}
 	}
 

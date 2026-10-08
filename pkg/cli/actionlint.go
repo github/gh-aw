@@ -303,6 +303,7 @@ func maybePrintActionlintVersion(ctx context.Context) {
 func resolveActionlintPaths(lockFiles []string) (string, []string, error) {
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
+		actionlintLog.Printf("Failed to resolve git root: %v", err)
 		return "", nil, err
 	}
 	relPaths := make([]string, 0, len(lockFiles))
@@ -313,6 +314,7 @@ func resolveActionlintPaths(lockFiles []string) (string, []string, error) {
 		}
 		relPaths = append(relPaths, relPath)
 	}
+	actionlintLog.Printf("Resolved actionlint paths: gitRoot=%s, files=%d", gitRoot, len(relPaths))
 	return gitRoot, relPaths, nil
 }
 
@@ -327,11 +329,13 @@ func runActionlintCommand(ctx context.Context, gitRoot string, lockFiles, relPat
 	}
 	printActionlintRunMessage(lockFiles, relPaths, verboseHint, options)
 
+	actionlintLog.Printf("Starting actionlint docker command: files=%d, timeout=%s", len(lockFiles), timeoutDuration)
 	cmd := exec.CommandContext(runCtx, "docker", buildActionlintDockerArgs(gitRoot, relPaths, options)...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	actionlintLog.Printf("Actionlint docker command finished: err=%v, stdout_bytes=%d, stderr_bytes=%d", err, stdout.Len(), stderr.Len())
 
 	return actionlintCommandResult{
 		stdout:          stdout.String(),
@@ -402,6 +406,7 @@ func actionlintShouldParseOutput(err error) bool {
 
 func actionlintContextError(result actionlintCommandResult, lockFiles []string) error {
 	if errors.Is(result.ctxErr, context.DeadlineExceeded) {
+		actionlintLog.Printf("Actionlint timed out after %s on %s", result.timeoutDuration, actionlintFileDescription(lockFiles))
 		if actionlintStats != nil {
 			actionlintStats.IntegrationErrors++
 		}
@@ -409,6 +414,7 @@ func actionlintContextError(result actionlintCommandResult, lockFiles []string) 
 			int(result.timeoutDuration.Minutes()), actionlintFileDescription(lockFiles))
 	}
 	if errors.Is(result.ctxErr, context.Canceled) {
+		actionlintLog.Print("Actionlint was canceled before completion")
 		return errors.New("actionlint was canceled before completion (for example by Ctrl+C or caller cancellation)")
 	}
 	return nil
