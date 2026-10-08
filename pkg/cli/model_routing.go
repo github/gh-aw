@@ -275,12 +275,9 @@ func applyAgentUsageToModelRouting(summary *ModelRoutingSummary, agents []AgentU
 }
 
 func tokenUsageEntriesForRun(runDir string) []TokenUsageEntry {
-	path := findTokenUsageFile(runDir)
-	if path == "" {
-		return nil
-	}
-	entries, _, err := scanTokenUsageEntries(path)
+	entries, err := readUnifiedTokenUsageEntries(runDir)
 	if err != nil {
+		tokenUsageSubagentLog.Printf("failed to read unified firewall token usage: %v", err)
 		return nil
 	}
 	return entries

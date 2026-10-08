@@ -102,6 +102,7 @@ type SubagentModelRequest struct {
 	RequestedModel  string   `json:"requested_model"`
 	ResolvedModel   string   `json:"resolved_model,omitempty"`
 	ServedModels    []string `json:"served_models,omitempty"`
+	ErrorCode       string   `json:"error_code,omitempty"`
 	InvocationCount int      `json:"invocation_count"`
 	CompletedCount  int      `json:"completed_count,omitempty"`
 	FailedCount     int      `json:"failed_count,omitempty"`
@@ -147,8 +148,9 @@ type AgentUsageBreakdown struct {
 }
 
 type agentRequestUsage struct {
-	Model     string
-	Timestamp time.Time
+	Model           string
+	Timestamp       time.Time
+	UsageIncomplete bool
 	TokenCoreMetrics
 }
 
@@ -203,7 +205,6 @@ const agentUsageJSONPath = "agent_usage.json"
 const modelMismatchReasonTokenUsageMissing = "TOKEN_USAGE_MISSING"
 const modelMismatchReasonModelNotObserved = "REQUESTED_MODEL_NOT_OBSERVED"
 const modelMismatchReasonSubagentFailed = "SUBAGENT_FAILED"
-const subagentStdioWarning = "partial or incorrect data: sub-agent model requests are inferred from agent-stdio.log; use token_usage.jsonl for reliable token consumption"
 const tokenSteeringEventName = "token_steering"
 const timeoutSteeringEventName = "timeout_steering"
 const awfTokenWarningPrefix = "[AWF TOKEN WARNING]"

@@ -1007,7 +1007,7 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.Contains(t, summary.ByModel, "unknown", "unknown model bucket should be present")
 	})
 
-	t.Run("records requested sub-agent models and mismatch when token logs do not show requested model", func(t *testing.T) {
+	t.Run("does not infer sub-agent models from agent stdio", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t, "analyze-subagent-model-mismatch")
 		logsDir := filepath.Join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs")
 		require.NoError(t, os.MkdirAll(logsDir, 0o755))
@@ -1023,17 +1023,10 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err)
 		require.NotNil(t, summary)
-		require.Len(t, summary.SubagentModelRequests, 3)
+		require.Empty(t, summary.SubagentModelRequests)
 		require.Empty(t, summary.SubagentModelActuals)
-		assert.Equal(t, 3, summary.MismatchCount)
-		require.Contains(t, summary.Warnings, subagentStdioWarning)
-
-		for _, req := range summary.SubagentModelRequests {
-			assert.Equal(t, "claude-haiku-4.5", req.RequestedModel)
-			assert.Equal(t, 1, req.InvocationCount)
-			assert.Empty(t, req.EffectiveModel)
-			assert.Equal(t, modelMismatchReasonModelNotObserved, req.ReasonCode)
-		}
+		assert.Zero(t, summary.MismatchCount)
+		require.Empty(t, summary.Warnings)
 	})
 
 	t.Run("records token-usage-missing reason when sub-agent model request is present but no model actuals exist", func(t *testing.T) {
@@ -1044,12 +1037,10 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err)
 		require.NotNil(t, summary)
-		require.Len(t, summary.SubagentModelRequests, 1)
+		require.Empty(t, summary.SubagentModelRequests)
 		assert.Empty(t, summary.SubagentModelActuals)
-		assert.Equal(t, 1, summary.MismatchCount)
-		assert.Equal(t, modelMismatchReasonTokenUsageMissing, summary.SubagentModelRequests[0].ReasonCode)
-		assert.Empty(t, summary.SubagentModelRequests[0].EffectiveModel)
-		require.Contains(t, summary.Warnings, subagentStdioWarning)
+		assert.Zero(t, summary.MismatchCount)
+		require.Empty(t, summary.Warnings)
 	})
 
 	t.Run("falls back to agent_usage.json in usage subdir when token_usage.jsonl is empty", func(t *testing.T) {
@@ -1091,12 +1082,9 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		summary, err := analyzeTokenUsage(tmpDir, false)
 		require.NoError(t, err)
 		require.NotNil(t, summary)
-		require.Len(t, summary.SubagentModelRequests, 1)
-		assert.Equal(t, "small", summary.SubagentModelRequests[0].RequestedModel)
-		assert.Equal(t, "gpt-5-mini", summary.SubagentModelRequests[0].EffectiveModel)
-		assert.Empty(t, summary.SubagentModelRequests[0].ReasonCode)
+		require.Empty(t, summary.SubagentModelRequests)
 		assert.Zero(t, summary.MismatchCount)
-		require.Contains(t, summary.Warnings, subagentStdioWarning)
+		require.Empty(t, summary.Warnings)
 	})
 }
 

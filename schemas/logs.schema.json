@@ -2145,6 +2145,9 @@
                             "type": "string"
                           }
                         },
+                        "error_code": {
+                          "type": "string"
+                        },
                         "invocation_count": {
                           "type": "integer"
                         },
@@ -2203,6 +2206,9 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "error_code": {
+                          "type": "string"
                         },
                         "invocation_count": {
                           "type": "integer"

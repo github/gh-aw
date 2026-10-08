@@ -311,7 +311,7 @@ func TestSessionParserCopilotWithoutSubagents(t *testing.T) {
 	require.Zero(t, summary.MismatchCount)
 }
 
-func TestSessionParserCopilotLegacySubagentFallback(t *testing.T) {
+func TestSessionParserDoesNotInferSubagentsFromStdio(t *testing.T) {
 	t.Parallel()
 	requireSessionTestNode(t)
 	for _, dispatch := range []string{"Research(opus)", "Research (model: opus)"} {
@@ -328,10 +328,8 @@ func TestSessionParserCopilotLegacySubagentFallback(t *testing.T) {
 			summary, err := analyzeTokenUsage(root, false)
 			require.NoError(t, err)
 			require.NotNil(t, summary)
-			require.Equal(t, []SubagentModelRequest{
-				{AgentName: "Research", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1},
-			}, summary.SubagentModelRequests)
-			require.Contains(t, summary.Warnings, subagentStdioWarning)
+			require.Empty(t, summary.SubagentModelRequests)
+			require.Empty(t, summary.Warnings)
 			require.Zero(t, summary.MismatchCount)
 		})
 	}

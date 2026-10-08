@@ -9,6 +9,11 @@ const { spawn } = require("node:child_process");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeProviderErrorMessage } = require("./pi_provider_error.cjs");
 
+function getErrorCode(error) {
+  if (!error || typeof error !== "object" || !("code" in error)) return "";
+  return typeof error.code === "string" ? error.code : "";
+}
+
 /** @param {any} agent @param {string} promptPath */
 function subagentArgs(agent, promptPath) {
   let inherited;
@@ -35,16 +40,18 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
   if (!Number.isFinite(minutes) || minutes <= 0) throw new Error("GH_AW_TIMEOUT_MINUTES must be positive");
   const invocationId = randomUUID();
   let resultEmitted = false;
-  const emitResult = (outcome, error = "") => {
+  const emitResult = (outcome, error = "", errorCode = "") => {
     if (resultEmitted) return;
     resultEmitted = true;
     process.stdout.write(
       JSON.stringify({
         type: "gh_aw_subagent_result",
+        timestamp: new Date().toISOString(),
         invocation_id: invocationId,
         agent: agent.name,
         outcome,
         ...(error ? { error: sanitizeProviderErrorMessage(error).slice(0, 300) } : {}),
+        ...(errorCode ? { error_code: errorCode } : {}),
       }) + "\n"
     );
   };
@@ -59,7 +66,9 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
       "The parent is responsible for finalizing the workflow and its required safe-output reporting. Do not emit noop safe outputs or workflow-completion reports for this child session. " +
       "Safe-output actions required to perform the delegated task remain permitted.";
     fs.writeFileSync(promptPath, system + agent.prompt + "\n\n" + delegationScope, { mode: 0o600 });
-    process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_dispatch", invocation_id: invocationId, agent: agent.name, requested_model: agent.declaredModel || agent.modelId, resolved_model: agent.modelId }) + "\n");
+    process.stdout.write(
+      JSON.stringify({ type: "gh_aw_subagent_dispatch", timestamp: new Date().toISOString(), invocation_id: invocationId, agent: agent.name, requested_model: agent.declaredModel || agent.modelId, resolved_model: agent.modelId }) + "\n"
+    );
     return await new Promise((resolve, reject) => {
       const child = launch(process.env.GH_AW_PI_COMMAND || "pi", subagentArgs(agent, promptPath), {
         cwd: ctx.cwd,
@@ -139,7 +148,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
         clearTimeout(timeout);
         clearTimeout(killTimer);
         signal?.removeEventListener("abort", abort);
-        emitResult("failed", getErrorMessage(error));
+        emitResult("failed", getErrorMessage(error), getErrorCode(error));
         reject(new Error(`Cannot launch Pi sub-agent "${agent.name}": ${getErrorMessage(error)}`, { cause: error }));
       });
       child.on("close", (code, terminationSignal) => {
@@ -164,7 +173,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
       if (signal?.aborted) abort();
     });
   } catch (error) {
-    emitResult("failed", getErrorMessage(error));
+    emitResult("failed", getErrorMessage(error), getErrorCode(error));
     throw new Error(`Pi sub-agent "${agent.name}" failed: ${getErrorMessage(error)}`, { cause: error });
   } finally {
     if (dir) {

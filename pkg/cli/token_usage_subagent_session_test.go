@@ -170,7 +170,7 @@ func TestSessionSubagentModels(t *testing.T) {
 		assert.Empty(t, requests[0].EffectiveModel)
 	})
 
-	t.Run("continues to canonical trace after malformed usage artifact", func(t *testing.T) {
+	t.Run("does not use legacy trace when usage artifact is present but malformed", func(t *testing.T) {
 		root := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(root, "usage", "aw_session.jsonl"), []byte("invalid\n"), 0o644))
@@ -178,8 +178,9 @@ func TestSessionSubagentModels(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(root, "agent-stdio.log"), []byte("● Fake (model: wrong)"), 0o644))
 		summary := &TokenUsageSummary{}
 		augmentSubagentModelAttribution(root, summary)
-		require.Equal(t, []SubagentModelRequest{{AgentName: "routing-research", RequestedModel: "opus", ResolvedModel: "opus", InvocationCount: 1, IncompleteCount: 1}}, summary.SubagentModelRequests)
-		assert.Empty(t, summary.Warnings, "a later valid source suppresses diagnostics from an earlier source")
+		assert.Empty(t, summary.SubagentModelRequests)
+		require.Len(t, summary.Warnings, 1)
+		assert.Contains(t, summary.Warnings[0], "failed to parse unified subagent information")
 	})
 
 	t.Run("does not add native and projected snapshots", func(t *testing.T) {
@@ -209,17 +210,15 @@ func TestSessionSubagentModels(t *testing.T) {
 		assert.Empty(t, requests)
 	})
 
-	t.Run("malformed unified session warns and falls back", func(t *testing.T) {
+	t.Run("malformed unified session warns without inferring rows from stdio", func(t *testing.T) {
 		root := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(root, "usage", "aw_session.jsonl"), []byte(subagentSessionHeader+"invalid\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(root, "agent-stdio.log"), []byte("● Check repository status (shell)\n● Read OpenAPI spec (head)\n● Research (model: opus) Research routing\n[INFO] container(s)\nclass RoutingProfile(StrictModel)\nlen(d)\n"), 0o644))
 		summary := &TokenUsageSummary{ByModel: map[string]*ModelTokenUsage{"opus": {Requests: 1}}}
 		augmentSubagentModelAttribution(root, summary)
-		require.Len(t, summary.SubagentModelRequests, 1)
-		assert.Equal(t, "Research", summary.SubagentModelRequests[0].AgentName)
-		assert.Equal(t, "opus", summary.SubagentModelRequests[0].RequestedModel)
-		require.Len(t, summary.Warnings, 2)
+		assert.Empty(t, summary.SubagentModelRequests)
+		require.Len(t, summary.Warnings, 1)
 		assert.Contains(t, summary.Warnings[0], "failed to parse unified subagent information")
 	})
 
@@ -250,6 +249,7 @@ func TestSessionSubagentFailuresAreNotReportedAsServed(t *testing.T) {
 	require.Equal(t, "file-summarizer", failed.AgentName)
 	require.Equal(t, "SUBAGENT_FAILED", failed.ReasonCode)
 	require.Equal(t, 1, failed.FailedCount)
+	require.Empty(t, failed.ErrorCode)
 	require.Empty(t, failed.EffectiveModel)
 	require.Equal(t, "HTTP 400 Cannot translate request", failed.Error)
 	completed := requests[1]
@@ -436,4 +436,62 @@ func TestSubagentGroupEffectiveModelIsIndependentOfIterationOrder(t *testing.T) 
 		require.Equal(t, "gpt-5.4-mini", requests[0].EffectiveModel)
 		require.Empty(t, requests[0].ReasonCode)
 	}
+}
+
+func TestCopilotUnifiedFixtureRetainsFailedCrossFamilySubagent(t *testing.T) {
+	fixture := filepath.Join("testdata", "subagent_attribution", "copilot-cross-family")
+	summary := &TokenUsageSummary{}
+	augmentSubagentModelAttribution(fixture, summary)
+
+	require.Len(t, summary.SubagentModelRequests, 1)
+	failed := summary.SubagentModelRequests[0]
+	require.Equal(t, "File-summarizer", failed.AgentName)
+	require.Equal(t, modelMismatchReasonSubagentFailed, failed.ReasonCode)
+	require.Equal(t, "SUBAGENT_MODEL_UNAVAILABLE", failed.ErrorCode)
+	require.Equal(t, "The requested model has no available endpoint.", failed.Error)
+	require.Equal(t, 1, failed.FailedCount)
+	require.Empty(t, failed.EffectiveModel)
+	require.Len(t, summary.AgentUsage, 2)
+	require.Equal(t, "main", summary.AgentUsage[0].AgentType)
+	require.Equal(t, 1, summary.AgentUsage[0].Requests)
+	require.InDelta(t, 0.25, summary.AgentUsage[0].AIC, 0.000001)
+	require.Equal(t, 1, summary.AgentUsage[1].FailedCount)
+	require.Zero(t, summary.AgentUsage[1].Requests)
+	require.Zero(t, summary.AgentUsage[1].AIC)
+}
+
+func TestPiUnifiedFixtureAttributesInterleavedRequestsFromFirewallEvents(t *testing.T) {
+	fixture := filepath.Join("testdata", "subagent_attribution", "pi-interleaved")
+	_, actuals, agents, found, err := readSessionSubagentModelsDetailed(fixture)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, actuals, 1)
+	require.Equal(t, 4, actuals[0].Requests)
+
+	entries, err := readUnifiedTokenUsageEntries(fixture)
+	require.NoError(t, err)
+	require.Len(t, entries, 5)
+	require.Equal(t, "/v1/messages", entries[0].Path)
+	require.Equal(t, "subagent", entries[0].Purpose)
+	require.Equal(t, "z-1", entries[0].RequestID)
+
+	resolver := newModelIdentityResolver("")
+	agents = resolveAgentUsageModels(agents, resolver, tokenUsageEntryModels(entries)...)
+	summary := &TokenUsageSummary{AgentUsage: agents, AICFound: true, TotalAIC: 2.35}
+	matchPiAgentUsageCredits(summary, entries, resolver)
+	reconcileAgentUsageCredits(summary, entries)
+
+	creditsByAgent := make(map[string]float64)
+	requestsByAgent := make(map[string]int)
+	for _, agent := range summary.AgentUsage {
+		creditsByAgent[agent.AgentName] = agent.AIC
+		requestsByAgent[agent.AgentName] = agent.Requests
+	}
+	require.InDelta(t, 0.9, creditsByAgent["a-reader"], 0.000001)
+	require.InDelta(t, 1.2, creditsByAgent["z-reader"], 0.000001)
+	require.InDelta(t, 0.25, creditsByAgent["main"], 0.000001)
+	require.Equal(t, 2, requestsByAgent["a-reader"])
+	require.Equal(t, 2, requestsByAgent["z-reader"])
+	require.Equal(t, 1, requestsByAgent["main"])
+	require.Empty(t, summary.Warnings)
 }

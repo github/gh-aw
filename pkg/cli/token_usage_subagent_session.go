@@ -41,8 +41,14 @@ type sessionSubagentData struct {
 	RequestedModel   string                                `json:"requestedModel"`
 	ResolvedModel    string                                `json:"resolvedModel"`
 	Outcome          string                                `json:"outcome"`
+	ErrorCode        string                                `json:"errorCode"`
 	ErrorMessage     string                                `json:"errorMessage"`
 	ReasoningEffort  string                                `json:"reasoningEffort"`
+	RequestID        string                                `json:"requestId"`
+	InputTokens      *int                                  `json:"inputTokens"`
+	OutputTokens     *int                                  `json:"outputTokens"`
+	CacheReadTokens  *int                                  `json:"cacheReadTokens"`
+	CacheWriteTokens *int                                  `json:"cacheWriteTokens"`
 	Error            json.RawMessage                       `json:"error"`
 	Agent            string                                `json:"agent"`
 	ToolName         string                                `json:"toolName"`
@@ -98,27 +104,136 @@ func readSessionSubagentModels(runDir string) ([]SubagentModelRequest, []Subagen
 }
 
 func readSessionSubagentModelsDetailed(runDir string) ([]SubagentModelRequest, []SubagentModelActual, []AgentUsageBreakdown, bool, error) {
-	var diagnostics error
-	for _, relative := range []string{"usage/aw_session.jsonl", "aw_session.jsonl", "agent-session.jsonl"} {
+	for _, relative := range []string{"usage/aw_session.jsonl", "aw_session.jsonl"} {
 		path := filepath.Join(runDir, filepath.FromSlash(relative))
+		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return nil, nil, nil, false, fmt.Errorf("%s: %w", relative, err)
+		}
 		if err := validateSubagentSessionSource(path); err != nil {
-			diagnostics = errors.Join(diagnostics, err)
-			continue
+			return nil, nil, nil, false, fmt.Errorf("%s: %w", relative, err)
 		}
-		requests, actuals, agentUsage, found, parseErr := parseSessionSubagentFileDetailed(path, relative != "agent-session.jsonl")
-		if errors.Is(parseErr, os.ErrNotExist) {
-			continue
-		}
+		requests, actuals, agentUsage, found, parseErr := parseSessionSubagentFileDetailed(path, true)
 		if parseErr != nil {
 			tokenUsageSubagentLog.Printf("failed to parse %s: %v", relative, parseErr)
-			diagnostics = errors.Join(diagnostics, fmt.Errorf("%s: %w", relative, parseErr))
-			continue
+			return nil, nil, nil, false, fmt.Errorf("%s: %w", relative, parseErr)
 		}
-		if found {
-			return requests, actuals, agentUsage, true, nil
+		return requests, actuals, agentUsage, found, nil
+	}
+
+	path := filepath.Join(runDir, "agent-session.jsonl")
+	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+		return nil, nil, nil, false, nil
+	} else if err != nil {
+		return nil, nil, nil, false, fmt.Errorf("agent-session.jsonl: %w", err)
+	}
+	if err := validateSubagentSessionSource(path); err != nil {
+		return nil, nil, nil, false, fmt.Errorf("agent-session.jsonl: %w", err)
+	}
+	requests, actuals, agentUsage, found, err := parseSessionSubagentFileDetailed(path, false)
+	if err != nil {
+		tokenUsageSubagentLog.Printf("failed to parse agent-session.jsonl: %v", err)
+		return nil, nil, nil, false, fmt.Errorf("agent-session.jsonl: %w", err)
+	}
+	if found {
+		return requests, actuals, agentUsage, true, nil
+	}
+	return nil, nil, nil, false, nil
+}
+
+func readUnifiedTokenUsageEntries(runDir string) ([]TokenUsageEntry, error) {
+	path := ""
+	for _, relative := range []string{"usage/aw_session.jsonl", "aw_session.jsonl"} {
+		candidate := filepath.Join(runDir, filepath.FromSlash(relative))
+		if _, err := os.Lstat(candidate); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("%s: %w", relative, err)
+		}
+		if err := validateSubagentSessionSource(candidate); err != nil {
+			return nil, fmt.Errorf("%s: %w", relative, err)
+		}
+		path = candidate
+		break
+	}
+	if path == "" {
+		return nil, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	entries := make([]TokenUsageEntry, 0)
+	reader := bufio.NewReader(file)
+	for lineNumber := 1; ; lineNumber++ {
+		line, oversized, readErr := readUnifiedSessionLine(reader)
+		if oversized {
+			return nil, fmt.Errorf("oversized session record on line %d", lineNumber)
+		}
+		if line = bytes.TrimSpace(line); len(line) > 0 {
+			var event sessionSubagentEvent
+			if err := json.Unmarshal(line, &event); err != nil {
+				return nil, fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
+			}
+			if event.Type == "firewall.token_usage" && event.Provenance.Component == "firewall" && event.Provenance.Phase == "agent" {
+				entry, err := unifiedTokenUsageEntry(event)
+				if err != nil {
+					return nil, fmt.Errorf("invalid firewall.token_usage on line %d: %w", lineNumber, err)
+				}
+				entries = append(entries, entry)
+			}
+		}
+		if readErr != nil {
+			if !errors.Is(readErr, io.EOF) {
+				return nil, fmt.Errorf("failed to read session: %w", readErr)
+			}
+			break
 		}
 	}
-	return nil, nil, nil, false, diagnostics
+	return entries, nil
+}
+
+func unifiedTokenUsageEntry(event sessionSubagentEvent) (TokenUsageEntry, error) {
+	var data struct {
+		Provider   string          `json:"provider"`
+		Model      string          `json:"model"`
+		Purpose    string          `json:"purpose"`
+		Path       string          `json:"path"`
+		RequestID  string          `json:"requestId"`
+		AIC        json.RawMessage `json:"aic"`
+		TotalAIC   json.RawMessage `json:"totalAic"`
+		DurationMs int             `json:"durationMs"`
+		Usage      struct {
+			InputTokens              int             `json:"inputTokens"`
+			OutputTokens             int             `json:"outputTokens"`
+			CacheReadInputTokens     int             `json:"cacheReadInputTokens"`
+			CacheCreationInputTokens int             `json:"cacheCreationInputTokens"`
+			ReasoningOutputTokens    int             `json:"reasoningOutputTokens"`
+			InputTokensIncludeCache  json.RawMessage `json:"inputTokensIncludeCache"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		return TokenUsageEntry{}, err
+	}
+	timestamp, err := subagentSessionStart(event)
+	if err != nil {
+		return TokenUsageEntry{}, err
+	}
+	entry := TokenUsageEntry{
+		Provider: data.Provider, Model: data.Model, Purpose: data.Purpose, Path: data.Path,
+		RequestID: data.RequestID, Timestamp: timestamp.Format(time.RFC3339Nano), DurationMs: data.DurationMs,
+		TokenCoreMetrics: TokenCoreMetrics{
+			InputTokens: data.Usage.InputTokens, OutputTokens: data.Usage.OutputTokens,
+			CacheReadTokens: data.Usage.CacheReadInputTokens, CacheWriteTokens: data.Usage.CacheCreationInputTokens,
+			ReasoningTokens: data.Usage.ReasoningOutputTokens,
+		},
+		AICreditsThisResponse: data.AIC, AICreditsTotal: data.TotalAIC,
+		InputTokensIncludeCache: data.Usage.InputTokensIncludeCache,
+	}
+	return entry, nil
 }
 
 func validateSubagentSessionSource(path string) error {
@@ -290,7 +405,7 @@ func subagentSessionStart(event sessionSubagentEvent) (time.Time, error) {
 
 func (models *subagentSessionModels) observe(event sessionSubagentEvent) error {
 	switch event.Type {
-	case "session.start", "session.init", "subagent.started", "subagent.configured", "subagent.completed", "subagent.failed", "session.model_change", "session.result", "session.shutdown", "pi.subagent_dispatch", "pi.subagent_event", "pi.subagent_result", "tool.execution_start", "tool.execution_complete":
+	case "session.start", "session.init", "subagent.started", "subagent.configured", "subagent.request", "subagent.completed", "subagent.failed", "session.model_change", "session.result", "session.shutdown", "pi.subagent_dispatch", "pi.subagent_event", "pi.subagent_result", "tool.execution_start", "tool.execution_complete":
 	default:
 		return nil
 	}
@@ -328,9 +443,116 @@ func (models *subagentSessionModels) observe(event sessionSubagentEvent) error {
 		return models.observePiToolEvent(event, data)
 	}
 	if strings.HasPrefix(event.Type, "subagent.") || (event.Type == "session.model_change" && event.AgentID != "") {
+		if event.Type == "subagent.request" {
+			return models.observeSubagentRequest(event, data)
+		}
 		return models.observeLifecycle(event, data)
 	}
 	return nil
+}
+
+func (models *subagentSessionModels) observeSubagentRequest(event sessionSubagentEvent, data sessionSubagentData) error {
+	identity := firstNonEmptyModel(event.AgentID, data.InvocationID)
+	if identity == "" {
+		return errors.New("missing sub-agent invocation identity")
+	}
+	model := data.Model
+	if model == "" {
+		return nil
+	}
+	name := firstNonEmptyModel(data.AgentName, data.AgentDisplayName, "unknown")
+	row := models.agents[identity]
+	if row == nil {
+		row = &SubagentModelRequest{AgentName: name, InvocationCount: 1, IncompleteCount: 1}
+		models.agents[identity] = row
+	}
+	if row.AgentName == "" {
+		row.AgentName = name
+	}
+	models.found = true
+	usage, incomplete, err := subagentRequestTokenMetrics(data)
+	if err != nil {
+		return err
+	}
+	timestamp, err := subagentSessionStart(event)
+	if err != nil {
+		return err
+	}
+	models.recordSubagentRequest(identity, row.AgentName, model, usage, incomplete, timestamp)
+	return nil
+}
+
+func subagentRequestTokenMetrics(data sessionSubagentData) (TokenCoreMetrics, bool, error) {
+	usage := TokenCoreMetrics{}
+	incomplete := false
+	for _, metric := range []*int{data.InputTokens, data.OutputTokens, data.CacheReadTokens, data.CacheWriteTokens} {
+		if metric == nil {
+			incomplete = true
+			continue
+		}
+		if *metric < 0 {
+			return TokenCoreMetrics{}, false, errors.New("negative sub-agent token count")
+		}
+	}
+	if data.InputTokens != nil {
+		usage.InputTokens = *data.InputTokens
+	}
+	if data.OutputTokens != nil {
+		usage.OutputTokens = *data.OutputTokens
+	}
+	if data.CacheReadTokens != nil {
+		usage.CacheReadTokens = *data.CacheReadTokens
+	}
+	if data.CacheWriteTokens != nil {
+		usage.CacheWriteTokens = *data.CacheWriteTokens
+	}
+	return usage, incomplete, nil
+}
+
+func (models *subagentSessionModels) recordSubagentRequest(
+	identity, agentName, model string,
+	usage TokenCoreMetrics,
+	incomplete bool,
+	timestamp time.Time,
+) {
+	byModel := models.actualModels[identity]
+	if byModel == nil {
+		byModel = make(map[string]SubagentModelActual)
+		models.actualModels[identity] = byModel
+	}
+	actual := byModel[model]
+	actual.Model = model
+	actual.Requests++
+	actual.InputTokens += usage.InputTokens
+	actual.OutputTokens += usage.OutputTokens
+	actual.CacheReadTokens += usage.CacheReadTokens
+	actual.CacheWriteTokens += usage.CacheWriteTokens
+	byModel[model] = actual
+	if models.actualCounts[identity] == nil {
+		models.actualCounts[identity] = make(map[string]int)
+	}
+	models.actualCounts[identity][model] = actual.Requests
+
+	agentUsage := models.agentUsage[identity]
+	if agentUsage == nil {
+		agentUsage = &AgentUsageBreakdown{AgentName: agentName, AgentType: "subagent", InstanceCount: 1, IncompleteCount: 1}
+		models.agentUsage[identity] = agentUsage
+	}
+	agentUsage.AgentName = agentName
+	agentUsage.AgentType = "subagent"
+	agentUsage.SourceEngine = models.sourceEngine
+	agentUsage.InstanceCount = max(agentUsage.InstanceCount, 1)
+	agentUsage.Requests++
+	agentUsage.InputTokens += usage.InputTokens
+	agentUsage.OutputTokens += usage.OutputTokens
+	agentUsage.CacheReadTokens += usage.CacheReadTokens
+	agentUsage.CacheWriteTokens += usage.CacheWriteTokens
+	agentUsage.Models = appendAgentModelUsage(agentUsage.Models, AgentModelUsage{
+		Model: model, Requests: 1, TokenCoreMetrics: usage,
+	})
+	agentUsage.requestUsages = append(agentUsage.requestUsages, agentRequestUsage{
+		Model: model, Timestamp: timestamp, UsageIncomplete: incomplete, TokenCoreMetrics: usage,
+	})
 }
 
 func (models *subagentSessionModels) observeMetrics(data sessionSubagentData) error {
@@ -464,8 +686,10 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 	}
 	agentUsage.AgentName = row.AgentName
 	agentUsage.AgentType = "subagent"
+	agentUsage.SourceEngine = models.sourceEngine
 	if event.Type == "subagent.started" {
 		row.RequestedModel = data.Model
+		row.ResolvedModel = data.ResolvedModel
 		row.IncompleteCount = 1
 		row.Effort = data.ReasoningEffort
 		agentUsage := models.agentUsage[identity]
@@ -476,11 +700,13 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 		agentUsage.InstanceCount = 1
 		agentUsage.IncompleteCount = max(agentUsage.IncompleteCount, 1)
 		agentUsage.RequestedModels = appendUnique(agentUsage.RequestedModels, data.Model)
+		agentUsage.ResolvedModels = appendUnique(agentUsage.ResolvedModels, data.ResolvedModel)
 		agentUsage.Effort = data.ReasoningEffort
 	}
 	if event.Type == "subagent.configured" {
 		if data.Model != "" {
 			row.ResolvedModel = data.Model
+			agentUsage.ResolvedModels = appendUnique(agentUsage.ResolvedModels, data.Model)
 		}
 		if data.ReasoningEffort != "" {
 			row.Effort = data.ReasoningEffort
@@ -506,6 +732,7 @@ func observeLifecycleOutcome(row *SubagentModelRequest, agentUsage *AgentUsageBr
 		row.FailedCount++
 		row.IncompleteCount = max(0, row.IncompleteCount-1)
 		row.Error = sanitizeSubagentError(firstNonEmptyModel(subagentErrorMessage(data.Error), data.ErrorMessage))
+		row.ErrorCode = data.ErrorCode
 		agentUsage.FailedCount++
 		agentUsage.IncompleteCount = max(0, agentUsage.IncompleteCount-1)
 	}
@@ -633,9 +860,15 @@ func (models *subagentSessionModels) observePiResult(event sessionSubagentEvent,
 		models.agents[identity] = row
 	}
 	row.IncompleteCount = max(0, row.IncompleteCount-1)
-	if data.Outcome == "failed" || len(data.Error) > 0 || data.ErrorMessage != "" {
+	if data.Outcome == "failed" || strings.HasPrefix(data.Outcome, "SUBAGENT_") || len(data.Error) > 0 || data.ErrorMessage != "" {
 		row.FailedCount = 1
 		row.Error = sanitizeSubagentError(firstNonEmptyModel(subagentErrorMessage(data.Error), data.ErrorMessage))
+		row.ErrorCode = firstNonEmptyModel(data.ErrorCode, func() string {
+			if strings.HasPrefix(data.Outcome, "SUBAGENT_") {
+				return data.Outcome
+			}
+			return ""
+		}())
 	} else {
 		row.CompletedCount = 1
 	}
@@ -800,6 +1033,9 @@ func addSubagentRequestGroup(grouped map[subagentModelKey]SubagentModelRequest, 
 		combined.Effort = combineSubagentEffort(combined.Effort, current.Effort)
 		if combined.Error == "" && current.Error != "" {
 			combined.Error = current.Error
+		}
+		if combined.ErrorCode == "" {
+			combined.ErrorCode = current.ErrorCode
 		}
 	}
 	grouped[key] = combined

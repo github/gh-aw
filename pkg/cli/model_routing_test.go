@@ -114,8 +114,8 @@ func TestAnalyzeModelRoutingFromCompactUsageArtifact(t *testing.T) {
 	), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(usageDir, "token_usage.jsonl"), []byte(
-		"{\"request_id\":\"usage-request\",\"ai_credits_this_response\":0.4}\n",
+	if err := os.WriteFile(filepath.Join(runDir, "usage", "aw_session.jsonl"), []byte(
+		"{\"type\":\"firewall.token_usage\",\"data\":{\"requestId\":\"usage-request\",\"aic\":0.4,\"usage\":{\"inputTokens\":1,\"outputTokens\":2}},\"timestamp\":\"2026-10-08T10:00:00Z\",\"provenance\":{\"component\":\"firewall\",\"phase\":\"agent\"}}\n",
 	), 0600); err != nil {
 		t.Fatal(err)
 	}

@@ -470,34 +470,6 @@ func TestCombineSubagentEffortKeepsMixedState(t *testing.T) {
 	require.Equal(t, "mixed", combineSubagentEffort("mixed", "low"))
 }
 
-func TestSubagentDispatchLine(t *testing.T) {
-	t.Parallel()
-	for _, test := range []struct {
-		name, line string
-		want       subagentDispatchKey
-		count      int
-	}{
-		{"compact dispatch", "● Agent-alpha(claude-haiku-4.5) Get model name", subagentDispatchKey{agent: "Agent-alpha", model: "claude-haiku-4.5"}, 1},
-		{"labelled dispatch", "● Research worker (model: opus) Research routing", subagentDispatchKey{agent: "Research worker", model: "opus"}, 1},
-		{"compact alias preserves agent case", "● Quick-Checker(small) Inspect the project", subagentDispatchKey{agent: "Quick-Checker", model: "small"}, 1},
-		{"shell tool call", "● Check repository status (shell)", subagentDispatchKey{}, 0},
-		{"read tool call", "● Read OpenAPI spec (read)", subagentDispatchKey{}, 0},
-		{"other tool label", "● Read OpenAPI spec (head)", subagentDispatchKey{}, 0},
-		{"ordinary prose", "class RoutingProfile(StrictModel)", subagentDispatchKey{}, 0},
-		{"quoted dispatch", "Example: ● Research (model: opus)", subagentDispatchKey{}, 0},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			counts := make(map[subagentDispatchKey]int)
-			countSubagentDispatchLine(counts, test.line)
-			require.Len(t, counts, test.count)
-			if test.count != 0 {
-				require.Equal(t, 1, counts[test.want])
-			}
-		})
-	}
-}
-
 func TestDeclaredSubagentModelsExcludeDetectionUsage(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(`{"sub_agent_models":[{"name":"reader","model":"claude-haiku-4.5"}]}`), 0600))

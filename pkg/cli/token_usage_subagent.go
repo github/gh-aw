@@ -1,13 +1,8 @@
 package cli
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math"
-	"os"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -15,14 +10,6 @@ import (
 )
 
 var tokenUsageSubagentLog = logger.New("cli:token_usage_subagent")
-
-var subagentDispatchPattern = regexp.MustCompile(`^●\s+([A-Za-z0-9][A-Za-z0-9._ -]*?)\s*\((model:\s*)?([A-Za-z0-9][A-Za-z0-9._:-]*)\)`)
-
-type subagentDispatchKey struct {
-	agent    string
-	model    string
-	resolved string
-}
 
 func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) {
 	if summary == nil {
@@ -36,7 +23,11 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	if found {
 		resolver := newModelIdentityResolver(runDir)
 		modelCandidates := tokenUsageModelCandidates(summary)
-		entries := tokenUsageEntriesForRun(runDir)
+		entries, usageErr := readUnifiedTokenUsageEntries(runDir)
+		if usageErr != nil {
+			addTokenUsageWarning(summary, "failed to read unified firewall token usage: "+usageErr.Error())
+			tokenUsageSubagentLog.Printf("failed to read unified firewall token usage: %v", usageErr)
+		}
 		summary.AgentUsage = resolveAgentUsageModels(agentUsage, resolver, modelCandidates...)
 		agentActuals := subagentActualsFromAgentUsage(summary.AgentUsage)
 		if len(agentActuals) == 0 {
@@ -52,12 +43,7 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	}
 
 	augmentDeclaredSubagentModels(runDir, summary)
-	requests = extractSubagentModelRequests(runDir)
-	if len(requests) == 0 {
-		tokenUsageSubagentLog.Print("no subagent model dispatch requests found, skipping attribution")
-		return
-	}
-	augmentHeuristicSubagentModelAttribution(requests, summary, newModelIdentityResolver(runDir))
+	tokenUsageSubagentLog.Print("no structured subagent information found, skipping attribution")
 }
 
 func subagentActualsFromAgentUsage(agents []AgentUsageBreakdown) []SubagentModelActual {
@@ -77,97 +63,36 @@ func subagentActualsFromAgentUsage(agents []AgentUsageBreakdown) []SubagentModel
 	return actuals
 }
 
-func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, summary *TokenUsageSummary, resolver *modelIdentityResolver) {
-	addTokenUsageWarning(summary, subagentStdioWarning)
-
-	allActuals, _ := collectSubagentModelActuals(summary)
-	actuals := allActuals
-	actuals = filterSubagentActualModels(actuals, requests, resolver)
-	actuals = resolveSubagentActualModels(actuals, resolver)
-	summary.SubagentModelActuals = actuals
-	observedModels := make(map[string]string, len(actuals))
-	for _, actual := range actuals {
-		if actual.Requests > 0 {
-			observedModels[actual.Model] = actual.Provider
-		}
-	}
-
-	requestRows := make([]SubagentModelRequest, 0, len(requests))
-	mismatchCount := 0
-	for _, row := range requests {
-		requested := row.RequestedModel
-		if row.ResolvedModel != "" {
-			requested = row.ResolvedModel
-		}
-		var observedNames []string
-		for model := range observedModels {
-			observedNames = append(observedNames, model)
-		}
-		resolved := resolver.resolve(requested, "", observedNames)
-		if _, ok := observedModels[resolved]; ok {
-			row.ResolvedModel = resolved
-			row.EffectiveModel = resolved
-			for _, actual := range actuals {
-				if resolver.matches(requested, actual.Model, actual.Provider) {
-					row.ServedModels = appendUnique(row.ServedModels, actual.Model)
-					for _, served := range actual.ServedModels {
-						row.ServedModels = appendUnique(row.ServedModels, served)
-					}
-				}
-			}
-		} else {
-			if len(allActuals) == 0 {
-				row.ReasonCode = modelMismatchReasonTokenUsageMissing
-			} else {
-				row.ReasonCode = modelMismatchReasonModelNotObserved
-			}
-			mismatchCount += row.InvocationCount
-		}
-		requestRows = append(requestRows, row)
-	}
-	summary.SubagentModelRequests = requestRows
-	summary.MismatchCount = mismatchCount
-	tokenUsageSubagentLog.Printf("attributed %d subagent request(s), %d mismatch(es)", len(requestRows), mismatchCount)
-}
-
-func filterSubagentActualModels(actuals []SubagentModelActual, requests []SubagentModelRequest, resolver *modelIdentityResolver) []SubagentModelActual {
-	filtered := make([]SubagentModelActual, 0, len(actuals))
-	for _, actual := range actuals {
-		for _, request := range requests {
-			model := firstNonEmptyModel(request.ResolvedModel, request.RequestedModel)
-			if resolver.matches(model, actual.Model, actual.Provider) {
-				filtered = append(filtered, actual)
-				break
-			}
-		}
-	}
-	return filtered
-}
-
 func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []SubagentModelActual, resolver *modelIdentityResolver, candidates ...string) []SubagentModelRequest {
 	for i := range requests {
 		row := &requests[i]
 		localObserved := make([]string, 0)
+		localServed := make([]string, 0)
 		for _, actual := range actuals {
 			if actual.agentName != "" && !strings.EqualFold(actual.agentName, row.AgentName) {
 				continue
 			}
 			localObserved = append(localObserved, actual.Model)
 			localObserved = append(localObserved, actual.ServedModels...)
+			if actual.Requests > 0 {
+				localServed = append(localServed, actual.Model)
+				localServed = append(localServed, actual.ServedModels...)
+			}
 		}
 		slices.Sort(localObserved)
+		slices.Sort(localServed)
 		requested := firstNonEmptyModel(row.ResolvedModel, row.RequestedModel)
 		row.ResolvedModel = resolver.resolve(requested, "", localObserved)
 		if row.EffectiveModel != "" {
 			row.EffectiveModel = resolver.resolve(row.EffectiveModel, "", localObserved)
-			for _, candidate := range localObserved {
+			for _, candidate := range localServed {
 				if !isModelIdentityAlias(resolver, candidate) && resolver.matches(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), candidate, "") {
 					row.ServedModels = appendUnique(row.ServedModels, candidate)
 				}
 			}
 		} else {
-			row.EffectiveModel = firstMatchingObservedModel(requested, localObserved, resolver)
-			for _, candidate := range localObserved {
+			row.EffectiveModel = firstMatchingObservedModel(requested, localServed, resolver)
+			for _, candidate := range localServed {
 				if !isModelIdentityAlias(resolver, candidate) && resolver.matches(requested, candidate, "") {
 					row.ServedModels = appendUnique(row.ServedModels, candidate)
 				}
@@ -472,6 +397,9 @@ func matchPiSubagentRequests(summary *TokenUsageSummary, entries []TokenUsageEnt
 }
 
 func matchingProxyUsageEntry(entries []TokenUsageEntry, used map[int]bool, request agentRequestUsage, resolver *modelIdentityResolver) (int, TokenUsageEntry, bool) {
+	if request.UsageIncomplete {
+		return -1, TokenUsageEntry{}, false
+	}
 	for index, entry := range entries {
 		if used[index] || entry.Purpose == "routing_classification" || entry.Model == "" {
 			continue
@@ -587,133 +515,4 @@ func addTokenUsageWarning(summary *TokenUsageSummary, warning string) {
 type subagentModelKey struct {
 	agent string
 	model string
-}
-
-func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
-	agentStdioPath := findAgentStdioFile(runDir)
-	if agentStdioPath == "" {
-		tokenUsageSubagentLog.Printf("no agent stdio file found under %s", runDir)
-		return nil
-	}
-
-	file, err := os.Open(agentStdioPath)
-	if err != nil {
-		tokenUsageSubagentLog.Printf("failed to open agent stdio file %s: %v", agentStdioPath, err)
-		return nil
-	}
-	defer file.Close()
-
-	counts := make(map[subagentDispatchKey]int)
-
-	reader := bufio.NewReader(file)
-	for {
-		line, readErr := reader.ReadString('\n')
-		line = strings.TrimSpace(line)
-		if line != "" {
-			countSubagentDispatchLine(counts, line)
-		}
-
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			tokenUsageSubagentLog.Printf("failed to read agent stdio file %s: %v", agentStdioPath, readErr)
-			return nil
-		}
-	}
-
-	return subagentModelRequestRows(counts)
-}
-
-func subagentModelRequestRows(counts map[subagentDispatchKey]int) []SubagentModelRequest {
-	rows := make([]SubagentModelRequest, 0, len(counts))
-	for k, n := range counts {
-		rows = append(rows, SubagentModelRequest{
-			AgentName:       k.agent,
-			RequestedModel:  k.model,
-			ResolvedModel:   k.resolved,
-			InvocationCount: n,
-		})
-	}
-	slices.SortStableFunc(rows, func(a, b SubagentModelRequest) int {
-		if a.AgentName != b.AgentName {
-			if a.AgentName < b.AgentName {
-				return -1
-			}
-			return 1
-		}
-		switch {
-		case a.RequestedModel < b.RequestedModel:
-			return -1
-		case a.RequestedModel > b.RequestedModel:
-			return 1
-		default:
-			return strings.Compare(a.ResolvedModel, b.ResolvedModel)
-		}
-	})
-	return rows
-}
-
-func collectSubagentModelActuals(summary *TokenUsageSummary) ([]SubagentModelActual, map[string]string) {
-	actuals := make([]SubagentModelActual, 0, len(summary.ByModel))
-	observedModels := make(map[string]string, len(summary.ByModel))
-	for model, usage := range subagentObservedModels(summary) {
-		if usage == nil || model == "" || usage.Requests == 0 {
-			continue
-		}
-		actuals = append(actuals, SubagentModelActual{
-			Model: model, Provider: usage.Provider, Requests: usage.Requests,
-			TokenCoreMetrics: usage.TokenCoreMetrics, AIC: usage.AIC,
-			TotalDurationMs: usage.DurationMs,
-		})
-		observedModels[model] = usage.Provider
-	}
-	sortSubagentModelActuals(actuals)
-	return actuals, observedModels
-}
-
-func countSubagentDispatchLine(counts map[subagentDispatchKey]int, line string) {
-	var dispatch struct {
-		Type      string `json:"type"`
-		Agent     string `json:"agent"`
-		Requested string `json:"requested_model"`
-		Resolved  string `json:"resolved_model"`
-	}
-	if json.Unmarshal([]byte(line), &dispatch) == nil && dispatch.Type == "gh_aw_subagent_dispatch" {
-		if dispatch.Agent != "" && dispatch.Requested != "" {
-			counts[subagentDispatchKey{agent: dispatch.Agent, model: dispatch.Requested, resolved: dispatch.Resolved}]++
-		}
-		return
-	}
-	match := subagentDispatchPattern.FindStringSubmatch(line)
-	if len(match) < 4 {
-		return
-	}
-	agentName, modelLabel, modelName := "", "", ""
-	for index, value := range match {
-		switch index {
-		case 1:
-			agentName = strings.TrimSpace(value)
-		case 2:
-			modelLabel = value
-		case 3:
-			modelName = strings.TrimSpace(value)
-		}
-	}
-	requestedModel := ""
-	if modelLabel != "" || isLegacyModelName(modelName) {
-		requestedModel = modelName
-	}
-	if agentName != "" && requestedModel != "" {
-		counts[subagentDispatchKey{agent: agentName, model: requestedModel}]++
-	}
-}
-
-func isLegacyModelName(model string) bool {
-	switch strings.ToLower(model) {
-	case "apply_patch", "bash", "browser", "cat", "command", "edit", "exec", "fetch", "find", "glob", "grep", "head", "http", "list", "mcp", "memory", "open", "patch", "read", "run", "search", "shell", "task", "terminal", "tool", "url", "view", "write":
-		return false
-	default:
-		return true
-	}
 }
