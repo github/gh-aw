@@ -79,6 +79,9 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	if behaviorEngine, ok := agenticEngine.(*BehaviorDefinedEngine); ok && model == "" && parser.BuiltinVirtualFileExists(builtinEnginePath(agenticEngine.GetID())) {
 		model = behaviorEngine.definition.Models.Default
 	}
+	if _, ok := agenticEngine.(*AgyEngine); ok && model == "" {
+		model = constants.AgyDefaultModel
+	}
 	if err := c.runPostEngineValidations(result.Frontmatter, engineSetting, engineConfig, networkPermissions, sandboxConfig, agenticEngine, importsResult); err != nil {
 		return nil, err
 	}
@@ -644,6 +647,9 @@ func (c *Compiler) resolveEngineRuntimeConfig(engineSetting string, engineConfig
 		if err := validateAgyEngineConfig(engineConfig); err != nil {
 			return nil, nil, err
 		}
+		if engineConfig != nil && engineConfig.Version == "" {
+			engineConfig.Version = string(constants.DefaultAgyVersion)
+		}
 	}
 	const noDefaultMaxTurns = ""
 	if engineConfig != nil && engineConfig.MaxTurns == "" && agenticEngine.GetCapabilities().MaxTurns {
@@ -678,6 +684,9 @@ func (c *Compiler) runPostEngineValidations(
 	enableFirewallByDefaultForClaude(engineSetting, networkPermissions, sandboxConfig)
 	enableFirewallByDefaultForPi(engineSetting, networkPermissions, sandboxConfig)
 	enableFirewallByDefaultForGemini(engineSetting, networkPermissions, sandboxConfig)
+	if engineSetting == string(constants.AgyEngine) {
+		enableFirewallByDefaultForEngine(engineSetting, networkPermissions, sandboxConfig)
+	}
 	if err := validateMaxToolCallsConfig(engineConfig, agenticEngine); err != nil {
 		return err
 	}

@@ -133,6 +133,7 @@ jobs:
           GH_AW_SETUP_WORKFLOW_NAME: "Engine Conformance Agy (Experimental)"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/engine-conformance-agy.lock.yml@${{ github.ref }}
           GH_AW_INFO_VERSION: "1.3.1"
+          GH_AW_INFO_AWF_VERSION: "v0.28.49"
           GH_AW_INFO_ENGINE_ID: "agy"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Mask OTLP telemetry headers
@@ -150,8 +151,8 @@ jobs:
           GH_AW_INFO_SUPPORTS_TOOLS_ALLOWLIST: "false"
           GH_AW_INFO_STAGED: "true"
           GH_AW_INFO_ALLOWED_DOMAINS: '["defaults"]'
-          GH_AW_INFO_FIREWALL_ENABLED: "false"
-          GH_AW_INFO_AWF_VERSION: ""
+          GH_AW_INFO_FIREWALL_ENABLED: "true"
+          GH_AW_INFO_AWF_VERSION: "v0.28.49"
           GH_AW_INFO_AWMG_VERSION: ""
           GH_AW_INFO_FIREWALL_TYPE: "squid"
           GH_AW_INFO_AGENT_RUNTIME: ""
@@ -408,6 +409,7 @@ jobs:
           GH_AW_SETUP_WORKFLOW_NAME: "Engine Conformance Agy (Experimental)"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/engine-conformance-agy.lock.yml@${{ github.ref }}
           GH_AW_INFO_VERSION: "1.3.1"
+          GH_AW_INFO_AWF_VERSION: "v0.28.49"
           GH_AW_INFO_ENGINE_ID: "agy"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Set runtime paths
@@ -805,47 +807,6 @@ jobs:
 
           bash "${RUNNER_TEMP}/gh-aw/actions/start_mcp_scripts_server.sh"
 
-      - name: Write Google Antigravity CLI MCP config adapter script
-        run: |
-          mkdir -p "${RUNNER_TEMP}/gh-aw/actions"
-          cat <<'GHAW_MCP_CONFIG_ADAPTER_SCRIPT_7e1a4d2c_EOF' > "${RUNNER_TEMP}/gh-aw/actions/agy_mcp_config_adapter.cjs"
-          const fs = require("node:fs");
-          const path = require("node:path");
-          const { loadGatewayContext, normalizeGatewayEntry, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
-          const context = loadGatewayContext({ extraRequiredEnv: ["GITHUB_WORKSPACE"] });
-          const raw = JSON.parse(fs.readFileSync(context.gatewayOutput, "utf8"));
-          if (!raw.mcpServers || typeof raw.mcpServers !== "object" || Array.isArray(raw.mcpServers)) {
-            throw new Error("Agy MCP gateway configuration requires an mcpServers object");
-          }
-          const servers = Object.create(null);
-          for (const [name, entry] of Object.entries(raw.mcpServers)) {
-            if (context.cliServers.has(name)) continue;
-            if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error("Agy MCP server must be an object");
-            if (typeof entry.url !== "string" || entry.command !== undefined) throw new Error("Agy requires gateway-backed HTTP MCP servers");
-            const transformed = normalizeGatewayEntry(entry, context.urlPrefix);
-            const url = new URL(transformed.url);
-            if (url.origin !== new URL(context.urlPrefix).origin || !url.pathname.startsWith("/mcp/") || url.username || url.password || url.search || url.hash) {
-              throw new Error("Agy MCP endpoints must use the configured gateway");
-            }
-            const server = { serverUrl: transformed.url };
-            if (transformed.headers !== undefined) {
-              if (!transformed.headers || typeof transformed.headers !== "object" || Array.isArray(transformed.headers) ||
-                  Object.values(transformed.headers).some(value => typeof value !== "string")) {
-                throw new Error("Agy MCP headers must be a string-valued object");
-              }
-              server.headers = transformed.headers;
-            }
-            servers[name] = server;
-          }
-          const directory = path.join(context.extraEnv.GITHUB_WORKSPACE, ".agents");
-          const output = path.join(directory, "mcp_config.json");
-          for (const target of [directory, output]) {
-            if (fs.lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("Agy MCP configuration must not use symlinks");
-          }
-          writeSecureOutput(output, JSON.stringify({ mcpServers: servers }, null, 2));
-
-          GHAW_MCP_CONFIG_ADAPTER_SCRIPT_7e1a4d2c_EOF
-          chmod 755 "${RUNNER_TEMP}/gh-aw/actions/agy_mcp_config_adapter.cjs"
       - name: Start MCP Gateway
         id: start-mcp-gateway
         env:
@@ -886,7 +847,7 @@ jobs:
           export DEBUG="*"
 
           export GH_AW_ENGINE="agy"
-          export GH_AW_MCP_CONFIG_ADAPTER="agy_mcp_config_adapter.cjs"
+          export GH_AW_MCP_CONFIG_ADAPTER="convert_gateway_config_agy.cjs"
           MCP_GATEWAY_UID=$(id -u 2>/dev/null || echo '0')
           MCP_GATEWAY_GID=$(id -g 2>/dev/null || echo '0')
           source "${RUNNER_TEMP}/gh-aw/actions/resolve_docker_socket_gid.sh"
@@ -984,216 +945,6 @@ jobs:
         id: pre_agent_audit
         continue-on-error: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/audit_pre_agent_workspace.sh"
-      - name: Write Google Antigravity CLI harness script
-        run: |
-          mkdir -p "${RUNNER_TEMP}/gh-aw/actions"
-          cat <<'GHAW_HARNESS_SCRIPT_3c7b9f1a_EOF' > "${RUNNER_TEMP}/gh-aw/actions/agy_harness.cjs"
-          const { spawn, spawnSync } = require("node:child_process");
-          const { createHash } = require("node:crypto");
-          const fs = require("node:fs");
-          const os = require("node:os");
-          const path = require("node:path");
-          const { fetchAWFReflect, deriveBaseUrlFromModelsURL } = require("./awf_reflect.cjs");
-          const [command, ...commandArgs] = process.argv.slice(2);
-          const log = message => process.stderr.write(`[agy-harness] ${message}\n`);
-          const checksums = { "1.3.1": "0e313b309ea58c71431ce86bb820936a3700e17e44eabce7bf2264617dc822db" };
-          const fail = (result, action) => {
-            if (result.error || result.signal || result.status !== 0) throw new Error(`${action} failed`);
-          };
-          const main = async () => {
-            const version = process.env.GH_AW_ENGINE_VERSION;
-            if (!Object.hasOwn(checksums, version)) throw new Error("Agy requires the verified 1.3.1 release");
-            if (!command) throw new Error("Agy command is required");
-            const workspace = process.env.GITHUB_WORKSPACE;
-            const promptPath = process.env.GH_AW_PROMPT;
-            const model = process.env.GH_AW_AGY_MODEL;
-            if (!workspace || !promptPath) throw new Error("GITHUB_WORKSPACE and GH_AW_PROMPT are required");
-            if (!model || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(model)) throw new Error("Agy requires a native model slug, not provider/model syntax");
-            const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-agy-"));
-            try {
-              let binary = command;
-              if (command === "agy") {
-                if (process.platform !== "linux" || process.arch !== "x64") throw new Error("Experimental Agy installation supports Linux x64 only");
-                const archive = path.join(root, "agy.tar.gz");
-                fail(spawnSync("curl", ["--fail", "--location", "--silent", "--show-error", "--proto", "=https", "--tlsv1.2", "--max-time", "120", "--output", archive,
-                  `https://github.com/google-antigravity/antigravity-cli/releases/download/${version}/agy_cli_linux_x64.tar.gz`], { stdio: ["ignore", "ignore", "inherit"] }), "Agy download");
-                if (createHash("sha256").update(fs.readFileSync(archive)).digest("hex") !== checksums[version]) throw new Error("Agy archive checksum did not match");
-                fail(spawnSync("tar", ["-xzf", archive, "-C", root, "--", "antigravity"], { stdio: ["ignore", "ignore", "inherit"] }), "Agy extraction");
-                binary = path.join(root, "antigravity");
-              }
-              const verification = spawnSync(binary, ["--version"], { encoding: "utf8", timeout: 10000 });
-              fail(verification, "Agy version verification");
-              if (verification.stdout.trim() !== version) throw new Error("Agy executable does not match engine.version");
-
-              const env = { ...process.env };
-              if (env.AWF_REFLECT_ENABLED === "1") {
-                const reflection = await fetchAWFReflect({ logger: log });
-                if (!reflection.ok || !reflection.reflectData) throw new Error("Agy could not discover the AWF Gemini endpoint; direct inference fallback is disabled");
-                const endpoint = reflection.reflectData.endpoints?.find(entry =>
-                  entry?.configured === true && ["gemini", "google"].includes(entry.provider));
-                if (typeof endpoint?.models_url !== "string") throw new Error("Agy requires a configured Gemini models endpoint in AWF");
-                // The native client appends the Gemini API version to its base URL.
-                env.GOOGLE_GEMINI_BASE_URL = deriveBaseUrlFromModelsURL(endpoint.models_url).replace(/\/v1beta\/?$/, "");
-                env.GEMINI_API_KEY = "awf-proxy";
-              } else if (!env.GEMINI_API_KEY) {
-                throw new Error("GEMINI_API_KEY is required when AWF is explicitly disabled");
-              }
-              const home = path.join(root, "home");
-              const settings = path.join(home, ".gemini", "antigravity-cli");
-              fs.mkdirSync(settings, { recursive: true, mode: 0o700 });
-              fs.writeFileSync(path.join(settings, "settings.json"), JSON.stringify({ modelProvider: "gemini" }), { mode: 0o600, flag: "wx" });
-              env.HOME = home;
-              env.XDG_CONFIG_HOME = path.join(home, ".config");
-              env.XDG_CACHE_HOME = path.join(home, ".cache");
-              delete env.GOOGLE_APPLICATION_CREDENTIALS;
-              delete env.AGY_ADC_AUTH;
-              delete env.GOOGLE_API_KEY;
-              delete env.CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE;
-              delete env.GOOGLE_GENAI_USE_VERTEXAI;
-              if (!env.GH_AW_MCP_CONFIG) {
-                const directory = path.join(workspace, ".agents");
-                const config = path.join(directory, "mcp_config.json");
-                for (const target of [directory, config]) {
-                  if (fs.lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("Agy MCP configuration must not use symlinks");
-                }
-                fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-                fs.writeFileSync(config, JSON.stringify({ mcpServers: {} }), { mode: 0o600 });
-                fs.chmodSync(config, 0o600);
-              }
-              const prompt = fs.readFileSync(promptPath, "utf8");
-              const args = [...commandArgs, "--input-format", "stream-json", "--output-format", "stream-json",
-                "--print-timeout", "5m", "--model", model, "--dangerously-skip-permissions"];
-              log(`verified experimental Agy ${version}`);
-              await new Promise((resolve, reject) => {
-                const child = spawn(binary, args, { cwd: env.GH_AW_ENGINE_CWD || workspace, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
-                let buffer = "", stderrTail = "", result, invalid = false, denied = false, interrupted = false, timedOut = false, settled = false, escalation, drain;
-                const pendingTools = new Set();
-                const signalGroup = signal => {
-                  if (!child.pid) return;
-                  try { process.kill(-child.pid, signal); }
-                  catch (error) {
-                    if (error.code !== "ESRCH") {
-                      invalid = true;
-                      log(`Agy process group termination failed (${error.code})`);
-                      child.kill(signal);
-                    }
-                  }
-                };
-                const terminate = signal => {
-                  if (settled) return;
-                  signalGroup(signal);
-                  escalation ??= setTimeout(() => signalGroup("SIGKILL"), 1000);
-                  drain ??= setTimeout(() => {
-                    invalid = true;
-                    child.stdin.destroy();
-                    child.stdout.destroy();
-                    child.stderr.destroy();
-                    complete(child.exitCode, child.signalCode);
-                  }, 1500);
-                };
-                const onInterrupt = () => { interrupted = true; terminate("SIGINT"); };
-                const onTerminate = () => { interrupted = true; terminate("SIGTERM"); };
-                process.once("SIGINT", onInterrupt);
-                process.once("SIGTERM", onTerminate);
-                const timer = setTimeout(() => { timedOut = true; terminate("SIGTERM"); }, 305000);
-                const line = value => {
-                  if (!value.trim()) return;
-                  let event;
-                  try { event = JSON.parse(value); } catch { invalid = true; terminate("SIGTERM"); return; }
-                  if (event.event === "result") result = event.result;
-                  else if (event.status === "ERROR") result = event;
-                  const step = event.step_update;
-                  if (step?.step_type === "tool") {
-                    if (step.state === "ACTIVE") pendingTools.add(step.step_index);
-                    if (step.state === "DONE") pendingTools.delete(step.step_index);
-                    if (/denied|permission|rejected/i.test(step.tool_info?.error?.type || "")) denied = true;
-                  }
-                };
-                child.stdout.setEncoding("utf8").on("data", chunk => {
-                  process.stdout.write(chunk);
-                  buffer += chunk;
-                  if (buffer.length > 2 * 1024 * 1024) { invalid = true; terminate("SIGTERM"); return; }
-                  let newline;
-                  while ((newline = buffer.indexOf("\n")) >= 0) {
-                    line(buffer.slice(0, newline));
-                    buffer = buffer.slice(newline + 1);
-                  }
-                });
-                child.stderr.setEncoding("utf8").on("data", chunk => {
-                  stderrTail = (stderrTail + chunk).slice(-4096);
-                  if (/soft[- ]denied|permission[^\n]*denied|requires approval/i.test(stderrTail)) denied = true;
-                  process.stderr.write(chunk);
-                });
-                child.stdin.on("error", error => {
-                  if (error.code !== "EPIPE") { invalid = true; terminate("SIGTERM"); }
-                });
-                const cleanup = () => {
-                  signalGroup("SIGKILL");
-                  clearTimeout(timer);
-                  clearTimeout(escalation);
-                  clearTimeout(drain);
-                  process.removeListener("SIGINT", onInterrupt);
-                  process.removeListener("SIGTERM", onTerminate);
-                };
-                child.once("error", () => { if (settled) return; settled = true; cleanup(); reject(new Error("Agy executable could not be started")); });
-                const complete = (code, signal) => {
-                  if (settled) return;
-                  settled = true;
-                  cleanup();
-                  line(buffer);
-                  const inferred = Number.isSafeInteger(result?.num_turns) && result.num_turns > 0 &&
-                    Number.isSafeInteger(result?.usage?.input_tokens) && result.usage.input_tokens > 0 &&
-                    Number.isSafeInteger(result?.usage?.output_tokens) && result.usage.output_tokens > 0;
-                  if (code !== 0 || signal || invalid || denied || interrupted || timedOut || pendingTools.size || result?.status !== "SUCCESS" || !inferred) {
-                    if (result?.status === "SUCCESS") {
-                      process.stdout.write(JSON.stringify({ event: "result", result: { ...result, status: "ERROR", error: "Agy run was denied, interrupted, or lacked completed inference" } }) + "\n");
-                    }
-                    reject(new Error("Agy run failed, was denied, interrupted, or lacked completed inference"));
-                  } else resolve();
-                };
-                child.once("exit", () => terminate("SIGTERM"));
-                child.once("close", complete);
-                child.stdin.end(JSON.stringify({ event: "user", message: { content: prompt } }) + "\n");
-              });
-            } finally {
-              fs.rmSync(root, { recursive: true, force: true });
-            }
-          };
-          main().catch(error => {
-            const message = error instanceof Error ? error.message : "Agy harness failed";
-            log(message);
-            process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
-            process.exitCode = 1;
-          });
-
-          GHAW_HARNESS_SCRIPT_3c7b9f1a_EOF
-          chmod 755 "${RUNNER_TEMP}/gh-aw/actions/agy_harness.cjs"
-      - name: Write Google Antigravity CLI log parser script
-        if: always()
-        run: |
-          mkdir -p "${RUNNER_TEMP}/gh-aw/actions"
-          cat <<'GHAW_LOG_PARSER_SCRIPT_5d2e8b3f_EOF' > "${RUNNER_TEMP}/gh-aw/actions/agy_log_parser.cjs"
-          // @ts-check
-          // Auto-generated log parser for behavior-defined engine "Google Antigravity CLI".
-          const { createEngineLogParser } = require("./log_parser_shared.cjs");
-
-          // --- begin engine-provided parse function ---
-          function parseLog(content) {
-            return require("./parse_agy_log.cjs").parseAgyLog(content);
-          }
-          // --- end engine-provided parse function ---
-
-          const main = createEngineLogParser({
-            parserName: "Google Antigravity CLI",
-            parseFunction: parseLog,
-            supportsDirectories: false,
-          });
-
-          if (typeof module !== "undefined" && module.exports) {
-            module.exports = { main, parseLog };
-          }
-          GHAW_LOG_PARSER_SCRIPT_5d2e8b3f_EOF
-          chmod 755 "${RUNNER_TEMP}/gh-aw/actions/agy_log_parser.cjs"
       - name: Execute experimental Agy CLI
         id: agentic_execution
         timeout-minutes: 10
@@ -1208,6 +959,7 @@ jobs:
           export GH_AW_AWF_EXECUTION_COMPONENT="agent"
           export GH_AW_AWF_EXECUTION_EVIDENCE_FILE="/tmp/gh-aw/agent_execution.json"
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
+          touch /tmp/gh-aw/agent-step-summary.md
           (umask 177 && touch /tmp/gh-aw/agent-stdio.log)
           # shellcheck disable=SC2016
           printf '%s\n' '{"$schema":"https://github.com/github/gh-aw-firewall/releases/download/v0.28.49/awf-config.schema.json","network":{"allowDomains":["api.github.com","api.npms.io","api.snapcraft.io","archive.ubuntu.com","azure.archive.ubuntu.com","bun.sh","cdn.jsdelivr.net","crl.geotrust.com","crl.globalsign.com","crl.identrust.com","crl.sectigo.com","crl.thawte.com","crl.usertrust.com","crl.verisign.com","crl3.digicert.com","crl4.digicert.com","crls.ssl.com","deb.nodesource.com","deno.land","esm.sh","get.pnpm.io","github.com","googleapis.deno.dev","googlechromelabs.github.io","host.docker.internal","json-schema.org","json.schemastore.org","jsr.io","keyserver.ubuntu.com","nodejs.org","npm.pkg.github.com","npmjs.com","npmjs.org","objects.githubusercontent.com","ocsp.digicert.com","ocsp.geotrust.com","ocsp.globalsign.com","ocsp.identrust.com","ocsp.sectigo.com","ocsp.ssl.com","ocsp.thawte.com","ocsp.usertrust.com","ocsp.verisign.com","packagecloud.io","packages.cloud.google.com","packages.microsoft.com","ppa.launchpad.net","registry.bower.io","registry.npmjs.com","registry.npmjs.org","registry.yarnpkg.com","release-assets.githubusercontent.com","repo.yarnpkg.com","s.symcb.com","s.symcd.com","security.ubuntu.com","skimdb.npmjs.com","storage.googleapis.com","telemetry.vercel.com","ts-crl.ws.symantec.com","ts-ocsp.ws.symantec.com","www.googleapis.com","www.npmjs.com","www.npmjs.org","yarnpkg.com"],"isolation":true,"topologyAttach":["awmg-mcpg"]},"apiProxy":{"enabled":true,"enableTokenSteering":true,"maxRuns":500,"maxCacheMisses":12,"maxAiCredits":5,"targets":{"gemini":{"host":"generativelanguage.googleapis.com"}},"models":{"agent":["sonnet-6x","gpt-6","gpt-5.4","gpt-5.5","gpt-5.6","gpt-5.3","gemini-pro","any"],"antigravity":["copilot/antigravity*","google/antigravity*","gemini/antigravity*"],"any":["copilot/*","anthropic/*","openai/*","google/*","gemini/*"],"auto":["copilot/auto","large"],"claude":["agent"],"codex":["agent"],"coding":["copilot/gpt-5*codex*","openai/gpt-5*codex*","gpt-5-codex","kimi"],"computer-use":["copilot/*computer-use*","google/*computer-use*","gemini/*computer-use*","openai/*computer-use*"],"copilot":["agent"],"deep-research":["copilot/deep-research*","copilot/o3-deep-research*","copilot/o4-mini-deep-research*","google/deep-research*","gemini/deep-research*","openai/o3-deep-research*","openai/o4-mini-deep-research*"],"detection":["small"],"evals":["small"],"fable":["copilot/*fable*","anthropic/*fable*"],"gemini":["agent"],"gemini-3-flash":["copilot/gemini-3*flash*","google/gemini-3*flash*","gemini/gemini-3*flash*"],"gemini-3-pro":["copilot/gemini-3*pro*","google/gemini-3*pro*","google/nano-banana*","gemini/gemini-3*pro*"],"gemini-3.1-flash":["copilot/gemini-3.1*flash*","google/gemini-3.1*flash*","gemini/gemini-3.1*flash*"],"gemini-3.1-pro":["copilot/gemini-3.1*pro*","google/gemini-3.1*pro*","gemini/gemini-3.1*pro*"],"gemini-3.5-flash":["copilot/gemini-3.5*flash*","google/gemini-3.5*flash*","gemini/gemini-3.5*flash*"],"gemini-3.6-flash":["copilot/gemini-3.6*flash*","google/gemini-3.6*flash*","gemini/gemini-3.6*flash*"],"gemini-3.7-flash":["copilot/gemini-3.7*flash*","google/gemini-3.7*flash*","gemini/gemini-3.7*flash*"],"gemini-3.8-flash":["copilot/gemini-3.8*flash*","google/gemini-3.8*flash*","gemini/gemini-3.8*flash*"],"gemini-flash":["copilot/gemini-*flash*","google/gemini-*flash*","gemini/gemini-*flash*"],"gemini-flash-lite":["copilot/gemini-*flash*lite*","google/gemini-*flash*lite*","gemini/gemini-*flash*lite*"],"gemini-omni":["copilot/gemini-omni*","google/gemini-omni*","gemini/gemini-omni*"],"gemini-pro":["copilot/gemini-*pro*","google/gemini-*pro*","gemini/gemini-*pro*"],"gemma":["copilot/gemma*","google/gemma*","gemini/gemma*"],"gpt-5":["copilot/gpt-5*","openai/gpt-5*"],"gpt-5-codex":["copilot/gpt-5*codex*","openai/gpt-5*codex*"],"gpt-5-mini":["copilot/gpt-5*mini*","openai/gpt-5*mini*"],"gpt-5-nano":["copilot/gpt-5*nano*","openai/gpt-5*nano*"],"gpt-5-pro":["copilot/gpt-5*pro*","openai/gpt-5*pro*"],"gpt-5.1":["copilot/gpt-5.1*","openai/gpt-5.1*"],"gpt-5.2":["copilot/gpt-5.2*","openai/gpt-5.2*"],"gpt-5.3":["copilot/gpt-5.3*","openai/gpt-5.3*"],"gpt-5.4":["copilot/gpt-5.4*","openai/gpt-5.4*"],"gpt-5.5":["copilot/gpt-5.5*","openai/gpt-5.5*"],"gpt-5.6":["copilot/gpt-5.6*","openai/gpt-5.6*"],"gpt-6":["copilot/gpt-6*","openai/gpt-6*"],"grok":["copilot/*grok*","openai/*grok*"],"haiku":["copilot/*haiku*","anthropic/*haiku*"],"image-generation":["copilot/gpt-image*","openai/gpt-image*","openai/chatgpt-image*","copilot/gemini-*image*","google/gemini-*image*","gemini/gemini-*image*","google/imagen*"],"kimi":["copilot/kimi*","openai/kimi*"],"kiwi":["copilot/kiwi*","openai/kiwi*"],"large":["sonnet","gpt-6","gpt-5-pro","gpt-5","gemini-pro"],"lyria":["google/lyria*","gemini/lyria*","copilot/lyria*"],"mai-code":["copilot/MAI-Code*","copilot/mai-code*","openai/MAI-Code*"],"mai-code-1-flash-picker":["copilot/MAI-Code-1-Flash-picker*","copilot/mai-code-1-flash-picker*","openai/MAI-Code-1-Flash-picker*"],"mini":["haiku","gpt-5-mini","gpt-5-nano","gemini-flash-lite"],"nano-banana":["copilot/nano-banana*","google/nano-banana*","gemini/nano-banana*"],"opus":["copilot/*opus*","anthropic/*opus*"],"opusplan":["opus?effort=high"],"raptor-mini":["copilot/raptor*","openai/raptor*"],"reasoning":["copilot/o1*","copilot/o3*","copilot/o4*","openai/o1*","openai/o3*","openai/o4*"],"robotics":["copilot/*robotics*","google/*robotics*","gemini/*robotics*"],"small":["mini"],"small-agent":["haiku","gpt-5-mini","gemini-flash"],"sonnet":["copilot/*sonnet*","anthropic/*sonnet*"],"sonnet-6x":["copilot/*sonnet-4.5*","copilot/*sonnet-4.6*","copilot/*sonnet-5*","copilot/*sonnet-4-5-*","anthropic/*sonnet-4-5-*","copilot/*sonnet-4-6*","anthropic/*sonnet-4-6*","anthropic/*sonnet-5*"],"summarization":["haiku","gpt-5-mini","gemini-flash-lite","mini"],"veo":["google/veo*","gemini/veo*"],"vision":["copilot/gemini-*image*","google/gemini-*image*","gemini/gemini-*image*","copilot/gemini-*flash*","google/gemini-*flash*","gemini/gemini-*flash*"]}},"container":{"imageTag":"0.28.49,squid=sha256:0041ab94c9c3e190fbd851add7dd46bf950e987322ca2bf20e9fadb5803e94e7,agent=sha256:39f923c51e2790a2a00085959bf8c31a06a23fb3d7fd463f704d7d41291425b3,api-proxy=sha256:ef6d61dac70d98389384c3a760882931d20310a45b908f30dd2cc0ebf36f1b39,cli-proxy=sha256:147eb25d465ce0aa6b60d2b711279533b8e1aa40b9d5161f90e927252c84955c"},"logging":{"proxyLogsDir":"/tmp/gh-aw/sandbox/firewall/logs","auditDir":"/tmp/gh-aw/sandbox/firewall/audit"}}' > "${RUNNER_TEMP}/gh-aw/awf-config.json"
@@ -1238,10 +990,11 @@ jobs:
           GH_AW_AGY_MODEL: gemini-3.8-flash-medium
           GH_AW_ENGINE_VERSION: 1.3.1
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
-          GH_AW_MCP_CONFIG: .agents/mcp_config.json
+          GH_AW_MCP_CONFIG: ${{ github.workspace }}/.agents/mcp_config.json
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
           GH_AW_SAFE_OUTPUTS_STAGED: true
+          GITHUB_STEP_SUMMARY: /tmp/gh-aw/agent-step-summary.md
           GITHUB_WORKSPACE: ${{ github.workspace }}
           NO_PROXY: localhost,127.0.0.1,host.docker.internal,host.docker.internal:10000,host.docker.internal:10001,host.docker.internal:10002,host.docker.internal:10003,172.30.0.30,172.30.0.30:10000,172.30.0.30:10001,172.30.0.30:10002,172.30.0.30:10003
           RUNNER_TEMP: ${{ runner.temp }}
@@ -1317,7 +1070,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'agy_log_parser.cjs'));
+            const { main } = require(path.join(actionsDir, 'parse_agy_log.cjs'));
             await main();
       - name: Parse MCP Scripts logs for step summary
         if: always()
@@ -1500,6 +1253,7 @@ jobs:
           GH_AW_SETUP_WORKFLOW_NAME: "Engine Conformance Agy (Experimental)"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/engine-conformance-agy.lock.yml@${{ github.ref }}
           GH_AW_INFO_VERSION: "1.3.1"
+          GH_AW_INFO_AWF_VERSION: "v0.28.49"
           GH_AW_INFO_ENGINE_ID: "agy"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download agent output artifact
@@ -1795,6 +1549,7 @@ jobs:
           GH_AW_SETUP_WORKFLOW_NAME: "Engine Conformance Agy (Experimental)"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/engine-conformance-agy.lock.yml@${{ github.ref }}
           GH_AW_INFO_VERSION: "1.3.1"
+          GH_AW_INFO_AWF_VERSION: "v0.28.49"
           GH_AW_INFO_ENGINE_ID: "agy"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Mask OTLP telemetry headers

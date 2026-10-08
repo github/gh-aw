@@ -24,6 +24,8 @@ package workflow
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
@@ -31,6 +33,21 @@ import (
 )
 
 var featuresValidationLog = logger.New("workflow:features_validation")
+
+func validateDryRunFeatures(features map[string]any) error {
+	var prohibited []string
+	for name, value := range features {
+		enabled, _ := parseFeatureValue(value)
+		if enabled && strings.HasPrefix(strings.ToLower(strings.TrimSpace(name)), "dangerously-") {
+			prohibited = append(prohibited, "features."+name)
+		}
+	}
+	if len(prohibited) == 0 {
+		return nil
+	}
+	slices.Sort(prohibited)
+	return fmt.Errorf("strict dry-run validation: enabled dangerously-* workflow features are not allowed: %s. Remove these entries from the workflow Markdown configuration", strings.Join(prohibited, ", "))
+}
 
 // validateFeatures validates all feature flags in the workflow data
 func validateFeatures(data *WorkflowData) error {
