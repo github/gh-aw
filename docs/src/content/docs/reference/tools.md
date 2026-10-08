@@ -115,6 +115,9 @@ Use wildcards like `git:*` for command families or `:*` for unrestricted access.
 
 ### Locked tasks (`locked-tasks:`)
 
+> [!WARNING]
+> Locked tasks are experimental. Configuration and runtime behavior may change.
+
 Exposes fixed workflow-owned commands as the native MCP tool `locked-tasks.run_task`.
 The agent selects a task name; it cannot supply executable arguments, environment
 variables, a working directory, or execution limits.
