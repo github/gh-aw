@@ -61,7 +61,7 @@ function piSteeringExtension(pi) {
   });
 
   pi.on("turn_end", async (/** @type {any} */ event, /** @type {any} */ ctx) => {
-    if (startTime === undefined || event.message?.stopReason === "stop") {
+    if (startTime === undefined || event.message?.stopReason !== "toolUse") {
       return;
     }
 

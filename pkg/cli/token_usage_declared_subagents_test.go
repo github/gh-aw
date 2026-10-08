@@ -46,6 +46,21 @@ func TestDeclaredSubagentModelAudit(t *testing.T) {
 	}
 }
 
+func TestMatchesDeclaredModelEffectiveIDs(t *testing.T) {
+	for _, test := range []struct {
+		name, pattern, observed, provider string
+		want                              bool
+	}{
+		{"Claude dated version ID", "github-copilot/claude-haiku-4.5", "claude-haiku-4-5-20251001", "github-copilot", true},
+		{"OpenAI dated model ID", "copilot/gpt-4o-mini", "gpt-4o-mini-2024-07-18", "github-copilot", true},
+		{"unrelated model version", "copilot/gpt-4o-mini", "gpt-4o-mini-audio-2024-07-18", "github-copilot", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.want, matchesDeclaredModel(test.pattern, test.observed, test.provider))
+		})
+	}
+}
+
 func TestPiStructuredSubagentModelAttribution(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-session.jsonl"), []byte("{\"type\":\"session.init\",\"data\":{\"sourceEngine\":\"pi\",\"sessionId\":\"parent\"}}\n{\"type\":\"pi.subagent_dispatch\",\"data\":{\"agent\":\"reader\",\"requestedModel\":\"small\",\"resolvedModel\":\"claude-haiku-4.5\"}}\n"), 0600))

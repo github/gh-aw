@@ -49,13 +49,13 @@ describe("Pi timeout steering", () => {
     const { handlers, sendUserMessage } = harness();
     await handlers.agent_start();
     vi.advanceTimersByTime(6 * 60_000);
-    await handlers.turn_end({}, {});
-    await handlers.turn_end({}, {});
+    await handlers.turn_end({ message: { role: "assistant", stopReason: "toolUse" } }, {});
+    await handlers.turn_end({ message: { role: "assistant", stopReason: "toolUse" } }, {});
     expect(sendUserMessage).toHaveBeenCalledTimes(1);
     expect(sendUserMessage).toHaveBeenNthCalledWith(1, expect.stringContaining("wrap up"), { deliverAs: "steer" });
     vi.advanceTimersByTime(3 * 60_000);
-    await handlers.turn_end({}, {});
-    await handlers.turn_end({}, {});
+    await handlers.turn_end({ message: { role: "assistant", stopReason: "toolUse" } }, {});
+    await handlers.turn_end({ message: { role: "assistant", stopReason: "toolUse" } }, {});
     expect(sendUserMessage).toHaveBeenCalledTimes(2);
     expect(sendUserMessage).toHaveBeenNthCalledWith(2, expect.stringContaining("CRITICAL"), { deliverAs: "steer" });
   });
@@ -65,17 +65,23 @@ describe("Pi timeout steering", () => {
     await handlers.agent_start();
     vi.advanceTimersByTime(9 * 60_000);
     await handlers.agent_start();
-    await handlers.turn_end({}, {});
+    await handlers.turn_end({ message: { role: "assistant", stopReason: "toolUse" } }, {});
     expect(sendUserMessage).toHaveBeenCalledOnce();
     expect(sendUserMessage).toHaveBeenCalledWith(expect.stringContaining("CRITICAL"), { deliverAs: "steer" });
   });
 
-  it("does not reopen a completed answer, but still steers subsequent tool turns", async () => {
+  it.each(["stop", "error", "aborted", "unknown", undefined])("does not steer terminal assistant turns with stopReason %s", async stopReason => {
     const { handlers, sendUserMessage } = harness();
     await handlers.agent_start();
     vi.advanceTimersByTime(9 * 60_000);
-    await handlers.turn_end({ message: { role: "assistant", stopReason: "stop" } }, {});
+    await handlers.turn_end({ message: { role: "assistant", stopReason } }, {});
     expect(sendUserMessage).not.toHaveBeenCalled();
+  });
+
+  it("steers only ongoing tool turns", async () => {
+    const { handlers, sendUserMessage } = harness();
+    await handlers.agent_start();
+    vi.advanceTimersByTime(9 * 60_000);
     await handlers.turn_end({ message: { role: "assistant", stopReason: "toolUse" } }, {});
     expect(sendUserMessage).toHaveBeenCalledOnce();
     expect(sendUserMessage).toHaveBeenCalledWith(expect.stringContaining("CRITICAL"), { deliverAs: "steer" });
