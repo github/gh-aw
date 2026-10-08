@@ -145,6 +145,14 @@ for index in "${!artifact_paths[@]}"; do
   fi
 done
 
+stage_dir="$("${trusted_tools[mktemp]}" -d)"
+"${trusted_tools[chmod]}" 700 "$stage_dir"
+"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_OPENVMM_SOURCE" "${stage_dir}/openvmm"
+"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_KERNEL_SOURCE" "${stage_dir}/vmlinux"
+"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_INITRAMFS_SOURCE" "${stage_dir}/initramfs.cpio.gz"
+"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE" "${stage_dir}/manifest.json"
+"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE_SOURCE" "${stage_dir}/manifest.sigstore.jsonl"
+
 if ! "${trusted_tools[gh]}" attestation verify "${stage_dir}/manifest.json" \
   --repo github/gh-aw-firewall \
   --bundle "${stage_dir}/manifest.sigstore.jsonl" \
