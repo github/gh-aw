@@ -139,7 +139,6 @@ type EngineCapabilitiesDefinition struct {
 	BareMode             bool `yaml:"bare-mode,omitempty"`
 	BashCommandAllowlist bool `yaml:"bash-command-allowlist,omitempty"`
 	BashDisable          bool `yaml:"bash-disable,omitempty"`
-	StructuredOutput     bool `yaml:"structured-output,omitempty"`
 }
 
 // ToRuntimeCapabilities converts the declarative capabilities definition into the
@@ -154,7 +153,6 @@ func (d EngineCapabilitiesDefinition) ToRuntimeCapabilities() EngineCapabilities
 		BareMode:             d.BareMode,
 		BashCommandAllowlist: d.BashCommandAllowlist,
 		BashDisable:          d.BashDisable,
-		StructuredOutput:     d.StructuredOutput,
 	}
 }
 

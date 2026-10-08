@@ -139,9 +139,17 @@ func TestStructuredOutputSteps(t *testing.T) {
 	assert.Contains(t, upload.String(), "steps.structured_output.outcome == 'success'")
 }
 
-func TestStructuredOutputDeclaredCapability(t *testing.T) {
+func TestStructuredOutputUnsupportedGoose(t *testing.T) {
 	assert.False(t, (EngineCapabilitiesDefinition{}).ToRuntimeCapabilities().StructuredOutput)
-	assert.True(t, (EngineCapabilitiesDefinition{StructuredOutput: true}).ToRuntimeCapabilities().StructuredOutput)
+	engine, err := NewBehaviorDefinedEngine(loadGooseSample(t))
+	require.NoError(t, err)
+	assert.False(t, engine.GetCapabilities().StructuredOutput)
+	frontmatter := map[string]any{"structured-output": map[string]any{"schema": map[string]any{"type": "object"}}}
+	_, err = parseStructuredOutput(frontmatter, "workflow.md", engine, nil)
+	require.ErrorContains(t, err, `not supported by engine "goose"`)
+	config, err := parseStructuredOutput(map[string]any{}, "workflow.md", engine, nil)
+	require.NoError(t, err)
+	assert.Nil(t, config)
 }
 
 func TestStructuredOutputSchemaSizeLimit(t *testing.T) {
@@ -161,6 +169,8 @@ func TestStructuredOutputWorkflowParsing(t *testing.T) {
 		error  string
 	}{
 		{"native Codex", "codex", ""},
+		{"native Claude", "claude", ""},
+		{"unsupported Gemini", "gemini", "native JSON Schema output support"},
 		{"unsupported Pi", "pi", "native JSON Schema output support"},
 		{"unsupported Copilot CLI", "copilot", "copilot-sdk"},
 	} {

@@ -3221,11 +3221,6 @@ engine:
       # (optional)
       bash-command-allowlist: true
 
-      # Native JSON Schema constraints on the primary response. The engine harness must
-      # consume the compiled schema and emit raw validated JSON.
-      # (optional)
-      structured-output: true
-
     # (optional)
     manifest:
       # (optional)
@@ -21714,11 +21709,6 @@ safe-outputs:
 
           # (optional)
           bash-command-allowlist: true
-
-          # Native JSON Schema constraints on the primary response. The engine harness must
-          # consume the compiled schema and emit raw validated JSON.
-          # (optional)
-          structured-output: true
 
         # (optional)
         manifest:

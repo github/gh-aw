@@ -36,33 +36,9 @@ experiments:
     tags: [cost_optimization, smoke_tests]
 engine:
   id: gemini
-  model: gemini-3.8-flash
-structured-output:
-  schema:
-    type: object
-    properties:
-      engine:
-        type: string
-        enum: [gemini]
-      status:
-        type: string
-        enum: [pass, fail]
-      testsPassed:
-        type: integer
-        minimum: 0
-        maximum: 5
-    required: [engine, status, testsPassed]
-    additionalProperties: false
-jobs:
-  assert-structured-output:
-    needs: agent
-    runs-on: ubuntu-latest
-    steps:
-      - name: Assert exact Gemini structured output
-        env:
-          STRUCTURED_OUTPUT: ${{ needs.agent.outputs.structured }}
-        run: |
-          node -e 'require("node:assert/strict").deepStrictEqual(JSON.parse(process.env.STRUCTURED_OUTPUT), {engine: "gemini", status: "pass", testsPassed: 5})'
+  fallback-models:
+    - gemini/gemini-3.8-flash
+    - gemini/gemini-2.5-pro
 strict: true
 imports:
   - shared/reporting-otlp.md
@@ -145,12 +121,6 @@ After launching all agents, wait for completion notifications and collect result
 {{/if}}
 
 ## Output
-
-After submitting all safe outputs, make your **primary final response** the JSON
-object with exactly `engine` (`"gemini"`), `status` (`"pass"` if all five tests
-passed, otherwise `"fail"`), and `testsPassed` (the number of passing tests).
-The engine applies a native response schema; do not write this response to a file
-or wrap it in Markdown. The downstream job asserts the exact successful shape.
 
 **ALWAYS create an issue** with a summary of the smoke test run:
 - Title: "Smoke Test: Gemini - ${{ github.run_id }}"

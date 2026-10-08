@@ -47,8 +47,6 @@ Support is opt-in for the verified execution paths below. Custom commands, harne
 | Codex | Built-in harness, CLI >=0.132.0; verified at 0.159.3 | [`--output-schema` and `--output-last-message`](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/exec/src/cli.rs); [schema-preserving resume](https://github.com/openai/codex/commit/af6ffb6ebb4c1aad5793bb1eff4ea1ac785cd22d) permits a constrained correction. |
 | Claude Code | Built-in harness, CLI >=2.1.205; verified at 2.1.288 | [`--json-schema` and `structured_output`](https://code.claude.com/docs/en/headless#get-structured-output). [Draft-07 only](https://code.claude.com/docs/en/agent-sdk/structured-outputs); native retries are capped and the correction resumes the same session. |
 | Copilot | Built-in SDK mode only, CLI >=1.0.90 and SDK 1.0.16 | SDK [`responseSchema`](https://github.com/github/copilot-sdk/blob/v1.0.16/nodejs/src/session.ts), not CLI event formatting. Custom drivers, ordinary CLI mode, and engine autopilot are unsupported. |
-| Gemini | Built-in Gemini CLI 0.62.0 path, compatible Gemini-3 model | Native [generation settings](https://github.com/google-gemini/gemini-cli/blob/v0.62.0/docs/cli/generation-settings.md) pass the schema into [primary-chat generation](https://github.com/google-gemini/gemini-cli/blob/v0.62.0/packages/core/src/core/geminiChat.ts#L955-L962), using the pinned SDK's [`responseJsonSchema`](https://github.com/googleapis/js-genai/blob/v1.30.0/src/types.ts#L2178-L2193). |
-| Goose | Imported Goose definition, verified at 1.53.0 | Recipe [`response.json_schema`](https://github.com/aaif-goose/goose/blob/v1.53.0/documentation/docs/guides/recipes/recipe-reference.md#response), native [`recipe__final_output` validation](https://github.com/aaif-goose/goose/blob/v1.53.0/crates/goose/src/agents/final_output_tool.rs), and [terminal enforcement](https://github.com/aaif-goose/goose/blob/v1.53.0/crates/goose/src/agents/state_machine/ops_recipe.rs). |
 
 For Copilot, explicitly select SDK mode and a supported CLI version:
 
@@ -59,12 +57,14 @@ engine:
   copilot-sdk: true
 ```
 
-Provider restrictions still apply. [OpenAI strict schemas](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas) require every object property to be required and every object to set `additionalProperties: false`; use nullable types for optional values. Claude permits optional fields, but its [native schema dialect](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#json-schema-limitations) is narrower than general draft-07. Gemini rejects unsupported keywords, recursive or anchor references, and conflicting model hooks/settings before execution. No integration rewrites an unsupported schema into a weaker prompt constraint.
+Provider restrictions still apply. [OpenAI strict schemas](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas) require every object property to be required and every object to set `additionalProperties: false`; use nullable types for optional values. Claude permits optional fields, but its [native schema dialect](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#json-schema-limitations) is narrower than general draft-07. No integration rewrites an unsupported schema into a weaker prompt constraint.
 
 The remaining configured runtimes stay disabled:
 
 | Runtime inspected | Reason |
 |-------------------|--------|
+| Gemini | Native generation-settings integration is deferred; the configured gh-aw engine does not accept `structured-output`. |
+| Goose | Native recipe integration is deferred; imported engine definitions do not expose a structured-output capability. |
 | Pi 1.0.0 | [`text`, `json`, and `rpc` modes](https://github.com/earendil-works/pi-mono/blob/v1.0.0/packages/coding-agent/src/cli/args.ts) serialize events; no primary-response schema entry point. |
 | Aider 0.86.2 | [Editing protocols](https://github.com/Aider-AI/aider/blob/v0.86.2/aider/args.py) and [provider parameter passthrough](https://github.com/Aider-AI/aider/blob/v0.86.2/aider/models.py) do not establish native primary-response support in the configured runtime. |
 | Crush 0.88.0 | [`run`](https://github.com/charmbracelet/crush/blob/v0.88.0/internal/cmd/run.go) has no response schema option; [`schema`](https://github.com/charmbracelet/crush/blob/v0.88.0/internal/cmd/schema.go) describes configuration. |

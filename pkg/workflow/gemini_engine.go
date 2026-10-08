@@ -1,15 +1,12 @@
 package workflow
 
 import (
-	"errors"
 	"fmt"
 	"maps"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
-	"golang.org/x/mod/semver"
 )
 
 var geminiLog = logger.New("workflow:gemini_engine")
@@ -37,28 +34,10 @@ func NewGeminiEngine() *GeminiEngine {
 				WebSearch:            false,
 				NativeAgentFile:      false, // Gemini does not support agent file natively; the compiler prepends the agent file content to prompt.txt
 				BashCommandAllowlist: true,  // Gemini enforces tools.bash allowlist via tools.core: [run_shell_command(cmd)]
-				StructuredOutput:     true,
 			},
 			dedicatedLLMGatewayPort: constants.GeminiLLMGatewayPort,
 		},
 	}
-}
-
-// ValidateStructuredOutputConfig restricts native generation settings to verified CLI versions.
-func (e *GeminiEngine) ValidateStructuredOutputConfig(config *EngineConfig) error {
-	if config == nil {
-		return nil
-	}
-	if config.Command != "" {
-		return errors.New("structured-output with Gemini requires the standard Gemini CLI; remove engine.command")
-	}
-	if config.Version != "" {
-		version := "v" + strings.TrimPrefix(config.Version, "v")
-		if !semver.IsValid(version) || semver.Prerelease(version) != "" || semver.Compare(version, "v0.62.0") < 0 {
-			return errors.New("structured-output with Gemini requires Gemini CLI version 0.62.0 or later; update engine.version")
-		}
-	}
-	return nil
 }
 
 // GetModelEnvVarName returns the native environment variable name that the Gemini CLI uses
@@ -255,14 +234,6 @@ func (e *GeminiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 
 	// Append the prompt arg raw (not through shellJoinArgs) to preserve shell expansion
 	geminiCommand := fmt.Sprintf(`%s %s --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"`, commandName, shellJoinArgs(geminiArgs))
-	if workflowData.StructuredOutput != nil {
-		// The native CLI's modelConfigs overrides constrain generation; stream-json
-		// only supplies the session envelope from which the wrapper extracts the final answer.
-		geminiCommand = fmt.Sprintf(`node "%s/gemini_structured_output.cjs" %s %s --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"`,
-			SetupActionDestinationShell,
-			shellJoinArgs([]string{StructuredOutputSchemaPath, StructuredOutputFilePath, "--", commandName}),
-			shellJoinArgs(geminiArgs))
-	}
 	geminiCommand = getWorkspaceCommandPrefixFor(workflowData.EngineConfig) + geminiCommand
 
 	// Build the full command with AWF wrapping if enabled

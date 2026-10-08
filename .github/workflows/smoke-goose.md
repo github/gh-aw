@@ -23,16 +23,6 @@ name: Smoke Goose
 model: copilot/gpt-5.4
 engine:
   id: goose
-structured-output:
-  schema:
-    type: object
-    properties:
-      summary:
-        type: string
-      passed:
-        type: boolean
-    required: [summary, passed]
-    additionalProperties: false
 max-turns: 30
 max-ai-credits: 20
 strict: true
@@ -93,10 +83,6 @@ post-steps:
           return fs.readFileSync(file, "utf8");
         };
         assert.equal(process.env.SMOKE_EXECUTION, "success", "Goose execution failed");
-        const structured = JSON.parse(read("/tmp/gh-aw/structured-output.json"));
-        assert.deepEqual(Object.keys(structured).sort(), ["passed", "summary"]);
-        assert.equal(structured.passed, true, "Native structured output must report a passed smoke test");
-        assert.ok(typeof structured.summary === "string" && structured.summary.length > 0);
         const root = process.env.SMOKE_ROOT;
         const run = process.env.SMOKE_RUN_ID;
         const result = JSON.parse(read(path.join(root, `smoke-test-goose-${run}.json`)));
@@ -217,11 +203,6 @@ evidence and fails the job for missing evidence or any failed check.
 Do not skip this file. A PASS issue without this file is a failed smoke test.
 
 ## Output
-
-After submitting safe outputs, finish with a native structured response containing
-`summary` (a short string) and `passed` (true only if all six checks succeeded).
-Do not write `/tmp/gh-aw/structured-output.json` yourself: Goose's native recipe
-response mechanism owns the final JSON result.
 
 **ALWAYS create an issue** with a summary of the smoke test run:
 - Title: "Smoke Test: Goose - ${{ github.run_id }}"
