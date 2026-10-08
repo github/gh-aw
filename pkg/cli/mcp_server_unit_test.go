@@ -29,7 +29,7 @@ func TestMCPServerUnit_ListTools(t *testing.T) {
 
 	// expectedTools must match the tools registered in createMCPServer.
 	// Keep this list in sync with mcp_server_tools_test.go (integration tests).
-	expectedTools := []string{"status", "compile", "logs", "audit", "audit-diff", "checks", "mcp-inspect", "add", "update", "fix"}
+	expectedTools := []string{"status", "compile", "logs", "audit", "audit-diff", "checks", "mcp-inspect", "work-queue", "add", "update", "fix"}
 	toolNames := make(map[string]bool)
 	for _, tool := range result.Tools {
 		toolNames[tool.Name] = true

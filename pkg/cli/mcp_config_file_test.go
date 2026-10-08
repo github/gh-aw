@@ -41,7 +41,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 				if len(server.Args) != 2 || server.Args[0] != "aw" || server.Args[1] != "mcp-server" {
 					t.Errorf("Expected args ['aw', 'mcp-server'], got %v", server.Args)
 				}
-				expectedTools := []string{"compile", "audit", "logs", "inspect", "status", "audit-diff"}
+				expectedTools := []string{"compile", "audit", "logs", "inspect", "status", "audit-diff", "work-queue"}
 				if len(server.Tools) != len(expectedTools) {
 					t.Errorf("Expected %d tools, got %d (%v)", len(expectedTools), len(server.Tools), server.Tools)
 				} else {
@@ -90,7 +90,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 						Type:    "local",
 						Command: "gh",
 						Args:    []string{"aw", "mcp-server"},
-						Tools:   []string{"compile", "audit", "logs", "inspect", "status", "audit-diff"},
+						Tools:   []string{"compile", "audit", "logs", "inspect", "status", "audit-diff", "work-queue"},
 					},
 				},
 			},
@@ -127,7 +127,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 				if !reflect.DeepEqual(server.Args, expectedArgs) {
 					t.Errorf("Expected args %v, got %v", expectedArgs, server.Args)
 				}
-				expectedTools := []string{"compile", "audit", "logs", "inspect", "status", "audit-diff"}
+				expectedTools := []string{"compile", "audit", "logs", "inspect", "status", "audit-diff", "work-queue"}
 				if len(server.Tools) != len(expectedTools) {
 					t.Errorf("Expected tools %v, got %v", expectedTools, server.Tools)
 				}
@@ -159,8 +159,8 @@ func TestEnsureMCPConfig(t *testing.T) {
 				if server.Type != "local" {
 					t.Errorf("Expected type 'local', got %q", server.Type)
 				}
-				if len(server.Tools) != 6 {
-					t.Errorf("Expected 6 tools, got %d", len(server.Tools))
+				if len(server.Tools) != 7 {
+					t.Errorf("Expected 7 tools, got %d", len(server.Tools))
 				}
 			},
 		},

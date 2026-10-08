@@ -384,7 +384,7 @@ func TestMCPToolParams(t *testing.T) {
 	// This list must mirror createMCPServer in mcp_server.go.  If a new tool is
 	// registered there, add it here as well — the len check below will fail and
 	// catch any discrepancy at test time.
-	expectedTools := []string{"status", "compile", "logs", "audit", "audit-diff", "checks", "mcp-inspect", "add", "update", "fix"}
+	expectedTools := []string{"status", "compile", "logs", "audit", "audit-diff", "checks", "mcp-inspect", "work-queue", "add", "update", "fix"}
 
 	// Verify the registry has exactly the expected number of entries so that a
 	// new tool added to mcpToolParams() without also adding it to expectedTools
