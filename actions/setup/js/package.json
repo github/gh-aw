@@ -8,7 +8,7 @@
     "@actions/glob": "^0.7.0",
     "@actions/io": "^3.0.2",
     "@github/copilot-sdk": "^1.0.16",
-    "@types/node": "^26.6.4",
+    "@types/node": "26.6.3",
     "@vitest/coverage-v8": "^5.0.3",
     "@vitest/ui": "^5.0.3",
     "ajv": "^8.17.1",
@@ -20,6 +20,7 @@
     "vitest": "^5.0.3"
   },
   "overrides": {
+    "magic-string": "1.4.2",
     "undici": "^6.23.0",
     "vite": {
       "postcss": {
