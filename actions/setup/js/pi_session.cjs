@@ -33,61 +33,6 @@ function isPiResultError(result) {
   );
 }
 
-const PI_SESSION_ENTRY_TYPES = new Set(["message", "model_change", "thinking_level_change", "usage", "compaction", "context_edit", "branch_summary", "custom", "custom_message", "label", "session_info"]);
-const PI_USAGE_FIELDS = ["input_tokens", "output_tokens", "reasoning_output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "total_tokens"];
-
-/** @param {any} record @returns {boolean} */
-function isPiSessionEntry(record) {
-  return !!record && typeof record.type === "string" && (PI_SESSION_ENTRY_TYPES.has(record.type) || (typeof record.id === "string" && Object.hasOwn(record, "parentId") && (record.parentId === null || typeof record.parentId === "string")));
-}
-
-/**
- * Persisted entries are raw tree history, not repeated streaming snapshots.
- * Never deduplicate siblings by message timestamp, response ID, or tool-call ID.
- * @param {any} raw
- * @returns {SessionEvent[]}
- */
-function transformPiSessionEntry(raw) {
-  const { type, id, parentId, timestamp, ...payload } = raw;
-  const extension = (name, data) => createSessionEvent({ ...raw, data: undefined }, `pi.${name}`, data);
-  if (type !== "message") return [extension(type, payload)];
-  const message = raw.message;
-  if (!message || typeof message !== "object" || Array.isArray(message)) return [extension("message", payload)];
-  const { content, ...metadata } = message;
-  if (message.role === "system") {
-    if (message.sections !== undefined || message.toolsAdded !== undefined || message.toolsRemoved !== undefined) return [extension("system_message", message)];
-    return [createSessionEvent(raw, "prompt.system", { ...metadata, content })];
-  }
-  if (message.role === "user") return [createSessionEvent(raw, "user.message", { ...metadata, content })];
-  if (message.role === "toolResult") {
-    return [
-      createSessionEvent(raw, "tool.execution_complete", {
-        ...message,
-        output: content,
-        success: isPiResultError(message) ? false : message.isError === false ? true : undefined,
-      }),
-      extension("message_metadata", metadata),
-    ];
-  }
-  if (message.role !== "assistant") return [extension(message.role === "bashExecution" ? "bash_execution" : "message", message)];
-  /** @type {SessionEvent[]} */
-  const events = [];
-  const blocks = typeof content === "string" ? [{ type: "text", text: content }] : Array.isArray(content) ? content : [];
-  for (const block of blocks) {
-    if (block?.type === "text" && typeof block.text === "string") {
-      events.push(createSessionEvent(raw, "assistant.message", { ...metadata, ...block, content: block.text }));
-    } else if (block?.type === "thinking" && typeof block.thinking === "string") {
-      events.push(createSessionEvent(raw, "assistant.reasoning", { ...metadata, ...block, content: block.thinking }));
-    } else if (block?.type === "toolCall") {
-      events.push(createSessionEvent(raw, "tool.execution_start", { ...block, toolCallId: block.id, toolName: block.name, input: block.arguments }));
-    } else {
-      events.push(extension("message_content", { block }));
-    }
-  }
-  events.push(extension("message_metadata", metadata));
-  return events;
-}
-
 /**
  * Pi repeats complete messages at message_end, turn_end and agent_end. Text deltas
  * are observations, whereas those envelopes are snapshots of the same message.
@@ -212,11 +157,8 @@ function transformPiV3Entries(records) {
       const event = structuredClone(raw);
       events.push(event);
       if (event.type === "tool.execution_start" && event.data.toolCallId !== undefined) calls.set(event.data.toolCallId, event);
-    } else if (PI_SESSION_ENTRY_TYPES.has(raw.type)) events.push(...transformPiSessionEntry(raw));
-    else if (raw.type === "session") {
-      emit(raw, "session.init", { sourceEngine: "pi", sessionId: raw.id, cwd: raw.cwd, model: raw.model });
-      if (raw.version !== undefined || raw.parentSession !== undefined) emit(raw, "pi.session_metadata", { version: raw.version, parentSession: raw.parentSession });
-    } else if (raw.type === "turn_start") {
+    } else if (raw.type === "session") emit(raw, "session.init", { sourceEngine: "pi", sessionId: raw.id, cwd: raw.cwd, model: raw.model });
+    else if (raw.type === "turn_start") {
       assistantState = activeState = newMessageState();
       partialAssistant = false;
     } else if (raw.type === "message_start") {
@@ -293,11 +235,7 @@ function transformPiV3Entries(records) {
         emitMessage(raw, message, index >= 0 ? snapshots[index].state : partialAssistant && position === lastAssistant ? assistantState : newMessageState());
       }
     } else if (raw.type === "error") emit(raw, "pi.error", { error: raw.error ?? raw.message });
-    else {
-      const flat = normalizeAgentSession(transformFlatSessionEntries([raw]), { sourceEngine: "pi" });
-      if (flat.length) events.push(...flat);
-      else if (isPiSessionEntry(raw)) events.push(...transformPiSessionEntry(raw));
-    }
+    else events.push(...normalizeAgentSession(transformFlatSessionEntries([raw]), { sourceEngine: "pi" }));
   }
   return events;
 }
@@ -308,7 +246,6 @@ function piUsage(usage) {
     ...usage,
     input_tokens: usage.input ?? usage.input_tokens,
     output_tokens: usage.output ?? usage.output_tokens,
-    reasoning_output_tokens: usage.reasoning ?? usage.reasoning_output_tokens,
     cache_read_input_tokens: usage.cacheRead ?? usage.cache_read_input_tokens,
     cache_creation_input_tokens: usage.cacheWrite ?? usage.cache_creation_input_tokens,
     total_tokens: usage.totalTokens ?? usage.total_tokens,
@@ -343,7 +280,7 @@ function computePiV3Stats(records) {
     if (!value || auxiliarySeen.has(key)) return;
     auxiliarySeen.add(key);
     const normalized = piUsage(value);
-    for (const field of PI_USAGE_FIELDS) {
+    for (const field of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "total_tokens"]) {
       if (isTokenCount(normalized[field])) usage[field] = (usage[field] ?? 0) + normalized[field];
     }
     if (isMetric(value.cost?.total)) totalCostUsd = (totalCostUsd ?? 0) + value.cost.total;
@@ -351,8 +288,8 @@ function computePiV3Stats(records) {
   };
   const addMessage = (raw, message) => {
     if (!message || message.role !== "assistant") return;
+    const identity = messageIdentity(message) ?? (raw.id !== undefined && raw.type !== "agent_end" ? JSON.stringify(["record", raw.id]) : undefined);
     const sourceIdentity = raw.id !== undefined && raw.type !== "agent_end" ? JSON.stringify(["record", raw.id]) : undefined;
-    const identity = raw.type === "message" ? sourceIdentity : (messageIdentity(message) ?? sourceIdentity);
     const signature = { ...message, usage: undefined, errorMessage: undefined };
     let report = (sourceIdentity !== undefined && seen.get(sourceIdentity)) || (identity !== undefined && seen.get(identity));
     if (!report && raw.type === "turn_end" && lastWasMessageEnd && isDeepStrictEqual(lastReport?.signature, signature)) report = lastReport;
@@ -368,7 +305,7 @@ function computePiV3Stats(records) {
     report.message = structuredClone(message);
     if (message.usage && typeof message.usage === "object") {
       const normalized = piUsage(message.usage);
-      for (const key of PI_USAGE_FIELDS) {
+      for (const key of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "total_tokens"]) {
         if (!isTokenCount(normalized[key])) continue;
         usage[key] = (usage[key] ?? 0) + normalized[key] - (report.usage[key] ?? 0);
         report.usage[key] = normalized[key];
@@ -389,12 +326,10 @@ function computePiV3Stats(records) {
     if (raw.type === "turn_start") {
       lastReport = undefined;
       lastWasMessageEnd = false;
-    } else if (raw.type === "message" || raw.type === "message_end" || raw.type === "turn_end") {
+    } else if (raw.type === "message_end" || raw.type === "turn_end") {
       addMessage(raw, raw.message);
-      if (raw.message?.role === "toolResult") addAuxiliaryUsage(raw.type === "message" ? (raw.id === undefined ? raw : `entry:${raw.id}`) : `tool:${raw.message.toolCallId}`, raw.message.usage);
+      if (raw.message?.role === "toolResult") addAuxiliaryUsage(`tool:${raw.message.toolCallId}`, raw.message.usage);
       for (const result of raw.toolResults ?? []) addAuxiliaryUsage(`tool:${result.toolCallId}`, result.usage);
-    } else if (["usage", "compaction", "branch_summary"].includes(raw.type)) {
-      addAuxiliaryUsage(raw.id === undefined ? raw : `${raw.type}:${raw.id}`, raw.usage);
     } else if (raw.type === "compaction_end") {
       addAuxiliaryUsage(`compaction:${compactionCount++}`, raw.result?.usage);
       if (raw.errorMessage) errors.push(raw.errorMessage);
@@ -412,7 +347,7 @@ function computePiV3Stats(records) {
       const snapshot = raw.usage ?? raw.stats?.usage ?? raw.stats;
       if (snapshot && typeof snapshot === "object") {
         const normalized = piUsage(snapshot);
-        for (const key of PI_USAGE_FIELDS) {
+        for (const key of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "total_tokens"]) {
           if (isTokenCount(normalized[key])) usage[key] = normalized[key];
         }
         if (isTokenCount(snapshot.input) && [snapshot.cacheRead, snapshot.cacheWrite].some(isTokenCount)) usage.input_tokens_include_cache = false;
@@ -457,4 +392,4 @@ function computePiV3Stats(records) {
   };
 }
 
-module.exports = { transformPiV3Entries, computePiV3Stats, isPiSessionEntry };
+module.exports = { transformPiV3Entries, computePiV3Stats };

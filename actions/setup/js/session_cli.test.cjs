@@ -58,26 +58,6 @@ describe("Session CLI adapter", () => {
     expect(sessionCLI(["agent-markdown", file, "codex"])).toContain("Codex response");
   });
 
-  it("renders persisted Pi session files and reconstructs their unified evidence", () => {
-    const records = [
-      { type: "session", version: 3, id: "pi-session", cwd: "/project" },
-      { type: "message", id: "user", parentId: null, timestamp: "2026-10-08T00:00:00Z", message: { role: "user", content: "PRIVATE_PI_PROMPT" } },
-      { type: "message", id: "answer", parentId: "user", timestamp: "2026-10-08T00:00:01Z", message: { role: "assistant", content: [{ type: "text", text: "Persisted Pi answer" }], usage: { input: 4, output: 2 } } },
-      { type: "context_edit", id: "edit", parentId: "answer", timestamp: "2026-10-08T00:00:02Z", targetId: "answer", replacement: null },
-    ];
-    const file = write("agent-stdio.log", records);
-    const markdown = sessionCLI(["agent-markdown", file, "pi"]);
-    expect(markdown).toContain("Persisted Pi answer");
-    expect(markdown).not.toContain("PRIVATE_PI_PROMPT");
-    const jsonl = sessionCLI(["reconstruct", root, "pi"]);
-    const events = jsonl.trimEnd().split("\n").map(JSON.parse);
-    expect(events[0]).toMatchObject({ type: "session.format", data: { version: 1 } });
-    expect(events.find(event => event.type === "assistant.message")).toMatchObject({ id: "answer", parentId: "user", provenance: { path: "agent-stdio.log" }, data: { content: "Persisted Pi answer" } });
-    expect(events.find(event => event.type === "pi.context_edit").data).toEqual({ targetId: "answer", replacement: null });
-    expect(events.find(event => event.type === "session.result").data).toMatchObject({ numTurns: 1, usage: { inputTokens: 4, outputTokens: 2 } });
-    expect(sessionCLI(["markdown", write("usage/aw_session.jsonl", jsonl)])).not.toContain("PRIVATE_PI_PROMPT");
-  });
-
   it("rejects unrecognized agent logs rather than returning a metadata-only session", () => {
     write("agent-stdio.log", "unrecognized log text\n");
     vi.spyOn(console, "error").mockImplementation(() => {});

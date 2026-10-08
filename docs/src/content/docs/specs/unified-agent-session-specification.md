@@ -3,7 +3,7 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.7.0"
+version: "1.6.1"
 status: Draft
 publication_date: "2026-10-08"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.7.0<br>
+**Version**: 1.6.1<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-08<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.7.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.6.1 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -166,6 +166,12 @@ Dot-namespaced means a type containing a namespace separator, for example `sessi
 **T-UAS-007 — Metadata preservation.** Normalization MUST retain supplied native `id`, `parentId`, `timestamp`, and other source metadata without rewriting their values. Known payload values MUST map to the core fields; other supplied metadata MUST survive as compatible extension fields. When one source record expands into several events, its applicable metadata MUST be retained on those events. A native record ID MUST NOT be replaced with a tool correlation ID or assumed globally unique across such expansion.
 
 Existing native payload fields, including fields not understood by the implementation, remain supported. Native metadata can include source-specific versions; preserving an existing native field is different from adding a specification version field.
+
+The unified model is engine-neutral. Source formats can inform shared concepts
+and identifier names without becoming the canonical envelope or requiring a
+particular engine's persistence, tree navigation, or context-replay behavior.
+[Appendix F](#126-appendix-f-engine-neutral-session-design) compares reusable
+identifiers and distinguishes existing support from prospective extensions.
 
 Copilot dynamic workflow observations (`workflow.run_started`,
 `workflow.run_updated`, and `workflow.run_settled`) retain run identity, attempt
@@ -877,7 +883,7 @@ repeated anonymous text does not establish snapshot coverage.
 
 ### 7.5 Pi
 
-**T-UAS-040 — Pi adapter.** The Pi adapter MUST support recognized flat JSONL, current streaming records, and persisted session JSONL. It MUST preserve observed content, execution events, IDs, source metadata, and provider errors even without a finalized message. It MUST accumulate distinct finalized-message usage and MUST emit canonical `session.result`, not append bare legacy `result` for telemetry.
+**T-UAS-040 — Pi adapter.** The Pi adapter MUST support both recognized flat JSONL and v3 streaming records. It MUST preserve observed streaming content, execution events, IDs, source metadata, and provider errors even without a finalized message. It MUST accumulate distinct finalized-turn usage and MUST emit canonical `session.result`, not append bare legacy `result` for telemetry.
 
 | Source signature | Canonical mapping |
 | --- | --- |
@@ -889,35 +895,8 @@ repeated anonymous text does not establish snapshot coverage.
 | Distinct `turn_end.message.usage` | Sum supplied `input`/`output`; map supplied `cacheRead`/`cacheWrite` to cache-read/cache-creation fields. Preserve other usage/cost data when exposed. |
 | `turn_end.message.errorMessage` | Session/provider error, even when content is empty. |
 | Recognized `agent_end` or other terminal accounting | Reconcile any supplied session snapshot; do not add it again to per-turn totals. |
-| Persisted `message` entries | User content, assistant text/thinking, `toolCall` starts, and `toolResult` completions map to core events. Preserve structured user content and native tool outcomes. |
-| Persisted assistant/tool message metadata | `pi.message_metadata` retains provider/model, response identity, thinking settings, usage, stop reason, tool details, and other supplied message fields apart from content. Unsupported or redacted-only assistant blocks remain `pi.message_content`. |
-| Persisted system messages | Plain content maps to `prompt.system`; prompt-section and tool-loadout patches remain opaque `pi.system_message` observations. |
-| Persisted `model_change`, `thinking_level_change`, `usage`, `compaction`, `context_edit`, `branch_summary`, `custom`, `custom_message`, `label`, `session_info` | Retain as `pi.<type>` extensions with their payloads, IDs, parents, and timestamps. Preserve unknown tree entry kinds the same way. |
-| Other persisted message roles | Direct `bashExecution` remains `pi.bash_execution`, not an invented LLM tool call. Custom, legacy `hookMessage`, summary, and unknown roles remain opaque `pi.message` observations. |
 
 The adapter can discover a reported model from a finalized turn without inventing an earlier model observation. Presentation aliases such as `bash` → `Bash` do not change canonical tool names. Sources lacking duration or cost do not supply zero duration or zero cost.
-
-Persisted files are **raw append-order history**, not Pi's active model-context
-projection. All branches and roots MUST remain represented; compaction and
-`context_edit` entries MUST NOT delete, replace, or recount earlier evidence.
-Distinct persisted message entries MUST NOT be deduplicated by equal content,
-nested message timestamps, response IDs, or reused tool-call IDs. The source
-entry's ISO timestamp remains distinct from its nested message's millisecond
-timestamp. Versions 1–3 are accepted without migrating the source or inventing
-missing legacy tree links. `pi.session_metadata` preserves a supplied native
-file version and fork/clone `parentSession`, independently of the unified
-`session.format` version. Expanded events share the original entry ID and
-parent; these are source-tree links, not newly generated canonical event IDs.
-
-Persisted accounting includes assistant and nested tool usage, standalone
-`usage` entries of any `kind`, and usage supplied by compaction or branch
-summaries. Each identified report contributes once to whole-file totals,
-including abandoned branches; these are not active-branch totals or proof of
-task completion. Only assistant messages contribute to `numTurns`.
-`reasoning` maps to `reasoning_output_tokens` and is already included in
-`output`; `cacheWrite1h` is a subset of `cacheWrite`, not additional tokens.
-Structured system patches, compaction checkpoints, extension context, labels,
-and context edits remain omitted from default conversation summaries.
 
 ### 7.6 Custom engines
 
@@ -1185,7 +1164,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | Copilot | Native `events.jsonl`; legacy input; structured debug responses; known pretty-print layouts; command-only input; MCP server; JSON result blocks; incomplete debug tool call | Native extensions survive; no synthetic debug success/random IDs; display names do not rewrite storage; explicit turns only. |
 | Codex | Known JSONL lifecycle/item shapes and legacy text; partial item start; preserved item IDs; failed command/MCP result; top-level/turn/item errors; two completed turns plus snapshot | Starts/ends retained in observation order; session errors separate; cumulative usage/cache counts; no last-turn-only accounting. |
 | Gemini | Flat JSONL init, user/assistant messages, whitespace-only deltas, tool use/result, final stats, unknown/debug/partial lines; false/zero/object outputs | Exact streaming text; typed outputs; canonical result present; `tool_calls` retained but never used as turns. |
-| Pi | Flat/current streams and persisted v1–v3 session files; branches/roots, context edits, system patches, extension records; orphan tools, partial text, provider errors; per-message, auxiliary, and terminal usage | Preserve source-tree history without context replay; no lost partial tools/text; input/output/cache/reasoning accounting once; absent duration/cost; canonical result only. |
+| Pi | Flat and v3 streams; session metadata; tool end before finalized turn; streaming-only partial turn; orphan end; reasoning; empty-content provider error; two finalized usage reports; terminal snapshot | No reorder for pairing, no lost partial tools/text, cumulative input/output/cache fields once, absent duration/cost, canonical result only. |
 | Custom | Actual native/Claude/Codex signatures; deterministic delegate ties; mixed legacy/events; unrelated JSON, unknown-only dotted record, plain prose, delegate fallback markdown | Correct supported detection and delegation; no false format recognition from parseability or nonempty markdown. |
 | OpenCode | Recognized session/part envelopes; tool lifecycle; distinct step finishes; structured errors; budget/server diagnostics | Source IDs and millisecond timestamps, accounting once, independent failures and absent metrics. |
 | Goose | Message/channel deltas; source-second timestamps; repeated tool observations; structured-only results; zero/invalid cumulative metrics; startup and maximum-turn errors | Exact content, retained identities, snapshot accounting, observed turn counts, explicit malformed-record warnings and no fabricated outcomes. |
@@ -1371,7 +1350,7 @@ These links identify inspected implementation surfaces. They are not external en
 - **[Codex]** [`actions/setup/js/parse_codex_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_codex_log.cjs).
 - **[Gemini]** [`actions/setup/js/parse_gemini_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_gemini_log.cjs).
 - **[Pi]** [`actions/setup/js/parse_pi_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_pi_log.cjs).
-- **[Pi session format]** [Session File Format](https://pi.dev/docs/latest/session-format) and [Message Types](https://pi.dev/docs/latest/message-types), inspected 2026-10-08. Persisted JSONL and runtime streaming events are distinct input formats.
+- **[Session design reference]** [Pi Session File Format](https://pi.dev/docs/latest/session-format) and [Message Types](https://pi.dev/docs/latest/message-types), inspected 2026-10-08. These inform Appendix F; they do not define the unified format or establish persisted-file import support.
 - **[Custom]** [`actions/setup/js/parse_custom_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_custom_log.cjs).
 - **[OpenCode]** [`actions/setup/js/parse_opencode_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_opencode_log.cjs).
 - **[Goose]** [`actions/setup/js/parse_goose_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_goose_log.cjs).
@@ -1622,13 +1601,61 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
+### 12.6 Appendix F: Engine-neutral session design
+
+Pi's session format illustrates useful separation between an append-only
+history, parent-linked branches, and the messages selected for a model request.
+Those concepts apply across engines. The unified format retains its existing
+`type`/`data` envelope, dot-namespaced event vocabulary, optional native metadata,
+source provenance, and independent `session.format` header; it does not adopt
+an engine's session-file layout or require its SDK.
+
+The following comparison reuses identifiers where their meanings fit. Rows
+marked **prospective** are naming guidance for future shared extensions, not
+new core signatures, implemented engine mappings, or context-replay support.
+Names use the existing neutral namespace rather than a provider prefix.
+
+| Concept | Unified event or surface | Reusable identifiers and boundaries |
+| --- | --- | --- |
+| Entry identity and ancestry | Existing event metadata | `id`, `parentId`, `timestamp`. Preserve source values; missing parents do not establish roots. Expanded events can share a source ID, so references also need source provenance and may remain ambiguous. |
+| Session identity | Existing `session.init` | Keep `sessionId` and `cwd`; do not conflate a session ID with an entry ID. `parentSession` is a prospective relationship field, not a requirement for a filesystem path or UUID. |
+| Conversation and tool evidence | Existing message and tool events | Keep `content`, `toolCallId`, and `toolName`. A parent link is not a tool-correlation ID, and equal text or timestamps do not establish duplicate observations. |
+| Context compaction | Prospective `session.compaction` | `summary`, `firstKeptEntryId`, `tokensBefore`, and optional `systemMessage`. A checkpoint describes a context boundary, not deletion of historical evidence. |
+| Context edit | Prospective `session.context_edit` | `targetId`, `replacement`. A null replacement can express omission from future context; empty content remains a replacement, not omission. |
+| Branch summary | Prospective `session.branch_summary` | `fromId`, `summary`, with the existing `parentId` describing ancestry. A summary does not establish which branch is active. |
+| Model or reasoning-setting change | Prospective `session.model_change`, `session.thinking_level_change` | `provider`, `modelId`, `thinkingLevel`. Selected settings are distinct from the model reported by an actual response. |
+| Prompt/tool-loadout patch | Prospective `prompt.system_patch` | `sections`, `toolsAdded`, `toolsRemoved`. A patch is distinct from an exact `prompt.system` content snapshot. |
+| Extension state and context | Prospective `session.custom`, `session.custom_message` | `customType`, `data`, `content`, `display`. Persisted state is not automatically model context, and a display flag does not authorize publication. |
+| Bookmark or display name | Prospective `session.label`, `session.info` | `targetId`, `label`, `name`. These annotate evidence rather than changing tool outcomes or accounting. |
+| Independent usage | Existing `usage.report` | Keep the existing `provider`, `model`, and normalized `usage` fields. A separate report is not automatically an additional contribution to a session total. |
+
+Shared concepts should have neutral identifiers; genuinely engine-specific
+observations can continue to use native extension namespaces. This comparison
+does not rename existing event types, replace canonical token keys with a
+provider's aliases, or register the prospective payloads in generated schemas.
+Unknown extension payloads remain opaque under the existing preservation
+contract until their shared semantics are defined and implemented.
+
+Historical evidence and model-context projections are separate views. A future
+context-aware reader would need an explicit branch selection and source-scoped
+reference resolution before applying compaction or edits. Native IDs alone are
+not guaranteed unique after normalization, and provenance positions identify
+observations rather than inventing tree nodes. Neither an edit nor a branch
+switch proves that earlier usage should be subtracted. Whole-history,
+selected-branch, and per-request accounting scopes need explicit definitions
+rather than an engine-specific default.
+
+This is a design comparison only. It adds no Pi session importer, changes no
+existing adapter behavior, and leaves serialization-format version `1`
+unchanged.
+
 ## 13. Change Log (Informative)
 
-### Version 1.7.0 — Draft (2026-10-08)
+### Version 1.6.1 — Draft (2026-10-08)
 
-- Added persisted Pi session-file mappings, preserving raw branches, system patches, context edits, compaction checkpoints, and extension state.
-- Included persisted auxiliary usage and source-reported reasoning tokens without double-counting output or cache subsets.
-- Retained numeric serialization-format version 1; Pi-specific observations use the existing open extension vocabulary.
+- Clarified the engine-neutral boundary and added an informative comparison of reusable session-tree and context identifiers.
+- Distinguished existing event support from prospective neutral extension names and context-replay behavior.
+- Retained existing engine mappings, generated schemas, and numeric serialization-format version 1.
 
 ### Version 1.6.0 — Draft (2026-10-05)
 
