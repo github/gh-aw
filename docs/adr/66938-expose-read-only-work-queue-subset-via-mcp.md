@@ -1,18 +1,18 @@
 # ADR-66938: Expose a Minimal Read-Only Work-Queue Subset Through the MCP Server
 
 **Date**: 2026-10-08
-**Status**: Draft
-**Deciders**: pelikhan (PR #66938 author) [TODO: verify other reviewers]
+**Status**: Accepted
+**Deciders**: pelikhan (PR #66938 author)
 
 ---
 
 ### Context
 
-AI clients connected to the `gh aw mcp-server` need to observe the Git-backed work queue (Work items, Claims, dependencies, delivery barriers) to reason about in-flight agentic work, but giving them queue mutation capability (publish, claim, dispatch, cancel) would let an agent change shared coordination state. The existing work-queue functionality is implemented as CLI subcommands with JSON output, filtering, pagination, and Git credential handling already in place. The MCP surface previously shipped the tool set `compile`, `audit`, `logs`, `inspect`, `status`, `audit-diff` and had no work-queue visibility at all. Any new tool must fit the repository's MCP conventions: a generated JSON schema, an allowlisted argument registry (`mcpToolParams`), registration in `mcp_server.go`, and inclusion in generated `.github/mcp.json` configuration.
+AI clients connected to the `gh aw mcp-server` need to observe the Git-backed work queue (Work items, Claims, dependencies, delivery barriers) to reason about in-flight agentic work, but giving them queue mutation capability (publish, claim, dispatch, cancel) would let an agent change shared coordination state. The existing work-queue functionality is implemented as CLI subcommands with JSON output, filtering, pagination, and GitHub API credential handling already in place. The MCP server previously had no work-queue visibility. Any new tool must fit the repository's MCP conventions: a generated JSON schema, an allowlisted argument registry (`mcpToolParams`), registration in `mcp_server.go`, and inclusion in generated `.github/mcp.json` configuration.
 
 ### Decision
 
-We will expose exactly one MCP tool, `work-queue`, that supports only two read-only operations: `state` (bounded, metadata-only Work/Claim forest with filters and pagination) and `inspect` (details for exactly one `work_id` or `claim_id`). The tool is a thin wrapper that shells out to the existing CLI (`work-queue <operation> --json --storage=git`) rather than reimplementing queue access, is annotated `ReadOnlyHint`/`IdempotentHint`, requires an explicit `repo` (with `branch` defaulting to `work-queue`), and rejects any argument that does not belong to the selected operation. All other read-only operations (`replay`, `stats`, `explain`, `trace`, `evidence`) and every mutating operation remain CLI-only. The primary drivers are capability minimization (no mutation path reachable from an agent) and bounded response size for MCP clients.
+Expose exactly one MCP tool, `work-queue`, that supports only two read-only operations: `state` (bounded, metadata-only Work/Claim forest with filters and pagination) and `inspect` (details for exactly one `work_id` or `claim_id`). The tool is a thin wrapper that executes the existing CLI directly, without a shell (`work-queue <operation> --json --storage=git`), rather than reimplementing queue access. It is annotated `ReadOnlyHint`/`IdempotentHint`, requires an explicit `repo` (with `branch` defaulting to `work-queue`), and rejects any argument that does not belong to the selected operation. Invalid selectors and state filters are rejected as invalid MCP parameters before execution; actual execution failures remain internal errors. All other read-only operations (`replay`, `stats`, `explain`, `trace`, `evidence`) and every mutating operation remain CLI-only. The primary drivers are capability minimization (no queue mutation path reachable through this tool) and bounded metadata responses for MCP clients.
 
 ### Alternatives Considered
 
@@ -22,19 +22,19 @@ Register separate `work-queue-state`, `work-queue-inspect`, (and later `work-que
 
 #### Alternative 2: Expose all read-only work-queue operations
 
-Ship `state`, `inspect`, `replay`, `stats`, `explain`, `trace`, and `evidence` through MCP since none of them mutate state. Rejected because several of these produce large or unbounded output that is poorly suited to MCP response limits, and because each exposed operation is additional attack and support surface that has not yet been shown to be needed by AI clients. The narrower subset can be widened later; it cannot easily be narrowed once clients depend on it.
+Ship `state`, `inspect`, `replay`, `stats`, `explain`, `trace`, and `evidence` through MCP since none of them mutate state. The initial implementation exposed this set, but the author requested only the essentials. `state` already supplies counts, and `inspect` supplies item details. Full replay can expose payloads and produce large output; the other operations add specialized diagnostics beyond this initial need. The narrower subset can be widened later; it cannot easily be narrowed once clients depend on it.
 
 #### Alternative 3: Call the work-queue Go packages directly instead of shelling out to the CLI
 
-Invoke the internal queue/Git APIs in-process for lower latency and no subprocess cost. Rejected because the CLI already owns JSON shaping, filtering, pagination defaults, storage selection, and credential handling; duplicating that in the MCP layer would create two code paths that can drift. [TODO: verify no latency requirement makes the subprocess hop unacceptable.]
+Invoke the internal queue/GitHub APIs in-process for lower latency and no subprocess cost. Not selected because the CLI already owns JSON shaping, filtering, pagination defaults, storage selection, and credential handling. Reusing its command path follows the server's existing subprocess pattern and avoids a second presentation path. This change makes no latency guarantee; a future optimization can extract shared presentation helpers if subprocess overhead becomes material.
 
 ### Consequences
 
 #### Positive
-- Agents gain queue observability with no reachable mutation path; the tool is annotated read-only and idempotent.
+- Agents gain queue observability with no reachable queue mutation path through this tool; it is annotated read-only and idempotent.
 - Output formatting, filtering, pagination, and Git credentials are reused from the CLI, so MCP and CLI results stay consistent by construction.
 - Argument allowlisting per operation (`offset >= 0`, `limit` in 1..256, flag-attached values) prevents option smuggling into the executed command line.
-- Responses are bounded by default (`limit` default 80, max 256), protecting MCP clients from oversized payloads.
+- State output is bounded by both row pagination (`limit` default 80, max 256) and the CLI's 64 KiB view budget. Inspect detail text uses the same view budget; neither operation exposes work payloads or receipt bodies.
 
 #### Negative
 - Each tool call spawns a `gh aw work-queue` subprocess, adding process-startup latency compared with an in-process call.
@@ -49,4 +49,4 @@ Invoke the internal queue/Git APIs in-process for lower latency and no subproces
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Finalized for PR #66938.*

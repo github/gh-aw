@@ -78,8 +78,14 @@ func workQueueMCPCommand(args workQueueArgs, raw json.RawMessage) ([]string, err
 	var options []string
 	switch args.Operation {
 	case "state":
+		if args.State != "" && !slices.Contains([]string{"available", "claimed", "completed", "cancelled"}, args.State) {
+			return nil, errors.New("state must be available, claimed, completed, or cancelled")
+		}
 		options = []string{"graph", "pool", "state", "search", "offset", "limit"}
 	case "inspect":
+		if (args.WorkID == "") == (args.ClaimID == "") {
+			return nil, errors.New("provide exactly one of work_id or claim_id")
+		}
 		options = []string{"work_id", "claim_id"}
 	default:
 		return nil, fmt.Errorf("unsupported read-only operation %q", args.Operation)

@@ -5,12 +5,12 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"maps"
 	"os/exec"
 	"slices"
 	"testing"
 
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,6 +29,11 @@ func TestWorkQueueToolOperations(t *testing.T) {
 			`{"status":"committed_snapshot","rows":[],"next_offset":2}`},
 		{"inspect", map[string]any{"work_id": "work"}, []string{"--work-id=work"}, `{"details":"metadata"}`},
 		{"inspect", map[string]any{"claim_id": "claim"}, []string{"--claim-id=claim"}, `{"details":"claim metadata"}`},
+		{"inspect", map[string]any{"work_id": "work", "claim_id": ""}, []string{"--work-id=work", "--claim-id="}, `{"details":"metadata"}`},
+		{"inspect", map[string]any{"work_id": "", "claim_id": "claim"}, []string{"--work-id=", "--claim-id=claim"}, `{"details":"claim metadata"}`},
+		{"state", map[string]any{"state": "claimed"}, []string{"--state=claimed"}, `{"rows":[]}`},
+		{"state", map[string]any{"state": "completed"}, []string{"--state=completed"}, `{"rows":[]}`},
+		{"state", map[string]any{"state": "cancelled"}, []string{"--state=cancelled"}, `{"rows":[]}`},
 		{"state", map[string]any{"limit": 256}, []string{"--limit=256"}, `{"rows":[]}`},
 	}
 	for _, tt := range tests {
@@ -123,6 +128,7 @@ func TestWorkQueueToolDefaultsAndExplicitEmptyFlags(t *testing.T) {
 	}{
 		{`{"operation":"state"}`, nil},
 		{`{"operation":"state","pool":""}`, []string{"--pool="}},
+		{`{"operation":"state","state":""}`, []string{"--state="}},
 	} {
 		var args workQueueArgs
 		require.NoError(t, json.Unmarshal([]byte(tt.raw), &args))
@@ -152,13 +158,11 @@ func TestWorkQueueToolErrors(t *testing.T) {
 			server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
 			require.NoError(t, registerWorkQueueTool(server, tt.exec))
 			session := connectInMemory(t, server)
-			result, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "work-queue", Arguments: map[string]any{"operation": "state", "repo": "owner/repo"}})
-			if err != nil {
-				assert.Contains(t, err.Error(), tt.expect)
-			} else {
-				require.True(t, result.IsError)
-				assert.Contains(t, extractTextResult(t, result), tt.expect)
-			}
+			_, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "work-queue", Arguments: map[string]any{"operation": "state", "repo": "owner/repo"}})
+			var rpcErr *jsonrpc.Error
+			require.ErrorAs(t, err, &rpcErr)
+			assert.Equal(t, int64(jsonrpc.CodeInternalError), rpcErr.Code)
+			assert.Contains(t, rpcErr.Message, tt.expect)
 		})
 	}
 }
@@ -211,11 +215,14 @@ func TestWorkQueueToolSchema(t *testing.T) {
 	}
 }
 
-func TestWorkQueueToolCLIValidation(t *testing.T) {
+func TestWorkQueueToolSelectorValidation(t *testing.T) {
 	t.Parallel()
 	for _, raw := range []string{
 		`{"operation":"inspect","work_id":"work","claim_id":"claim"}`,
 		`{"operation":"inspect"}`,
+		`{"operation":"inspect","work_id":""}`,
+		`{"operation":"inspect","claim_id":""}`,
+		`{"operation":"inspect","work_id":"","claim_id":""}`,
 		`{"operation":"state","state":"invalid"}`,
 	} {
 		t.Run(raw, func(t *testing.T) {
@@ -223,14 +230,26 @@ func TestWorkQueueToolCLIValidation(t *testing.T) {
 			var args workQueueArgs
 			require.NoError(t, json.Unmarshal([]byte(raw), &args))
 			cmdArgs, err := workQueueMCPCommand(args, json.RawMessage(raw))
-			require.NoError(t, err)
-			cmd := NewWorkCommand()
-			cmd.SetOut(io.Discard)
-			cmd.SetErr(io.Discard)
-			cmd.SetArgs(cmdArgs[1:])
-			err = cmd.Execute()
 			require.Error(t, err)
-			assert.NotContains(t, err.Error(), "repo must be owner/repo", "CLI selector validation must fail before reading the queue")
+			assert.Nil(t, cmdArgs)
+
+			executed := false
+			mockExec := func(ctx context.Context, args ...string) *exec.Cmd {
+				executed = true
+				return mockCommandWithOutput(`{}`, "")(ctx, args...)
+			}
+			server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
+			require.NoError(t, registerWorkQueueTool(server, mockExec))
+			session := connectInMemory(t, server)
+			var options map[string]any
+			require.NoError(t, json.Unmarshal([]byte(raw), &options))
+			options["repo"] = "owner/repo"
+			_, err = session.CallTool(context.Background(), &mcp.CallToolParams{Name: "work-queue", Arguments: options})
+			var rpcErr *jsonrpc.Error
+			require.ErrorAs(t, err, &rpcErr)
+			assert.Equal(t, int64(jsonrpc.CodeInvalidParams), rpcErr.Code)
+			assert.Contains(t, rpcErr.Message, "invalid work-queue arguments")
+			assert.False(t, executed, "selector validation must fail before executing a subprocess")
 		})
 	}
 }
