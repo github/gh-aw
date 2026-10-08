@@ -262,6 +262,11 @@ model inventory; development compilation fails if that inventory is unavailable
 and the workflow declares `models` policies or `engine.models`. It does not prove
 live model availability.
 
+Copilot's explicitly enabled `engine.dynamic-workflows: true` is supported in
+development testing. Its experimental-feature notice is informational in
+`--dry-run` mode, not a compiler warning; other experimental-feature warnings,
+including LSP, still fail the gate.
+
 Docker-based scanners and `--validate-images` remain opt-in. Docker unavailability
 does not block the dry-run gate; install native `shellcheck` for required run-step
 linting without Docker. When Docker is available, running `gh aw validate my-workflow`

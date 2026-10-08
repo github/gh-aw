@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,4 +62,73 @@ func TestCopilotDynamicWorkflowsExperimentalWarning(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCopilotDynamicWorkflowsDryRunNotice(t *testing.T) {
+	const notice = "Using experimental feature: copilot.dynamic-workflows"
+	for _, enabled := range []bool{false, true} {
+		for _, sdk := range []bool{false, true} {
+			for _, batch := range []bool{false, true} {
+				compiler := NewCompiler()
+				compiler.SetDryRun(true)
+				compiler.SetBatchMode(batch)
+				data := &WorkflowData{EngineConfig: &EngineConfig{
+					ID: "copilot", DynamicWorkflows: &enabled, CopilotSDK: sdk,
+				}}
+				var output bytes.Buffer
+				compiler.emitExperimentalFeatureWarningsTo(data, &output)
+
+				assert.Zero(t, compiler.GetWarningCount(), "dry-run supports explicitly enabled Copilot dynamic workflows")
+				if enabled && batch {
+					assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()[notice])
+				} else {
+					assert.Zero(t, compiler.GetExperimentalFeatureUsage()[notice])
+				}
+				if enabled && !batch {
+					assert.Contains(t, output.String(), notice)
+					assert.Contains(t, output.String(), "i ")
+				} else {
+					assert.Empty(t, output.String())
+				}
+			}
+		}
+	}
+}
+
+func TestCopilotDynamicWorkflowsDryRunPreservesOtherWarnings(t *testing.T) {
+	enabled := true
+	for _, batch := range []bool{false, true} {
+		compiler := NewCompiler()
+		compiler.SetDryRun(true)
+		compiler.SetBatchMode(batch)
+		compiler.IncrementWarningCount()
+		data := &WorkflowData{
+			EngineConfig: &EngineConfig{ID: "copilot", DynamicWorkflows: &enabled},
+			LSP:          map[string]LSPServerConfig{"typescript": {Command: "typescript-language-server"}},
+		}
+		var output bytes.Buffer
+		compiler.emitExperimentalFeatureWarningsTo(data, &output)
+
+		assert.Equal(t, 2, compiler.GetWarningCount(), "existing diagnostics and LSP must remain blocking")
+		if batch {
+			assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()["Using experimental feature: lsp"])
+		} else {
+			assert.Contains(t, output.String(), "Using experimental feature: lsp")
+		}
+	}
+}
+
+type failingExperimentalFeatureWriter struct{}
+
+func (failingExperimentalFeatureWriter) Write([]byte) (int, error) {
+	return 0, io.ErrClosedPipe
+}
+
+func TestCopilotDynamicWorkflowsDryRunDiagnosticWriteFailure(t *testing.T) {
+	enabled := true
+	compiler := NewCompiler()
+	compiler.SetDryRun(true)
+	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", DynamicWorkflows: &enabled}}
+	compiler.emitExperimentalFeatureWarningsTo(data, failingExperimentalFeatureWriter{})
+	assert.Equal(t, 1, compiler.GetWarningCount(), "a failed informational diagnostic must block dry-run compilation")
 }

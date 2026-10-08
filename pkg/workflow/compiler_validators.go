@@ -533,10 +533,11 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		detectionConfigured = isFeatureInEnvironment(string(constants.GHAWDetectionFeatureFlag), false)
 	}
 	warnings := []struct {
-		enabled bool
-		message string
+		enabled         bool
+		message         string
+		dryRunSupported bool
 	}{
-		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows"},
+		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows", dryRunSupported: true},
 		{enabled: workflowData.RateLimit != nil, message: "Using experimental feature: rate limiting"},
 		{enabled: workflowData.Graders != nil && workflowData.Graders.HasGraders(), message: "Using experimental feature: graders"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.DispatchRepository != nil, message: "Using experimental feature: dispatch-repository"},
@@ -564,17 +565,28 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		if warning.enabled {
 			if c.batchMode {
 				c.featureUsage[warning.message]++
+			} else if c.dryRun && warning.dryRunSupported {
+				c.writeExperimentalFeatureDiagnostic(writer, console.FormatInfoMessage(warning.message))
 			} else {
-				fmt.Fprintln(writer, console.FormatWarningMessageStderr(warning.message))
+				c.writeExperimentalFeatureDiagnostic(writer, console.FormatWarningMessageStderr(warning.message))
 			}
-			c.IncrementWarningCount()
+			if !c.dryRun || !warning.dryRunSupported {
+				c.IncrementWarningCount()
+			}
 		}
 	}
 
 	if shouldWarnSparseInteractionCells(workflowData) {
-		fmt.Fprintln(writer, console.FormatWarningMessageStderr(
+		c.writeExperimentalFeatureDiagnostic(writer, console.FormatWarningMessageStderr(
 			"experiments: potential sparse interaction cells detected (multiple active experiments with weighted traffic). "+
 				"Reporting should include factorial K1×K2 cell diagnostics before recommending promotion."))
+		c.IncrementWarningCount()
+	}
+}
+
+func (c *Compiler) writeExperimentalFeatureDiagnostic(writer io.Writer, message string) {
+	if _, err := fmt.Fprintln(writer, message); err != nil {
+		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to write experimental feature diagnostic: %v", err)))
 		c.IncrementWarningCount()
 	}
 }

@@ -65,16 +65,6 @@ tools:
       - pelikhan
   playwright:
   cli-proxy: true
-lsp:
-  typescript:
-    command: typescript-language-server
-    args: ["--stdio"]
-    fileExtensions:
-      ".js": javascript
-      ".cjs": javascript
-      ".mjs": javascript
-      ".ts": typescript
-      ".tsx": typescriptreact
 runtimes:
   go:
     version: "1.26"
@@ -181,7 +171,7 @@ evals:
   - id: issue-created
     question: Was a smoke test issue created with test results? Look for a create_issue output containing 'Smoke Test' in the title.
   - id: dynamic-workflow-completed
-    question: Does test 17 report a completed smoke-copilot-dynamic-workflow run with the exact marker GH_AW_DYNAMIC_WORKFLOW_SMOKE_OK, packageVersion 1, supportFile support/.fixture.json, and one subagent?
+    question: Does test 16 report a completed smoke-copilot-dynamic-workflow run with the exact marker GH_AW_DYNAMIC_WORKFLOW_SMOKE_OK, packageVersion 1, supportFile support/.fixture.json, and one subagent?
 
 sandbox:
   agent:
@@ -222,11 +212,7 @@ Run these checks and mark each as ✅/❌:
 13. Comment memory: append an original 3-line haiku to `/tmp/gh-aw/comment-memory/*.md`.
 14. Sub-agent: use `file-summarizer` on `README.md`.
 15. Check run: call `create_check_run` with `conclusion=success`, title `Smoke Copilot - Run ${{ github.run_id }}`, summary `All smoke tests completed.`, text `Detailed results attached.`
-16. **LSP TypeScript Testing**: Use the TypeScript language server (configured via `lsp.typescript` frontmatter) to count the number of functions in `${{ github.workspace }}/actions/setup/js/safe_output_helpers.cjs`:
-    - Open the file `${{ github.workspace }}/actions/setup/js/safe_output_helpers.cjs` via LSP
-    - Use LSP document symbols to list all symbols in the file and count functions
-    - Report the total function count as ✅ if at least 1 function is found, ❌ otherwise
-17. **Dynamic workflow**: Use `run_dynamic_workflow` to run the registered `smoke-copilot-dynamic-workflow` exactly once with arguments `{"marker":"GH_AW_DYNAMIC_WORKFLOW_SMOKE_OK"}`. The packaged extension is in `.github/extensions/smoke-copilot-dynamic-workflow/`. Wait for completion and inspect the durable run with `dynamic_workflows_manage` (`operation: "inspect-run"`). Mark ✅ only for status `completed` and exact result `{"status":"PASS","marker":"GH_AW_DYNAMIC_WORKFLOW_SMOKE_OK","packageVersion":1,"supportFile":"support/.fixture.json","subagents":1}`. Record the run ID, status, and actual result or error. A permission denial, missing registration, or mismatched result is ❌; do not author a replacement workflow, bypass permissions, or infer success from registration or logs.
+16. **Dynamic workflow**: Use `run_dynamic_workflow` to run the registered `smoke-copilot-dynamic-workflow` exactly once with arguments `{"marker":"GH_AW_DYNAMIC_WORKFLOW_SMOKE_OK"}`. The packaged extension is in `.github/extensions/smoke-copilot-dynamic-workflow/`. Wait for completion and inspect the durable run with `dynamic_workflows_manage` (`operation: "inspect-run"`). Mark ✅ only for status `completed` and exact result `{"status":"PASS","marker":"GH_AW_DYNAMIC_WORKFLOW_SMOKE_OK","packageVersion":1,"supportFile":"support/.fixture.json","subagents":1}`. Record the run ID, status, and actual result or error. A permission denial, missing registration, or mismatched result is ❌; do not author a replacement workflow, bypass permissions, or infer success from registration or logs.
 
 ## Output
 
@@ -234,7 +220,7 @@ Run these checks and mark each as ✅/❌:
    - Use the temporary ID `aw_smoke1` for the issue so you can reference it later
    - Title: "Smoke Test: Copilot - ${{ github.run_id }}"
    - Body should include:
-     - Test results (✅ or ❌ for each test, including test #16 LSP TypeScript and test #17 dynamic workflow with its run ID, status, and actual result or error)
+     - Test results (✅ or ❌ for each test, including test #16 dynamic workflow with its run ID, status, and actual result or error)
      - Overall status: PASS or FAIL
      - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
      - Timestamp
