@@ -538,7 +538,7 @@ func buildEvalsModelFallbackExpression(engineID string) string {
 	case string(constants.ClaudeEngine):
 		return compilerenv.BuildModelOverrideExpression(constants.EnvVarModelEvalsClaude, compilerenv.DefaultModelClaude, constants.SonnetDefaultModel)
 	case string(constants.CodexEngine):
-		return compilerenv.BuildModelOverrideExpressionWithoutFallback(constants.EnvVarModelEvalsCodex, compilerenv.DefaultModelCodex)
+		return compilerenv.BuildModelOverrideExpression(constants.EnvVarModelEvalsCodex, compilerenv.DefaultModelCodex, constants.CodexDefaultModel)
 	default:
 		return ""
 	}

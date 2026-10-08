@@ -203,8 +203,8 @@ func TestBuildModelOverrideExpression(t *testing.T) {
 	)
 	assert.Equal(
 		t,
-		"${{ vars.GH_AW_MODEL_AGENT_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX }}",
-		BuildModelOverrideExpressionWithoutFallback("GH_AW_MODEL_AGENT_CODEX", "GH_AW_DEFAULT_MODEL_CODEX"),
+		"${{ vars.GH_AW_MODEL_AGENT_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}",
+		BuildModelOverrideExpressionEmptyFallback("GH_AW_MODEL_AGENT_CODEX", "GH_AW_DEFAULT_MODEL_CODEX"),
 	)
 }
 

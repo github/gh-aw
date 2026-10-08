@@ -487,13 +487,13 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	applyEngineHarnessRetryEnv(env, workflowData)
 	if modelConfigured {
 		if containsExpression(workflowData.Model) {
-			env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpressionWithoutFallback(modelEnvVar, compilerenv.DefaultModelCodex)
+			env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)
 		}
 		model := codexModelID(workflowData.Model)
 		codexEngineLog.Printf("Setting %s env var for model: %s", modelEnvVar, model)
 		env[modelEnvVar] = model
 	} else {
-		env[modelEnvVar] = compilerenv.BuildModelOverrideExpressionWithoutFallback(modelEnvVar, compilerenv.DefaultModelCodex)
+		env[modelEnvVar] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)
 	}
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, codexEngineLog)

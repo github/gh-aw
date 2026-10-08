@@ -203,7 +203,7 @@ func TestCodexHasNoImplicitFallbackModel(t *testing.T) {
 		}
 		env := NewCodexEngine().buildCodexExecutionEnv(data, false, true, phase.modelVar)
 		require.Equal(t, data.Model, env[phase.modelVar])
-		require.Equal(t, "${{ vars."+phase.modelVar+" || vars.GH_AW_DEFAULT_MODEL_CODEX }}", env[constants.EnvVarModelFallback])
+		require.Equal(t, "${{ vars."+phase.modelVar+" || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}", env[constants.EnvVarModelFallback])
 	}
-	require.Equal(t, "${{ vars.GH_AW_MODEL_EVALS_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX }}", buildEvalsModelFallbackExpression("codex"))
+	require.Equal(t, "${{ vars.GH_AW_MODEL_EVALS_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}", buildEvalsModelFallbackExpression("codex"))
 }
