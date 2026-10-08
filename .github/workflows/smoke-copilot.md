@@ -26,7 +26,7 @@ name: Smoke Copilot
 engine:
   id: copilot
   dynamic-workflows: true
-  args: ["--experimental"]
+  args: ["--experimental", "--allow-url", "github.com", "--allow-url", "http://host.docker.internal:4173"]
   fallback-models:
     - copilot/gpt-5.4
     - copilot/claude-sonnet-5
@@ -183,6 +183,14 @@ sandbox:
 {{#if experiments.caveman }}
 Talk like a caveman in all your responses and outputs. Use short, broken sentences. Me test. You run.
 {{/if}}
+
+## Execution Order and Failures
+
+Run test 16 (dynamic workflow) first, before any shell or MCP checks, and record
+its actual durable result or error. Do not skip it because another test fails.
+Continue independent checks after a failure; never retry a denied operation or
+expand permissions. Report failed or unavailable checks explicitly instead of
+ending the suite after the first denial.
 
 ## Hard Limit: `add_comment` Budget
 
