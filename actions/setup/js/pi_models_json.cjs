@@ -303,7 +303,7 @@ function resolvePiRoutingEndpoint({ reflectData, modelId, api }) {
   const endpoint = PI_API_ROUTING_ENDPOINTS[api] || null;
   const routingModel = getAWFRoutingModel(reflectData, modelId);
   const supportedEndpoints = routingModel?.supported_endpoints;
-  if (reflectData?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
+  if (routingModel?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
     return { endpoint, error: `AWF /reflect cannot verify endpoints for Pi model ${modelId}; candidate metadata is incomplete` };
   }
   if (!endpoint || !supportedEndpoints.includes(endpoint)) {

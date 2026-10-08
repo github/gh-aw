@@ -70,7 +70,7 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
     }
     const routingModel = getAWFRoutingModel(reflectData, wireModel);
     const supportedEndpoints = routingModel?.supported_endpoints;
-    if (reflectData.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
+    if (routingModel?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
       return { selection: null, error: `AWF /reflect cannot verify endpoints for model ${wireModel}; candidate metadata is incomplete for engine API ${allowedEndpoints.join(", ")}` };
     }
     effectiveEndpoint = allowedEndpoints.find(candidate => supportedEndpoints.includes(candidate)) || "";

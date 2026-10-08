@@ -26,11 +26,22 @@ describe("awf_model_routing.cjs", () => {
   it("uses an engine-compatible endpoint from complete routing metadata and preserves AWF's selection", () => {
     const reflect = {
       ...reflectData,
-      candidate_metadata_complete: true,
+      models_fetch_complete: true,
       endpoints: [
         {
           ...reflectData.endpoints[0],
-          routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/v1/messages", "/chat/completions"] }],
+          provider: "copilot",
+          routing_models: [
+            {
+              model_id: "claude-opus-5",
+              source: "provider",
+              supported_endpoints: ["/v1/messages", "/chat/completions"],
+              supported_reasoning_efforts: ["low", "medium", "high", "xhigh", "max"],
+              context_window_tokens: 1000000,
+              candidate_metadata_complete: true,
+            },
+            { model_id: "claude-haiku-4.5", source: "provider", supported_endpoints: ["/chat/completions", "/v1/messages"], supported_reasoning_efforts: [], context_window_tokens: 200000, candidate_metadata_complete: true },
+          ],
         },
       ],
       routing: {
@@ -45,13 +56,19 @@ describe("awf_model_routing.cjs", () => {
   });
 
   it.each([
-    [{ candidate_metadata_complete: false, routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/v1/messages"] }] }, "metadata is incomplete"],
-    [{ candidate_metadata_complete: true, routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/responses"] }] }, "advertises endpoints"],
-    [{ candidate_metadata_complete: true, routing_models: [] }, "metadata is incomplete"],
-  ])("fails closed when the model endpoint metadata cannot verify a compatible endpoint: %s", ({ candidate_metadata_complete, routing_models }, error) => {
+    [[{ model_id: "claude-opus-5", candidate_metadata_complete: false, supported_endpoints: ["/v1/messages"] }], "metadata is incomplete"],
+    [
+      [
+        { model_id: "claude-opus-5", supported_endpoints: ["/v1/messages"] },
+        { model_id: "claude-haiku-4.5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] },
+      ],
+      "metadata is incomplete",
+    ],
+    [[{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/responses"] }], "advertises endpoints"],
+    [[], "metadata is incomplete"],
+  ])("fails closed when the model endpoint metadata cannot verify a compatible endpoint: %s", (routing_models, error) => {
     const reflect = {
       ...reflectData,
-      candidate_metadata_complete,
       endpoints: [{ ...reflectData.endpoints[0], routing_models }],
       routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" } },
     };

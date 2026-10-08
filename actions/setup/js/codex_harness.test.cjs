@@ -154,8 +154,7 @@ describe("codex_harness.cjs", () => {
       [
         {
           ...reflectData,
-          candidate_metadata_complete: true,
-          endpoints: [{ ...reflectData.endpoints[0], routing_models: [{ model_id: "gpt-5.6-sol", supported_endpoints: ["/v1/messages"] }] }],
+          endpoints: [{ ...reflectData.endpoints[0], routing_models: [{ model_id: "gpt-5.6-sol", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] }] }],
           routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/v1/messages" } },
         },
         "advertises endpoints [/v1/messages]",
@@ -168,8 +167,7 @@ describe("codex_harness.cjs", () => {
     it("uses the Responses endpoint for a routed GPT model selected on Chat Completions", () => {
       const reflect = {
         ...reflectData,
-        candidate_metadata_complete: true,
-        endpoints: [{ ...reflectData.endpoints[0], routing_models: [{ model_id: "gpt-5.6-sol", supported_endpoints: ["/chat/completions", "/responses"] }] }],
+        endpoints: [{ ...reflectData.endpoints[0], routing_models: [{ model_id: "gpt-5.6-sol", candidate_metadata_complete: true, supported_endpoints: ["/chat/completions", "/responses"] }] }],
         routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" } },
       };
       const result = resolveCodexModelRouting(reflect, ["exec"]);

@@ -204,8 +204,7 @@ describe("claude_harness.cjs", () => {
     it("uses the Messages endpoint for a routed model selected on Chat Completions", async () => {
       const reflect = {
         ...routedReflect,
-        candidate_metadata_complete: true,
-        endpoints: [{ ...routedReflect.endpoints[0], routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/chat/completions", "/v1/messages"] }] }],
+        endpoints: [{ ...routedReflect.endpoints[0], routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/chat/completions", "/v1/messages"] }] }],
         routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, effort: "max", endpoint: "/chat/completions" } },
       };
       const messages = [];
@@ -237,8 +236,7 @@ describe("claude_harness.cjs", () => {
         stubScript,
         reflectData: {
           ...routedReflect,
-          candidate_metadata_complete: true,
-          endpoints: [{ ...routedReflect.endpoints[0], routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/responses"] }] }],
+          endpoints: [{ ...routedReflect.endpoints[0], routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/responses"] }] }],
           routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, endpoint: "/responses" } },
         },
         extraEnv: { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github", GH_AW_SAFE_OUTPUTS: "" },
