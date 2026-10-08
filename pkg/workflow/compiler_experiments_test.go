@@ -3,9 +3,14 @@
 package workflow
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -223,6 +228,101 @@ func TestRewriteActivationOutputsToLocalStepOutputs(t *testing.T) {
 	assert.Equal(t, "no reference here", RewriteActivationOutputsToLocalStepOutputs("no reference here", experiments))
 	// Undeclared experiment names are left untouched.
 	assert.Equal(t, "${{ needs.activation.outputs.unknown }}", RewriteActivationOutputsToLocalStepOutputs("${{ needs.activation.outputs.unknown }}", experiments))
+}
+
+func TestWriteSubagentModelDeclarationsExperimentExpressions(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		model        string
+		wantModel    string
+		wantPatterns []string
+	}{
+		{"experiment", "${{ experiments.subagent_model }}", "${{ steps.pick-experiment.outputs.subagent_model }}", []string{"github-copilot/gpt-5-mini", "github-copilot/gpt-5.4"}},
+		{"fallback metadata rewrite only", "${{ experiments.subagent_model || 'small' }}", "${{ steps.pick-experiment.outputs.subagent_model || 'small' }}", nil},
+		{"literal in expression", "${{ format('experiments.subagent_model-{0}', experiments.subagent_model) }}", "${{ format('experiments.subagent_model-{0}', steps.pick-experiment.outputs.subagent_model) }}", nil},
+		{"downstream output", "${{ needs.activation.outputs.subagent_model }}", "${{ steps.pick-experiment.outputs.subagent_model }}", []string{"github-copilot/gpt-5-mini", "github-copilot/gpt-5.4"}},
+		{"other context", "${{ inputs.model }}", "${{ inputs.model }}", nil},
+		{"undeclared experiment", "${{ experiments.unknown }}", "${{ experiments.unknown }}", nil},
+		{"static model", "gpt-5.4", "gpt-5.4", []string{"github-copilot/gpt-5.4"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{
+				Experiments:    map[string][]string{"subagent_model": {"small", "large"}},
+				ModelMappings:  map[string][]string{"small": {"copilot/gpt-5-mini"}, "large": {"copilot/gpt-5.4"}},
+				SubAgentModels: []parser.SubAgentModel{{Name: "reader", Model: test.model}},
+			}
+			var generated strings.Builder
+			writeSubagentModelDeclarations(&generated, data, "copilot")
+			var env map[string]string
+			require.NoError(t, yaml.Unmarshal([]byte(generated.String()), &env))
+			var declarations []struct {
+				Name     string   `json:"name"`
+				Model    string   `json:"model"`
+				Patterns []string `json:"patterns"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(env["GH_AW_INFO_SUB_AGENT_MODELS"]), &declarations))
+			require.Len(t, declarations, 1)
+			assert.Equal(t, "reader", declarations[0].Name)
+			assert.Equal(t, test.wantModel, declarations[0].Model)
+			assert.Equal(t, test.wantPatterns, declarations[0].Patterns)
+			assert.Equal(t, test.model, data.SubAgentModels[0].Model, "metadata generation must not mutate the runtime declaration")
+		})
+	}
+}
+
+func TestCompileCopilotWithExperimentalSubagentModels(t *testing.T) {
+	for _, model := range []string{
+		"${{ experiments.subagent_model }}",
+		"${{ experiments.subagent_model || 'small' }}",
+		"${{ format('{0}', experiments.subagent_model) }}",
+		"${{ experiments.unknown }}",
+	} {
+		for _, imported := range []bool{false, true} {
+			name := "inline"
+			if imported {
+				name = "imported"
+			}
+			t.Run(model+"/"+name, func(t *testing.T) {
+				agent := "## agent: `reader`\n---\ndescription: Summarize a file\nmodel: " + model + "\n---\nRead the file.\n"
+				source := filepath.Join(t.TempDir(), "workflow.md")
+				content := "---\non: workflow_dispatch\nstrict: false\npermissions:\n  contents: read\nengine: copilot\nexperiments:\n  subagent_model: [small, large]\n"
+				if imported {
+					require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(source), "shared.md"), []byte("# Shared\n\n"+agent), 0600))
+					content += "imports:\n  - shared.md\n"
+				}
+				content += "---\n# Work\nSummarize README.md using reader.\n\n"
+				if !imported {
+					content += agent
+				}
+				require.NoError(t, os.WriteFile(source, []byte(content), 0600))
+				compiler := NewCompiler()
+				data, err := compiler.ParseWorkflowFile(source)
+				require.NoError(t, err)
+				require.Equal(t, []parser.SubAgentModel{{Name: "reader", Model: model}}, data.SubAgentModels)
+				generated, err := compiler.CompileToYAML(data, source)
+				if model != "${{ experiments.subagent_model }}" {
+					require.Error(t, err)
+					assert.Empty(t, generated, "unsupported runtime models must not produce a lock file")
+					if model == "${{ experiments.unknown }}" {
+						assert.Contains(t, err.Error(), "undeclared experiment")
+					} else {
+						assert.Contains(t, err.Error(), "compound experiment expression")
+						assert.Contains(t, err.Error(), "put the complete model or alias in each experiment variant")
+					}
+					return
+				}
+				require.NoError(t, err)
+				assert.NotRegexp(t, `\$\{\{[^}\n]*\bexperiments\.subagent_model`, generated, "compiled prompt and metadata expressions must use an Actions context")
+				assert.Contains(t, generated, "steps.pick-experiment.outputs.subagent_model", "sub-agent metadata must use the activation-local experiment output")
+				assert.Contains(t, generated, "GH_AW_INFO_SUB_AGENT_MODELS")
+				pickIndex := strings.Index(generated, "id: pick-experiment")
+				infoIndex := strings.Index(generated, "id: generate_aw_info")
+				require.NotEqual(t, -1, pickIndex)
+				require.NotEqual(t, -1, infoIndex)
+				assert.Less(t, pickIndex, infoIndex, "experiment selection must precede sub-agent model metadata")
+			})
+		}
+	}
 }
 
 // TestRewriteExperimentPrefixCollision guards against one declared experiment name being a

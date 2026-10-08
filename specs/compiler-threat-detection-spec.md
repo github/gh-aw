@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.43
+**Version**: 1.0.44
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.44` | Unreleased | Clarifies CTR-001: `id-token: write` is exempt from repository-write rejection, and its OIDC trust-policy reminder is informational rather than a warning. No lock-file compatibility change. |
 | `1.0.43` | `v0.87.9` | Clarifies CTR-008 trusted `pull_request_target` checkouts: acknowledgment suppresses only the trigger warning, allowlisted checkouts require an exact literal repository/ref pair, and any configured `fetch` is rejected. |
 | `1.0.42` | `v0.87.9` | Audit-only; same-repository bot PR checkout authorization is a runtime trust control governed by the security architecture specification, not a new compiler threat rule. |
 | `1.0.41` | `v0.87.9` | Adds CTR-031; private-to-public flow opt-outs are rejected in strict mode and warned in non-strict mode because they can expose private data through public logs or destinations. |
@@ -75,7 +76,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 
 ### 5.1 Core Rule Catalog
 
-- **CTR-001 Privilege Escalation**: Reject unauthorized generated-job write permissions.
+- **CTR-001 Privilege Escalation**: Reject unauthorized generated-job write permissions. `id-token: write` MUST be exempt from repository-write rejection because it permits OIDC token issuance, not repository modification. Its audience and cloud-provider trust-policy reminder MUST be informational, MUST NOT increment the compiler warning count, and MUST NOT by itself fail warnings-as-errors validation. Missing required OIDC permissions and invalid `id-token: read` declarations MUST still be rejected.
 - **CTR-002 Unpinned Action Integrity**: Reject unpinned action references in strict contexts.
 - **CTR-003 Unsafe Tool Scope Expansion**: Reject or warn on policy-violating wildcard or overbroad tool scope.
 - **CTR-004 Sandbox Bypass Configuration**: Reject generated configuration that disables required sandboxing.
@@ -147,7 +148,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 
 | Rule ID | Primary Implementation Areas | Test Coverage Targets |
 |---------|------------------------------|-----------------------|
-| CTR-001 Privilege Escalation | `pkg/workflow/*permissions*validation*.go`, `compiler_builtin_job_augmentation.go` | `*permissions*_test.go`, `compiler_custom_jobs_test.go` |
+| CTR-001 Privilege Escalation | `pkg/workflow/*permissions*validation*.go`, `permissions_compiler_validator.go`, `compiler_builtin_job_augmentation.go` | `*permissions*_test.go`, `compiler_custom_jobs_test.go`, `idtoken_write_info_test.go`, `compiler_threat_detection_formal_test.go`, `pkg/cli/compile_development_test.go` |
 | CTR-002 Unpinned Action Integrity | `pkg/workflow/*action*.go`, `tools_validation*.go`, strict-mode validation | `*action*_test.go`, `*tools*_test.go` |
 | CTR-003 Unsafe Tool Scope Expansion | `pkg/workflow/*action*.go`, `tools_validation*.go`, strict-mode validation | `*action*_test.go`, `*tools*_test.go` |
 | CTR-004 Sandbox Bypass Configuration | sandbox validation, `enclaves.go`, `enclave_github_proxy.go` | sandbox, enclave, and proxy tests |
@@ -190,7 +191,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 
 | Test ID | Rule | Detection Trigger | Expected Compiler Action | Stable Diagnostic ID |
 |---------|------|--------------------|---------------------------|----------------------|
-| **T-CTR-001** | CTR-001 Privilege Escalation | Reject unauthorized generated-job write permissions | Reject unauthorized generated-job write permissions. | `CTR-001` |
+| **T-CTR-001** | CTR-001 Privilege Escalation | Unauthorized generated-job write permissions or an `id-token` declaration | Reject unauthorized repository writes, missing required OIDC permissions, and `id-token: read`; allow `id-token: write` with an informational reminder and no additional warning count. | `CTR-001` |
 | **T-CTR-002** | CTR-002 Unpinned Action Integrity | Reject unpinned action references in strict contexts | Reject unpinned action references in strict contexts. | `CTR-002` |
 | **T-CTR-003** | CTR-003 Unsafe Tool Scope Expansion | Reject or warn on policy-violating wildcard or overbroad tool scope | Reject or warn on policy-violating wildcard or overbroad tool scope. | `CTR-003` |
 | **T-CTR-004** | CTR-004 Sandbox Bypass Configuration | Reject generated configuration that disables required sandboxing | Reject generated configuration that disables required sandboxing. | `CTR-004` |

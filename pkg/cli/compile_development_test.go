@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -180,6 +182,34 @@ func TestEnforceDevelopmentDiagnostics(t *testing.T) {
 			assert.Equal(t, 1, stats.Errors)
 		})
 	}
+}
+
+func TestDevelopmentCompileAllowsIDTokenInfo(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "oidc.md")
+	content := `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+  id-token: write
+safe-outputs:
+  noop:
+---
+# OIDC workflow
+Say Done.
+`
+	require.NoError(t, os.WriteFile(source, []byte(content), 0600))
+	config := applyDevelopmentCompileMode(CompileConfig{
+		DryRun: true, activeModels: &activeModelInventory{},
+	})
+	compiler := createAndConfigureCompiler(config)
+	require.NoError(t, compiler.CompileWorkflow(source))
+	require.Zero(t, compiler.GetWarningCount())
+	stats := &CompilationStats{Total: 1, Succeeded: 1}
+	results := []ValidationResult{{Workflow: "oidc.md", Valid: true}}
+	require.NoError(t, enforceDevelopmentDiagnostics(config, compiler, stats, &results))
+	assert.True(t, results[0].Valid)
+	assert.Zero(t, stats.Errors)
 }
 
 func TestDevelopmentExplicitlyDisabledChecks(t *testing.T) {

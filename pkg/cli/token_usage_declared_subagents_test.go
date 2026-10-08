@@ -46,6 +46,22 @@ func TestDeclaredSubagentModelAudit(t *testing.T) {
 	}
 }
 
+func TestDeclaredExperimentalSubagentModelAudit(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(`{"sub_agent_models":[{"name":"reader","model":"small","patterns":["github-copilot/gpt-5-mini","github-copilot/gpt-5.4"]}]}`), 0600))
+	summary := &TokenUsageSummary{ByModel: map[string]*ModelTokenUsage{
+		"gpt-5-mini": {Provider: "github-copilot", Requests: 1},
+	}}
+	augmentDeclaredSubagentModels(dir, summary)
+	require.Len(t, summary.DeclaredSubagentModels, 1)
+	row := summary.DeclaredSubagentModels[0]
+	require.Equal(t, "small", row.RequestedModel)
+	require.Equal(t, "gpt-5-mini", row.EffectiveModel)
+	require.Empty(t, row.ReasonCode)
+	require.Zero(t, row.InvocationCount, "matching a possible experiment model is not proof of delegation")
+	require.Empty(t, generateSubagentModelFindings(summary))
+}
+
 func TestMatchesDeclaredModelEffectiveIDs(t *testing.T) {
 	for _, test := range []struct {
 		name, pattern, observed, provider string
