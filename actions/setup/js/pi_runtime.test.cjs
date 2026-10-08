@@ -75,6 +75,20 @@ describe("Pi runtime configuration", () => {
     expect(result.settings.retry).toEqual({ enabled: true, maxRetries: 4, baseDelayMs: 500, maxAgentDelayMs: 30000 });
   });
 
+  it("applies the routed model effort instead of a fixed setting", () => {
+    fs.mkdirSync(path.join(dir, "agent"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "agent/model-routing-selection.json"), JSON.stringify({ wire_model: "claude-opus-5", mapped_effort: "off" }));
+    vi.stubEnv("GH_AW_MODEL_ROUTING", "1");
+    const result = preparePiRuntime({ settings: { defaultThinkingLevel: "high" } });
+    expect(result.routingSelection).toEqual({ wire_model: "claude-opus-5", mapped_effort: "off" });
+    expect(result.settings.defaultThinkingLevel).toBe("off");
+  });
+
+  it("fails closed when the routed selection file is missing", () => {
+    vi.stubEnv("GH_AW_MODEL_ROUTING", "1");
+    expect(() => preparePiRuntime({})).toThrow("AWF model routing selection is unavailable to Pi");
+  });
+
   it("uses only gateway-authorized MCP servers and preserves scoped headers", () => {
     fs.mkdirSync(path.join(dir, "gh-aw/mcp-config"), { recursive: true });
     fs.writeFileSync(path.join(dir, "gh-aw/mcp-config/mcp-servers.json"), JSON.stringify({ mcpServers: { safeoutputs: { url: "http://gateway/mcp/safeoutputs", headers: { Authorization: "gateway-session-token" } } } }));

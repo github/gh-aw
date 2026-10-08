@@ -94,6 +94,75 @@ describe("pi_models_json.cjs", () => {
     });
   });
 
+  describe("AWF model routing", () => {
+    it.each([
+      ["/v1/messages", "anthropic-messages"],
+      ["/responses", "openai-responses"],
+      ["/chat/completions", "openai-completions"],
+    ])("maps routed endpoint %s to Pi API %s", (endpoint, api) => {
+      const result = piModelsJson.resolvePiModelRouting({
+        endpoints: [{ provider: "github", configured: true, models: ["routed-model"] }],
+        routing: {
+          status: "selected",
+          selection: { provider: "github", model: "github-copilot/routed-model", wire_model: "routed-model", effort: "none", endpoint },
+        },
+      });
+      expect(result.error).toBeNull();
+      expect(result.api).toBe(api);
+      expect(result.selection).toMatchObject({ wire_model: "routed-model", mapped_effort: "off" });
+    });
+
+    it.each([
+      [null, "required model-routing selection"],
+      [{ routing: { status: "pending" } }, "pending"],
+      [
+        { endpoints: [{ provider: "github", configured: true, models: ["other"] }], routing: { status: "selected", selection: { provider: "github", wire_model: "routed-model", effort: "high", endpoint: "/responses" } } },
+        "unavailable Copilot wire model",
+      ],
+      [
+        { endpoints: [{ provider: "github", configured: true, models: ["routed-model"] }], routing: { status: "selected", selection: { provider: "github", wire_model: "routed-model", effort: "high", endpoint: "/unknown" } } },
+        "not supported by this engine",
+      ],
+    ])("fails closed for invalid routing selection: %s", (reflect, error) => {
+      expect(piModelsJson.resolvePiModelRouting(reflect).error).toContain(error);
+    });
+
+    it("writes the selected model, endpoint API, and mapped effort for Pi", async () => {
+      const agentDir = path.join(tmpDir, "routed-pi");
+      const modelsPath = path.join(agentDir, "models.json");
+      const routingModelPath = path.join(tmpDir, "routed-model");
+      process.env.GH_AW_MODEL_ROUTING = "1";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.PI_CODING_AGENT_DIR = agentDir;
+      process.env.GH_AW_PI_MODELS_JSON_PATH = modelsPath;
+      process.env.GH_AW_PI_MODEL_ROUTING_MODEL_FILE = routingModelPath;
+      const messages = [];
+      const reflect = {
+        endpoints: [{ provider: "github", configured: true, port: 10002, base_url: "http://api-proxy:10002", models: ["gpt-5.6-sol"] }],
+        routing: {
+          status: "selected",
+          selection: { provider: "github", model: "github-copilot/gpt-5.6-sol", wire_model: "gpt-5.6-sol", effort: "none", endpoint: "/responses" },
+        },
+      };
+      await piModelsJson.main({
+        fetchReflect: async () => ({ ok: true, reflectData: reflect }),
+        loadModelsJson: () => ({ data: [] }),
+        loadSDK: async () => ({ ModelRuntime: { create: async () => ({ getModel: () => undefined }) } }),
+        logger: message => messages.push(message),
+      });
+      const models = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
+      expect(models.providers["aw-gateway"].api).toBe("openai-responses");
+      expect(models.providers["aw-gateway"].models[0].id).toBe("gpt-5.6-sol");
+      expect(fs.readFileSync(routingModelPath, "utf8")).toBe("gpt-5.6-sol");
+      expect(JSON.parse(fs.readFileSync(path.join(agentDir, "model-routing-selection.json"), "utf8"))).toMatchObject({
+        wire_model: "gpt-5.6-sol",
+        mapped_effort: "off",
+      });
+      expect(messages.join("\n")).toContain("inference routing: mode=awf-routed model=gpt-5.6-sol effort=none");
+    });
+  });
+
   describe("buildModelsJSON", () => {
     it("builds the aw-gateway provider payload with the default api", () => {
       const json = piModelsJson.buildModelsJSON({
@@ -268,6 +337,18 @@ describe("pi_models_json.cjs", () => {
         })
       ).toThrow('Pi model "gpt-5.5" requires the OpenAI Responses API');
       expect(logs).toContain("warning: Pi model API override conflicts with Responses-only model (model=gpt-5.5, override_api=openai-completions)");
+    });
+
+    it("rejects routed endpoints that conflict with catalog API metadata", () => {
+      expect(() =>
+        piModelsJson.resolvePiApiForModel({
+          provider: "github",
+          modelId: "gpt-5.5",
+          model: { api: "openai-completions" },
+          overrideApi: "openai-responses",
+          strictOverrideApi: true,
+        })
+      ).toThrow('Pi model "gpt-5.5" API metadata is "openai-completions"');
     });
   });
 
@@ -452,7 +533,9 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("main", () => {
-    it("registers each delegated model with its own gateway protocol", async () => {
+    it.each([false, true])("stages delegated models with their own gateway protocol (routing=%s)", async routing => {
+      if (routing) process.env.GH_AW_MODEL_ROUTING = "1";
+      else delete process.env.GH_AW_MODEL_ROUTING;
       process.env.GH_AW_PI_MODEL_ID = "gpt-5.6-luna";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
       process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
@@ -460,10 +543,12 @@ describe("pi_models_json.cjs", () => {
       process.env.PI_CODING_AGENT_DIR = tmpDir;
       process.env.GH_AW_PI_CONFIG = "{}";
       process.env.GH_AW_PI_MODEL_ALIASES = '{"small":["copilot/*haiku*"]}';
+      process.env.GH_AW_PI_STAGING_DIR = path.join(tmpDir, "staged");
+      process.env.GH_AW_PI_MODEL_ROUTING_MODEL_FILE = path.join(tmpDir, "routing-model");
       delete process.env.AWF_REFLECT_ENABLED;
       delete process.env.GH_AW_PI_MODELS_JSON_PATH;
-      fs.mkdirSync(path.join(tmpDir, "agents"));
-      fs.writeFileSync(path.join(tmpDir, "agents/reader.md"), "Fixture");
+      fs.mkdirSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents"), { recursive: true });
+      fs.writeFileSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents/reader.md"), "Fixture");
       const catalog = [
         { provider: "github-copilot", id: "gpt-5.6-luna", api: "openai-responses", reasoning: true, input: ["text"], contextWindow: 128000, maxTokens: 32000 },
         { provider: "github-copilot", id: "claude-haiku-4.5", api: "openai-completions", reasoning: false, input: ["text"], contextWindow: 200000, maxTokens: 8192 },
@@ -472,7 +557,18 @@ describe("pi_models_json.cjs", () => {
         parseFrontmatter: () => ({ frontmatter: { description: "Read files", model: "small" }, body: "Read only." }),
         ModelRuntime: { create: async () => ({ getModels: () => catalog, getModel: (_provider, id) => catalog.find(model => model.id === id) }) },
       };
-      await piModelsJson.main({ loadSDK: async () => sdk, loadModelsJson: () => ({ providers: {} }) });
+      await piModelsJson.main({
+        loadSDK: async () => sdk,
+        loadModelsJson: () => ({ providers: {} }),
+        fetchReflect: async () => ({
+          ok: true,
+          reflectData: {
+            models_fetch_complete: true,
+            endpoints: [{ provider: "copilot", configured: true, port: 10002, models: catalog.map(model => model.id) }],
+            routing: { status: "selected", selection: { provider: "github", wire_model: "gpt-5.6-luna", effort: "none", endpoint: "/responses" } },
+          },
+        }),
+      });
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8")).providers["aw-gateway"];
       expect(written.api).toBe("openai-responses");
       expect(written.models).toEqual([

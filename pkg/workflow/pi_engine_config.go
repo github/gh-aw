@@ -38,6 +38,9 @@ func piToolPolicyJSON(data *WorkflowData) string {
 				policy[name] = value
 			}
 		}
+		if data.BashDisabled {
+			policy["bash"] = false
+		}
 	}
 	encoded, err := json.Marshal(policy)
 	if err != nil {
@@ -51,8 +54,11 @@ func (c *Compiler) validatePiEngineConfig(data *WorkflowData) error {
 		return nil
 	}
 	config := data.EngineConfig
+	if isModelRoutingEnabled(data) && config.Driver != "" && config.Driver != "pi_agent_core_driver.cjs" && config.Driver != "pi_rpc_driver.cjs" {
+		return errors.New("engine.model-routing requires the built-in Pi CLI, SDK, or RPC driver")
+	}
 	if config.Driver != "" && config.Driver != "pi_agent_core_driver.cjs" && config.Driver != "pi_rpc_driver.cjs" &&
-		(HasBashExplicitRestriction(data.Tools) || data.Tools["edit"] == false) {
+		(data.BashDisabled || HasBashExplicitRestriction(data.Tools) || data.Tools["edit"] == false) {
 		return errors.New("engine 'pi' tool restrictions require the built-in CLI, SDK, or RPC driver; custom drivers must implement their own tool policy")
 	}
 	if config.Driver == "pi_agent_core_driver.cjs" && len(config.Args) > 0 {

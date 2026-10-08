@@ -90,6 +90,26 @@ func TestPiSubagentArgumentsAreIsolated(t *testing.T) {
 	require.True(t, piSessionSettings(data).Enabled, "child isolation must not mutate the parent configuration")
 }
 
+func TestPiCompiledDisabledBash(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "workflow.md")
+	content := "---\non: workflow_dispatch\nstrict: false\npermissions:\n  contents: read\nengine: pi\ntools:\n  bash: false\n  cli-proxy: false\n  edit: false\n---\n# Work\nReturn a short answer.\n"
+	require.NoError(t, os.WriteFile(source, []byte(content), 0600))
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowFile(source)
+	require.NoError(t, err)
+	require.True(t, data.BashDisabled)
+	require.NotContains(t, data.Tools, "bash", "normalization removes the disabled tool")
+	generated, err := compiler.CompileToYAML(data, source)
+	require.NoError(t, err)
+	require.Contains(t, generated, `GH_AW_PI_TOOL_POLICY: '{"bash":false,"edit":false}'`)
+	require.Contains(t, generated, `"--exclude-tools","bash"`)
+	require.Contains(t, generated, "--exclude-tools bash")
+	data.EngineConfig.Driver = "custom.cjs"
+	delete(data.Tools, "edit")
+	require.ErrorContains(t, compiler.validatePiEngineConfig(data), "tool restrictions require")
+}
+
 func TestPiInlineActivationTargets(t *testing.T) {
 	registry := GetGlobalEngineRegistry()
 	for _, engine := range registry.GetSupportedEngines() {

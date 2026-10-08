@@ -194,7 +194,7 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	// This avoids embedding the value directly in the shell command (which fails template injection
 	// validation for GitHub Actions expressions like ${{ inputs.model }}).
 	// Fallback for unconfigured model uses GH_AW_MODEL_AGENT_CLAUDE with shell expansion.
-	modelConfigured := workflowData.Model != ""
+	modelConfigured := workflowData.Model != "" && !isModelRoutingEnabled(workflowData)
 
 	claudeArgs, mcpConfigArg, allowedTools := e.buildClaudeCliArgs(workflowData, toolsWithMountedCLIs, logFile)
 
@@ -368,7 +368,7 @@ func (e *ClaudeEngine) buildClaudeCommandString(workflowData *WorkflowData, clau
 	// via shell expansion so users can set a default via GitHub Actions variables.
 	// When model IS configured, ANTHROPIC_MODEL is set in the env block and the Claude CLI
 	// reads it natively — no --model flag in the shell command needed.
-	if !modelConfigured {
+	if !modelConfigured && !isModelRoutingEnabled(workflowData) {
 		isDetectionJob := isDetectionRun(workflowData)
 		var modelEnvVar string
 		if workflowRunPhase(workflowData) == runPhaseEvals {
@@ -493,13 +493,16 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	applyOptionalEngineToolTimeouts(env, workflowData)
 	applyEngineMaxTurnsEnv(env, workflowData)
 	applyEngineHarnessRetryEnv(env, workflowData)
-	applyClaudeModelEnvVars(env, workflowData)
+	if !isModelRoutingEnabled(workflowData) {
+		applyClaudeModelEnvVars(env, workflowData)
+	}
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, claudeLog)
 	if isEditToolExplicitlyDisabled(workflowData.Tools) {
 		env["GH_AW_CLAUDE_DISABLE_REPO_EDITS"] = "true"
 	}
 	applyMCPScriptsSecretEnv(env, workflowData)
+	applyModelRoutingEnv(env, workflowData)
 	return env
 }
 

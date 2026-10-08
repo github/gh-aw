@@ -29,6 +29,7 @@ const {
   resolveRetryConfig,
   resolveStartupRetryLimit,
   buildClaudeChildEnv,
+  removeClaudeRoutingOverrides,
 } = require("./claude_harness.cjs");
 
 const agentTempDir = "/tmp/gh-aw/agent";
@@ -66,12 +67,14 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
       encoding: "utf8",
       timeout: 45000,
     });
-    const calls = fs
-      .readFileSync(callsPath, "utf8")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map(line => JSON.parse(line));
+    const calls = fs.existsSync(callsPath)
+      ? fs
+          .readFileSync(callsPath, "utf8")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map(line => JSON.parse(line))
+      : [];
     return { result, calls };
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -170,6 +173,77 @@ describe("claude_harness.cjs", () => {
       const env = { GH_AW_LLM_PROVIDER: "anthropic", GH_AW_LLM_PROVIDER_EXPLICIT: "1", ANTHROPIC_MODEL: "copilot/claude-sonnet-4-6", ANTHROPIC_BASE_URL: "https://custom.example/anthropic" };
       expect(await buildClaudeChildEnv(null, env, () => {})).toMatchObject({ ANTHROPIC_MODEL: "claude-sonnet-4-6", ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL });
       expect(await buildClaudeChildEnv(null, { ANTHROPIC_MODEL: "anthropic/custom-model" }, () => {})).toMatchObject({ ANTHROPIC_MODEL: "anthropic/custom-model" });
+    });
+  });
+
+  describe("AWF model routing", () => {
+    const routedReflect = {
+      endpoints: [{ provider: "github", configured: true, port: 43123, base_url: "http://api-proxy:43123", models: ["claude-opus-5"] }],
+      routing: {
+        status: "selected",
+        selection: { provider: "github", model: "github-copilot/claude-opus-5", wire_model: "claude-opus-5", effort: "xhigh", endpoint: "/v1/messages" },
+      },
+    };
+
+    it("applies the routed model and effort and removes fixed overrides", async () => {
+      const messages = [];
+      const env = {
+        GH_AW_MODEL_ROUTING: "1",
+        GH_AW_LLM_PROVIDER: "github",
+        ANTHROPIC_MODEL: "fixed-model",
+        CLAUDE_CODE_EFFORT_LEVEL: "low",
+        GH_AW_MODEL_FALLBACK: "fallback-model",
+      };
+      const child = await buildClaudeChildEnv(routedReflect, env, message => messages.push(message));
+      expect(child).toMatchObject({ ANTHROPIC_MODEL: "claude-opus-5", CLAUDE_CODE_EFFORT_LEVEL: "xhigh" });
+      expect(child.GH_AW_MODEL_FALLBACK).toBeUndefined();
+      expect(messages[0]).toContain("inference routing: mode=awf-routed model=claude-opus-5 effort=xhigh");
+      expect(removeClaudeRoutingOverrides(["--model", "fixed", "--effort=low", "--print"])).toEqual(["--print"]);
+    });
+
+    it("starts the harness with the routed model and refuses an endpoint mismatch", () => {
+      const stubScript = `
+        const fs = require("fs");
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, JSON.stringify({
+          args: process.argv.slice(2), model: process.env.ANTHROPIC_MODEL, effort: process.env.CLAUDE_CODE_EFFORT_LEVEL
+        }) + "\\n");
+        process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "done" }) + "\\n");
+      `;
+      const success = runHarnessWithStub({
+        stubScript,
+        reflectData: routedReflect,
+        extraArgs: ["--model", "fixed-model", "--effort", "low"],
+        extraEnv: { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: "fixed-model", GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "0" },
+      });
+      expect(success.result.status, success.result.stderr).toBe(0);
+      expect(success.calls[0]).toMatchObject({ model: "claude-opus-5", effort: "xhigh" });
+      expect(success.calls[0].args).not.toContain("fixed-model");
+      expect(success.calls[0].args).not.toContain("--effort");
+
+      const mismatch = runHarnessWithStub({
+        stubScript,
+        reflectData: { ...routedReflect, routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, endpoint: "/responses" } } },
+        extraEnv: { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github", GH_AW_SAFE_OUTPUTS: "" },
+      });
+      expect(mismatch.result.status).not.toBe(0);
+      expect(mismatch.result.stderr).toContain("not supported by this engine");
+      expect(mismatch.calls).toHaveLength(0);
+    });
+
+    it.each([
+      [{ endpoints: routedReflect.endpoints, routing: { status: "pending" } }, "pending"],
+      [{ endpoints: routedReflect.endpoints, routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, endpoint: "/responses" } } }, "not supported by this engine"],
+      [{ ...routedReflect, endpoints: [{ ...routedReflect.endpoints[0], models: ["gpt-5.6-sol"] }] }, "unavailable Copilot wire model"],
+    ])("fails closed when routing is invalid: %s", async (reflect, error) => {
+      await expect(buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github" }, () => {})).rejects.toThrow(error);
+    });
+
+    it("rejects efforts Claude Code cannot represent", async () => {
+      const reflect = {
+        ...routedReflect,
+        routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, effort: "minimal" } },
+      };
+      await expect(buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github" }, () => {})).rejects.toThrow('"minimal"');
     });
   });
 

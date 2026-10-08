@@ -6,6 +6,9 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
 const { default: extension, subagentArgs, runPiSubagent } = await import("./pi_subagent_extension.cjs");
+const { writeInlineSubAgents } = await import("./extract_inline_sub_agents.cjs");
+const { stagePiArtifacts } = await import("./pi_runtime.cjs");
+const { preparePiSubagents } = await import("./pi_subagent_config.cjs");
 let dir;
 const agent = { name: "reader", description: "Read facts", prompt: "Read only.", declaredModel: "small", modelId: "claude-haiku-4.5", model: "aw-gateway/claude-haiku-4.5", tools: ["read"] };
 
@@ -154,5 +157,76 @@ process.stdin.on("end", () => {
     vi.stubEnv("GH_AW_PI_COMMAND", executable);
     const result = await runPiSubagent(agent, "Summarize README.md", { cwd: dir });
     expect(result.content[0].text).toBe("R\u00e9sum\u00e9");
+  });
+
+  it("extracts and dispatches all three agents from the Pi smoke workflow", async () => {
+    const originalEnv = process.env;
+    try {
+      process.env = {
+        PATH: originalEnv.PATH,
+        RUNNER_TEMP: dir,
+        PI_CODING_AGENT_DIR: path.join(dir, "managed"),
+        GH_AW_PI_STAGING_DIR: path.join(dir, ".pi"),
+        GH_AW_SUB_AGENT_DIR: ".pi/agents",
+        GH_AW_SUB_AGENT_EXT: ".md",
+        GH_AW_PI_SUBAGENT_ARGS: originalEnv.GH_AW_PI_SUBAGENT_ARGS,
+        GH_AW_PI_TOOL_POLICY: originalEnv.GH_AW_PI_TOOL_POLICY,
+      };
+      vi.stubGlobal("core", { info: vi.fn() });
+      const source = fs.readFileSync(new URL("../../../.github/workflows/smoke-pi-sub-agents.md", import.meta.url), "utf8");
+      const parentPrompt = writeInlineSubAgents(source, dir, dir, "pi");
+      expect(parentPrompt).not.toContain("## agent:");
+      stagePiArtifacts(process.env.PI_CODING_AGENT_DIR);
+      const expected = ["claude-haiku-4.5", "gpt-5-mini", "gpt-5-nano"];
+      const sdk = {
+        parseFrontmatter: content => {
+          const [, header, body] = content.split("---");
+          const frontmatter = Object.fromEntries(
+            header
+              .trim()
+              .split("\n")
+              .map(line => {
+                const colon = line.indexOf(":");
+                return [line.slice(0, colon), line.slice(colon + 1).trim()];
+              })
+          );
+          return { frontmatter, body };
+        },
+      };
+      const agents = preparePiSubagents({
+        agentDir: process.env.PI_CODING_AGENT_DIR,
+        sdk,
+        provider: "github-copilot",
+        catalog: expected.map(model => `github-copilot/${model}`),
+        gateway: true,
+        parentModel: "github-copilot/gpt-5.3-codex",
+      });
+      expect(agents.map(agent => agent.modelId).sort()).toEqual([...expected].sort());
+      const executable = path.join(dir, "fixture-pi");
+      fs.writeFileSync(
+        executable,
+        `#!/usr/bin/env node
+let task = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", chunk => task += chunk);
+process.stdin.on("end", () => {
+  const args = process.argv.slice(2);
+  const model = args[args.indexOf("--model") + 1]?.replace(/^aw-gateway\\//, "");
+  if (task !== "who am i?" || !${JSON.stringify(expected)}.includes(model) || !args.includes("--no-session")) process.exit(2);
+  process.stdout.write(JSON.stringify({ type: "message_end", message: { role: "assistant", model, content: [{ type: "text", text: model }] } }) + "\\n");
+});
+`,
+        { mode: 0o700 }
+      );
+      process.env.GH_AW_PI_COMMAND = executable;
+      for (const agent of agents) {
+        const result = await runPiSubagent(agent, "who am i?", { cwd: dir });
+        expect(result.content[0].text).toBe(agent.declaredModel);
+        expect(result.details.model).toBe(agent.modelId);
+      }
+    } finally {
+      process.env = originalEnv;
+      vi.unstubAllGlobals();
+    }
   });
 });

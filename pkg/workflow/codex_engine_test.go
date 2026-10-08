@@ -1563,3 +1563,25 @@ func TestCodexEngineHttpMCPHeaderSecretsUseEnvVars(t *testing.T) {
 		}
 	}
 }
+
+func TestCodexEngineModelRoutingExecutionStep(t *testing.T) {
+	workflowData := &WorkflowData{
+		Name:  "routed-workflow",
+		Model: "gpt-5.6-sol",
+		EngineConfig: &EngineConfig{
+			ID:          "codex",
+			LLMProvider: LLMProviderGitHub,
+			ModelRouting: &CopilotModelRoutingConfig{
+				Goal: "cost", Mode: "balanced", AllowedModels: []string{"gpt-5.6-sol"},
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+		ParsedTools:        NewTools(map[string]any{}),
+	}
+
+	step := strings.Join([]string(NewCodexEngine().GetExecutionSteps(workflowData, "test-log")[0]), "\n")
+	require.Contains(t, step, "GH_AW_MODEL_ROUTING")
+	require.Contains(t, step, "candidateModels")
+	require.NotContains(t, step, "GH_AW_MODEL_AGENT_CODEX:")
+	require.NotContains(t, step, "${GH_AW_MODEL_AGENT_CODEX:+ --model")
+}

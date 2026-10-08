@@ -2,22 +2,7 @@
 
 "use strict";
 
-/**
- * Reasoning efforts accepted for AWF model-routing selections.
- *
- * Must match the values the pinned Copilot CLI lists for `--reasoning-effort`
- * (`copilot --help` → `[possible values: none, minimal, low, medium, high, xhigh, max]`),
- * which is also the effort set used by gh-aw-router and the AWF routing candidate pool.
- */
-const ROUTING_REASONING_EFFORTS = Object.freeze(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
-
-/**
- * @param {unknown} effort
- * @returns {boolean}
- */
-function isRoutingReasoningEffort(effort) {
-  return typeof effort === "string" && ROUTING_REASONING_EFFORTS.includes(effort);
-}
+const { ROUTING_REASONING_EFFORTS, isRoutingReasoningEffort } = require("./awf_model_routing.cjs");
 
 /**
  * Resolve the reasoning effort the SDK driver should forward to the session.
