@@ -160,7 +160,7 @@ const SAMPLE_VALIDATION_CONFIG = {
     defaultMax: 5,
     fields: {
       issue_number: { issueOrPRNumber: true },
-      issue_type: { required: true, type: "string", sanitize: true, maxLength: 128 },
+      issue_type: { required: true, type: "string", sanitize: true, maxLength: 128, allowEmpty: true },
       rationale: { type: "string", sanitize: true, maxLength: 280, "x-strip-on-error": true },
       confidence: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"], "x-strip-on-error": true },
       suggest: { type: "boolean" },
@@ -600,6 +600,26 @@ describe("safe_output_type_validator", () => {
 
       const valid = validateItem({ type: "add_comment", body: "Review complete.", data: { verdict: "APPROVE", criteria_passed: 5 } }, "add_comment", 1);
       expect(valid.isValid).toBe(true);
+    });
+
+    it("omits blank data only when structured data is enabled", async () => {
+      const { validateItem, resetValidationConfigCache } = await import("./safe_output_type_validator.cjs");
+      const configWithDataSchema = JSON.parse(JSON.stringify(SAMPLE_VALIDATION_CONFIG));
+      configWithDataSchema.add_comment.dataSchema = { type: "object", additionalProperties: false };
+      process.env.GH_AW_VALIDATION_CONFIG = JSON.stringify(configWithDataSchema);
+      resetValidationConfigCache();
+
+      const enabled = validateItem({ type: "add_comment", body: "Review complete.", data: "" }, "add_comment", 1);
+      expect(enabled.isValid).toBe(true);
+      expect(enabled.normalizedItem).not.toHaveProperty("data");
+
+      configWithDataSchema.add_comment.dataEnabled = false;
+      delete configWithDataSchema.add_comment.dataSchema;
+      process.env.GH_AW_VALIDATION_CONFIG = JSON.stringify(configWithDataSchema);
+      resetValidationConfigCache();
+      const disabled = validateItem({ type: "add_comment", body: "Review complete.", data: "" }, "add_comment", 1);
+      expect(disabled.isValid).toBe(false);
+      expect(disabled.error).toContain("'data' is not enabled");
     });
 
     it("should enforce runtime data schema supplied as JSON string", async () => {
@@ -1068,6 +1088,17 @@ describe("safe_output_type_validator", () => {
     });
   });
 
+  it("preserves an explicit empty issue_type clear but still requires the field", async () => {
+    const { validateItem } = await import("./safe_output_type_validator.cjs");
+    const cleared = validateItem({ type: "set_issue_type", issue_type: "" }, "set_issue_type", 1);
+    expect(cleared.isValid).toBe(true);
+    expect(cleared.normalizedItem.issue_type).toBe("");
+
+    const missing = validateItem({ type: "set_issue_type" }, "set_issue_type", 1);
+    expect(missing.isValid).toBe(false);
+    expect(missing.error).toContain("'issue_type'");
+  });
+
   describe("custom validation: requiresOneOf", () => {
     it("should pass when at least one field is present", async () => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
@@ -1094,6 +1125,15 @@ describe("safe_output_type_validator", () => {
       expect(result.error).toContain("requires at least one of");
     });
 
+    it.each([
+      ["status", { status: "" }],
+      ["labels", { labels: "" }],
+    ])("should reject update_issue when only its blank %s field is present", async (_field, update) => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const result = validateItem({ type: "update_issue", issue_number: 42, ...update }, "update_issue", 1);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("requires at least one of");
+    });
     it("should pass for assign_to_agent with issue_number", async () => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
 
