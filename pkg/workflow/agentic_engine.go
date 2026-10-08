@@ -117,6 +117,10 @@ type EngineCapabilities struct {
 	// MCP reports whether the engine supports MCP servers directly.
 	MCP bool
 
+	// CLIOnlyMCPInfrastructure exposes safeoutputs and mcpscripts only through
+	// CLI wrappers, while preserving other configured native MCP servers.
+	CLIOnlyMCPInfrastructure bool
+
 	// MaxTurns reports whether the engine supports the max-turns feature.
 	MaxTurns bool
 

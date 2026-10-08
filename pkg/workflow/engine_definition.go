@@ -131,28 +131,30 @@ type ModelSelection struct {
 // EngineCapabilitiesDefinition captures declarative engine capabilities loaded from
 // engine definition frontmatter.
 type EngineCapabilitiesDefinition struct {
-	ToolsAllowlist       bool `yaml:"tools-allowlist,omitempty"`
-	MaxTurns             bool `yaml:"max-turns,omitempty"`
-	WebSearch            bool `yaml:"web-search,omitempty"`
-	MaxContinuations     bool `yaml:"max-continuations,omitempty"`
-	NativeAgentFile      bool `yaml:"native-agent-file,omitempty"`
-	BareMode             bool `yaml:"bare-mode,omitempty"`
-	BashCommandAllowlist bool `yaml:"bash-command-allowlist,omitempty"`
-	BashDisable          bool `yaml:"bash-disable,omitempty"`
+	ToolsAllowlist           bool `yaml:"tools-allowlist,omitempty"`
+	MaxTurns                 bool `yaml:"max-turns,omitempty"`
+	WebSearch                bool `yaml:"web-search,omitempty"`
+	MaxContinuations         bool `yaml:"max-continuations,omitempty"`
+	NativeAgentFile          bool `yaml:"native-agent-file,omitempty"`
+	BareMode                 bool `yaml:"bare-mode,omitempty"`
+	BashCommandAllowlist     bool `yaml:"bash-command-allowlist,omitempty"`
+	BashDisable              bool `yaml:"bash-disable,omitempty"`
+	CLIOnlyMCPInfrastructure bool `yaml:"cli-only-mcp-infrastructure,omitempty"`
 }
 
 // ToRuntimeCapabilities converts the declarative capabilities definition into the
 // runtime EngineCapabilities struct used by CodingAgentEngine implementations.
 func (d EngineCapabilitiesDefinition) ToRuntimeCapabilities() EngineCapabilities {
 	return EngineCapabilities{
-		ToolsAllowlist:       d.ToolsAllowlist,
-		MaxTurns:             d.MaxTurns,
-		WebSearch:            d.WebSearch,
-		MaxContinuations:     d.MaxContinuations,
-		NativeAgentFile:      d.NativeAgentFile,
-		BareMode:             d.BareMode,
-		BashCommandAllowlist: d.BashCommandAllowlist,
-		BashDisable:          d.BashDisable,
+		ToolsAllowlist:           d.ToolsAllowlist,
+		MaxTurns:                 d.MaxTurns,
+		WebSearch:                d.WebSearch,
+		MaxContinuations:         d.MaxContinuations,
+		NativeAgentFile:          d.NativeAgentFile,
+		BareMode:                 d.BareMode,
+		BashCommandAllowlist:     d.BashCommandAllowlist,
+		BashDisable:              d.BashDisable,
+		CLIOnlyMCPInfrastructure: d.CLIOnlyMCPInfrastructure,
 	}
 }
 

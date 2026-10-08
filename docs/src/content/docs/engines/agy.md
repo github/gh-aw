@@ -71,9 +71,11 @@ the runner's step summary only after secret redaction, matching other built-in e
 
 Configured HTTP MCP servers are translated from the gh-aw gateway into
 owner-only `.agents/mcp_config.json`, using native `serverUrl` entries and
-validated headers. CLI-mounted infrastructure tools, including `safeoutputs`
-and `mcpscripts`, are omitted from native MCP configuration. Repository MCP
-configuration is replaced by the explicitly configured gateway servers.
+validated headers. Agy declares the `CLIOnlyMCPInfrastructure` engine capability,
+so configured `safeoutputs` and `mcpscripts` are omitted from native MCP
+configuration. Custom MCP servers and `awf-enclave` remain native
+unless `tools.cli-proxy` is enabled, which excludes all CLI-mounted servers.
+Repository MCP configuration is replaced by the explicitly configured gateway servers.
 `AGENTS.md`, `GEMINI.md`, `.agents/` and `.gemini/` are protected instruction
 and configuration surfaces.
 

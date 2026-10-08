@@ -33,6 +33,9 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 			compiler.SetWorkflowIdentifier(tt.workflow)
 			data, err := compiler.ParseWorkflowFile(path)
 			require.NoError(t, err)
+			engine, err := compiler.getAgenticEngine(ResolveEngineID(data))
+			require.NoError(t, err)
+			capabilities := engine.GetCapabilities()
 			switch ResolveEngineID(data) {
 			case "claude":
 				assert.False(t, data.BashDisabled)
@@ -48,25 +51,25 @@ func TestReportedWorkflowToolPermissions(t *testing.T) {
 					assert.Contains(t, args, grant)
 				}
 				if tt.workflow == "daily-graft-intelligence" {
-					assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "graft")
+					assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data, capabilities), "graft")
 					graft, ok := data.Tools["graft"].(map[string]any)
 					require.True(t, ok)
 					assert.Contains(t, graft["allowed"], "graft_check")
 					assert.Contains(t, graft["allowed"], "graft_map")
 				}
 				if tt.workflow == "smoke-copilot-aoai-apikey" {
-					assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "safeoutputs")
+					assert.Contains(t, getMCPCLIExcludeFromAgentConfig(data, capabilities), "safeoutputs")
 					require.NotNil(t, data.SafeOutputs.UploadArtifact)
 					require.NotNil(t, data.SafeOutputs.DispatchWorkflow)
 				}
 				if tt.workflow == "daily-compiler-quality" {
-					assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data), "serena")
-					assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data), "safeoutputs")
+					assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data, capabilities), "serena")
+					assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data, capabilities), "safeoutputs")
 				}
 			case "codex":
 				assert.True(t, data.BashDisabled)
 				require.True(t, IsMCPScriptsEnabled(data.MCPScripts))
-				assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data), "mcpscripts")
+				assert.NotContains(t, getMCPCLIExcludeFromAgentConfig(data, capabilities), "mcpscripts")
 				if tt.workflow == "outcome-collector" {
 					require.Contains(t, data.MCPScripts.Tools, "read-outcome-summary")
 					require.Contains(t, data.MCPScripts.Tools, "read-outcome-evaluations")

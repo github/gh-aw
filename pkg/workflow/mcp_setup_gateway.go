@@ -387,7 +387,7 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 			yaml.WriteString("          export GH_AW_MCP_CONFIG_ADAPTER=\"" + adapterFilename + "\"\n")
 		}
 	}
-	if cliServers := getMCPCLIExcludeFromAgentConfig(workflowData); len(cliServers) > 0 {
+	if cliServers := getMCPCLIExcludeFromAgentConfig(workflowData, engine.GetCapabilities()); len(cliServers) > 0 {
 		cliServersJSON, err := json.Marshal(cliServers)
 		if err == nil {
 			escapedCLIServersJSON := shellEscapeArg(string(cliServersJSON))

@@ -12,6 +12,155 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetMCPCLIExcludeFromAgentConfig(t *testing.T) {
+	agyCapabilities := NewAgyEngine().GetCapabilities()
+	safeOutputs := &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
+	mcpScripts := &MCPScriptsConfig{
+		Tools: map[string]*MCPScriptToolConfig{
+			"hello": {Name: "hello", Script: "return 'ok';"},
+		},
+	}
+	enclaves := EnclavesConfig{{Script: &ScriptEnclaveConfig{}}}
+	customTools := map[string]any{
+		"custom": map[string]any{"type": "http", "url": "http://localhost:8080"},
+	}
+	infra := []string{constants.MCPScriptsMCPServerID.String(), constants.SafeOutputsMCPServerID.String()}
+
+	tests := []struct {
+		name         string
+		data         *WorkflowData
+		capabilities EngineCapabilities
+		expected     []string
+	}{
+		{name: "nil workflow"},
+		{name: "empty workflow", data: &WorkflowData{}},
+		{
+			name:         "agy no infrastructure",
+			capabilities: agyCapabilities,
+			data:         &WorkflowData{EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false}},
+		},
+		{
+			name:         "agy empty infrastructure",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
+				SafeOutputs: &SafeOutputsConfig{}, MCPScripts: &MCPScriptsConfig{},
+			},
+		},
+		{
+			name:         "agy safeoutputs only",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
+				SafeOutputs: safeOutputs,
+			},
+			expected: []string{constants.SafeOutputsMCPServerID.String()},
+		},
+		{
+			name:         "agy mcpscripts only",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
+				MCPScripts: mcpScripts,
+			},
+			expected: []string{constants.MCPScriptsMCPServerID.String()},
+		},
+		{
+			name:         "agy both infrastructure servers",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
+				SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
+			},
+			expected: infra,
+		},
+		{
+			name:         "agy nil parsed tools still excludes infrastructure",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)},
+				SafeOutputs:  safeOutputs, MCPScripts: mcpScripts,
+			},
+			expected: infra,
+		},
+		{
+			name:         "agy preserves enclave and custom without infrastructure",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: NewTools(customTools),
+				Tools: customTools, Enclaves: enclaves,
+			},
+		},
+		{
+			name:         "agy preserves enclave and custom with infrastructure",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: NewTools(customTools),
+				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
+			},
+			expected: infra,
+		},
+		{
+			name:         "agy explicit cli proxy excludes all mounted servers",
+			capabilities: agyCapabilities,
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: true},
+				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
+			},
+			expected: []string{enclaveMCPServerName, "custom", constants.MCPScriptsMCPServerID.String(), constants.SafeOutputsMCPServerID.String()},
+		},
+		{
+			name: "other engine without cli proxy keeps infrastructure",
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.ClaudeEngine)}, ParsedTools: &Tools{CLIProxy: false},
+				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
+			},
+		},
+		{
+			name: "other engine explicit cli proxy excludes all mounted servers",
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: string(constants.ClaudeEngine)}, ParsedTools: &Tools{CLIProxy: true},
+				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
+			},
+			expected: []string{enclaveMCPServerName, "custom", constants.MCPScriptsMCPServerID.String(), constants.SafeOutputsMCPServerID.String()},
+		},
+		{
+			name: "nil engine keeps infrastructure without cli proxy",
+			data: &WorkflowData{ParsedTools: &Tools{CLIProxy: false}, SafeOutputs: safeOutputs, MCPScripts: mcpScripts},
+		},
+		{
+			name: "engine ID alone does not exclude infrastructure",
+			data: &WorkflowData{EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, SafeOutputs: safeOutputs, MCPScripts: mcpScripts},
+		},
+		{
+			name: "arbitrary engine capability excludes only infrastructure",
+			data: &WorkflowData{
+				EngineConfig: &EngineConfig{ID: "custom-capability-engine"}, ParsedTools: NewTools(customTools),
+				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
+			},
+			capabilities: EngineCapabilities{CLIOnlyMCPInfrastructure: true},
+			expected:     infra,
+		},
+		{
+			name:         "capability works without engine config",
+			data:         &WorkflowData{SafeOutputs: safeOutputs, MCPScripts: mcpScripts},
+			capabilities: EngineCapabilities{CLIOnlyMCPInfrastructure: true},
+			expected:     infra,
+		},
+		{
+			name:     "nil engine explicit cli proxy excludes infrastructure",
+			data:     &WorkflowData{ParsedTools: &Tools{CLIProxy: true}, SafeOutputs: safeOutputs, MCPScripts: mcpScripts},
+			expected: infra,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, getMCPCLIExcludeFromAgentConfig(tt.data, tt.capabilities))
+		})
+	}
+}
+
 func TestHasBashRestrictedAllowlist(t *testing.T) {
 	tests := []struct {
 		name     string

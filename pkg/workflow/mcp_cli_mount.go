@@ -297,21 +297,30 @@ func withMountedCLIShellCommandsInRestrictedBash(workflowData *WorkflowData) map
 // getMCPCLIExcludeFromAgentConfig returns the sorted list of MCP server names that
 // should be excluded from the agent's MCP config (because they are CLI-only).
 //
-// Agy always excludes CLI-mounted servers to keep infrastructure tools CLI-only.
-// Other engines only exclude servers when tools.cli-proxy is enabled. Infrastructure
-// servers (safeoutputs, mcpscripts) are CLI-mounted even without cli-proxy (so the
-// agent can call them as shell commands), but they remain in the agent's MCP config
-// unless cli-proxy is explicitly enabled. This preserves existing agent behaviour
-// for workflows that use safeoutputs via MCP rather than via the CLI wrapper.
-func getMCPCLIExcludeFromAgentConfig(data *WorkflowData) []string {
+// Explicit tools.cli-proxy excludes all CLI-mounted servers for every engine.
+// Engines with CLIOnlyMCPInfrastructure exclude only configured safeoutputs and
+// mcpscripts, preserving native custom and enclave servers. Otherwise,
+// infrastructure servers remain accessible through native MCP and CLI wrappers.
+func getMCPCLIExcludeFromAgentConfig(data *WorkflowData, capabilities EngineCapabilities) []string {
 	if data == nil {
 		return nil
 	}
-	agy := data.EngineConfig != nil && data.EngineConfig.ID == string(constants.AgyEngine)
-	if !agy && (data.ParsedTools == nil || !data.ParsedTools.CLIProxy) {
+	if data.ParsedTools != nil && data.ParsedTools.CLIProxy {
+		return getMCPCLIServerNames(data)
+	}
+	if !capabilities.CLIOnlyMCPInfrastructure {
 		return nil
 	}
-	return getMCPCLIServerNames(data)
+
+	var servers []string
+	if IsMCPScriptsEnabled(data.MCPScripts) {
+		servers = append(servers, constants.MCPScriptsMCPServerID.String())
+	}
+	if HasSafeOutputsEnabled(data.SafeOutputs) {
+		servers = append(servers, constants.SafeOutputsMCPServerID.String())
+	}
+	sort.Strings(servers)
+	return servers
 }
 
 // generateMCPCLIMountStep generates the "Mount MCP servers as CLIs" workflow step.

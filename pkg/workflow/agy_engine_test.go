@@ -37,6 +37,7 @@ func TestAgyBuiltInRegistration(t *testing.T) {
 	assert.Equal(t, "1.3.1", def.Version)
 	assert.False(t, engine.GetCapabilities().BashCommandAllowlist)
 	assert.False(t, engine.GetCapabilities().BashDisable)
+	assert.True(t, engine.GetCapabilities().CLIOnlyMCPInfrastructure)
 	assert.Contains(t, NewEngineCatalog(NewEngineRegistry()).IDs(), "agy")
 	assert.Equal(t, "copilot", def.DetectionEngine)
 	assert.NotNil(t, constants.GetEngineOption("agy"))
