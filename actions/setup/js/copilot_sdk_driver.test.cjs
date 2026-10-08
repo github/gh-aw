@@ -908,7 +908,7 @@ describe("copilot_sdk_driver.cjs", () => {
 
     it("session.task_complete is written to events.jsonl", async () => {
       // session.task_complete must be serialized to the JSONL log so that
-      // unified_timeline.cjs can surface the agent's task summary.
+      // unified_session.cjs can retain the agent's task summary.
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);
       let onEvent = () => {};
