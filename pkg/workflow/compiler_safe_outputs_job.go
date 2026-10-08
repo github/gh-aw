@@ -931,7 +931,13 @@ func (c *Compiler) calculatePreambleInsertIndex(steps []string, data *WorkflowDa
 func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string, agentArtifactPrefix string) []string {
 	isStaged := c.trialMode || templatableBoolIsTrue(data.SafeOutputs.Staged)
 	if !isStaged {
-		steps = append(steps, buildSafeOutputItemsManifestUploadStep(agentArtifactPrefix, c.getActionPin)...)
+		claimArtifacts := isWorkQueueWorker(data)
+		if claimArtifacts {
+			var redaction strings.Builder
+			c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data)
+			steps = append(steps, redaction.String())
+		}
+		steps = append(steps, buildSafeOutputItemsManifestUploadStep(agentArtifactPrefix, c.getActionPin, claimArtifacts)...)
 	}
 	if c.actionMode.IsDev() && usesPatchesAndCheckouts(data.SafeOutputs) {
 		steps = append(steps, c.generateRestoreActionsSetupStep())

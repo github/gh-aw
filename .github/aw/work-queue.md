@@ -299,6 +299,18 @@ subcommands, not `gh aw work-queue` operator commands. Staged finish is an inten
 trusted processing publishes Completion before scoped effects and Result only
 after delivery verification.
 
+Claim-scoped audit exports retain executed operations, temporary-ID references
+and structured errors, not raw handler output or proof of Result. They use private
+directories/files, decoded-field secret redaction and a fail-closed final upload
+defaulting to one-day retention. The unused disk delivery receipt is removed; protected
+in-memory verification evidence remains unchanged. Only queue workers gain these
+upload paths and the final redaction step.
+
+See [Claim diagnostic artifacts](../../docs/src/content/docs/patterns/daily-report-portfolio.md#claim-diagnostic-artifacts)
+for each file's purpose and the limits of secret redaction. Repository references
+are not anonymized, and opaque masks registered only in the safe-output job are
+not recovered from agent logs.
+
 ## Inspect and manage the queue with the CLI
 
 `gh aw work-queue` and workflow runtime use the same closed QueueCommit contract

@@ -415,6 +415,35 @@ sequenceDiagram
 Completion is not Result. An API success response or a native run's success
 conclusion is also not proof that the required Discussion exists.
 
+## Claim diagnostic artifacts
+
+Worker diagnostics live under `/tmp/gh-aw/claims/<original-identity-hash>/`.
+They are audit exports, not scheduling authority or proof of Result.
+
+| File | Purpose |
+| --- | --- |
+| `safe-output-items.jsonl` | Executed resource operations and their original Claim attribution |
+| `temporary-id-map.json` | Symbolic-to-resource references for auditing; runtime resolution uses the unchanged in-memory map |
+| `safe-output-errors.json` | Structured failure diagnostics, not raw handler stdout/stderr |
+
+The redundant `delivery-receipt.json` is not written or uploaded. Independent
+verification uses protected in-memory evidence, and outcomes belong in
+`work-queue.jsonl`, not a diagnostic receipt.
+
+Claim directories and files use modes `0700` and `0600`. Writers redact available
+configured secrets, gateway tokens and built-in credential patterns from decoded
+JSON keys and values before serialization. After delivery verification, the
+existing redactor applies the worker job's configured secrets and any recoverable
+agent-log runtime masks. Upload requires successful redaction and defaults to
+one-day retention; `GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS` can override that
+repository-wide default. Ordinary workflows and queue observers gain no Claim
+paths or extra redaction step.
+
+Redaction does not anonymize repository names, resource IDs or URLs, and cannot
+identify arbitrary personal data or unknown secrets. Opaque runtime masks
+registered only in the safe-output job are not recovered from agent logs. Avoid
+putting such data in diagnostics; restrict artifact access accordingly.
+
 ## No data, backlog and uncertain launches
 
 The reporting count is an operating target, never a reason to bypass queue

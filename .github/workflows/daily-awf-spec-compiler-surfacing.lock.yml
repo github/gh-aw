@@ -2552,9 +2552,5 @@ jobs:
             /tmp/gh-aw/safe-output-items.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
-            /tmp/gh-aw/claims/*/safe-output-items.jsonl
-            /tmp/gh-aw/claims/*/temporary-id-map.json
-            /tmp/gh-aw/claims/*/safe-output-errors.json
-            /tmp/gh-aw/claims/*/delivery-receipt.json
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}

@@ -41,7 +41,6 @@ const {
   currentClaimAssignment,
   claimIdentity,
   assertClaimIdentity,
-  claimArtifactPath,
   closeClaimEffectChannel,
 } = require("./work_queue_claim_scope.cjs");
 const { withClaimEffectClients, wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
@@ -1908,9 +1907,6 @@ async function settleClaimDelivery(scope, messages, results, options = {}) {
       : undefined,
   });
   options.signal?.throwIfAborted();
-  const directory = claimArtifactPath(options.deliveryArtifactRoot || "/tmp/gh-aw", handle);
-  fs.mkdirSync(directory, { recursive: true });
-  fs.writeFileSync(nodePath.join(directory, "delivery-receipt.json"), JSON.stringify(delivery) + "\n");
   return delivery;
 }
 

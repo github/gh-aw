@@ -2320,8 +2320,24 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
-      - name: Upload Safe Outputs Items
+      - name: Redact secrets in logs
+        id: redact_secrets
         if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
+            await main();
+        env:
+          GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
+          SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Safe Outputs Items
+        if: always() && steps.redact_secrets.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: safe-outputs-items
@@ -2332,6 +2348,5 @@ jobs:
             /tmp/gh-aw/claims/*/safe-output-items.jsonl
             /tmp/gh-aw/claims/*/temporary-id-map.json
             /tmp/gh-aw/claims/*/safe-output-errors.json
-            /tmp/gh-aw/claims/*/delivery-receipt.json
           if-no-files-found: ignore
-          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}

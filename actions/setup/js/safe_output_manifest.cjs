@@ -6,16 +6,25 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 const { MANIFEST_FILE_PATH, TEMPORARY_ID_MAP_FILE_PATH, SAFE_OUTPUT_ERRORS_FILE_PATH } = require("./constants.cjs");
 const { redactBuiltInPatterns, redactSecrets, extractMCPGatewayTokens, MCP_GATEWAY_CONFIG_PATHS } = require("./redact_secrets.cjs");
-const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentity } = require("./work_queue_claim_scope.cjs");
+const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentity, assertClaimArtifactDirectory, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
 
 /** @param {string} filename @returns {string} */
 function scopedArtifactFile(filename) {
   const handle = currentClaimHandle();
   if (!handle) return filename;
-  if (nodePath.basename(nodePath.dirname(filename)) === nodePath.basename(claimArtifactPath("", handle)) && nodePath.basename(nodePath.dirname(nodePath.dirname(filename))) === "claims") return filename;
-  const directory = claimArtifactPath(nodePath.dirname(filename), handle);
-  fs.mkdirSync(directory, { recursive: true });
-  return nodePath.join(directory, nodePath.basename(filename));
+  const scoped = nodePath.basename(nodePath.dirname(filename)) === nodePath.basename(claimArtifactPath("", handle)) && nodePath.basename(nodePath.dirname(nodePath.dirname(filename))) === "claims";
+  const directory = scoped ? nodePath.dirname(filename) : claimArtifactPath(nodePath.dirname(filename), handle);
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  assertClaimArtifactDirectory(directory);
+  fs.chmodSync(directory, 0o700);
+  const destination = nodePath.join(directory, nodePath.basename(filename));
+  const existing = fs.lstatSync(destination, { throwIfNoEntry: false });
+  if (existing) {
+    assertClaimArtifactFile(destination, directory);
+    if (!existing.isFile() || existing.nlink !== 1) throw new Error(`${ERR_SYSTEM}: Claim diagnostic must be a private regular file`);
+    fs.chmodSync(destination, 0o600);
+  }
+  return destination;
 }
 
 /**
@@ -127,7 +136,7 @@ function redactManifestValue(value, secretValues) {
     return value.map(entry => redactManifestValue(entry, secretValues));
   }
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, redactManifestValue(nestedValue, secretValues)]));
+    return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [redactManifestValue(key, secretValues), redactManifestValue(nestedValue, secretValues)]));
   }
   return value;
 }
@@ -186,6 +195,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
       const redactedEntry = /** @type {ManifestEntry} */ redactManifestValue(entry, secretValues);
       jsonLine = JSON.stringify(redactedEntry);
     } catch (error) {
+      if (identity) throw new Error(`${ERR_SYSTEM}: Failed to redact Claim manifest entry`, { cause: error });
       if (typeof core !== "undefined" && typeof core.warning === "function") {
         core.warning(`Failed to redact safe-output manifest entry (type=${entry.type}); recording minimal fields only to avoid persisting unredacted data: ${getErrorMessage(error)}`);
       }
@@ -198,7 +208,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
       });
     }
     try {
-      fs.appendFileSync(destination, jsonLine + "\n");
+      fs.appendFileSync(destination, jsonLine + "\n", identity ? { mode: 0o600 } : undefined);
     } catch (error) {
       throw new Error(`${ERR_SYSTEM}: Failed to write to manifest file: ${getErrorMessage(error)}`, { cause: error });
     }
@@ -216,7 +226,7 @@ function ensureManifestExists(manifestFile = MANIFEST_FILE_PATH) {
   manifestFile = scopedArtifactFile(manifestFile);
   if (!fs.existsSync(manifestFile)) {
     try {
-      fs.writeFileSync(manifestFile, "");
+      fs.writeFileSync(manifestFile, "", currentClaimHandle() ? { mode: 0o600 } : undefined);
     } catch (error) {
       throw new Error(`${ERR_SYSTEM}: Failed to create manifest file: ${getErrorMessage(error)}`, { cause: error });
     }
@@ -309,8 +319,10 @@ function writeTemporaryIdMapFile(temporaryIdMap, filePath = TEMPORARY_ID_MAP_FIL
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(filePath, JSON.stringify(temporaryIdMap, null, 2) + "\n");
+    const exported = currentClaimHandle() ? redactManifestValue(temporaryIdMap, collectArtifactSecretValues()) : temporaryIdMap;
+    fs.writeFileSync(filePath, JSON.stringify(exported, null, 2) + "\n", currentClaimHandle() ? { mode: 0o600 } : undefined);
   } catch (error) {
+    if (currentClaimHandle()) throw new Error(`${ERR_SYSTEM}: Failed to safely export Claim temporary ID map`, { cause: error });
     throw new Error(`${ERR_SYSTEM}: Failed to write temporary ID map file: ${getErrorMessage(error)}`, { cause: error });
   }
 }
@@ -321,11 +333,11 @@ function writeTemporaryIdMapFile(temporaryIdMap, filePath = TEMPORARY_ID_MAP_FIL
  * The report captures *structured* failure metadata only (error code, error
  * message produced by gh-aw itself, and the list of failing safe-output types).
  * Raw handler stdout/stderr is never captured. Built-in credential patterns are
- * redacted from the serialized report before it is written to disk.
+ * redacted from decoded fields before JSON serialization.
  *
  * The file is uploaded with the safe-outputs-items artifact (which is uploaded
- * with `if: always()`), so failures of the "Process Safe Outputs" step remain
- * diagnosable after the job logs expire.
+ * after redaction succeeds for Claim workers), so failures of the "Process
+ * Safe Outputs" step remain diagnosable without uploading raw error text.
  *
  * @param {{status?: string, errorCode?: string, message?: string, failures?: Array<{type?: string, errorCode?: string, error?: string}>}} report - Failure diagnostics
  * @param {string} [filePath] - Path to the output file (defaults to SAFE_OUTPUT_ERRORS_FILE_PATH)
@@ -350,14 +362,12 @@ function writeSafeOutputErrorReport(report, filePath = SAFE_OUTPUT_ERRORS_FILE_P
       : [],
   };
 
-  let content = JSON.stringify(entry, null, 2) + "\n";
+  let content;
   try {
-    content = redactBuiltInPatterns(content).content;
-    content = redactSecrets(content, collectArtifactSecretValues()).content;
+    content = JSON.stringify(redactManifestValue(entry, collectArtifactSecretValues()), null, 2) + "\n";
   } catch {
-    // Redaction is a safety net; if it fails, drop the free-form text rather
-    // than risk writing an unredacted credential into an artifact.
-    content = JSON.stringify({ timestamp: entry.timestamp, status: entry.status, message: "<redaction unavailable: diagnostics omitted>" }, null, 2) + "\n";
+    if (typeof core !== "undefined" && typeof core.warning === "function") core.warning("Safe-output diagnostic redaction failed; free-form diagnostics omitted");
+    content = JSON.stringify({ timestamp: entry.timestamp, status: "failure", message: "<redaction unavailable: diagnostics omitted>" }, null, 2) + "\n";
   }
 
   try {
@@ -365,7 +375,7 @@ function writeSafeOutputErrorReport(report, filePath = SAFE_OUTPUT_ERRORS_FILE_P
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(filePath, content);
+    fs.writeFileSync(filePath, content, currentClaimHandle() ? { mode: 0o600 } : undefined);
   } catch (error) {
     throw new Error(`${ERR_SYSTEM}: Failed to write safe output error report: ${getErrorMessage(error)}`, { cause: error });
   }

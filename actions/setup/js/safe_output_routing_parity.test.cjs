@@ -233,11 +233,92 @@ describe("real immutable Claim routing", () => {
     for (const [index, settlement] of result.settlements.entries()) {
       expect(settlement).toMatchObject({ claim_handle: fixture.assignment.claims[index].handle, success: true });
       expect(settlement.delivery.verification).toBe("unknown");
-      expect(fs.existsSync(path.join(scope.claimArtifactPath(options.deliveryArtifactRoot, settlement.claim_handle, fixture.assignment), "delivery-receipt.json"))).toBe(true);
+      const directory = scope.claimArtifactPath(options.deliveryArtifactRoot, settlement.claim_handle, fixture.assignment);
+      expect(fs.existsSync(path.join(directory, "delivery-receipt.json"))).toBe(false);
     }
     expect(options.finalizeResults).toHaveBeenCalledTimes(1);
     expect(global.core.setOutput).toHaveBeenCalledWith("work_queue_outcome", "delivery_pending");
     expect(global.getOctokit).not.toHaveBeenCalled();
+  });
+
+  it("redacts every persisted Claim diagnostic before JSON encoding and keeps files private", async () => {
+    const original = assignment(2);
+    const handle = original.claims[0].handle;
+    const base = path.join(root, "privacy");
+    const secret = 'private"\\credential\nsecond-line';
+    const token = "ghp_" + "q".repeat(36);
+    const temporaryIds = { aw_example: { repo: `owner/${secret}`, number: 19 }, [secret]: { value: token } };
+    process.env.GH_AW_SECRET_NAMES = "CLAIM_PRIVACY";
+    process.env.SECRET_CLAIM_PRIVACY = secret;
+    await scope.withClaimExecution({ assignment: original, claim_handle: handle, authorize }, async () => {
+      manifest.createManifestLogger(path.join(base, "safe-output-items.jsonl"))({
+        type: "create_issue",
+        repo: "owner/repo",
+        metadata: { [secret]: [secret, token] },
+      });
+      manifest.writeTemporaryIdMapFile(temporaryIds, path.join(base, "temporary-id-map.json"));
+      manifest.writeSafeOutputErrorReport({ message: secret, failures: [{ type: "create_issue", error: `${secret} ${token}` }] }, path.join(base, "safe-output-errors.json"));
+    });
+    const directory = scope.claimArtifactPath(base, handle, original);
+    const assertPrivate = value => {
+      if (typeof value === "string") {
+        expect(value).not.toContain(secret);
+        expect(value).not.toContain(token);
+      } else if (Array.isArray(value)) value.forEach(assertPrivate);
+      else if (value && typeof value === "object") {
+        for (const [key, nested] of Object.entries(value)) {
+          assertPrivate(key);
+          assertPrivate(nested);
+        }
+      }
+    };
+    expect(fs.statSync(directory).mode & 0o777).toBe(0o700);
+    for (const file of ["safe-output-items.jsonl", "temporary-id-map.json", "safe-output-errors.json"]) {
+      const filename = path.join(directory, file);
+      assertPrivate(JSON.parse(fs.readFileSync(filename, "utf8")));
+      expect(fs.statSync(filename).mode & 0o777).toBe(0o600);
+      expect(fs.existsSync(path.join(base, file))).toBe(false);
+    }
+    expect(fs.existsSync(scope.claimArtifactPath(base, original.claims[1].handle, original))).toBe(false);
+    expect(temporaryIds.aw_example.repo).toBe(`owner/${secret}`);
+    expect(temporaryIds[secret].value).toBe(token);
+  });
+
+  it.each(["symbolic link", "dangling symbolic link", "hard link"])("rejects redirected Claim diagnostic files (%s)", async kind => {
+    const original = assignment(1);
+    const handle = original.claims[0].handle;
+    const base = path.join(root, `redirected-${kind}`);
+    const directory = scope.claimArtifactPath(base, handle, original);
+    const outside = path.join(root, "unrelated.txt");
+    const missing = path.join(root, "must-not-be-created.txt");
+    const filename = path.join(directory, "temporary-id-map.json");
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(outside, "unchanged", { mode: 0o644 });
+    if (kind === "hard link") fs.linkSync(outside, filename);
+    else fs.symlinkSync(kind === "symbolic link" ? outside : missing, filename);
+    await scope.withClaimExecution({ assignment: original, claim_handle: handle, authorize }, async () => {
+      expect(() => manifest.writeTemporaryIdMapFile({ aw_example: { repo: "owner/repo", number: 19 } }, path.join(base, "temporary-id-map.json"))).toThrow();
+    });
+    expect(fs.readFileSync(outside, "utf8")).toBe("unchanged");
+    expect(fs.statSync(outside).mode & 0o777).toBe(0o644);
+    expect(fs.existsSync(missing)).toBe(false);
+  });
+
+  it("does not persist or log raw Claim records when redaction fails", async () => {
+    const original = assignment(1);
+    const handle = original.claims[0].handle;
+    const base = path.join(root, "failed-redaction");
+    const metadata = { secret: "opaque-must-not-leak" };
+    metadata.self = metadata;
+    await scope.withClaimExecution({ assignment: original, claim_handle: handle, authorize }, async () => {
+      const logger = manifest.createManifestLogger(path.join(base, "safe-output-items.jsonl"));
+      expect(() => logger({ type: "create_issue", metadata })).toThrow("Failed to redact Claim manifest entry");
+      expect(() => manifest.writeTemporaryIdMapFile(metadata, path.join(base, "temporary-id-map.json"))).toThrow("Failed to safely export Claim temporary ID map");
+    });
+    const directory = scope.claimArtifactPath(base, handle, original);
+    expect(fs.readFileSync(path.join(directory, "safe-output-items.jsonl"), "utf8")).toBe("");
+    expect(fs.existsSync(path.join(directory, "temporary-id-map.json"))).toBe(false);
+    expect(core.warning.mock.calls.flat().join("\n")).not.toContain(metadata.secret);
   });
 
   it("rejects omitted, malformed, foreign and conflicting selectors without shrinking original multi-Claim membership", async () => {
