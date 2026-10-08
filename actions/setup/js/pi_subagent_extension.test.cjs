@@ -171,13 +171,14 @@ process.stdin.on("end", () => {
         GH_AW_SUB_AGENT_EXT: ".md",
         GH_AW_PI_SUBAGENT_ARGS: originalEnv.GH_AW_PI_SUBAGENT_ARGS,
         GH_AW_PI_TOOL_POLICY: originalEnv.GH_AW_PI_TOOL_POLICY,
+        GH_AW_PI_MODEL_ALIASES: JSON.stringify({ "gpt-5-mini": ["copilot/gpt-5*mini*"], "gpt-5-nano": ["copilot/gpt-5*nano*"] }),
       };
       vi.stubGlobal("core", { info: vi.fn() });
       const source = fs.readFileSync(new URL("../../../.github/workflows/smoke-pi-sub-agents.md", import.meta.url), "utf8");
       const parentPrompt = writeInlineSubAgents(source, dir, dir, "pi");
       expect(parentPrompt).not.toContain("## agent:");
       stagePiArtifacts(process.env.PI_CODING_AGENT_DIR);
-      const expected = ["claude-haiku-4.5", "gpt-5-mini", "gpt-5-nano"];
+      const expected = ["claude-haiku-4.5", "gpt-5-mini", "gpt-4o-mini"];
       const sdk = {
         parseFrontmatter: content => {
           const [, header, body] = content.split("---");
@@ -197,7 +198,7 @@ process.stdin.on("end", () => {
         agentDir: process.env.PI_CODING_AGENT_DIR,
         sdk,
         provider: "github-copilot",
-        catalog: expected.map(model => `github-copilot/${model}`),
+        catalog: [...expected, "gpt-5.4-mini"].map(model => `github-copilot/${model}`),
         gateway: true,
         parentModel: "github-copilot/gpt-5.3-codex",
       });
@@ -221,7 +222,7 @@ process.stdin.on("end", () => {
       process.env.GH_AW_PI_COMMAND = executable;
       for (const agent of agents) {
         const result = await runPiSubagent(agent, "who am i?", { cwd: dir });
-        expect(result.content[0].text).toBe(agent.declaredModel);
+        expect(result.content[0].text).toBe(agent.modelId);
         expect(result.details.model).toBe(agent.modelId);
       }
     } finally {

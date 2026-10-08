@@ -40,8 +40,8 @@ This is the Pi variant of `smoke-copilot-sub-agents.md`. Keep output short.
 1. Use the managed `subagent` tool exactly once per declared agent, sequentially:
    - `{"agent":"haiku-whoami","task":"who am i?"}`
    - `{"agent":"mini-whoami","task":"who am i?"}`
-   - `{"agent":"nano-whoami","task":"who am i?"}`
-2. Check the exact responses: `claude-haiku-4.5`, `gpt-5-mini`, and `gpt-5-nano`.
+   - `{"agent":"compact-whoami","task":"who am i?"}`
+2. Check the exact responses: `claude-haiku-4.5`, `gpt-5-mini`, and `gpt-4o-mini`.
 3. Mark a missing tool, failed delegation, or unexpected response as FAIL. Do not
    answer on behalf of a sub-agent or substitute a different agent.
 4. Do not make other tool calls except the staged `create_issue` report below.
@@ -55,11 +55,12 @@ Create a staged issue titled **"Smoke Test: Pi Sub Agents - ${{ github.run_id }}
 
 These fixed responses test delegation, not a model's ability to identify itself.
 The dispatch records and inference model usage provide model-selection evidence.
+Provider-qualified model IDs pin the exact models rather than resolving aliases.
 
 ## agent: `haiku-whoami`
 ---
 description: Returns the Haiku model identity for smoke testing
-model: claude-haiku-4.5
+model: copilot/claude-haiku-4.5
 ---
 When asked `who am i?`, reply with exactly:
 
@@ -70,7 +71,7 @@ No extra words, punctuation, or formatting.
 ## agent: `mini-whoami`
 ---
 description: Returns the GPT-5 mini model identity for smoke testing
-model: gpt-5-mini
+model: copilot/gpt-5-mini
 ---
 When asked `who am i?`, reply with exactly:
 
@@ -78,13 +79,13 @@ When asked `who am i?`, reply with exactly:
 
 No extra words, punctuation, or formatting.
 
-## agent: `nano-whoami`
+## agent: `compact-whoami`
 ---
-description: Returns the GPT-5 nano model identity for smoke testing
-model: gpt-5-nano
+description: Returns the GPT-4o mini model identity for smoke testing
+model: copilot/gpt-4o-mini
 ---
 When asked `who am i?`, reply with exactly:
 
-`gpt-5-nano`
+`gpt-4o-mini`
 
 No extra words, punctuation, or formatting.
