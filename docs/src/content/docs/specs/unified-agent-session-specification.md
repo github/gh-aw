@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.6.0"
+version: "1.7.0"
 status: Draft
-publication_date: "2026-10-05"
+publication_date: "2026-10-08"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.6.0<br>
+**Version**: 1.7.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-05<br>
+**Publication Date**: 2026-10-08<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.6.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.7.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -234,7 +234,8 @@ opaque because its essential fields are not defined by this specification.
 | Payload family | Essential fields |
 | --- | --- |
 | Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
-| Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
+| Agent messages and reasoning | Exact `content`, supplied message/reasoning IDs, stream flags, and session/agent/model/request/turn correlation; no duplicate text blocks or original message envelope. Native `system.message` retains exact content, role, and correlation without duplicated `contentBlocks`. |
+| Agent conversation lifecycle | Native message/reasoning deltas retain exact `deltaContent` and their identities; turn boundaries retain correlation; `session.task_complete` retains exact summary and supplied success. |
 | Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
 | Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
@@ -800,6 +801,9 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Source signature | Canonical mapping or interpretation |
 | --- | --- |
 | Dot-namespaced `type` with object `data` and optional native envelope | Core events retained; other native types retained as extensions. |
+| `assistant.message` with `data.reasoningText` | Preserve the message and expose exact reasoning as `assistant.reasoning`, retaining message and request correlation. |
+| `assistant.message_delta` / `assistant.reasoning_delta` with textual `data.deltaContent` | Preserve native deltas and project exact message/reasoning fragments with `delta: true`; omit redundant managed projections when a same-scope final snapshot covers the stream. |
+| `assistant.message.data.toolRequests[]` with a native tool name and arguments | Expose requested calls as tool starts only when no same-scope native start was observed; preserve argument values and never invent completion or success. |
 | `session.task_complete` with textual `data.summary` | Retain the native completion event and expose its source-proven final summary as assistant content without duplicating an already observed answer. |
 | Recognized Claude-compatible legacy entries | Per-record legacy mappings, with `sourceEngine: "copilot"` on mapped initialization. |
 | Framed `[DEBUG] data:` JSON response with `choices[].message` | `content` → assistant message, `reasoning_text` → reasoning, `tool_calls[].id/function` → starts; preserve argument text when it is not valid structured JSON. |
@@ -808,6 +812,15 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Recognized usage/model footer and explicit `Turns:` | Preserve reported usage/model and explicit turn count; no tool-count fallback for turns. |
 
 CLI/debug framing is removed, but retained source payload text is not trimmed. A native event stream does not need a synthesized result merely because its renderer can estimate conversation turns.
+
+Message snapshots, tool requests/completions, usage identities, and turn identities
+are correlated within source component, phase, path, session, agent, and parent
+tool scope. Reused IDs in independent scopes MUST NOT suppress streaming evidence
+or attach another source's tool name or MCP server. Reasoning streams use their
+supplied `reasoningId`, independently of assistant message IDs. Native observations
+remain available when managed projections are superseded by later snapshots or
+execution starts. User messages and refusals retain their supplied message and
+request correlation in the unified projection without exposing prompts in summaries.
 
 Retry sessions retain independent source provenance and tool-correlation scopes.
 The bootstrap persists each observed session rather than only the last attempt;
@@ -1211,6 +1224,7 @@ payloads with harmless examples.
 | Claude | [Smoke Claude success](https://github.com/github/gh-aw/actions/runs/36812703027) and [failure](https://github.com/github/gh-aw/actions/runs/36762044297) | `agent-stdio.log` | `fixtures/claude_ci_sessions.cjs`, `claude_session.test.cjs` |
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
+| Copilot | Smoke Copilot successes [37713903842](https://github.com/github/gh-aw/actions/runs/37713903842), [37470423256](https://github.com/github/gh-aw/actions/runs/37470423256), and failure [37553647085](https://github.com/github/gh-aw/actions/runs/37553647085) | Native `events.jsonl`, canonical `agent-session.jsonl`, and published `usage/aw_session.jsonl` | `fixtures/copilot_ci_messages.cjs`, `copilot_session_normalization.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
 | Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
 
@@ -1222,11 +1236,18 @@ to a CI run. In particular, observed Pi streams expose their model on message
 snapshots and do not expose a session duration. Readers display that observed model
 without rewriting initialization or inventing zero duration.
 
-The successful Copilot artifacts lack native session files; their legacy process
+The initial successful Copilot artifacts lack native session files; their legacy process
 logs provide the success-path evidence. Additional usage, delta, and error cases use
 documented SDK shapes. The failed Smoke Copilot workflow failed in downstream safe
 outputs, not in its recorded agent session. A failed workflow does not by itself
 establish a failed agent session (T-UAS-048).
+
+The three newer Copilot samples contain native user/system messages, assistant
+reasoning and tool requests, tool lifecycle, turn boundaries, task summaries, and
+shutdown accounting. The failed workflow again failed downstream of the agent.
+Their sanitized excerpt exercises message correlation and essential-payload
+compaction; interrupted requests, reused identities, SDK reasoning deltas, and
+nonzero reasoning-token reports are supplemental synthetic cases.
 
 The two Gemini spending-cap samples contain only initialization, a user prompt,
 and a terminal provider error. Their reported zero token counts and duration are
@@ -1627,6 +1648,13 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.7.0 — Draft (2026-10-08)
+
+- Scoped Copilot message, reasoning, and tool normalization to source/session/agent identity.
+- Added reasoning-delta and interrupted tool-request projections without duplicate snapshots or fabricated completions.
+- Preserved user/refusal/tool correlation and reported reasoning-token subsets; compacted known native conversation payloads.
+- Added three existing Copilot-run samples and retained numeric serialization-format version 1.
 
 ### Version 1.6.0 — Draft (2026-10-05)
 

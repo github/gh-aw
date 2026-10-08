@@ -7,7 +7,7 @@
 const { normalizeAgentSession, createSessionEvent, accumulateSessionUsage, isTokenCount, isMetric } = require("./agent_session.cjs");
 const { isDeepStrictEqual } = require("node:util");
 
-const COPILOT_CONVERSATION_EVENT_TYPES = new Set(["assistant.message", "assistant.message_delta", "user.message", "tool.execution_start", "tool.execution_complete"]);
+const COPILOT_CONVERSATION_EVENT_TYPES = new Set(["assistant.message", "assistant.message_delta", "assistant.reasoning", "assistant.reasoning_delta", "assistant.refusal", "user.message", "tool.execution_start", "tool.execution_complete"]);
 
 /**
  * @param {Array<any>} events
@@ -73,18 +73,6 @@ function normalizeCopilotSession(entries) {
     bucket.push({ evidence: projectionEvidence(event), consumed: false });
     projections.set(key, bucket);
   }
-  const deltaText = new Map();
-  for (const event of source) {
-    if (event.type === "assistant.message_delta" && event.data.messageId !== undefined && typeof event.data.deltaContent === "string") {
-      deltaText.set(event.data.messageId, (deltaText.get(event.data.messageId) ?? "") + event.data.deltaContent);
-    }
-  }
-  const snapshots = new Set(
-    source
-      .filter(event => event.type === "assistant.message" && !event.copilotProjection && typeof event.data.content === "string" && deltaText.has(event.data.messageId) && event.data.content.startsWith(deltaText.get(event.data.messageId)))
-      .map(event => event.data.messageId)
-      .filter(id => id !== undefined)
-  );
   const summaryScopes = [];
   const sourceSessions = new Map();
   const originScopes = new Map();
@@ -94,10 +82,12 @@ function normalizeCopilotSession(entries) {
   const retainedSummaries = new Set();
   for (const [index, event] of source.entries()) {
     const provenance = event.provenance && typeof event.provenance === "object" ? event.provenance : {};
-    const sourceKey = JSON.stringify(["phase" in provenance ? provenance.phase : undefined, "path" in provenance ? provenance.path : undefined, event.agentId]);
+    const sourceKey = JSON.stringify(["component" in provenance ? provenance.component : undefined, "phase" in provenance ? provenance.phase : undefined, "path" in provenance ? provenance.path : undefined]);
     if (["session.start", "session.init"].includes(event.type) && event.data.sessionId !== undefined) sourceSessions.set(sourceKey, event.data.sessionId);
-    const originKey = JSON.stringify([sourceKey, event.id, event.timestamp]);
-    const observedScope = JSON.stringify([sourceKey, event.session_id ?? sourceSessions.get(sourceKey)]);
+    const agentId = event.agentId ?? event.data.agentId;
+    const parentToolId = event.parent_tool_use_id ?? event.parentToolUseId ?? event.parentToolCallId ?? event.data.parentToolUseId ?? event.data.parent_tool_use_id ?? event.data.parentToolCallId;
+    const originKey = JSON.stringify([sourceKey, agentId, parentToolId, event.id, event.timestamp]);
+    const observedScope = JSON.stringify([sourceKey, event.session_id ?? event.sessionId ?? event.data.sessionId ?? event.data.session_id ?? sourceSessions.get(sourceKey), agentId, parentToolId]);
     const scope = event.copilotProjection && event.id !== undefined ? (originScopes.get(originKey) ?? observedScope) : observedScope;
     summaryScopes[index] = scope;
     if (!event.copilotProjection && event.id !== undefined) originScopes.set(originKey, scope);
@@ -120,7 +110,23 @@ function normalizeCopilotSession(entries) {
     if (!emittedMessages.has(scope)) emittedMessages.set(scope, new Set());
     emittedMessages.get(scope).add(content);
   }
-  let sessionId;
+  const correlationKey = (scope, id) => JSON.stringify([scope, id]);
+  const streamKey = (scope, event) => JSON.stringify([scope, event.type.startsWith("assistant.reasoning") ? "reasoning" : "message", event.data.reasoningId ?? event.data.messageId]);
+  const deltaText = new Map();
+  const nativeStarts = new Set();
+  for (const [index, event] of source.entries()) {
+    const scope = summaryScopes[index];
+    if (["assistant.message_delta", "assistant.reasoning_delta"].includes(event.type) && (event.data.messageId !== undefined || event.data.reasoningId !== undefined) && typeof event.data.deltaContent === "string") {
+      const key = streamKey(scope, event);
+      deltaText.set(key, (deltaText.get(key) ?? "") + event.data.deltaContent);
+    }
+    if (event.type === "tool.execution_start" && !event.copilotProjection && event.data.toolCallId !== undefined) nativeStarts.add(correlationKey(scope, event.data.toolCallId));
+  }
+  const snapshots = new Set();
+  for (const [index, event] of source.entries()) {
+    const key = streamKey(summaryScopes[index], event);
+    if (["assistant.message", "assistant.reasoning"].includes(event.type) && !event.copilotProjection && typeof event.data.content === "string" && deltaText.has(key) && event.data.content.startsWith(deltaText.get(key))) snapshots.add(key);
+  }
   let finalizedTurns = 0;
   let hasTurnResult = false;
 
@@ -129,6 +135,8 @@ function normalizeCopilotSession(entries) {
     /** @type {Record<string, any>} */
     const data = event.data;
     const summaryScope = summaryScopes[index];
+    if ((event.copilotProjection === "assistant.message_delta" || event.copilotProjection === "assistant.reasoning_delta") && snapshots.has(streamKey(summaryScope, event))) continue;
+    if (event.type === "tool.execution_start" && event.copilotProjection === "assistant.toolRequests" && data.toolCallId !== undefined && nativeStarts.has(correlationKey(summaryScope, data.toolCallId))) continue;
     if (event.type === "assistant.message" && event.copilotProjection === "session.task_complete") {
       const identity = JSON.stringify([summaryScope, data.content]);
       if (emittedMessages.get(summaryScope)?.has(data.content) || retainedSummaries.has(identity)) continue;
@@ -160,7 +168,6 @@ function normalizeCopilotSession(entries) {
     };
 
     if (event.type === "session.start") {
-      sessionId = data.sessionId;
       if (!Object.hasOwn(data, "model") && Object.hasOwn(data, "selectedModel")) data.model = data.selectedModel;
       if (!Object.hasOwn(data, "cwd") && data.context && Object.hasOwn(data.context, "cwd")) data.cwd = data.context.cwd;
       project("session.init", {
@@ -172,15 +179,28 @@ function normalizeCopilotSession(entries) {
       if (!Object.hasOwn(data, "input") && !Object.hasOwn(data, "parameters") && Object.hasOwn(data, "arguments")) {
         event.data.input = structuredClone(data.arguments);
       }
-      if (data.toolCallId !== undefined) tools.set(data.toolCallId, data);
+      if (data.toolCallId !== undefined) tools.set(correlationKey(summaryScope, data.toolCallId), data);
     } else if (event.type === "tool.execution_complete") {
-      const start = tools.get(data.toolCallId);
-      if (!Object.hasOwn(data, "toolName") && start?.toolName !== undefined) data.toolName = start.toolName;
+      const start = data.toolCallId !== undefined ? tools.get(correlationKey(summaryScope, data.toolCallId)) : undefined;
+      for (const key of ["toolName", "mcpServerName"]) {
+        if (!Object.hasOwn(data, key) && start?.[key] !== undefined) data[key] = structuredClone(start[key]);
+      }
       if (!Object.hasOwn(data, "exitCode") && Number.isSafeInteger(data.shellExecution?.exitCode)) data.exitCode = data.shellExecution.exitCode;
-    } else if ((event.type === "assistant.message" || event.type === "assistant.refusal") && typeof data.reasoningText === "string") {
-      project("assistant.reasoning", { content: data.reasoningText });
-    } else if (event.type === "assistant.message_delta" && typeof data.deltaContent === "string" && !snapshots.has(data.messageId)) {
-      project("assistant.message", { content: data.deltaContent });
+    } else if (event.type === "assistant.message" || event.type === "assistant.refusal") {
+      if (typeof data.reasoningText === "string") project("assistant.reasoning", { content: data.reasoningText });
+      for (const request of Array.isArray(data.toolRequests) ? data.toolRequests : []) {
+        if (!request || typeof request !== "object" || Array.isArray(request) || typeof request.name !== "string") continue;
+        if (request.toolCallId !== undefined && nativeStarts.has(correlationKey(summaryScope, request.toolCallId))) continue;
+        const fields = {
+          ...request,
+          toolName: request.name,
+          ...(!Object.hasOwn(request, "input") && !Object.hasOwn(request, "parameters") && Object.hasOwn(request, "arguments") ? { input: structuredClone(request.arguments) } : {}),
+        };
+        project("tool.execution_start", fields, "assistant.toolRequests");
+        if (request.toolCallId !== undefined) tools.set(correlationKey(summaryScope, request.toolCallId), fields);
+      }
+    } else if (["assistant.message_delta", "assistant.reasoning_delta"].includes(event.type) && typeof data.deltaContent === "string" && !snapshots.has(streamKey(summaryScope, event))) {
+      project(event.type === "assistant.reasoning_delta" ? "assistant.reasoning" : "assistant.message", { content: data.deltaContent, delta: true });
     } else if (event.type === "session.task_complete" && typeof data.summary === "string" && data.summary.trim()) {
       const messages = summaryMessages.get(summaryScope) ?? new Set();
       if (!messages.has(data.summary)) {
@@ -190,13 +210,13 @@ function normalizeCopilotSession(entries) {
         retainedSummaries.add(JSON.stringify([summaryScope, data.summary]));
       }
     } else if (event.type === "assistant.turn_end") {
-      const identity = data.turnId !== undefined ? JSON.stringify([sessionId, event.agentId, data.turnId]) : event.id;
+      const identity = data.turnId !== undefined || event.id !== undefined ? correlationKey(summaryScope, data.turnId ?? event.id) : undefined;
       if (identity === undefined || !turns.has(identity)) {
         finalizedTurns++;
         if (identity !== undefined) turns.add(identity);
       }
     } else if (event.type === "assistant.usage") {
-      const identity = data.apiCallId ?? event.id;
+      const identity = data.apiCallId !== undefined || event.id !== undefined ? correlationKey(summaryScope, data.apiCallId ?? event.id) : undefined;
       if (identity === undefined || !responses.has(identity)) {
         if (identity !== undefined) responses.add(identity);
         accumulateSessionUsage(usage, copilotUsage(data));
@@ -251,6 +271,7 @@ function copilotUsage(data) {
     ["outputTokens", "output_tokens"],
     ["cacheReadTokens", "cache_read_input_tokens"],
     ["cacheWriteTokens", "cache_creation_input_tokens"],
+    ["reasoningTokens", "reasoning_output_tokens"],
   ]) {
     if (isTokenCount(data?.[nativeKey])) usage[key] = data[nativeKey];
   }

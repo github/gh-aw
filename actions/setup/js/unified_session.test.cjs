@@ -587,10 +587,23 @@ describe("Unified conclusion session", () => {
     expect(answers.map(event => event.data.content)).toEqual([summary]);
     expect(answers[0].id).toBe("complete");
     expect(answers[0].provenance.path).toBe("agent-session.jsonl");
-    expect(events.find(event => event.type === "session.task_complete").data.sourceDetail).toBe("observed metadata");
+    expect(events.find(event => event.type === "session.task_complete").data).toEqual({ summary });
+    expect(fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8")).toContain("observed metadata");
     const markdown = require("./session_cli.cjs").sessionCLI(["markdown", write("usage/aw_session.jsonl", events)]);
     expect(markdown).toContain("Observed historical final answer");
     expect(markdown).toContain("Second paragraph.");
+  });
+
+  it.each([
+    { type: "assistant.reasoning_delta", data: { reasoningId: "thought", deltaContent: "Observed partial reasoning." } },
+    { type: "assistant.refusal", data: { reason: "refusal", content: "Observed refusal." } },
+  ])("retains reasoning-only and refusal-only native sessions (%j)", observation => {
+    write("aw_info.json", { engine_id: "copilot" });
+    write("sandbox/agent/logs/copilot-session-state/partial/events.jsonl", [{ type: "session.start", data: { sessionId: "partial" } }, observation]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const type = observation.type === "assistant.reasoning_delta" ? "assistant.reasoning" : "assistant.refusal";
+    expect(events.find(event => event.type === type).data.content).toBe(observation.data.content ?? observation.data.deltaContent);
+    expect(events.some(event => event.type === "session.collection_warning")).toBe(false);
   });
 
   it("does not reproject canonical Copilot initialization after native provenance indexing", () => {

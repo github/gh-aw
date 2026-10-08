@@ -119,6 +119,7 @@
         "totalTokens": { "$ref": "#/definitions/SessionCount" },
         "inputTokens": { "$ref": "#/definitions/SessionCount" },
         "outputTokens": { "$ref": "#/definitions/SessionCount" },
+        "reasoningOutputTokens": { "$ref": "#/definitions/SessionCount" },
         "cacheCreationInputTokens": { "$ref": "#/definitions/SessionCount" },
         "cacheReadInputTokens": { "$ref": "#/definitions/SessionCount" },
         "input_tokens_include_cache": { "type": "boolean" },

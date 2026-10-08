@@ -10,6 +10,7 @@ const USAGE_ALIASES = {
   input_tokens: "inputTokens",
   output_tokens: "outputTokens",
   total_tokens: "totalTokens",
+  reasoning_output_tokens: "reasoningOutputTokens",
   cache_creation_input_tokens: "cacheCreationInputTokens",
   cache_read_input_tokens: "cacheReadInputTokens",
 };

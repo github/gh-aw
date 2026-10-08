@@ -48,7 +48,12 @@ function collapseStreamedMessages(events) {
       output.push(entry);
       continue;
     }
-    if (source.type === "assistant.message_delta" || source.type === "claude.assistant_snapshot" || (source.type === "gemini.message_snapshot" && source.data?.role !== "user" && source.data?.type !== "user")) {
+    if (
+      source.type === "assistant.message_delta" ||
+      source.type === "assistant.reasoning_delta" ||
+      source.type === "claude.assistant_snapshot" ||
+      (source.type === "gemini.message_snapshot" && source.data?.role !== "user" && source.data?.type !== "user")
+    ) {
       if (source.type === "gemini.message_snapshot") geminiSnapshot = { scope, id: source.data?.messageId ?? source.data?.message_id ?? source.messageId ?? source.message_id, content: entry.data?.content };
       output.push(entry);
       continue;
@@ -58,13 +63,13 @@ function collapseStreamedMessages(events) {
     const type = legacy ? (block?.type === "text" ? "assistant.message" : block?.type === "thinking" ? "assistant.reasoning" : undefined) : source.type;
     const field = block?.type === "thinking" ? "thinking" : "text";
     const text = legacy ? block?.[field] : entry.data?.content;
-    const messageId = source.data?.messageId ?? source.data?.message_id ?? source.messageId ?? source.message_id ?? source.message?.id;
+    const messageId = (type === "assistant.reasoning" ? source.data?.reasoningId : undefined) ?? source.data?.messageId ?? source.data?.message_id ?? source.messageId ?? source.message_id ?? source.message?.id;
     const claude = claudeMessages.get(scope);
     const snapshotBlocks = source.message?.content;
     const matchingBlocks = Array.isArray(snapshotBlocks) ? snapshotBlocks.map((value, index) => ({ value, index })).filter(({ value }) => value?.type === (type === "assistant.reasoning" ? "thinking" : "text")) : [];
     const claudeContinuation = claude?.id !== undefined && messageId === claude.id && matchingBlocks.length === 1;
     const position = native?.index ?? source.data?.contentIndex ?? (claudeContinuation ? matchingBlocks[0].index : undefined);
-    const delta = source.delta === true || source.data?.delta === true || source.copilotProjection === "assistant.message_delta";
+    const delta = source.delta === true || source.data?.delta === true || ["assistant.message_delta", "assistant.reasoning_delta"].includes(source.copilotProjection);
     const partial = source.partial === true || source.data?.partial === true;
     const key = JSON.stringify([scope, type, messageId ?? claude?.id, claude?.sequence, position]);
     const previousText = previous?.legacy ? previous.entry.message.content[0][previous.field] : previous?.entry.data.content;

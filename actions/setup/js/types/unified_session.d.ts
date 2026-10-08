@@ -33,12 +33,7 @@ export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTu
   usage?: UnifiedSessionUsage | null;
 }
 
-export interface UnifiedMessageData extends Pick<MessageData, "content"> {
-  delta?: JsonValue;
-  partial?: JsonValue;
-  messageId?: JsonValue;
-  contentIndex?: JsonValue;
-  channel?: JsonValue;
+export interface UnifiedCorrelationData {
   sessionId?: JsonValue;
   agentId?: JsonValue;
   parentToolUseId?: JsonValue;
@@ -47,6 +42,35 @@ export interface UnifiedMessageData extends Pick<MessageData, "content"> {
   interactionId?: JsonValue;
   turnId?: JsonValue;
   parentToolCallId?: JsonValue;
+}
+
+export interface UnifiedMessageData extends Pick<MessageData, "content">, UnifiedCorrelationData {
+  delta?: JsonValue;
+  partial?: JsonValue;
+  messageId?: JsonValue;
+  reasoningId?: JsonValue;
+  originatingMessageId?: JsonValue;
+  contentIndex?: JsonValue;
+  channel?: JsonValue;
+}
+
+export interface UnifiedMessageDeltaData extends UnifiedCorrelationData {
+  messageId?: JsonValue;
+  deltaContent?: JsonValue;
+}
+
+export interface UnifiedReasoningDeltaData extends UnifiedCorrelationData {
+  reasoningId?: JsonValue;
+  deltaContent?: JsonValue;
+}
+
+export interface UnifiedSystemMessageData extends Pick<MessageData, "content">, UnifiedCorrelationData {
+  role?: JsonValue;
+}
+
+export interface UnifiedTaskCompleteData extends UnifiedCorrelationData {
+  summary?: JsonValue;
+  success?: JsonValue;
 }
 
 export interface DynamicWorkflowTaskData {
@@ -267,17 +291,24 @@ export interface UnifiedSessionEventDataMap {
   "agent.execution": AgentExecutionData;
   "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
   "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
-  "user.message": Pick<MessageData, "content">;
+  "user.message": UnifiedMessageData;
+  "system.message": UnifiedSystemMessageData;
   "prompt.system": Pick<MessageData, "content">;
   "prompt.user": Pick<MessageData, "content">;
   "assistant.message": UnifiedMessageData;
-  "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial">;
+  "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial"> & UnifiedMessageData;
   "assistant.reasoning": UnifiedMessageData;
-  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName">;
+  "assistant.message_delta": UnifiedMessageDeltaData;
+  "assistant.reasoning_delta": UnifiedReasoningDeltaData;
+  "assistant.turn_start": UnifiedCorrelationData;
+  "assistant.turn_end": UnifiedCorrelationData;
+  "session.task_complete": UnifiedTaskCompleteData;
+  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName"> & UnifiedCorrelationData;
   "tool.execution_complete": Pick<
     ToolExecutionCompleteData,
     "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError" | "taskId" | "taskType" | "workflowName" | "workflowRunId"
-  >;
+  > &
+    UnifiedCorrelationData;
   "dynamicWorkflows.task_started": DynamicWorkflowObservationData;
   "dynamicWorkflows.task_progress": DynamicWorkflowObservationData;
   "dynamicWorkflows.task_updated": DynamicWorkflowObservationData;

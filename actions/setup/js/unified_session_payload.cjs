@@ -20,7 +20,19 @@ const USAGE_FIELDS = {
 const AIC_RESOLVABLE_PHASES = new Set(["detection", "evals"]);
 
 /** @type {Fields} */
+const CORRELATION_FIELDS = {
+  sessionId: ["sessionId", "session_id"],
+  agentId: ["agentId"],
+  parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
+  model: ["model"],
+  apiCallId: ["apiCallId"],
+  interactionId: ["interactionId"],
+  turnId: ["turnId"],
+  parentToolCallId: ["parentToolCallId"],
+};
+/** @type {Fields} */
 const TOOL_FIELDS = {
+  ...CORRELATION_FIELDS,
   toolCallId: ["toolCallId", "tool_call_id", "tool_use_id"],
   toolName: ["toolName", "tool_name"],
   mcpServerName: ["mcpServerName"],
@@ -83,16 +95,11 @@ const MESSAGE_FIELDS = {
   delta: ["delta"],
   partial: ["partial"],
   messageId: ["messageId", "message_id"],
+  reasoningId: ["reasoningId"],
+  originatingMessageId: ["originatingMessageId"],
   contentIndex: ["contentIndex"],
   channel: ["channel"],
-  sessionId: ["sessionId", "session_id"],
-  agentId: ["agentId"],
-  parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
-  model: ["model"],
-  apiCallId: ["apiCallId"],
-  interactionId: ["interactionId"],
-  turnId: ["turnId"],
-  parentToolCallId: ["parentToolCallId"],
+  ...CORRELATION_FIELDS,
 };
 
 /** @type {Fields} */
@@ -112,12 +119,18 @@ const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model", "selectedModel"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"], reasoningEffort: ["reasoningEffort"] },
-  "user.message": { content: ["content"] },
+  "user.message": MESSAGE_FIELDS,
+  "system.message": { ...CORRELATION_FIELDS, content: ["content"], role: ["role"] },
   "prompt.system": { content: ["content"] },
   "prompt.user": { content: ["content"] },
   "assistant.message": MESSAGE_FIELDS,
-  "assistant.refusal": { reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
+  "assistant.refusal": { ...MESSAGE_FIELDS, reason: ["reason"], policyCategory: ["policyCategory"], explanation: ["explanation"] },
   "assistant.reasoning": MESSAGE_FIELDS,
+  "assistant.message_delta": { ...CORRELATION_FIELDS, messageId: ["messageId"], deltaContent: ["deltaContent"] },
+  "assistant.reasoning_delta": { ...CORRELATION_FIELDS, reasoningId: ["reasoningId"], deltaContent: ["deltaContent"] },
+  "assistant.turn_start": CORRELATION_FIELDS,
+  "assistant.turn_end": CORRELATION_FIELDS,
+  "session.task_complete": { ...CORRELATION_FIELDS, summary: ["summary"], success: ["success"] },
   "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
   "tool.execution_complete": {
     ...TOOL_FIELDS,
@@ -296,13 +309,37 @@ function normalizeUnifiedSessionEvent(event, phase) {
       );
     }
   }
-  if (event.type === "assistant.message" || event.type === "assistant.reasoning") {
-    const metadata = selectFields(event, MESSAGE_FIELDS);
+  if (
+    [
+      "user.message",
+      "system.message",
+      "assistant.message",
+      "assistant.reasoning",
+      "assistant.refusal",
+      "assistant.message_delta",
+      "assistant.reasoning_delta",
+      "assistant.turn_start",
+      "assistant.turn_end",
+      "session.task_complete",
+      "tool.execution_start",
+      "tool.execution_complete",
+    ].includes(event.type)
+  ) {
+    const metadata = selectFields(event, ["user.message", "assistant.message", "assistant.reasoning", "assistant.refusal"].includes(event.type) ? MESSAGE_FIELDS : CORRELATION_FIELDS);
     delete metadata.content;
     for (const [key, value] of Object.entries(metadata)) if (!Object.hasOwn(data, key)) data[key] = value;
     const message = event.message;
-    if (!Object.hasOwn(data, "messageId") && message && typeof message === "object" && !Array.isArray(message) && "id" in message && message.id !== undefined) data.messageId = structuredClone(message.id);
-    if (event.copilotProjection === "assistant.message_delta") data.delta = true;
+    if (
+      ["user.message", "assistant.message", "assistant.reasoning", "assistant.refusal"].includes(event.type) &&
+      !Object.hasOwn(data, "messageId") &&
+      message &&
+      typeof message === "object" &&
+      !Array.isArray(message) &&
+      "id" in message &&
+      message.id !== undefined
+    )
+      data.messageId = structuredClone(message.id);
+    if (event.copilotProjection === "assistant.message_delta" || event.copilotProjection === "assistant.reasoning_delta") data.delta = true;
   }
   if (known && event.type.startsWith("mcp.") && event.type !== "mcp.event") {
     const rpc = source.payload;

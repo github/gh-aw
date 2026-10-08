@@ -94,6 +94,7 @@ function eventDetail(event) {
     case "session.start":
       return fields(data, ["sourceEngine", "model", "sessionId"]);
     case "user.message":
+    case "system.message":
     case "prompt.system":
     case "prompt.user":
       return undefined;
