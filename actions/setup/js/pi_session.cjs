@@ -121,6 +121,7 @@ function transformPiV3Entries(records) {
       toolName: message.toolName,
       output: message.content,
       success: message.isError === true || isPiResultError(message) ? false : message.isError === false ? true : undefined,
+      ...(message.details?.diagnostics ? { diagnostics: message.details.diagnostics } : {}),
     });
   };
 
@@ -206,6 +207,7 @@ function transformPiV3Entries(records) {
         error: raw.error ?? raw.result?.error,
         success: raw.isError === true || raw.error != null || isPiResultError(raw.result) ? false : raw.isError === false ? true : undefined,
         durationMs: isMetric(raw.durationMs) ? raw.durationMs : undefined,
+        ...(raw.result?.details?.diagnostics ? { diagnostics: raw.result.details.diagnostics } : {}),
       });
     } else if (raw.type === "tool_execution_update") emit(raw, "pi.tool_execution_update", { toolCallId: raw.toolCallId, toolName: raw.toolName, input: raw.args, partialResult: raw.partialResult });
     else if (

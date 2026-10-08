@@ -29,6 +29,7 @@ type copilotSDKToolConfig struct {
 	Permissions             copilotSDKPermissionConfig `json:"permissions"`
 	MaxToolCalls            string                     `json:"maxToolCalls,omitempty"`
 	ExplicitlyDisabledTools []string                   `json:"explicitlyDisabledTools,omitempty"`
+	Diagnostics             []string                   `json:"diagnostics,omitempty"`
 }
 
 func isCopilotSDKMode(workflowData *WorkflowData) bool {
@@ -124,7 +125,7 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 			return true
 		case "bash", "edit", "web-fetch", "web-search", "playwright",
 			"agentic-workflows", "cache-memory", "drive-memory", "repo-memory",
-			"comment-memory", "cli-proxy", "timeout", "startup-timeout":
+			"comment-memory", "cli-proxy", "timeout", "startup-timeout", "diagnostics":
 			continue
 		}
 		if config, ok := value.(map[string]any); ok {
@@ -175,6 +176,7 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 	config := copilotSDKToolConfig{
 		Version:      copilotSDKToolConfigVersion,
 		MaxToolCalls: maxToolCalls,
+		Diagnostics:  diagnosticsLanguages(workflowData),
 		Capabilities: copilotSDKToolCapabilities{
 			Bash:             isCopilotBashToolEnabled(workflowData),
 			Edit:             isCopilotEditToolEnabled(tools, workflowData),

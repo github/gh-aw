@@ -4,6 +4,7 @@
 
 const { createCopilotSDKWebFetchTool } = require("./copilot_sdk_web_fetch.cjs");
 const { parseMaxToolCalls } = require("./copilot_sdk_tool_budget.cjs");
+const { parseDiagnosticLanguages } = require("./command_diagnostics.cjs");
 
 const COPILOT_SDK_TOOL_CONFIG_VERSION = 1;
 const COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS = Object.freeze(["view", "rg", "glob", "sql"]);
@@ -29,6 +30,7 @@ const COPILOT_SDK_WORKFLOW_BUILTIN_TOOLS = Object.freeze(["run_dynamic_workflow"
  *   capabilities: CopilotSDKToolCapabilities,
  *   permissions: {allowedTools: string[]},
  *   maxToolCalls?: number,
+ *   diagnostics?: import("./types/command_diagnostics").DiagnosticLanguage[],
  *   explicitlyDisabledTools: string[],
  * }} CopilotSDKToolConfig
  */
@@ -192,6 +194,7 @@ function parseCopilotSDKToolConfig(value) {
       allowedTools,
     },
     ...(maxToolCalls === undefined ? {} : { maxToolCalls }),
+    ...(parsed.diagnostics === undefined ? {} : { diagnostics: parseDiagnosticLanguages(parsed.diagnostics) }),
     explicitlyDisabledTools: parsed.explicitlyDisabledTools == null ? [] : parseStringArray(parsed.explicitlyDisabledTools, "explicitlyDisabledTools"),
   };
   validateToolPermissionParity(config);

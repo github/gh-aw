@@ -867,6 +867,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
                 tool_use_id: resolvedToolId,
                 content: output,
                 has_output: data.output !== undefined || data.result !== undefined,
+                diagnostics: data.diagnostics,
                 error: data.error,
                 is_error: success === undefined ? undefined : !success,
                 duration_ms: isMetric(data.durationMs) ? data.durationMs : undefined,

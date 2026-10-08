@@ -20,6 +20,7 @@ import "embed"
 //go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/models.json js/shim.cjs
 //go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs
 //go:embed js/engine_log_parser.cjs
+//go:embed js/command_diagnostics.cjs js/command_diagnostics_render.cjs js/go_diagnostics.cjs js/typescript_diagnostics.cjs js/python_diagnostics.cjs
 //go:embed js/parse_kiro_log.cjs
 //go:embed js/parse_deepseek_log.cjs
 //go:embed js/parse_pydantic_log.cjs

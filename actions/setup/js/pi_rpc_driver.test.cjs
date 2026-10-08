@@ -25,7 +25,8 @@ describe("Pi RPC driver", () => {
     expect(rpcArgs(["--print", "--mode", "json", "--no-session", "--thinking", "high"])).toEqual(["--no-session", "--thinking", "high"]);
   });
 
-  it("handles settlement before prompt acceptance and always stops the client", async () => {
+  it.each([false, true])("handles settlement with diagnostics enabled: %s", async diagnostics => {
+    vi.stubEnv("GH_AW_DIAGNOSTICS", diagnostics ? '["go"]' : "");
     let handler;
     const client = {
       onEvent: vi.fn(fn => {
@@ -47,6 +48,7 @@ describe("Pi RPC driver", () => {
     });
     await main({ sdk: { RpcClient }, cliPath: "/pi/dist/bundle/cli.js", emit: vi.fn() });
     expect(RpcClient).toHaveBeenCalledWith(expect.objectContaining({ args: expect.arrayContaining(["--no-approve", path.join(dir, "gh-aw/actions/pi_tool_policy.cjs")]) }));
+    expect(RpcClient.mock.calls[0][0].args.includes(path.join(dir, "gh-aw/actions/pi_diagnostics_extension.cjs"))).toBe(diagnostics);
     expect(client.waitForIdle).not.toHaveBeenCalled();
     expect(client.stop).toHaveBeenCalledOnce();
   });

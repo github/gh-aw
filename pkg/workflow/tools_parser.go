@@ -107,6 +107,7 @@ var knownTools = map[string]struct{}{
 	"timeout":           {},
 	"startup-timeout":   {},
 	"cli-proxy":         {},
+	"diagnostics":       {},
 }
 
 func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing tool parsing remains centralized.
@@ -125,6 +126,9 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 
 	// Copy raw map
 	maps.Copy(tools.raw, toolsMap)
+	if val, exists := toolsMap["diagnostics"]; exists {
+		tools.Diagnostics, tools.diagnosticsParseErr = parseDiagnosticsTool(val)
+	}
 
 	// Extract and parse known tools
 	if val, exists := toolsMap["github"]; exists {

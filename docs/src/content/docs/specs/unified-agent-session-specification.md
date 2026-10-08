@@ -535,8 +535,17 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 | `durationMs` | Source-dependent finite nonnegative duration in milliseconds, including zero. |
 | `error` | Optional native error string, object, or other supported error value. |
 | `result` | Optional native result value, including Copilot `result.content` arrays or JSON content blocks. |
+| `diagnostics` | Optional version-1 built-in command diagnostic report: `diagnostics`, `truncated`, and `issues`. Entries preserve language, severity, message, and supplied code/test/package and validated repository location/related locations. |
 
 `output` and `result` can coexist. A reader uses an explicitly present `output` for the primary output view, otherwise the native `result`; neither is destroyed. Source-specific result envelopes remain available to readers.
+
+Command diagnostics are interpretation of untrusted tool output, not execution
+outcomes. They MUST NOT override success, cancellation, permissions, or exit status.
+Reports MUST survive canonical and unified normalization and appear in tool-result
+summaries. Pi repeated execution-end/message snapshots MUST NOT duplicate reports.
+Parsers and renderers are SDK-independent JavaScript built-ins for Go, TypeScript,
+and Python; selection is controlled by `tools.diagnostics`, never executable
+content from a checkout or downloaded artifact.
 
 **T-UAS-014 — Explicit failures.** A mapping MUST represent an explicit failed status, error outcome, `is_error: true`, `isError: true`, or nonzero command exit code as a failure. Absence of an error is not, by itself, evidence of completion or success. A source protocol's documented successful completion or default non-error tool-result semantics MAY establish `success: true`; a start alone MUST NOT. If preserved native signals conflict, readers MUST treat an explicit failure as controlling and retain the contradictory source evidence.
 

@@ -20,6 +20,7 @@ type codexNativeConfig struct {
 	Defaults       map[string]any `json:"defaults"`
 	Overrides      map[string]any `json:"overrides"`
 	DisablePlugins bool           `json:"disablePlugins"`
+	Diagnostics    []string       `json:"diagnostics,omitempty"`
 }
 
 func parseCodexConfig(config string) (map[string]any, error) {
@@ -90,6 +91,7 @@ func (e *CodexEngine) buildNativeConfig(workflowData *WorkflowData, mcpTools []s
 		},
 		Overrides:      make(map[string]any),
 		DisablePlugins: workflowData == nil || len(workflowData.Plugins) == 0,
+		Diagnostics:    diagnosticsLanguages(workflowData),
 	}
 	features := map[string]any{"plugins": !config.DisablePlugins}
 	if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {

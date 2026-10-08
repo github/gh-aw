@@ -84,6 +84,7 @@ type ToolsConfig struct {
 	Ledger           *LedgerToolConfig           `yaml:"ledger,omitempty"`
 	Timeout          *TemplatableInt32           `yaml:"timeout,omitempty"`
 	StartupTimeout   *TemplatableInt32           `yaml:"startup-timeout,omitempty"`
+	Diagnostics      []string                    `yaml:"diagnostics,omitempty"`
 
 	// Custom MCP tools (anything not in the above list)
 	Custom map[string]MCPServerConfig `yaml:",inline"`
@@ -97,8 +98,9 @@ type ToolsConfig struct {
 	CLIProxy bool `yaml:"cli-proxy,omitempty"`
 
 	// Raw map for backwards compatibility
-	raw            map[string]any
-	ledgerParseErr error
+	raw                 map[string]any
+	ledgerParseErr      error
+	diagnosticsParseErr error
 }
 
 // Tools is a type alias for ToolsConfig for backward compatibility.
@@ -117,6 +119,9 @@ func ParseToolsConfig(toolsMap map[string]any) (*ToolsConfig, error) {
 		}
 	}
 	config := NewTools(toolsMap)
+	if config.diagnosticsParseErr != nil {
+		return nil, config.diagnosticsParseErr
+	}
 	if config.GitHub != nil && config.GitHub.reposParseErr != nil {
 		return nil, config.GitHub.reposParseErr
 	}
@@ -131,6 +136,9 @@ func ParseToolsConfig(toolsMap map[string]any) (*ToolsConfig, error) {
 func (t *ToolsConfig) ParseError() error {
 	if t == nil {
 		return nil
+	}
+	if t.diagnosticsParseErr != nil {
+		return t.diagnosticsParseErr
 	}
 	return t.ledgerParseErr
 }
@@ -216,6 +224,9 @@ func (t *ToolsConfig) ToMap() map[string]any { //nolint:largefunc // Existing co
 	toolsTypesLog.Print("Constructing map from ToolsConfig fields")
 	result := make(map[string]any)
 
+	if len(t.Diagnostics) > 0 {
+		result["diagnostics"] = t.Diagnostics
+	}
 	if t.GitHub != nil {
 		result["github"] = t.GitHub
 	}
@@ -612,6 +623,8 @@ func (t *Tools) HasTool(name string) bool {
 		return t.Timeout != nil
 	case "startup-timeout":
 		return t.StartupTimeout != nil
+	case "diagnostics":
+		return len(t.Diagnostics) > 0
 	default:
 		_, exists := t.Custom[name]
 		return exists
@@ -627,6 +640,9 @@ func (t *Tools) GetToolNames() []string {
 	toolsTypesLog.Print("Collecting configured tool names")
 	names := []string{}
 
+	if len(t.Diagnostics) > 0 {
+		names = append(names, "diagnostics")
+	}
 	if t.GitHub != nil {
 		names = append(names, "github")
 	}

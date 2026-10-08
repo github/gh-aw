@@ -109,7 +109,8 @@ function eventDetail(event) {
       if (data.workflowRunId !== undefined && data.status === "async_launched") {
         return `${fields(data, ["toolName", "toolCallId", "taskId", "workflowName", "workflowRunId"])} [launch ${outcome}; workflow outcome pending]`;
       }
-      return `${fields(data, ["toolName", "mcpServerName", "toolCallId", "durationMs"])} [${outcome}]`;
+      const diagnostics = data.diagnostics ? require("./command_diagnostics_render.cjs").renderDiagnostics(data.diagnostics) : "";
+      return `${fields(data, ["toolName", "mcpServerName", "toolCallId", "durationMs"])} [${outcome}]${diagnostics ? " " + inline(diagnostics) : ""}`;
     }
     case "session.result":
       return fields(data, ["numTurns", "durationMs", "totalCostUsd"]);

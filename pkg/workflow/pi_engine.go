@@ -422,9 +422,13 @@ func (e *PiEngine) buildPiCommand(workflowData *WorkflowData, commandName string
 		piCommand = buildPiDriverCommand(workflowData.EngineConfig.Driver)
 		piLog.Printf("Pi: using driver mode with driver=%s", workflowData.EngineConfig.Driver)
 	} else {
+		diagnosticsExtension := ""
+		if len(diagnosticsLanguages(workflowData)) > 0 {
+			diagnosticsExtension = ` --extension "${RUNNER_TEMP}/gh-aw/actions/pi_diagnostics_extension.cjs"`
+		}
 		piCommand = fmt.Sprintf(
-			`cat /tmp/gh-aw/aw-prompts/user.txt | %s %s --append-system-prompt /tmp/gh-aw/aw-prompts/system.txt --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_tool_policy.cjs" --extension builtin:mcp --extension builtin:codemode --extension builtin:tool-search 2>&1 | tee %s`,
-			commandName, shellJoinArgs(piArgs), PiStreamingLogFile)
+			`cat /tmp/gh-aw/aw-prompts/user.txt | %s %s --append-system-prompt /tmp/gh-aw/aw-prompts/system.txt --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_tool_policy.cjs"%s --extension builtin:mcp --extension builtin:codemode --extension builtin:tool-search 2>&1 | tee %s`,
+			commandName, shellJoinArgs(piArgs), diagnosticsExtension, PiStreamingLogFile)
 	}
 	if piModelsJSONSetup != "" {
 		piCommand = piModelsJSONSetup + piCommand

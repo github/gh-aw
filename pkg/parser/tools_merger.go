@@ -118,6 +118,27 @@ func mergeToolObjectList(jsonObjects []map[string]any) (map[string]any, error) {
 }
 
 func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool, error) {
+	if key == "diagnostics" {
+		asArray := func(value any) ([]any, error) {
+			switch value := value.(type) {
+			case string:
+				return []any{value}, nil
+			case []any:
+				return value, nil
+			default:
+				return nil, errors.New("tools.diagnostics must be a language or a list of languages")
+			}
+		}
+		existing, err := asArray(existingValue)
+		if err != nil {
+			return nil, false, err
+		}
+		additional, err := asArray(newValue)
+		if err != nil {
+			return nil, false, err
+		}
+		return mergeAllowedArrays(existing, additional), true, nil
+	}
 	if existingArray, ok := existingValue.([]any); ok {
 		if newArray, ok := newValue.([]any); ok {
 			return mergeAllowedArrays(existingArray, newArray), true, nil

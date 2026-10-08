@@ -35,7 +35,7 @@ async function main(options = {}) {
   const model = fs.existsSync(path.join(agentDir, "models.json")) ? `aw-gateway/${modelId}` : `${provider}/${modelId}`;
   const args = rpcArgs(JSON.parse(process.env.GH_AW_PI_ARGS || '["--no-session","--no-approve"]'));
   const actionsDir = process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, "gh-aw/actions") : __dirname;
-  for (const file of ["pi_provider.cjs", "pi_steering_extension.cjs", "pi_tool_policy.cjs"]) args.push("--extension", path.join(actionsDir, file));
+  for (const file of ["pi_provider.cjs", "pi_steering_extension.cjs", "pi_tool_policy.cjs", ...(process.env.GH_AW_DIAGNOSTICS ? ["pi_diagnostics_extension.cjs"] : [])]) args.push("--extension", path.join(actionsDir, file));
   for (const builtin of ["mcp", "codemode", "tool-search"]) args.push("--extension", `builtin:${builtin}`);
   if (process.env.GH_AW_PI_SYSTEM_PROMPT) args.push("--append-system-prompt", process.env.GH_AW_PI_SYSTEM_PROMPT);
   const client = new sdk.RpcClient({ cliPath: options.cliPath || resolvePiPackageFile("dist/bundle/cli.js"), cwd, args, ...(configuredModel ? { model } : {}) });

@@ -1,3 +1,5 @@
+import type { DiagnosticReport } from "./command_diagnostics";
+
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 /**
@@ -82,6 +84,7 @@ export interface ToolExecutionCompleteData {
   output?: JsonValue;
   result?: JsonValue;
   error?: JsonValue;
+  diagnostics?: DiagnosticReport;
   durationMs?: SessionMetric;
   exitCode?: number;
   status?: string;

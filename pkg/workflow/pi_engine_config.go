@@ -152,6 +152,9 @@ func (e *PiEngine) applyPiConfigEnv(env map[string]string, data *WorkflowData) {
 
 func applyPiToolPolicyEnv(env map[string]string, data *WorkflowData) {
 	env["GH_AW_PI_TOOL_POLICY"] = piToolPolicyJSON(data)
+	if len(diagnosticsLanguages(data)) > 0 {
+		env["GH_AW_DIAGNOSTICS"] = diagnosticsLanguagesJSON(data)
+	}
 	if data.EngineConfig == nil {
 		return
 	}

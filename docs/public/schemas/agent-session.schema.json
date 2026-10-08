@@ -47,6 +47,25 @@
       "required": ["reason"],
       "additionalProperties": {}
     },
+    "CommandDiagnostic": {
+      "type": "object",
+      "properties": {
+        "language": { "$ref": "#/definitions/DiagnosticLanguage" },
+        "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+        "message": { "type": "string", "maxLength": 2000 },
+        "code": { "type": "string", "maxLength": 128 },
+        "location": { "$ref": "#/definitions/DiagnosticLocation" },
+        "test": { "type": "string", "maxLength": 256 },
+        "package": { "type": "string", "maxLength": 256 },
+        "related": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "message": { "type": "string", "maxLength": 1000 }, "location": { "$ref": "#/definitions/DiagnosticLocation" } }, "required": ["message"], "additionalProperties": false },
+          "maxItems": 10
+        }
+      },
+      "required": ["language", "severity", "message"],
+      "additionalProperties": false
+    },
     "DetectionResultData": {
       "type": "object",
       "properties": {
@@ -58,6 +77,28 @@
         "maliciousPatch": { "type": "boolean" }
       },
       "additionalProperties": {}
+    },
+    "DiagnosticLanguage": { "type": "string", "enum": ["go", "typescript", "python"] },
+    "DiagnosticLocation": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Repository-relative path; never a URL or an external absolute path." },
+        "line": { "type": "number", "minimum": 1, "maximum": 9007199254740991, "multipleOf": 1 },
+        "column": { "type": "number", "minimum": 1, "maximum": 9007199254740991, "multipleOf": 1 }
+      },
+      "required": ["path", "line"],
+      "additionalProperties": false
+    },
+    "DiagnosticReport": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "number", "const": 1 },
+        "diagnostics": { "type": "array", "items": { "$ref": "#/definitions/CommandDiagnostic" }, "maxItems": 50 },
+        "truncated": { "type": "boolean" },
+        "issues": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["version", "diagnostics", "truncated", "issues"],
+      "additionalProperties": false
     },
     "EventMetadata": { "type": "object", "properties": { "id": { "type": "string" }, "parentId": { "type": ["string", "null"] }, "timestamp": { "type": ["string", "number"] } }, "additionalProperties": {} },
     "JsonValue": {
@@ -137,6 +178,7 @@
         "output": { "$ref": "#/definitions/JsonValue" },
         "result": { "$ref": "#/definitions/JsonValue" },
         "error": { "$ref": "#/definitions/JsonValue" },
+        "diagnostics": { "$ref": "#/definitions/DiagnosticReport" },
         "durationMs": { "$ref": "#/definitions/SessionMetric" },
         "exitCode": { "type": "number" },
         "status": { "type": "string" },

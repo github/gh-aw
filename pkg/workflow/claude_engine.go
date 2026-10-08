@@ -381,6 +381,9 @@ func (e *ClaudeEngine) buildClaudeCommandString(workflowData *WorkflowData, clau
 		claudeCommand = fmt.Sprintf(`%s${%s:+ --model "$%s"}`, claudeCommand, modelEnvVar, modelEnvVar)
 	}
 
+	if len(diagnosticsLanguages(workflowData)) > 0 {
+		claudeCommand = fmt.Sprintf(`%s %s/claude_diagnostics.cjs %s`, nodeRuntimeResolutionCommand, SetupActionDestinationShell, claudeCommand)
+	}
 	return claudeCommand
 }
 
@@ -456,6 +459,9 @@ func claudeSecretEnvVarNames(data *WorkflowData) []string {
 func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[string]string {
 	provider := e.ResolveLLMProvider(workflowData)
 	env := buildClaudeBaseEnvMap(provider, workflowData)
+	if len(diagnosticsLanguages(workflowData)) > 0 {
+		env["GH_AW_DIAGNOSTICS"] = diagnosticsLanguagesJSON(workflowData)
+	}
 	env["GH_AW_LLM_PROVIDER"] = string(provider)
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.LLMProvider != "" {
 		env["GH_AW_LLM_PROVIDER_EXPLICIT"] = "1"

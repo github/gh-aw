@@ -4494,6 +4494,18 @@
         }
       ],
       "properties": {
+        "diagnostics": {
+          "description": "Built-in Go, TypeScript, and Python command diagnostics for Copilot SDK and Pi. Does not grant command execution permissions.",
+          "oneOf": [
+            { "type": "string", "enum": ["go", "typescript", "python"] },
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["go", "typescript", "python"] }
+            }
+          ]
+        },
         "github": {
           "description": "GitHub API tools for repository operations (issues, pull requests, content management)",
           "oneOf": [

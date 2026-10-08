@@ -21,7 +21,8 @@ afterEach(() => {
 });
 
 describe("Pi coding-agent SDK driver", () => {
-  it("runs the full session layer with MCP, codemode, and policy extensions", async () => {
+  it.each([false, true])("runs the full session layer with diagnostics enabled: %s", async diagnostics => {
+    vi.stubEnv("GH_AW_DIAGNOSTICS", diagnostics ? '["go"]' : "");
     const model = { id: "gpt-5.4", reasoning: true, input: ["text", "image"] };
     const session = { sessionId: "session-id", subscribe: vi.fn(), bindExtensions: vi.fn(), prompt: vi.fn(), dispose: vi.fn() };
     const resourceLoader = { reload: vi.fn() };
@@ -45,6 +46,8 @@ describe("Pi coding-agent SDK driver", () => {
         additionalExtensionPaths: expect.arrayContaining([path.join(dir, "gh-aw/actions/pi_tool_policy.cjs")]),
       })
     );
+    const diagnosticPath = path.join(dir, "gh-aw/actions/pi_diagnostics_extension.cjs");
+    expect(sdk.DefaultResourceLoader.mock.calls[0][0].additionalExtensionPaths.includes(diagnosticPath)).toBe(diagnostics);
     expect(sdk.createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model, resourceLoader, sessionManager: "in-memory" }));
     expect(session.bindExtensions).toHaveBeenCalledOnce();
     expect(session.prompt).toHaveBeenCalledWith("Complete the task");

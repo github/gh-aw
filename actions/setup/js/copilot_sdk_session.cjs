@@ -41,6 +41,8 @@ const { buildCopilotSDKToolCallBudget } = require("./copilot_sdk_tool_budget.cjs
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { extractShellCommandFromToolData, extractStructuredToolInput } = require("./tool_call_details.cjs");
 const { COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
+const { buildCopilotDiagnosticHooks } = require("./copilot_sdk_diagnostics.cjs");
+const { diagnoseToolResult, diagnosticSecrets } = require("./command_diagnostics_tools.cjs");
 
 // Default timeout for a single sendAndWait call: 10 minutes.
 // This is intentionally generous — the headless Copilot CLI has its own internal
@@ -155,6 +157,9 @@ async function runWithCopilotSDK({
   // The SDK is large and has side-effects on import (worker threads, etc.).
   const sdk = sdkModule ?? require("@github/copilot-sdk");
   const { CopilotClient, RuntimeConnection, approveAll } = sdk;
+  const diagnosticLanguages = toolConfig?.diagnostics ?? [];
+  const secrets = [...diagnosticSecrets(process.env), ...(connectionToken ? [connectionToken] : [])];
+  const diagnosticContext = { root: process.env.GITHUB_WORKSPACE || process.cwd(), secrets };
 
   const startTime = Date.now();
   let output = "";
@@ -241,7 +246,7 @@ async function runWithCopilotSDK({
    * Map from toolCallId → {toolName, mcpServerName} for enriching tool.execution_complete
    * events and for tracking in-flight tool calls when the idle-timeout fires.
    * Declared at function scope so the catch block can check pendingToolCalls.size.
-   * @type {Map<string, {toolName: string, mcpServerName: string}>}
+   * @type {Map<string, {toolName: string, mcpServerName: string, input?: unknown}>}
    */
   const pendingToolCalls = new Map();
 
@@ -340,7 +345,14 @@ async function runWithCopilotSDK({
       providers,
       models: providerModels,
       onPermissionRequest,
-      ...(toolCallBudget ? { hooks: { onPreToolUse: toolCallBudget.onPreToolUse } } : {}),
+      ...(toolCallBudget || diagnosticLanguages.length
+        ? {
+            hooks: {
+              ...(toolCallBudget ? { onPreToolUse: toolCallBudget.onPreToolUse } : {}),
+              ...(diagnosticLanguages.length ? buildCopilotDiagnosticHooks(diagnosticLanguages, diagnosticContext) : {}),
+            },
+          }
+        : {}),
       ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
     };
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
@@ -397,7 +409,7 @@ async function runWithCopilotSDK({
           // what was invoked, so persist it alongside the derived command text.
           const input = extractStructuredToolInput(event.data);
           if (toolCallId) {
-            pendingToolCalls.set(toolCallId, { toolName, mcpServerName });
+            pendingToolCalls.set(toolCallId, { toolName, mcpServerName, input });
           }
           const eventData = {
             toolName,
@@ -422,9 +434,16 @@ async function runWithCopilotSDK({
           // Include result.content (concise LLM-facing output) so that the log
           // parser can render tool output previews from events.jsonl directly.
           const result = event.data?.result ?? undefined;
+          const error = event.data?.error;
+          const diagnostics = diagnoseToolResult(toolName, pending?.input, error ?? result, diagnosticLanguages, { ...diagnosticContext, cwd: diagnosticContext.root });
           // max-tool-denials intentionally tracks permission denials only.
           // Tool execution failures are still logged, but do not increment the guardrail counter.
-          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result }, event.timestamp, event);
+          writeEvent(
+            "tool.execution_complete",
+            { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result, ...(error !== undefined ? { error } : {}), ...(diagnostics ? { diagnostics } : {}) },
+            event.timestamp,
+            event
+          );
           break;
         }
 

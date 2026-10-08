@@ -306,6 +306,20 @@ export function canUseWriteTool(config: PermissionConfig): boolean {
 
 ## 6. Logging Requirements
 
+When `tools.diagnostics` is configured, the compiler-owned tool contract carries
+the selected built-in languages (`go`, `typescript`, `python`). The driver MUST
+compose diagnostic hooks with existing tool-budget hooks. Both `onPostToolUse`
+and `onPostToolUseFailure` MUST supply bounded, sanitized diagnostic
+`additionalContext` before the next model turn when recognizable output exists.
+The failure hook receives only its error string; it MUST NOT replace the failure
+envelope or infer a different execution outcome. Denied and timed-out results do
+not become ordinary failures through parsing.
+
+Observed tool completions MUST retain structured reports correlated by their
+original tool-call ID, including error-only completions. The pending-call map and
+watchdog behavior MUST remain unchanged. Omitted diagnostic selection MUST leave
+existing agent-visible results unchanged.
+
 ### 6.1 Log Channels
 
 A conforming implementation MUST support:

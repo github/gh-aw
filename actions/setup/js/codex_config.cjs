@@ -2,6 +2,8 @@
 "use strict";
 
 const fs = require("fs");
+const { parseDiagnosticLanguages } = require("./command_diagnostics.cjs");
+const { withCodexDiagnostics } = require("./codex_diagnostics.cjs");
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 function isTable(value) {
@@ -111,7 +113,7 @@ function runtimeTimeout(name, fallback) {
   return Number(raw);
 }
 
-/** @returns {{ defaults: Record<string, unknown>, overrides: Record<string, unknown>, disablePlugins: boolean, envExpanded?: boolean }} */
+/** @returns {{ defaults: Record<string, unknown>, overrides: Record<string, unknown>, disablePlugins: boolean, envExpanded?: boolean, diagnostics?: import("./types/command_diagnostics").DiagnosticLanguage[] }} */
 function loadCompiledConfig() {
   const inline = process.env.GH_AW_CODEX_CONFIG_JSON;
   const configPath = process.env.GH_AW_CODEX_CONFIG;
@@ -123,7 +125,13 @@ function loadCompiledConfig() {
     throw new Error("Invalid compiled Codex configuration: expected defaults, overrides, and disablePlugins");
   }
   if (payload.envExpanded !== undefined && typeof payload.envExpanded !== "boolean") throw new Error("Invalid compiled Codex environment expansion state");
-  return { defaults: payload.defaults, overrides: payload.overrides, disablePlugins: payload.disablePlugins, envExpanded: payload.envExpanded === true };
+  return {
+    defaults: payload.defaults,
+    overrides: payload.overrides,
+    disablePlugins: payload.disablePlugins,
+    envExpanded: payload.envExpanded === true,
+    ...(payload.diagnostics === undefined ? {} : { diagnostics: parseDiagnosticLanguages(payload.diagnostics) }),
+  };
 }
 
 /** @param {Record<string, Record<string, unknown>>} servers @param {string} urlPrefix */
@@ -168,7 +176,7 @@ function buildConfig(servers, urlPrefix) {
   }
   const expanded = compiled.envExpanded ? merged : expandConfigEnv(merged);
   if (!isTable(expanded)) throw new Error("Invalid Codex configuration root");
-  return expanded;
+  return withCodexDiagnostics(expanded, compiled.diagnostics);
 }
 
 module.exports = { isTable, directToolCatalog, mergeConfig, tomlValue, serializeConfig, buildConfig, loadCompiledConfig, expandConfigEnv };

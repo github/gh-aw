@@ -17,6 +17,53 @@ Some tools are available by default. All tools declared in imported components a
 
 ## Built-in Tools
 
+### Command Diagnostics (`diagnostics:`)
+
+Enable built-in language-aware command diagnostics for **Copilot SDK mode**,
+**Pi** (CLI, SDK driver, and RPC driver), **Claude**, or **Codex**:
+
+```yaml wrap
+engine:
+  id: copilot
+  copilot-sdk: true
+tools:
+  bash: true
+  diagnostics: [go, typescript, python]
+```
+
+A single language can use the scalar form, `diagnostics: go`. Supported names are
+`go`, `typescript`, and `python`; lists must be nonempty and contain no duplicates.
+Omitting `diagnostics` leaves tool results unchanged. Imported selections are
+merged. Other engines reject this setting rather than silently ignoring it.
+
+| Language | Recognized output |
+| --- | --- |
+| Go | Compiler/build and vet locations, plain and JSON test failures, panic frames |
+| TypeScript | Standard and pretty `tsc` errors, TS codes, continuation text, related locations |
+| Python | Syntax/indentation errors, exception tracebacks, pytest and unittest failures |
+
+Diagnostics provide concise context to the agent. Copilot SDK and Pi also attach
+structured reports to session artifacts and summaries. They do not install language tools, change
+commands, grant shell access, or determine whether a command succeeded.
+Original tool output and outcome remain intact. Copilot failed tools receive
+additional model context; Pi results retain their original content and metadata.
+Claude uses `PostToolUse` and `PostToolUseFailure` command hooks, preserving
+explicit settings and existing hook arrays, including in bare mode. Codex uses
+`PostToolUse` for successful and nonzero-exit command results and requires
+version **0.159.3 or later**. Only the bundled Codex handler is trusted; existing
+project and plugin hooks do not receive a trust bypass. Native hook policies
+remain in effect. Disabling hooks in explicit engine configuration conflicts
+with diagnostics and produces an error.
+
+Only bundled parsers are supported; there are no external parser imports or
+plugins. Parsing is bounded to 256 KiB of input. Reports contain at most 50
+diagnostics and 16 KiB of serialized JSON; agent-facing text is capped at 4 KiB.
+Unavailable or truncated parsing is explicit. Unrecognized output is left alone.
+Known secrets and Actions mask declarations are redacted before parsing.
+Locations outside the known repository root, or containing traversal, remain
+plain diagnostic text rather than repository locations. Columns are included
+only when the source supplies them.
+
 ### Edit Tool (`edit:`)
 
 Allows file editing in the GitHub Actions workspace.

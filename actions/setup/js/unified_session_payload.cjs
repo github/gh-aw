@@ -119,6 +119,7 @@ const EVENT_FIELDS = {
     success: ["success"],
     output: ["output", "result"],
     error: ["error"],
+    diagnostics: ["diagnostics"],
     durationMs: ["durationMs", "duration_ms"],
     exitCode: ["exitCode", "exit_code"],
     status: ["status"],

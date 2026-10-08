@@ -26,6 +26,7 @@ const path = require("path");
 const fs = require("fs");
 const { runGatewayConversion, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { buildConfig, serializeConfig, tomlValue, loadCompiledConfig, mergeConfig, expandConfigEnv, isTable, directToolCatalog } = require("./codex_config.cjs");
+const { withCodexDiagnostics } = require("./codex_diagnostics.cjs");
 
 /**
  * @param {string} name
@@ -65,7 +66,7 @@ function main() {
     compiled.envExpanded = true;
     let config = mergeConfig(compiled.defaults, compiled.overrides);
     if (compiled.disablePlugins) config = mergeConfig(config, { features: { plugins: false } });
-    const output = serializeConfig(config);
+    const output = serializeConfig(withCodexDiagnostics(config, compiled.diagnostics));
     writeSecureOutput(outputPath, output);
     writeSecureOutput(path.join(path.dirname(outputPath), "codex-config.json"), JSON.stringify(compiled));
     return output;

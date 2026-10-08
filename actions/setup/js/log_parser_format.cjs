@@ -345,10 +345,11 @@ function createLogParserFormatters(deps) {
 
     const outputPresent = toolResult && (toolResult.has_output ?? toolResult.content !== undefined);
     if (outputPresent) details = sessionOutputText(toolResult.content);
+    const diagnosticText = toolResult?.diagnostics ? require("./command_diagnostics_render.cjs").renderDiagnostics(toolResult.diagnostics) : "";
     const errorText = toolResult?.error != null ? sessionOutputText(toolResult.error) : "";
 
     const inputText = JSON.stringify(input);
-    const outputText = details;
+    const outputText = diagnosticText + details;
     const totalTokens = estimateTokens(inputText) + estimateTokens(outputText);
 
     let metadata = "";
@@ -443,6 +444,7 @@ function createLogParserFormatters(deps) {
       }
     }
 
+    if (diagnosticText) sections.push({ label: "Diagnostics", content: diagnosticText });
     if (outputPresent) {
       sections.push({
         label: includeDetailedParameters ? "Response" : "Output",
@@ -565,6 +567,12 @@ function createLogParserFormatters(deps) {
 
     if (state.standard && toolName === "Bash" && content.has_input && (Object.keys(fields).length > 1 || input === null || typeof input !== "object" || Array.isArray(input))) {
       if (!appendConversationLine(lines, `   Arguments: ${formatMcpParameters(input)}`, state)) return;
+    }
+    if (toolResult?.diagnostics) {
+      const diagnosticText = require("./command_diagnostics_render.cjs").renderDiagnostics(toolResult.diagnostics);
+      for (const line of diagnosticText.split("\n")) {
+        if (!appendConversationLine(lines, `   ${line}`, state)) return;
+      }
     }
     if (toolResult && (toolResult.has_output ?? toolResult.content !== undefined)) {
       const resultText = sessionOutputText(toolResult.content) || "[empty output]";
