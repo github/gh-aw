@@ -80,7 +80,14 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 	if !config.DryRun {
 		return nil
 	}
-	appendDevelopmentCompilerDiagnostics(compiler, stats, results)
+	acceptedExperimentalWarnings := 0
+	if config.AllowExperimental {
+		acceptedExperimentalWarnings = compiler.GetExperimentalWarningCount()
+		if config.dryRunReport != nil {
+			config.dryRunReport.AcceptedExperimentalWarnings = acceptedExperimentalWarnings
+		}
+	}
+	appendDevelopmentCompilerDiagnostics(compiler, stats, results, acceptedExperimentalWarnings)
 	if len(config.modelValidationWarnings) > 0 {
 		appendDevelopmentBatchDiagnostics("models", modelInventoryWarnings(config), stats, results)
 	}
@@ -112,7 +119,7 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 	return errors.New("development testing checks failed; resolve all warnings and scanner failures before uploading or dispatching a live test:\n" + strings.Join(diagnostics, "\n"))
 }
 
-func appendDevelopmentCompilerDiagnostics(compiler *workflow.Compiler, stats *CompilationStats, results *[]ValidationResult) {
+func appendDevelopmentCompilerDiagnostics(compiler *workflow.Compiler, stats *CompilationStats, results *[]ValidationResult, acceptedExperimentalWarnings int) {
 	var compilerDiagnostics []ValidationIssue
 	for _, message := range compiler.GetSafeUpdateWarnings() {
 		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{Type: "safe_update_warning", Message: message})
@@ -120,7 +127,7 @@ func appendDevelopmentCompilerDiagnostics(compiler *workflow.Compiler, stats *Co
 	for _, message := range compiler.GetScheduleWarnings() {
 		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{Type: "schedule_warning", Message: message})
 	}
-	if stats.Warnings > 0 || compiler.GetWarningCount() > 0 {
+	if stats.Warnings > acceptedExperimentalWarnings || compiler.GetWarningCount() > acceptedExperimentalWarnings {
 		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{
 			Type: "compiler_warning", Message: "compiler reported warnings; review the complete compiler diagnostics",
 		})

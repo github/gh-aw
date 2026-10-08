@@ -196,6 +196,17 @@ func (c *Compiler) IncrementWarningCount() {
 	c.warningCount++
 }
 
+// IncrementExperimentalWarningCount records a feature notice without changing its visibility.
+func (c *Compiler) IncrementExperimentalWarningCount() {
+	c.warningCount++
+	c.experimentalWarnings++
+}
+
+// GetExperimentalWarningCount returns only built-in experimental-feature notices.
+func (c *Compiler) GetExperimentalWarningCount() int {
+	return c.experimentalWarnings
+}
+
 // SetConfiguredModelValidator configures optional validation against an external active model inventory.
 func (c *Compiler) SetConfiguredModelValidator(validator func(data *WorkflowData) []string) {
 	c.configuredModelValidator = validator
@@ -209,6 +220,7 @@ func (c *Compiler) GetWarningCount() int {
 // ResetWarningCount resets the warning counter to zero
 func (c *Compiler) ResetWarningCount() {
 	c.warningCount = 0
+	c.experimentalWarnings = 0
 }
 
 // SetWorkflowIdentifier sets the identifier for the current workflow being compiled
