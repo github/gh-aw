@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -180,6 +182,40 @@ func TestEnforceDevelopmentDiagnostics(t *testing.T) {
 			assert.Equal(t, 1, stats.Errors)
 		})
 	}
+}
+
+func TestDevelopmentCopilotDynamicWorkflowsWarningBlocksCompilation(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "dynamic-workflows.md")
+	require.NoError(t, os.WriteFile(path, []byte(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+engine:
+  id: copilot
+  dynamic-workflows: true
+features:
+  gh-aw-detection: false
+safe-outputs:
+  noop:
+    report-as-issue: false
+---
+Test dynamic workflows.
+`), 0600))
+
+	compiler := workflow.NewCompiler()
+	compiler.SetDryRun(true)
+	require.NoError(t, compiler.CompileWorkflow(path))
+	require.Equal(t, 1, compiler.GetWarningCount())
+	stats := &CompilationStats{Total: 1, Succeeded: 1}
+	results := []ValidationResult{{Workflow: path, Valid: true}}
+	err := enforceDevelopmentDiagnostics(CompileConfig{DryRun: true}, compiler, stats, &results)
+	require.ErrorContains(t, err, "development testing checks failed")
+	require.ErrorContains(t, err, "compiler reported warnings")
+	require.Len(t, results, 2)
+	assert.False(t, results[1].Valid)
+	assert.Equal(t, "compiler_warning", results[1].Errors[0].Type)
 }
 
 func TestDevelopmentExplicitlyDisabledChecks(t *testing.T) {

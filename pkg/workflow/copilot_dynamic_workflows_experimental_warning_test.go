@@ -132,6 +132,10 @@ func TestCopilotDynamicWorkflowsDryRunDiagnosticWriteFailure(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.SetDryRun(true)
 	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", DynamicWorkflows: &enabled}}
-	compiler.emitExperimentalFeatureWarningsTo(data, failingExperimentalFeatureWriter{})
+	output := captureStderrOutput(t, func() {
+		compiler.emitExperimentalFeatureWarningsTo(data, failingExperimentalFeatureWriter{})
+	})
+	assert.Contains(t, output, "Failed to write experimental feature diagnostic")
+	assert.Contains(t, output, io.ErrClosedPipe.Error())
 	assert.Equal(t, 2, compiler.GetWarningCount(), "the experimental warning and its write failure must both be counted")
 }

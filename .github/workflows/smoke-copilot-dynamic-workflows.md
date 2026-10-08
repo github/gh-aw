@@ -22,6 +22,14 @@ tools:
   bash: ["curl"]
 safe-outputs:
   staged: true
+  report-failure-as-issue: false
+  report-failed-jobs: false
+  missing-tool:
+    create-issue: false
+  missing-data:
+    create-issue: false
+  report-incomplete:
+    create-issue: false
   noop:
     report-as-issue: false
 timeout-minutes: 5
@@ -33,6 +41,9 @@ sandbox:
 ---
 
 # Minimal Reproducer
+
+Copilot CLI 1.0.90 is pinned to reproduce the investigated permission behavior,
+not to track the newer version used by the dedicated dynamic-workflow smoke.
 
 Run only these two checks. Do not retry denials, change permissions, or stop
 before attempting the second check.
