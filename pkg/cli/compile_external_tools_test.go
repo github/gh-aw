@@ -181,6 +181,7 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 	calls = nil
 	config.DryRun = true
 	config.JSONOutput = true
+	config.dryRunReport = newDryRunCompileReport(config)
 	stats = &CompilationStats{Total: 2, Succeeded: 2}
 	validationResults = []ValidationResult{
 		{Workflow: "a.md", Valid: true},
@@ -199,6 +200,9 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 	assert.Empty(t, validationResults[1].Errors)
 	assert.Equal(t, 2, stats.Succeeded)
 	assert.Equal(t, 10, stats.Errors, "all findings, including the joined actionlint error, must be counted exactly once")
+	for _, tool := range wantOrder {
+		assert.Equal(t, DryRunScannerCheck{Requested: true, Status: "failed"}, config.dryRunReport.Scanners[tool])
+	}
 	output, err := formatValidationOutput(validationResults)
 	require.NoError(t, err)
 	var decoded []ValidationResult
@@ -219,4 +223,23 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 	}
 	require.Len(t, decoded[2].Errors, 2)
 	assert.Equal(t, "second actionlint finding", decoded[2].Errors[1].Message)
+
+	calls = nil
+	failAll = false
+	config.dryRunReport = newDryRunCompileReport(config)
+	stats = &CompilationStats{}
+	validationResults = nil
+	strictGrantErr, batchToolErr = runBatchExternalTools(ctx, config, opts, stats, &validationResults)
+	require.NoError(t, strictGrantErr)
+	require.ErrorIs(t, batchToolErr, fakeActionlintErr)
+	assert.Equal(t, wantOrder, calls)
+	for _, tool := range wantOrder {
+		status := "passed"
+		if tool == "actionlint" {
+			status = "failed"
+		}
+		assert.Equal(t, DryRunScannerCheck{Requested: true, Status: status}, config.dryRunReport.Scanners[tool])
+	}
+	require.Len(t, validationResults, 1)
+	assert.Equal(t, "actionlint", validationResults[0].Workflow)
 }

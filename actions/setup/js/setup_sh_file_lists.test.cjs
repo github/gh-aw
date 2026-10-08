@@ -124,6 +124,7 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
   it("includes the work queue replay module", () => {
     expect(safeOutputsFiles).toContain("work_queue_replay.cjs");
     expect(safeOutputsFiles).toContain("work_queue_store.cjs");
+    expect(safeOutputsFiles).toContain("work_queue_logging.cjs");
   });
 
   it("deploys Claim authority and worker route provisioning dependencies", () => {

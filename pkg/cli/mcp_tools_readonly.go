@@ -71,7 +71,7 @@ Returns a JSON array where each element has the following structure:
 // compileArgs holds the input parameters for the compile tool.
 type compileArgs struct {
 	Workflows      []string `json:"workflows,omitempty" jsonschema:"Workflow files to compile as an array (e.g., [\"workflow.md\"]) (empty for all)"`
-	DryRun         bool     `json:"dry_run,omitempty" jsonschema:"Disable compiler-managed GitHub mutations, stage safe outputs, record dry_run in aw_info.json, and enable strict validation, shellcheck, and model checks; Docker-based scanners are opt-in; custom scripts and external MCP effects remain unverified; explicitly disabling a required check is rejected; does not upload or dispatch workflows"`
+	DryRun         bool     `json:"dry_run,omitempty" jsonschema:"Disable compiler-managed GitHub mutations, stage safe outputs, record dry_run in aw_info.json, and enable strict validation, shellcheck, and model checks; Docker-based scanners are opt-in; JSON includes a batch dry-run gate and scanner invocation coverage; model inventory refresh warnings fail the gate; custom scripts and external MCP effects remain unverified; explicitly disabling a required check is rejected; does not authorize execution, upload, or dispatch workflows"`
 	Environment    string   `json:"environment,omitempty" jsonschema:"Override the environment on every generated job; reusable-workflow caller jobs are rejected"`
 	Strict         bool     `json:"strict,omitempty" jsonschema:"Override frontmatter to enforce strict mode validation for all workflows. Note: Workflows default to strict mode unless frontmatter sets strict: false"`
 	ValidateImages bool     `json:"validate_images,omitempty" jsonschema:"Require Docker for container image validation; fail instead of skipping when Docker is unavailable"`
@@ -184,8 +184,12 @@ Returns JSON array with validation results for each workflow:
 					// compile without the Docker-based tools and surface a warning so
 					// the caller knows static analysis was skipped.
 					dockerUnavailableWarning = err.Error()
-					args.Zizmor = false
-					args.Poutine = false
+					if localScannerPath(ctx, "zizmor") == "" {
+						args.Zizmor = false
+					}
+					if localScannerPath(ctx, "poutine") == "" {
+						args.Poutine = false
+					}
 					args.Actionlint = false
 					args.RunnerGuard = false
 					args.Syft = false
