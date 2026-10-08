@@ -537,6 +537,7 @@ func TestPiEngine_GetExecutionSteps_FirewallCopilotProvider_CopilotRequestsWrite
 		"github":    map[string]any{"mode": "gh-proxy"},
 		"cli-proxy": true,
 	}
+
 	workflowData := &WorkflowData{
 		Name:         "test-workflow",
 		Model:        "copilot/gpt-5.4",
@@ -568,4 +569,30 @@ func TestPiEngine_GetExecutionSteps_FirewallCopilotProvider_CopilotRequestsWrite
 	assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_SECRET_ENV=COPILOT_GITHUB_TOKEN", "Should export the gateway secret env var name for pi_models_json.cjs")
 	assert.Contains(t, stepText, fmt.Sprintf("GH_AW_PI_GATEWAY_FALLBACK_PORT=%d", constants.CopilotLLMGatewayPort), "Should export the compile-time fallback port")
 	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github", "Should export the reflect provider name for pi_models_json.cjs")
+}
+
+func TestPiEngine_GetExecutionSteps_ModelRouting(t *testing.T) {
+	workflowData := &WorkflowData{
+		Name:  "routed-workflow",
+		Model: "gpt-5.6-sol",
+		EngineConfig: &EngineConfig{
+			ID:          "pi",
+			LLMProvider: LLMProviderGitHub,
+			ModelRouting: &CopilotModelRoutingConfig{
+				Goal: "cost", Mode: "balanced", AllowedModels: []string{"gpt-5.6-sol"},
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+		ParsedTools:        NewTools(map[string]any{}),
+	}
+
+	step := strings.Join(NewPiEngine().GetExecutionSteps(workflowData, "test-log")[0], "\n")
+	assert.Contains(t, step, "GH_AW_MODEL_ROUTING")
+	assert.Contains(t, step, "candidateModels")
+	assert.Contains(t, step, "pi_models_json.cjs")
+	assert.NotContains(t, step, "GH_AW_PI_MODEL:")
+	assert.NotContains(t, step, "GH_AW_PI_NATIVE_PROVIDER:")
+	assert.NotContains(t, step, "GH_AW_PI_MODEL_ID=")
+	assert.NotContains(t, step, "--model aw-gateway/gpt-5.6-sol")
+	assert.Contains(t, step, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`)
 }

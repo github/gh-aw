@@ -1052,3 +1052,26 @@ func TestIsAnthropicWIF(t *testing.T) {
 		})
 	}
 }
+
+func TestClaudeEngineModelRoutingExecutionStep(t *testing.T) {
+	workflowData := &WorkflowData{
+		Name:  "routed-workflow",
+		Model: "claude-opus-5",
+		EngineConfig: &EngineConfig{
+			ID:          "claude",
+			LLMProvider: LLMProviderGitHub,
+			ModelRouting: &CopilotModelRoutingConfig{
+				Goal: "cost", Mode: "balanced", AllowedModels: []string{"claude-opus-5"},
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+		ParsedTools:        NewTools(map[string]any{}),
+	}
+
+	step := strings.Join([]string(NewClaudeEngine().GetExecutionSteps(workflowData, "test-log")[0]), "\n")
+	require.Contains(t, step, "GH_AW_MODEL_ROUTING")
+	require.Contains(t, step, "candidateModels")
+	require.NotContains(t, step, "ANTHROPIC_MODEL:")
+	require.NotContains(t, step, "GH_AW_MODEL_AGENT_CLAUDE:")
+	require.NotContains(t, step, "--model")
+}

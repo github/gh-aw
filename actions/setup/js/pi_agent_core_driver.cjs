@@ -35,7 +35,11 @@ function jsonEvent(event) {
 async function main(options = {}) {
   const sdk = options.sdk || (await loadPiSDK());
   const emit = options.emit || (event => process.stdout.write(JSON.stringify(event) + "\n"));
-  const { agentDir, settings, config } = preparePiRuntime();
+  const { agentDir, settings, config, routingSelection } = preparePiRuntime();
+  if (routingSelection) {
+    process.env.GH_AW_PI_MODEL = `aw-gateway/${routingSelection.wire_model}`;
+    process.env.GH_AW_PI_NATIVE_PROVIDER = "aw-gateway";
+  }
   const cwd = process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd();
   const bare = process.env.GH_AW_PI_BARE === "true";
   const promptPath = process.env.GH_AW_PI_USER_PROMPT || process.env.GH_AW_PROMPT;
@@ -45,7 +49,7 @@ async function main(options = {}) {
   const settingsManager = sdk.SettingsManager.create(cwd, agentDir, { projectTrusted: false });
   settingsManager.applyOverrides(settings);
   const modelRuntime = await sdk.ModelRuntime.create({ authPath: path.join(agentDir, "auth.json"), modelsPath: path.join(agentDir, "models.json") });
-  const modelString = process.env.GH_AW_PI_MODEL || process.env.PI_MODEL || "";
+  const modelString = routingSelection ? process.env.GH_AW_PI_MODEL || "" : process.env.GH_AW_PI_MODEL || process.env.PI_MODEL || "";
   const slash = modelString.indexOf("/");
   const provider = process.env.GH_AW_PI_NATIVE_PROVIDER || nativePiProvider(slash >= 0 ? modelString.slice(0, slash) : "copilot");
   const modelId = slash >= 0 ? modelString.slice(slash + 1) : modelString;

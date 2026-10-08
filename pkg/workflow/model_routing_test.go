@@ -67,6 +67,7 @@ func TestThreatDetectionDoesNotUseModelRouting(t *testing.T) {
 	routing := &CopilotModelRoutingConfig{
 		Goal: "cost", Mode: "balanced", AllowedModels: []string{"gpt-5.4-mini"},
 	}
+
 	for _, override := range []bool{false, true} {
 		name := "inherited"
 		if override {
@@ -509,4 +510,87 @@ func TestCopilotModelRoutingDoesNotEmitCompileTimeModel(t *testing.T) {
 	}, true, "GH_AW_MODEL")
 
 	require.NotContains(t, env, "COPILOT_MODEL")
+}
+
+func TestInheritedDetectionModelStaysUnsetForRoutedEnginesWithoutAModel(t *testing.T) {
+	tests := []struct {
+		engineID          string
+		detectionEngineID string
+		model             string
+	}{
+		{engineID: "copilot", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+		{engineID: "claude", detectionEngineID: "claude", model: "claude-opus-5"},
+		{engineID: "codex", detectionEngineID: "codex", model: "gpt-5.6-sol"},
+		{engineID: "pi", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{
+					ID:          tc.engineID,
+					LLMProvider: LLMProviderGitHub,
+					ModelRouting: &CopilotModelRoutingConfig{
+						Goal: "cost", Mode: "balanced", AllowedModels: []string{tc.model},
+					},
+				},
+			}
+
+			require.Empty(t, data.Model)
+			require.Empty(t, inheritedDetectionModel(data, tc.detectionEngineID))
+			detectionData := buildExternalDetectorWorkflowData(data, tc.detectionEngineID)
+			require.Empty(t, detectionData.Model)
+			require.Nil(t, detectionData.EngineConfig.ModelRouting)
+		})
+	}
+}
+
+func TestRoutedEnginesDoNotRouteThreatDetection(t *testing.T) {
+	tests := []struct {
+		engineID          string
+		detectionEngineID string
+		model             string
+	}{
+		{engineID: "copilot", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+		{engineID: "claude", detectionEngineID: "claude", model: "claude-opus-5"},
+		{engineID: "codex", detectionEngineID: "codex", model: "gpt-5.6-sol"},
+		{engineID: "pi", detectionEngineID: "copilot", model: "gpt-5.6-sol"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: tc.engineID,
+				EngineConfig: &EngineConfig{
+					ID:          tc.engineID,
+					LLMProvider: LLMProviderGitHub,
+					ModelRouting: &CopilotModelRoutingConfig{
+						Goal: "cost", Mode: "balanced", AllowedModels: []string{tc.model},
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+				SafeOutputs:        &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			}
+			detectionData := buildExternalDetectorWorkflowData(data, tc.detectionEngineID)
+			configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName: tc.detectionEngineID, WorkflowData: detectionData,
+			})
+			require.NoError(t, err)
+			var config map[string]any
+			require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+			require.NotContains(t, config["apiProxy"].(map[string]any), "routing")
+			require.NotContains(t, config["container"].(map[string]any)["images"].(map[string]any), awfImageRoleRouter)
+
+			compiler := NewCompiler()
+			for name, build := range map[string]func(*WorkflowData) []string{
+				"external": compiler.buildExternalDetectorExecutionStep,
+				"inline":   compiler.buildDetectionEngineExecutionStep,
+			} {
+				t.Run(name, func(t *testing.T) {
+					steps := strings.Join(build(data), "")
+					require.NotContains(t, steps, "GH_AW_MODEL_ROUTING")
+					require.NotContains(t, steps, "candidateModels")
+					require.NotContains(t, steps, awfImageRoleRouter)
+				})
+			}
+		})
+	}
 }

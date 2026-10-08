@@ -27,6 +27,12 @@ func isModelRoutingEnabled(data *WorkflowData) bool {
 	return data != nil && data.EngineConfig != nil && data.EngineConfig.ModelRouting != nil
 }
 
+func applyModelRoutingEnv(env map[string]string, data *WorkflowData) {
+	if isModelRoutingEnabled(data) {
+		env["GH_AW_MODEL_ROUTING"] = "1"
+	}
+}
+
 func resolveModelRoutingAllowedModels(routing *CopilotModelRoutingConfig) ([]string, error) {
 	if routing == nil {
 		return nil, nil
