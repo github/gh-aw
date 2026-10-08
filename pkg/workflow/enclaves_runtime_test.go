@@ -33,7 +33,7 @@ func TestValidateCloudHypervisorEnclaveVersion(t *testing.T) {
 			data.NetworkPermissions.Firewall.Version = version
 			err := validateEnclavesConfig(data)
 			switch version {
-			case "v0.28.47", "v0.28.48", "latest":
+			case "", "v0.28.47", "v0.28.48", "latest":
 				require.NoError(t, err)
 			default:
 				require.ErrorContains(t, err, "requires AWF v0.28.47 or newer")
