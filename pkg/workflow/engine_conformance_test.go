@@ -218,6 +218,49 @@ func TestAgyNativeConformanceRequiresStagedNoop(t *testing.T) {
 	}
 }
 
+func TestAgyNativeConformanceAllowlistMatchesServerTools(t *testing.T) {
+	var suite conformanceSuite
+	var source struct {
+		MCPServers map[string]struct {
+			Allowed []string `yaml:"allowed"`
+		} `yaml:"mcp-servers"`
+	}
+	file := "../../.github/workflows/shared/agy-conformance.md"
+	readConformanceFrontmatter(t, file, &suite)
+	readConformanceFrontmatter(t, file, &source)
+	allowed := source.MCPServers["agy-native"].Allowed
+	require.Equal(t, []string{"native_challenge"}, allowed)
+	require.Contains(t, suite.MCPScripts, "native-challenge")
+
+	names := make([]string, 0, len(suite.MCPScripts))
+	for name := range suite.MCPScripts {
+		names = append(names, name)
+	}
+	encodedNames, err := json.Marshal(names)
+	require.NoError(t, err)
+	encodedAllowed, err := json.Marshal(allowed)
+	require.NoError(t, err)
+	script := `
+const assert = require("node:assert/strict");
+const { registerTool, handleRequest } = require("../../actions/setup/js/mcp_server_core.cjs");
+const server = { tools: {}, debug() {} };
+for (const name of ` + string(encodedNames) + `) {
+  registerTool(server, { name, description: "Conformance probe", inputSchema: { type: "object" } });
+}
+handleRequest(server, { jsonrpc: "2.0", id: 1, method: "tools/list" })
+  .then(response => {
+    assert.equal(response.error, undefined);
+    const exposed = response.result.tools.map(tool => tool.name);
+    for (const name of ` + string(encodedAllowed) + `) {
+      assert.ok(exposed.includes(name), "Native gateway allowlist must match tools/list: " + name);
+    }
+  })
+  .catch(error => { console.error(error); process.exitCode = 1; });
+`
+	output, err := runConformanceNode(t, nil, "-e", script)
+	require.NoError(t, err, "%s", output)
+}
+
 func TestEngineConformanceCatalogCoverage(t *testing.T) {
 	registry := NewEngineRegistry()
 	ids := registry.GetSupportedEngines()

@@ -7,7 +7,7 @@ mcp-servers:
     headers:
       Authorization: "${{ steps.mcp-scripts-start.outputs.api_key }}"
     allowed:
-      - native-challenge
+      - native_challenge
 mcp-scripts:
   native-challenge:
     description: Return a fresh nonce and record evidence for the native Agy MCP transport.
@@ -93,6 +93,6 @@ imports:
 
 Execute the imported engine configuration conformance suite once.
 
-Also call the `native-challenge` tool through the native MCP server `agy-native`,
+Also call the `native_challenge` tool through the native MCP server `agy-native`,
 using the actual fixture `fileNonce`. Do not call `mcpscripts native-challenge`
 or substitute a shell/HTTP request; the checker requires a native MCP tool event.
