@@ -74,14 +74,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: node scripts/pr-sous-chef.mjs
       - name: Upload compact queue
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: pr-sous-chef-queue
           path: /tmp/gh-aw/agent/pr-sous-chef-candidates-compact.json
           retention-days: 1
 steps:
   - name: Download compact queue
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       name: pr-sous-chef-queue
       path: /tmp/gh-aw/agent

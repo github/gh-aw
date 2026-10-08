@@ -108,7 +108,7 @@ jobs:
           # Artifact upload drops empty directories; keep `out/` present in the sandbox.
           printf 'Write scan notes and confirmed findings here.\n' > "$BUNDLE_ROOT/out/README.md"
       - name: Upload VulnHunter bundle artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ steps.artifact_name.outputs.value }}
           path: ${{ runner.temp }}/vulnhunter-bundle
@@ -119,7 +119,7 @@ sandbox:
     id: awf
 steps:
   - name: Download VulnHunter bundle artifact
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       name: ${{ needs.vulnhunter_bundle.outputs.artifact_name }}
       path: /tmp/gh-aw/agent/vulnhunter

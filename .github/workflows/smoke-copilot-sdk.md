@@ -79,7 +79,7 @@ sandbox:
 
 ## Tasks
 
-1. **File Writing**: Create a file `/tmp/smoke-copilot-sdk-${{ github.run_id }}.txt` with the content:
+1. **File Writing**: Create a file `/tmp/gh-aw/agent/smoke-copilot-sdk-${{ github.run_id }}.txt` with the content:
    ```
    Copilot SDK smoke test passed at <current date/time>
    ```

@@ -112,10 +112,7 @@ network:
     - www.gstatic.com
 sandbox:
   agent:
-    config:
-      filesystem:
-        allow-write:
-          - /tmp/gh-aw/agent
+    id: awf
 tools:
   agentic-workflows:
   cli-proxy: true

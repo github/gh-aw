@@ -14,7 +14,7 @@ safe-outputs:
         contents: read
       steps:
         - name: Post message to Slack
-          uses: actions/github-script@v9
+          uses: actions/github-script@v9.0.0
           env:
             SLACK_BOT_TOKEN: "${{ secrets.SLACK_BOT_TOKEN }}"
             SLACK_CHANNEL_ID: "${{ env.GH_AW_SLACK_CHANNEL_ID }}"

@@ -116,7 +116,7 @@ jobs:
           persist-credentials: false
       - name: Compute Release Config
         id: compute_config
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             const releaseType = context.payload.inputs.release_type;
@@ -282,7 +282,7 @@ jobs:
           cache-from: type=gha
 
       - name: Upload release binaries
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: release-binaries-${{ needs.config.outputs.release_tag }}
           path: dist/
@@ -313,7 +313,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Download release binaries
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@v8.0.2
         with:
           name: release-binaries-${{ needs.config.outputs.release_tag }}
           path: dist/
@@ -618,7 +618,7 @@ jobs:
           persist-credentials: true
 
       - name: Download release binaries
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@v8.0.2
         with:
           name: release-binaries-${{ needs.config.outputs.release_tag }}
           path: dist/
@@ -737,7 +737,7 @@ jobs:
           echo "✓ No secrets detected in SBOM files"
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: sbom-artifacts
           path: |
@@ -791,7 +791,7 @@ jobs:
       issues: write
     steps:
       - name: Comment on pull requests included in release
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         env:
           RELEASE_TAG: ${{ needs.config.outputs.release_tag }}
           RELEASE_ID: ${{ needs.release.outputs.release_id }}

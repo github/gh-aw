@@ -22,7 +22,7 @@ tools:
 steps:
   - name: Find crops ready to grow
     id: crops
-    uses: actions/github-script@v9
+    uses: actions/github-script@v9.0.0
     with:
       script: |
         const fs = require("fs");

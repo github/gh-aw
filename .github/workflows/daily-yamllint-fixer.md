@@ -82,7 +82,7 @@ jobs:
             echo "has_warnings=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Upload yamllint results artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: yamllint-results
           path: /tmp/gh-aw/agent/yamllint/warnings-before.txt
@@ -90,7 +90,7 @@ jobs:
           retention-days: 3
 steps:
   - name: Download yamllint results artifact
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       name: yamllint-results
       path: /tmp/gh-aw/agent/yamllint

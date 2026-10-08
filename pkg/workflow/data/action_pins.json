@@ -48,10 +48,10 @@
       "version": "v3.2.0",
       "sha": "bcd2ba49218906704ab6c1aa796996da409d3eb1"
     },
-    "actions/download-artifact@v8.0.1": {
+    "actions/download-artifact@v8.0.2": {
       "repo": "actions/download-artifact",
-      "version": "v8.0.1",
-      "sha": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+      "version": "v8.0.2",
+      "sha": "9000827ccba6bdab643e8b6fd33ac0654aef8333"
     },
     "actions/gh-drives-preview/checkout@main": {
       "repo": "actions/gh-drives-preview/checkout",
@@ -63,19 +63,19 @@
       "version": "main",
       "sha": "c9163b96f9720dc55e0de19b37028ae22dcfa42a"
     },
-    "actions/github-script@v9": {
+    "actions/github-script@v9.0.0": {
       "repo": "actions/github-script",
-      "version": "v9",
+      "version": "v9.0.0",
       "sha": "3a2844b7e9c422d3c10d287c895573f7108da1b3"
     },
-    "actions/setup-dotnet@v6": {
+    "actions/setup-dotnet@v6.0.0": {
       "repo": "actions/setup-dotnet",
-      "version": "v6",
+      "version": "v6.0.0",
       "sha": "a98b56852c35b8e3190ac28c8c2271da59106c68"
     },
-    "actions/setup-go@v7": {
+    "actions/setup-go@v7.0.0": {
       "repo": "actions/setup-go",
-      "version": "v7",
+      "version": "v7.0.0",
       "sha": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e"
     },
     "actions/setup-java@v6.0.1": {
@@ -83,20 +83,20 @@
       "version": "v6.0.1",
       "sha": "de7274f081f381c8f8158605e0321c36c376e2e6"
     },
-    "actions/setup-node@v7": {
+    "actions/setup-node@v7.0.0": {
       "repo": "actions/setup-node",
-      "version": "v7",
+      "version": "v7.0.0",
       "sha": "820762786026740c76f36085b0efc47a31fe5020"
     },
-    "actions/setup-python@v7": {
+    "actions/setup-python@v7.0.0": {
       "repo": "actions/setup-python",
-      "version": "v7",
+      "version": "v7.0.0",
       "sha": "5fda3b95a4ea91299a34e894583c3862153e4b97"
     },
-    "actions/upload-artifact@v7.0.1": {
+    "actions/upload-artifact@v7.0.2": {
       "repo": "actions/upload-artifact",
-      "version": "v7.0.1",
-      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+      "version": "v7.0.2",
+      "sha": "cf430e030ddbb5b0abf93d22962f4752f3646cd9"
     },
     "actions/upload-code-coverage@v1.4.4": {
       "repo": "actions/upload-code-coverage",
@@ -799,11 +799,6 @@
       "image": "ghcr.io/oraios/serena:1.7.0",
       "digest": "sha256:6c9459e4246a39c9deaa4f23fb05a526ac6e237b24c8e84a927a098fa1ab6730",
       "pinned_image": "ghcr.io/oraios/serena:1.7.0@sha256:6c9459e4246a39c9deaa4f23fb05a526ac6e237b24c8e84a927a098fa1ab6730"
-    },
-    "ghcr.io/xberg-io/xberg:latest": {
-      "image": "ghcr.io/xberg-io/xberg:latest",
-      "digest": "sha256:6dc84d07c00cd00b11ed309012fb5f87c2d40e530fbf8c16be1c4fe8900dca40",
-      "pinned_image": "ghcr.io/xberg-io/xberg:latest@sha256:6dc84d07c00cd00b11ed309012fb5f87c2d40e530fbf8c16be1c4fe8900dca40"
     },
     "grafana/mcp-grafana:1.1.0-alpine": {
       "image": "grafana/mcp-grafana:1.1.0-alpine",
