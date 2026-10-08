@@ -4,7 +4,7 @@
 /** @typedef {import("./types/agent_session").SessionUsage} SessionUsage */
 /** @typedef {import("./types/agent_session").SessionResultData} SessionResultData */
 
-const { normalizeAgentSession, createSessionEvent, accumulateSessionUsage, isTokenCount, isMetric } = require("./agent_session.cjs");
+const { normalizeAgentSession, createSessionEvent, accumulateSessionUsage, isTokenCount, isMetric, sessionEventContexts } = require("./agent_session.cjs");
 const { isDeepStrictEqual } = require("node:util");
 
 const COPILOT_CONVERSATION_EVENT_TYPES = new Set(["assistant.message", "assistant.message_delta", "assistant.reasoning", "assistant.reasoning_delta", "assistant.refusal", "user.message", "tool.execution_start", "tool.execution_complete"]);
@@ -43,8 +43,7 @@ function normalizeCopilotSession(entries) {
   const source = normalizeAgentSession(entries, { sourceEngine: "copilot" });
   /** @type {SessionEvent[]} */
   const events = [];
-  /** @type {SessionUsage} */
-  const usage = {};
+  const usageByScope = new Map();
   const responses = new Set();
   const turns = new Set();
   const tools = new Map();
@@ -66,28 +65,48 @@ function normalizeCopilotSession(entries) {
       data: projectionData(event.data),
       ...(Object.hasOwn(event, "provenance") ? { provenance: projectionProvenance(event.provenance) } : {}),
     });
-  for (const event of source) {
-    if (!event.copilotProjection) continue;
-    const key = projectionKey(event.copilotProjection, event);
-    const bucket = projections.get(key) ?? [];
-    bucket.push({ evidence: projectionEvidence(event), consumed: false });
-    projections.set(key, bucket);
-  }
   const summaryScopes = [];
-  const sourceSessions = new Map();
+  const contexts = sessionEventContexts(source);
+  for (const [index, event] of source.entries()) {
+    const context = contexts[index];
+    if (
+      context.nested &&
+      [
+        "session.start",
+        "session.init",
+        "session.result",
+        "session.error",
+        "session.shutdown",
+        "session.task_complete",
+        "user.message",
+        "system.message",
+        "assistant.message",
+        "assistant.reasoning",
+        "assistant.refusal",
+        "assistant.message_delta",
+        "assistant.reasoning_delta",
+        "assistant.turn_start",
+        "assistant.turn_end",
+        "assistant.usage",
+        "tool.execution_start",
+        "tool.execution_complete",
+      ].includes(event.type)
+    ) {
+      if (!Object.hasOwn(event, "agentId") && typeof context.agentId === "string") event.agentId = context.agentId;
+      for (const key of ["sessionId", "agentId", "parentAgentId", "parentToolCallId"]) {
+        if (!Object.hasOwn(event.data, key) && context[key] !== undefined) event.data[key] = context[key];
+      }
+    }
+  }
   const originScopes = new Map();
   const summaryMessages = new Map();
   const emittedMessages = new Map();
   const summaryDeltas = new Map();
   const retainedSummaries = new Set();
   for (const [index, event] of source.entries()) {
-    const provenance = event.provenance && typeof event.provenance === "object" ? event.provenance : {};
-    const sourceKey = JSON.stringify(["component" in provenance ? provenance.component : undefined, "phase" in provenance ? provenance.phase : undefined, "path" in provenance ? provenance.path : undefined]);
-    if (["session.start", "session.init"].includes(event.type) && event.data.sessionId !== undefined) sourceSessions.set(sourceKey, event.data.sessionId);
-    const agentId = event.agentId ?? event.data.agentId;
-    const parentToolId = event.parent_tool_use_id ?? event.parentToolUseId ?? event.parentToolCallId ?? event.data.parentToolUseId ?? event.data.parent_tool_use_id ?? event.data.parentToolCallId;
-    const originKey = JSON.stringify([sourceKey, agentId, parentToolId, event.id, event.timestamp]);
-    const observedScope = JSON.stringify([sourceKey, event.session_id ?? event.sessionId ?? event.data.sessionId ?? event.data.session_id ?? sourceSessions.get(sourceKey), agentId, parentToolId]);
+    const context = contexts[index];
+    const originKey = JSON.stringify([context.sourceKey, context.agentId, context.agentId === undefined ? context.parentToolCallId : undefined, event.id, event.timestamp]);
+    const observedScope = context.scope;
     const scope = event.copilotProjection && event.id !== undefined ? (originScopes.get(originKey) ?? observedScope) : observedScope;
     summaryScopes[index] = scope;
     if (!event.copilotProjection && event.id !== undefined) originScopes.set(originKey, scope);
@@ -114,6 +133,9 @@ function normalizeCopilotSession(entries) {
   const streamKey = (scope, event) => JSON.stringify([scope, event.type.startsWith("assistant.reasoning") ? "reasoning" : "message", event.data.reasoningId ?? event.data.messageId]);
   const deltaText = new Map();
   const nativeStarts = new Set();
+  const recordedTurnScopes = new Set();
+  const recordedUsage = new Set();
+  const usageSourceKey = (scope, event) => JSON.stringify([scope, event.id, event.data.apiCallId, event.timestamp]);
   for (const [index, event] of source.entries()) {
     const scope = summaryScopes[index];
     if (["assistant.message_delta", "assistant.reasoning_delta"].includes(event.type) && (event.data.messageId !== undefined || event.data.reasoningId !== undefined) && typeof event.data.deltaContent === "string") {
@@ -121,20 +143,38 @@ function normalizeCopilotSession(entries) {
       deltaText.set(key, (deltaText.get(key) ?? "") + event.data.deltaContent);
     }
     if (event.type === "tool.execution_start" && !event.copilotProjection && event.data.toolCallId !== undefined) nativeStarts.add(correlationKey(scope, event.data.toolCallId));
+    if (event.type === "assistant.turn_end") recordedTurnScopes.add(scope);
+    if (event.type === "assistant.usage" && !event.copilotProjection) recordedUsage.add(usageSourceKey(scope, event));
+  }
+  const supersededAccounting = new Set(
+    source.filter(
+      (event, index) =>
+        (event.copilotProjection === "finalized-turns" && recordedTurnScopes.has(summaryScopes[index])) ||
+        (event.copilotProjection === "assistant.usage" && event.type === "session.result" && recordedUsage.has(usageSourceKey(summaryScopes[index], event)))
+    )
+  );
+  for (const event of source) {
+    if (!event.copilotProjection || supersededAccounting.has(event)) continue;
+    const key = projectionKey(event.copilotProjection, event);
+    const bucket = projections.get(key) ?? [];
+    bucket.push({ evidence: projectionEvidence(event), consumed: false });
+    projections.set(key, bucket);
   }
   const snapshots = new Set();
   for (const [index, event] of source.entries()) {
     const key = streamKey(summaryScopes[index], event);
     if (["assistant.message", "assistant.reasoning"].includes(event.type) && !event.copilotProjection && typeof event.data.content === "string" && deltaText.has(key) && event.data.content.startsWith(deltaText.get(key))) snapshots.add(key);
   }
-  let finalizedTurns = 0;
-  let hasTurnResult = false;
+  const finalizedTurns = new Map();
+  const turnResults = new Set();
 
   for (let index = 0; index < source.length; index++) {
     const event = source[index];
     /** @type {Record<string, any>} */
     const data = event.data;
     const summaryScope = summaryScopes[index];
+    const context = contexts[index];
+    if (supersededAccounting.has(event)) continue;
     if ((event.copilotProjection === "assistant.message_delta" || event.copilotProjection === "assistant.reasoning_delta") && snapshots.has(streamKey(summaryScope, event))) continue;
     if (event.type === "tool.execution_start" && event.copilotProjection === "assistant.toolRequests" && data.toolCallId !== undefined && nativeStarts.has(correlationKey(summaryScope, data.toolCallId))) continue;
     if (event.type === "assistant.message" && event.copilotProjection === "session.task_complete") {
@@ -212,14 +252,18 @@ function normalizeCopilotSession(entries) {
     } else if (event.type === "assistant.turn_end") {
       const identity = data.turnId !== undefined || event.id !== undefined ? correlationKey(summaryScope, data.turnId ?? event.id) : undefined;
       if (identity === undefined || !turns.has(identity)) {
-        finalizedTurns++;
+        const previous = finalizedTurns.get(summaryScope);
+        finalizedTurns.set(summaryScope, { count: (previous?.count ?? 0) + 1, event, context });
         if (identity !== undefined) turns.add(identity);
       }
     } else if (event.type === "assistant.usage") {
+      /** @type {SessionUsage} */
+      const usage = usageByScope.get(summaryScope) ?? {};
       const identity = data.apiCallId !== undefined || event.id !== undefined ? correlationKey(summaryScope, data.apiCallId ?? event.id) : undefined;
       if (identity === undefined || !responses.has(identity)) {
         if (identity !== undefined) responses.add(identity);
         accumulateSessionUsage(usage, copilotUsage(data));
+        usageByScope.set(summaryScope, usage);
       }
       if (Object.keys(usage).length) project("session.result", { usage: { ...usage } });
     } else if (event.type === "session.shutdown") {
@@ -253,11 +297,16 @@ function normalizeCopilotSession(entries) {
     } else if (event.type === "session.error") {
       project("session.result", { errors: [data.error !== undefined ? structuredClone(data.error) : structuredClone(data)] });
     }
-    if (event.type === "session.result" && isTokenCount(data.numTurns)) hasTurnResult = true;
+    if (event.type === "session.result" && isTokenCount(data.numTurns)) turnResults.add(summaryScope);
   }
 
-  if (finalizedTurns && !hasTurnResult) {
-    events.push({ type: "session.result", data: { numTurns: finalizedTurns }, copilotProjection: "finalized-turns" });
+  for (const [scope, { count, event, context }] of finalizedTurns) {
+    if (!turnResults.has(scope)) {
+      const identity = Object.fromEntries(
+        Object.entries({ sessionId: context.sessionId, agentId: context.agentId, parentAgentId: context.parentAgentId, parentToolCallId: context.parentToolCallId }).filter(([, value]) => value !== undefined)
+      );
+      events.push({ ...event, type: "session.result", data: { ...identity, numTurns: count }, copilotProjection: "finalized-turns" });
+    }
   }
   return events;
 }

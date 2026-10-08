@@ -3,11 +3,22 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
-const { ERR_PARSE } = require("./error_codes.cjs");
+const { ERR_PARSE, ERR_VALIDATION } = require("./error_codes.cjs");
 const createLogParserFormatters = require("./log_parser_format.cjs");
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
-const { isSessionEvent, normalizeAgentSession, normalizeSessionUsage, projectSessionResult, projectSessionInitialization, sessionOutputText, sessionToolSuccess, sessionTokenTotal, isMetric } = require("./agent_session.cjs");
-const { escapeSummaryText, toolInventoryName, displayArgument } = require("./agent_session_render.cjs");
+const {
+  isSessionEvent,
+  normalizeAgentSession,
+  normalizeSessionUsage,
+  projectSessionResult,
+  projectSessionInitialization,
+  sessionEventContexts,
+  sessionOutputText,
+  sessionToolSuccess,
+  sessionTokenTotal,
+  isMetric,
+} = require("./agent_session.cjs");
+const { escapeSummaryText, toolInventoryName, displayArgument, sessionPublicationSource } = require("./agent_session_render.cjs");
 
 /**
  * Shared utility functions for log parsers
@@ -667,7 +678,13 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   if (!isCopilotEventLogEntries(logEntries)) {
     return logEntries;
   }
+  const sourceEntries = logEntries.map(sessionPublicationSource);
+  const published = sourceEntries.some((entry, index) => entry !== logEntries[index]);
   logEntries = normalizeAgentSession(logEntries);
+  const identityEntries = published ? normalizeAgentSession(sourceEntries) : logEntries;
+  if (identityEntries.length !== logEntries.length) throw new Error(`${ERR_VALIDATION}: Copilot publication records do not match their source identities`);
+  const contexts = sessionEventContexts(identityEntries);
+  const visibleContexts = published ? sessionEventContexts(logEntries) : contexts;
 
   /** @type {Array<any>} */
   const normalizedEntries = [];
@@ -675,12 +692,18 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   const pendingIdsByToolName = new Map();
   let toolCounter = 0;
   const usedToolIds = new Set(logEntries.filter(e => typeof e.data?.toolCallId === "string").map(e => e.data.toolCallId));
+  const allocatedToolIds = new Set();
   const displayToolId = () => {
     let id;
     do {
       id = `sdk_tool_${++toolCounter}`;
     } while (usedToolIds.has(id));
     usedToolIds.add(id);
+    return id;
+  };
+  const claimToolId = nativeId => {
+    const id = nativeId !== null && !allocatedToolIds.has(nativeId) ? nativeId : displayToolId();
+    allocatedToolIds.add(id);
     return id;
   };
 
@@ -762,9 +785,13 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     return base === undefined ? {} : base;
   };
 
-  for (const entry of logEntries) {
+  for (const [index, entry] of logEntries.entries()) {
     if (!entry || typeof entry !== "object") continue;
     const data = entry.data && typeof entry.data === "object" ? entry.data : {};
+    const context = contexts[index];
+    const scopedId = id => JSON.stringify([context.scope, id]);
+    const scopedToolName = () => scopedId(normalizeToolName(identityEntries[index].data?.toolName, identityEntries[index].data?.mcpServerName));
+    const firstProjection = normalizedEntries.length;
 
     switch (entry.type) {
       case "session.start":
@@ -810,11 +837,11 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       case "tool.execution_start": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
         const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
-        const resolvedToolId = toolCallId ?? displayToolId();
+        const resolvedToolId = claimToolId(toolCallId);
         if (toolCallId !== null) {
-          pendingByToolCallId.set(toolCallId, { id: resolvedToolId, name: toolName });
+          pendingByToolCallId.set(scopedId(toolCallId), { id: resolvedToolId, name: scopedToolName() });
         }
-        addPendingId(toolName, resolvedToolId);
+        addPendingId(scopedToolName(), resolvedToolId);
         normalizedEntries.push({
           type: "assistant",
           message: {
@@ -830,19 +857,19 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
         /** @type {any} */
         let resolvedToolId = null;
 
-        if (toolCallId !== null && pendingByToolCallId.has(toolCallId)) {
-          const pending = pendingByToolCallId.get(toolCallId);
+        if (toolCallId !== null && pendingByToolCallId.has(scopedId(toolCallId))) {
+          const pending = pendingByToolCallId.get(scopedId(toolCallId));
           resolvedToolId = pending.id;
-          pendingByToolCallId.delete(toolCallId);
+          pendingByToolCallId.delete(scopedId(toolCallId));
           if (resolvedToolId !== null) {
             removePendingId(pending.name, resolvedToolId);
           }
         }
-        if (resolvedToolId === null && toolCallId === null && (pendingIdsByToolName.get(toolName)?.length ?? 0) === 1) {
-          resolvedToolId = shiftPendingId(toolName);
+        if (resolvedToolId === null && toolCallId === null && (pendingIdsByToolName.get(scopedToolName())?.length ?? 0) === 1) {
+          resolvedToolId = shiftPendingId(scopedToolName());
         }
         if (resolvedToolId === null) {
-          resolvedToolId = toolCallId ?? displayToolId();
+          resolvedToolId = claimToolId(toolCallId);
           normalizedEntries.push({
             type: "assistant",
             message: {
@@ -884,9 +911,20 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       default:
         break;
     }
+    if (context.nested) {
+      const visible = visibleContexts[index];
+      for (const projection of normalizedEntries.slice(firstProjection)) {
+        Object.assign(
+          projection,
+          Object.fromEntries(Object.entries({ session_id: visible.sessionId, agentId: visible.agentId, parentAgentId: visible.parentAgentId, parent_tool_use_id: visible.parentToolCallId }).filter(([, value]) => value !== undefined))
+        );
+      }
+    }
   }
 
-  const result = projectSessionResult(logEntries);
+  const accountingContexts = contexts.filter((_, index) => !logEntries[index].type.startsWith("subagent."));
+  const includeNested = accountingContexts.length > 0 && accountingContexts.every(context => context.nested && context.scope === accountingContexts[0].scope);
+  const result = projectSessionResult(logEntries, { includeNested });
   const init = projectSessionInitialization(logEntries);
   if (init) normalizedEntries.unshift(init);
   if (result) normalizedEntries.push(result);

@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { isSessionEvent } = require("./agent_session.cjs");
+const { isSessionEvent, isNestedSessionEvent } = require("./agent_session.cjs");
 const { hasCopilotConversation, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -305,7 +305,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const native = walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
   let agentEvents = add(canonical, "agent", "agent", undefined);
   const canonicalSource = sources.find(source => source.component === "agent" && source.path === "agent-session.jsonl");
-  const sessionId = event => (["session.start", "session.init"].includes(event?.type) && typeof event.data?.sessionId === "string" && event.data.sessionId ? event.data.sessionId : undefined);
+  const sessionId = event => (["session.start", "session.init"].includes(event?.type) && !isNestedSessionEvent(event) && typeof event.data?.sessionId === "string" && event.data.sessionId ? event.data.sessionId : undefined);
   /** @param {SessionEvent} event @returns {Record<string, unknown>} */
   const nativeProvenance = event => (event.provenance && typeof event.provenance === "object" && !Array.isArray(event.provenance) ? Object.fromEntries(Object.entries(event.provenance)) : {});
   const canonicalCopilot = engine === "copilot" || canonicalSource?.events.some(event => event.data.sourceEngine === "copilot" || isNativePath(nativeProvenance(event).path));

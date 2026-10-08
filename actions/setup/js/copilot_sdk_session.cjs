@@ -12,8 +12,8 @@
  *   SDK "tool.execution_start"    → JSONL "tool.execution_start"  (toolName, mcpServerName, mcpToolName?, toolCallId?, input?, command?)
  *   SDK "tool.execution_complete" → JSONL "tool.execution_complete" (toolName, mcpServerName, toolCallId?, success, result)
  *   SDK "assistant.message"       → JSONL "assistant.message"     (content)
- *   SDK "assistant.turn_start"    → watchdog disarmed (inAssistantTurn = true)
- *   SDK "assistant.turn_end"      → watchdog re-enabled (inAssistantTurn = false)
+ *   SDK "assistant.turn_start"    → JSONL; watchdog disarmed for the active agent
+ *   SDK "assistant.turn_end"      → JSONL; watchdog re-enabled when every agent is idle
  *   SDK "session.task_complete"   → JSONL "session.task_complete" (success, summary)
  *   SDK "subagent.started"        → JSONL "subagent.started"      (agentName, agentDisplayName, toolCallId)
  *   SDK "subagent.completed"      → JSONL "subagent.completed"    (agentName, toolCallId)
@@ -32,6 +32,7 @@
 "use strict";
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { isNestedSessionEvent } = require("./agent_session.cjs");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -260,7 +261,7 @@ async function runWithCopilotSDK({
   // assistant.turn_end).  The watchdog must not fire during this window because
   // pendingToolCalls may legitimately be empty before the model dispatches its
   // first tool call of the new turn.
-  let inAssistantTurn = false;
+  const activeAssistantTurns = new Set();
 
   /**
    * Best-effort write of a driver-level event to events.jsonl and stderr.
@@ -367,7 +368,12 @@ async function runWithCopilotSDK({
      */
     function writeEvent(type, data, timestamp, native = {}) {
       const metadata = Object.fromEntries(["id", "parentId", "agentId", "ephemeral"].filter(key => Object.hasOwn(native, key)).map(key => [key, native[key]]));
-      const entry = { type, timestamp: timestamp ?? new Date().toISOString(), ...metadata, data };
+      const correlation = Object.fromEntries(
+        ["sessionId", "messageId", "originatingMessageId", "reasoningId", "interactionId", "turnId", "apiCallId", "model", "parentToolCallId", "parentAgentTaskId"]
+          .filter(key => Object.hasOwn(native.data ?? {}, key))
+          .map(key => [key, native.data[key]])
+      );
+      const entry = { type, timestamp: timestamp ?? new Date().toISOString(), ...metadata, data: { ...correlation, ...data } };
       const jsonl = JSON.stringify(entry) + "\n";
       stream.write(jsonl);
       process.stderr.write(jsonl);
@@ -375,6 +381,8 @@ async function runWithCopilotSDK({
 
     // Subscribe to all session events and serialise the ones we care about.
     session.on(event => {
+      const owner = event.agentId || event.data?.agentId || event.data?.parentToolCallId || "main";
+      const toolKey = JSON.stringify([owner, event.data?.toolCallId]);
       // Workflow lifecycle signals are ephemeral; without this copy they never reach the artifact.
       if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
         writeEvent(event.type, event.data, event.timestamp, event);
@@ -384,7 +392,7 @@ async function runWithCopilotSDK({
 
       switch (event.type) {
         case "user.message":
-          writeEvent("user.message", {}, event.timestamp);
+          writeEvent("user.message", Object.hasOwn(event.data ?? {}, "content") ? { content: event.data.content } : {}, event.timestamp, event);
           break;
 
         case "tool.execution_start": {
@@ -397,7 +405,7 @@ async function runWithCopilotSDK({
           // what was invoked, so persist it alongside the derived command text.
           const input = extractStructuredToolInput(event.data);
           if (toolCallId) {
-            pendingToolCalls.set(toolCallId, { toolName, mcpServerName });
+            pendingToolCalls.set(toolKey, { toolName, mcpServerName });
           }
           const eventData = {
             toolName,
@@ -414,10 +422,10 @@ async function runWithCopilotSDK({
         case "tool.execution_complete": {
           const toolCallId = event.data?.toolCallId;
           // Resolve toolName/mcpServerName from the matching start event when available.
-          const pending = toolCallId ? pendingToolCalls.get(toolCallId) : undefined;
+          const pending = toolCallId ? pendingToolCalls.get(toolKey) : undefined;
           const toolName = pending?.toolName ?? event.data?.toolDescription?.name ?? "unknown";
           const mcpServerName = pending?.mcpServerName ?? "";
-          if (toolCallId) pendingToolCalls.delete(toolCallId);
+          if (toolCallId) pendingToolCalls.delete(toolKey);
           const success = event.data?.success ?? !event.data?.error;
           // Include result.content (concise LLM-facing output) so that the log
           // parser can render tool output previews from events.jsonl directly.
@@ -430,12 +438,13 @@ async function runWithCopilotSDK({
 
         case "assistant.message": {
           const content = event.data?.content ?? "";
-          if (content) {
+          if (content && !isNestedSessionEvent(event)) {
             hasOutput = true;
             output += content;
             assistantTurnCount++;
           }
-          writeEvent("assistant.message", { content }, event.timestamp, event);
+          const details = Object.fromEntries(["toolRequests", "reasoningText"].filter(key => Object.hasOwn(event.data ?? {}, key)).map(key => [key, event.data[key]]));
+          writeEvent("assistant.message", { ...details, content }, event.timestamp, event);
           break;
         }
 
@@ -443,7 +452,8 @@ async function runWithCopilotSDK({
           // LLM inference started for a new turn. Disarm the watchdog — the model
           // may not have dispatched any tool calls yet, so pendingToolCalls can be
           // empty while real work is still in progress.
-          inAssistantTurn = true;
+          activeAssistantTurns.add(owner);
+          writeEvent("assistant.turn_start", {}, event.timestamp, event);
           if (postCompletionWatchdog) {
             clearTimeout(postCompletionWatchdog);
             postCompletionWatchdog = null;
@@ -453,11 +463,12 @@ async function runWithCopilotSDK({
         case "assistant.turn_end":
           // LLM inference finished. Allow the watchdog to re-arm on the next event
           // that satisfies the completion conditions.
-          inAssistantTurn = false;
+          activeAssistantTurns.delete(owner);
+          writeEvent("assistant.turn_end", {}, event.timestamp, event);
           break;
 
         case "session.task_complete":
-          writeEvent("session.task_complete", { success: event.data?.success, summary: event.data?.summary }, event.timestamp);
+          writeEvent("session.task_complete", { success: event.data?.success, summary: event.data?.summary }, event.timestamp, event);
           break;
 
         default:
@@ -472,14 +483,14 @@ async function runWithCopilotSDK({
       //   tool call was just started, LLM inference is in progress, or no output yet).
       // The watchdog fires only if sendAndWait never resolves on its own after
       // the final tool result is returned — the common SDK post-completion hang.
-      if (hasOutput && pendingToolCalls.size === 0 && !inAssistantTurn) {
+      if (hasOutput && pendingToolCalls.size === 0 && activeAssistantTurns.size === 0) {
         if (postCompletionWatchdog) clearTimeout(postCompletionWatchdog);
         postCompletionWatchdog = setTimeout(() => {
           postCompletionWatchdog = null;
           // Re-check conditions at fire time: a new tool call could have started
           // or a new turn could have begun between arming the watchdog and the
           // timer firing (race condition guard).
-          if (!hasOutput || pendingToolCalls.size !== 0 || inAssistantTurn || !session) return;
+          if (!hasOutput || pendingToolCalls.size !== 0 || activeAssistantTurns.size !== 0 || !session) return;
           log(`warning: post-completion idle watchdog fired after ${postCompletionIdleMs}ms — force-disconnecting session`);
           postCompletionWatchdogTriggered = true;
           void session.disconnect().catch(err => {
@@ -508,7 +519,7 @@ async function runWithCopilotSDK({
 
     // sendAndWait returns the last assistant.message event; capture its content
     // as a fallback in case the on() handler missed it.
-    if (result && !hasOutput) {
+    if (result && !hasOutput && !isNestedSessionEvent(result)) {
       const content = result.data?.content ?? "";
       if (content) {
         output = content;

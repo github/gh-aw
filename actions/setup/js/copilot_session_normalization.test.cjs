@@ -27,7 +27,7 @@ describe("Copilot message normalization from sampled CI shapes", () => {
     expect(byType(events, "tool.execution_complete")).toHaveLength(2);
     expect(byType(events, "assistant.message").map(event => event.data.content)).toEqual(["  Checking the repository.\n", "  Completed the task.\n"]);
     expect(byType(events, "assistant.reasoning")[0].data).toMatchObject({ content: "  Inspect the available evidence.\n", messageId: "answer", originatingMessageId: "origin", apiCallId: "api", interactionId: "interaction", turnId: "0" });
-    expect(byType(events, "user.message")[0].data).toEqual({ content: "PRIVATE_USER_PROMPT", messageId: "user-message", interactionId: "interaction", turnId: "0" });
+    expect(byType(events, "user.message")[0].data).toEqual({ content: "PRIVATE_USER_PROMPT", messageId: "user-message", interactionId: "interaction", turnId: "0", parentAgentTaskId: "task" });
     expect(byType(events, "system.message")[0].data).toEqual({ content: "PRIVATE_SYSTEM_PROMPT", role: "system", interactionId: "interaction" });
     expect(byType(events, "tool.execution_complete")[0].data).toMatchObject({ toolName: "bash", model: "claude-sonnet-5.5", interactionId: "interaction", turnId: "0", exitCode: 0, output: { content: "  sanitized output\n" } });
     expect(byType(events, "assistant.turn_start")[0].data).toEqual({ interactionId: "interaction", turnId: "0" });
@@ -113,7 +113,8 @@ describe("Copilot scoped stream and tool correlation", () => {
       { ...last, type: "tool.execution_complete", data: { toolCallId: "shared", success: true } },
       { ...last, type: "assistant.message", id: "requested", data: { toolRequests: [{ toolCallId: "shared", name: "right", arguments: {} }] } },
     ]);
-    expect(byType(events, "tool.execution_complete")[0].data).toEqual({ toolCallId: "shared", success: true });
+    expect(byType(events, "tool.execution_complete")[0].data).toMatchObject({ toolCallId: "shared", success: true });
+    expect(byType(events, "tool.execution_complete")[0].data.toolName).toBeUndefined();
     expect(byType(events, "tool.execution_start").map(event => event.data.toolName)).toEqual(["wrong", "right"]);
     stable(events);
   });

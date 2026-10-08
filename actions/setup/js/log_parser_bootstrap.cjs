@@ -140,7 +140,7 @@ function readCopilotSessions(directory, parseLog) {
     const result = parseLog(content);
     const events = result?.logEntries;
     if (!Array.isArray(events) || !events.length) continue;
-    const start = events.find(event => event.type === "session.start" || event.type === "session.init");
+    const start = events.find(event => ["session.start", "session.init"].includes(event.type) && !require("./agent_session.cjs").isNestedSessionEvent(event));
     const identity = start?.data?.sessionId ?? file;
     const startTime = Date.parse(start?.data?.startTime ?? start?.timestamp) || 0;
     const relative = path.relative(directory, file).split(path.sep).join("/");

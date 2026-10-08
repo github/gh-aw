@@ -495,7 +495,10 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "session.init").data).toMatchObject({ sourceEngine: "copilot", model: "fixture-model" });
     expect(events.find(event => event.type === "assistant.message").data.content).toBe("Recovered response.");
     expect(events.find(event => event.type === "tool.execution_complete").data).toMatchObject({ toolName: "bash", success: true, exitCode: 0 });
-    expect(events.filter(event => event.type === "session.result").map(event => event.data)).toEqual([{ durationMs: 5000, usage: { inputTokens: 10, outputTokens: 4 } }, { numTurns: 1 }]);
+    expect(events.filter(event => event.type === "session.result").map(event => event.data)).toEqual([
+      { durationMs: 5000, usage: { inputTokens: 10, outputTokens: 4 } },
+      { sessionId: "native", numTurns: 1 },
+    ]);
     expect(events.filter(event => event.provenance.component === "agent").every(event => event.provenance.path === nativePath)).toBe(true);
     const { generatePlainTextSummary } = require("./log_parser_shared.cjs");
     const summary = generatePlainTextSummary(events);

@@ -23,6 +23,7 @@ const AIC_RESOLVABLE_PHASES = new Set(["detection", "evals"]);
 const CORRELATION_FIELDS = {
   sessionId: ["sessionId", "session_id"],
   agentId: ["agentId"],
+  parentAgentId: ["parentAgentId"],
   parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
   model: ["model"],
   apiCallId: ["apiCallId"],
@@ -97,6 +98,7 @@ const MESSAGE_FIELDS = {
   messageId: ["messageId", "message_id"],
   reasoningId: ["reasoningId"],
   originatingMessageId: ["originatingMessageId"],
+  parentAgentTaskId: ["parentAgentTaskId"],
   contentIndex: ["contentIndex"],
   channel: ["channel"],
   ...CORRELATION_FIELDS,
@@ -147,6 +149,7 @@ const EVENT_FIELDS = {
     workflowRunId: ["workflowRunId"],
   },
   "session.result": {
+    ...CORRELATION_FIELDS,
     numTurns: ["numTurns", "num_turns"],
     durationMs: ["durationMs", "duration_ms"],
     totalCostUsd: ["totalCostUsd", "total_cost_usd"],

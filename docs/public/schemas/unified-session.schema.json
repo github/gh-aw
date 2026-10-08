@@ -25,6 +25,7 @@
               "properties": {
                 "sessionId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
+                "parentAgentId": { "$ref": "#/definitions/JsonValue" },
                 "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
                 "model": { "$ref": "#/definitions/JsonValue" },
                 "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -37,6 +38,7 @@
                 "messageId": { "$ref": "#/definitions/JsonValue" },
                 "reasoningId": { "$ref": "#/definitions/JsonValue" },
                 "originatingMessageId": { "$ref": "#/definitions/JsonValue" },
+                "parentAgentTaskId": { "$ref": "#/definitions/JsonValue" },
                 "contentIndex": { "$ref": "#/definitions/JsonValue" },
                 "channel": { "$ref": "#/definitions/JsonValue" },
                 "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
@@ -104,6 +106,7 @@
               "properties": {
                 "sessionId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
+                "parentAgentId": { "$ref": "#/definitions/JsonValue" },
                 "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
                 "model": { "$ref": "#/definitions/JsonValue" },
                 "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -139,6 +142,7 @@
               "properties": {
                 "sessionId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
+                "parentAgentId": { "$ref": "#/definitions/JsonValue" },
                 "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
                 "model": { "$ref": "#/definitions/JsonValue" },
                 "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -496,6 +500,7 @@
       "properties": {
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentId": { "$ref": "#/definitions/JsonValue" },
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
         "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -510,6 +515,7 @@
       "properties": {
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentId": { "$ref": "#/definitions/JsonValue" },
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
         "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -522,6 +528,7 @@
         "messageId": { "$ref": "#/definitions/JsonValue" },
         "reasoningId": { "$ref": "#/definitions/JsonValue" },
         "originatingMessageId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentTaskId": { "$ref": "#/definitions/JsonValue" },
         "contentIndex": { "$ref": "#/definitions/JsonValue" },
         "channel": { "$ref": "#/definitions/JsonValue" }
       },
@@ -532,6 +539,7 @@
       "properties": {
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentId": { "$ref": "#/definitions/JsonValue" },
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
         "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -548,6 +556,7 @@
       "properties": {
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentId": { "$ref": "#/definitions/JsonValue" },
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
         "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -562,6 +571,15 @@
     "UnifiedSessionResultData": {
       "type": "object",
       "properties": {
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "model": { "$ref": "#/definitions/JsonValue" },
+        "apiCallId": { "$ref": "#/definitions/JsonValue" },
+        "interactionId": { "$ref": "#/definitions/JsonValue" },
+        "turnId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
         "numTurns": { "$ref": "#/definitions/SessionCount" },
         "durationMs": { "$ref": "#/definitions/SessionMetric" },
         "totalCostUsd": { "$ref": "#/definitions/SessionMetric" },
@@ -594,6 +612,7 @@
       "properties": {
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentId": { "$ref": "#/definitions/JsonValue" },
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
         "apiCallId": { "$ref": "#/definitions/JsonValue" },
@@ -610,6 +629,7 @@
       "properties": {
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentAgentId": { "$ref": "#/definitions/JsonValue" },
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
         "apiCallId": { "$ref": "#/definitions/JsonValue" },

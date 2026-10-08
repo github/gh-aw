@@ -22,6 +22,123 @@ describe("copilot_sdk_driver.cjs", () => {
   });
 
   describe("runWithCopilotSDK", () => {
+    it.each([true, false])("preserves nested SDK identity without treating child output as the root answer (root output: %s)", async rootOutput => {
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      let onEvent = () => {};
+      const childMessage = {
+        type: "assistant.message",
+        agentId: "left",
+        id: "child-message",
+        parentId: "preceding-event",
+        data: {
+          content: "  Child answer\n",
+          messageId: "child-message",
+          originatingMessageId: "child-user",
+          apiCallId: "child-api",
+          turnId: "0",
+          parentToolCallId: "spawn-left",
+          toolRequests: [{ toolCallId: "same", name: "lookup", arguments: false }],
+        },
+      };
+      const session = {
+        sessionId: `sdk-nested-${rootOutput}`,
+        on: handler => {
+          onEvent = handler;
+        },
+        sendAndWait: async () => {
+          onEvent({ type: "subagent.started", agentId: "left", data: { toolCallId: "spawn-left", parentId: "parent-agent", agentName: "explore" } });
+          onEvent({ type: "user.message", agentId: "left", data: { content: "  Child request\n", messageId: "child-user", parentAgentTaskId: "parent-agent" } });
+          onEvent({ type: "assistant.turn_start", agentId: "left", data: { turnId: "0", parentToolCallId: "spawn-left" } });
+          onEvent(childMessage);
+          onEvent({ type: "tool.execution_start", agentId: "left", data: { toolCallId: "same", toolName: "lookup", mcpServerName: "left-server" } });
+          onEvent({ type: "tool.execution_start", agentId: "right", data: { toolCallId: "same", toolName: "lookup", mcpServerName: "right-server" } });
+          onEvent({ type: "tool.execution_complete", agentId: "right", data: { toolCallId: "same", success: true } });
+          onEvent({ type: "tool.execution_complete", agentId: "left", data: { toolCallId: "same", success: true } });
+          onEvent({ type: "assistant.turn_end", agentId: "left", data: { turnId: "0", parentToolCallId: "spawn-left" } });
+          onEvent({ type: "session.task_complete", agentId: "left", data: { success: true, summary: "Child answer" } });
+          if (!rootOutput) return childMessage;
+          const root = { type: "assistant.message", data: { content: "  Root answer\n" } };
+          onEvent(root);
+          return root;
+        },
+        disconnect: vi.fn().mockResolvedValue(undefined),
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockResolvedValue(session);
+        stop = vi.fn().mockResolvedValue(undefined);
+      }
+      try {
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test",
+          logger: () => {},
+          sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+        });
+        expect(result.exitCode).toBe(0);
+        expect(result.hasOutput).toBe(rootOutput);
+        expect(result.output).toBe(rootOutput ? "  Root answer\n" : "");
+        const records = fs
+          .readFileSync(path.join(testSessionStateDir, session.sessionId, "events.jsonl"), "utf8")
+          .trim()
+          .split("\n")
+          .map(JSON.parse);
+        expect(records.find(event => event.type === "assistant.message" && event.agentId === "left")).toMatchObject(childMessage);
+        expect(records.find(event => event.type === "user.message")).toMatchObject({ agentId: "left", data: { content: "  Child request\n", messageId: "child-user", parentAgentTaskId: "parent-agent" } });
+        expect(records.filter(event => event.type === "tool.execution_complete").map(event => [event.agentId, event.data.mcpServerName])).toEqual([
+          ["right", "right-server"],
+          ["left", "left-server"],
+        ]);
+        expect(records.find(event => event.type === "session.task_complete").agentId).toBe("left");
+        expect(records.find(event => event.type === "assistant.turn_end").data).toMatchObject({ turnId: "0", parentToolCallId: "spawn-left" });
+      } finally {
+        stderr.mockRestore();
+      }
+    });
+
+    it("does not let a child turn end re-enable the watchdog while the root is still inferring", async () => {
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const previousIdle = process.env.GH_AW_SDK_IDLE_MS;
+      process.env.GH_AW_SDK_IDLE_MS = "10";
+      const disconnect = vi.fn().mockResolvedValue(undefined);
+      let onEvent = () => {};
+      const session = {
+        sessionId: "sdk-nested-active-turns",
+        on: handler => {
+          onEvent = handler;
+        },
+        sendAndWait: async () => {
+          onEvent({ type: "assistant.turn_start", data: { turnId: "root" } });
+          onEvent({ type: "assistant.message", data: { content: "Root is still working" } });
+          onEvent({ type: "assistant.turn_start", agentId: "child", data: { turnId: "child" } });
+          onEvent({ type: "assistant.turn_end", agentId: "child", data: { turnId: "child" } });
+          await new Promise(resolve => setTimeout(resolve, 40));
+          expect(disconnect).not.toHaveBeenCalled();
+          onEvent({ type: "assistant.turn_end", data: { turnId: "root" } });
+          return { data: { content: "Root is still working" } };
+        },
+        disconnect,
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockResolvedValue(session);
+        stop = vi.fn().mockResolvedValue(undefined);
+      }
+      try {
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test",
+          logger: () => {},
+          sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+        });
+        expect(result.exitCode).toBe(0);
+      } finally {
+        if (previousIdle === undefined) delete process.env.GH_AW_SDK_IDLE_MS;
+        else process.env.GH_AW_SDK_IDLE_MS = previousIdle;
+        stderr.mockRestore();
+      }
+    });
+
     it("disconnects session and stops client on success", async () => {
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);

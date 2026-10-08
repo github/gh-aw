@@ -814,8 +814,10 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 CLI/debug framing is removed, but retained source payload text is not trimmed. A native event stream does not need a synthesized result merely because its renderer can estimate conversation turns.
 
 Message snapshots, tool requests/completions, usage identities, and turn identities
-are correlated within source component, phase, path, session, agent, and parent
-tool scope. Reused IDs in independent scopes MUST NOT suppress streaming evidence
+are correlated within source component, phase, path, session, and agent scope.
+The instance `agentId` is authoritative; deprecated parent-tool markers identify
+an independent scope only when no agent instance is known. Missing parent-tool
+markers MUST NOT split events carrying the same agent ID. Reused IDs in independent scopes MUST NOT suppress streaming evidence
 or attach another source's tool name or MCP server. Reasoning streams use their
 supplied `reasoningId`, independently of assistant message IDs. Native observations
 remain available when managed projections are superseded by later snapshots or
@@ -835,6 +837,23 @@ effort. `session.shutdown.data.agentMetrics` is exposed unchanged in
 `session.result.data.agentMetrics`, including per-agent model request counts,
 token counts, and nano-AIU credits. This is an authoritative snapshot, not an
 additional contribution to session usage.
+
+Child starts and initialization MUST NOT replace the main session's identity,
+model, or working directory. Live usage and finalized turn counts are maintained
+independently for each session and agent. Child results, errors, and shutdown
+snapshots MUST NOT overwrite main-session accounting; their evidence remains in
+the child conversation. Managed accounting projections from older canonical
+artifacts are recomputed when their native usage or turn evidence is available.
+Explicit native counts remain authoritative, and projections without supporting
+native records are retained.
+
+Known child conversation records retain `sessionId`, `agentId`,
+`parentToolCallId`, and `parentAgentId` when established by lifecycle evidence.
+`parentAgentId` comes from `subagent.started.data.parentId`, never the native
+envelope's chronological `parentId`. Supplied user-message `parentAgentTaskId`
+and `originatingMessageId` remain separate correlation fields. Parent-tool-only
+records acquire an agent ID only when observed lifecycle evidence identifies
+exactly one instance. Unknown extension payloads remain opaque.
 
 Audit and logs read subagent models from `usage/aw_session.jsonl` first, then
 `agent-session.jsonl` when structured conclusion evidence is unavailable.
@@ -857,6 +876,17 @@ snapshot, not proxy or router totals. Snapshots replace earlier observations;
 native and projected copies are not added together. Missing accounting remains
 unavailable, distinct from observed zero usage. Publication applies the existing
 redaction, escaping, and byte limits.
+
+Published conversations separate root, child, and grandchild streams and label
+child sessions with their supplied or lifecycle-proven ancestry. The root
+overview retains the complete subagent tree, including failed dispatches.
+Collision-avoidance tool IDs are display-only; native IDs remain unchanged.
+Pairing uses private source identities before redaction, so masking two agent
+IDs to the same text cannot mix their tool results.
+
+The SDK adapter preserves user content, message/request correlation, child
+identity, and turn boundaries. Child output is not the main answer, and a child
+turn ending cannot re-enable the idle watchdog while another agent is inferring.
 
 ### 7.3 Codex
 
@@ -1225,10 +1255,20 @@ payloads with harmless examples.
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Copilot | Smoke Copilot successes [37713903842](https://github.com/github/gh-aw/actions/runs/37713903842), [37470423256](https://github.com/github/gh-aw/actions/runs/37470423256), and failure [37553647085](https://github.com/github/gh-aw/actions/runs/37553647085) | Native `events.jsonl`, canonical `agent-session.jsonl`, and published `usage/aw_session.jsonl` | `fixtures/copilot_ci_messages.cjs`, `copilot_session_normalization.test.cjs` |
+| Copilot | Nested research [37505153056](https://github.com/githubnext/gh-aw-routing-sandbox/actions/runs/37505153056) and failed-child/fallback [37732418818](https://github.com/githubnext/gh-aw-routing-sandbox/actions/runs/37732418818) | Native `events.jsonl` and canonical `agent-session.jsonl`; lifecycle and first-turn excerpts, with observed per-agent request/credit snapshots | `fixtures/copilot_nested_ci.cjs`, `copilot_nested_sessions.test.cjs`, `copilot_sdk_driver.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
 | Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
 
 Paths in the corpus column are relative to `actions/setup/js/`. Supplemental cases
+for Copilot cover synthetic reused IDs, missing deprecated metadata, independent
+child-session initialization, live usage, and publication identity collisions.
+Full replay of the nested research run preserves all 156 tool starts and 101
+recorded turns while attributing 41 turns to the main session, 45 to research,
+and 3 and 12 to its two explore children. The failed-child run preserves 9 tool
+starts and attributes 5 main turns independently of its 7 child turns. Historical
+canonical projections no longer misreport these totals as 101 and 12 main turns.
+
+Supplemental cases
 cover features absent from the samples: Claude streaming wrappers, Codex terminal
 failures that reached the engine, Pi terminal-metric snapshots, and malformed or
 interrupted transport records. These are labeled synthetic rather than attributed

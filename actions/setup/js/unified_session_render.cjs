@@ -1,7 +1,7 @@
 // @ts-check
 
 const fs = require("fs");
-const { sessionOutputText } = require("./agent_session.cjs");
+const { sessionOutputText, sessionEventContexts, isNestedSessionEvent } = require("./agent_session.cjs");
 const { collapseStreamedMessages, boundSummaryLines, escapeSummaryText, redactSessionForPublication } = require("./agent_session_render.cjs");
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -71,9 +71,8 @@ function fields(value, keys) {
     .join(" ");
 }
 
-/** @param {any} event @returns {string | undefined} */
-function eventDetail(event) {
-  const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
+/** @param {any} event @param {any} data @returns {string | undefined} */
+function eventContentDetail(event, data) {
   if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
     return fields({ ...data, agentId: event.agentId }, ["agentId", ...Object.keys(COPILOT_WORKFLOW_EVENT_FIELDS[event.type])]);
   }
@@ -101,6 +100,9 @@ function eventDetail(event) {
     case "assistant.message":
     case "assistant.reasoning":
       return inline(data.content);
+    case "assistant.turn_start":
+    case "assistant.turn_end":
+      return fields(data, ["turnId", "interactionId"]);
     case "assistant.refusal":
       return `[Policy refusal: ${inline(data.reason)}] ${fields(data, ["policyCategory", "partial", "content", "explanation"])}`;
     case "tool.execution_start":
@@ -170,6 +172,15 @@ function eventDetail(event) {
   }
 }
 
+/** @param {any} event @returns {string | undefined} */
+function eventDetail(event) {
+  const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
+  const detail = eventContentDetail(event, data);
+  if (detail === undefined || COPILOT_WORKFLOW_EVENT_TYPES.has(event.type) || !["assistant.", "tool.", "session."].some(prefix => event.type.startsWith(prefix)) || !isNestedSessionEvent(event)) return detail;
+  const identity = fields({ ...data, agentId: event.agentId ?? data.agentId }, ["agentId", "parentAgentId", "parentToolUseId", "parentToolCallId"]);
+  return identity ? `${identity} ${detail}` : detail;
+}
+
 /**
  * The source-local order, not the merged wall clock, controls agent correlation.
  * @param {Array<any>} events
@@ -184,10 +195,33 @@ function scopedAgentSessions(events) {
     if (!groups.has(label)) groups.set(label, []);
     groups.get(label).push(event);
   }
-  return [...groups].map(([label, entries]) => ({
-    label,
-    events: entries.sort((left, right) => (left.provenance?.index ?? 0) - (right.provenance?.index ?? 0)).map(({ provenance, ...event }) => event),
-  }));
+  return [...groups].flatMap(([label, entries]) => {
+    entries.sort((left, right) => (left.provenance?.index ?? 0) - (right.provenance?.index ?? 0));
+    const contexts = sessionEventContexts(entries);
+    const conversations = new Map();
+    for (const [index, event] of entries.entries()) {
+      if (event.type.startsWith("subagent.")) continue;
+      const context = contexts[index];
+      if (!conversations.has(context.scope)) conversations.set(context.scope, { context, events: [] });
+      conversations.get(context.scope).events.push(event);
+    }
+    for (const [index, event] of entries.entries()) {
+      const context = contexts[index];
+      if (!event.type.startsWith("subagent.") || !context.nested) continue;
+      const groups = [...conversations.values()];
+      const root = groups.find(group => !group.context.nested && group.context.sessionId === context.rootSessionId);
+      if (root) root.events.push(event);
+      const children = groups.filter(group => group.context.agentId === context.agentId && group.context.nested);
+      const child = children.find(group => group.context.scope === context.scope) ?? (children.length === 1 ? children[0] : undefined);
+      if (child) child.events.push(event);
+    }
+    if (!conversations.size) return [{ label, events: entries.map(({ provenance, ...event }) => event) }];
+    const multipleRoots = [...conversations.values()].filter(group => !group.context.nested).length > 1;
+    return [...conversations.values()].map(group => ({
+      label: group.context.nested || multipleRoots ? `${label} (${fields(group.context, ["sessionId", "agentId", "parentAgentId", "parentToolCallId"])})` : label,
+      events: group.events.sort((left, right) => (left.provenance?.index ?? 0) - (right.provenance?.index ?? 0)).map(({ provenance, ...event }) => event),
+    }));
+  });
 }
 
 /** @param {Array<any>} events @returns {Array<{label: string, events: Array<any>}>} */

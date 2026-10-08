@@ -1,6 +1,6 @@
 // @ts-check
 
-const { isMetric, isTokenCount, sessionOutputText } = require("./agent_session.cjs");
+const { isMetric, isTokenCount, isNestedSessionEvent, sessionOutputText } = require("./agent_session.cjs");
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 
@@ -24,20 +24,21 @@ function renderSubagentSummary(events) {
   let sessionId;
   for (const event of redacted) {
     const data = event.data ?? {};
-    if (["session.start", "session.init"].includes(event.type) && !event.agentId) {
+    if (["session.start", "session.init"].includes(event.type) && !isNestedSessionEvent(event)) {
       if ((data.sessionId !== undefined && data.sessionId !== sessionId) || (event.type === "session.init" && data.sessionId === undefined && data.sourceEngine === "copilot")) {
         agents.clear();
         metrics = undefined;
         sessionId = data.sessionId;
       }
     }
-    if (["session.result", "session.shutdown"].includes(event.type) && object(data.agentMetrics)) metrics = data.agentMetrics;
+    if (["session.result", "session.shutdown"].includes(event.type) && !isNestedSessionEvent(event) && object(data.agentMetrics)) metrics = data.agentMetrics;
     if (!event.type?.startsWith("subagent.")) continue;
     const id = event.agentId ?? data.toolCallId;
     if (id === undefined) continue;
     const previous = agents.get(id) ?? {};
     const fields = ["agentName", "agentDisplayName", "parentId", "model", "reasoningEffort", "executionMode"];
     for (const field of fields) if (data[field] !== undefined) previous[field] = data[field];
+    if (["subagent.started", "subagent.completed", "subagent.failed"].includes(event.type)) previous.status = event.type.slice("subagent.".length);
     agents.set(id, previous);
   }
   if (object(metrics)) {
@@ -51,7 +52,7 @@ function renderSubagentSummary(events) {
   const totalCredits = object(metrics) && Object.values(metrics).every(metric => isMetric(metric?.totalNanoAiu)) ? Object.values(metrics).reduce((sum, metric) => sum + metric.totalNanoAiu, 0) / 1e9 : undefined;
   if (object(metrics?.main)) lines.push(...agentUsageLines("main", metrics.main, totalCredits));
   for (const [id, agent] of agents) {
-    const metadata = ["agentName", "parentId", "model", "reasoningEffort", "executionMode"].filter(field => agent[field] !== undefined).map(field => `${field}=${text(agent[field])}`);
+    const metadata = ["agentName", "parentId", "model", "reasoningEffort", "executionMode", "status"].filter(field => agent[field] !== undefined).map(field => `${field}=${text(agent[field])}`);
     lines.push(`  ${text(agent.agentDisplayName ?? agent.agentName ?? id)} (agentId=${text(id)}) ${metadata.join(" ")}`.trimEnd());
     const metric = metrics?.[id];
     lines.push(...(object(metric) ? agentUsageLines(id, metric, totalCredits) : ["    Usage: unavailable"]));

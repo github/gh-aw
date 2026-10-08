@@ -8,6 +8,11 @@ const { collectArtifactSecretValues, redactManifestValue } = require("./safe_out
 // Redacted identities can coincide; correlate using private source envelopes.
 const publicationSources = new WeakMap();
 
+/** @param {any} event @returns {any} */
+function sessionPublicationSource(event) {
+  return publicationSources.get(event) ?? event;
+}
+
 /** @param {any} source @returns {string} */
 function messageSourceScope(source) {
   return JSON.stringify([
@@ -16,7 +21,7 @@ function messageSourceScope(source) {
     source.provenance?.path,
     source.session_id ?? source.sessionId ?? source.data?.sessionId ?? source.data?.session_id,
     source.agentId ?? source.data?.agentId,
-    source.parent_tool_use_id ?? source.data?.parentToolUseId ?? source.data?.parent_tool_use_id,
+    (source.agentId ?? source.data?.agentId) === undefined ? (source.parent_tool_use_id ?? source.data?.parentToolUseId ?? source.data?.parent_tool_use_id ?? source.data?.parentToolCallId) : undefined,
     source.channel ?? source.data?.channel,
   ]);
 }
@@ -37,7 +42,7 @@ function collapseStreamedMessages(events) {
   /** @type {{key: string, entry: any, legacy: boolean, field: string}|undefined} */
   let previous;
   for (const entry of events) {
-    const source = publicationSources.get(entry) ?? entry;
+    const source = sessionPublicationSource(entry);
     const scope = messageSourceScope(source);
     const native = source.event ?? source.data?.event;
     if (source.type === "claude.stream_event" && native && ["message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"].includes(native.type)) {
@@ -223,4 +228,4 @@ function redactSessionForPublication(events, redact) {
   }
 }
 
-module.exports = { collapseStreamedMessages, escapeSummaryText, toolInventoryName, displayArgument, renderInitializationLines, toolOutcome, boundSummaryLines, redactSessionForPublication };
+module.exports = { collapseStreamedMessages, escapeSummaryText, toolInventoryName, displayArgument, renderInitializationLines, toolOutcome, boundSummaryLines, redactSessionForPublication, sessionPublicationSource };

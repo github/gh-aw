@@ -29,13 +29,14 @@ export interface UnifiedSessionUsage {
   overflowedTokens?: string[];
 }
 
-export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics"> {
+export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics">, UnifiedCorrelationData {
   usage?: UnifiedSessionUsage | null;
 }
 
 export interface UnifiedCorrelationData {
   sessionId?: JsonValue;
   agentId?: JsonValue;
+  parentAgentId?: JsonValue;
   parentToolUseId?: JsonValue;
   model?: JsonValue;
   apiCallId?: JsonValue;
@@ -50,6 +51,7 @@ export interface UnifiedMessageData extends Pick<MessageData, "content">, Unifie
   messageId?: JsonValue;
   reasoningId?: JsonValue;
   originatingMessageId?: JsonValue;
+  parentAgentTaskId?: JsonValue;
   contentIndex?: JsonValue;
   channel?: JsonValue;
 }
