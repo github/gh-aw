@@ -37,6 +37,7 @@ export interface EventMetadata {
 export interface SessionInitData {
   sourceEngine?: string;
   model?: string;
+  reasoningEffort?: string;
   sessionId?: string | null;
   cwd?: string;
   tools?: JsonValue[];
@@ -118,6 +119,8 @@ export interface SessionResultData {
   usage?: SessionUsage;
   errors?: JsonValue[];
   permissionDenials?: JsonValue[];
+  /** Exact per-agent accounting snapshot supplied by the engine, not additive usage. */
+  agentMetrics?: JsonValue;
   [key: string]: unknown;
 }
 

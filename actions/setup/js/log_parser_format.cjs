@@ -4,6 +4,7 @@ const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_bu
 const { normalizeSessionUsage, sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult } = require("./agent_session.cjs");
 const { collapseStreamedMessages, escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
 const { isUnifiedSessionTrace, publicationAgentSessions, renderUnifiedSession } = require("./unified_session_render.cjs");
+const { renderSubagentSummary } = require("./subagent_session_render.cjs");
 
 /**
  * Minimal dependency contract injected from log_parser_shared.cjs.
@@ -705,7 +706,10 @@ function createLogParserFormatters(deps) {
       lines.push("");
     }
 
-    if (includeStatistics) appendStatistics(lines, renderEntries, toolUsePairs, state.standard);
+    if (includeStatistics) {
+      appendStatistics(lines, renderEntries, toolUsePairs, state.standard);
+      lines.push(...renderSubagentSummary(logEntries));
+    }
 
     return lines;
   }
@@ -788,6 +792,7 @@ function createLogParserFormatters(deps) {
         const model = observedSessionModel(entries);
         const lines = [...(model ? [`Model: ${model}`] : []), ...renderInitializationLines(projected.find(entry => entry.type === "system" && entry.subtype === "init"))];
         appendStatistics(lines, projected, collectToolUsePairs(projected), true);
+        lines.push(...renderSubagentSummary(entries));
         return lines;
       },
       agentConversation: entries => generateSummaryLines(entries, false),

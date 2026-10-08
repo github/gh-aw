@@ -81,6 +81,7 @@
       "properties": {
         "sourceEngine": { "type": "string" },
         "model": { "type": "string" },
+        "reasoningEffort": { "type": "string" },
         "sessionId": { "type": ["string", "null"] },
         "cwd": { "type": "string" },
         "tools": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
@@ -101,7 +102,8 @@
         "sourceType": { "type": "string" },
         "usage": { "$ref": "#/definitions/SessionUsage" },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
-        "permissionDenials": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } }
+        "permissionDenials": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "agentMetrics": { "$ref": "#/definitions/JsonValue", "description": "Exact per-agent accounting snapshot supplied by the engine, not additive usage." }
       },
       "additionalProperties": {}
     },

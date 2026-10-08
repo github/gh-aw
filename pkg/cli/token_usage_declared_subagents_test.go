@@ -48,6 +48,7 @@ func TestDeclaredSubagentModelAudit(t *testing.T) {
 
 func TestPiStructuredSubagentModelAttribution(t *testing.T) {
 	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-session.jsonl"), []byte("{\"type\":\"session.init\",\"data\":{\"sourceEngine\":\"pi\",\"sessionId\":\"parent\"}}\n{\"type\":\"pi.subagent_dispatch\",\"data\":{\"agent\":\"reader\",\"requestedModel\":\"small\",\"resolvedModel\":\"claude-haiku-4.5\"}}\n"), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-stdio.log"), []byte("{\"type\":\"gh_aw_subagent_dispatch\",\"agent\":\"reader\",\"requested_model\":\"small\",\"resolved_model\":\"claude-haiku-4.5\"}\n"), 0600))
 	summary := &TokenUsageSummary{ByModel: map[string]*ModelTokenUsage{"claude-haiku-4.5": {Provider: "github-copilot", Requests: 1}}}
 	augmentSubagentModelAttribution(dir, summary)
@@ -58,6 +59,30 @@ func TestPiStructuredSubagentModelAttribution(t *testing.T) {
 	require.Equal(t, row.ResolvedModel, row.EffectiveModel)
 	require.Empty(t, row.ReasonCode)
 	require.Zero(t, summary.MismatchCount)
+}
+
+func TestSubagentDispatchLine(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name, line string
+		want       subagentDispatchKey
+		count      int
+	}{
+		{"compact dispatch", "● Agent-alpha(claude-haiku-4.5) Get model name", subagentDispatchKey{agent: "Agent-alpha", model: "claude-haiku-4.5"}, 1},
+		{"labelled dispatch", "● Research worker (model: opus) Research routing", subagentDispatchKey{agent: "Research worker", model: "opus"}, 1},
+		{"ordinary prose", "class RoutingProfile(StrictModel)", subagentDispatchKey{}, 0},
+		{"quoted dispatch", "Example: ● Research (model: opus)", subagentDispatchKey{}, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			counts := make(map[subagentDispatchKey]int)
+			countSubagentDispatchLine(counts, test.line)
+			require.Len(t, counts, test.count)
+			if test.count != 0 {
+				require.Equal(t, 1, counts[test.want])
+			}
+		})
+	}
 }
 
 func TestDeclaredSubagentModelsExcludeDetectionUsage(t *testing.T) {

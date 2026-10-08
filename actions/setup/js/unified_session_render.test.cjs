@@ -98,7 +98,10 @@ describe("unified session publication views", () => {
     expect(trace).toEqual(original);
     const markdown = generateCopilotCliStyleSummary(trace);
     expect(markdown).toContain("Done &lt;details&gt;");
-    expect(markdown).toContain("<details><summary>Unified trace details</summary>");
+    expect(markdown).toContain("<details><summary>Unified session</summary>");
+    expect(markdown).not.toContain("### Unified session");
+    expect(markdown).not.toContain("=== Unified session ===");
+    expect(markdown).not.toContain("| Time |");
   });
 
   it.each(["completed", "failed", "stopped"])("distinguishes a Workflow launch from task status %s and renders progress without embedded prompts", status => {
@@ -117,10 +120,16 @@ describe("unified session publication views", () => {
     }
   });
 
-  it("renders top-level parent correlation for Copilot subagent events in both views", () => {
-    const events = [header, { ...event("subagent.started", { agentName: "child" }, "agent", 1, 1), agentId: "child-id", parentId: "parent-id" }];
+  it("renders parent-agent hierarchy without confusing it with event-chain parent correlation", () => {
+    const events = [
+      header,
+      { ...event("subagent.started", { agentName: "child", parentId: "parent-id" }, "agent", 1, 1), agentId: "child-id", parentId: "previous-event-id" },
+      { ...event("subagent.started", { agentName: "root" }, "agent", 2, 2), agentId: "root-id", parentId: "another-event-id" },
+    ];
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       expect(output).toContain("subagent.started agentId=child-id agentName=child parentId=parent-id");
+      expect(output).not.toContain("parentId=previous-event-id");
+      expect(output).not.toContain("parentId=another-event-id");
     }
   });
 
@@ -341,7 +350,7 @@ describe("unified session publication views", () => {
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("mcp.tool_call"));
     const output = fs.readFileSync(summary, "utf8");
     expect(output.startsWith("Earlier summary\n")).toBe(true);
-    expect(output).toContain("### Unified session");
+    expect(output.match(/<summary>Unified session<\/summary>/g)).toHaveLength(1);
     expect(output).toContain("mcp.tool_call");
   });
 
