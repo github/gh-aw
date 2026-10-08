@@ -78,6 +78,34 @@ describe("mcp_cli_bridge.cjs", () => {
     });
   });
 
+  it.each(["", " \t\n"])("omits blank optional safeoutputs flags before coercion (%j)", blank => {
+    const properties = {
+      stack_position: { type: ["number", "string"] },
+      stack_root: { type: "string" },
+      labels: { type: "array" },
+      draft: { type: "boolean" },
+      body: { type: "string" },
+      line: { type: "number" },
+    };
+    const options = { omitBlankOptionalFields: true, requiredFields: ["line"] };
+    for (const flags of [
+      ["--stack_position", blank, "--stack-root", blank, "--labels", blank, "--draft", blank, "--body", "", "--line", blank],
+      [`--stack_position=${blank}`, `--stack_root=${blank}`, `--labels=${blank}`, `--draft=${blank}`, "--body=", `--line=${blank}`],
+    ]) {
+      expect(parseToolArgs(flags, properties, null, options).args).toEqual({ body: "", line: blank });
+    }
+  });
+
+  it("normalizes blank safeoutputs fields in JSON and per-field stdin modes", () => {
+    const properties = { stack_position: { type: "number" }, body: { type: "string" } };
+    const options = { omitBlankOptionalFields: true };
+    const payload = '{"stack_position":"","body":""}';
+    expect(parseToolArgs([payload], properties, null, options).args).toEqual({ body: "" });
+    expect(parseToolArgs(["."], properties, payload, options).args).toEqual({ body: "" });
+    expect(parseToolArgs(["--stack_position", "."], properties, payload, options).args).toEqual({});
+    expect(parseToolArgs(["--stack_position", "3", "--stack_position", ""], properties, null, options).args).toEqual({ stack_position: 3 });
+  });
+
   it("rejects partially malformed safeoutputs flags instead of silently dropping positional payloads", () => {
     expect(() => parseToolArgs(["--message", "done", "private payload"], { message: { type: "string" } }, null, { rejectPositionalArguments: true })).toThrow(
       "Unexpected positional argument. Pass a single quoted JSON object or use --key value flags."

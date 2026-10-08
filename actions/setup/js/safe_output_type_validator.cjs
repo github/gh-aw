@@ -15,6 +15,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
+const { isBlankOptionalField, normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 
 /**
  * Default max body length for GitHub content
@@ -451,6 +452,10 @@ function validateIssueNumberOrTemporaryId(value, fieldName, lineNum) {
  * @returns {{isValid: boolean, normalizedValue?: any, error?: string}}
  */
 function validateField(value, fieldName, validation, itemType, lineNum, options) {
+  if (isBlankOptionalField(value, validation, false, fieldName)) {
+    return { isValid: true };
+  }
+
   // For positiveInteger fields, delegate required check to validatePositiveInteger
   if (validation.positiveInteger) {
     return validatePositiveInteger(value, `${itemType} '${fieldName}'`, lineNum);
@@ -466,7 +471,7 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
   }
 
   // Handle required check for other fields
-  if (validation.required && (value === undefined || value === null)) {
+  if (validation.required && (value === undefined || value === null || (!validation.minLength && typeof value === "string" && value.trim() === ""))) {
     const fieldType = validation.typeHint || validation.type || "string";
     return {
       isValid: false,
@@ -773,6 +778,8 @@ function validateItem(item, itemType, lineNum, options) {
     // Unknown type - let the caller handle this
     return { isValid: true, normalizedItem: item };
   }
+
+  item = normalizeBlankOptionalFields(item, typeConfig.fields);
 
   // Build the downstream payload from the declared contract. The raw item is
   // agent-controlled, so forwarding undeclared fields would let consumers act
