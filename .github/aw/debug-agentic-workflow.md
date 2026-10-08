@@ -98,6 +98,12 @@ push jobs, memory/cache persistence, reusable safe-output calls, work-queue
 operations, reactions, status/failure comments and issues, label removal, and
 issue locking. Diagnostics, summaries, and run artifacts remain available;
 `aw_info.json` records `dry_run: true`.
+Compile text output reports excluded effects and scanner invocation coverage.
+`--json` adds a batch `workflow: "dry-run"` summary: `dry_run.gate` includes
+workflow and batch failures; scanner statuses distinguish `passed`, `failed`
+and `not_run`. Model inventory refresh/collection warnings fail the dry-run
+gate. Check the exit status and all results; preflight failures may emit no
+summary. Passing coverage is not execution approval or per-image/script proof.
 
 This is not a sandbox for arbitrary code. Custom scripts/jobs, agent shell
 commands, external MCP servers, and custom credentials remain unverified.
