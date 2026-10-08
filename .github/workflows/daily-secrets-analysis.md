@@ -2,7 +2,6 @@
 emoji: "🔒"
 description: Daily analysis of secret usage patterns across all compiled lock.yml workflow files
 on:
-  schedule: daily
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +25,10 @@ network:
     - node
 tracker-id: daily-secrets-analysis
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   cli-proxy: true
   github:
     mode: gh-proxy
@@ -34,6 +37,7 @@ tools:
   cache-memory: true
 timeout-minutes: 20
 imports:
+  - shared/daily-report-worker.md
   - uses: shared/daily-audit-base.md
     with:
       title-prefix: "[daily secrets] "

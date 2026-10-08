@@ -1339,6 +1339,7 @@ async function main(config = {}) {
           // a typed, actionable error instead of a bare git exit-1.
           // For fork-backed PRs, push to the head repo remote instead of origin.
           const reviewPushRemote = pushRemoteUrl || "origin";
+          await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: reviewPushRemote, branch: reviewBranchName, cwd: baseGitOpts.cwd, gitAuthEnv });
           const reviewPushOutput = await withGitHubHostToken(
             pushRemoteUrl ? headGitHubToken : "",
             async () =>
@@ -1547,6 +1548,7 @@ async function main(config = {}) {
             // Use getExecOutput to capture stderr for 'workflows' scope diagnostics.
             // For fork-backed PRs, push to the head repo remote instead of origin.
             const fallbackPushRemote = pushRemoteUrl || "origin";
+            await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: fallbackPushRemote, branch: fallbackBranchName, cwd: baseGitOpts.cwd, gitAuthEnv });
             const fallbackPushOutput = await withGitHubHostToken(
               pushRemoteUrl ? headGitHubToken : "",
               async () =>

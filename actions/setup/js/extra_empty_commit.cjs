@@ -251,6 +251,7 @@ async function pushExtraEmptyCommit({ branchName, repoOwner, repoName, commitMes
         }
         await exec.exec("git", ["remote", "add", "ci-trigger", remoteUrl]);
         await exec.exec("git", ["commit", "--allow-empty", "-m", message]);
+        await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: "ci-trigger", branch: branchName });
         await exec.exec("git", ["push", "ci-trigger", branchName]);
       }
 

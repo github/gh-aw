@@ -1,0 +1,38 @@
+{
+  "$defs": {
+    "FinishParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "completed"
+            },
+            {
+              "const": "cancelled"
+            }
+          ]
+        }
+      },
+      "required": ["dispatch_id", "claim_handle", "outcome"],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    }
+  },
+  "$id": "FinishParameters.json",
+  "$ref": "#/$defs/FinishParameters",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FinishParameters"
+}

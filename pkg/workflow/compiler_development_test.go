@@ -184,7 +184,7 @@ func TestDryRunWorkQueueAndCallWorkflow(t *testing.T) {
 	require.NoError(t, os.MkdirAll(dir, 0755))
 	createWorker(t, dir, "worker", "")
 	path := filepath.Join(dir, "gateway.md")
-	require.NoError(t, os.WriteFile(path, []byte(`---
+	queueSource := `---
 on: workflow_dispatch
 engine: copilot
 tools:
@@ -192,34 +192,57 @@ tools:
     storage: git
     require-assignment: true
     worker: true
+---
+Debug generated queue worker jobs.
+`
+	delegatedSource := `---
+on: workflow_dispatch
+engine: copilot
 safe-outputs:
   call-workflow: [worker]
 ---
-Debug generated worker jobs.
-`), 0600))
-	compiler := NewCompiler()
-	compiler.SetSkipValidation(true)
-	compiler.SetApprove(true)
+Debug generated delegated workflow jobs.
+`
+	for _, source := range []string{queueSource, delegatedSource} {
+		require.NoError(t, os.WriteFile(path, []byte(source), 0600))
+		compiler := NewCompiler()
+		compiler.SetSkipValidation(true)
+		compiler.SetApprove(true)
+		for _, enabled := range []bool{true, false} {
+			compiler.SetDryRun(enabled)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			content, err := os.ReadFile(filepath.Join(dir, "gateway.lock.yml"))
+			require.NoError(t, err)
+			var compiled struct {
+				Jobs map[string]map[string]any `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal(content, &compiled))
+			if source == delegatedSource {
+				require.Contains(t, compiled.Jobs, "call-worker")
+				if enabled {
+					assert.Equal(t, false, compiled.Jobs["call-worker"]["if"])
+				} else {
+					assert.NotEqual(t, false, compiled.Jobs["call-worker"]["if"])
+				}
+			} else if !enabled {
+				assert.Contains(t, string(content), "Snapshot work queue state")
+				assert.Contains(t, string(content), "Reconcile work queue claim")
+			}
+			if enabled {
+				assert.NotContains(t, string(content), "Snapshot work queue state")
+				assert.NotContains(t, string(content), "Reconcile work queue claim")
+				assert.NotContains(t, compiled.Jobs, "work_queue_claim")
+			}
+		}
+	}
+
+	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(queueSource, "---\nDebug", "safe-outputs:\n  call-workflow: [worker]\n---\nDebug", 1)), 0600))
 	for _, enabled := range []bool{true, false} {
+		compiler := NewCompiler()
+		compiler.SetSkipValidation(true)
+		compiler.SetApprove(true)
 		compiler.SetDryRun(enabled)
-		require.NoError(t, compiler.CompileWorkflow(path))
-		content, err := os.ReadFile(filepath.Join(dir, "gateway.lock.yml"))
-		require.NoError(t, err)
-		var compiled struct {
-			Jobs map[string]map[string]any `yaml:"jobs"`
-		}
-		require.NoError(t, yaml.Unmarshal(content, &compiled))
-		require.Contains(t, compiled.Jobs, "call-worker")
-		if enabled {
-			assert.Equal(t, false, compiled.Jobs["call-worker"]["if"])
-			assert.NotContains(t, string(content), "Snapshot work queue state")
-			assert.NotContains(t, string(content), "Reconcile work queue claim")
-			assert.NotContains(t, compiled.Jobs, "work_queue_claim")
-		} else {
-			assert.NotEqual(t, false, compiled.Jobs["call-worker"]["if"])
-			assert.Contains(t, string(content), "Snapshot work queue state")
-			assert.Contains(t, string(content), "Reconcile work queue claim")
-		}
+		require.ErrorContains(t, compiler.CompileWorkflow(path), "delegated workflow/repository dispatch requires a trusted per-Claim delivery adapter")
 	}
 }
 

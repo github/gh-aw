@@ -13,6 +13,7 @@ const mockCore = {
 
 const mockGithub = {
   graphql: vi.fn(),
+  request: vi.fn(),
 };
 
 const mockContext = {
@@ -55,6 +56,46 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockContext.payload = {};
+});
+
+describe("create_project view layouts", () => {
+  for (const ownerType of ["org", "user"]) {
+    for (const layout of ["table", "board", "roadmap"]) {
+      it(`passes a validated ${layout} layout to the ${ownerType} views endpoint`, async () => {
+        const owner = ownerType === "org" ? "test-org" : "test-user";
+        const scope = ownerType === "org" ? "orgs" : "users";
+        const project = { ...CREATED_PROJECT_RESPONSE.createProjectV2.projectV2, url: `https://github.com/${scope}/${owner}/projects/1` };
+        mockGithub.graphql.mockResolvedValueOnce(ownerType === "org" ? ORG_OWNER_RESPONSE : { user: { id: "USER_abc123" } }).mockResolvedValueOnce({ createProjectV2: { projectV2: project } });
+        mockGithub.request.mockResolvedValueOnce({ data: { id: 17 } });
+        const handler = await makeHandler({ views: [{ name: " Overview ", layout: ` ${layout} `, filter: "state:open", visible_fields: [2, 3] }] });
+
+        const result = await handler({ title: "My Project", owner, owner_type: ownerType });
+
+        expect(result.success).toBe(true);
+        expect(mockGithub.request).toHaveBeenCalledExactlyOnceWith(ownerType === "org" ? "POST /orgs/{org}/projectsV2/{project_number}/views" : "POST /users/{user_id}/projectsV2/{project_number}/views", {
+          ...(ownerType === "org" ? { org: owner } : { user_id: owner }),
+          project_number: 1,
+          name: "Overview",
+          layout,
+          filter: "state:open",
+          ...(layout === "roadmap" ? {} : { visible_fields: [2, 3] }),
+        });
+        if (layout === "roadmap") expect(mockCore.warning).toHaveBeenCalledWith('visible_fields is not applicable to layout "roadmap"; ignoring.');
+      });
+    }
+  }
+
+  it.each(["", "kanban", 1, null, {}, true])("rejects invalid layout %j before calling the views endpoint", async layout => {
+    mockGithub.graphql.mockResolvedValueOnce(ORG_OWNER_RESPONSE).mockResolvedValueOnce(CREATED_PROJECT_RESPONSE);
+    const handler = await makeHandler({ views: [{ name: "Invalid view", layout }] });
+
+    const result = await handler({ title: "My Project" });
+
+    expect(result.success).toBe(true);
+    expect(mockGithub.request).not.toHaveBeenCalled();
+    expect(mockCore.error).toHaveBeenCalledWith("Failed to create configured view 1: Invalid view");
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Invalid view layout"));
+  });
 });
 
 // ─── temporary_id field ───────────────────────────────────────────────────────

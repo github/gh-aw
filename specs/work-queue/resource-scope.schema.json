@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/github/gh-aw/specs/work-queue/resource-scope.schema.json",
+  "title": "Immutable Work resource scope",
+  "description": "Optional Work payload.resource_scope. Exact selectors narrow, never enlarge, the frozen and installed worker profile. Absence inherits profile scope; an empty list denies all effects.",
+  "type": "object",
+  "properties": {
+    "version": { "const": 1 },
+    "resources": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/resource" }
+    }
+  },
+  "required": ["version", "resources"],
+  "additionalProperties": false,
+  "$defs": {
+    "identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "not": { "pattern": "[\u0000-\u001f\u007f]" },
+      "$comment": "Runtime additionally checks the 256-byte UTF-8 limit."
+    },
+    "decimal": {
+      "allOf": [
+        { "$ref": "#/$defs/identity" },
+        {
+          "pattern": "^[1-9][0-9]*$",
+          "not": { "pattern": "[^0-9]" }
+        }
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "allOf": [{ "$ref": "#/$defs/identity" }, { "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" }]
+        },
+        "kind": { "enum": ["issue", "pull_request"] },
+        "host": { "const": "github.com" },
+        "repository_id": { "$ref": "#/$defs/decimal" },
+        "resource_id": { "$ref": "#/$defs/decimal" },
+        "number": { "$ref": "#/$defs/decimal" },
+        "comment_id": { "$ref": "#/$defs/decimal" },
+        "run_id": { "$ref": "#/$defs/decimal" },
+        "ref": { "$ref": "#/$defs/identity" },
+        "path": { "$ref": "#/$defs/identity" }
+      },
+      "required": ["repository"],
+      "additionalProperties": false,
+      "$comment": "Every supplied field is an exact conjunction, not a wildcard or prefix. Runtime rejects absolute, backslash, empty-segment and dot-segment paths. Targets use this same closed shape. Native run targets must match the original bound worker. Typed existing targets additionally intersect the complete immutable Work.subject."
+    }
+  }
+}

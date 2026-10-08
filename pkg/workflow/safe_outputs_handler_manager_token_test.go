@@ -202,7 +202,7 @@ func TestHandlerManagerGitHubTokenEnvVarForCrossRepo(t *testing.T) {
 			yamlStr := strings.Join(steps, "")
 
 			if tt.shouldHaveGitHubToken {
-				assert.Contains(t, yamlStr, tt.expectedGitHubTokenLine,
+				assert.Contains(t, yamlStr, "\n          "+tt.expectedGitHubTokenLine+"\n",
 					"Expected GITHUB_TOKEN env var %q to be set in handler manager step for cross-repo git operations",
 					tt.expectedGitHubTokenLine)
 			} else {

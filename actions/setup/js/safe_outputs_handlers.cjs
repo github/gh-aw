@@ -34,6 +34,7 @@ const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
 const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
+const { normalizeRuntimeMessage, readClaimScopeContext, withClaimExecution, currentClaimHandle, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
 
 function createEligibleMemoryValidationView(memoryDir, isEligibleFile) {
   let validationDir;
@@ -440,6 +441,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    */
   const operationCounts = new Map();
   const uploadedAssetPaths = new Set();
+  const scopedKey = value => JSON.stringify([currentClaimHandle() || null, value]);
 
   /**
    * Return the explicitly user-configured max for a safe-output type, or null if not set / unlimited.
@@ -473,7 +475,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
   function enforcePerTypeMax(type) {
     const maxAllowed = getExplicitMax(type);
     if (maxAllowed === null) return; // no explicit limit configured
-    const current = operationCounts.get(type) || 0;
+    const current = operationCounts.get(scopedKey(type)) || 0;
     if (current >= maxAllowed) {
       throw {
         code: -32602,
@@ -518,7 +520,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const type = entry?.type;
     if (type) enforcePerTypeMax(type);
     appendSafeOutput(entry);
-    if (type) operationCounts.set(type, (operationCounts.get(type) || 0) + 1);
+    if (type) operationCounts.set(scopedKey(type), (operationCounts.get(scopedKey(type)) || 0) + 1);
   };
 
   /**
@@ -654,6 +656,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const target = args?.ledger === undefined && candidates.length === 1 ? candidates[0] : candidates.find(ledger => ledger.name === args?.ledger);
     if (!target) return buildIntentErrorResponse("Specify a configured ledger of the correct built-in type.");
     const { ledger: _ledger, temp_id, ...fields } = args || {};
+    const claimHandle = currentClaimHandle();
+    if (claimHandle) {
+      for (const field of ["claim_handle", "claim_id", "work_id"]) delete fields[field];
+    }
     if (Object.hasOwn(fields, "operation")) return buildIntentErrorResponse("Invalid built-in ledger operation arguments.");
     const record = { operation, ...fields };
     try {
@@ -661,7 +667,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     } catch {
       return buildIntentErrorResponse("Invalid built-in ledger operation arguments.");
     }
-    return defaultHandler("ledger_append")({ ledger: target.name, ...(temp_id !== undefined && { temp_id }), ...record });
+    return defaultHandler("ledger_append")({ ledger: target.name, ...(temp_id !== undefined && { temp_id }), ...(claimHandle ? { claim_handle: claimHandle } : {}), ...record });
   };
   const ledgerAgentAppendHandler = args => {
     const ledgers = config.ledger_append?.ledgers || [];
@@ -705,7 +711,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (!isInWorkspace && !isInTmp) {
       throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspaceDir}) or /tmp directory. ` + `Provided path: ${filePath} (resolved to: ${absolutePath})`);
     }
-    if (uploadedAssetPaths.has(absolutePath)) {
+    if (uploadedAssetPaths.has(scopedKey(absolutePath))) {
       throw new Error(`${ERR_VALIDATION}: Duplicate upload_asset source path is not allowed: ${filePath}`);
     }
 
@@ -751,7 +757,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     // Create assets directory
     // Use RUNNER_TEMP so the staged files land on the host filesystem (shared with
     // the artifact-upload step), matching the same pattern used by upload_artifact.
-    const assetsDir = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "assets");
+    const assetsRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "assets");
+    const assetsDir = currentClaimHandle() ? claimArtifactPath(assetsRoot, currentClaimHandle()) : assetsRoot;
     if (!fs.existsSync(assetsDir)) {
       try {
         fs.mkdirSync(assetsDir, { recursive: true });
@@ -784,21 +791,22 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
 
     // Generate target filename as sha + extension (lowercased)
-    const targetFileName = (sha + fileExt).toLowerCase();
+    const targetFileName = currentClaimHandle() ? `claims/${path.basename(claimArtifactPath("", currentClaimHandle()))}/${sha}${fileExt}` : (sha + fileExt).toLowerCase();
 
     const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
     const repo = process.env.GITHUB_REPOSITORY || "owner/repo";
+    const assetBranch = currentClaimHandle() ? `${normalizedBranchName}/claims/${path.basename(claimArtifactPath("", currentClaimHandle()))}` : normalizedBranchName;
     let url;
     try {
       const serverHostname = new URL(githubServer).hostname;
       if (serverHostname === "github.com") {
-        url = `https://github.com/${repo}/blob/${normalizedBranchName}/${targetFileName}?raw=true`;
+        url = `https://github.com/${repo}/blob/${assetBranch}/${targetFileName}?raw=true`;
       } else {
         // GitHub Enterprise Server - raw content is served from the same host with /raw/ path
-        url = `${githubServer}/${repo}/raw/${normalizedBranchName}/${targetFileName}`;
+        url = `${githubServer}/${repo}/raw/${assetBranch}/${targetFileName}`;
       }
     } catch {
-      url = `${githubServer}/${repo}/raw/${normalizedBranchName}/${targetFileName}`;
+      url = `${githubServer}/${repo}/raw/${assetBranch}/${targetFileName}`;
     }
 
     // Create entry for safe outputs
@@ -813,7 +821,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     };
 
     appendSafeOutputCounted(entry);
-    uploadedAssetPaths.add(absolutePath);
+    uploadedAssetPaths.add(scopedKey(absolutePath));
 
     return {
       content: [
@@ -2192,7 +2200,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
     if (deduplicateByTitle.enabled) {
       const normalizedTitle = normalizeTitleForDedup(resolvedTitle);
-      const seenTitles = seenIssueTitlesByRepo.get(resolvedRepo) || [];
+      const seenTitles = seenIssueTitlesByRepo.get(scopedKey(resolvedRepo)) || [];
       const duplicate = findDuplicateByTitle(normalizedTitle, seenTitles, deduplicateByTitle.maxDistance);
       if (duplicate) {
         const droppedEntry = {
@@ -2219,7 +2227,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         };
       }
       seenTitles.push({ title: resolvedTitle, normalizedTitle });
-      seenIssueTitlesByRepo.set(resolvedRepo, seenTitles);
+      seenIssueTitlesByRepo.set(scopedKey(resolvedRepo), seenTitles);
     }
 
     const largeContentResponse = maybeHandleLargeContent(entry);
@@ -2491,7 +2499,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    * Incremented by createPullRequestReviewCommentHandler, read by submitPullRequestReviewHandler
    * to guard against empty review submissions at the MCP server phase.
    */
-  let inlineReviewCommentCount = 0;
+  const inlineReviewCommentCounts = new Map();
 
   /**
    * Handler for create_pull_request_review_comment tool (MCP server phase).
@@ -2506,7 +2514,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     // (e.g. due to large-content rejection or an append write error) the counter
     // must not advance so the empty-review guard remains accurate.
     if (!result?.isError) {
-      inlineReviewCommentCount++;
+      const key = scopedKey("review");
+      inlineReviewCommentCounts.set(key, (inlineReviewCommentCounts.get(key) || 0) + 1);
     }
     return result;
   };
@@ -2544,7 +2553,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       };
     }
 
-    if (!body && inlineReviewCommentCount === 0) {
+    if (!body && !inlineReviewCommentCounts.get(scopedKey("review"))) {
       throw {
         code: -32602,
         message:
@@ -2556,7 +2565,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
     // Reset the counter after a successful review submission so that subsequent
     // reviews in the same MCP session start with a clean slate.
-    inlineReviewCommentCount = 0;
+    inlineReviewCommentCounts.delete(scopedKey("review"));
 
     return defaultHandler("submit_pull_request_review")(args);
   };
@@ -2742,7 +2751,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (typeof entry.path === "string") {
       // Enforce allowed canonical source roots: staging dir and GITHUB_WORKSPACE.
       // RUNNER_TEMP is intentionally excluded — only the specific staging subdirectory is allowed.
-      const stagingDir = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
+      const stagingRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
+      const stagingDir = currentClaimHandle() ? claimArtifactPath(stagingRoot, currentClaimHandle()) : stagingRoot;
 
       let filePath = entry.path;
       if (!path.isAbsolute(filePath)) {
@@ -2881,7 +2891,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    */
   const uploadCodeCoverageHandler = args => {
     const entry = { ...(args || {}), type: "upload_code_coverage" };
-    const stagingDir = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-code-coverage");
+    const stagingRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-code-coverage");
+    const stagingDir = currentClaimHandle() ? claimArtifactPath(stagingRoot, currentClaimHandle()) : stagingRoot;
     const coverageRoot = process.env.GITHUB_WORKSPACE ? path.join(process.env.GITHUB_WORKSPACE, "coverage") : "";
 
     if (typeof entry.file === "string") {
@@ -3371,7 +3382,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       `To close a specific discussion, supply discussion_number explicitly.`,
   });
 
-  return {
+  const handlers = {
     defaultHandler,
     ledgerBuiltinHandler,
     ledgerAgentAppendHandler,
@@ -3410,6 +3421,25 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     updateDiscussionHandler,
     closeDiscussionHandler,
   };
+  const scopedHandler =
+    (handler, type) =>
+    (...args) => {
+      const executionHandle = currentClaimHandle();
+      const scope = executionHandle ? null : readClaimScopeContext();
+      if (!scope && !executionHandle) return handler(...args);
+      const message = normalizeRuntimeMessage(type ? { ...(args[0] || {}), type } : args[0] || {});
+      if (type && !Object.hasOwn(args[0] || {}, "type")) delete message.type;
+      if (executionHandle) return handler(message, ...args.slice(1));
+      return withClaimExecution({ ...scope, claim_handle: message.claim_handle }, () => handler(message, ...args.slice(1)));
+    };
+  return Object.fromEntries(
+    Object.entries(handlers).map(([name, handler]) => [
+      name,
+      ["defaultHandler", "ledgerBuiltinHandler"].includes(name)
+        ? (...args) => scopedHandler(Reflect.apply(handler, undefined, args), name === "defaultHandler" ? args[0] : "ledger_append")
+        : scopedHandler(handler, name === "ledgerAgentAppendHandler" ? "ledger_append" : undefined),
+    ])
+  );
 }
 
 module.exports = {

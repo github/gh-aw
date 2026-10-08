@@ -22,6 +22,23 @@ afterEach(() => {
 });
 
 describe("setupGlobals API version", () => {
+  it.each([0, 1, 2])("replaces cached shim globals with exact injected Actions objects for %i Claims without parsing assignments", count => {
+    const fetch = vi.fn();
+    const client = getOctokit("test-token", { request: { fetch } });
+    global.context = { cachedShim: true };
+    global.core = { cachedShim: true };
+    const core = { info: vi.fn(), setSecret: vi.fn() };
+    const context = { payload: { inputs: { work_queue_assignment: count ? { claims: Array.from({ length: count }, (_, i) => ({ handle: `h${i}` })) } : "stray malformed assignment" } } };
+    const exec = {};
+    const io = {};
+    setupGlobals(core, client, context, exec, io, getOctokit);
+    expect(global.core).toBe(core);
+    expect(global.context).toBe(context);
+    expect(global.exec).toBe(exec);
+    expect(global.io).toBe(io);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   function setupClient() {
     const fetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ number: 50 }), {

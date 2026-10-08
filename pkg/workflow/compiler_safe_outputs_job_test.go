@@ -1740,7 +1740,7 @@ func TestCreateCodeScanningAlertUploadJobWorkflowCallDependsOnActivation(t *test
 func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string {
 		return action + "@test-pin"
-	})
+	}, false)
 
 	content := strings.Join(steps, "")
 
@@ -1749,4 +1749,49 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	assert.Contains(t, content, "/tmp/gh-aw/safe-output-items.jsonl")
 	assert.NotContains(t, content, "process-safe-outputs.stdout.log")
 	assert.NotContains(t, content, "process-safe-outputs.stderr.log")
+}
+
+func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		queue  any
+		staged bool
+		worker bool
+	}{
+		{name: "ordinary"},
+		{name: "queue-disabled", queue: false},
+		{name: "queue-reader", queue: true},
+		{name: "worker", queue: map[string]any{"worker": true}, worker: true},
+		{name: "staged-worker", queue: map[string]any{"worker": true}, staged: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.trialMode = test.staged
+			data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{}, Tools: map[string]any{}}
+			if test.queue != nil {
+				data.Tools["work-queue"] = test.queue
+			}
+			before := []string{
+				"      - name: Process Safe Outputs\n",
+				"        env:\n",
+				"          PRIVATE_TOKEN: ${{ secrets.PRIVATE_TOKEN }}\n",
+			}
+			content := strings.Join(compiler.appendFinalSafeOutputSteps(data, before, ""), "")
+			require.NotContains(t, content, "/tmp/gh-aw/claims/*/delivery-receipt.json")
+			if test.worker {
+				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-items.jsonl")
+				require.Contains(t, content, "/tmp/gh-aw/claims/*/temporary-id-map.json")
+				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-errors.json")
+				require.Contains(t, content, "id: redact_secrets")
+				require.Contains(t, content, "steps.redact_secrets.outcome == 'success'")
+				require.Contains(t, content, "SECRET_PRIVATE_TOKEN: ${{ secrets.PRIVATE_TOKEN }}")
+				require.Contains(t, content, "retention-days: 1")
+				require.Less(t, strings.Index(content, "id: redact_secrets"), strings.Index(content, "Upload Safe Outputs Items"))
+			} else {
+				require.NotContains(t, content, "/claims/")
+				require.NotContains(t, content, "redact_secrets")
+				require.NotContains(t, content, "retention-days:")
+			}
+		})
+	}
 }

@@ -101,6 +101,13 @@ git commit -m "Update shell scripts"
 
 **Note:** JavaScript and shell files are NOT embedded in the binary. They are copied at runtime by `setup.sh` from `actions/setup/js/` and `actions/setup/sh/` to `${{ runner.temp }}/gh-aw/actions` where workflows can access them.
 
+The separate MCP Scripts and safe-outputs directories use the explicit `MCP_SCRIPTS_FILES` and `SAFE_OUTPUTS_FILES` lists in `setup.sh`. Update these lists when adding or removing their runtime modules, including transitive local dependencies. Check deployment completeness with:
+
+```bash
+cd actions/setup/js
+npx vitest run setup_sh_file_lists.test.cjs
+```
+
 ## Testing Locally
 
 You can test this action locally using the provided test script:
