@@ -1,8 +1,14 @@
 ---
 name: Smoke Agy (Experimental)
-description: Manual smoke test for experimental Agy authentication, inference, AWF, MCP and staged safe outputs.
+description: On-demand smoke test for experimental Agy authentication, inference, AWF, MCP and staged safe outputs.
 on:
   workflow_dispatch:
+  slash_command:
+    name: smoke-agy
+    strategy: centralized
+    events: [issues, issue_comment, pull_request, pull_request_comment]
+  reaction: none
+  status-comment: false
 permissions:
   contents: read
 concurrency:

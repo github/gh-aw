@@ -184,9 +184,15 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 				assert.Contains(t, callee.Concurrency["group"], "${{ github.run_id }}")
 			}
 			for name, config := range callee.Jobs {
+				allowedPermissions := binding.Permissions
+				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
+					allowedPermissions = map[string]string{
+						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
+					}
+				}
 				for permission, level := range config.Permissions {
-					assert.NotEqual(t, "write", level, "%s must not grant %s write permission", name, permission)
-					assert.Equal(t, level, binding.Permissions[permission], "caller must allow %s required by %s", permission, name)
+					assert.Equal(t, "read", level, "%s must not grant %s write permission", name, permission)
+					assert.Equal(t, allowedPermissions[permission], level, "%s must allow only scoped %s permission", name, permission)
 				}
 			}
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
@@ -221,7 +227,17 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 		t.Run(entry.id, func(t *testing.T) {
 			var source map[string]any
 			readConformanceFrontmatter(t, "../../.github/workflows/"+entry.id+".md", &source)
-			assert.Equal(t, map[string]any{entry.trigger: nil}, source["on"])
+			expectedTriggers := map[string]any{entry.trigger: nil}
+			if entry.id == "smoke-agy" {
+				expectedTriggers["slash_command"] = map[string]any{
+					"name":     "smoke-agy",
+					"strategy": "centralized",
+					"events":   []any{"issues", "issue_comment", "pull_request", "pull_request_comment"},
+				}
+				expectedTriggers["reaction"] = "none"
+				expectedTriggers["status-comment"] = false
+			}
+			assert.Equal(t, expectedTriggers, source["on"])
 			assert.Equal(t, []any{"shared/agy-conformance.md"}, source["imports"])
 			assert.EqualValues(t, entry.credits, source["max-ai-credits"])
 			delete(source, "name")
@@ -231,6 +247,15 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})
 	}
+}
+
+func TestAgySmokeSlashCommandIsCentrallyRouted(t *testing.T) {
+	router, err := os.ReadFile("../../.github/workflows/agentic_commands.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(router), `"smoke-agy":[{"workflow":"smoke-agy","events":["issue_comment","issues","pull_request","pull_request_comment"]}]`)
+	lock, err := os.ReadFile("../../.github/workflows/smoke-agy.lock.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(lock), `GH_AW_COMMANDS: "[\"smoke-agy\"]"`)
 }
 
 func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {
