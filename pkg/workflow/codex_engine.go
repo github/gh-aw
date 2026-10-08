@@ -505,14 +505,14 @@ func applyCodexModelEnv(env map[string]string, workflowData *WorkflowData, model
 	}
 	if modelConfigured {
 		if containsExpression(workflowData.Model) {
-			env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpression(modelEnvVar, compilerenv.DefaultModelCodex, constants.CodexDefaultModel)
+			env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)
 		}
 		model := codexModelID(workflowData.Model)
 		codexEngineLog.Printf("Setting %s env var for model: %s", modelEnvVar, model)
 		env[modelEnvVar] = model
 		return
 	}
-	env[modelEnvVar] = compilerenv.BuildModelOverrideExpression(modelEnvVar, compilerenv.DefaultModelCodex, constants.CodexDefaultModel)
+	env[modelEnvVar] = compilerenv.BuildModelOverrideExpressionEmptyFallback(modelEnvVar, compilerenv.DefaultModelCodex)
 }
 
 func (e *CodexEngine) buildCodexExecutionStep(workflowData *WorkflowData, command string, env map[string]string) GitHubActionStep {

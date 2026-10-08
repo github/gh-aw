@@ -324,8 +324,8 @@ func BuildModelOverrideExpression(primaryVar, enterpriseDefaultVar, builtinFallb
 	return fmt.Sprintf("${{ vars.%s || vars.%s || '%s' }}", primaryVar, enterpriseDefaultVar, escaped)
 }
 
-// BuildModelOverrideExpressionEmptyFallback builds a vars expression with primary model var,
-// enterprise default model var, and empty string fallback.
+// BuildModelOverrideExpressionEmptyFallback leaves model selection to the runtime
+// when neither the phase nor enterprise model variable is configured.
 func BuildModelOverrideExpressionEmptyFallback(primaryVar, enterpriseDefaultVar string) string {
 	return fmt.Sprintf("${{ vars.%s || vars.%s || '' }}", primaryVar, enterpriseDefaultVar)
 }
