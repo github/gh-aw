@@ -386,7 +386,7 @@ func (c *Compiler) mergeImportedEngineConfig(
 	engineConfig *EngineConfig,
 	model string,
 ) (*EngineConfig, string, error) {
-	firstEngine := ""
+	var firstEngine string
 	if len(allEngines) > 0 {
 		firstEngine = allEngines[0]
 	} else {

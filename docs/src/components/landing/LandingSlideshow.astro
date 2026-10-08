@@ -209,8 +209,7 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     transition: opacity 180ms ease, background-color 180ms ease;
   }
   .slideshow-controls:hover,
-  .slideshow-controls:has(:focus-visible),
-  .slideshow-controls:has([data-drawing-toggle][aria-expanded='true']) {
+  .slideshow-controls:focus-within {
     opacity: 1;
     background: var(--aw-color-bg);
   }

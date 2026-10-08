@@ -203,7 +203,7 @@ do not claim success or substitute a guessed value.
    `node /tmp/gh-aw/agent/engine-conformance/shell-probe.cjs`.
    Retain the returned `shellDigest` and `engineEnv`.
 3. Use the mounted MCP CLI through your shell capability:
-   `mcpscripts conformance-challenge --file_nonce "<fileNonce>"`.
+   `mcpscripts conformance_challenge --file_nonce "<fileNonce>"`.
    Pass the actual fixture nonce, then retain the returned `toolNonce`.
    This tests the production MCP gateway/CLI transport, including for engines
    without a native MCP client.
@@ -212,7 +212,11 @@ do not claim success or substitute a guessed value.
    `fileNonce` (string), `sum` (number, `left + right`), `shellDigest` (string),
    `engineEnv` (string), and `toolNonce` (string).
 
-After writing the result, call `safeoutputs noop --message "Conformance probes completed"`.
+After writing the result and completing any additional imported probes, emit
+exactly one noop with message `"Conformance probes completed"`. Unless an imported
+suite specifies a native MCP completion call, use
+`safeoutputs noop --message "Conformance probes completed"`.
+Use only the specified transport; do not emit a second noop through another tool.
 Safe outputs are staged; do not create an issue or comment. Your final reply
 should be one short line. The JavaScript post-step, not your reply, decides
 whether the suite passed.

@@ -97,6 +97,9 @@ type AWFConfigFile struct {
 	// CloudHypervisor contains Cloud Hypervisor microVM execution configuration.
 	CloudHypervisor *AWFCloudHypervisorConfig `json:"cloudHypervisor,omitempty"`
 
+	// NVX contains NVX one-shot microVM execution configuration.
+	NVX *AWFNVXConfig `json:"nvx,omitempty"`
+
 	// Logging contains logging and diagnostics configuration.
 	Logging *AWFLoggingConfig `json:"logging,omitempty"`
 
@@ -315,6 +318,9 @@ type AWFContainerConfig struct {
 	// Maps to: --docker-host-path-prefix <value>
 	DockerHostPathPrefix string `json:"dockerHostPathPrefix,omitempty"`
 
+	// ContainerWorkDir selects the guest working directory.
+	ContainerWorkDir string `json:"containerWorkDir,omitempty"`
+
 	// Images is the closed manifest of digest-pinned AWF infrastructure images,
 	// keyed by AWF image role (squid, agent, apiProxy, ...). Mapped from the
 	// sandbox.agent.images frontmatter field. When present, AWF fails closed
@@ -339,6 +345,23 @@ type AWFCloudHypervisorConfig struct {
 	MemoryMiB                           int                             `json:"memoryMib,omitempty"`
 	APITimeoutMs                        int                             `json:"apiTimeoutMs,omitempty"`
 	SHA256                              *AWFCloudHypervisorSHA256Config `json:"sha256,omitempty"`
+}
+
+// AWFNVXConfig is the "nvx" section of the AWF config file.
+type AWFNVXConfig struct {
+	PreviewEnabled             bool   `json:"previewEnabled"`
+	MountPolicy                string `json:"mountPolicy"`
+	LayerPath                  string `json:"layerPath"`
+	ArtifactManifestPath       string `json:"artifactManifestPath"`
+	ArtifactManifestBundlePath string `json:"artifactManifestBundlePath"`
+	SignerWorkflow             string `json:"signerWorkflow,omitempty"`
+	OpenVMMPath                string `json:"openvmmPath"`
+	KernelPath                 string `json:"kernelPath"`
+	InitramfsPath              string `json:"initramfsPath"`
+	MemoryMiB                  int    `json:"memoryMib"`
+	MemoryMaxBytes             int64  `json:"memoryMaxBytes"`
+	PidsMax                    int    `json:"pidsMax"`
+	ScratchBytes               int64  `json:"scratchBytes,omitempty"`
 }
 
 // AWFCloudHypervisorSHA256Config contains development-only legacy artifact hashes.
