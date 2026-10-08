@@ -283,5 +283,28 @@
    "Stores no request history; 1 MiB/64 in-flight bounds"
   ],
   "blogged": false
+ },
+ "githubnext/gh-aw-wizard": {
+  "kind": "tool",
+  "reviewed": "2026-10-08",
+  "score": 6,
+  "summary": "Web wizard that turns a few answers into a ready gh-aw workflow; config-driven via src/wizard.json, very active curated archetypes.",
+  "highlights": [
+   "README.md: wizard.json-driven, self-hostable",
+   "Active (commits 2026-10-07)",
+   "patterns/ library of archetypes"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-canvas": {
+  "kind": "tool",
+  "reviewed": "2026-10-08",
+  "score": 4,
+  "summary": "Copilot App canvas for gh-aw; README is one line, no commits since June 2026.",
+  "highlights": [
+   "Imported dashboard project",
+   "Minimal documentation"
+  ],
+  "blogged": false
  }
 }
