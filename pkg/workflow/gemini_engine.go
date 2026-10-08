@@ -23,7 +23,7 @@ func NewGeminiEngine() *GeminiEngine {
 		BaseEngine: BaseEngine{
 			id:               "gemini",
 			displayName:      "Google Gemini CLI",
-			description:      "Google Gemini CLI with headless mode and LLM gateway support",
+			description:      "Deprecated Google Gemini CLI; use the experimental agy engine where supported",
 			experimental:     false,
 			ghSkillAgentName: "gemini-cli",
 			capabilities: EngineCapabilities{

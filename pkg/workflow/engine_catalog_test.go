@@ -47,6 +47,19 @@ func TestEngineCatalog_All(t *testing.T) {
 	}
 }
 
+func TestEngineCatalog_GeminiDeprecated(t *testing.T) {
+	catalog := NewEngineCatalog(NewEngineRegistry())
+	for _, def := range catalog.All() {
+		if def.ID == "gemini" {
+			assert.Contains(t, def.Description, "Deprecated")
+			assert.Contains(t, def.Description, "agy")
+			assert.Equal(t, NewGeminiEngine().GetDescription(), def.Description)
+			return
+		}
+	}
+	t.Fatal("deprecated Gemini engine must remain selectable")
+}
+
 // engineSchemaOneOfVariants parses the main workflow schema and returns the
 // type identifiers of each variant in engine_config.oneOf for structural assertions.
 func engineSchemaOneOfVariants(t *testing.T) []map[string]any {

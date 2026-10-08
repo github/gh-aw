@@ -2,7 +2,7 @@
 engine:
   id: gemini
   display-name: Google Gemini CLI
-  description: Google Gemini CLI with headless mode and LLM gateway support
+  description: Deprecated Google Gemini CLI; use the experimental agy engine where supported
   runtime-id: gemini
   provider:
     name: google

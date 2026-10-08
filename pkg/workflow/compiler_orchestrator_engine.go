@@ -82,6 +82,9 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	if err := c.runPostEngineValidations(result.Frontmatter, engineSetting, engineConfig, networkPermissions, sandboxConfig, agenticEngine, importsResult); err != nil {
 		return nil, err
 	}
+	if agenticEngine.GetID() == string(constants.GeminiEngine) {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("The gemini engine is deprecated in favor of the experimental agy engine. Use engine: agy where supported; retain engine: gemini for Google WIF or features Agy does not support. See https://github.github.com/gh-aw/engines/agy/"))
+	}
 	return &engineSetupResult{
 		engineSetting:      engineSetting,
 		model:              model,
