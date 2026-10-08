@@ -3,7 +3,9 @@ package cli
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math"
 	"os"
 	"regexp"
 	"slices"
@@ -26,15 +28,19 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	if summary == nil {
 		return
 	}
-	requests, actuals, found, err := readSessionSubagentModels(runDir)
+	requests, actuals, agentUsage, found, err := readSessionSubagentModelsDetailed(runDir)
 	if err != nil {
 		addTokenUsageWarning(summary, "failed to parse unified subagent information: "+err.Error())
 		tokenUsageSubagentLog.Printf("failed to parse unified subagent information: %v", err)
 	}
 	if found {
 		resolver := newModelIdentityResolver(runDir)
-		summary.SubagentModelRequests = resolveSubagentRequestModels(requests, actuals, resolver)
-		summary.SubagentModelActuals = resolveSubagentActualModels(actuals, resolver)
+		modelCandidates := tokenUsageModelCandidates(summary)
+		summary.SubagentModelRequests = resolveSubagentRequestModels(requests, actuals, resolver, modelCandidates...)
+		summary.SubagentModelActuals = resolveSubagentActualModels(actuals, resolver, modelCandidates...)
+		summary.AgentUsage = resolveAgentUsageModels(agentUsage, resolver, modelCandidates...)
+		matchPiAgentUsageCredits(summary, tokenUsageEntriesForRun(runDir), resolver)
+		reconcileAgentUsageCredits(summary)
 		summary.MismatchCount = 0
 		augmentDeclaredSubagentModels(runDir, summary)
 		return
@@ -52,7 +58,8 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, summary *TokenUsageSummary, resolver *modelIdentityResolver) {
 	addTokenUsageWarning(summary, subagentStdioWarning)
 
-	actuals, _ := collectSubagentModelActuals(summary)
+	allActuals, _ := collectSubagentModelActuals(summary)
+	actuals := allActuals
 	actuals = filterSubagentActualModels(actuals, requests, resolver)
 	actuals = resolveSubagentActualModels(actuals, resolver)
 	summary.SubagentModelActuals = actuals
@@ -78,9 +85,16 @@ func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, s
 		if _, ok := observedModels[resolved]; ok {
 			row.ResolvedModel = resolved
 			row.EffectiveModel = resolved
-			row.ServedModels = []string{resolved}
+			for _, actual := range actuals {
+				if resolver.matches(requested, actual.Model, actual.Provider) {
+					row.ServedModels = appendUnique(row.ServedModels, actual.Model)
+					for _, served := range actual.ServedModels {
+						row.ServedModels = appendUnique(row.ServedModels, served)
+					}
+				}
+			}
 		} else {
-			if len(observedModels) == 0 {
+			if len(allActuals) == 0 {
 				row.ReasonCode = modelMismatchReasonTokenUsageMissing
 			} else {
 				row.ReasonCode = modelMismatchReasonModelNotObserved
@@ -108,8 +122,8 @@ func filterSubagentActualModels(actuals []SubagentModelActual, requests []Subage
 	return filtered
 }
 
-func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []SubagentModelActual, resolver *modelIdentityResolver) []SubagentModelRequest {
-	observed := make([]string, 0, len(actuals)*2)
+func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []SubagentModelActual, resolver *modelIdentityResolver, candidates ...string) []SubagentModelRequest {
+	observed := append([]string(nil), candidates...)
 	for _, actual := range actuals {
 		observed = append(observed, actual.Model)
 		observed = append(observed, actual.ServedModels...)
@@ -119,7 +133,11 @@ func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []Sub
 		row.ResolvedModel = resolver.resolve(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), "", observed)
 		if row.EffectiveModel != "" {
 			row.EffectiveModel = resolver.resolve(row.EffectiveModel, "", observed)
-			row.ServedModels = []string{row.EffectiveModel}
+			for _, candidate := range observed {
+				if resolver.matches(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), candidate, "") {
+					row.ServedModels = appendUnique(row.ServedModels, candidate)
+				}
+			}
 		}
 		if row.FailedCount > 0 && row.CompletedCount == 0 && row.EffectiveModel == "" {
 			row.ReasonCode = modelMismatchReasonSubagentFailed
@@ -137,8 +155,8 @@ func firstNonEmptyModel(values ...string) string {
 	return ""
 }
 
-func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelIdentityResolver) []SubagentModelActual {
-	observed := make([]string, 0, len(actuals))
+func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelIdentityResolver, candidates ...string) []SubagentModelActual {
+	observed := append([]string(nil), candidates...)
 	for _, actual := range actuals {
 		observed = append(observed, actual.Model)
 		observed = append(observed, actual.ServedModels...)
@@ -165,6 +183,11 @@ func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelI
 		for _, model := range actual.ServedModels {
 			combined.ServedModels = appendUnique(combined.ServedModels, model)
 		}
+		for _, candidate := range observed {
+			if resolver.matches(actual.Model, candidate, actual.Provider) {
+				combined.ServedModels = appendUnique(combined.ServedModels, candidate)
+			}
+		}
 		grouped[resolved] = combined
 	}
 	result := make([]SubagentModelActual, 0, len(grouped))
@@ -180,6 +203,195 @@ func appendUnique(values []string, value string) []string {
 		return values
 	}
 	return append(values, value)
+}
+
+func resolveAgentUsageModels(agents []AgentUsageBreakdown, resolver *modelIdentityResolver, candidates ...string) []AgentUsageBreakdown {
+	for i := range agents {
+		agent := &agents[i]
+		observed := append([]string(nil), candidates...)
+		actuals := make([]SubagentModelActual, 0, len(agent.Models))
+		for _, model := range agent.Models {
+			observed = append(observed, model.Model)
+			actuals = append(actuals, SubagentModelActual{
+				Model: model.Model, Requests: model.Requests, TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC,
+			})
+		}
+		resolved := resolveSubagentActualModels(actuals, resolver, observed...)
+		agent.Models = make([]AgentModelUsage, 0, len(resolved))
+		for _, model := range resolved {
+			agent.Models = append(agent.Models, AgentModelUsage{
+				Model: model.Model, ResolvedModel: model.ResolvedModel, Requests: model.Requests,
+				TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC,
+			})
+			for _, served := range model.ServedModels {
+				if model.Requests > 0 {
+					agent.ServedModels = appendUnique(agent.ServedModels, served)
+				}
+			}
+		}
+		for _, requested := range agent.RequestedModels {
+			agent.ResolvedModels = appendUnique(agent.ResolvedModels, resolver.resolve(requested, "", observed))
+		}
+		slices.Sort(agent.RequestedModels)
+		slices.Sort(agent.ResolvedModels)
+		slices.Sort(agent.ServedModels)
+	}
+	return agents
+}
+
+func tokenUsageModelCandidates(summary *TokenUsageSummary) []string {
+	if summary == nil {
+		return nil
+	}
+	models := make([]string, 0, len(summary.ByModel))
+	for model := range summary.ByModel {
+		models = append(models, model)
+	}
+	slices.Sort(models)
+	return models
+}
+
+func reconcileAgentUsageCredits(summary *TokenUsageSummary) {
+	if summary == nil || !summary.AICFound || len(summary.AgentUsage) == 0 {
+		return
+	}
+	var attributed float64
+	for _, agent := range summary.AgentUsage {
+		attributed += agent.AIC
+	}
+	if attributed == 0 || math.Abs(attributed-summary.TotalAIC) <= 0.01 {
+		return
+	}
+	endpoint := summary.endpoint
+	if endpoint == "" {
+		endpoint = "unknown endpoint"
+	}
+	addTokenUsageWarning(summary, fmt.Sprintf("per-agent AI credits (%.3f) differ from proxy total (%.3f) for endpoint %s", attributed, summary.TotalAIC, endpoint))
+}
+
+func matchPiAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsageEntry, resolver *modelIdentityResolver) {
+	if summary == nil || len(entries) == 0 {
+		return
+	}
+	type indexedRequest struct {
+		agentIndex int
+		usage      agentRequestUsage
+	}
+	piAgents := make([]int, 0)
+	requests := make([]indexedRequest, 0)
+	for i := range summary.AgentUsage {
+		agent := &summary.AgentUsage[i]
+		if agent.SourceEngine != "pi" || agent.AgentType != "subagent" {
+			continue
+		}
+		piAgents = append(piAgents, i)
+		for _, request := range agent.requestUsages {
+			requests = append(requests, indexedRequest{agentIndex: i, usage: request})
+		}
+	}
+	if len(piAgents) == 0 || len(requests) == 0 {
+		return
+	}
+	slices.SortFunc(requests, func(a, b indexedRequest) int {
+		if order := a.usage.Timestamp.Compare(b.usage.Timestamp); order != 0 {
+			return order
+		}
+		return strings.Compare(summary.AgentUsage[a.agentIndex].AgentName, summary.AgentUsage[b.agentIndex].AgentName)
+	})
+	entries = append([]TokenUsageEntry(nil), entries...)
+	slices.SortStableFunc(entries, func(a, b TokenUsageEntry) int {
+		aTime, aValid := parseTokenUsageTimestamp(a.Timestamp)
+		bTime, bValid := parseTokenUsageTimestamp(b.Timestamp)
+		if !aValid {
+			if !bValid {
+				return 0
+			}
+			return 1
+		}
+		if !bValid {
+			return -1
+		}
+		return aTime.Compare(bTime)
+	})
+	used := make(map[int]bool)
+	matched := 0
+	lastMatchedEntry := -1
+	for _, indexed := range requests {
+		agent := &summary.AgentUsage[indexed.agentIndex]
+		request := indexed.usage
+		entryIndex := matchingProxyUsageEntry(entries, used, request, resolver, lastMatchedEntry)
+		if entryIndex < 0 {
+			addTokenUsageWarning(summary, fmt.Sprintf("could not match pi sub-agent %s model %s usage to proxy token usage; credits were not inferred", agent.AgentName, request.Model))
+			continue
+		}
+		used[entryIndex] = true
+		lastMatchedEntry = entryIndex
+		matched++
+		entry := entries[entryIndex]
+		credits := tokenUsageEntryCredits(entry)
+		agent.AIC += credits
+		agent.TotalApiDurationMs += entry.DurationMs
+		for modelIndex := range agent.Models {
+			if normalizeModelIdentity(agent.Models[modelIndex].Model) == normalizeModelIdentity(request.Model) {
+				agent.Models[modelIndex].AIC += credits
+				break
+			}
+		}
+	}
+	if matched != len(requests) {
+		return
+	}
+	main := AgentUsageBreakdown{AgentName: "main", AgentType: "main", SourceEngine: "pi", InstanceCount: 1}
+	for index, entry := range entries {
+		if used[index] || entry.Purpose == "routing_classification" || entry.Model == "" {
+			continue
+		}
+		main.Requests++
+		main.InputTokens += entry.InputTokens
+		main.OutputTokens += entry.OutputTokens
+		main.CacheReadTokens += entry.CacheReadTokens
+		main.CacheWriteTokens += entry.CacheWriteTokens
+		main.ReasoningTokens += entry.ReasoningTokens
+		main.AIC += tokenUsageEntryCredits(entry)
+		main.TotalApiDurationMs += entry.DurationMs
+		main.Models = appendAgentModelUsage(main.Models, AgentModelUsage{
+			Model: entry.Model, ResolvedModel: normalizeModelIdentity(modelNameWithoutProvider(entry.Model)),
+			Requests: 1, TokenCoreMetrics: TokenCoreMetrics{
+				InputTokens: entry.InputTokens, OutputTokens: entry.OutputTokens,
+				CacheReadTokens: entry.CacheReadTokens, CacheWriteTokens: entry.CacheWriteTokens,
+				ReasoningTokens: entry.ReasoningTokens,
+			}, AIC: tokenUsageEntryCredits(entry),
+		})
+	}
+	summary.AgentUsage = append(summary.AgentUsage, main)
+}
+
+func matchingProxyUsageEntry(entries []TokenUsageEntry, used map[int]bool, request agentRequestUsage, resolver *modelIdentityResolver, afterIndex int) int {
+	for index := afterIndex + 1; index < len(entries); index++ {
+		entry := entries[index]
+		if used[index] || entry.Purpose == "routing_classification" || entry.Model == "" {
+			continue
+		}
+		if !resolver.matches(request.Model, modelNameWithoutProvider(entry.Model), entry.Provider) {
+			continue
+		}
+		if request.InputTokens == entry.InputTokens && request.OutputTokens == entry.OutputTokens &&
+			request.CacheReadTokens == entry.CacheReadTokens && request.CacheWriteTokens == entry.CacheWriteTokens {
+			return index
+		}
+	}
+	return -1
+}
+
+func tokenUsageEntryCredits(entry TokenUsageEntry) float64 {
+	if credits, _, valid := parseOptionalNonNegativeFloat(entry.AICreditsThisResponse); valid {
+		return credits
+	}
+	inputTokensIncludeCache, _, _ := parseOptionalBool(entry.InputTokensIncludeCache)
+	return computeModelInferenceAICWithCacheSemantics(
+		entry.Provider, entry.Model, entry.InputTokens, entry.OutputTokens,
+		entry.CacheReadTokens, entry.CacheWriteTokens, entry.ReasoningTokens, inputTokensIncludeCache,
+	)
 }
 
 func sortSubagentModelActuals(actuals []SubagentModelActual) {

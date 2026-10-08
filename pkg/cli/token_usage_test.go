@@ -1024,15 +1024,14 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, summary)
 		require.Len(t, summary.SubagentModelRequests, 3)
-		require.Len(t, summary.SubagentModelActuals, 1)
+		require.Empty(t, summary.SubagentModelActuals)
 		assert.Equal(t, 3, summary.MismatchCount)
-		assert.Equal(t, "claude-sonnet-4-6", summary.SubagentModelActuals[0].Model)
 		require.Contains(t, summary.Warnings, subagentStdioWarning)
 
 		for _, req := range summary.SubagentModelRequests {
 			assert.Equal(t, "claude-haiku-4.5", req.RequestedModel)
 			assert.Equal(t, 1, req.InvocationCount)
-			assert.Equal(t, "claude-sonnet-4-6", req.EffectiveModel)
+			assert.Empty(t, req.EffectiveModel)
 			assert.Equal(t, modelMismatchReasonModelNotObserved, req.ReasonCode)
 		}
 	})
@@ -1095,8 +1094,8 @@ func TestAnalyzeTokenUsage(t *testing.T) {
 		require.Len(t, summary.SubagentModelRequests, 1)
 		assert.Equal(t, "small", summary.SubagentModelRequests[0].RequestedModel)
 		assert.Equal(t, "gpt-5-mini", summary.SubagentModelRequests[0].EffectiveModel)
-		assert.Equal(t, modelMismatchReasonModelNotObserved, summary.SubagentModelRequests[0].ReasonCode)
-		assert.Equal(t, 1, summary.MismatchCount)
+		assert.Empty(t, summary.SubagentModelRequests[0].ReasonCode)
+		assert.Zero(t, summary.MismatchCount)
 		require.Contains(t, summary.Warnings, subagentStdioWarning)
 	})
 }

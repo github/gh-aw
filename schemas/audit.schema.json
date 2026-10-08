@@ -163,6 +163,15 @@
                     },
                     "router_version": {
                       "type": "string"
+                    },
+                    "main_agent_cost": {
+                      "$ref": "#/$defs/modelRoutingCost"
+                    },
+                    "subagent_costs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/modelRoutingAgentCost"
+                      }
                     }
                   },
                   "additionalProperties": false
@@ -190,6 +199,15 @@
                 },
                 "router_version": {
                   "type": "string"
+                },
+                "main_agent_cost": {
+                  "$ref": "#/$defs/modelRoutingCost"
+                },
+                "subagent_costs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/modelRoutingAgentCost"
+                  }
                 }
               },
               "additionalProperties": false
@@ -316,6 +334,15 @@
                         },
                         "router_version": {
                           "type": "string"
+                        },
+                        "main_agent_cost": {
+                          "$ref": "#/$defs/modelRoutingCost"
+                        },
+                        "subagent_costs": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/modelRoutingAgentCost"
+                          }
                         }
                       },
                       "additionalProperties": false
@@ -337,6 +364,15 @@
                         },
                         "router_version": {
                           "type": "string"
+                        },
+                        "main_agent_cost": {
+                          "$ref": "#/$defs/modelRoutingCost"
+                        },
+                        "subagent_costs": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/modelRoutingAgentCost"
+                          }
                         }
                       },
                       "additionalProperties": false
@@ -1415,6 +1451,15 @@
                 "additionalProperties": false
               }
             },
+            "agent_usage": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "$ref": "#/$defs/agentUsage"
+              }
+            },
             "subagent_model_requests": {
               "type": [
                 "null",
@@ -1432,8 +1477,29 @@
                   "resolved_model": {
                     "type": "string"
                   },
+                  "served_models": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "invocation_count": {
                     "type": "integer"
+                  },
+                  "completed_count": {
+                    "type": "integer"
+                  },
+                  "failed_count": {
+                    "type": "integer"
+                  },
+                  "incomplete_count": {
+                    "type": "integer"
+                  },
+                  "effort": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
                   },
                   "effective_model": {
                     "type": "string"
@@ -1467,8 +1533,29 @@
                   "resolved_model": {
                     "type": "string"
                   },
+                  "served_models": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "invocation_count": {
                     "type": "integer"
+                  },
+                  "completed_count": {
+                    "type": "integer"
+                  },
+                  "failed_count": {
+                    "type": "integer"
+                  },
+                  "incomplete_count": {
+                    "type": "integer"
+                  },
+                  "effort": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
                   },
                   "effective_model": {
                     "type": "string"
@@ -1499,7 +1586,34 @@
                   "provider": {
                     "type": "string"
                   },
+                  "resolved_model": {
+                    "type": "string"
+                  },
+                  "served_models": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "requests": {
+                    "type": "integer"
+                  },
+                  "input_tokens": {
+                    "type": "integer"
+                  },
+                  "output_tokens": {
+                    "type": "integer"
+                  },
+                  "cache_read_tokens": {
+                    "type": "integer"
+                  },
+                  "cache_write_tokens": {
+                    "type": "integer"
+                  },
+                  "aic": {
+                    "type": "number"
+                  },
+                  "total_duration_ms": {
                     "type": "integer"
                   }
                 },
@@ -1797,6 +1911,15 @@
               ],
               "additionalProperties": false
             },
+            "main_agent_cost": {
+              "$ref": "#/$defs/modelRoutingCost"
+            },
+            "subagent_costs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/modelRoutingAgentCost"
+              }
+            },
             "endpoint_only_deviation_normalized": {
               "type": "boolean"
             }
@@ -1806,7 +1929,8 @@
             "labels",
             "classifier_cost",
             "selected_model_cost",
-            "deviated_traffic_cost"
+            "deviated_traffic_cost",
+            "main_agent_cost"
           ],
           "additionalProperties": false
         },
@@ -5850,5 +5974,221 @@
       ],
       "additionalProperties": false
     }
-  ]
+  ],
+  "$defs": {
+    "modelRoutingCost": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "integer"
+        },
+        "input_tokens": {
+          "type": "integer"
+        },
+        "output_tokens": {
+          "type": "integer"
+        },
+        "cache_read_tokens": {
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "type": "integer"
+        },
+        "aic": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "requests",
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "aic"
+      ],
+      "additionalProperties": false
+    },
+    "modelRoutingAgentCost": {
+      "type": "object",
+      "properties": {
+        "agent_name": {
+          "type": "string"
+        },
+        "agent_type": {
+          "type": "string"
+        },
+        "instance_count": {
+          "type": "integer"
+        },
+        "completed_count": {
+          "type": "integer"
+        },
+        "failed_count": {
+          "type": "integer"
+        },
+        "incomplete_count": {
+          "type": "integer"
+        },
+        "effort": {
+          "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requests": {
+          "type": "integer"
+        },
+        "input_tokens": {
+          "type": "integer"
+        },
+        "output_tokens": {
+          "type": "integer"
+        },
+        "cache_read_tokens": {
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "type": "integer"
+        },
+        "aic": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "agent_name",
+        "agent_type",
+        "instance_count",
+        "requests",
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "aic"
+      ],
+      "additionalProperties": false
+    },
+    "agentUsage": {
+      "type": "object",
+      "properties": {
+        "agent_name": {
+          "type": "string"
+        },
+        "agent_type": {
+          "type": "string"
+        },
+        "source_engine": {
+          "type": "string"
+        },
+        "instance_count": {
+          "type": "integer"
+        },
+        "completed_count": {
+          "type": "integer"
+        },
+        "failed_count": {
+          "type": "integer"
+        },
+        "incomplete_count": {
+          "type": "integer"
+        },
+        "requested_models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resolved_models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "served_models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "effort": {
+          "type": "string"
+        },
+        "requests": {
+          "type": "integer"
+        },
+        "input_tokens": {
+          "type": "integer"
+        },
+        "output_tokens": {
+          "type": "integer"
+        },
+        "cache_read_tokens": {
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "type": "integer"
+        },
+        "aic": {
+          "type": "number"
+        },
+        "total_api_duration_ms": {
+          "type": "integer"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "resolved_model": {
+                "type": "string"
+              },
+              "requests": {
+                "type": "integer"
+              },
+              "input_tokens": {
+                "type": "integer"
+              },
+              "output_tokens": {
+                "type": "integer"
+              },
+              "cache_read_tokens": {
+                "type": "integer"
+              },
+              "cache_write_tokens": {
+                "type": "integer"
+              },
+              "aic": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "model",
+              "requests",
+              "input_tokens",
+              "output_tokens",
+              "cache_read_tokens",
+              "cache_write_tokens"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "agent_name",
+        "agent_type",
+        "instance_count",
+        "requests",
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens"
+      ],
+      "additionalProperties": false
+    }
+  }
 }

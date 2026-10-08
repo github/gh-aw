@@ -51,7 +51,7 @@ func normalizeModelIdentity(model string) string {
 
 func (resolver *modelIdentityResolver) resolve(model, provider string, observed []string) string {
 	normalized := normalizeModelIdentity(model)
-	patterns := resolver.aliases[normalized]
+	patterns := resolver.patternsFor(normalized)
 	if len(patterns) == 0 {
 		return normalized
 	}
@@ -66,7 +66,7 @@ func (resolver *modelIdentityResolver) resolve(model, provider string, observed 
 }
 
 func (resolver *modelIdentityResolver) matches(pattern, observed, provider string) bool {
-	patterns := resolver.aliases[normalizeModelIdentity(pattern)]
+	patterns := resolver.patternsFor(normalizeModelIdentity(pattern))
 	if len(patterns) == 0 {
 		patterns = []string{pattern}
 	}
@@ -78,9 +78,33 @@ func (resolver *modelIdentityResolver) matches(pattern, observed, provider strin
 	return modelPatternMatches(pattern, observed, provider)
 }
 
+func (resolver *modelIdentityResolver) patternsFor(model string) []string {
+	var patterns []string
+	visited := make(map[string]bool)
+	var expand func(string)
+	expand = func(alias string) {
+		alias = normalizeModelIdentity(alias)
+		if visited[alias] {
+			return
+		}
+		visited[alias] = true
+		for _, pattern := range resolver.aliases[alias] {
+			nested := normalizeModelIdentity(pattern)
+			if !strings.ContainsAny(pattern, "/*?") && len(resolver.aliases[nested]) > 0 {
+				expand(nested)
+				continue
+			}
+			patterns = append(patterns, pattern)
+		}
+	}
+	expand(model)
+	return patterns
+}
+
 func modelPatternMatches(pattern, observed, provider string) bool {
 	pattern, _, _ = strings.Cut(strings.ToLower(pattern), "?")
 	observed, _, _ = strings.Cut(strings.ToLower(observed), "?")
+	originalObserved := observed
 	patternProvider, patternModel, patternQualified := strings.Cut(pattern, "/")
 	observedProvider, observedModel, observedQualified := strings.Cut(observed, "/")
 	if patternQualified {
@@ -94,7 +118,7 @@ func modelPatternMatches(pattern, observed, provider string) bool {
 	}
 	if observedQualified {
 		if provider != "" && normalizeModelProvider(observedProvider) != normalizeModelProvider(provider) {
-			return false
+			return modelPatternMatches(patternModel, originalObserved, "")
 		}
 		observed = observedModel
 	}

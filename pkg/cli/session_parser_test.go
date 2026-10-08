@@ -219,9 +219,9 @@ func TestSessionParserCopilotSubagentAttribution(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, summary)
 			require.Equal(t, []SubagentModelRequest{
-				{AgentName: "awf-routing", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
-				{AgentName: "ghaw-issues", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
-				{AgentName: "subagent-research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
+				{AgentName: "awf-routing", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, CompletedCount: 1, Effort: "low"},
+				{AgentName: "ghaw-issues", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "low"},
+				{AgentName: "subagent-research", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "xhigh"},
 			}, summary.SubagentModelRequests)
 			require.Equal(t, []SubagentModelActual{{Model: "opus", Requests: 60}}, summary.SubagentModelActuals)
 			require.Zero(t, summary.MismatchCount)
@@ -326,7 +326,7 @@ func TestSessionParserCopilotLegacySubagentFallback(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, summary)
 			require.Equal(t, []SubagentModelRequest{
-				{AgentName: "Research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
+				{AgentName: "Research", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1},
 			}, summary.SubagentModelRequests)
 			require.Contains(t, summary.Warnings, subagentStdioWarning)
 			require.Zero(t, summary.MismatchCount)

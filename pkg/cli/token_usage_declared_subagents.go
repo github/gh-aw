@@ -72,6 +72,9 @@ func declaredSessionModelRow(model declaredSubagentModel, requests []SubagentMod
 		if request.EffectiveModel == "" {
 			continue
 		}
+		for _, served := range request.ServedModels {
+			row.ServedModels = appendUnique(row.ServedModels, served)
+		}
 		row.ServedModels = appendUnique(row.ServedModels, request.EffectiveModel)
 		if declaredModelMatches(model, request.EffectiveModel, "", resolver) {
 			row.EffectiveModel = request.EffectiveModel
@@ -82,7 +85,11 @@ func declaredSessionModelRow(model declaredSubagentModel, requests []SubagentMod
 		return row, false
 	}
 	if row.EffectiveModel == "" {
-		row.ReasonCode = modelMismatchReasonModelNotObserved
+		if row.FailedCount > 0 && row.CompletedCount == 0 {
+			row.ReasonCode = modelMismatchReasonSubagentFailed
+		} else {
+			row.ReasonCode = modelMismatchReasonModelNotObserved
+		}
 	}
 	return row, true
 }

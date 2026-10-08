@@ -38,10 +38,12 @@ type AuditComparisonBaseline struct {
 }
 
 type AuditComparisonRoute struct {
-	Model         string `json:"model,omitempty"`
-	Effort        string `json:"effort,omitempty"`
-	Mode          string `json:"mode,omitempty"`
-	RouterVersion string `json:"router_version,omitempty"`
+	Model         string                  `json:"model,omitempty"`
+	Effort        string                  `json:"effort,omitempty"`
+	Mode          string                  `json:"mode,omitempty"`
+	RouterVersion string                  `json:"router_version,omitempty"`
+	MainAgentCost ModelRoutingCost        `json:"main_agent_cost,omitempty"`
+	SubagentCosts []ModelRoutingAgentCost `json:"subagent_costs,omitempty"`
 }
 
 type AuditComparisonDelta struct {
@@ -127,6 +129,7 @@ func modelRoutingComparisonRoute(routing *ModelRoutingSummary) *AuditComparisonR
 	return &AuditComparisonRoute{
 		Model: routing.SelectedModel, Effort: routing.SelectedEffort,
 		Mode: routing.Mode, RouterVersion: routing.RouterVersion,
+		MainAgentCost: routing.MainAgentCost, SubagentCosts: routing.SubagentCosts,
 	}
 }
 

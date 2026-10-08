@@ -33,6 +33,9 @@ func buildTokenUsageSummary(entries []TokenUsageEntry, duplicateRecordCount int)
 	}
 
 	for _, entry := range entries {
+		if summary.endpoint == "" {
+			summary.endpoint = entry.Path
+		}
 		// Aggregate totals
 		summary.TotalInputTokens += entry.InputTokens
 		summary.TotalOutputTokens += entry.OutputTokens

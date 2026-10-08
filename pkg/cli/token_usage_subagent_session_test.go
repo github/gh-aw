@@ -268,3 +268,40 @@ func TestSessionSubagentFailuresAreNotReportedAsServed(t *testing.T) {
 	require.Contains(t, findings[0].Description, "file-summarizer failed 1 invocation")
 	require.Contains(t, findings[0].Description, "HTTP 400 Cannot translate request")
 }
+
+func TestSessionAgentUsageIncludesMainAndSubagents(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(`{"sub_agent_models":[{"name":"quick-checker","model":"small","patterns":["copilot/gpt-5.4-mini"]}]}`), 0600))
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"usage"}}`) +
+		subagentSessionRecord(`{"type":"subagent.started","agentId":"quick-1","data":{"agentDisplayName":"quick-checker","model":"small"}}`) +
+		subagentSessionRecord(`{"type":"subagent.configured","agentId":"quick-1","data":{"reasoningEffort":"low"}}`) +
+		subagentSessionRecord(`{"type":"subagent.completed","agentId":"quick-1","data":{}}`) +
+		subagentSessionRecord(`{"type":"session.shutdown","data":{"agentMetrics":{"main":{"totalNanoAiu":1599000000,"totalApiDurationMs":1200,"modelMetrics":{"gpt-5.6-luna":{"requests":{"count":10},"usage":{"inputTokens":100,"outputTokens":20}}}},"quick-1":{"agentDisplayName":"quick-checker","totalNanoAiu":1144000000,"totalApiDurationMs":400,"modelMetrics":{"small":{"requests":{"count":4},"usage":{"inputTokens":40,"outputTokens":8}},"gpt-5.4-mini":{"requests":{"count":0},"totalNanoAiu":1144000000}}}}}}`)
+	requests, actuals, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, requests, 1)
+	require.Len(t, agents, 2)
+	require.Equal(t, "main", agents[0].AgentType)
+	require.Equal(t, 1.599, agents[0].AIC)
+	require.Equal(t, "quick-checker", agents[1].AgentName)
+	require.Equal(t, 1, agents[1].CompletedCount)
+	require.Equal(t, "low", agents[1].Effort)
+	require.Equal(t, 4, agents[1].Requests)
+	require.Equal(t, 1.144, agents[1].AIC)
+	resolver := newModelIdentityResolver(dir)
+	modelID := "gpt-5.4-mini-2026-03-17"
+	requests = resolveSubagentRequestModels(requests, actuals, resolver, modelID)
+	actuals = resolveSubagentActualModels(actuals, resolver, modelID)
+	agents = resolveAgentUsageModels(agents, resolver, modelID)
+	require.Equal(t, "gpt-5.4-mini", requests[0].EffectiveModel)
+	require.Contains(t, requests[0].ServedModels, modelID)
+	require.Len(t, actuals, 1)
+	require.Equal(t, 4, actuals[0].Requests)
+	require.Equal(t, 1.144, actuals[0].AIC)
+	require.Contains(t, actuals[0].ServedModels, modelID)
+	require.Len(t, agents[1].Models, 1)
+	require.Equal(t, "gpt-5.4-mini", agents[1].Models[0].Model)
+	require.Contains(t, agents[1].ServedModels, modelID)
+}

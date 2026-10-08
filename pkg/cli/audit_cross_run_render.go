@@ -52,6 +52,18 @@ func renderMarkdownModelRoutingToWriter(w io.Writer, routing *ModelRoutingLogsSu
 	writeModelRoutingReportLine(w, "## Model Routing\n\n")
 	writeModelRoutingReportLine(w, "Classifier AIC: %.3f; deviated requests: %d/%d (%.1f%%)\n\n",
 		routing.ClassifierAIC, routing.DeviatedRequests, routing.TotalRequests, routing.DeviatedTrafficShare*100)
+	if routing.MainAgentCost.Requests > 0 || routing.MainAgentCost.AIC > 0 || len(routing.SubagentCosts) > 0 {
+		writeModelRoutingReportLine(w, "Main-agent AIC: %.3f\n\n", routing.MainAgentCost.AIC)
+		if len(routing.SubagentCosts) > 0 {
+			writeModelRoutingReportLine(w, "| Sub-agent | Effort | Requests | Total AIC |\n|---|---|---:|---:|\n")
+			for _, agent := range routing.SubagentCosts {
+				writeModelRoutingReportLine(w, "| %s | %s | %d | %.3f |\n",
+					modelRoutingMarkdownCell(agent.AgentName), modelRoutingMarkdownCell(agent.Effort),
+					agent.Requests, agent.AIC)
+			}
+			writeModelRoutingReportLine(w, "\n")
+		}
+	}
 	if len(routing.Routes) == 0 {
 		return
 	}

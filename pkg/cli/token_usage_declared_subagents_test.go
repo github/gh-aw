@@ -3,9 +3,11 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -138,6 +140,51 @@ func TestPiStructuredSubagentUsageAndTerminalResult(t *testing.T) {
 	require.Equal(t, 1, summary.SubagentModelActuals[0].Requests)
 	require.Equal(t, 10, summary.SubagentModelActuals[0].InputTokens)
 	require.Equal(t, 2, summary.SubagentModelActuals[0].OutputTokens)
+}
+
+func TestMatchPiAgentUsageCreditsUsesResponseModelAndProxyTimeOrder(t *testing.T) {
+	resolver := newModelIdentityResolver("")
+	summary := &TokenUsageSummary{AgentUsage: []AgentUsageBreakdown{
+		{AgentName: "first", AgentType: "subagent", SourceEngine: "pi", requestUsages: []agentRequestUsage{{
+			Model: "claude-haiku-4-5-20251001", Timestamp: time.Date(2026, 3, 17, 10, 1, 0, 0, time.UTC),
+			TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10, OutputTokens: 2},
+		}}},
+		{AgentName: "second", AgentType: "subagent", SourceEngine: "pi", requestUsages: []agentRequestUsage{{
+			Model: "claude-haiku-4-5-20251001", Timestamp: time.Date(2026, 3, 17, 10, 3, 0, 0, time.UTC),
+			TokenCoreMetrics: TokenCoreMetrics{InputTokens: 20, OutputTokens: 4},
+		}}},
+	}}
+	entries := []TokenUsageEntry{
+		{Timestamp: "2026-03-17T10:04:00Z", Provider: "anthropic", Model: "claude-haiku-4-5-20251001", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 20, OutputTokens: 4}, AICreditsThisResponse: json.RawMessage(`0.7`)},
+		{Timestamp: "2026-03-17T10:02:00Z", Provider: "anthropic", Model: "claude-haiku-4-5-20251001", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10, OutputTokens: 2}, AICreditsThisResponse: json.RawMessage(`0.5`)},
+	}
+
+	matchPiAgentUsageCredits(summary, entries, resolver)
+	require.Empty(t, summary.Warnings)
+	require.InDelta(t, 0.5, summary.AgentUsage[0].AIC, 0.000001)
+	require.InDelta(t, 0.7, summary.AgentUsage[1].AIC, 0.000001)
+	require.Len(t, summary.AgentUsage, 3)
+	require.Equal(t, "main", summary.AgentUsage[2].AgentType)
+
+	unmatched := &TokenUsageSummary{AgentUsage: []AgentUsageBreakdown{{
+		AgentName: "reader", AgentType: "subagent", SourceEngine: "pi",
+		requestUsages: []agentRequestUsage{{Model: "claude-haiku-4-5-20251001", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 1}}},
+	}}}
+	matchPiAgentUsageCredits(unmatched, entries[:1], resolver)
+	require.Len(t, unmatched.Warnings, 1)
+	require.Contains(t, unmatched.Warnings[0], "credits were not inferred")
+	require.Zero(t, unmatched.AgentUsage[0].AIC)
+}
+
+func TestReconcileAgentUsageCreditsNamesEndpoint(t *testing.T) {
+	summary := &TokenUsageSummary{
+		AICFound: true, TotalAIC: 2.576, endpoint: "/responses",
+		AgentUsage: []AgentUsageBreakdown{{AgentName: "main", AIC: 2.743}},
+	}
+	reconcileAgentUsageCredits(summary)
+	require.Len(t, summary.Warnings, 1)
+	require.Contains(t, summary.Warnings[0], "/responses")
+	require.Contains(t, summary.Warnings[0], "differ from proxy total")
 }
 
 func TestSubagentDispatchLine(t *testing.T) {
