@@ -8,7 +8,7 @@
     "@actions/glob": "^0.7.0",
     "@actions/io": "^3.0.2",
     "@github/copilot-sdk": "^1.0.16",
-    "@types/node": "^26.6.4",
+    "@types/node": "26.6.3",
     "@vitest/coverage-v8": "^5.0.3",
     "@vitest/ui": "^5.0.3",
     "ajv": "^8.17.1",
@@ -17,11 +17,18 @@
     "prettier": "^3.9.9",
     "ts-json-schema-generator": "2.4.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2",
+    "vite": "8.3.1",
     "vitest": "^5.0.3"
   },
   "overrides": {
-    "undici": "^6.23.0"
+    "magic-string": "1.4.2",
+    "undici": "^6.23.0",
+    "vite": {
+      "postcss": {
+        ".": "8.5.28",
+        "nanoid": "3.3.19"
+      }
+    }
   },
   "scripts": {
     "schema:session": "node scripts/generate_session_schemas.cjs",
