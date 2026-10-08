@@ -1,8 +1,8 @@
 # ADR-66746: Prefer Structured Unified Sessions over Stdio Heuristics for Subagent Model Attribution
 
-**Date**: 2026-11-24
-**Status**: Draft
-**Deciders**: pelikhan [TODO: verify full decider list]
+**Date**: 2026-10-08
+**Status**: Proposed
+**Deciders**: pelikhan
 
 ---
 
@@ -50,4 +50,4 @@ Have the workflow runtime write an aggregated subagent attribution file that the
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Proposed for maintainer review; acceptance is not implied by implementation.*

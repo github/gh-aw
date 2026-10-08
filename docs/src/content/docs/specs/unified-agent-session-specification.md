@@ -832,6 +832,19 @@ heuristic warning; only CLI dispatch-marker lines are considered, supporting
 both `Name(model)` and `Name (model: model)` layouts. Invalid structured evidence
 produces a warning before falling back.
 
+Subagent attribution is scoped to the final retry session; earlier source
+records cannot contribute even when merged timestamps interleave them.
+Malformed preferred artifacts produce diagnostics while the reader continues
+to the next structured source before attempting legacy inference.
+
+Step summaries display subagent instance IDs, definition and display names,
+parent-agent identity, model configuration, per-model requests and token counts,
+and per-agent credits. Credit percentages use only the complete per-agent
+snapshot, not proxy or router totals. Snapshots replace earlier observations;
+native and projected copies are not added together. Missing accounting remains
+unavailable, distinct from observed zero usage. Publication applies the existing
+redaction, escaping, and byte limits.
+
 ### 7.3 Codex
 
 **T-UAS-038 — Codex adapter.** The Codex adapter MUST support recognized `thread.*`, `turn.*`, and `item.*` JSONL records and the existing recognized legacy text layouts. It MUST preserve native item/tool IDs, independent starts/completions, text/reasoning, explicit tool failures, and session errors. Distinct `turn.completed.usage` reports MUST accumulate as specified in Section 6.

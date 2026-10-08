@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,72 @@ const subagentSessionHeader = `{"type":"session.format","data":{"version":1},"pr
 
 func subagentSessionRecord(record string) string {
 	return strings.TrimSuffix(record, "}") + `,"provenance":{"component":"agent","phase":"agent"}}` + "\n"
+}
+
+func TestSessionSubagentModelsInterleavedRetries(t *testing.T) {
+	t.Parallel()
+	for _, canonical := range []bool{false, true} {
+		t.Run(fmt.Sprintf("canonical=%t", canonical), func(t *testing.T) {
+			t.Parallel()
+			record := func(kind, path, id, timestamp, data string) string {
+				provenance := `"path":"` + path + `"`
+				if canonical {
+					provenance = `"path":"agent-session.jsonl","native":{"path":"` + path + `"}`
+				}
+				return `{"type":"` + kind + `","agentId":"` + id + `","timestamp":"` + timestamp + `","data":` + data +
+					`,"provenance":{"component":"agent","phase":"agent",` + provenance + "}}\n"
+			}
+			early := "2026-10-08T01:00:00Z"
+			late := "2026-10-08T01:01:00Z"
+			content := subagentSessionHeader +
+				record("session.start", "first.jsonl", "", early, `{"sessionId":"first"}`) +
+				record("session.init", "first.jsonl", "", early, `{"sourceEngine":"copilot","sessionId":"first"}`) +
+				record("session.start", "last.jsonl", "", late, `{"sessionId":"last"}`) +
+				record("session.init", "last.jsonl", "", late, `{"sourceEngine":"copilot","sessionId":"last"}`) +
+				record("subagent.started", "last.jsonl", "child", late, `{"agentName":"final-worker","model":"haiku"}`) +
+				record("session.result", "last.jsonl", "", late, `{"agentMetrics":{"child":{"modelMetrics":{"haiku":{"requests":{"count":7}}}}}}`) +
+				record("subagent.started", "first.jsonl", "child", late, `{"agentName":"stale-worker","model":"opus"}`) +
+				record("session.result", "first.jsonl", "", late, `{"agentMetrics":{"child":{"modelMetrics":{"opus":{"requests":{"count":99}}}}}}`)
+			requests, actuals, found, err := parseSessionSubagentModels(strings.NewReader(content), true)
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Equal(t, []SubagentModelRequest{{AgentName: "final-worker", RequestedModel: "haiku", EffectiveModel: "haiku", InvocationCount: 1}}, requests)
+			require.Equal(t, []SubagentModelActual{{Model: "haiku", Requests: 7}}, actuals)
+		})
+	}
+}
+
+func TestSubagentSessionStart(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name, record string
+		milliseconds int64
+		wantError    bool
+	}{
+		{name: "RFC3339", record: `{"timestamp":"1970-01-01T00:00:02Z"}`, milliseconds: 2000},
+		{name: "milliseconds", record: `{"timestamp":2000}`, milliseconds: 2000},
+		{name: "seconds", record: `{"timestamp":2,"provenance":{"timestampUnit":"seconds"}}`, milliseconds: 2000},
+		{name: "missing", record: `{}`},
+		{name: "null", record: `{"timestamp":null}`},
+		{name: "invalid", record: `{"timestamp":"not-a-date"}`, wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var event sessionSubagentEvent
+			require.NoError(t, json.Unmarshal([]byte(test.record), &event))
+			start, err := subagentSessionStart(event)
+			if test.wantError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if test.milliseconds == 0 {
+				require.True(t, start.IsZero())
+			} else {
+				require.Equal(t, test.milliseconds, start.UnixMilli())
+			}
+		})
+	}
 }
 
 func TestSessionSubagentModels(t *testing.T) {

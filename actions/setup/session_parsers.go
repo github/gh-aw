@@ -12,6 +12,7 @@ import "embed"
 //go:embed js/provider_refusal.cjs
 //go:embed js/codex_session.cjs js/codex_log_framing.cjs js/copilot_session.cjs
 //go:embed js/copilot_workflow_events.cjs js/dynamic_workflow_session.cjs
+//go:embed js/subagent_session_render.cjs
 //go:embed js/gemini_session.cjs
 //go:embed js/pi_session.cjs js/pi_session_redaction.cjs js/session_artifact.cjs
 //go:embed js/log_parser_bootstrap.cjs js/log_parser_format.cjs js/log_parser_shared.cjs
