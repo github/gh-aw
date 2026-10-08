@@ -58,7 +58,7 @@ const tabIcon = { 'repo-assist': 'copilot', 'ci-doctor': 'pulse', 'repo-status':
           <h3>{w.name}</h3>
           <span class="wf-trigger"><Octicon name={w.triggerIcon} size={14} />{w.trigger}</span>
           <p class="wf-outcome">{w.outcome}</p>
-          <p class="wf-detail">{w.detail}</p>
+          <p class="wf-detail" data-slideshow-hide>{w.detail}</p>
           {w.id === 'repo-assist' && (
             <p class="wf-proof">Running in <b>13</b> open-source repos, Repo Assist has closed <b>578</b> issues, with issues closing a median <b>8X</b> faster.</p>
           )}

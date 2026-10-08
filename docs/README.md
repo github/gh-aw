@@ -36,6 +36,48 @@ All commands are run from the root of the project, from a terminal:
 | `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
 
+## Homepage slideshow
+
+On desktop, select the presentation icon in the homepage header to present the
+landing page as a nine-slide deck. The slideshow runtime, drawing tools, and
+snippet expansion JavaScript are loaded on demand on the first click, not
+when browsing the page. Slides fit the window and retain their
+interactive examples. Use the previous/next buttons, arrow keys or Page Up/Page
+Down to navigate, Home/End to jump to the first/last slide, and Escape or the
+close button to return to the page. Keyboard controls inside demos keep their
+normal behavior. The presentation icon is hidden below the desktop menu breakpoint
+(50rem), and resizing to mobile exits the slideshow.
+Supported browsers animate slide changes with directional CSS View Transitions;
+reduced-motion preferences disable these animations.
+The compact toolbar floats above the bottom of the slide without reserving
+footer space. It rests at 12% opacity and becomes opaque on hover, keyboard
+focus, or while its drawing palette is open.
+Add `data-slideshow-hide` to any element to omit secondary content from the
+presentation without hiding it on the normal page. On a whole slide section,
+the attribute skips that slide and updates the navigation count. Guided-form
+notes, lengthy workflow descriptions, the extra workflow catalog, and the
+custom-engine footnote already use this annotation.
+When a demo tab is focused, Left/Right select tabs; Up/Down and Page Up/Page Down
+still navigate slides, and Tab/Shift+Tab leave the tablist.
+
+The pencil button opens drawing tools inspired by
+[Microsoft Streamer](https://github.com/microsoft/streamer): colored rectangles
+(hold Shift for squares), arrows, and emoji stamps. Click to stamp an emoji or
+drag to resize and rotate it. Select the pointer tool to interact with demos.
+Undo (also Ctrl/Cmd+Z) and clear apply to the current slide. Drawings stay with
+their slide while presenting and are cleared when exiting. Escape leaves
+drawing mode and clears all annotations without leaving the slide; a second
+Escape exits the presentation.
+Drawing instructions appear in the question-mark tooltip on hover or keyboard focus.
+
+Click a code snippet, prompt, or example output to expand it to a full-window
+view with larger type. Enter/Space also expand a focused snippet. The view
+zooms and fades smoothly (unless reduced motion is enabled); Escape or its
+close button returns focus to the snippet without changing slides.
+Code in the expanded view is editable as plain text for live demonstrations.
+Edits affect only the expanded copy and are discarded when it closes; opening
+the snippet again restores its original contents.
+
 ## ⚠️ Known Dev-Mode Limitations
 
 ### Sitemap behavior in dev and production

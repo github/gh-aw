@@ -4,7 +4,7 @@ import Octicon from '../Octicon.astro';
 ---
 
 <div class="va" aria-hidden="true">
-  <div class="va-card aw-card va-chat">
+  <div class="va-card aw-card va-chat" data-slideshow-snippet="Coding agent prompt">
     <div class="va-msg">
       <span class="va-you">You</span>
       <p>Create a daily agentic workflow that gives me an issue summary</p>
@@ -17,7 +17,7 @@ import Octicon from '../Octicon.astro';
 
   <div class="va-step"><span class="va-step-line"></span></div>
 
-  <div class="va-card aw-card va-file">
+  <div class="va-card aw-card va-file" data-slideshow-snippet="daily-issue-summary.md">
     <div class="va-bar"><Octicon name="file" size={14} />.github/workflows/daily-issue-summary.md</div>
 <pre class="va-code"><span class="m">---</span>
 <span class="k">on:</span> daily
@@ -30,7 +30,7 @@ anything that needs a reply.</pre>
 
   <div class="va-step va-step-time"><span class="va-step-label"><Octicon name="clock" size={14} />Next morning, 08:00</span></div>
 
-  <div class="va-card aw-card va-issue">
+  <div class="va-card aw-card va-issue" data-slideshow-snippet="Issue summary">
     <div class="va-issue-head">
       <span class="va-title">Issue summary — Oct 2 <span class="va-num">#241</span></span>
       <span class="va-state"><Octicon name="issue-opened" size={14} />Open</span>
