@@ -1,0 +1,103 @@
+---
+import Octicon from '../Octicon.astro';
+---
+
+<dialog class="snippet-dialog" data-slideshow-snippet-dialog aria-labelledby="slideshow-snippet-title">
+  <div class="snippet-header">
+    <h2 id="slideshow-snippet-title">Expanded snippet</h2>
+    <button type="button" data-snippet-close aria-label="Close expanded snippet" autofocus>
+      <Octicon name="x" size={24} />
+    </button>
+  </div>
+  <div class="snippet-content" data-snippet-content></div>
+</dialog>
+
+<script>
+  import { initializeSlideshowSnippets } from '../../scripts/slideshow-snippets';
+
+  let cleanup = () => {};
+  function initialize() {
+    cleanup();
+    cleanup = initializeSlideshowSnippets();
+  }
+  initialize();
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+</script>
+
+<style>
+  .snippet-dialog {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: clamp(1.5rem, 4vw, 4rem);
+    border: 0;
+    background: var(--aw-color-bg);
+    color: var(--aw-color-text);
+    overflow: auto;
+    opacity: 0;
+    transform: scale(0.96);
+    transition: opacity 220ms ease, transform 220ms ease, display 220ms allow-discrete, overlay 220ms allow-discrete;
+  }
+  .snippet-dialog[open] { display: flex; flex-direction: column; opacity: 1; transform: scale(1); }
+  @starting-style {
+    .snippet-dialog[open] { opacity: 0; transform: scale(0.96); }
+  }
+  .snippet-dialog::backdrop {
+    background: var(--aw-color-bg);
+    opacity: 0;
+    transition: opacity 220ms ease, display 220ms allow-discrete, overlay 220ms allow-discrete;
+  }
+  .snippet-dialog[open]::backdrop { opacity: 1; }
+  @starting-style {
+    .snippet-dialog[open]::backdrop { opacity: 0; }
+  }
+  .snippet-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .snippet-header h2 { margin: 0; font-size: var(--aw-step-1); font-weight: 500; }
+  .snippet-header button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-sm);
+    background: var(--aw-color-surface);
+    color: var(--aw-color-text);
+    cursor: pointer;
+  }
+  .snippet-content {
+    --aw-step--1: clamp(1.25rem, 2.4vw, 2rem);
+    --aw-step-0: clamp(1.5rem, 2.8vw, 2.25rem);
+    --aw-text-ui: clamp(1.25rem, 2.4vw, 2rem);
+    width: min(100%, 76rem);
+    margin: auto;
+    padding-block: 2rem;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+  }
+  .snippet-content > :global(*) {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    overflow: visible;
+    animation: none;
+    transform: none;
+  }
+  .snippet-content :global(pre) { font-size: var(--aw-step-0); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .snippet-content :global(.gh) { position: relative; inset: auto; width: 100%; min-height: 0; padding: 2rem; }
+  .snippet-content :global([data-snippet-trigger]) { cursor: auto; }
+  :global(#landing-slideshow [data-snippet-trigger]) { cursor: zoom-in; }
+  :global(#landing-slideshow [data-snippet-trigger]:focus-visible) { outline: var(--aw-focus-ring); outline-offset: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    .snippet-dialog, .snippet-dialog::backdrop { transition: none; transform: none; }
+  }
+</style>

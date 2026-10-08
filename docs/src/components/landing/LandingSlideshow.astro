@@ -1,0 +1,374 @@
+---
+import Octicon from '../Octicon.astro';
+import SlideshowDrawing from './SlideshowDrawing.astro';
+import SlideshowSnippet from './SlideshowSnippet.astro';
+---
+
+<button
+  type="button"
+  class="slideshow-trigger"
+  data-slideshow-trigger
+  aria-label="Start slideshow"
+  aria-haspopup="dialog"
+  aria-controls="landing-slideshow"
+  title="Start slideshow"
+  hidden
+>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M3 3h18M4 3v13h16V3M12 16v5M7 21l5-5 5 5" />
+    <path d="m10 7 5 3-5 3Z" />
+  </svg>
+</button>
+
+<dialog id="landing-slideshow" aria-label="GitHub Agentic Workflows presentation">
+  <div class="slideshow-viewport" data-slideshow-viewport>
+    <div class="slideshow-stage" data-slideshow-stage>
+      <svg class="slideshow-ink" data-slideshow-ink role="img" aria-label="Slide annotations" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+  <div class="slideshow-controls" role="group" aria-label="Slide navigation">
+    <span class="slideshow-hint">Arrow keys to navigate · Esc to exit</span>
+    <SlideshowDrawing />
+    <button type="button" data-slideshow-previous aria-label="Previous slide">
+      <Octicon name="chevron-left" size={20} />
+    </button>
+    <span data-slideshow-status role="status" aria-live="polite" aria-atomic="true"></span>
+    <button type="button" data-slideshow-next aria-label="Next slide">
+      <Octicon name="chevron-right" size={20} />
+    </button>
+    <button type="button" data-slideshow-close aria-label="Exit slideshow" autofocus>
+      <Octicon name="x" size={20} />
+    </button>
+  </div>
+  <SlideshowSnippet />
+</dialog>
+
+<script>
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const trigger = document.querySelector<HTMLButtonElement>('[data-slideshow-trigger]');
+    const dialog = document.querySelector<HTMLDialogElement>('#landing-slideshow');
+    const deck = document.querySelector<HTMLElement>('[data-slideshow-slides]');
+    const viewport = dialog?.querySelector<HTMLElement>('[data-slideshow-viewport]');
+    const stage = dialog?.querySelector<HTMLElement>('[data-slideshow-stage]');
+    const ink = dialog?.querySelector<SVGSVGElement>('[data-slideshow-ink]');
+    const previous = dialog?.querySelector<HTMLButtonElement>('[data-slideshow-previous]');
+    const next = dialog?.querySelector<HTMLButtonElement>('[data-slideshow-next]');
+    const close = dialog?.querySelector<HTMLButtonElement>('[data-slideshow-close]');
+    const status = dialog?.querySelector<HTMLElement>('[data-slideshow-status]');
+    if (!trigger || !dialog || !deck || !viewport || !stage || !ink || !previous || !next || !close || !status) return;
+    const slides = Array.from(deck.querySelectorAll<HTMLElement>(':scope > section'));
+    if (!slides.length) return;
+
+    const controller = new AbortController();
+    const { signal } = controller;
+    const desktop = window.matchMedia('(min-width: 50rem)');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const placeholder = document.createComment('Landing slideshow');
+    let index = 0;
+    let requestedIndex = 0;
+    let scrollY = 0;
+    let transition: ViewTransition | undefined;
+
+    const fit = () => {
+      if (!dialog.open) return;
+      const width = deck.offsetWidth;
+      const height = deck.offsetHeight;
+      if (!width || !height) return;
+      const scale = Math.min(1, viewport.clientWidth / width, viewport.clientHeight / height);
+      stage.style.width = `${width * scale}px`;
+      stage.style.height = `${height * scale}px`;
+      deck.style.transform = `scale(${scale})`;
+      ink.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    };
+
+    const observer = new ResizeObserver(fit);
+    observer.observe(viewport);
+    observer.observe(deck);
+
+    function pauseVideos(slide: HTMLElement) {
+      slide.querySelectorAll('video').forEach(video => video.pause());
+    }
+
+    const showSlide = (target: number) => {
+      const newIndex = Math.max(0, Math.min(slides.length - 1, target));
+      if (newIndex !== index) pauseVideos(slides[index]);
+      index = newIndex;
+      slides.forEach((slide, i) => { slide.hidden = i !== index; });
+      previous.disabled = index === 0;
+      next.disabled = index === slides.length - 1;
+      const heading = Array.from(slides[index].querySelectorAll<HTMLElement>('h1, h2'))
+        .find(element => element.checkVisibility());
+      status.textContent = `${index + 1} / ${slides.length} — ${heading?.textContent?.trim() ?? 'Slide'}`;
+      // Keep focus out of hidden slides and disabled navigation buttons.
+      if (document.activeElement instanceof HTMLElement &&
+          (document.activeElement.closest('section[hidden]') ||
+           document.activeElement === previous && previous.disabled ||
+           document.activeElement === next && next.disabled)) {
+        close.focus({ preventScroll: true });
+      }
+      fit();
+      dialog.dataset.slideIndex = String(index);
+      dialog.dispatchEvent(new Event('slideshow:slide-change'));
+    };
+
+    const navigate = (target: number) => {
+      const newIndex = Math.max(0, Math.min(slides.length - 1, target));
+      if (newIndex === requestedIndex) return;
+      const direction = newIndex > requestedIndex ? 'forward' : 'backward';
+      requestedIndex = newIndex;
+      transition?.skipTransition();
+      if (!document.startViewTransition || reducedMotion.matches) {
+        showSlide(newIndex);
+        return;
+      }
+      document.documentElement.dataset.slideshowDirection = direction;
+      const current = document.startViewTransition(() => {
+        if (dialog.open && requestedIndex === newIndex) showSlide(newIndex);
+      });
+      transition = current;
+      current.finished.then(() => {
+        if (transition !== current) return;
+        transition = undefined;
+        delete document.documentElement.dataset.slideshowDirection;
+      });
+    };
+
+    const restore = () => {
+      transition?.skipTransition();
+      transition = undefined;
+      delete document.documentElement.dataset.slideshowDirection;
+      if (!placeholder.parentNode) return;
+      slides.forEach(slide => {
+        pauseVideos(slide);
+        slide.hidden = false;
+      });
+      deck.style.removeProperty('transform');
+      placeholder.replaceWith(deck);
+      dialog.dispatchEvent(new Event('slideshow:reset'));
+      window.scrollTo({ top: scrollY, behavior: 'instant' });
+      trigger.focus({ preventScroll: true });
+    };
+
+    trigger.hidden = false;
+    trigger.addEventListener('click', () => {
+      if (!desktop.matches || dialog.open) return;
+      scrollY = window.scrollY;
+      deck.replaceWith(placeholder);
+      stage.prepend(deck);
+      dialog.showModal();
+      requestedIndex = 0;
+      showSlide(0);
+      close.focus({ preventScroll: true });
+    }, { signal });
+    previous.addEventListener('click', () => navigate(requestedIndex - 1), { signal });
+    next.addEventListener('click', () => navigate(requestedIndex + 1), { signal });
+    close.addEventListener('click', () => {
+      dialog.close();
+      restore();
+    }, { signal });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      dialog.close();
+      restore();
+    }, { signal });
+    dialog.addEventListener('close', () => {
+      if (!dialog.open) restore();
+    }, { signal });
+    desktop.addEventListener('change', () => {
+      if (!desktop.matches && dialog.open) {
+        dialog.close();
+        restore();
+      }
+    }, { signal });
+    dialog.addEventListener('keydown', event => {
+      if (dialog.querySelector('dialog[open]')) return;
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
+          event.target instanceof HTMLElement &&
+          event.target.closest('input, textarea, select, video, summary, [contenteditable]')) return;
+      if (event.target instanceof HTMLElement && event.target.closest('[role="tab"]') &&
+          ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const destinations: Record<string, number> = {
+        ArrowRight: requestedIndex + 1, ArrowDown: requestedIndex + 1, PageDown: requestedIndex + 1,
+        ArrowLeft: requestedIndex - 1, ArrowUp: requestedIndex - 1, PageUp: requestedIndex - 1,
+        Home: 0, End: slides.length - 1,
+      };
+      if (!(event.key in destinations)) return;
+      event.preventDefault();
+      navigate(destinations[event.key]);
+    }, { signal });
+
+    cleanup = () => {
+      controller.abort();
+      observer.disconnect();
+      if (dialog.open) dialog.close();
+      restore();
+      trigger.hidden = true;
+    };
+  }
+
+  initialize();
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+</script>
+
+<style>
+  .slideshow-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--aw-radius-sm);
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+  }
+  .slideshow-trigger:hover { color: var(--aw-color-text-strong); }
+  .slideshow-trigger[hidden] { display: none; }
+  @media (max-width: 49.99rem) {
+    .slideshow-trigger { display: none; }
+  }
+  :global(html:has(#landing-slideshow[open])) { overflow: hidden; }
+  dialog {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: var(--aw-color-bg);
+    color: var(--aw-color-text);
+    font-family: var(--aw-font-sans);
+    overflow: hidden;
+  }
+  dialog[open] { display: flex; flex-direction: column; }
+  .slideshow-viewport {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 0;
+    margin: 1rem 1rem 5.5rem;
+    overflow: hidden;
+  }
+  .slideshow-stage { position: relative; flex: none; }
+  dialog[open] .slideshow-stage { view-transition-name: aw-slide; }
+  .slideshow-ink {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .slideshow-ink[data-tool]:not([data-tool='pointer']) {
+    pointer-events: auto;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  dialog :global([data-slideshow-slides]) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 72rem;
+    transform-origin: top left;
+  }
+  dialog :global([data-slideshow-slides] > section) {
+    margin: 0;
+    padding-block: 2rem;
+  }
+  dialog :global([data-slideshow-slides] > section[hidden]) { display: none; }
+  .slideshow-controls {
+    position: absolute;
+    inset-inline: 1rem;
+    bottom: 1rem;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex: none;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--aw-color-divider);
+    border-radius: var(--aw-radius-md);
+    background: color-mix(in srgb, var(--aw-color-bg) 85%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--aw-shadow-raised);
+    font-size: var(--aw-step--1);
+    opacity: 0.65;
+    transition: opacity 180ms ease, background-color 180ms ease;
+  }
+  .slideshow-controls:hover,
+  .slideshow-controls:has(:focus-visible) {
+    opacity: 1;
+    background: var(--aw-color-bg);
+  }
+  .slideshow-hint { margin-inline-end: auto; color: var(--aw-color-text-muted); }
+  .slideshow-controls :global(button) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-sm);
+    background: var(--aw-color-surface);
+    color: var(--aw-color-text);
+    cursor: pointer;
+  }
+  .slideshow-controls :global(button:hover) { background: var(--aw-color-bg-subtle); }
+  .slideshow-controls :global(button:disabled) { opacity: 0.4; cursor: default; }
+  [data-slideshow-status] {
+    max-width: min(40vw, 32rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+  }
+  [data-slideshow-close] { margin-inline-start: auto; }
+  @media (max-width: 63.99rem) {
+    .slideshow-hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slideshow-controls { transition: none; }
+  }
+</style>
+
+<style is:global>
+  html[data-slideshow-direction='forward'] { --aw-slide-offset: 3rem; }
+  html[data-slideshow-direction='backward'] { --aw-slide-offset: -3rem; }
+  html[data-slideshow-direction]::view-transition { pointer-events: none; }
+  html[data-slideshow-direction]::view-transition-old(root),
+  html[data-slideshow-direction]::view-transition-new(root) { animation: none; }
+  html[data-slideshow-direction]::view-transition-group(aw-slide) {
+    animation-duration: 280ms;
+    animation-timing-function: ease;
+  }
+  html[data-slideshow-direction]::view-transition-old(aw-slide) {
+    animation: aw-slide-out 200ms ease-in both;
+  }
+  html[data-slideshow-direction]::view-transition-new(aw-slide) {
+    animation: aw-slide-in 280ms ease-out both;
+  }
+  @keyframes aw-slide-out {
+    to { opacity: 0; transform: translateX(calc(-1 * var(--aw-slide-offset))) scale(0.98); }
+  }
+  @keyframes aw-slide-in {
+    from { opacity: 0; transform: translateX(var(--aw-slide-offset)) scale(0.98); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html[data-slideshow-direction]::view-transition-group(aw-slide),
+    html[data-slideshow-direction]::view-transition-old(aw-slide),
+    html[data-slideshow-direction]::view-transition-new(aw-slide) { animation: none; }
+  }
+</style>

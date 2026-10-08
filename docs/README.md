@@ -36,6 +36,34 @@ All commands are run from the root of the project, from a terminal:
 | `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
 
+## Homepage slideshow
+
+On desktop, select the presentation icon in the homepage header to present the
+landing page as a nine-slide deck. Slides fit the window and retain their
+interactive examples. Use the previous/next buttons, arrow keys or Page Up/Page
+Down to navigate, Home/End to jump to the first/last slide, and Escape or the
+close button to return to the page. Keyboard controls inside demos keep their
+normal behavior. The presentation icon is hidden below the desktop menu breakpoint
+(50rem), and resizing to mobile exits the slideshow.
+Supported browsers animate slide changes with directional CSS View Transitions;
+reduced-motion preferences disable these animations.
+The floating toolbar is semi-transparent until hovered or focused with the keyboard.
+When a demo tab is focused, Left/Right select tabs; Up/Down and Page Up/Page Down
+still navigate slides, and Tab/Shift+Tab leave the tablist.
+
+The pencil button opens drawing tools inspired by
+[Microsoft Streamer](https://github.com/microsoft/streamer): colored rectangles
+(hold Shift for squares), lines, and emoji stamps. Click to stamp an emoji or
+drag to resize and rotate it. Select the pointer tool to interact with demos.
+Undo (also Ctrl/Cmd+Z) and clear apply to the current slide. Drawings stay with
+their slide while presenting and are cleared when exiting. Escape first closes
+an open drawing palette, then exits the presentation.
+
+Click a code snippet, prompt, or example output to expand it to a full-window
+view with larger type. Enter/Space also expand a focused snippet. The view
+zooms and fades smoothly (unless reduced motion is enabled); Escape or its
+close button returns focus to the snippet without changing slides.
+
 ## ⚠️ Known Dev-Mode Limitations
 
 ### Sitemap behavior in dev and production

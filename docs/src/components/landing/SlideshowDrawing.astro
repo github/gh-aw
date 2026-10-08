@@ -1,0 +1,103 @@
+---
+import Octicon from '../Octicon.astro';
+
+const emojis = [
+  { symbol: '😄', label: 'Smile' },
+  { symbol: '🤔', label: 'Thinking' },
+  { symbol: '😭', label: 'Crying' },
+  { symbol: '👀', label: 'Eyes' },
+];
+const colors = [
+  { value: '#ffe135', label: 'Yellow' },
+  { value: '#00d9ff', label: 'Cyan' },
+  { value: '#cf1fdb', label: 'Magenta' },
+  { value: '#ee0000', label: 'Red' },
+];
+---
+
+<div class="drawing-tools" data-slideshow-drawing>
+  <button type="button" data-drawing-toggle aria-label="Drawing tools" aria-expanded="false" aria-controls="slideshow-drawing-panel" title="Drawing tools">
+    <Octicon name="pencil" size={20} />
+  </button>
+  <div id="slideshow-drawing-panel" class="drawing-panel" role="group" aria-label="Draw on slides" hidden>
+    <div class="drawing-row">
+      <button type="button" data-drawing-tool="pointer" aria-label="Interact with slide" aria-pressed="true" title="Interact with slide">
+        <Octicon name="cursor" size={20} />
+      </button>
+      <button type="button" data-drawing-tool="rect" aria-label="Draw rectangle (Shift for square)" aria-pressed="false" title="Draw rectangle (Shift for square)">
+        <Octicon name="square" size={20} />
+      </button>
+      <button type="button" data-drawing-tool="line" aria-label="Draw line" aria-pressed="false" title="Draw line">
+        <Octicon name="dash" size={20} />
+      </button>
+      {emojis.map(emoji => (
+        <button type="button" data-drawing-tool="emoji" data-emoji={emoji.symbol} aria-label={`${emoji.label} emoji`} aria-pressed="false" title={`${emoji.label} emoji`}>
+          <span aria-hidden="true">{emoji.symbol}</span>
+        </button>
+      ))}
+    </div>
+    <div class="drawing-row">
+      <div class="drawing-colors" role="group" aria-label="Ink color">
+        {colors.map((color, index) => (
+          <button type="button" data-drawing-color={color.value} aria-label={`${color.label} ink`} aria-pressed={index === 0 ? 'true' : 'false'} title={`${color.label} ink`}>
+            <span class="drawing-swatch" style={`background:${color.value}`} aria-hidden="true"></span>
+          </button>
+        ))}
+      </div>
+      <button type="button" data-drawing-undo aria-label="Undo drawing" title="Undo drawing (Ctrl/Cmd+Z)" disabled>
+        <Octicon name="reply" size={20} />
+      </button>
+      <button type="button" data-drawing-clear aria-label="Clear slide drawings" title="Clear slide drawings" disabled>
+        <Octicon name="trash" size={20} />
+      </button>
+    </div>
+    <p>Drag to draw. Hold Shift for squares. Click an emoji to stamp; drag to resize and rotate.</p>
+    <span class="sr-only" data-drawing-status role="status" aria-live="polite"></span>
+  </div>
+</div>
+
+<script>
+  import { initializeSlideshowDrawing } from '../../scripts/slideshow-drawing';
+
+  let cleanup = () => {};
+  function initialize() {
+    cleanup();
+    cleanup = initializeSlideshowDrawing();
+  }
+  initialize();
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+</script>
+
+<style>
+  .drawing-tools { position: relative; }
+  .drawing-panel {
+    position: absolute;
+    inset-inline-start: 0;
+    bottom: calc(100% + 1rem);
+    width: max-content;
+    max-width: calc(100vw - 4rem);
+    padding: 0.75rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-md);
+    background: var(--aw-color-bg);
+    box-shadow: var(--aw-shadow-raised);
+  }
+  .drawing-panel[hidden] { display: none; }
+  .drawing-row, .drawing-colors { display: flex; gap: 0.375rem; align-items: center; }
+  .drawing-row + .drawing-row { margin-top: 0.5rem; }
+  .drawing-colors { margin-inline-end: auto; }
+  .drawing-tools button[aria-pressed='true'] {
+    border-color: var(--aw-color-accent);
+    box-shadow: inset 0 0 0 1px var(--aw-color-accent);
+  }
+  .drawing-tools [data-emoji] { font-size: 1.5rem; }
+  .drawing-swatch { width: 1.125rem; height: 1.125rem; border-radius: 50%; }
+  .drawing-panel p {
+    max-width: 35ch;
+    margin: 0.75rem 0 0;
+    color: var(--aw-color-text-muted);
+    font-size: var(--aw-step--1);
+    line-height: 1.5;
+  }
+</style>
