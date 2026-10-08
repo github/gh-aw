@@ -13,7 +13,7 @@
           "enum": ["append", "add", "remove", "put", "delete", "insert", "update", "upsert", "increment", "decrement"],
           "description": "Built-in ledger operation (allowed operations depend on its configured type)."
         },
-        "value": { "type": ["object", "array", "string", "number", "boolean", "null"], "description": "Value for append, add, remove, put, insert, or upsert." },
+        "value": { "type": ["object", "array", "string", "number", "boolean", "null"], "x-preserve-blank": true, "description": "Value for append, add, remove, put, insert, or upsert." },
         "key": { "type": "string", "description": "String key for put, delete, or update." },
         "patch": { "type": "object", "description": "Shallow object merge patch for table update." },
         "name": { "type": "string", "description": "Counter name." },
@@ -1368,6 +1368,7 @@
           "description": "Trustworthiness level of the message source (e.g., \"low\", \"medium\", \"high\")."
         }
       },
+      "anyOf": [{ "required": ["status"] }, { "required": ["title"] }, { "required": ["body"] }, { "required": ["labels"] }, { "required": ["assignees"] }, { "required": ["milestone"] }],
       "additionalProperties": false
     }
   },

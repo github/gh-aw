@@ -718,83 +718,34 @@ Agent calls `set_issue_field` with `value`, and either `field_name` (preferred) 
 }
 ```
 
-#### Issue field discovery mechanism
+#### Issue field discovery
 
-When `field_name` is provided, the handler discovers available issue fields for the target repository and resolves the matching field automatically.
-
-1. Agent calls `set_issue_field` with `field_name`.
-2. Handler fetches available issue fields and resolves the field by label.
-3. If the field is unknown, the error includes available field names and guidance to use `field_node_id`.
-
-```json
-{
-  "type": "set_issue_field",
-  "field_name": "Urgency",
-  "value": "P0"
-}
-```
-
-Example actionable error:
+When `field_name` is provided, the handler fetches the repository's issue fields and resolves the matching one. If the field is unknown, the error lists available names and suggests `field_node_id`:
 
 ```text
 Issue field "Urgency" not found. Available fields: Priority, Iteration, Story Points.
 Use a listed field_name or provide field_node_id to bypass discovery.
 ```
 
-Retrying with explicit ID:
+Retry with `{"type": "set_issue_field", "field_node_id": "PVTF_lADOExampleFieldId", "value": "P0"}` to skip discovery.
 
-```json
-{
-  "type": "set_issue_field",
-  "field_node_id": "PVTF_lADOExampleFieldId",
-  "value": "P0"
-}
-```
-
-#### End-to-end triage workflow example (discovery + field updates)
+#### Triage example
 
 ```yaml wrap
----
-on:
-  issues:
-    types: [opened, reopened]
-
-permissions:
-  contents: read
-  issues: write
-
 safe-outputs:
-  create-issue:
-    title-prefix: "[triage] "
-    labels: [triage]
-    allowed-fields: [Priority, Iteration, Story Points]
   update-issue:
     target: triggering
-    status:
     body:
   set-issue-field:
     target: triggering
     allowed-fields: [Priority, Iteration]
----
 ```
 
 ```json
 [
-  {
-    "type": "update_issue",
-    "body": "Initial triage complete. Escalating for review.",
-    "operation": "append"
-  },
-  {
-    "type": "set_issue_field",
-    "field_name": "Priority",
-    "value": "High"
-  },
-  {
-    "type": "set_issue_field",
-    "field_name": "Iteration",
-    "value": "Sprint 42"
-  }
+  {"type": "update_issue", "body": "Initial triage complete.", "operation": "append"},
+  {"type": "set_issue_field", "field_name": "Priority", "value": "High"},
+  {"type": "set_issue_field", "field_name": "Iteration", "value": "Sprint 42"}
 ]
 ```
 

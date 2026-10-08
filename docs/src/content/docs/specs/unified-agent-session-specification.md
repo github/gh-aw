@@ -1080,6 +1080,11 @@ unified events. Their unified view shows file version, per-component record
 counts, per-source agent statistics and conversations, and a chronological trace. Existing
 agent-only inputs retain their earlier rendering behavior.
 
+Actions publishes this view once in a plain-titled `Unified session` disclosure,
+using a fenced CLI-style transcript like the Claude conversation summary rather
+than a Markdown table. Gateway diagnostics do not append a second unified event
+timeline, and the disclosure does not repeat its title as a standalone heading.
+
 | Observation | Unified display projection |
 | --- | --- |
 | Agent messages and tool lifecycle | Source-ordered conversations preserve multiline assistant/reasoning text and display tool arguments, output/error previews, pending/unknown/orphan outcomes, and scoped accounting before the runtime trace. The chronological trace includes correlation IDs and observed outcomes. User prompt records remain omitted. |

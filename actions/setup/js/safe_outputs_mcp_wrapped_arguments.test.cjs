@@ -48,6 +48,39 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
     expect(debug).toHaveBeenCalledWith(expect.stringContaining(JSON.stringify(payloadKeys)));
   });
 
+  it.each(["", " \t\n"])("omits blank optional fields before MCP validation and NDJSON append (%j)", async blank => {
+    const configPath = path.join(tempDir, "config.json");
+    const toolsPath = path.join(tempDir, "tools.json");
+    const outputPath = path.join(tempDir, "output.jsonl");
+    const tools = JSON.parse(fs.readFileSync(path.join(process.cwd(), "safe_outputs_tools.json"), "utf8"));
+    fs.writeFileSync(configPath, JSON.stringify({ add_comment: { enabled: true, target: "42" } }));
+    fs.writeFileSync(toolsPath, JSON.stringify(tools.filter(tool => tool.name === "add_comment")));
+    process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH = configPath;
+    process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH = toolsPath;
+    process.env.GH_AW_SAFE_OUTPUTS = outputPath;
+
+    const { server } = createMCPServer();
+    const request = body => ({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "add_comment", arguments: { body, item_number: blank, comment_id: blank, temporary_id: blank } },
+    });
+    const rejected = await server.handleRequest(request(""));
+    expect(rejected.error || rejected.result?.isError).toBeTruthy();
+    expect(fs.existsSync(outputPath)).toBe(false);
+
+    const response = await server.handleRequest(request("A useful comment"));
+    expect(response.error).toBeUndefined();
+    expect(response.result.isError).toBe(false);
+    const written = JSON.parse(fs.readFileSync(outputPath, "utf8").trim());
+    expect(written).toMatchObject({ type: "add_comment", body: "A useful comment" });
+    for (const field of ["item_number", "comment_id"]) {
+      expect(written).not.toHaveProperty(field);
+    }
+    expect(written.temporary_id).toMatch(/^aw_[A-Za-z0-9_]{3,12}$/);
+  });
+
   it("maps configured parameter synonyms to canonical field names", () => {
     const debug = vi.fn();
     const normalized = normalizeSafeOutputToolArguments(
@@ -220,5 +253,30 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
       severity: "warning",
       message: "test",
     });
+  });
+
+  it.each([
+    ["status", { status: "" }],
+    ["labels", { labels: "" }],
+  ])("rejects update_issue with only a normalized-away %s field", async (_field, update) => {
+    const configPath = path.join(tempDir, "config.json");
+    const toolsPath = path.join(tempDir, "tools.json");
+    const outputPath = path.join(tempDir, "output.jsonl");
+    const tools = JSON.parse(fs.readFileSync(path.join(process.cwd(), "safe_outputs_tools.json"), "utf8"));
+    fs.writeFileSync(configPath, JSON.stringify({ update_issue: { enabled: true, target: "*" } }));
+    fs.writeFileSync(toolsPath, JSON.stringify(tools.filter(tool => tool.name === "update_issue")));
+    process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH = configPath;
+    process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH = toolsPath;
+    process.env.GH_AW_SAFE_OUTPUTS = outputPath;
+
+    const { server } = createMCPServer();
+    const response = await server.handleRequest({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "update_issue", arguments: { issue_number: 42, ...update } },
+    });
+    expect(response.error || response.result?.isError).toBeTruthy();
+    expect(fs.existsSync(outputPath)).toBe(false);
   });
 });
