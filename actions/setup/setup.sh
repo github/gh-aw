@@ -412,6 +412,7 @@ SAFE_OUTPUTS_FILES=(
   "work_queue_git_tree_adapter.cjs"
   "work_queue_graph.cjs"
   "work_queue_graphql_adapter.cjs"
+  "work_queue_indexes.cjs"
   "work_queue_intents.cjs"
   "work_queue_limits.cjs"
   "work_queue_mcp_server.cjs"

@@ -2,6 +2,7 @@
 "use strict";
 
 const { canonicalBytes, integer, queueError } = require("./work_queue_codec.cjs");
+const { indexesFor } = require("./work_queue_indexes.cjs");
 
 /** @typedef {{ledger_bytes: number, recovery_bytes: number, payload_bytes: number, graph_nodes: number, predecessors: number, pending_nodes: number, operations: number, assignment_bytes: number, result_bytes: number, evidence_bytes: number, observation_writes: number}} QueueLimits */
 
@@ -40,19 +41,20 @@ function observationRefreshBudget(state, maximum = 128) {
 function recoveryHeadroom(state) {
   // Reserve every bounded remaining retry plus delivery and native closure.
   let bytes = 0;
-  for (const node of state.works.values()) {
-    if (node.state === "cancelled" || (node.state === "completed" && node.barrier !== "pending")) continue;
+  const indexes = indexesFor(state);
+  for (const id of indexes.unfinished) {
+    const node = state.works.get(id);
     const pool = state.policy.pools[node.pool];
     const limits = state.policy.limits;
     const remaining = node.state === "completed" ? 0 : Math.max(0, pool.retry.max_attempts - node.attempts);
     bytes += remaining * (4 * limits.evidence_bytes + 8192) + 2 * limits.result_bytes + 2 * limits.evidence_bytes + 8192;
     if (node.state === "claimed") bytes += 8192;
   }
-  for (const dispatch of state.dispatches.values())
-    if (!dispatch.released) {
-      const remaining = Math.max(0, state.policy.pools[dispatch.pool].reconciliation.max_attempts + 4 - (state.lifecycleWrites.get(dispatch.dispatch_id) ?? 0));
-      bytes += remaining * (2 * state.policy.limits.evidence_bytes + 12288) + 2 * state.policy.limits.evidence_bytes + 8192;
-    }
+  for (const id of indexes.reservations) {
+    const dispatch = state.dispatches.get(id);
+    const remaining = Math.max(0, state.policy.pools[dispatch.pool].reconciliation.max_attempts + 4 - (state.lifecycleWrites.get(dispatch.dispatch_id) ?? 0));
+    bytes += remaining * (2 * state.policy.limits.evidence_bytes + 12288) + 2 * state.policy.limits.evidence_bytes + 8192;
+  }
   return bytes;
 }
 

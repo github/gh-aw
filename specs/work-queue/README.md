@@ -114,6 +114,65 @@ the stale action rather than silently redirecting it. These administrator
 extensions are covered by Go/JavaScript protocol tests; the existing fixed-priority
 TLA+ scheduling models do not model arbitrary operator reprioritization.
 
+## Local stress simulator
+
+Run the simulator from the repository root with Node.js 24 or later and Git.
+It uses temporary local Git repositories, concurrent worker threads and a
+simulated GitHub Git/Actions API; it does not contact GitHub or need credentials.
+
+```bash
+node --test .github/scripts/work-queue-stress.test.cjs
+node .github/scripts/work-queue-stress.cjs --mode history --items 100000 --workers 2
+node .github/scripts/work-queue-stress.cjs --items 1024 --workers 4 --queue-items 64 --seed 7
+node .github/scripts/work-queue-stress.cjs --mode saturation --items 100000 --workers 4
+```
+
+The history profile counts retained **Work plus Claim items**, not successful
+worker completions. The lifecycle profile submits, grants, launches simulated
+original native runs, finishes Claims, verifies no-op delivery receipts and
+releases reservations. Its total workload is explicitly divided into bounded
+queue branches; `--items 100000` is a long-running aggregate workload, not a
+promise that one queue admits 100,000 pending Work items. The saturation profile
+instead reports the first real admission refusal, accepted batch count and
+unattempted remainder without fabricating Claims or completions.
+
+Seeded faults force competing real Git reference updates and lose one successful
+publication response. JSON diagnostics report CAS conflicts, recovered requests,
+native POST counts, ledger bytes, cold replay timings, memory and workload scope.
+Workers have bounded deadlines and fixtures are cleaned up on completion or
+failure. Canonicalization must preserve the complete causal history and projection.
+
+The separate [Work Queue Stress workflow](../../.github/workflows/work-queue-stress.yml)
+runs on pull requests and `main` pushes changing `actions/setup/js` JavaScript,
+the simulator, its workflow or protocol fixtures. It runs the 100,000-item history
+profile, 1,024 live lifecycles and admission saturation independently, and uploads
+diagnostics even on failure. It uses read-only checkout credentials and does not
+dispatch actual GitHub workflow runs.
+
+## Runtime scaling and compaction
+
+The JavaScript replay maintains private indexes for available Work, unfinished
+delivery barriers, open Claims, native reservations, graph membership and original
+run bindings. Scheduling copies only unfinished Work, its direct predecessors and
+held reservations, rather than cloning the entire ledger. Graph admission checks
+new nodes against indexed accepted graphs and traverses new edges iteratively.
+These indexes are derived from validated commits, never stored as authority.
+Detached public projections rebuild indexes when used again, so caller mutation
+cannot leave a stale scheduling cache.
+
+The Git store parses and replays a read once, validates an appended candidate
+once, and serializes that checked history without another replay. Custom candidate
+generators still receive isolated copies. Multi-MiB base64 blobs use linear
+validation rather than a repeated-quartet regular expression that can overflow
+the JavaScript engine's stack.
+
+Compaction remains canonical ordering and identical-commit deduplication only.
+It does not erase terminal Work, historical Claims, request identities, FIFO
+positions or scheduling debt. Native ledger, graph, pending-node and recovery
+bounds still apply; 100,000 submitted Work items are not interchangeable with
+100,000 combined Work/Claim records. A workload that reaches admission limits
+must report that boundary, not raise policy ceilings or silently drop history.
+
 ## Historical queue inspection and operator commands
 
 > [!WARNING]

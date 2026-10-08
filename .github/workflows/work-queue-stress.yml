@@ -1,0 +1,78 @@
+name: Work Queue Stress
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/work-queue-stress.yml'
+      - '.github/scripts/work-queue-stress*.cjs'
+      - 'actions/setup/js/**/*.cjs'
+      - 'actions/setup/js/**/*.js'
+      - 'specs/work-queue/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/work-queue-stress.yml'
+      - '.github/scripts/work-queue-stress*.cjs'
+      - 'actions/setup/js/**/*.cjs'
+      - 'actions/setup/js/**/*.js'
+      - 'specs/work-queue/**'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: work-queue-stress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stress:
+    name: Local Git and concurrent workers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Verify simulator invariants
+        run: |
+          mkdir -p stress-results
+          node --test .github/scripts/work-queue-stress.test.cjs \
+            | tee stress-results/invariants.tap
+
+      - name: Replay 100000 retained Work and Claim items
+        run: |
+          node .github/scripts/work-queue-stress.cjs \
+            --mode history --items 100000 --workers 2 --seed 7 \
+            --timeout-seconds 300 > stress-results/history.json
+
+      - name: Complete 1024 concurrent worker lifecycles
+        run: |
+          node .github/scripts/work-queue-stress.cjs \
+            --items 1024 --workers 4 --queue-items 64 --seed 7 \
+            --timeout-seconds 600 > stress-results/lifecycle.json
+
+      - name: Verify single-queue admission saturation
+        run: |
+          node .github/scripts/work-queue-stress.cjs \
+            --mode saturation --items 100000 --workers 4 --seed 7 \
+            --timeout-seconds 60 > stress-results/saturation.json
+
+      - name: Upload stress diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: work-queue-stress-results
+          path: stress-results/
+          if-no-files-found: error
+          retention-days: 7
