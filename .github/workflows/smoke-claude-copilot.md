@@ -52,7 +52,7 @@ sandbox:
 post-steps:
   - name: Assert Claude Copilot inference evidence
     if: always()
-    uses: actions/github-script@v9
+    uses: actions/github-script@v9.0.0
     env:
       SMOKE_RECEIPT: ${{ runner.temp }}/gh-aw/safeoutputs/claude-copilot-receipt.json
       SMOKE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
