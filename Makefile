@@ -488,10 +488,11 @@ bundle-js:
 	@echo "✓ bundle-js tool built"
 	@echo "To bundle a JavaScript file: ./bundle-js <input-file> [output-file]"
 
-# Run Bash script tests (check-stale-lock-files, check-workflow-drift, check-cgo-cjs-workflow-purity)
+# Run script tests (authentication probes, stale locks, workflow drift, and workflow purity).
 .PHONY: test-scripts
 test-scripts: build
-	@echo "Running Bash script tests..."
+	@echo "Running script tests..."
+	node --test scripts/agy-authentication.test.cjs
 	bash scripts/extract-workflow-frontmatter-keys_test.sh
 	bash scripts/check-stale-lock-files_test.sh
 	bash scripts/check-skill-file-paths_test.sh
@@ -504,7 +505,7 @@ test-scripts: build
 	bash actions/setup/sh/copy_gh_aw_binary_for_mcp_test.sh
 	bash actions/setup/sh/create_gh_aw_tmp_dir_test.sh
 	bash actions/setup/sh/download_docker_images_local_test.sh
-	@echo "✓ All Bash script tests passed"
+	@echo "✓ All script tests passed"
 
 # Test all code (Go, JavaScript, wasm golden, and shell scripts)
 .PHONY: test-all
