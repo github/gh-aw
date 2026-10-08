@@ -38,7 +38,11 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
     const promptPath = path.join(dir, "system.txt");
     const systemPath = process.env.GH_AW_PI_SYSTEM_PROMPT;
     const system = systemPath ? fs.readFileSync(systemPath, "utf8") + "\n\n" : "";
-    fs.writeFileSync(promptPath, system + agent.prompt, { mode: 0o600 });
+    const delegationScope =
+      "You are a delegated sub-agent, not the workflow's main agent. Complete only the delegated task and return your answer to the parent, following the declared agent's output format exactly. " +
+      "The parent is responsible for finalizing the workflow and its required safe-output reporting. Do not emit noop safe outputs or workflow-completion reports for this child session. " +
+      "Safe-output actions required to perform the delegated task remain permitted.";
+    fs.writeFileSync(promptPath, system + agent.prompt + "\n\n" + delegationScope, { mode: 0o600 });
     process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_dispatch", agent: agent.name, requested_model: agent.declaredModel || agent.modelId, resolved_model: agent.modelId }) + "\n");
     return await new Promise((resolve, reject) => {
       const child = launch(process.env.GH_AW_PI_COMMAND || "pi", subagentArgs(agent, promptPath), {

@@ -68,6 +68,7 @@ function piToolPolicy(pi) {
       callCount = reservePiBudget("calls", callCount, limit);
       let reason;
       if (limit !== undefined && callCount > limit) reason = `Workflow tool-call budget exhausted (${limit} calls)`;
+      else if (process.env.GH_AW_PI_SUBAGENT_CHILD === "1" && /(?:^|[^a-z0-9])(?:noop|report_incomplete|create_report_incomplete_issue)$/i.test(event.toolName || "")) reason = "Workflow-completion reporting is owned by the parent agent";
       else if (event.toolName === "bash" && !isPiBashAllowed(event.input?.command, policy.bash)) reason = "Command is outside the workflow tools.bash allowlist";
       else if (policy.edit === false && ["edit", "write"].includes(event.toolName)) reason = "File editing is disabled by the workflow";
       if (!reason) return;
