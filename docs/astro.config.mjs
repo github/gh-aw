@@ -445,6 +445,7 @@ export default defineConfig({
             { label: "DispatchOps", link: "/patterns/dispatch-ops/" },
             { label: "IssueOps", link: "/patterns/issue-ops/" },
             { label: "LabelOps", link: "/patterns/label-ops/" },
+            { label: "Linter Factory", link: "/patterns/linter-factory/" },
             { label: "MemoryOps", link: "/patterns/memory-ops/" },
             { label: "MonitorOps", link: "/patterns/monitor-ops/" },
             { label: "FeatureOps", link: "/patterns/feature-grower/" },

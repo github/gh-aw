@@ -13,6 +13,8 @@ DAG barriers. In that protocol, Issues and pull requests can be dependency
 vertices, but Issues are not a supported queue-storage backend. See the
 [work-queue protocol](https://github.com/github/gh-aw/blob/main/specs/work-queue/priority-and-fairness.md)
 for its implementation coverage and explicitly deferred security requirements.
+The [Linter Factory](/gh-aw/patterns/linter-factory/) is an example of that
+feature, with ledger lifecycle, mixed-Claim, and recovery diagrams.
 
 ```mermaid
 flowchart LR
