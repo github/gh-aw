@@ -74,6 +74,10 @@ func mergeRuntimeWithFields(req *RuntimeRequirement) map[string]string {
 		allExtraFields[k] = formatYAMLValue(v)
 	}
 
+	if req.Runtime.ID == "uv" {
+		allExtraFields["enable-cache"] = "false"
+	}
+
 	return allExtraFields
 }
 
