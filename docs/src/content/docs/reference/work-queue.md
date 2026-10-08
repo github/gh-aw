@@ -43,6 +43,11 @@ implementation coverage, and the
 [formal verification reference](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md)
 for executable models, contracts and reproduction instructions.
 
+For workflow examples, see the [Linter Factory](/gh-aw/patterns/linter-factory/)
+for fair dispatch and Claim-scoped worker outputs, and the
+[Daily Report Portfolio](/gh-aw/patterns/daily-report-portfolio/) for a daily
+dispatcher coordinating reporting workers.
+
 ## Workflow roles and intent tools
 
 `tools.work-queue` gives the agent an immutable snapshot of the queue at
