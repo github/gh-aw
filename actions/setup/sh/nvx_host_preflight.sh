@@ -145,9 +145,9 @@ for index in "${!artifact_paths[@]}"; do
   fi
 done
 
-if ! "${trusted_tools[gh]}" attestation verify "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE" \
+if ! "${trusted_tools[gh]}" attestation verify "${stage_dir}/manifest.json" \
   --repo github/gh-aw-firewall \
-  --bundle "$GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE_SOURCE" \
+  --bundle "${stage_dir}/manifest.sigstore.jsonl" \
   --signer-workflow "$GH_AW_NVX_SIGNER_WORKFLOW" \
   --deny-self-hosted-runners; then
   echo "::error::NVX manifest offline attestation verification failed; no unsigned or hash-only fallback is permitted."
