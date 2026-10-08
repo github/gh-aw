@@ -785,13 +785,30 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Source signature | Canonical mapping |
 | --- | --- |
 | `type: "system", subtype: "init"` | `session.init`; map snake_case initialization names as in 4.1. |
-| `type: "assistant", message.content[]` with `text` blocks | `assistant.message`, `content` from each `text`. |
+| `type: "assistant", message.content[]` with `text` blocks | `assistant.message`, exact `content` from each `text`; preserve the message ID, model, and content-block position. |
 | Same envelope with `thinking` blocks | `assistant.reasoning`, `content` from `thinking`. |
-| Same envelope with `tool_use` blocks | `tool.execution_start`; `id` → `toolCallId`, `name` → `toolName`, `input` retained. |
+| Same envelope with `tool_use` blocks | `tool.execution_start`; `id` → `toolCallId`, `input` retained. MCP names `mcp__server__tool` map to `mcpServerName: "server"` and `toolName: "tool"`; the original name remains in the parser trace. |
 | `type: "user", message.content[]` with `text` blocks | `user.message`, not discarded because the user envelope also carries tool results. |
 | Same user envelope with `tool_result` blocks | `tool.execution_complete`; `tool_use_id`, `content`, `is_error`, `duration_ms` mapped. |
-| `type: "result"` with recognized accounting/diagnostic fields | `session.result`; preserve source result metadata. |
-| Recognized non-init system status with textual message/content | Retain status metadata; use the established assistant-text compatibility view only for actual status text, not user prompts or provider errors. |
+| Direct `type: "message", role: "assistant"` or `"user"` envelopes | The same content-block mappings as SDK assistant/user envelopes; only assistant usage contributes to session accounting. |
+| `type: "result"` with recognized accounting/diagnostic fields | `session.result`; preserve source result metadata, expose `sourceType: "result"` and the terminal subtype as `status`. Explicit `is_error` or an error subtype takes precedence and maps to `status: "error"`. |
+| Recognized non-init system status with textual message/content | Retain status metadata; use the established assistant-text compatibility view only for actual status text, not user prompts, permission-denial notices, or provider errors. |
+
+Claude `usage.output_tokens_details.thinking_tokens` maps to
+`usage.reasoning_output_tokens` in parser traces and `usage.reasoningOutputTokens`
+in the unified projection. Reasoning tokens are a subset of output tokens, not
+an additional contribution to total tokens. Explicit canonical reasoning counts,
+including zero, take precedence over nested provider details.
+
+SDK assistant snapshots can contain a single finalized block rather than a full
+response. Streaming reconciliation matches that block to its observed type and
+tool identity when unambiguous, retaining its stream position, exact text, and
+thinking signature. A divergent final text snapshot remains a canonical
+non-delta observation; display views replace the preceding streamed text rather
+than concatenating it. User, assistant, and reasoning messages retain available
+attribution in the unified projection; user prompts remain omitted from default
+summaries. Structured tool-result content stays structured, and an absent tool
+outcome remains unknown.
 
 ### 7.2 Copilot
 
@@ -1209,6 +1226,7 @@ payloads with harmless examples.
 | Engine | Workflow and existing run | Extracted session | Regression corpus |
 | --- | --- | --- | --- |
 | Claude | [Smoke Claude success](https://github.com/github/gh-aw/actions/runs/36812703027) and [failure](https://github.com/github/gh-aw/actions/runs/36762044297) | `agent-stdio.log` | `fixtures/claude_ci_sessions.cjs`, `claude_session.test.cjs` |
+| Claude | [Documentation review](https://github.com/github/gh-aw/actions/runs/37623157868), [dynamic workflow](https://github.com/github/gh-aw/actions/runs/37732499835), and [Smoke Claude](https://github.com/github/gh-aw/actions/runs/37089888775) | `agent-stdio.log` | `fixtures/claude_ci_normalization.cjs`, `claude_session_normalization.test.cjs`; direct API and streaming cases are synthetic |
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |

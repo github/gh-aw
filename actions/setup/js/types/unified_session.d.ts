@@ -267,7 +267,7 @@ export interface UnifiedSessionEventDataMap {
   "agent.execution": AgentExecutionData;
   "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
   "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
-  "user.message": Pick<MessageData, "content">;
+  "user.message": UnifiedMessageData;
   "prompt.system": Pick<MessageData, "content">;
   "prompt.user": Pick<MessageData, "content">;
   "assistant.message": UnifiedMessageData;

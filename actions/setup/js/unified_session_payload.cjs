@@ -112,7 +112,7 @@ const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model", "selectedModel"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"], reasoningEffort: ["reasoningEffort"] },
-  "user.message": { content: ["content"] },
+  "user.message": MESSAGE_FIELDS,
   "prompt.system": { content: ["content"] },
   "prompt.user": { content: ["content"] },
   "assistant.message": MESSAGE_FIELDS,
@@ -296,7 +296,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
       );
     }
   }
-  if (event.type === "assistant.message" || event.type === "assistant.reasoning") {
+  if (event.type === "user.message" || event.type === "assistant.message" || event.type === "assistant.reasoning") {
     const metadata = selectFields(event, MESSAGE_FIELDS);
     delete metadata.content;
     for (const [key, value] of Object.entries(metadata)) if (!Object.hasOwn(data, key)) data[key] = value;

@@ -9,6 +9,7 @@ const { getMessageRefusal, getProviderRefusals, normalizeOpenAIChatUsage } = req
 const USAGE_ALIASES = {
   input_tokens: "inputTokens",
   output_tokens: "outputTokens",
+  reasoning_output_tokens: "reasoningOutputTokens",
   total_tokens: "totalTokens",
   cache_creation_input_tokens: "cacheCreationInputTokens",
   cache_read_input_tokens: "cacheReadInputTokens",

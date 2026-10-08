@@ -1,6 +1,6 @@
 // @ts-check
 
-const { isSessionEvent, createSessionEvent, normalizeAgentSession, normalizeSessionUsage, accumulateSessionUsage, reconcileSessionUsage, isMetric, projectSessionResult } = require("./agent_session.cjs");
+const { isSessionEvent, createSessionEvent, normalizeAgentSession, normalizeSessionUsage, accumulateSessionUsage, reconcileSessionUsage, isMetric, isTokenCount, projectSessionResult } = require("./agent_session.cjs");
 const { getMessageRefusal } = require("./provider_refusal.cjs");
 const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
@@ -11,13 +11,25 @@ const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs
  */
 function claudeUsage(usage) {
   const normalized = normalizeSessionUsage(usage);
-  return normalized ? { ...normalized, input_tokens_include_cache: false } : undefined;
+  if (!normalized) return undefined;
+  const thinking = usage.output_tokens_details?.thinking_tokens;
+  if (!Object.hasOwn(usage, "reasoning_output_tokens") && !Object.hasOwn(usage, "reasoningOutputTokens") && isTokenCount(thinking)) normalized.reasoning_output_tokens = thinking;
+  return { ...normalized, input_tokens_include_cache: false };
 }
 
 /** @param {any} record @returns {Record<string, any>} */
 function sourceFields(record) {
   const { type, data, ...fields } = record;
   return { ...fields, ...data };
+}
+
+/** @param {any} block @param {any} [start] */
+function toolFields(block, start) {
+  const mcp = typeof block.name === "string" ? /^mcp__(.+?)__(.+)$/.exec(block.name) : undefined;
+  return {
+    toolName: mcp?.[2] ?? block.name ?? start?.toolName,
+    mcpServerName: block.mcpServerName ?? mcp?.[1] ?? start?.mcpServerName,
+  };
 }
 
 /**
@@ -52,10 +64,10 @@ function normalizeClaudeSession(records) {
   };
   const reportError = (source, error) => emit(source, "session.result", { sourceEngine: "claude", errors: [error] });
 
-  const streamFields = (state, index) => ({ delta: true, ...(state.id !== undefined ? { messageId: state.id } : {}), ...(index !== undefined ? { contentIndex: index } : {}) });
+  const streamFields = (state, index) => ({ delta: true, ...(state.id !== undefined ? { messageId: state.id } : {}), ...(state.model !== undefined ? { model: state.model } : {}), ...(index !== undefined ? { contentIndex: index } : {}) });
   const emitBlock = (source, block, metadata = {}) => {
     if (!block || typeof block !== "object") return;
-    const data = { ...sourceFields(source), ...block, ...metadata };
+    const data = { ...sourceFields(source), ...block, messageId: source.message?.id, model: source.message?.model, ...metadata };
     if (block.type === "text" && typeof block.text === "string") {
       return emit(source, source.type === "user" ? "user.message" : "assistant.message", { ...data, content: block.text });
     }
@@ -63,7 +75,7 @@ function normalizeClaudeSession(records) {
       return emit(source, "assistant.reasoning", { ...data, content: block.thinking });
     }
     if (block.type === "tool_use") {
-      const event = emit(source, "tool.execution_start", { ...data, toolCallId: block.id, toolName: block.name, input: block.input });
+      const event = emit(source, "tool.execution_start", { ...data, ...toolFields(block), toolCallId: block.id, input: block.input });
       if (block.id !== undefined) tools.set(toolKey(source, block.id), event.data);
       return event;
     }
@@ -74,7 +86,7 @@ function normalizeClaudeSession(records) {
       return emit(source, "tool.execution_complete", {
         ...data,
         toolCallId: block.tool_use_id,
-        toolName: block.name ?? start?.toolName,
+        ...toolFields(block, start),
         success,
         output: block.content,
         durationMs: isMetric(block.duration_ms) ? block.duration_ms : undefined,
@@ -97,9 +109,8 @@ function normalizeClaudeSession(records) {
     if (["message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"].includes(source.type)) {
       source = { ...source, type: "stream_event", event: source };
     }
-    if (source.type === "message" && source.role === "assistant" && source.stop_reason === "refusal") {
-      events.push(...normalizeAgentSession([source], { sourceEngine: "claude" }));
-      continue;
+    if (source.type === "message" && (source.role === "assistant" || source.role === "user")) {
+      source = { ...source, type: source.role, message: source };
     }
     if (source.type === "system" && source.subtype === "init") {
       const mapped = normalizeAgentSession([source], { sourceEngine: "claude" })[0];
@@ -109,7 +120,7 @@ function normalizeClaudeSession(records) {
       const raw = source.event;
       const channel = channelKey(source);
       if (raw.type === "message_start") {
-        const state = { id: raw.message?.id, blocks: new Map(), textEvents: [], refusalEvent: undefined };
+        const state = { id: raw.message?.id, model: raw.message?.model, blocks: new Map(), textEvents: [], refusalEvent: undefined };
         streams.set(channel, state);
         if (state.id !== undefined) streamedMessages.set(messageKey(source, state.id), state);
         reportUsage(source, state.id, raw.message?.usage);
@@ -118,7 +129,7 @@ function normalizeClaudeSession(records) {
       } else {
         let state = streams.get(channel);
         if (!state) {
-          state = { id: undefined, blocks: new Map(), textEvents: [], refusalEvent: undefined };
+          state = { id: undefined, model: undefined, blocks: new Map(), textEvents: [], refusalEvent: undefined };
           streams.set(channel, state);
         }
         if (raw.type === "message_delta") {
@@ -190,30 +201,41 @@ function normalizeClaudeSession(records) {
         reportError(source, { error: source.error, message: structuredClone(message) });
         continue;
       }
-      reportUsage(source, message?.id, message?.usage);
+      if (source.type === "assistant") reportUsage(source, message?.id, message?.usage);
       const blocks = typeof content === "string" ? [{ type: "text", text: content }] : Array.isArray(content) ? content : [];
       const streamed = source.type === "assistant" && message?.id !== undefined ? streamedMessages.get(messageKey(source, message.id)) : undefined;
       if (streamed) native(source, "claude.assistant_snapshot");
       const refusal = source.type === "assistant" ? getMessageRefusal(message) : undefined;
       if (refusal) {
         if (streamed?.refusalEvent) Object.assign(streamed.refusalEvent.data, refusal);
-        else emit(source, "assistant.refusal", { ...sourceFields(source), ...refusal });
+        else {
+          const fields = sourceFields(source);
+          delete fields.content;
+          emit(source, "assistant.refusal", { ...fields, ...refusal });
+        }
       }
-      for (const [index, block] of blocks.entries()) {
+      for (const [snapshotIndex, block] of blocks.entries()) {
         if (refusal && block?.type === "text") continue;
+        // SDK assistant records can contain one finalized block rather than the full response.
+        const candidates = blocks.length === 1 && streamed ? [...streamed.blocks.entries()].filter(([, observed]) => observed.type === block?.type && (block.type !== "tool_use" || observed.event?.data.toolCallId === block.id)) : [];
+        const index = candidates.length === 1 ? candidates[0][0] : snapshotIndex;
         const observed = streamed?.blocks.get(index);
-        if (!observed) {
-          emitBlock(source, block);
+        if (!observed || observed.type !== block?.type) {
+          emitBlock(source, block, { contentIndex: index });
         } else if (block.type === "text" || block.type === "thinking") {
+          if (Object.hasOwn(block, "signature") && observed.event) observed.event.data.signature = block.signature;
           const text = block.type === "thinking" ? block.thinking : block.text;
           if (typeof text === "string" && text.startsWith(observed.text) && text !== observed.text) {
             emitBlock(source, { ...block, [block.type === "thinking" ? "thinking" : "text"]: text.slice(observed.text.length) }, streamFields(streamed, index));
+            observed.text = text;
+          } else if (typeof text === "string" && text !== observed.text) {
+            emitBlock(source, block, { contentIndex: index, delta: false });
             observed.text = text;
           }
         } else if (block.type === "tool_use" && observed.type === "tool_use" && observed.event?.data.toolCallId === block.id) {
           if (Object.hasOwn(block, "input")) observed.event.data.input = structuredClone(block.input);
         } else {
-          emitBlock(source, block);
+          emitBlock(source, block, { contentIndex: index });
         }
       }
     } else if (source.type === "reasoning" && typeof source.data?.content === "string") {
@@ -222,8 +244,10 @@ function normalizeClaudeSession(records) {
       const mapped = normalizeAgentSession([source], { sourceEngine: "claude" })[0];
       if (!mapped || mapped.type !== "session.result") continue;
       /** @type {import("./types/agent_session").SessionResultData} */
-      const data = { ...sourceFields(source), ...mapped.data, sourceEngine: "claude", usage: claudeUsage(source.usage) };
+      const data = { ...sourceFields(source), ...mapped.data, sourceEngine: "claude", sourceType: source.type, usage: claudeUsage(source.usage) };
       const failed = source.is_error === true || (typeof source.subtype === "string" && source.subtype.startsWith("error"));
+      if (failed) data.status = "error";
+      else if (!Object.hasOwn(data, "status") && typeof source.subtype === "string") data.status = source.subtype;
       if (failed && (!Array.isArray(data.errors) || data.errors.length === 0)) {
         const diagnostic = {};
         for (const key of ["subtype", "is_error", "terminal_reason", "api_error_status", "error", "result"]) {
@@ -238,7 +262,7 @@ function normalizeClaudeSession(records) {
         reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
       } else if (source.error != null) {
         reportError(source, source.error);
-      } else {
+      } else if (source.subtype !== "permission_denied") {
         const content = typeof source.message === "string" ? source.message : (source.message?.content ?? source.content);
         if (typeof content === "string") emitBlock(source, { type: "text", text: content });
         else if (Array.isArray(content)) {

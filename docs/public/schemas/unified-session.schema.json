@@ -74,7 +74,7 @@
         "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CToolExecutionStartData%2C(%22toolCallId%22%7C%22toolName%22%7C%22input%22%7C%22command%22%7C%22mcpServerName%22)%3E" } } }
       },
       { "if": { "properties": { "type": { "const": "usage.report" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
-      { "if": { "properties": { "type": { "const": "user.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      { "if": { "properties": { "type": { "const": "user.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedMessageData" } } } },
       { "if": { "properties": { "type": { "const": "workflow.info" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/WorkflowInfoData" } } } }
     ]
   },
