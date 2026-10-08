@@ -87,7 +87,7 @@ func TestModelEnvVarInjectionForAgentJob(t *testing.T) {
 			if tt.expectedDefault != "" {
 				expectedEnvLine = tt.expectedEnvVar + ": ${{ vars." + tt.expectedEnvVar + " || vars." + tt.expectedDefaultOverride + " || '" + tt.expectedDefault + "' }}"
 			} else {
-				expectedEnvLine = tt.expectedEnvVar + ": ${{ vars." + tt.expectedEnvVar + " || vars." + tt.expectedDefaultOverride + " }}"
+				expectedEnvLine = tt.expectedEnvVar + ": ${{ vars." + tt.expectedEnvVar + " || vars." + tt.expectedDefaultOverride + " || '' }}"
 			}
 			if !strings.Contains(stepsContent, expectedEnvLine) {
 				t.Errorf("Expected env var line '%s' not found in steps:\n%s", expectedEnvLine, stepsContent)
@@ -165,7 +165,7 @@ func TestModelEnvVarInjectionForDetectionJob(t *testing.T) {
 				}
 			} else {
 				// For engines without a built-in model, leave selection to the runtime
-				expectedEnvLine := tt.expectedEnvVar + ": ${{ vars." + tt.expectedEnvVar + " || vars." + tt.expectedDefaultOverride + " }}"
+				expectedEnvLine := tt.expectedEnvVar + ": ${{ vars." + tt.expectedEnvVar + " || vars." + tt.expectedDefaultOverride + " || '' }}"
 				if !strings.Contains(stepsContent, expectedEnvLine) {
 					t.Errorf("Expected env var line '%s' not found in steps:\n%s", expectedEnvLine, stepsContent)
 				}
@@ -513,7 +513,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:                "${{ inputs.provider }}/${{ inputs.model }}",
 			expectedModelEnvVar:  constants.EnvVarModelAgentCodex,
 			expectedModelEnvVal:  "${{ inputs.provider }}/${{ inputs.model }}",
-			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCodex + " || vars." + compilerenv.DefaultModelCodex + " }}",
+			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCodex + " || vars." + compilerenv.DefaultModelCodex + " || '' }}",
 			expectShellExpansion: true, // Codex has no native model env var, uses shell expansion
 		},
 	}
