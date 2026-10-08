@@ -88,6 +88,11 @@
       "version": "v7.0.0",
       "sha": "820762786026740c76f36085b0efc47a31fe5020"
     },
+    "actions/setup-node@v7.1.0": {
+      "repo": "actions/setup-node",
+      "version": "v7.1.0",
+      "sha": "949feb2413d6458794dcd2491c4babbbce0c15c1"
+    },
     "actions/setup-python@v7.0.0": {
       "repo": "actions/setup-python",
       "version": "v7.0.0",
@@ -172,11 +177,6 @@
       "repo": "safedep/pmg",
       "version": "v1",
       "sha": "5ac0f275b83d9d5a9342c6aae977ec32fa330daa"
-    },
-    "super-linter/super-linter@v9": {
-      "repo": "super-linter/super-linter",
-      "version": "v9",
-      "sha": "2da136927bd4a73596db63044b504547c62cb854"
     }
   },
   "containers": {
