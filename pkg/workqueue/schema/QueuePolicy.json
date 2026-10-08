@@ -10,6 +10,11 @@
       "minimum": 1,
       "type": "integer"
     },
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
     "Identity": {
       "maxLength": 256,
       "minLength": 1,
@@ -130,6 +135,38 @@
       "required": ["pools", "priorities", "fairness_keys"],
       "type": "object"
     },
+    "ProjectorRule": {
+      "additionalProperties": false,
+      "properties": {
+        "pools": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "principal": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repositories": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["principal", "workflow", "ref", "pools", "repositories"],
+      "type": "object"
+    },
     "QueuePolicy": {
       "additionalProperties": false,
       "properties": {
@@ -177,6 +214,13 @@
           "x-forbid-key-ascii-controls": true,
           "x-key-min-utf8-bytes": 1,
           "x-key-utf8-max-bytes": 256
+        },
+        "projectors": {
+          "items": {
+            "$ref": "#/$defs/ProjectorRule"
+          },
+          "maxItems": 256,
+          "type": "array"
         }
       },
       "required": ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"],

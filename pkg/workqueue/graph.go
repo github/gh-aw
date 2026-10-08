@@ -172,6 +172,20 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 			return err
 		}
 	}
+	if node.BackingIssue != nil {
+		if node.BackingIssue.Kind != "issue" {
+			return queueError("resource_unauthorized", "backing resource must be an Issue")
+		}
+		if err := validateResource(*node.BackingIssue, pool); err != nil {
+			return err
+		}
+		for _, other := range state.Works {
+			resource := backingIssue(other)
+			if resource != nil && other.WorkID != node.WorkID && issueIdentity(*resource) == issueIdentity(*node.BackingIssue) {
+				return queueError("issue_binding_conflict", "one Work per backing Issue")
+			}
+		}
+	}
 	if existing := state.Works[node.WorkID]; existing != nil {
 		if !sameJSON(existing.WorkDefinition, node) {
 			return queueError("work_conflict", "immutable node %s differs", node.WorkID)
@@ -194,7 +208,7 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 		}
 	}
 	state.Works[node.WorkID] = &WorkState{
-		WorkDefinition: node, State: "available", Position: position, Barrier: "none",
+		WorkDefinition: node, State: "available", Position: position, Barrier: "none", admissionRequestID: commit.Request.ID,
 	}
 	return state.validateWorkAssignmentSize(node, commit, payload)
 }

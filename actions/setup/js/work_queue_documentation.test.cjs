@@ -26,13 +26,15 @@ describe("work-queue deployment documentation", () => {
   it("installs the documented policy after replacing identity placeholders", () => {
     const source = readRepositoryFile(deploymentPath);
     const examples = [...source.matchAll(/```json(?: [^\n]*)?\n([\s\S]*?)\n```/g)];
-    expect(examples).toHaveLength(1);
+    expect(examples).toHaveLength(2);
     const policy = JSON.parse(examples[0][1].replaceAll("REPLACE_WITH_PRODUCER_ACTOR_ID", "11").replaceAll("REPLACE_WITH_WORKER_CREDENTIAL_ACTOR_ID", "12").replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40)));
 
     expect(validatePolicy(policy)).toBe(policy);
     expect(policy.accounting_weights).toEqual({ "": 1 });
     expect(policy.producers["11"].fairness_keys).toEqual([""]);
     expect(policy.limits).toEqual(DEFAULT_LIMITS);
+    const projection = JSON.parse(examples[1][1].replaceAll("REPLACE_WITH_NATIVE_PRINCIPAL_ID", "12").replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40)));
+    expect(validatePolicy({ ...policy, ...projection }).projectors).toEqual(projection.projectors);
   });
 
   it("separates published docs and specifications from bounded agent instructions", () => {

@@ -96,6 +96,23 @@
             }
           }
         },
+        "projectors": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["principal", "workflow", "ref", "pools", "repositories"],
+            "properties": {
+              "principal": { "type": "string", "pattern": "^[1-9][0-9]*$", "maxLength": 256 },
+              "workflow": { "type": "string", "pattern": "^\\.github/workflows/[^\\s]+\\.lock\\.yml$" },
+              "ref": { "type": "string", "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$" },
+              "pools": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "string", "minLength": 1 } },
+              "repositories": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } }
+            }
+          }
+        },
         "dependencies": {
           "type": "object",
           "additionalProperties": false,
@@ -5244,6 +5261,20 @@
                 "worker": {
                   "type": "boolean",
                   "description": "Declare this workflow as a work-queue worker eligible to receive trusted queue claims."
+                },
+                "issues": {
+                  "description": "Mirror only this run's admitted Work and original authenticated Claims to GitHub Issues. Git remains authoritative; requires installed projector rules.",
+                  "oneOf": [
+                    { "type": "boolean" },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "label": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S", "default": "work" },
+                        "status-field": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S", "description": "Pre-provisioned native organization single-select field. Omit for comment-only status." }
+                      }
+                    }
+                  ]
                 },
                 "memory": {
                   "type": "object",

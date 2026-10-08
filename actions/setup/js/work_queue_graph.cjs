@@ -66,7 +66,13 @@ function newChildWork(state, actor, payload, node_key, at) {
 }
 
 function validateWork(node, state, actor) {
-  closed(node, ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"], ["subject", "replacement_of"], "Work", "unsupported_protocol");
+  closed(
+    node,
+    ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
+    ["subject", "backing_issue", "replacement_of"],
+    "Work",
+    "unsupported_protocol"
+  );
   if (node.kind !== "Work") throw queueError("unsupported_protocol", "graph admission requires Work operations");
   for (const field of ["work_id", "graph_id", "node_key", "pool", "worker_profile", "batch_trust_domain"]) identity(node[field], field);
   if (node.work_id !== nodeId(node.graph_id, node.node_key)) throw queueError("work_identity_invalid", "Work identity must bind graph_id/node_key");
@@ -91,6 +97,10 @@ function validateWork(node, state, actor) {
   if (Object.hasOwn(node, "subject")) {
     validateResource(node.subject);
     if (!pool.allowed_repositories.includes(node.subject.repository)) throw queueError("resource_unauthorized", "subject repository is not allowlisted");
+  }
+  if (Object.hasOwn(node, "backing_issue")) {
+    validateResource(node.backing_issue);
+    if (node.backing_issue.kind !== "issue" || !pool.allowed_repositories.includes(node.backing_issue.repository)) throw queueError("resource_unauthorized", "backing Issue must be an allowlisted Issue");
   }
   if (Object.hasOwn(node, "replacement_of")) {
     closed(node.replacement_of, ["work_id", "disposition", "evidence"], [], "replacement");
@@ -130,7 +140,7 @@ function validateWork(node, state, actor) {
 }
 
 function workDefinition(work) {
-  const fields = ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued", "subject", "replacement_of"];
+  const fields = ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued", "subject", "backing_issue", "replacement_of"];
   return Object.fromEntries(fields.filter(field => Object.hasOwn(work, field)).map(field => [field, work[field]]));
 }
 
@@ -139,10 +149,21 @@ function validateGraphAdmission(state, nodes, actor) {
   const admitted = new Map();
   const candidate = id => admitted.get(id) || state.works.get(id);
   const seen = new Set();
+  const issues = new Map();
+  const issueKey = resource => canonical([resource.host, resource.repository_id, resource.resource_id]);
+  for (const work of state.works.values()) {
+    const resource = work.backing_issue || work.issue_link;
+    if (resource) issues.set(issueKey(resource), work.work_id);
+  }
   for (const node of nodes) {
     validateWork(node, state, actor);
     if (seen.has(node.work_id)) throw queueError("graph_invalid", "duplicate node key within one submission");
     seen.add(node.work_id);
+    if (node.backing_issue) {
+      const key = issueKey(node.backing_issue);
+      if (issues.has(key) && issues.get(key) !== node.work_id) throw queueError("issue_binding_conflict", "one Work per backing Issue");
+      issues.set(key, node.work_id);
+    }
     const existing = state.works.get(node.work_id);
     if (existing && canonical(workDefinition(existing)) !== canonical(node)) throw queueError("work_conflict", "immutable node definition differs");
     if (!existing && state.admission_paused) throw queueError("admission_paused", "new Work admission is paused");

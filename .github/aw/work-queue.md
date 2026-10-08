@@ -54,6 +54,17 @@ producer entitlement. Never give agent execution or snapshot MCP queue-write
 credentials. Read the [deployment guide](../../docs/src/content/docs/guides/deploy-work-queue.md)
 only for installation tasks; writer-restriction automation remains deferred.
 
+## Mirror admitted Work with Issues
+
+`tools.work-queue.issues: true` mirrors admitted Work with the `work` label.
+An object may set `label` and a pre-provisioned native organization
+`status-field`. Require installed projector authority: only protected hooks
+project their own admissions/original Claims. Immutable `backing_issue` binds
+one Work per Issue. Agents never write mirrors; human edits never establish
+Result. Uncertain writes stay pending, never recreated or globally repaired.
+Upgrade all closed-schema readers first. See the
+[backing Issue reference](../../docs/src/content/docs/reference/work-queue.md#backing-issues).
+
 ## Plan and dispatch
 
 - Use `work_queue_read` / `work_queue_explain` for the immutable activation
