@@ -115,7 +115,7 @@ func buildCopilotMCPConfigExport(workflowData *WorkflowData) string {
 	b.WriteString("export XDG_CONFIG_HOME=\"$HOME\"\n")
 	if HasMCPServers(workflowData) {
 		if hasWorkflowTasks(workflowData) && workflowData.EngineConfig.CopilotSDK {
-			b.WriteString("export GH_AW_MCP_CONFIG=\"${RUNNER_TEMP}/gh-aw/tasks/copilot-mcp.json\"\n")
+			b.WriteString("export GH_AW_MCP_CONFIG=\"${RUNNER_TEMP}/gh-aw/locked-tasks/copilot-mcp.json\"\n")
 		} else {
 			b.WriteString("export GH_AW_MCP_CONFIG=\"$HOME/.copilot/mcp-config.json\"\n")
 		}

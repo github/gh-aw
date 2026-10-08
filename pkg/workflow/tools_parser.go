@@ -91,7 +91,7 @@ func toAnySlice(ss []string) []any {
 // knownTools is the set of built-in tool names that NewTools handles explicitly.
 // It is a package-level variable to avoid re-allocating this map on every call.
 var knownTools = map[string]struct{}{
-	"tasks":             {},
+	"locked-tasks":      {},
 	"github":            {},
 	"bash":              {},
 	"web-fetch":         {},
@@ -127,11 +127,11 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 
 	// Copy raw map
 	maps.Copy(tools.raw, toolsMap)
-	if val, exists := toolsMap["tasks"]; exists {
+	if val, exists := toolsMap["locked-tasks"]; exists {
 		definitions, err := parser.ResolveTasks(val)
-		tools.tasksParseErr = err
+		tools.lockedTasksParseErr = err
 		if err == nil && len(definitions) > 0 {
-			tools.Tasks = &TasksToolConfig{Definitions: definitions, Raw: val}
+			tools.LockedTasks = &LockedTasksToolConfig{Definitions: definitions, Raw: val}
 		}
 	}
 

@@ -4939,8 +4939,8 @@
             }
           ]
         },
-        "tasks": {
-          "description": "Named commands executed through native MCP inside AWF. Enable the built-in Go set with go: true.",
+        "locked-tasks": {
+          "description": "Locked workflow-owned commands with fixed arguments, executed through native MCP inside AWF. Enable the built-in Go set with go: true.",
           "oneOf": [
             { "const": false },
             {

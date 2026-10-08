@@ -136,7 +136,7 @@ async function main() {
     models: sdkModels,
     permissionConfig,
     toolConfig,
-    ...(process.env.GH_AW_TASKS_MCP ? { mcpServers: loadCopilotSDKMCPConfig(process.env.GH_AW_MCP_CONFIG) } : {}),
+    ...(process.env.GH_AW_LOCKED_TASKS_MCP ? { mcpServers: loadCopilotSDKMCPConfig(process.env.GH_AW_MCP_CONFIG) } : {}),
   });
 
   process.exit(result.exitCode);

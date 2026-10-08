@@ -40,7 +40,7 @@ var builtInToolNames = map[string]bool{
 	"repo-memory":       true,
 	"ledger":            true,
 	"work-queue":        true,
-	"tasks":             true,
+	"locked-tasks":      true,
 	"bash":              true,
 	"edit":              true,
 	"web-fetch":         true,

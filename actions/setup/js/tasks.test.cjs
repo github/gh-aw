@@ -206,15 +206,15 @@ describe("native tasks MCP", () => {
 describe("engine task configuration", () => {
   it("injects a direct native Pi endpoint without accepting exposure overrides", () => {
     const dir = temporary();
-    const saved = Object.fromEntries(["RUNNER_TEMP", "PI_CODING_AGENT_DIR", "GH_AW_TASKS_MCP"].map(key => [key, process.env[key]]));
+    const saved = Object.fromEntries(["RUNNER_TEMP", "PI_CODING_AGENT_DIR", "GH_AW_LOCKED_TASKS_MCP"].map(key => [key, process.env[key]]));
     try {
       process.env.RUNNER_TEMP = dir;
       process.env.PI_CODING_AGENT_DIR = path.join(dir, "agent");
-      process.env.GH_AW_TASKS_MCP = JSON.stringify({ type: "http", url: "http://127.0.0.1:1234/mcp", headers: { Authorization: "Bearer " + "a".repeat(64) } });
+      process.env.GH_AW_LOCKED_TASKS_MCP = JSON.stringify({ type: "http", url: "http://127.0.0.1:1234/mcp", headers: { Authorization: "Bearer " + "a".repeat(64) } });
       preparePiRuntime({});
       const config = JSON.parse(fs.readFileSync(path.join(dir, "agent/mcp.json"), "utf8"));
-      assert.equal(config.mcpServers.tasks.exposure, "direct");
-      assert.deepEqual(config.mcpServers.tasks.tools, ["run_task"]);
+      assert.equal(config.mcpServers["locked-tasks"].exposure, "direct");
+      assert.deepEqual(config.mcpServers["locked-tasks"].tools, ["run_task"]);
       assert.throws(() => preparePiRuntime({ mcp: { exposure: "hidden" } }), /cannot be hidden/);
     } finally {
       for (const [key, value] of Object.entries(saved)) {
@@ -227,7 +227,7 @@ describe("engine task configuration", () => {
   it("reserves native tasks configuration", () => {
     const raw = JSON.stringify({ type: "http", url: "http://127.0.0.1:1234/mcp", headers: { Authorization: "Bearer " + "a".repeat(64) } });
     assert.deepEqual(tasksMCPConfig(raw).tools, ["run_task"]);
-    assert.throws(() => addTasksMCPServer({ tasks: {} }, raw), /reserved/);
+    assert.throws(() => addTasksMCPServer({ "locked-tasks": {} }, raw), /reserved/);
     assert.throws(() => tasksMCPConfig(raw.replace("127.0.0.1", "example.com")), /loopback/);
     assert.throws(() => tasksMCPConfig(JSON.stringify({ ...JSON.parse(raw), command: "evil" })), /Invalid/);
   });
@@ -239,7 +239,7 @@ describe("engine task configuration", () => {
       const manifest = path.join(dir, "manifest.json");
       fs.writeFileSync(manifest, JSON.stringify({ version: 1, tasks: { check: task("") } }));
       const code =
-        "const c=JSON.parse(process.env.GH_AW_TASKS_MCP);fetch(c.url,{method:'POST',headers:{...c.headers,'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}).then(r=>r.json()).then(r=>process.exit(r.result.tools[0].name==='run_task'?0:1))";
+        "const c=JSON.parse(process.env.GH_AW_LOCKED_TASKS_MCP);fetch(c.url,{method:'POST',headers:{...c.headers,'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}).then(r=>r.json()).then(r=>process.exit(r.result.tools[0].name==='run_task'?0:1))";
       const mounts = [];
       assert.equal(await runTasksRuntime(manifest, [process.execPath, "-e", code], { env: { ...process.env, GITHUB_WORKSPACE: workspace }, verifyMount: name => mounts.push(name) }), 0);
       assert.equal(mounts.length, 2);
@@ -279,7 +279,7 @@ describe("engine task configuration", () => {
         return this.items;
       }
     }
-    const allowed = { name: "tasks-run_task", mcpServerName: "tasks", mcpToolName: "run_task" };
+    const allowed = { name: "locked-tasks-run_task", mcpServerName: "locked-tasks", mcpToolName: "run_task" };
     const extra = { name: "github-delete", mcpServerName: "github", mcpToolName: "delete" };
     let restricted = false;
     const session = {
@@ -287,18 +287,18 @@ describe("engine task configuration", () => {
         tools: { initializeAndValidate: async () => {}, getCurrentMetadata: async () => ({ tools: restricted ? [allowed] : [allowed, extra] }) },
         options: {
           update: async input => {
-            assert.deepEqual(input.availableTools, ["mcp:tasks-run_task"]);
+            assert.deepEqual(input.availableTools, ["mcp:locked-tasks-run_task"]);
             restricted = true;
             return { success: true };
           },
         },
       },
     };
-    const metadata = await restrictTaskCatalog(session, { ToolSet, availableTools: new ToolSet(), allowedTools: ["tasks(run_task)"], mcpServers: { tasks: { tools: ["run_task"] } } });
+    const metadata = await restrictTaskCatalog(session, { ToolSet, availableTools: new ToolSet(), allowedTools: ["locked-tasks(run_task)"], mcpServers: { "locked-tasks": { tools: ["run_task"] } } });
     assert.deepEqual(metadata, [allowed]);
-    const handler = buildCopilotSDKPermissionHandler({ allowedTools: ["tasks(run_task)"] }, () => ({ kind: "approve-once" }), { getMCPToolMetadata: () => metadata });
-    assert.equal(handler({ kind: "mcp", serverName: "tasks", toolName: "tasks-run_task" }).kind, "approve-once");
-    assert.equal(handler({ kind: "mcp", serverName: "tasks", toolName: "run_task" }).kind, "reject");
-    assert.equal(handler({ kind: "mcp", serverName: "github", toolName: "tasks-run_task" }).kind, "reject");
+    const handler = buildCopilotSDKPermissionHandler({ allowedTools: ["locked-tasks(run_task)"] }, () => ({ kind: "approve-once" }), { getMCPToolMetadata: () => metadata });
+    assert.equal(handler({ kind: "mcp", serverName: "locked-tasks", toolName: "locked-tasks-run_task" }).kind, "approve-once");
+    assert.equal(handler({ kind: "mcp", serverName: "locked-tasks", toolName: "run_task" }).kind, "reject");
+    assert.equal(handler({ kind: "mcp", serverName: "github", toolName: "locked-tasks-run_task" }).kind, "reject");
   });
 });

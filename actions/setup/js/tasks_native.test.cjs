@@ -62,7 +62,7 @@ describe("native tasks consumers", () => {
           await client.start();
           const availableTools = new sdk.ToolSet();
           availableTools.addMcp("*");
-          const mcpServers = { tasks: tasksMCPConfig(JSON.stringify(server.config)) };
+          const mcpServers = { "locked-tasks": tasksMCPConfig(JSON.stringify(server.config)) };
           let metadata = [];
           session = await client.createSession({
             model: "fixture/gpt-4o",
@@ -71,11 +71,11 @@ describe("native tasks consumers", () => {
             availableTools,
             mcpServers,
             toolSearch: { enabled: false },
-            onPermissionRequest: buildCopilotSDKPermissionHandler({ allowedTools: ["tasks(run_task)"] }, sdk.approveAll, { getMCPToolMetadata: () => metadata }),
+            onPermissionRequest: buildCopilotSDKPermissionHandler({ allowedTools: ["locked-tasks(run_task)"] }, sdk.approveAll, { getMCPToolMetadata: () => metadata }),
           });
-          metadata = await restrictTaskCatalog(session, { ToolSet: sdk.ToolSet, availableTools, allowedTools: ["tasks(run_task)"], mcpServers });
+          metadata = await restrictTaskCatalog(session, { ToolSet: sdk.ToolSet, availableTools, allowedTools: ["locked-tasks(run_task)"], mcpServers });
           assert.equal(metadata.length, 1);
-          assert.equal(metadata[0].mcpServerName, "tasks");
+          assert.equal(metadata[0].mcpServerName, "locked-tasks");
           assert.equal(metadata[0].mcpToolName, "run_task");
           const result = await session.rpc.tools.execute({ name: metadata[0].name, arguments: { name: "check" } });
           assert.equal(result.resultType, "success");
@@ -97,11 +97,11 @@ describe("native tasks consumers", () => {
     "discovers the compiler-generated direct tasks endpoint in real Pi",
     async () =>
       withNativeTasks(async ({ root, cwd, home, server }) => {
-        const saved = Object.fromEntries(["RUNNER_TEMP", "PI_CODING_AGENT_DIR", "GH_AW_TASKS_MCP"].map(key => [key, process.env[key]]));
+        const saved = Object.fromEntries(["RUNNER_TEMP", "PI_CODING_AGENT_DIR", "GH_AW_LOCKED_TASKS_MCP"].map(key => [key, process.env[key]]));
         try {
           process.env.RUNNER_TEMP = root;
           process.env.PI_CODING_AGENT_DIR = path.join(home, "pi-agent");
-          process.env.GH_AW_TASKS_MCP = JSON.stringify(server.config);
+          process.env.GH_AW_LOCKED_TASKS_MCP = JSON.stringify(server.config);
           preparePiRuntime({});
           const result = await promisify(execFile)(process.env.GH_AW_TEST_PI_BIN, ["mcp", "list", "--json"], {
             cwd,
@@ -110,7 +110,7 @@ describe("native tasks consumers", () => {
           });
           const catalog = JSON.parse(result.stdout);
           assert.deepEqual(catalog.errors, []);
-          const tasks = catalog.servers.find(entry => entry.name === "tasks");
+          const tasks = catalog.servers.find(entry => entry.name === "locked-tasks");
           assert.equal(tasks.state, "connected");
           assert.equal(tasks.exposure, "direct");
           assert.deepEqual(tasks.tools, ["run_task"]);

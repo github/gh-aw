@@ -36,27 +36,27 @@ func GoTasks() map[string]TaskDefinition {
 func parseTaskDefinition(name string, value any) (TaskDefinition, error) {
 	var task TaskDefinition
 	if name == "constructor" || name == "prototype" || name == "__proto__" {
-		return task, fmt.Errorf("tools.tasks task name %q is reserved; choose a different name", name)
+		return task, fmt.Errorf("tools.locked-tasks task name %q is reserved; choose a different name", name)
 	}
 	if !taskNamePattern.MatchString(name) {
-		return task, fmt.Errorf("tools.tasks task name %q must start with a letter and contain at most 64 letters, digits, dots, underscores or hyphens", name)
+		return task, fmt.Errorf("tools.locked-tasks task name %q must start with a letter and contain at most 64 letters, digits, dots, underscores or hyphens", name)
 	}
 	encoded, err := json.Marshal(value)
 	if err != nil {
-		return task, fmt.Errorf("tools.tasks.%s: %w", name, err)
+		return task, fmt.Errorf("tools.locked-tasks.%s: %w", name, err)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&task); err != nil {
-		return task, fmt.Errorf("tools.tasks.%s must be a task definition: %w", name, err)
+		return task, fmt.Errorf("tools.locked-tasks.%s must be a task definition: %w", name, err)
 	}
 	if strings.TrimSpace(task.Description) == "" || len(task.Description) > 1024 || !taskCommandPattern.MatchString(task.Command) {
-		return task, fmt.Errorf("tools.tasks.%s requires a non-empty description (at most 1024 bytes) and an executable name without paths", name)
+		return task, fmt.Errorf("tools.locked-tasks.%s requires a non-empty description (at most 1024 bytes) and an executable name without paths", name)
 	}
 	if task.Args == nil {
 		if fields, ok := value.(map[string]any); ok {
 			if _, present := fields["args"]; present {
-				return task, fmt.Errorf("tools.tasks.%s.args must be an array of strings", name)
+				return task, fmt.Errorf("tools.locked-tasks.%s.args must be an array of strings", name)
 			}
 		}
 		task.Args = []string{}
@@ -64,17 +64,17 @@ func parseTaskDefinition(name string, value any) (TaskDefinition, error) {
 	if task.Timeout == 0 {
 		if fields, ok := value.(map[string]any); ok {
 			if _, present := fields["timeout"]; present {
-				return task, fmt.Errorf("tools.tasks.%s.timeout must be between 1 and 600 seconds", name)
+				return task, fmt.Errorf("tools.locked-tasks.%s.timeout must be between 1 and 600 seconds", name)
 			}
 		}
 		task.Timeout = 60
 	}
 	if task.Timeout < 1 || task.Timeout > 600 || len(task.Args) > 128 {
-		return task, fmt.Errorf("tools.tasks.%s requires a timeout between 1 and 600 seconds and at most 128 arguments", name)
+		return task, fmt.Errorf("tools.locked-tasks.%s requires a timeout between 1 and 600 seconds and at most 128 arguments", name)
 	}
 	for _, literal := range append([]string{task.Description, task.Command}, task.Args...) {
 		if strings.Contains(literal, "${{") || strings.ContainsRune(literal, '\x00') || len(literal) > 8192 {
-			return task, fmt.Errorf("tools.tasks.%s fields must be literal strings without Actions expressions or NUL bytes, at most 8192 bytes each", name)
+			return task, fmt.Errorf("tools.locked-tasks.%s fields must be literal strings without Actions expressions or NUL bytes, at most 8192 bytes each", name)
 		}
 	}
 	return task, nil
@@ -88,7 +88,7 @@ func ResolveTasks(value any) (map[string]TaskDefinition, error) {
 	}
 	definitions, ok := value.(map[string]any)
 	if !ok {
-		return nil, errors.New("tools.tasks must be false or a map of named tasks and built-in sets")
+		return nil, errors.New("tools.locked-tasks must be false or a map of named tasks and built-in sets")
 	}
 	builtins := GoTasks()
 	for _, name := range slices.Sorted(maps.Keys(definitions)) {
@@ -96,7 +96,7 @@ func ResolveTasks(value any) (map[string]TaskDefinition, error) {
 		if name == "go" {
 			enabled, ok := value.(bool)
 			if !ok {
-				return nil, errors.New("tools.tasks.go must be true or false")
+				return nil, errors.New("tools.locked-tasks.go must be true or false")
 			}
 			if enabled {
 				maps.Copy(result, builtins)
@@ -104,7 +104,7 @@ func ResolveTasks(value any) (map[string]TaskDefinition, error) {
 			continue
 		}
 		if _, reserved := builtins[name]; reserved {
-			return nil, fmt.Errorf("tools.tasks.%s is reserved by the built-in Go set; use a different custom task name", name)
+			return nil, fmt.Errorf("tools.locked-tasks.%s is reserved by the built-in Go set; use a different custom task name", name)
 		}
 		task, err := parseTaskDefinition(name, value)
 		if err != nil {
@@ -113,7 +113,7 @@ func ResolveTasks(value any) (map[string]TaskDefinition, error) {
 		result[name] = task
 	}
 	if len(result) > 64 {
-		return nil, errors.New("tools.tasks supports at most 64 expanded tasks")
+		return nil, errors.New("tools.locked-tasks supports at most 64 expanded tasks")
 	}
 	return result, nil
 }
@@ -152,7 +152,7 @@ func mergeTaskConfigurations(base, additional any) (any, error) {
 			return nil, err
 		}
 		if left.Command != right.Command || left.Description != right.Description || left.Timeout != right.Timeout || !slices.Equal(left.Args, right.Args) {
-			return nil, fmt.Errorf("conflicting definitions of tools.tasks.%s across workflow imports; task arguments and executable definitions cannot be merged", name)
+			return nil, fmt.Errorf("conflicting definitions of tools.locked-tasks.%s across workflow imports; task arguments and executable definitions cannot be merged", name)
 		}
 	}
 	return result, nil

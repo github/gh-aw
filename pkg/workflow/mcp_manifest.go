@@ -60,7 +60,7 @@ func collectMCPServersForManifest(data *WorkflowData) []GHAWManifestMCPServer {
 	}
 
 	if hasWorkflowTasks(data) {
-		add("tasks", []string{"run_task"})
+		add("locked-tasks", []string{"run_task"})
 	}
 	if len(serversByName) == 0 {
 		return []GHAWManifestMCPServer{}

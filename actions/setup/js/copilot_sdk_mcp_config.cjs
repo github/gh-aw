@@ -15,7 +15,7 @@ function loadCopilotSDKMCPConfig(filename) {
     const config = JSON.parse(fs.readFileSync(filename, "utf8"));
     if (!isRecord(config) || !isRecord(config.mcpServers)) throw new Error("SDK MCP config requires mcpServers");
     for (const [name, entry] of Object.entries(config.mcpServers)) {
-      if (!/^[A-Za-z][A-Za-z0-9_.-]*$/.test(name) || ["__proto__", "constructor", "prototype", "tasks"].includes(name)) throw new Error("SDK MCP config contains an invalid or reserved server name");
+      if (!/^[A-Za-z][A-Za-z0-9_.-]*$/.test(name) || ["__proto__", "constructor", "prototype", "locked-tasks"].includes(name)) throw new Error("SDK MCP config contains an invalid or reserved server name");
       if (!isRecord(entry) || typeof entry.url !== "string" || (entry.type !== undefined && !["http", "sse"].includes(String(entry.type))) || entry.command !== undefined || entry.args !== undefined || entry.env !== undefined)
         throw new Error("SDK MCP config only supports compiler-converted HTTP/SSE servers");
       const url = new URL(entry.url);
@@ -45,7 +45,7 @@ function loadCopilotSDKMCPConfig(filename) {
     }
   }
   const tasks = tasksMCPConfig();
-  if (tasks) servers.tasks = tasks;
+  if (tasks) servers["locked-tasks"] = tasks;
   return servers;
 }
 

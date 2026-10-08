@@ -63,24 +63,24 @@ func TestTasksRejectInvalidDefinitions(t *testing.T) {
 }
 
 func TestTasksMergeAtomically(t *testing.T) {
-	base := map[string]any{"tasks": map[string]any{"go": true, "check": taskFixture("vet", "./...")}}
-	extra := map[string]any{"tasks": map[string]any{"check": taskFixture("vet", "./..."), "build": taskFixture("build", "./...")}}
+	base := map[string]any{"locked-tasks": map[string]any{"go": true, "check": taskFixture("vet", "./...")}}
+	extra := map[string]any{"locked-tasks": map[string]any{"check": taskFixture("vet", "./..."), "build": taskFixture("build", "./...")}}
 	merged, err := MergeTools(base, extra)
 	require.NoError(t, err)
-	tasks, err := ResolveTasks(merged["tasks"])
+	tasks, err := ResolveTasks(merged["locked-tasks"])
 	require.NoError(t, err)
 	require.Len(t, tasks, 7)
 	require.Equal(t, []string{"vet", "./..."}, tasks["check"].Args)
-	_, err = MergeTools(base, map[string]any{"tasks": map[string]any{"check": taskFixture("vet", "-race", "./...")}})
-	require.ErrorContains(t, err, "conflicting definitions of tools.tasks.check")
-	for _, pair := range [][2]map[string]any{{base, {"tasks": false}}, {{"tasks": false}, base}} {
+	_, err = MergeTools(base, map[string]any{"locked-tasks": map[string]any{"check": taskFixture("vet", "-race", "./...")}})
+	require.ErrorContains(t, err, "conflicting definitions of tools.locked-tasks.check")
+	for _, pair := range [][2]map[string]any{{base, {"locked-tasks": false}}, {{"locked-tasks": false}, base}} {
 		merged, err := MergeTools(pair[0], pair[1])
 		require.NoError(t, err)
-		require.Equal(t, false, merged["tasks"])
+		require.Equal(t, false, merged["locked-tasks"])
 	}
-	merged, err = MergeTools(base, map[string]any{"tasks": map[string]any{"go": false}})
+	merged, err = MergeTools(base, map[string]any{"locked-tasks": map[string]any{"go": false}})
 	require.NoError(t, err)
-	tasks, err = ResolveTasks(merged["tasks"])
+	tasks, err = ResolveTasks(merged["locked-tasks"])
 	require.NoError(t, err)
 	require.Len(t, tasks, 1)
 }
@@ -88,12 +88,15 @@ func TestTasksMergeAtomically(t *testing.T) {
 func TestTasksSchema(t *testing.T) {
 	for _, tasks := range []any{false, map[string]any{"go": true}, map[string]any{"check": taskFixture("vet", "./...")}} {
 		require.NoError(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
-			"on": "workflow_dispatch", "tools": map[string]any{"tasks": tasks},
+			"on": "workflow_dispatch", "tools": map[string]any{"locked-tasks": tasks},
 		}, "tasks.md"))
 	}
 	for _, tasks := range []any{true, map[string]any{"check": map[string]any{"description": "Check", "command": "go", "cwd": "."}}} {
 		require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
-			"on": "workflow_dispatch", "tools": map[string]any{"tasks": tasks},
+			"on": "workflow_dispatch", "tools": map[string]any{"locked-tasks": tasks},
 		}, "tasks.md"))
 	}
+	require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+		"on": "workflow_dispatch", "tools": map[string]any{"tasks": map[string]any{"go": true}},
+	}, "tasks.md"))
 }

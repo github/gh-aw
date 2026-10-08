@@ -13,7 +13,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 /** @param {string} filename */
 function requireReadOnlyMount(filename) {
-  if (process.platform !== "linux") throw new Error("Tasks require the AWF Linux sandbox");
+  if (process.platform !== "linux") throw new Error("Locked tasks require the AWF Linux sandbox");
   const target = fs.realpathSync(filename);
   const mounts = fs
     .readFileSync("/proc/self/mountinfo", "utf8")
@@ -24,31 +24,31 @@ function requireReadOnlyMount(filename) {
       return { path: fields[4].replace(/\\([0-7]{3})/g, (_, octal) => String.fromCharCode(parseInt(octal, 8))), options: fields[5].split(",") };
     });
   const mount = mounts.filter(entry => within(entry.path, target)).sort((a, b) => b.path.length - a.path.length)[0];
-  if (!mount?.options.includes("ro")) throw new Error(`Tasks require a read-only sandbox mount for ${filename}`);
+  if (!mount?.options.includes("ro")) throw new Error(`Locked tasks require a read-only sandbox mount for ${filename}`);
 }
 
 /**
  * @param {string | undefined} raw
  * @returns {{type: "http", url: string, headers: {Authorization: string}, tools: string[], timeout: number} | undefined}
  */
-function tasksMCPConfig(raw = process.env.GH_AW_TASKS_MCP) {
+function tasksMCPConfig(raw = process.env.GH_AW_LOCKED_TASKS_MCP) {
   if (raw === undefined) return undefined;
   const config = JSON.parse(raw);
   if (!isRecord(config) || Object.keys(config).some(key => !["type", "url", "headers", "tools", "timeout"].includes(key)) || config.type !== "http" || typeof config.url !== "string" || !isRecord(config.headers))
-    throw new Error("Invalid compiler-owned tasks MCP configuration");
+    throw new Error("Invalid compiler-owned locked-tasks MCP configuration");
   const url = new URL(config.url);
-  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || !url.port || url.pathname !== "/mcp" || url.search || url.hash || url.username || url.password) throw new Error("Tasks MCP must use a private loopback endpoint");
+  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || !url.port || url.pathname !== "/mcp" || url.search || url.hash || url.username || url.password) throw new Error("Locked tasks MCP must use a private loopback endpoint");
   const authorization = config.headers.Authorization;
-  if (typeof authorization !== "string" || !/^Bearer [a-f0-9]{64}$/.test(authorization) || Object.keys(config.headers).length !== 1) throw new Error("Tasks MCP requires its per-run authorization token");
+  if (typeof authorization !== "string" || !/^Bearer [a-f0-9]{64}$/.test(authorization) || Object.keys(config.headers).length !== 1) throw new Error("Locked tasks MCP requires its per-run authorization token");
   return { type: "http", url: config.url, headers: { Authorization: authorization }, tools: ["run_task"], timeout: 605_000 };
 }
 
 /** @param {Record<string, unknown>} servers @param {string | undefined} [raw] */
-function addTasksMCPServer(servers, raw = process.env.GH_AW_TASKS_MCP) {
+function addTasksMCPServer(servers, raw = process.env.GH_AW_LOCKED_TASKS_MCP) {
   const tasks = tasksMCPConfig(raw);
   if (!tasks) return servers;
-  if (Object.hasOwn(servers, "tasks")) throw new Error("The MCP server name tasks is reserved");
-  return { ...servers, tasks };
+  if (Object.hasOwn(servers, "locked-tasks")) throw new Error("The MCP server name locked-tasks is reserved");
+  return { ...servers, "locked-tasks": tasks };
 }
 
 /**
@@ -57,14 +57,14 @@ function addTasksMCPServer(servers, raw = process.env.GH_AW_TASKS_MCP) {
  * @param {{env?: NodeJS.ProcessEnv, verifyMount?: (filename: string) => void}} [options]
  */
 async function runTasksRuntime(manifestPath, command, { env = process.env, verifyMount = requireReadOnlyMount } = {}) {
-  if (command.length === 0) throw new Error("Tasks runtime requires the compiler-owned engine command");
-  if (!env.GITHUB_WORKSPACE) throw new Error("Tasks runtime requires GITHUB_WORKSPACE");
+  if (command.length === 0) throw new Error("Locked tasks runtime requires the compiler-owned engine command");
+  if (!env.GITHUB_WORKSPACE) throw new Error("Locked tasks runtime requires GITHUB_WORKSPACE");
   const root = fs.realpathSync(env.GITHUB_WORKSPACE);
   if (within(root, fs.realpathSync(manifestPath)) || within(root, fs.realpathSync(__dirname))) throw new Error("Task manifest and server code must be outside the checkout");
   verifyMount(manifestPath);
   verifyMount(__filename);
   const tasks = loadTaskManifest(manifestPath);
-  const privateRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-tasks-"));
+  const privateRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-locked-tasks-"));
   fs.chmodSync(privateRoot, 0o700);
   const controller = new AbortController();
   /** @type {ReturnType<typeof spawn> | undefined} */
@@ -89,9 +89,9 @@ async function runTasksRuntime(manifestPath, command, { env = process.env, verif
     });
     const catalog = await ready.json();
     if (!ready.ok || !isRecord(catalog) || !isRecord(catalog.result) || !Array.isArray(catalog.result.tools) || catalog.result.tools.length !== 1 || !isRecord(catalog.result.tools[0]) || catalog.result.tools[0].name !== "run_task")
-      throw new Error("Tasks MCP readiness check failed");
+      throw new Error("Locked tasks MCP readiness check failed");
     process.on("SIGTERM", stop).on("SIGINT", stop);
-    const engineEnv = { ...env, GH_AW_TASKS_MCP: JSON.stringify(server.config) };
+    const engineEnv = { ...env, GH_AW_LOCKED_TASKS_MCP: JSON.stringify(server.config) };
     const running = spawn(command[0], command.slice(1), { env: engineEnv, stdio: "inherit", detached: true, shell: false });
     child = running;
     /** @type {Promise<number>} */
@@ -131,7 +131,7 @@ async function runTasksRuntime(manifestPath, command, { env = process.env, verif
         server?.close(),
       ]);
       const failures = cleanup.filter(result => result.status === "rejected").map(result => result.reason);
-      if (failures.length) throw new AggregateError(failures, "Tasks runtime cleanup failed");
+      if (failures.length) throw new AggregateError(failures, "Locked tasks runtime cleanup failed");
     } finally {
       fs.rmSync(privateRoot, { recursive: true });
     }
@@ -141,7 +141,7 @@ async function runTasksRuntime(manifestPath, command, { env = process.env, verif
 if (require.main === module) {
   const args = process.argv.slice(2);
   if (args[0] !== "--manifest" || !args[1] || args[2] !== "--") {
-    process.stderr.write("Tasks runtime requires --manifest <path> -- <engine command>\n");
+    process.stderr.write("Locked tasks runtime requires --manifest <path> -- <engine command>\n");
     process.exitCode = 1;
   } else {
     runTasksRuntime(args[1], args.slice(3))
@@ -149,7 +149,7 @@ if (require.main === module) {
         process.exitCode = code;
       })
       .catch(error => {
-        process.stderr.write(`[tasks] ${getErrorMessage(error)}\n`);
+        process.stderr.write(`[locked-tasks] ${getErrorMessage(error)}\n`);
         process.exitCode = 1;
       });
   }

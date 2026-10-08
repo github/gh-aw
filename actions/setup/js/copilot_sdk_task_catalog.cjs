@@ -28,7 +28,7 @@ function authorizedMCPTool(tool, permissions, servers) {
  */
 async function restrictTaskCatalog(session, { ToolSet, availableTools, allowedTools, mcpServers }) {
   if (!session.rpc?.tools?.initializeAndValidate || !session.rpc.tools.getCurrentMetadata || !session.rpc.options?.update) {
-    throw new Error("Tasks require SDK native catalog initialization and tool-filter update APIs");
+    throw new Error("Locked tasks require SDK native catalog initialization and tool-filter update APIs");
   }
   const permissions = new Set(allowedTools);
   const base = availableTools.toArray().filter(selector => selector !== "mcp:*");
@@ -36,7 +36,7 @@ async function restrictTaskCatalog(session, { ToolSet, availableTools, allowedTo
   /** @type {NodeJS.Timeout | undefined} */
   let timer;
   function requireActive() {
-    if (expired) throw new Error("SDK tasks catalog initialization expired before inference");
+    if (expired) throw new Error("SDK locked-tasks catalog initialization expired before inference");
   }
   /** @returns {Promise<ToolMetadata[]>} */
   async function metadata() {
@@ -45,11 +45,11 @@ async function restrictTaskCatalog(session, { ToolSet, availableTools, allowedTo
     requireActive();
     const result = await session.rpc.tools.getCurrentMetadata();
     requireActive();
-    if (!Array.isArray(result.tools)) throw new Error("SDK tasks catalog metadata is unavailable");
+    if (!Array.isArray(result.tools)) throw new Error("SDK locked-tasks catalog metadata is unavailable");
     const names = new Set();
     for (const tool of result.tools) {
       if (!tool || typeof tool.name !== "string" || !tool.name || names.has(tool.name) || Boolean(tool.mcpServerName) !== Boolean(tool.mcpToolName)) {
-        throw new Error("SDK tasks catalog metadata contains invalid or duplicate tools");
+        throw new Error("SDK locked-tasks catalog metadata contains invalid or duplicate tools");
       }
       names.add(tool.name);
     }
@@ -57,9 +57,9 @@ async function restrictTaskCatalog(session, { ToolSet, availableTools, allowedTo
   }
   /** @param {ToolMetadata[]} tools */
   function requireTask(tools) {
-    const tasks = tools.filter(tool => tool.mcpServerName === "tasks");
+    const tasks = tools.filter(tool => tool.mcpServerName === "locked-tasks");
     if (tasks.length !== 1 || tasks[0].mcpToolName !== "run_task" || tasks[0].deferLoading === true) {
-      throw new Error("SDK tasks catalog must expose exactly the native tasks.run_task tool");
+      throw new Error("SDK locked-tasks catalog must expose exactly the native locked-tasks.run_task tool");
     }
   }
   async function initialize() {
@@ -71,12 +71,12 @@ async function restrictTaskCatalog(session, { ToolSet, availableTools, allowedTo
     requireActive();
     const update = await session.rpc.options.update({ availableTools: [...base, ...concrete.toArray()] });
     requireActive();
-    if (update.success !== true) throw new Error("SDK rejected the concrete tasks tool catalog");
+    if (update.success !== true) throw new Error("SDK rejected the concrete locked-tasks tool catalog");
     const restricted = await metadata();
     requireTask(restricted);
     for (const tool of restricted.filter(tool => tool.mcpServerName)) {
       if (!authorizedMCPTool(tool, permissions, mcpServers) || !approved.some(entry => entry.name === tool.name && entry.mcpServerName === tool.mcpServerName && entry.mcpToolName === tool.mcpToolName)) {
-        throw new Error("SDK tasks catalog exposes an unauthorized MCP tool");
+        throw new Error("SDK locked-tasks catalog exposes an unauthorized MCP tool");
       }
     }
     return restricted;
@@ -86,7 +86,7 @@ async function restrictTaskCatalog(session, { ToolSet, availableTools, allowedTo
     const deadline = new Promise((_, reject) => {
       timer = setTimeout(() => {
         expired = true;
-        reject(new Error("SDK tasks catalog initialization timed out before inference"));
+        reject(new Error("SDK locked-tasks catalog initialization timed out before inference"));
       }, 60_000);
     });
     return await Promise.race([initialize(), deadline]);

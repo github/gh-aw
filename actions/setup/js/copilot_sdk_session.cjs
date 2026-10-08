@@ -330,7 +330,7 @@ async function runWithCopilotSDK({
       logger: log,
       onDenied: requestSummary => recordToolDenial(`permission denied: ${requestSummary}`),
       workspaceRoot: process.env.GITHUB_WORKSPACE,
-      ...(mcpServers?.tasks ? { getMCPToolMetadata: () => verifiedMCPMetadata } : {}),
+      ...(mcpServers?.["locked-tasks"] ? { getMCPToolMetadata: () => verifiedMCPMetadata } : {}),
     });
     const toolCallBudget = buildCopilotSDKToolCallBudget(toolConfig?.maxToolCalls, event => {
       writeDriverEvent(event.exhausted ? "guard.tool_call_budget_exceeded" : "guard.tool_call_budget_debit", event);
@@ -346,7 +346,7 @@ async function runWithCopilotSDK({
       providers,
       models: providerModels,
       ...(mcpServers ? { mcpServers } : {}),
-      ...(mcpServers?.tasks ? { toolSearch: { enabled: false } } : {}),
+      ...(mcpServers?.["locked-tasks"] ? { toolSearch: { enabled: false } } : {}),
       onPermissionRequest,
       ...(toolCallBudget ? { hooks: { onPreToolUse: toolCallBudget.onPreToolUse } } : {}),
       ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
@@ -354,9 +354,9 @@ async function runWithCopilotSDK({
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
     session = await client.createSession(sessionConfig);
     log(`session created: sessionId=${session.sessionId}`);
-    if (mcpServers?.tasks) {
+    if (mcpServers?.["locked-tasks"]) {
       if (!sdk.ToolSet || !sessionConfig.availableTools || Array.isArray(sessionConfig.availableTools) || !toolConfig) {
-        throw new Error("Tasks require the compiler-controlled SDK tool catalog");
+        throw new Error("Locked tasks require the compiler-controlled SDK tool catalog");
       }
       verifiedMCPMetadata = await restrictTaskCatalog(session, {
         ToolSet: sdk.ToolSet,
@@ -364,7 +364,7 @@ async function runWithCopilotSDK({
         allowedTools: toolConfig.permissions.allowedTools,
         mcpServers,
       });
-      log("verified native tasks MCP catalog before inference");
+      log("verified native locked-tasks MCP catalog before inference");
     }
 
     // Prepare JSONL output file for this session.

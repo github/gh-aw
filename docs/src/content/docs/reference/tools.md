@@ -113,9 +113,9 @@ tools:
 
 Use wildcards like `git:*` for command families or `:*` for unrestricted access.
 
-### Tasks (`tasks:`)
+### Locked tasks (`locked-tasks:`)
 
-Exposes fixed workflow-owned commands as the native MCP tool `tasks.run_task`.
+Exposes fixed workflow-owned commands as the native MCP tool `locked-tasks.run_task`.
 The agent selects a task name; it cannot supply executable arguments, environment
 variables, a working directory, or execution limits.
 
@@ -126,7 +126,7 @@ engine:
 tools:
   bash: false
   cli-proxy: false
-  tasks:
+  locked-tasks:
     go: true
     check:
       description: Check a specific Go package
@@ -136,7 +136,7 @@ tools:
 ```
 
 `engine: pi` is also supported, including its bundled SDK and RPC drivers.
-Tasks require the AWF Docker runtime on a standard Linux runner, one
+Locked tasks require the AWF Docker runtime on a standard Linux runner, one
 current-repository checkout at the workspace root, and explicit
 `tools.cli-proxy: false`. Cloud Hypervisor, ARC/DinD, sampled execution,
 custom engine commands/drivers/extensions, custom sandbox mounts, and working
@@ -167,7 +167,7 @@ standard output, standard error, and duration in milliseconds.
 
 #### Built-in Go set
 
-`tools.tasks.go: true` expands these definitions:
+`tools.locked-tasks.go: true` expands these definitions:
 
 | Task | Command | Timeout |
 |---|---|---|
@@ -202,7 +202,7 @@ fragment can declare:
 
 ```aw wrap title=".github/workflows/shared/go-tasks.md"
 tools:
-  tasks:
+  locked-tasks:
     go: true
 ```
 
@@ -219,8 +219,8 @@ tools:
 Nested imports and import inputs follow the existing import rules. Distinct
 task names are combined; identical definitions are deduplicated. Conflicting
 definitions fail compilation instead of concatenating argument lists.
-`tools.tasks: false` disables the entire imported capability.
-`tools.tasks.go: false` disables the imported Go set while retaining custom
+`tools.locked-tasks: false` disables the entire imported capability.
+`tools.locked-tasks.go: false` disables the imported Go set while retaining custom
 tasks. Built-in task definitions cannot be individually overridden.
 
 ### Web Tools

@@ -99,7 +99,7 @@ func promptToolRequirements(content string) []promptToolRequirement {
 
 func promptKnownTools() map[string]promptToolRequirement {
 	knownTools := make(map[string]promptToolRequirement)
-	knownTools["run_task"] = promptToolRequirement{server: "tasks", tool: "run_task"}
+	knownTools["run_task"] = promptToolRequirement{server: "locked-tasks", tool: "run_task"}
 	gitHubTools, _ := getGitHubToolToToolsetMap()
 	for name := range gitHubTools {
 		knownTools[name] = promptToolRequirement{server: "github", tool: name}
@@ -363,7 +363,7 @@ func promptToolAvailable(data *WorkflowData, requirement promptToolRequirement, 
 	}
 	// Framework-generated servers are not necessarily present in the tools map.
 	switch requirement.server {
-	case "tasks":
+	case "locked-tasks":
 		return requirement.tool == "run_task" && hasWorkflowTasks(data)
 	case "native-read":
 		return !promptShellDisabledByProvider(data)

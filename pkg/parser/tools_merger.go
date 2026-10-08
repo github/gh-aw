@@ -118,7 +118,7 @@ func mergeToolObjectList(jsonObjects []map[string]any) (map[string]any, error) {
 }
 
 func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool, error) {
-	if key == "tasks" {
+	if key == "locked-tasks" {
 		merged, err := mergeTaskConfigurations(existingValue, newValue)
 		return merged, true, err
 	}

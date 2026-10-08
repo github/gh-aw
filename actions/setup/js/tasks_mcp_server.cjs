@@ -16,8 +16,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  * onError?: (error: Error) => void,
  * }} options
  */
-async function startTasksServer({ tasks, executables, cwd, env, token, signal, onError, log = event => process.stderr.write(`[tasks] ${JSON.stringify(event)}\n`) }) {
-  if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("Tasks server requires a private 256-bit token");
+async function startTasksServer({ tasks, executables, cwd, env, token, signal, onError, log = event => process.stderr.write(`[locked-tasks] ${JSON.stringify(event)}\n`) }) {
+  if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("Locked tasks server requires a private 256-bit token");
   /** @type {ReturnType<typeof runTaskProcess> | undefined} */
   let active;
   /** @type {Map<string | number | null, AbortController>} */
@@ -72,7 +72,7 @@ async function startTasksServer({ tasks, executables, cwd, env, token, signal, o
       let result;
       switch (message.method) {
         case "initialize":
-          result = { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "gh-aw-tasks", version: "1.0.0" } };
+          result = { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "gh-aw-locked-tasks", version: "1.0.0" } };
           break;
         case "ping":
           result = {};
@@ -128,14 +128,14 @@ async function startTasksServer({ tasks, executables, cwd, env, token, signal, o
     });
   });
   const address = server.address();
-  if (!address || typeof address === "string") throw new Error("Tasks MCP server has no loopback address");
+  if (!address || typeof address === "string") throw new Error("Locked tasks MCP server has no loopback address");
   /** @type {Promise<void> | undefined} */
   let closing;
   return {
     config: { type: "http", url: `http://127.0.0.1:${address.port}/mcp`, headers: { Authorization: `Bearer ${token}` }, tools: ["run_task"], timeout: 605_000 },
     close() {
       closing ??= (async () => {
-        for (const controller of calls.values()) controller.abort(new Error("Tasks server stopped"));
+        for (const controller of calls.values()) controller.abort(new Error("Locked tasks server stopped"));
         await Promise.allSettled(active ? [active] : []);
         server.closeAllConnections();
         await new Promise((resolve, reject) => server.close(error => (error ? reject(error) : resolve(undefined))));

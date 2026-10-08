@@ -84,7 +84,7 @@ type ToolsConfig struct {
 	Ledger           *LedgerToolConfig           `yaml:"ledger,omitempty"`
 	Timeout          *TemplatableInt32           `yaml:"timeout,omitempty"`
 	StartupTimeout   *TemplatableInt32           `yaml:"startup-timeout,omitempty"`
-	Tasks            *TasksToolConfig            `yaml:"tasks,omitempty"`
+	LockedTasks      *LockedTasksToolConfig      `yaml:"locked-tasks,omitempty"`
 
 	// Custom MCP tools (anything not in the above list)
 	Custom map[string]MCPServerConfig `yaml:",inline"`
@@ -98,9 +98,9 @@ type ToolsConfig struct {
 	CLIProxy bool `yaml:"cli-proxy,omitempty"`
 
 	// Raw map for backwards compatibility
-	raw            map[string]any
-	ledgerParseErr error
-	tasksParseErr  error
+	raw                 map[string]any
+	ledgerParseErr      error
+	lockedTasksParseErr error
 }
 
 // Tools is a type alias for ToolsConfig for backward compatibility.
@@ -119,8 +119,8 @@ func ParseToolsConfig(toolsMap map[string]any) (*ToolsConfig, error) {
 		}
 	}
 	config := NewTools(toolsMap)
-	if config.tasksParseErr != nil {
-		return nil, config.tasksParseErr
+	if config.lockedTasksParseErr != nil {
+		return nil, config.lockedTasksParseErr
 	}
 	if config.GitHub != nil && config.GitHub.reposParseErr != nil {
 		return nil, config.GitHub.reposParseErr
@@ -137,8 +137,8 @@ func (t *ToolsConfig) ParseError() error {
 	if t == nil {
 		return nil
 	}
-	if t.tasksParseErr != nil {
-		return t.tasksParseErr
+	if t.lockedTasksParseErr != nil {
+		return t.lockedTasksParseErr
 	}
 	return t.ledgerParseErr
 }
@@ -223,8 +223,8 @@ func (t *ToolsConfig) ToMap() map[string]any { //nolint:largefunc // Existing co
 	// Otherwise construct a new map from the fields
 	toolsTypesLog.Print("Constructing map from ToolsConfig fields")
 	result := make(map[string]any)
-	if t.Tasks != nil {
-		result["tasks"] = t.Tasks.Raw
+	if t.LockedTasks != nil {
+		result["locked-tasks"] = t.LockedTasks.Raw
 	}
 
 	if t.GitHub != nil {
@@ -674,8 +674,8 @@ func (t *Tools) GetToolNames() []string {
 	if t.Ledger != nil {
 		names = append(names, "ledger")
 	}
-	if t.Tasks != nil {
-		names = append(names, "tasks")
+	if t.LockedTasks != nil {
+		names = append(names, "locked-tasks")
 	}
 	if t.Timeout != nil {
 		names = append(names, "timeout")

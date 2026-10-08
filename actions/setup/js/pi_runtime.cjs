@@ -127,8 +127,8 @@ function preparePiRuntime(config = parsePiConfig()) {
   gateway.mcpServers = addTasksMCPServer(gateway.mcpServers || {});
   for (const [name, server] of Object.entries(gateway.mcpServers || {})) {
     if (!isRecord(server)) throw new Error("Pi MCP server configuration must be an object");
-    if (name === "tasks") {
-      if (config.mcp?.toolExposure?.tasks || config.mcp?.exposure === "hidden") throw new Error("Pi tasks MCP exposure cannot be hidden or overridden");
+    if (name === "locked-tasks") {
+      if (config.mcp?.toolExposure?.["locked-tasks"] || config.mcp?.exposure === "hidden") throw new Error("Pi locked-tasks MCP exposure cannot be hidden or overridden");
       server.exposure = "direct";
       continue;
     }

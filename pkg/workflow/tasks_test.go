@@ -16,7 +16,7 @@ func tasksWorkflowFixture(engine string) string {
 tools:
   bash: false
   cli-proxy: false
-  tasks:
+  locked-tasks:
     go: true
 ---
 Run the configured tasks to check the source.
@@ -38,13 +38,13 @@ func TestTasksCompileEngines(t *testing.T) {
 			require.NoError(t, err)
 			lock := string(content)
 			require.Contains(t, lock, "tasks_runtime.cjs")
-			require.Contains(t, lock, "tasks/manifest.json")
+			require.Contains(t, lock, "locked-tasks/manifest.json")
 			require.Contains(t, lock, `"go.test"`)
 			require.Contains(t, lock, `"args":["test","-count=1","./..."]`)
-			require.NotContains(t, lock, `mcp-proxy:tasks`)
-			require.Contains(t, lock, `"name":"tasks","tools":["run_task"]`)
+			require.NotContains(t, lock, `mcp-proxy:locked-tasks`)
+			require.Contains(t, lock, `"name":"locked-tasks","tools":["run_task"]`)
 			if name == "copilot-sdk" {
-				require.Contains(t, lock, "tasks(run_task)")
+				require.Contains(t, lock, "locked-tasks(run_task)")
 				require.Contains(t, lock, "gh-aw/copilot-sdk")
 			}
 		})
@@ -56,8 +56,10 @@ func TestTasksValidationAndRoundTrip(t *testing.T) {
 	data, err := compiler.ParseWorkflowString(tasksWorkflowFixture("  id: pi\n"), "tasks.md")
 	require.NoError(t, err)
 	require.NoError(t, validateTasks(data))
-	require.Contains(t, data.ParsedTools.GetToolNames(), "tasks")
-	require.Equal(t, data.Tools["tasks"], data.ParsedTools.ToMap()["tasks"])
+	require.NotNil(t, data.ParsedTools.LockedTasks)
+	require.Contains(t, data.ParsedTools.GetToolNames(), "locked-tasks")
+	require.NotContains(t, data.ParsedTools.GetToolNames(), "tasks")
+	require.Equal(t, data.Tools["locked-tasks"], data.ParsedTools.ToMap()["locked-tasks"])
 	for name, mutate := range map[string]func(*WorkflowData){
 		"unsupported engine":   func(d *WorkflowData) { d.EngineConfig.ID = "claude" },
 		"no SDK":               func(d *WorkflowData) { d.EngineConfig.ID = "copilot" },
@@ -66,7 +68,7 @@ func TestTasksValidationAndRoundTrip(t *testing.T) {
 		"custom arguments":     func(d *WorkflowData) { d.EngineConfig.Args = []string{"--help"} },
 		"checkout disabled":    func(d *WorkflowData) { d.CheckoutDisabled = true },
 		"proxy enabled":        func(d *WorkflowData) { d.Tools["cli-proxy"] = true },
-		"reserved environment": func(d *WorkflowData) { d.EngineConfig.Env = map[string]string{"GH_AW_TASKS_MCP": "{}"} },
+		"reserved environment": func(d *WorkflowData) { d.EngineConfig.Env = map[string]string{"GH_AW_LOCKED_TASKS_MCP": "{}"} },
 		"workspace override":   func(d *WorkflowData) { d.EngineConfig.Env = map[string]string{"GITHUB_WORKSPACE": "/tmp"} },
 		"sampled execution":    func(d *WorkflowData) { d.UseSamples = true },
 	} {
@@ -85,9 +87,15 @@ func TestTasksValidationAndRoundTrip(t *testing.T) {
 	require.Empty(t, resolvedWorkflowTasks(data))
 }
 
+func TestTasksRejectLegacyToolKey(t *testing.T) {
+	content := strings.Replace(tasksWorkflowFixture("  id: pi\n"), "  locked-tasks:", "  tasks:", 1)
+	_, err := NewCompiler().ParseWorkflowString(content, "tasks.md")
+	require.Error(t, err)
+}
+
 func TestTasksSharedImports(t *testing.T) {
 	dir := t.TempDir()
-	shared := "---\ntools:\n  tasks:\n    go: true\n    check:\n      description: Check source\n      command: go\n      args: [vet, ./...]\n---\n"
+	shared := "---\ntools:\n  locked-tasks:\n    go: true\n    check:\n      description: Check source\n      command: go\n      args: [vet, ./...]\n---\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(shared), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "nested.md"), []byte("---\nimports: [shared.md]\n---\n"), 0600))
 	for _, test := range []struct {
@@ -96,8 +104,8 @@ func TestTasksSharedImports(t *testing.T) {
 		wantManifest bool
 	}{
 		{"imported", "", true},
-		{"disabled", "  tasks: false\n", false},
-		{"duplicate", "  tasks:\n    check:\n      description: Check source\n      command: go\n      args: [vet, ./...]\n", true},
+		{"disabled", "  locked-tasks: false\n", false},
+		{"duplicate", "  locked-tasks:\n    check:\n      description: Check source\n      command: go\n      args: [vet, ./...]\n", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			content := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: pi\nimports: [nested.md]\ntools:\n  cli-proxy: false\n" + test.local + "---\nCheck source.\n"
@@ -110,18 +118,18 @@ func TestTasksSharedImports(t *testing.T) {
 		})
 	}
 	filename := filepath.Join(dir, "conflict.md")
-	conflict := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: pi\nimports: [nested.md]\ntools:\n  cli-proxy: false\n  tasks:\n    check:\n      description: Check source\n      command: go\n      args: [build, ./...]\n---\nCheck source.\n"
+	conflict := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: pi\nimports: [nested.md]\ntools:\n  cli-proxy: false\n  locked-tasks:\n    check:\n      description: Check source\n      command: go\n      args: [build, ./...]\n---\nCheck source.\n"
 	require.NoError(t, os.WriteFile(filename, []byte(conflict), 0600))
 	err := NewCompiler().CompileWorkflow(filename)
-	require.ErrorContains(t, err, "tools.tasks.check")
+	require.ErrorContains(t, err, "tools.locked-tasks.check")
 	require.ErrorContains(t, err, "shared.md")
 }
 
 func TestTasksImportInputs(t *testing.T) {
 	dir := t.TempDir()
-	shared := "---\ninputs:\n  package:\n    type: string\n    default: ./...\ntools:\n  tasks:\n    check:\n      description: Check source\n      command: go\n      args: [vet, '${{ github.aw.inputs.package }}']\n---\n"
+	shared := "---\ninputs:\n  package:\n    type: string\n    default: ./...\ntools:\n  locked-tasks:\n    check:\n      description: Check source\n      command: go\n      args: [vet, '${{ github.aw.inputs.package }}']\n---\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(shared), 0600))
-	main := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: pi\nimports:\n  - path: shared.md\n    inputs:\n      package: ./pkg/example/...\ntools:\n  cli-proxy: false\n---\nRun tasks(run_task).\n"
+	main := "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine: pi\nimports:\n  - path: shared.md\n    inputs:\n      package: ./pkg/example/...\ntools:\n  cli-proxy: false\n---\nRun locked-tasks(run_task).\n"
 	filename := filepath.Join(dir, "tasks.md")
 	require.NoError(t, os.WriteFile(filename, []byte(main), 0600))
 	require.NoError(t, NewCompiler().CompileWorkflow(filename))

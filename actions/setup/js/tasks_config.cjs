@@ -15,10 +15,10 @@ function isRecord(value) {
 /** @param {unknown} manifest @returns {Record<string, TaskDefinition>} */
 function parseTaskManifest(manifest) {
   if (!isRecord(manifest) || manifest.version !== 1 || !isRecord(manifest.tasks) || Object.keys(manifest).some(key => !["version", "tasks"].includes(key))) {
-    throw new Error("Tasks manifest must be a version-1 object with task definitions");
+    throw new Error("Locked tasks manifest must be a version-1 object with task definitions");
   }
   const entries = Object.entries(manifest.tasks);
-  if (entries.length < 1 || entries.length > 64) throw new Error("Tasks manifest must contain between 1 and 64 tasks");
+  if (entries.length < 1 || entries.length > 64) throw new Error("Locked tasks manifest must contain between 1 and 64 tasks");
   /** @type {Record<string, TaskDefinition>} */
   const tasks = Object.create(null);
   for (const [name, task] of entries) {
@@ -41,7 +41,7 @@ function loadTaskManifest(filename) {
   const fd = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
   try {
     const stat = fs.fstatSync(fd);
-    if (!stat.isFile() || stat.size > MAX_MANIFEST_BYTES) throw new Error("Tasks manifest must be a regular file of at most 1 MiB");
+    if (!stat.isFile() || stat.size > MAX_MANIFEST_BYTES) throw new Error("Locked tasks manifest must be a regular file of at most 1 MiB");
     const buffer = Buffer.alloc(MAX_MANIFEST_BYTES + 1);
     let length = 0;
     while (length < buffer.length) {
@@ -49,7 +49,7 @@ function loadTaskManifest(filename) {
       if (!count) break;
       length += count;
     }
-    if (length > MAX_MANIFEST_BYTES) throw new Error("Tasks manifest exceeds 1 MiB");
+    if (length > MAX_MANIFEST_BYTES) throw new Error("Locked tasks manifest exceeds 1 MiB");
     return parseTaskManifest(JSON.parse(buffer.subarray(0, length).toString("utf8")));
   } finally {
     fs.closeSync(fd);

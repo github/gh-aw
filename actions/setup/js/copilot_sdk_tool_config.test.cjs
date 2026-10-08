@@ -253,7 +253,7 @@ describe("workflow permission scope", () => {
 
 describe("runWithCopilotSDK compiler-owned catalog", () => {
   it.each([true, false])("keeps native tasks visible before inference when tasks enabled=%s", async enabled => {
-    const metadata = { name: "tasks-run_task", mcpServerName: "tasks", mcpToolName: "run_task", deferLoading: false };
+    const metadata = { name: "locked-tasks-run_task", mcpServerName: "locked-tasks", mcpToolName: "run_task", deferLoading: false };
     const initializeAndValidate = vi.fn().mockResolvedValue(undefined);
     const getCurrentMetadata = vi.fn().mockResolvedValue({ tools: [metadata] });
     const update = vi.fn().mockResolvedValue({ success: true });
@@ -274,14 +274,14 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
       createSession = createSession;
       stop = vi.fn().mockResolvedValue(undefined);
     }
-    const toolConfig = validToolConfig({ permissions: { allowedTools: ["read", "web_fetch", ...(enabled ? ["tasks(run_task)"] : [])] } });
+    const toolConfig = validToolConfig({ permissions: { allowedTools: ["read", "web_fetch", ...(enabled ? ["locked-tasks(run_task)"] : [])] } });
     const result = await runWithCopilotSDK({
       sdkUri: "http://127.0.0.1:3002",
       prompt: "test prompt",
       logger: () => {},
       permissionConfig: toolConfig.permissions,
       toolConfig,
-      ...(enabled ? { mcpServers: { tasks: { type: "http", url: "http://127.0.0.1:1234/mcp", tools: ["run_task"] } } } : {}),
+      ...(enabled ? { mcpServers: { "locked-tasks": { type: "http", url: "http://127.0.0.1:1234/mcp", tools: ["run_task"] } } } : {}),
       sdkModule: {
         ...fakeSDKTools,
         CopilotClient: FakeCopilotClient,
@@ -294,9 +294,9 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
     const sessionConfig = createSession.mock.calls[0][0];
     expect(sessionConfig.toolSearch).toEqual(enabled ? { enabled: false } : undefined);
     if (enabled) {
-      expect(update.mock.calls[0][0].availableTools).toContain("mcp:tasks-run_task");
+      expect(update.mock.calls[0][0].availableTools).toContain("mcp:locked-tasks-run_task");
       expect(update.mock.calls[0][0].availableTools).not.toContain("mcp:*");
-      expect(sessionConfig.onPermissionRequest({ kind: "mcp", serverName: "tasks", toolName: "tasks-run_task" }).kind).toBe("approve-once");
+      expect(sessionConfig.onPermissionRequest({ kind: "mcp", serverName: "locked-tasks", toolName: "locked-tasks-run_task" }).kind).toBe("approve-once");
     }
   });
 

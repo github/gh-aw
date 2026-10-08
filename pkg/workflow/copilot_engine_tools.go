@@ -183,7 +183,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	// Note: native web-search is unavailable in offline BYOK mode
 	builtInTools := map[string]struct {
 	}{
-		"tasks":        {},
+		"locked-tasks": {},
 		"bash":         {},
 		"edit":         {},
 		"web-search":   {},

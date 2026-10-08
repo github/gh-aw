@@ -125,7 +125,7 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 				continue
 			}
 			return true
-		case "tasks", "bash", "edit", "web-fetch", "web-search", "playwright",
+		case "locked-tasks", "bash", "edit", "web-fetch", "web-search", "playwright",
 			"agentic-workflows", "cache-memory", "drive-memory", "repo-memory",
 			"comment-memory", "cli-proxy", "timeout", "startup-timeout":
 			continue
