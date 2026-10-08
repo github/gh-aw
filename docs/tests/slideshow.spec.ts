@@ -234,11 +234,11 @@ test("floats a translucent toolbar that becomes opaque on hover and keyboard foc
   expect(Math.abs(toolbarBounds.x + toolbarBounds.width / 2 - size.width / 2)).toBeLessThan(1);
   expect(size.height - toolbarBounds.y - toolbarBounds.height).toBeGreaterThan(16);
   await page.mouse.move(0, 0);
-  await expect(toolbar).toHaveCSS("opacity", "0.65");
+  await expect(toolbar).toHaveCSS("opacity", "0.1");
   await toolbar.hover();
   await expect(toolbar).toHaveCSS("opacity", "1");
   await page.mouse.move(0, 0);
-  await expect(toolbar).toHaveCSS("opacity", "0.65");
+  await expect(toolbar).toHaveCSS("opacity", "0.1");
   await page.keyboard.press("Shift+Tab");
   await expect(toolbar).toHaveCSS("opacity", "1");
   await toolbar.getByRole("button", { name: "Drawing tools", exact: true }).click();
