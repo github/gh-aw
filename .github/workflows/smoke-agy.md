@@ -7,6 +7,10 @@ on:
     name: smoke-agy
     strategy: centralized
     events: [issues, issue_comment, pull_request, pull_request_comment]
+  label_command:
+    name: smoke
+    events: [pull_request]
+    remove_label: false
   reaction: none
   status-comment: false
 permissions:

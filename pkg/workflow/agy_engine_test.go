@@ -234,6 +234,11 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 					"strategy": "centralized",
 					"events":   []any{"issues", "issue_comment", "pull_request", "pull_request_comment"},
 				}
+				expectedTriggers["label_command"] = map[string]any{
+					"name":         "smoke",
+					"events":       []any{"pull_request"},
+					"remove_label": false,
+				}
 				expectedTriggers["reaction"] = "none"
 				expectedTriggers["status-comment"] = false
 			}
@@ -256,6 +261,16 @@ func TestAgySmokeSlashCommandIsCentrallyRouted(t *testing.T) {
 	lock, err := os.ReadFile("../../.github/workflows/smoke-agy.lock.yml")
 	require.NoError(t, err)
 	assert.Contains(t, string(lock), `GH_AW_COMMANDS: "[\"smoke-agy\"]"`)
+}
+
+func TestAgySmokeLabelCommandIsCentrallyRouted(t *testing.T) {
+	router, err := os.ReadFile("../../.github/workflows/agentic_commands.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(router), `"smoke":[{"workflow":"smoke-agy","events":["pull_request"]}`)
+	lock, err := os.ReadFile("../../.github/workflows/smoke-agy.lock.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(lock), `fromJSON(github.event.inputs.aw_context || '{}').trigger_label == 'smoke'`)
+	assert.NotContains(t, string(lock), "remove_trigger_label")
 }
 
 func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {

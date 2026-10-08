@@ -102,8 +102,10 @@ prompt. Release and Gemini deprecation are gated on that production path, not
 on mocked tests or native authentication alone.
 
 `smoke-agy.md` provides an on-demand smoke test using the same shared conformance
-suite. Run it with `workflow_dispatch` or `/smoke-agy` in an issue or pull request
-body or comment, routed through the centralized command workflow. It checks file
+suite. Run it with `workflow_dispatch`, `/smoke-agy` in an issue or pull request
+body or comment, or by adding the `smoke` label to a pull request. Commands and
+labels are routed through the centralized command workflow; the Agy workflow
+does not remove the trigger label. It checks file
 reads and writes, shell execution and environment forwarding,
 inference accounting, native and CLI-mounted MCP round trips, and staged safe
 outputs. Runs are bounded to ten minutes and fifty AI credits; results are recorded
