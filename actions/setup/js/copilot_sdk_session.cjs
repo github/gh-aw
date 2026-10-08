@@ -5,7 +5,7 @@
  *
  * Runs a single Copilot agentic session using the @github/copilot-sdk.
  * Serializes all SDK session events to a JSONL file so that
- * unified_timeline.cjs can render them in the step summary.
+ * unified_session.cjs can collect them for the unified session step summary.
  *
  * Event mapping:
  *   SDK "user.message"            → JSONL "user.message"
@@ -22,7 +22,7 @@
  * The JSONL file is written to:
  *   /tmp/gh-aw/sandbox/agent/logs/copilot-session-state/{sessionId}/events.jsonl
  * which mirrors the path that copy_copilot_session_state.sh produces and that
- * unified_timeline.cjs reads.
+ * unified_session.cjs reads.
  *
  * Consumed directly by copilot_sdk_driver.cjs (the built-in gh-aw driver) and
  * available to any custom driver that wants the same session lifecycle and JSONL
@@ -101,7 +101,7 @@ function extractPromptFromArgs(args) {
  * both modes uniformly.
  *
  * All SDK events are serialised to a JSONL file under the session state directory
- * so that unified_timeline.cjs can render them in the step summary.
+ * so that unified_session.cjs can collect them for the step summary.
  *
  * @param {{
  *   sdkUri: string,
@@ -170,7 +170,7 @@ async function runWithCopilotSDK({
   }
   log(`max-tool-denials threshold: ${maxToolDenialsLimit}`);
 
-  // Session state directory — mirrors the target path used by unified_timeline.cjs.
+  // Session state directory — mirrors the source path used by unified_session.cjs.
   // /tmp/gh-aw/sandbox/agent/logs/copilot-session-state/{sessionId}/events.jsonl
   // GH_AW_SESSION_STATE_BASE_DIR may be set in tests to redirect writes to an isolated directory.
   const defaultSessionStateBase = path.join(os.tmpdir(), "gh-aw", "sandbox", "agent", "logs", "copilot-session-state");
@@ -461,7 +461,7 @@ async function runWithCopilotSDK({
           break;
 
         default:
-          // Other event types are not consumed by unified_timeline.cjs; skip them.
+          // Only the explicitly mapped SDK events are serialized by this adapter.
           break;
       }
 
