@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -12,6 +13,31 @@ import (
 type dryRunEnvEdit struct {
 	start, end int
 	content    string
+}
+
+func (c *Compiler) prepareDryRunWorkflowData(data *WorkflowData) (*WorkflowData, error) {
+	if !c.dryRun {
+		return data, nil
+	}
+	result := c.dryRunWorkflowData(data)
+	if result.Env != "" {
+		env, err := removeDryRunTelemetryEnv(result.Env)
+		if err != nil {
+			return nil, err
+		}
+		result.Env = env
+	}
+	result.EnvSources = maps.Clone(data.EnvSources)
+	for name := range result.EnvSources {
+		if isDryRunTelemetryEnv(name) {
+			delete(result.EnvSources, name)
+		}
+	}
+	return result, nil
+}
+
+func isDryRunTelemetryEnv(name string) bool {
+	return strings.HasPrefix(name, "OTEL_") || strings.HasPrefix(name, "GH_AW_OTLP_")
 }
 
 // Rewrite only environment mappings so executable scalar contents remain intact.
@@ -92,7 +118,7 @@ func dryRunTelemetryEnvEdit(key, value *yaml.Node, lines []string) (*dryRunEnvEd
 	}
 	removed := false
 	for name := range env {
-		if strings.HasPrefix(name, "OTEL_") || strings.HasPrefix(name, "GH_AW_OTLP_") {
+		if isDryRunTelemetryEnv(name) {
 			delete(env, name)
 			removed = true
 		}

@@ -115,23 +115,49 @@ func TestDryRunTelemetryConfiguration(t *testing.T) {
 		}}},
 		OTLPEndpoint: "https://traces.example.com", OTLPHeaders: "Authorization=private",
 		OTLPEndpoints: `[{"url":"https://traces.example.com"}]`, OTLPUsesEnterpriseDefaults: true,
+		Env: "env:\n  OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTLP_HEADERS }}\n  GH_AW_OTLP_ATTRIBUTES: '{}'\n  KEEP: preserved\n",
+		EnvSources: map[string]string{
+			"OTEL_EXPORTER_OTLP_HEADERS": "(main workflow)",
+			"GH_AW_OTLP_ATTRIBUTES":      "(main workflow)",
+			"KEEP":                       "(main workflow)",
+		},
 	}
 	compiler.SetDryRun(true)
-	result := compiler.dryRunWorkflowData(data)
+	result, err := compiler.prepareDryRunWorkflowData(data)
+	require.NoError(t, err)
 	assert.Empty(t, result.OTLPEndpoint)
 	assert.Empty(t, result.OTLPHeaders)
 	assert.Empty(t, result.OTLPEndpoints)
 	assert.False(t, result.OTLPUsesEnterpriseDefaults)
 	assert.NotContains(t, result.RawFrontmatter, "observability")
 	assert.Nil(t, result.ParsedFrontmatter.Observability)
+	assert.False(t, isOTLPHeadersPresent(result))
+	assert.False(t, isOTLPAttributesPresent(result))
+	assert.Equal(t, map[string]string{"KEEP": "(main workflow)"}, result.EnvSources)
+	assert.Contains(t, result.Env, "KEEP: preserved")
 	assert.Contains(t, data.RawFrontmatter, "observability")
 	assert.NotNil(t, data.ParsedFrontmatter.Observability)
 	assert.Equal(t, "https://traces.example.com", data.OTLPEndpoint)
+	assert.True(t, isOTLPHeadersPresent(data))
+	assert.True(t, isOTLPAttributesPresent(data))
+	assert.Len(t, data.EnvSources, 3)
 	compiler.SetDryRun(false)
-	assert.Same(t, data, compiler.dryRunWorkflowData(data))
+	normal, err := compiler.prepareDryRunWorkflowData(data)
+	require.NoError(t, err)
+	assert.Same(t, data, normal)
 	var fresh WorkflowData
 	compiler.injectOTLPConfig(&fresh)
 	assert.Contains(t, fresh.Env, "OTEL_EXPORTER_OTLP_ENDPOINT:")
+}
+
+func TestPrepareDryRunWorkflowDataInvalidEnv(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.SetDryRun(true)
+	data := &WorkflowData{Env: "env: [invalid\n"}
+	result, err := compiler.prepareDryRunWorkflowData(data)
+	require.ErrorContains(t, err, "cannot remove dry-run telemetry")
+	assert.Nil(t, result)
+	assert.Equal(t, "env: [invalid\n", data.Env)
 }
 
 func TestDryRunCompiledTelemetryEnv(t *testing.T) {
@@ -161,8 +187,11 @@ engine:
     ENGINE_KEEP: preserved
 env:
   OTEL_CUSTOM: workflow
+  OTEL_USER_SECRET: ${{ secrets.USER_TELEMETRY_ONLY }}
   GH_AW_OTLP_ENDPOINTS: '[{"url":"https://manual.example.com"}]'
+  GH_AW_OTLP_ATTRIBUTES: '{"test": "value"}'
   KEEP: preserved
+  KEEP_LITERAL: OTEL_EXPORTER_OTLP_HEADERS GH_AW_OTLP_ATTRIBUTES
 tools:
   github: false
 pre-steps:
@@ -200,14 +229,22 @@ jobs:
 					assertNoDryRunTelemetryEnv(t, workflow)
 					assert.NotContains(t, compiled, "secrets.GH_AW_DEFAULT_OTLP_")
 					assert.NotContains(t, compiled, "secrets.OTLP_HEADERS")
+					assert.NotContains(t, compiled, "USER_TELEMETRY_ONLY")
 					assert.NotContains(t, compiled, "Check OTLP telemetry configuration")
+					assert.NotContains(t, compiled, "Mask OTLP")
 					assert.NotContains(t, compiled, "Mint OTLP")
 					assert.NotContains(t, compiled, `"opentelemetry":`)
+					assert.NotContains(t, compiled, "#   - OTEL_")
+					assert.NotContains(t, compiled, "#   - GH_AW_OTLP_")
 					assert.Contains(t, compiled, "ENGINE_KEEP: preserved")
 					assert.Contains(t, compiled, "KEEP: preserved")
+					assert.Contains(t, compiled, "KEEP_LITERAL: OTEL_EXPORTER_OTLP_HEADERS GH_AW_OTLP_ATTRIBUTES")
 				} else {
 					assert.Contains(t, compiled, "OTEL_EXPORTER_OTLP_ENDPOINT:")
 					assert.Contains(t, compiled, "OTEL_SERVICE_NAME: engine")
+					assert.Contains(t, compiled, "Mask OTLP telemetry headers")
+					assert.Contains(t, compiled, "Mask OTLP custom attribute values")
+					assert.Contains(t, compiled, "USER_TELEMETRY_ONLY")
 					if normal == "" {
 						normal = compiled
 					} else {

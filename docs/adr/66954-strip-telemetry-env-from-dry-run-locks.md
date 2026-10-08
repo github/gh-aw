@@ -16,6 +16,14 @@ The constraints are that ordinary (non-dry-run) compilation must be byte-for-byt
 
 We will suppress telemetry configuration in dry-run mode by rewriting the emitted YAML after generation, using a node-aware filter (`removeDryRunTelemetryEnv` in `pkg/workflow/compiler_development_telemetry.go`) that walks the parsed document, locates only `env` mapping nodes, and splices line-range edits back into the original text. Operating on line ranges rather than re-serialising the whole document preserves formatting, comments, anchors, and executable scalar contents exactly. The filter runs before secret collection and again after reusable-workflow body regeneration, and the dry-run job data separately clears automatic OTLP export/authentication configuration so no telemetry credential survives into secret declarations or manifests.
 
+Before generating jobs and headers, prepare a cloned dry-run workflow environment
+and remove its telemetry environment-source entries. This prevents telemetry-only
+masking steps and stale header entries from being generated. Retain the final
+output filter to cover environment values contributed by engines and custom jobs.
+Ordinary compilation remains unchanged. The emitted diagnostic lock and the
+previously published normal lock are distinct artifacts; restoring the latter
+does not transfer telemetry suppression or a review verdict to it.
+
 ### Alternatives Considered
 
 #### Alternative 1: Suppress telemetry at configuration-construction time

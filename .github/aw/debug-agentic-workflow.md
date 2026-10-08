@@ -125,6 +125,9 @@ issue locking. Diagnostics, summaries, and run artifacts remain available;
 `OTEL_*` and `GH_AW_OTLP_*` environment variables and automatic telemetry
 configuration/authentication are omitted from dry-run locks. Custom scripts
 that configure their own exporters remain outside this control.
+Review that emitted lock, not the previously published normal lock. If a live
+test is permitted, upload and dispatch the exact reviewed revision; restoring
+the normal lock before dispatch does not apply dry-run suppression to it.
 `aw_info.json` records `dry_run: true`.
 Compile text output reports excluded effects and scanner invocation coverage.
 `--json` adds a batch `workflow: "dry-run"` summary: `dry_run.gate` includes
