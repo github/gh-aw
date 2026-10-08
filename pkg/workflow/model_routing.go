@@ -102,7 +102,7 @@ func subAgentRequestModels(data *WorkflowData, candidates, allowed, blocked []st
 	}
 	var warnings []string
 	for _, agent := range data.SubAgentModels {
-		patterns := expandSubAgentModel(agent.Model, data.ModelMappings)
+		patterns := expandSubagentModelPatterns(agent.Model, data, "github-copilot")
 		admitted := false
 		for _, pattern := range patterns {
 			if len(allowed) > 0 && strings.ContainsAny(pattern, "*[") {
@@ -143,10 +143,6 @@ func subAgentRequestModels(data *WorkflowData, candidates, allowed, blocked []st
 		}
 	}
 	return result, warnings
-}
-
-func expandSubAgentModel(request string, aliases map[string][]string) []string {
-	return expandModelPatterns(request, aliases, "github-copilot")
 }
 
 func expandModelPatterns(request string, aliases map[string][]string, defaultProvider string) []string {
@@ -193,7 +189,7 @@ func (c *Compiler) warnRoutedSubAgentModels(data *WorkflowData) {
 		return
 	}
 	for _, agent := range data.SubAgentModels {
-		for _, model := range expandSubAgentModel(agent.Model, data.ModelMappings) {
+		for _, model := range expandSubagentModelPatterns(agent.Model, data, "github-copilot") {
 			if !modelRoutingEngineSupportsModel(data.EngineConfig.ID, model) {
 				warning := fmt.Sprintf("sub-agent %q model %q may be incompatible with the %s engine's model-routing API", agent.Name, agent.Model, data.EngineConfig.ID)
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))

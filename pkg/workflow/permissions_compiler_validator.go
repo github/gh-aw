@@ -31,7 +31,7 @@
 //     HTTP MCP server uses `auth.type: github-oidc`, because --exclude-env (required
 //     to keep Actions OIDC credentials out of the agent container) is only available
 //     in AWF v0.25.3+.
-//  10. id-token: write warning — emits a security reminder when OIDC tokens are
+//  10. id-token: write info — emits a security reminder when OIDC tokens are
 //     requested, because they can be used to authenticate to cloud providers.
 //
 // # Strict Mode
@@ -56,7 +56,7 @@ var permissionsCompilerLog = logger.New("workflow:permissions_compiler_validator
 
 // validatePermissions validates all permission-related configuration: dangerous
 // permissions, GitHub App-only constraints, MCP app write restrictions, workflow_run
-// branch security, GitHub MCP toolset permissions, and the id-token write warning.
+// branch security, GitHub MCP toolset permissions, and the id-token write reminder.
 // It returns the parsed *Permissions for reuse in subsequent validation steps.
 func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath string) (*Permissions, error) {
 	// Use the cached *Permissions object when available to avoid repeated YAML parsing.
@@ -188,14 +188,12 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
-	// Emit warning if id-token: write permission is detected
 	workflowLog.Printf("Checking for id-token: write permission")
 	if level, exists := workflowPermissions.Get(PermissionIdToken); exists && level == PermissionWrite {
-		warningMsg := `This workflow grants id-token: write permission
+		infoMsg := `This workflow grants id-token: write permission
 OIDC tokens can authenticate to cloud providers (AWS, Azure, GCP).
 Ensure proper audience validation and trust policies are configured.`
-		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warningMsg))
-		c.IncrementWarningCount()
+		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "info", infoMsg))
 	}
 	if !c.quiet && shouldEmitCopilotRequestsEnableTip(workflowData, workflowPermissions) && !c.repositoryOwnerIsIndividualUser() {
 		if !c.copilotRequestsTipShown[markdownPath] {

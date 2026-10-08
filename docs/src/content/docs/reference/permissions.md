@@ -80,6 +80,10 @@ permissions:
 
 This permission does not require safe-outputs.
 
+The compiler emits an informational reminder to validate OIDC audiences and
+cloud-provider trust policies. The reminder does not count as a warning or
+block warnings-as-errors validation, including `gh aw compile --dry-run`.
+
 ### Special Permission: `copilot-requests: write`
 
 The `copilot-requests: write` permission enables Copilot inference using the built-in GitHub Actions token. This is the recommended way to authenticate Copilot for workflows running in organizations with a Copilot subscription.
