@@ -82,6 +82,20 @@ func TestSharedExtractSecretsFromValue(t *testing.T) {
 			},
 		},
 		{
+			name:  "lowercase secret without whitespace",
+			value: "${{secrets.token}}",
+			expected: map[string]string{
+				"token": "${{secrets.token}}",
+			},
+		},
+		{
+			name:  "mixed-case context and secret in compound expression",
+			value: "${{ vars.CACHE || Secrets.Cache }}",
+			expected: map[string]string{
+				"Cache": "${{ vars.CACHE || Secrets.Cache }}",
+			},
+		},
+		{
 			name:  "secret with default value",
 			value: "${{ secrets.DD_SITE || 'datadoghq.com' }}",
 			expected: map[string]string{

@@ -222,6 +222,28 @@ func TestComputeAWFExcludeEnvVarNamesUVAfterSetupDeduplication(t *testing.T) {
 	}
 }
 
+func TestComputeAWFExcludeEnvVarNamesCaseInsensitiveSecrets(t *testing.T) {
+	for _, value := range []string{
+		"${{ secrets.token }}",
+		"${{secrets.token}}",
+		"${{ vars.CACHE || Secrets.Cache }}",
+	} {
+		t.Run(value, func(t *testing.T) {
+			data := WorkflowData{
+				CustomSteps: "steps:\n  - uses: astral-sh/setup-uv@v7\n",
+				Env:         "env:\n  UV_CACHE_DIR: " + value + "\n",
+				SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
+					Env: map[string]string{"PRIVATE_TOKEN": value},
+				}},
+			}
+			got := ComputeAWFExcludeEnvVarNames(&data, nil)
+			assert.Contains(t, got, "UV_CACHE_DIR")
+			assert.Contains(t, got, "UV_PYTHON_INSTALL_DIR")
+			assert.Contains(t, got, "PRIVATE_TOKEN")
+		})
+	}
+}
+
 func TestApplyDefaultMaxAICreditsEnvToMap(t *testing.T) {
 	t.Run("sets default agent expression when max-ai-credits is unset", func(t *testing.T) {
 		env := map[string]string{}
