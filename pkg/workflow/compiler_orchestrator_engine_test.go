@@ -21,8 +21,11 @@ func TestSetupEngineAndImports_GeminiDeprecation(t *testing.T) {
 		engine       string
 		imported     bool
 		override     string
+		batchMode    bool
+		quiet        bool
 		wantEngine   string
 		wantNotices  int
+		wantBatchUse int
 		wantWarnings int
 	}{
 		{name: "string form", engine: "engine: gemini\n", wantEngine: "gemini", wantNotices: 1},
@@ -30,6 +33,8 @@ func TestSetupEngineAndImports_GeminiDeprecation(t *testing.T) {
 		{name: "imported engine", imported: true, wantEngine: "gemini", wantNotices: 1},
 		{name: "override to Gemini", engine: "engine: copilot\n", override: "gemini", wantEngine: "gemini", wantNotices: 1, wantWarnings: 1},
 		{name: "override away from Gemini", engine: "engine: gemini\n", override: "copilot", wantEngine: "copilot", wantWarnings: 1},
+		{name: "batch mode aggregates notice", engine: "engine: gemini\n", batchMode: true, wantEngine: "gemini", wantBatchUse: 1},
+		{name: "quiet mode suppresses notice", engine: "engine: gemini\n", quiet: true, wantEngine: "gemini"},
 		{name: "default engine", wantEngine: "copilot"},
 		{name: "experimental replacement", engine: "engine: agy\n", wantEngine: "agy"},
 		{
@@ -60,6 +65,8 @@ func TestSetupEngineAndImports_GeminiDeprecation(t *testing.T) {
 			require.NoError(t, err)
 			compiler := NewCompiler(WithEngineOverride(tt.override))
 			compiler.SetStrictMode(true)
+			compiler.SetBatchMode(tt.batchMode)
+			compiler.SetQuiet(tt.quiet)
 			output := testutil.CaptureStderr(t, func() {
 				result, err := compiler.setupEngineAndImports(frontmatter, filepath.Join(tmpDir, "test.md"), []byte(content), tmpDir)
 				require.NoError(t, err)
@@ -76,6 +83,7 @@ func TestSetupEngineAndImports_GeminiDeprecation(t *testing.T) {
 				}
 			})
 			assert.Equal(t, tt.wantNotices, strings.Count(output, "The gemini engine is deprecated"))
+			assert.Equal(t, tt.wantBatchUse, compiler.GetExperimentalFeatureUsage()["gemini deprecation"])
 			assert.Equal(t, tt.wantWarnings, compiler.GetWarningCount())
 			if tt.wantNotices > 0 {
 				assert.Contains(t, output, "Use engine: agy where supported")
