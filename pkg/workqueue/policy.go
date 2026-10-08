@@ -235,6 +235,8 @@ func permitted(role, kind string) bool {
 		return role == "worker" || role == "reconciler"
 	case "WorkCancellation":
 		return role == "producer" || role == "administrator" || role == "reconciler" || role == "worker"
+	case "WorkPriority":
+		return role == "administrator"
 	}
 	return false
 }
@@ -248,7 +250,7 @@ func validateRequest(commit QueueCommit) error {
 		return err
 	}
 	kinds := map[string][]string{
-		"policy": {"Policy"}, "control": {"Control"}, "submit": {"Work"},
+		"policy": {"Policy"}, "control": {"Control", "WorkPriority"}, "submit": {"Work"},
 		"dispatch_next": {"Observation", "Claim"}, "finish": {"Completion", "ClaimCancellation", "WorkCancellation"},
 		"observe": {"Observation"}, "dispatch": {"Dispatch"}, "release": {"ClaimCancellation", "WorkCancellation", "Release"},
 		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"},

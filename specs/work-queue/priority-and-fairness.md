@@ -773,13 +773,26 @@ Use a small operation union:
 | `DeliveryFailure` | Close a completed node's unresolved delivery barrier after terminal-run evidence and bounded reconciliation; never authorize effects or release successors |
 | `Observation` | Record normalized trusted GitHub Issue/PR condition evidence, including identity and observation time |
 | `ClaimCancellation` | Remove this Claim's authority; optionally record trusted retry-not-before metadata |
-| `WorkCancellation` | Terminal cancellation; does not pretend the worker has stopped using capacity |
+| `WorkCancellation` | Terminal cancellation; optional `claim_id` fences the selected current owner; does not pretend the worker has stopped using capacity |
+| `WorkPriority` | Administrator-only prospective override for available Work, with `expected_priority` compare-and-set; admitted priority, FIFO position, retry boundary and all charged clocks remain unchanged |
 | `Dispatch` | Record launch started, bound run, definitive rejection, or uncertainty for a `dispatch_id` and its immutable Claim array |
 | `Release` | Release the group's native reservation once with trusted termination/nonlaunch evidence; logical Claim slots close independently |
 
 Do not repeat the entire Claim array in each dispatch lifecycle operation.
 Immutable membership is derived from the admission commit; lifecycle operations
 reference `dispatch_id`, its binding/evidence, and stable request identity.
+
+`WorkPriority` is published through an administrator `control` request in this
+same transaction log. Replay stores `effective_priority` separately from the
+immutable Work definition; native Go and JavaScript selection and historical
+grant explanations use it for future class charges. Active/completed/cancelled
+Work cannot be reprioritized, and child admission still inherits the original
+definition. These operator extensions are conformance-tested but are outside
+the fixed-priority TLA+ models' action sets. See the
+[current operator reference](README.md#current-operator-interface) for bounded
+ASCII views, the keyboard master-detail browser and exact cancellation semantics.
+Deploy matching readers/writers: older current-only readers reject these new
+closed operation shapes rather than interpreting them as legacy records.
 
 Only a `dispatch_next` request may create new Claims. The replayer verifies that each Claim is the next selection returned by `planNext` for the current prefix, after preceding operations in that same commit. It then applies the implied unit charge and reservation. There is no separately published grant to reconcile with a Claim.
 

@@ -52,7 +52,8 @@ const OP_FIELDS = {
     ["source_updated_at", "state_reason", "resource_state", "merged", "merge_commit"],
   ],
   ClaimCancellation: [["kind", "work_id", "claim_id", "reason", "retry_not_before"], []],
-  WorkCancellation: [["kind", "work_id", "reason"], []],
+  WorkCancellation: [["kind", "work_id", "reason"], ["claim_id"]],
+  WorkPriority: [["kind", "work_id", "priority", "expected_priority", "reason"], []],
   Dispatch: [
     ["kind", "dispatch_id", "state"],
     ["sender", "run", "evidence", "reason"],
@@ -62,7 +63,7 @@ const OP_FIELDS = {
 
 const REQUEST_KINDS = {
   policy: ["Policy"],
-  control: ["Control"],
+  control: ["Control", "WorkPriority"],
   submit: ["Work"],
   dispatch_next: ["Observation", "Claim"],
   finish: ["Completion", "ClaimCancellation", "WorkCancellation"],
@@ -86,6 +87,7 @@ const OP_ROLES = {
   Observation: ["reconciler", "dispatcher", "administrator", "worker"],
   ClaimCancellation: ["worker", "reconciler"],
   WorkCancellation: ["producer", "administrator", "reconciler", "worker"],
+  WorkPriority: ["administrator"],
   Dispatch: ["dispatcher", "worker", "reconciler"],
   Release: ["reconciler"],
 };
@@ -124,6 +126,10 @@ function validateOperation(operation) {
   if (Object.hasOwn(operation, "run")) validateRunBinding(operation.run);
   if (Object.hasOwn(operation, "sender")) validateActor(operation.sender);
   if (operation.kind === "Policy") validatePolicy(operation.policy);
+  if (operation.kind === "WorkPriority") {
+    integer(operation.priority, 1, 5, "priority");
+    integer(operation.expected_priority, 1, 5, "expected priority");
+  }
   if (operation.kind === "Claim") {
     if (!Array.isArray(operation.observations) || operation.observations.length > 64 || new Set(operation.observations).size !== operation.observations.length)
       throw queueError("claim_invalid", "observations must be a bounded unique array");
@@ -409,6 +415,16 @@ function applyLifecycle(state, operation, commit) {
     }
     case "WorkCancellation":
       if (!work || work.state === "completed") throw queueError("work_terminal", "completed ownership cannot be reopened or cancelled");
+      if (operation.claim_id) {
+        const selected = state.claims.get(operation.claim_id);
+        if (
+          !selected ||
+          selected.work_id !== work.work_id ||
+          work.claim_id !== selected.claim_id ||
+          (!(work.state === "claimed" && selected.state === "open") && !(work.state === "cancelled" && selected.state === "cancelled" && selected.terminal_commit_id === work.cancellation_commit_id))
+        )
+          throw queueError("claim_scope_invalid", "selected Claim is no longer this Work's current owner; refresh state");
+      }
       if (commit.actor.role === "producer") {
         const rule = state.policy.producers[commit.actor.principal];
         if (!rule || !rule.pools.includes(work.pool) || !rule.priorities.includes(work.priority) || !rule.fairness_keys.includes(work.fairness_key))
@@ -442,6 +458,7 @@ function applyLifecycle(state, operation, commit) {
       }
       work.state = "cancelled";
       work.cancellation_reason = operation.reason;
+      if (operation.claim_id) work.cancellation_claim_id = operation.claim_id;
       work.cancellation_commit_id = commit.id;
       state.cancellations.set(work.work_id, operation);
       break;
@@ -630,6 +647,14 @@ function replayTransactions(transactions) {
         case "Work":
           if (!state.works.has(operation.work_id)) state.works.set(operation.work_id, { ...operation, state: "available", position: { commit: ordinal, operation: index }, attempts: 0, retry_not_before: 0, barrier: "none" });
           break;
+        case "WorkPriority": {
+          const work = state.works.get(operation.work_id);
+          if (!work) throw queueError("work_missing", "priority change references missing Work");
+          if (work.state !== "available" || work.claim_id) throw queueError("ownership_terminal", "reprioritization requires available Work; immutable assignments cannot change");
+          if ((work.effective_priority ?? work.priority) !== operation.expected_priority) throw queueError("priority_conflict", "priority changed since selection; refresh state");
+          work.effective_priority = operation.priority;
+          break;
+        }
         case "Observation":
           if (expected) throw queueError("packing_invalid", "dispatch observations must precede its deterministic Claim prefix");
           applyObservation(state, operation, commit);

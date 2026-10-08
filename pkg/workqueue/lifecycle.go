@@ -333,8 +333,9 @@ func (state Projection) cancellationBackoffOrigin(claim *ClaimState, commit Queu
 
 func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
 	var cancellation struct {
-		WorkID string `json:"work_id"`
-		Reason string `json:"reason"`
+		WorkID  string `json:"work_id"`
+		Reason  string `json:"reason"`
+		ClaimID string `json:"claim_id"`
 	}
 	if err := json.Unmarshal(op, &cancellation); err != nil {
 		return err
@@ -345,6 +346,14 @@ func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
 	}
 	if work.State == "completed" {
 		return queueError("ownership_terminal", "completed Work cannot be cancelled")
+	}
+	if cancellation.ClaimID != "" {
+		claim := state.Claims[cancellation.ClaimID]
+		if claim == nil || claim.WorkID != work.WorkID || work.ClaimID != claim.ClaimID ||
+			(work.State != "claimed" || claim.State != "open") &&
+				(work.State != "cancelled" || claim.State != "cancelled" || claim.TerminalCommitID != work.CancellationCommitID) {
+			return queueError("claim_scope_invalid", "selected Claim is no longer this Work's current owner; refresh state")
+		}
 	}
 	if commit.Actor.Role == "producer" && !state.allowedProducer(commit.Actor, work.WorkDefinition) {
 		return queueError("admission_unauthorized", "producer cannot cancel another accounting scope")
@@ -365,11 +374,12 @@ func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
 		}
 	}
 	if work.State == "cancelled" {
-		if work.CancellationReason != cancellation.Reason {
+		if work.CancellationReason != cancellation.Reason || work.CancellationClaimID != cancellation.ClaimID {
 			return queueError("cancellation_conflict", "Work terminal cancellation reason is immutable")
 		}
 		return nil
 	}
+
 	if work.ClaimID != "" {
 		claim := state.Claims[work.ClaimID]
 		if claim.State == "open" {
@@ -380,6 +390,30 @@ func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
 	}
 	work.State = "cancelled"
 	work.CancellationReason, work.CancellationCommitID = cancellation.Reason, commit.ID
+	work.CancellationClaimID = cancellation.ClaimID
+	return nil
+}
+
+func (state Projection) reprioritizeWork(op Operation) error {
+	var change struct {
+		WorkID           string `json:"work_id"`
+		Priority         int    `json:"priority"`
+		ExpectedPriority int    `json:"expected_priority"`
+	}
+	if err := json.Unmarshal(op, &change); err != nil {
+		return err
+	}
+	work := state.Works[change.WorkID]
+	if work == nil {
+		return queueError("work_missing", "priority change references missing Work")
+	}
+	if work.State != "available" || work.ClaimID != "" {
+		return queueError("ownership_terminal", "reprioritization requires available Work; immutable assignments cannot change")
+	}
+	if work.SchedulingPriority() != change.ExpectedPriority {
+		return queueError("priority_conflict", "priority changed since selection; refresh state")
+	}
+	work.EffectivePriority = change.Priority
 	return nil
 }
 

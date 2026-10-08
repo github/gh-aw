@@ -116,10 +116,11 @@ function planNext(state, pool, at) {
     pending++;
     const dependency = eligibility(state, work, at, { logical: capacity.logical, account: capacity.accounts.get(work.fairness_key) || 0 });
     if (!dependency.ready) continue;
-    const keys = buckets.get(work.priority) ?? new Map();
+    const priority = work.effective_priority ?? work.priority;
+    const keys = buckets.get(priority) ?? new Map();
     const oldest = keys.get(work.fairness_key);
     if (!oldest || fifoCompare(work, oldest.work) < 0) keys.set(work.fairness_key, { work, dependency });
-    buckets.set(work.priority, keys);
+    buckets.set(priority, keys);
   }
   if (!buckets.size) return { reason: pending ? "no_eligible_work" : "no_work", observations: [] };
   const schedule = copySchedule(state.clocks.get(pool) ?? { classes: clock(), keys: new Map() });

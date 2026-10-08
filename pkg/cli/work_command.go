@@ -56,7 +56,8 @@ func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *c
 	cmd.AddCommand(workReplayCommand(), workStatsCommand(), workExplainCommand(),
 		workSubmitCommand(), workSubmitGraphCommand(), workDispatchNextCommand(),
 		workPolicyCommand(), workControlCommand(), workCancelCommand(),
-		workReconcileCommand(), workEvidenceCommand(), workCompactCommand(), workTraceCommand())
+		workReconcileCommand(), workEvidenceCommand(), workCompactCommand(), workTraceCommand(),
+		workStateCommand(), workInspectCommand(), workCancelClaimCommand(), workPriorityCommand(), workTUICommand())
 	return cmd
 }
 
@@ -561,32 +562,6 @@ func workControlCommand() *cobra.Command {
 	cmd.Flags().Bool("paused", false, "Explicit pause/resume value")
 	cmd.Flags().String("generation", "", "Opaque equivalent-scope credential generation, never a secret")
 	cmd.Flags().String("reason", "", "Sanitized operational reason code")
-	return cmd
-}
-
-func workCancelCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "cancel-work", Short: "Cancel nonterminal ownership without releasing possibly executing native workers",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			id, _ := cmd.Flags().GetString("work-id")
-			reason, _ := cmd.Flags().GetString("reason")
-			if id == "" || reason == "" {
-				return errors.New("--work-id and --reason are required")
-			}
-			operation, err := workqueue.Op(map[string]any{"kind": "WorkCancellation", "work_id": id, "reason": reason})
-			if err != nil {
-				return err
-			}
-			published, err := workPublish(cmd, "administrator", "cancel_work", workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
-			if err != nil {
-				return err
-			}
-			return workPrint(cmd, published, "Cancelled Work "+id+"; native reservation retained until definitive evidence")
-		},
-	}
-	cmd.Flags().String("work-id", "", "Work to terminally cancel, not a Claim selector")
-	cmd.Flags().String("reason", "", "Sanitized cancellation reason")
 	return cmd
 }
 

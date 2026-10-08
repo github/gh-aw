@@ -95,7 +95,7 @@ function renderWorkQueue(state, commit = undefined) {
   let shownWorks = 0;
   for (const work of works.values()) {
     const key = work.fairness_key === "" ? "(default)" : work.fairness_key;
-    if (!row(`| ${code(work.work_id, 16)} / ${code(work.node_key)} | ${code(work.worker_profile)} | ${work.priority} | ${code(key)} | ${code(work.state)} | ${code(work.barrier)} | ${dependencies(work)} |`)) break;
+    if (!row(`| ${code(work.work_id, 16)} / ${code(work.node_key)} | ${code(work.worker_profile)} | ${work.effective_priority ?? work.priority} | ${code(key)} | ${code(work.state)} | ${code(work.barrier)} | ${dependencies(work)} |`)) break;
     shownWorks++;
   }
   if (!shownWorks) lines.push("| No Work nodes shown | | | | | | |");

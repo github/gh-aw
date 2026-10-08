@@ -31,6 +31,9 @@ silently initialize policy over an existing invalid ledger.
 | Command | Purpose |
 |---|---|
 | `replay`, `stats` | Inspect the causal projection, typed graph nodes, independent Claims and native reservations |
+| `state [--graph GRAPH] [--pool POOL] [--state STATE] [--search TEXT]` | Metadata-only ASCII graph/Work/Claim forest; `--offset` and `--limit` paginate at most 256 rows/64 KiB |
+| `inspect --work-id ID` or `inspect --claim-id ID` | Full copyable IDs, dependency cross-references, current/historical ownership, original assignment membership and independent delivery/native barriers |
+| `tui` (alias `interactive`) | Keyboard master-detail browser; search, multi-select, live cursor details, checked cancellation and prospective priority changes |
 | `explain --pool POOL [--work-id ID]` | Evaluate the native selector or inspect a dependency path without changing passes |
 | `explain --request-id ID` or `explain --claim-id ID` | Reconstruct an exact historical grant using the authoritative prefix |
 | `trace --request-id ID` or `trace --claim-id ID` | Read bounded causal events without exposing payloads or receipt contents; use `--offset` and `--limit` for pagination |
@@ -40,6 +43,8 @@ silently initialize policy over an existing invalid ledger.
 | `submit-graph` | Atomically admit a bounded normalized graph, including Issue/PR dependency nodes |
 | `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit a deterministic fair prefix and its reservations; does not itself send a workflow-dispatch POST |
 | `control`, `cancel-work` | Apply authorized pause/cutover/cancellation decisions without refunding service or force-releasing a possible native run |
+| `cancel-claim --claim-id ID[,ID...] --reason CODE` | Atomically fence exact current Claims and terminally cancel their Work; not a retry, worker impersonation or native-run stop |
+| `reprioritize --work-id ID[,ID...] --priority 1..5 --reason CODE` | Administrator-only, compare-and-set override for future grants of available Work; preserves admitted definitions, FIFO positions, retry boundaries and accumulated debt |
 | `evidence`, `reconcile --dispatch-id ID` | Inspect authenticated run evidence and reconcile exact termination; uncertainty retains capacity |
 
 Use `--json` for structured output and `--request-id` to retain a logical
@@ -52,6 +57,62 @@ Worker finish remains the scoped `work_queue_claim_finish` MCP intent, not an
 operator impersonation command. Direct `claim --work-id`, scalar assignments
 and arbitrary run-ID adoption are unsupported. Actual worker binding and
 trusted delivery checks are required before resource effects.
+
+### Keyboard browser and checked actions
+
+```bash
+gh aw work-queue --repo owner/repo tui
+gh aw work-queue --repo owner/repo state --json --limit 80
+gh aw work-queue --repo owner/repo cancel-claim \
+  --claim-id CLAIM_A,CLAIM_B --reason operator_cancelled --request-id incident-cancel
+gh aw work-queue --repo owner/repo reprioritize \
+  --work-id WORK_A,WORK_B --priority 1 --reason operator_reprioritized --request-id incident-priority
+```
+
+The TUI requires interactive stdin/stdout and at least 45 columns by 16 rows.
+At 100 columns it shows the forest beside cursor-synchronized details; narrower
+terminals switch panes with `Tab` or `Enter`. Full IDs remain in scrollable
+details, while list labels are abbreviated. Selection and focus also use text
+markers, not color alone.
+
+| Key | Action |
+|---|---|
+| Arrows or `j`/`k`, `PgUp`/`PgDn`, `g`/`G` | Navigate Work and Claim attempts |
+| Left/right or `h`/`l` | Collapse/expand Claim history |
+| `Tab`/`Enter` | Focus details; arrows/page keys scroll that pane |
+| `/`, then `Enter` | Apply a case-insensitive ID/metadata search |
+| `Space` | Toggle multi-selection, including selections hidden by search |
+| `c`, `p` | Review cancellation or select priority 1..5; `y` publishes, `n`/`Esc` dismisses |
+| `r`, `?`, `q` | Refresh, keyboard help, quit |
+| `Esc` outside a dialog | Clear search and selection |
+
+Reads refresh every 10 seconds while idle; search and action reviews freeze
+automatic reads. Every action shows its authority and exact targets, and cannot
+publish if the targets exceed the confirmation viewport. Each TUI action
+generates its own stable request ID (`--json` and `--request-id` are rejected);
+uncertain acknowledgments remain visible for `explain --request-id` inspection.
+Read failures retain the previous view with an explicit stale/error status.
+
+Forest edges group graph membership and Claim attempts, **not** dependency
+parenthood. Shared Work dependencies and typed Issue/PR gates are explicit
+cross-references in details. These views never display payloads or receipt
+bodies; `replay --json` remains the full authoritative projection.
+
+Cancellation and reprioritization accept repeated selector flags or
+comma-separated IDs, require an administrator, and publish one all-or-nothing
+checked transaction. A Claim selector includes a durable ownership fence, so
+CAS refresh cannot cancel a replacement owner. Completed ownership cannot be
+cancelled; historical Claims must not be used to cancel a new attempt.
+Cancellation keeps dispatch membership, charges and native reservations;
+`reconcile` remains a separate evidence-based operation.
+
+Priority overrides apply only to available Work, including retry-waiting Work.
+They do not edit active assignments, admitted metadata, child admission defaults,
+fairness weights or prior charges. Configured weights determine class shares;
+the defaults favor lower numbers, without strict-preemption semantics. A competing grant or priority change rejects
+the stale action rather than silently redirecting it. These administrator
+extensions are covered by Go/JavaScript protocol tests; the existing fixed-priority
+TLA+ scheduling models do not model arbitrary operator reprioritization.
 
 ## Historical queue inspection and operator commands
 

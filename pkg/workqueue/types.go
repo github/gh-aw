@@ -239,6 +239,7 @@ type Position struct {
 
 type WorkState struct {
 	WorkDefinition
+	EffectivePriority    int             `json:"effective_priority,omitempty"`
 	State                string          `json:"state"`
 	Position             Position        `json:"position"`
 	ClaimID              string          `json:"claim_id,omitempty"`
@@ -250,8 +251,17 @@ type WorkState struct {
 	ResultCommitID       string          `json:"result_commit_id,omitempty"`
 	Disposition          string          `json:"disposition,omitempty"`
 	CancellationReason   string          `json:"cancellation_reason,omitempty"`
+	CancellationClaimID  string          `json:"cancellation_claim_id,omitempty"`
 	CancellationCommitID string          `json:"cancellation_commit_id,omitempty"`
 	completionAt         int64
+}
+
+// SchedulingPriority leaves the admitted definition and historical Claims immutable.
+func (work *WorkState) SchedulingPriority() int {
+	if work.EffectivePriority != 0 {
+		return work.EffectivePriority
+	}
+	return work.Priority
 }
 
 type ClaimState struct {

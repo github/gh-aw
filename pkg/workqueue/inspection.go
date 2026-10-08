@@ -111,10 +111,10 @@ func explainAndRecordClaim(state *Projection, operation Operation, commit QueueC
 		BeforeTip: state.Tip, Position: position,
 		RequestID: commit.Request.ID, CommitID: commit.ID, PolicyEpoch: commit.PolicyEpoch,
 		ClaimID: claim.ClaimID, DispatchID: claim.DispatchID, Handle: claim.Handle,
-		WorkID: work.WorkID, Pool: work.Pool, Priority: work.Priority, FairnessKey: work.FairnessKey,
+		WorkID: work.WorkID, Pool: work.Pool, Priority: work.SchedulingPriority(), FairnessKey: work.FairnessKey,
 		WorkPosition: work.Position, Selection: selection,
-		ClassPassPrior: current.Classes.Pass[strconv.Itoa(work.Priority)],
-		KeyPassPrior:   current.Keys[work.Priority].Pass[work.FairnessKey],
+		ClassPassPrior: current.Classes.Pass[strconv.Itoa(work.SchedulingPriority())],
+		KeyPassPrior:   current.Keys[work.SchedulingPriority()].Pass[work.FairnessKey],
 		CapacityBefore: capacity(*state, work),
 	}
 	if explanation.ClassPassPrior == "" {

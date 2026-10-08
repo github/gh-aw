@@ -7,20 +7,28 @@
       "x-forbid-ascii-controls": true,
       "x-utf8-max-bytes": 256
     },
+    "Priority": {
+      "maximum": 5,
+      "minimum": 1,
+      "type": "integer"
+    },
     "ReasonCode": {
       "maxLength": 128,
       "minLength": 1,
       "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
       "type": "string"
     },
-    "WorkCancellationOperation": {
+    "WorkPriorityOperation": {
       "additionalProperties": false,
       "properties": {
-        "claim_id": {
-          "$ref": "#/$defs/Identity"
+        "expected_priority": {
+          "$ref": "#/$defs/Priority"
         },
         "kind": {
-          "const": "WorkCancellation"
+          "const": "WorkPriority"
+        },
+        "priority": {
+          "$ref": "#/$defs/Priority"
         },
         "reason": {
           "$ref": "#/$defs/ReasonCode"
@@ -29,12 +37,12 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": ["kind", "work_id", "reason"],
+      "required": ["kind", "work_id", "priority", "expected_priority", "reason"],
       "type": "object"
     }
   },
-  "$id": "WorkCancellationOperation.json",
-  "$ref": "#/$defs/WorkCancellationOperation",
+  "$id": "WorkPriorityOperation.json",
+  "$ref": "#/$defs/WorkPriorityOperation",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WorkCancellationOperation"
+  "title": "WorkPriorityOperation"
 }

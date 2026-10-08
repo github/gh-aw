@@ -33,7 +33,7 @@ func mustWorkQueueOperation(t testing.TB, value any) workqueue.Operation {
 
 func TestWorkCommandClosedOperatorSurfaces(t *testing.T) {
 	command := NewWorkCommand()
-	for _, required := range []string{"compact", "trace", "explain"} {
+	for _, required := range []string{"compact", "trace", "explain", "state", "inspect", "cancel-claim", "reprioritize", "tui"} {
 		found := false
 		for _, subcommand := range command.Commands() {
 			if subcommand.Name() == required {
@@ -47,7 +47,7 @@ func TestWorkCommandClosedOperatorSurfaces(t *testing.T) {
 			t.Fatalf("required operator surface %s is absent", required)
 		}
 	}
-	for _, forbidden := range []string{"claim", "finish", "cancel-claim", "force-release"} {
+	for _, forbidden := range []string{"claim", "finish", "force-release"} {
 		for _, subcommand := range command.Commands() {
 			if subcommand.Name() == forbidden {
 				t.Fatalf("operator retained unsafe unscheduled/worker impersonation surface %s", forbidden)
@@ -67,6 +67,12 @@ func TestWorkCommandClosedOperatorSurfaces(t *testing.T) {
 		{"trace", "--claim-id", "chosen", "--limit", "257"},
 		{"explain", "--before-claim", "chosen", "--work-id", "work"},
 		{"explain", "--before-claim", "chosen", "--request-id", "request"},
+		{"cancel-claim"},
+		{"cancel-claim", "--claim-id", "x,x", "--reason", "operator_cancelled"},
+		{"reprioritize", "--work-id", "work", "--priority", "6", "--reason", "operator_reprioritized"},
+		{"inspect", "--work-id", "work", "--claim-id", "claim"},
+		{"state", "--limit", "257"},
+		{"tui", "--json"},
 	} {
 		cmd := NewWorkCommand()
 		cmd.SetOut(io.Discard)
@@ -553,5 +559,36 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 			operations[1].(map[string]any)["kind"] != "Claim" {
 			t.Fatal("human summary did not cover an actual atomic Observation plus Claim")
 		}
+	})
+	t.Run("operator state priority and cancellation use native publication", func(t *testing.T) {
+		one := run(`{"task":"operator-one"}`, "submit-work", "--file", "-", "--graph-id", "operator-one")["work_id"].(string)
+		two := run(`{"task":"operator-two"}`, "submit-work", "--file", "-", "--graph-id", "operator-two")["work_id"].(string)
+		before, writes := log, apiWrites
+		page := run("", "state", "--graph", "operator-one")
+		if page["status"] != "committed_snapshot" || len(page["rows"].([]any)) != 2 {
+			t.Fatalf("operator state is not a scoped metadata forest: %v", page)
+		}
+		detail := run("", "inspect", "--work-id", one)
+		if !strings.Contains(detail["details"].(string), one) || strings.Contains(detail["details"].(string), "operator-one\"}") {
+			t.Fatal("inspection omitted ID or exposed stored payload")
+		}
+		if log != before || apiWrites != writes {
+			t.Fatal("operator state/inspect mutated authority")
+		}
+		admin = false
+		reject("", "actor_unauthorized", "reprioritize", "--work-id", one, "--priority", "1", "--reason", "operator_reprioritized")
+		admin = true
+		priority := run("", "reprioritize", "--work-id", one+","+two, "--priority", "1", "--reason", "operator_reprioritized", "--request-id", "operator-priority")
+		if len(priority["commit"].(map[string]any)["operations"].([]any)) != 2 {
+			t.Fatal("bulk priority did not publish one atomic transaction")
+		}
+		accepted := log
+		run("", "reprioritize", "--work-id", two+","+one, "--priority", "1", "--reason", "operator_reprioritized", "--request-id", "operator-priority")
+		if log != accepted {
+			t.Fatal("priority restart did not recover original stable request")
+		}
+		reject("", "request_reuse", "reprioritize", "--work-id", one+","+two, "--priority", "2", "--reason", "operator_reprioritized", "--request-id", "operator-priority")
+		run("", "cancel-work", "--work-id", one, "--work-id", two, "--reason", "operator_cancelled")
+		reject("", "claim_missing", "cancel-claim", "--claim-id", "missing", "--reason", "operator_cancelled")
 	})
 }

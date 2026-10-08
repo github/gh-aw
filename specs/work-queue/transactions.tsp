@@ -307,6 +307,16 @@ model WorkCancellationOperation {
   kind: "WorkCancellation";
   work_id: Identity;
   reason: ReasonCode;
+  // Optional compare-and-cancel fence for an operator selecting a Claim.
+  claim_id?: Identity;
+}
+@jsonSchema
+model WorkPriorityOperation {
+  kind: "WorkPriority";
+  work_id: Identity;
+  priority: Priority;
+  expected_priority: Priority;
+  reason: ReasonCode;
 }
 @jsonSchema
 model ReleaseOperation {
@@ -319,7 +329,7 @@ union QueueOperation {
   PolicyOperation, ControlOperation, WorkOperation, ClaimOperation,
   CompletionOperation, ResultOperation, DeliveryFailureOperation,
   ObservationOperation, ClaimCancellationOperation, WorkCancellationOperation,
-  DispatchOperation, ReleaseOperation
+  DispatchOperation, ReleaseOperation, WorkPriorityOperation
 }
 
 @jsonSchema

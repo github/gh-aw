@@ -164,6 +164,8 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 		return state.cancelClaim(operation, commit)
 	case "WorkCancellation":
 		return state.cancelWork(operation, commit)
+	case "WorkPriority":
+		return state.reprioritizeWork(operation)
 	case "Dispatch":
 		return state.applyDispatch(operation, commit)
 	case "Release":

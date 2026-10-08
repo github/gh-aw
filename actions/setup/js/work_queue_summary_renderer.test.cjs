@@ -15,6 +15,15 @@ function finish(fixture, handle, outcome) {
 }
 
 describe("bounded work queue metadata renderer", () => {
+  it("shows effective prospective priority without rewriting admitted priority", () => {
+    const fixture = queueFixture({ granted: false });
+    const state = fixture.state;
+    const work = [...state.works.values()][0];
+    const admitted = work.priority;
+    work.effective_priority = 1;
+    expect(renderWorkQueue(state)).toContain("| 1 |");
+    expect(work.priority).toBe(admitted);
+  });
   it("shows admitted nodes, priority, accounting and predecessors without rendering payloads", () => {
     const fixture = queueFixture({ granted: false });
     const before = serializeProjection(fixture.state);

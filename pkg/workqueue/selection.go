@@ -173,11 +173,12 @@ func (state Projection) eligibleBuckets(poolName string, at int64, logical int, 
 		if state.eligibility(work, at, logical, accounts) != "ready" {
 			continue
 		}
-		if buckets[work.Priority] == nil {
-			buckets[work.Priority] = map[string]*WorkState{}
+		priority := work.SchedulingPriority()
+		if buckets[priority] == nil {
+			buckets[priority] = map[string]*WorkState{}
 		}
-		if current := buckets[work.Priority][work.FairnessKey]; current == nil || positionLess(work.Position, current.Position) {
-			buckets[work.Priority][work.FairnessKey] = work
+		if current := buckets[priority][work.FairnessKey]; current == nil || positionLess(work.Position, current.Position) {
+			buckets[priority][work.FairnessKey] = work
 		}
 	}
 	return buckets, hasAvailable

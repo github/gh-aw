@@ -716,6 +716,9 @@
         },
         {
           "$ref": "#/$defs/ReleaseOperation"
+        },
+        {
+          "$ref": "#/$defs/WorkPriorityOperation"
         }
       ]
     },
@@ -979,6 +982,9 @@
     "WorkCancellationOperation": {
       "additionalProperties": false,
       "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
         "kind": {
           "const": "WorkCancellation"
         },
@@ -1058,6 +1064,28 @@
         }
       },
       "required": ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
+      "type": "object"
+    },
+    "WorkPriorityOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_priority": {
+          "$ref": "#/$defs/Priority"
+        },
+        "kind": {
+          "const": "WorkPriority"
+        },
+        "priority": {
+          "$ref": "#/$defs/Priority"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "work_id", "priority", "expected_priority", "reason"],
       "type": "object"
     },
     "WorkerProfile": {

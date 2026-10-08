@@ -179,6 +179,13 @@ gh aw work-queue --repo github/gh-aw policy \
   --file queue-policy.json --epoch eslint-queue-v1
 ```
 
+Inspect the queue with `gh aw work-queue --repo github/gh-aw state`, or use
+`tui` for keyboard navigation and cursor-synchronized Work/Claim details.
+The [current operator reference](../../specs/work-queue/README.md#current-operator-interface)
+documents bounded JSON/ASCII views, exact bulk cancellation and available-Work
+priority overrides. Operator cancellation is terminal for Work and does not
+stop or release a native worker; reconcile its exact evidence separately.
+
 Run this as an explicitly authenticated administrator with permission to update
 the protected queue branch. Use `--branch QUEUE_BRANCH` before `policy` when
 selecting a separately protected queue branch. Policy changes after initialization
