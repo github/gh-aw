@@ -45,6 +45,23 @@ test.describe("Homepage Links", () => {
     await expect(page).toHaveURL(/\/gh-aw\/setup\/creating-workflows\//);
   });
 
+  test("should feature Google Antigravity branding in the hero and metadata", async ({ page }) => {
+    const hero = page.locator(".aw-hero-sub:visible");
+    await expect(hero).toContainText("Google Antigravity");
+    await expect(hero).not.toContainText("Gemini");
+
+    const logo = hero.locator(".aw-engine", { hasText: "Google Antigravity" }).locator("svg");
+    await expect(logo).toBeVisible();
+    await expect(logo).toHaveAttribute("viewBox", "13 18 85 78");
+    await expect(logo).toHaveAttribute("aria-hidden", "true");
+    await expect(logo.locator("path")).toHaveCount(1);
+
+    for (const selector of ['meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]']) {
+      await expect(page.locator(selector)).toHaveAttribute("content", /Google Antigravity/);
+      await expect(page.locator(selector)).not.toHaveAttribute("content", /Gemini/);
+    }
+  });
+
   test("should provide accessible labels for homepage videos", async ({ page }) => {
     const videos = page.locator(".aw-watch-frame video");
     await expect(videos).toHaveCount(2);
