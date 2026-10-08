@@ -79,6 +79,17 @@ func (c *Compiler) dryRunConclusionData(data *WorkflowData) *WorkflowData {
 		return data
 	}
 	result := *data
+	result.OTLPEndpoint = ""
+	result.OTLPHeaders = ""
+	result.OTLPEndpoints = ""
+	result.OTLPUsesEnterpriseDefaults = false
+	result.RawFrontmatter = maps.Clone(data.RawFrontmatter)
+	delete(result.RawFrontmatter, "observability")
+	if data.ParsedFrontmatter != nil {
+		frontmatter := *data.ParsedFrontmatter
+		frontmatter.Observability = nil
+		result.ParsedFrontmatter = &frontmatter
+	}
 	value := false
 	result.StatusComment = &value
 	if data.SafeOutputs == nil {

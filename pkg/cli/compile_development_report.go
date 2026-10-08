@@ -9,7 +9,7 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
-const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations are disabled, but custom scripts/jobs, agent shell commands, external MCP servers, and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
+const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mutations and OTLP telemetry configuration are disabled; OTEL_* and GH_AW_OTLP_* environment variables are removed. Custom scripts/jobs, agent shell commands, external MCP servers, and custom credentials remain unverified. Compilation does not authorize execution or approve emitted files."
 
 // DryRunCompileReport describes the compilation gate, not execution authorization.
 type DryRunCompileReport struct {

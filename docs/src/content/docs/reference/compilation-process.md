@@ -307,6 +307,13 @@ issue locking. `aw_info.json` records the boolean `dry_run` flag. Failure handli
 local diagnostics, step summaries, and run artifacts remain enabled. No new
 memory-tool fields are required; ordinary compilation preserves persistence.
 
+Dry-run locks omit `OTEL_*` and `GH_AW_OTLP_*` variables from workflow, job,
+step, container, and service environment mappings, including user-defined values.
+Automatic OTLP export configuration and telemetry authentication steps are also
+disabled. Existing network permissions, local diagnostics, summaries, and artifacts remain
+available; ordinary compilation preserves telemetry configuration. This does not
+rewrite custom scripts that configure their own exporters.
+
 Custom scripts/jobs, agent shell commands, external MCP servers, and custom
 credentials remain unverified and are explicitly reported at runtime. Dry-run is
 not an execution sandbox or a guarantee that those extensions cannot mutate GitHub.

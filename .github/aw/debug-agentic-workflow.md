@@ -114,6 +114,9 @@ rather than skipping them; review callees separately without the override.
 push jobs, memory/cache persistence, reusable safe-output calls, work-queue
 operations, reactions, status/failure comments and issues, label removal, and
 issue locking. Diagnostics, summaries, and run artifacts remain available;
+`OTEL_*` and `GH_AW_OTLP_*` environment variables and automatic telemetry
+configuration/authentication are omitted from dry-run locks. Custom scripts
+that configure their own exporters remain outside this control.
 `aw_info.json` records `dry_run: true`.
 Compile text output reports excluded effects and scanner invocation coverage.
 `--json` adds a batch `workflow: "dry-run"` summary: `dry_run.gate` includes

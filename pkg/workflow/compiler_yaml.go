@@ -195,6 +195,12 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, err
 	}
+	if c.dryRun {
+		bodyContent, err = removeDryRunTelemetryEnv(bodyContent)
+		if err != nil {
+			return "", nil, nil, err
+		}
+	}
 
 	// Collect secrets and external action references from the generated body.
 	// These are returned to the caller so they can be used for safe update enforcement
@@ -216,6 +222,12 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 			bodyContent, err = applyArtifactRetention(body.String(), repoConfig)
 			if err != nil {
 				return "", nil, nil, err
+			}
+			if c.dryRun {
+				bodyContent, err = removeDryRunTelemetryEnv(bodyContent)
+				if err != nil {
+					return "", nil, nil, err
+				}
 			}
 			compilerYamlLog.Printf("Regenerated workflow body with on.workflow_call.secrets declarations")
 		}
