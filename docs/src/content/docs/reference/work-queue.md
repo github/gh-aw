@@ -19,7 +19,7 @@ durable Claims, not CPU time or successful completions.
 
 In the native protocol, issues and pull requests can be dependency nodes, but
 cannot store the queue. [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) describes
-issue checklists as an alternative, but those
+issue checklists, cache-memory, and repo-memory as alternatives, but those
 progress markers do not provide native fair scheduling, Claim authority, or
 verified dependency graphs.
 

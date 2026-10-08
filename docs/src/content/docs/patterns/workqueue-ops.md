@@ -1,16 +1,18 @@
 ---
 title: WorkQueueOps
-description: Process durable work with the native work-queue feature or a lightweight issue checklist
+description: Process work with the native work-queue feature or simple checklist, cache-memory, and repo-memory alternatives
 sidebar:
   badge: { text: 'Queue-based', variant: 'note' }
 ---
 
-WorkQueueOps is a pattern for processing a backlog incrementally across workflow runs. The native `tools.work-queue` feature provides a Git-backed queue with fair scheduling, task dependencies, and Claim-scoped effects. An issue checklist is a lightweight alternative for small, human-managed batches.
+WorkQueueOps is a pattern for processing a backlog incrementally across workflow runs. The native `tools.work-queue` feature provides a Git-backed queue with fair scheduling, task dependencies, and Claim-scoped effects. Issue checklists, cache-memory, and repo-memory are lightweight alternatives when simple progress tracking is enough.
 
 | Approach | Choose it when |
 | --- | --- |
 | Native work queue | Multiple workers need fair scheduling, verified dependencies, and authorization for each task attempt. |
 | Issue checklist | A small backlog needs visible progress without deploying a native queue. |
+| Cache-memory | A short-lived, branch-local backlog can be reconstructed if the cache is evicted. |
+| Repo-memory | A file-based backlog needs Git history and persistence shared across workflow branches. |
 
 ```mermaid
 flowchart LR
@@ -105,6 +107,40 @@ flowchart LR
 
 Checklist progress markers do not provide native fair scheduling, Claim authority, or verified dependency graphs. The concurrency group serializes runs in that group, but does not protect against other workflows or humans editing the issue.
 
+## Alternative: Cache-Memory
+
+Enable [cache-memory](/gh-aw/reference/cache-memory/) and store a small JSON queue at `/tmp/gh-aw/cache-memory/workqueue.json`:
+
+```yaml title="Cache-memory frontmatter"
+tools:
+  cache-memory: true
+```
+
+```json title="workqueue.json"
+{
+  "pending": ["item-1", "item-2"],
+  "completed": ["item-0"],
+  "failed": []
+}
+```
+
+Each run loads the file, processes a bounded batch of pending items, and moves them to `completed` or `failed` before saving the updated file. The compiler restores and saves the cache automatically. Serialize runs that update the same queue and check whether an item's effects already exist before retrying it.
+
+Cache-memory is branch-scoped and unused caches can be evicted after seven days. Keep a way to reconstruct pending work from repository state; do not use the cache as the only record of irreplaceable tasks.
+
+## Alternative: Repo-Memory
+
+Use [repo-memory](/gh-aw/reference/repo-memory/) for the same JSON queue when progress needs Git history and persistence across workflow branches:
+
+```yaml title="Repo-memory frontmatter"
+tools:
+  repo-memory: true
+```
+
+Store `workqueue.json` at `/tmp/gh-aw/repo-memory-default/workqueue.json`. The compiler restores files from `memory/default` and commits and pushes updates after workflow completion. Use the same bounded processing loop as the cache-memory alternative, with a shared concurrency group for workflows writing the same queue. Concurrent updates can overwrite progress during conflict resolution.
+
+Neither memory alternative provides native fair scheduling, Claim authority, or verified dependency graphs. Standalone `tools.repo-memory` persistence is not supported in native work-queue workers; these are separate queue patterns, not storage backends for `tools.work-queue`.
+
 ## Idempotency and Concurrency
 
 All WorkQueueOps patterns should be **idempotent**: running the same item twice should not cause double processing.
@@ -122,4 +158,6 @@ All WorkQueueOps patterns should be **idempotent**: running the same item twice 
 - [ResearchPlanAssignOps](/gh-aw/patterns/research-plan-assign-ops/) — Research → Plan → Assign pattern for developer-supervised work
 - [Work queues](/gh-aw/reference/work-queue/) — Native queue roles, Claim-scoped effects, and operator commands
 - [Deploy a work queue](/gh-aw/guides/deploy-work-queue/) — Configure native producers, dispatchers, workers, and Policy
+- [Cache Memory](/gh-aw/reference/cache-memory/) — Short-lived, branch-scoped file storage
+- [Repo Memory](/gh-aw/reference/repo-memory/) — Git-backed file storage with persistent history
 - [Concurrency](/gh-aw/reference/concurrency/) — Prevent race conditions in queue-based workflows
