@@ -623,7 +623,7 @@ func TestSpec_DynamicResolution_VersionCommentConsistency(t *testing.T) {
 	})
 
 	t.Run("preserves exact source release tag when resolved pin uses major tag", func(t *testing.T) {
-		const repo = "actions/github-script"
+		const repo = "super-linter/super-linter"
 		pin, ok := actionpins.GetLatestActionPinByRepo(repo)
 		require.True(t, ok)
 		require.Equal(t, "v9", pin.Version)
