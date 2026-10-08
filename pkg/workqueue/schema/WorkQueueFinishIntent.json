@@ -1,24 +1,35 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "WorkQueueFinishIntent.json",
-  "type": "object",
-  "properties": {
-    "outcome": {
-      "anyOf": [
-        {
-          "type": "string",
-          "const": "completed"
+  "$defs": {
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "WorkQueueFinishIntent": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
         },
-        {
-          "type": "string",
-          "const": "cancelled"
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "completed"
+            },
+            {
+              "const": "cancelled"
+            }
+          ]
         }
-      ]
+      },
+      "required": ["outcome"],
+      "type": "object"
     }
   },
-  "required": ["outcome"],
-  "unevaluatedProperties": {
-    "not": {}
-  },
-  "description": "Agent intent recorded by work_queue_claim_finish, without authority fields."
+  "$id": "WorkQueueFinishIntent.json",
+  "$ref": "#/$defs/WorkQueueFinishIntent",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkQueueFinishIntent"
 }

@@ -8,6 +8,7 @@
 const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { currentClaimHandle, claimIdentity, assertClaimIdentity } = require("./work_queue_claim_scope.cjs");
 
 /**
  * Internal safe-output message fields that should not be forwarded as action inputs.
@@ -17,6 +18,7 @@ const { sanitizeContent } = require("./sanitize_content.cjs");
  * @type {Set<string>}
  */
 const INTERNAL_MESSAGE_FIELDS = new Set(["type"]);
+const CLAIM_MESSAGE_FIELDS = new Set(["claim_handle", "claim_id", "work_id"]);
 
 /**
  * Main handler factory for a custom safe output action.
@@ -40,6 +42,8 @@ const INTERNAL_MESSAGE_FIELDS = new Set(["type"]);
 async function main(config = {}) {
   const actionName = config.action_name || "unknown_action";
   const outputKey = `action_${actionName}_payload`;
+  const factoryClaim = currentClaimHandle();
+  const factoryIdentity = factoryClaim ? claimIdentity(factoryClaim) : null;
 
   core.info(`Custom action handler initialized: action_name=${actionName}, output_key=${outputKey}`);
 
@@ -56,6 +60,8 @@ async function main(config = {}) {
    * @returns {Promise<Object>} Result with success/error status
    */
   return async function handleCustomAction(message, resolvedTemporaryIds, temporaryIdMap = new Map()) {
+    if (currentClaimHandle() !== factoryClaim) throw new Error("Custom action handler cannot escape its original Claim factory");
+    if (factoryIdentity) assertClaimIdentity(factoryIdentity);
     // Enforce once-only constraint
     if (called) {
       const error = `Action "${actionName}" can only be called once per workflow run`;
@@ -80,7 +86,7 @@ async function main(config = {}) {
         // Skip internal safe-output messaging fields that are not action inputs.
         // Maintained as an explicit set to allow future additions without silently
         // forwarding new internal fields to external action steps.
-        if (INTERNAL_MESSAGE_FIELDS.has(key)) {
+        if (INTERNAL_MESSAGE_FIELDS.has(key) || (currentClaimHandle() && CLAIM_MESSAGE_FIELDS.has(key))) {
           continue;
         }
 

@@ -1,0 +1,371 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "profile-only-is-not-work-authority",
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "foreign-profile-repository",
+      "target": { "repository": "other/repo" },
+      "valid": false
+    },
+    {
+      "name": "exact-number-narrowing",
+      "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": true
+    },
+    {
+      "name": "same-repository-foreign-number",
+      "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" },
+      "valid": false
+    },
+    {
+      "name": "missing-narrowing-field",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "7" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "target-cannot-replace-frozen-scope",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "7" }] },
+      "target": { "repository": "owner/repo", "number": "8", "resource_scope": "allow" },
+      "valid": false
+    },
+    {
+      "name": "scope-cannot-widen-profile",
+      "scope": { "version": 1, "resources": [{ "repository": "other/repo" }] },
+      "target": { "repository": "other/repo" },
+      "valid": false
+    },
+    {
+      "name": "explicit-empty-scope-denies",
+      "scope": { "version": 1, "resources": [] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "null-scope-is-not-absence",
+      "scope_schema_valid": false,
+      "scope": null,
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "unknown-version",
+      "scope_schema_valid": false,
+      "scope": { "version": 2, "resources": [{ "repository": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "missing-version",
+      "scope_schema_valid": false,
+      "scope": { "resources": [{ "repository": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "null-resources",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": null },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "unknown-scope-field",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo" }], "authority": "administrator" },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "unknown-selector-field",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "repo": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "duplicate-selectors",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo" }, { "repository": "owner/repo" }] },
+      "target": { "repository": "owner/repo" },
+      "valid": false
+    },
+    {
+      "name": "noncanonical-selector-id",
+      "scope_schema_valid": false,
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "number": "007" }] },
+      "target": { "repository": "owner/repo", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "noncanonical-target-id",
+      "target": { "repository": "owner/repo", "number": "007" },
+      "valid": false
+    },
+    {
+      "name": "foreign-host",
+      "target": { "repository": "owner/repo", "host": "evil.example" },
+      "valid": false
+    },
+    {
+      "name": "target-control",
+      "target": { "repository": "owner/repo", "ref": "refs/heads/topic\n" },
+      "valid": false
+    },
+    {
+      "name": "exact-ref",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "ref": "refs/heads/topic" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "ref": "refs/heads/topic" },
+      "valid": true
+    },
+    {
+      "name": "ref-prefix-is-not-authority",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "ref": "refs/heads/topic" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "ref": "refs/heads/topic-other" },
+      "valid": false
+    },
+    {
+      "name": "exact-path",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" },
+      "valid": true
+    },
+    {
+      "name": "path-prefix-is-not-authority",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go/other" },
+      "valid": false
+    },
+    {
+      "name": "path-traversal",
+      "target": { "repository": "owner/repo", "path": "src/../a.go" },
+      "valid": false
+    },
+    {
+      "name": "original-native-run",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "run_id": "202" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "run_id": "202" },
+      "valid": true
+    },
+    {
+      "name": "scope-cannot-borrow-sibling-run",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "run_id": "203" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "run_id": "203" },
+      "valid": false
+    },
+    {
+      "name": "missing-target",
+      "target": {},
+      "valid": false
+    },
+    {
+      "name": "full-immutable-subject",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": true
+    },
+    {
+      "name": "subject-foreign-number",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" },
+      "valid": false
+    },
+    {
+      "name": "subject-foreign-resource-id",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "subject-kind-spoof",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "pull_request", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "subject-missing-identity",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "repository": "owner/repo", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "repository-selector-does-not-remove-subject",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo" }] },
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" },
+      "valid": false
+    },
+    {
+      "name": "positive-native-repository-selector",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1" },
+      "valid": true
+    },
+    {
+      "name": "selector-missing-native-host",
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1" },
+      "valid": false
+    },
+    {
+      "name": "selector-missing-native-repository-id",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1" },
+      "valid": false
+    },
+    {
+      "name": "typed-selector-missing-native-resource-id",
+      "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "number": "7" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "typed-selector-missing-kind",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": false
+    },
+    {
+      "name": "selector-does-not-borrow-renamed-repository-id",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "9" },
+      "valid": false
+    },
+    {
+      "name": "generic-ref-needs-exact-selector",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "ref": "refs/heads/topic" },
+      "valid": false
+    },
+    {
+      "name": "generic-path-needs-exact-selector",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" },
+      "valid": false
+    },
+    {
+      "name": "generic-run-needs-exact-selector",
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "run_id": "202" },
+      "valid": false
+    },
+    {
+      "name": "subject-cannot-authorize-generic-path-alone",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7", "path": "src/a.go" },
+      "valid": false
+    },
+    {
+      "name": "subject-requires-full-target-despite-generic-selector",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "path": "src/a.go" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" },
+      "valid": false
+    },
+    {
+      "name": "subject-and-exact-generic-selector-intersect",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo", "path": "src/a.go" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7", "path": "src/a.go" },
+      "valid": true
+    },
+    {
+      "name": "subject-does-not-cover-omitted-selector-path",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "scope": { "version": 1, "resources": [{ "repository": "owner/repo" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7", "path": "src/a.go" },
+      "valid": false
+    },
+    {
+      "name": "empty-selector-scope-still-denies-full-subject",
+      "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "scope": { "version": 1, "resources": [] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": false
+    }
+  ],
+  "ancestor_cases": [
+    {
+      "name": "child-preserves-parent-native-target",
+      "ancestors": [{ "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" }] } }],
+      "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": true
+    },
+    {
+      "name": "child-cannot-widen-parent-native-target",
+      "ancestors": [{ "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" }] } }],
+      "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" },
+      "valid": false
+    },
+    {
+      "name": "bound-child-cannot-invent-unbound-parent-authority",
+      "ancestors": [{}],
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1" },
+      "valid": false
+    },
+    {
+      "name": "child-may-narrow-positive-parent-repository-binding",
+      "ancestors": [{ "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] } }],
+      "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" },
+      "valid": true
+    },
+    {
+      "name": "child-cannot-borrow-another-native-repository-id",
+      "ancestors": [{ "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] } }],
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "9" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "9" },
+      "valid": false
+    },
+    {
+      "name": "child-cannot-remove-parent-subject",
+      "ancestors": [{ "subject": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "2", "number": "7" } }],
+      "scope": { "version": 1, "resources": [{ "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" }] },
+      "target": { "kind": "issue", "host": "github.com", "repository": "owner/repo", "repository_id": "1", "resource_id": "3", "number": "8" },
+      "valid": false
+    },
+    {
+      "name": "child-cannot-widen-parent-exact-path",
+      "ancestors": [{ "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" }] } }],
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/b.go" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/b.go" },
+      "valid": false
+    },
+    {
+      "name": "child-cannot-ignore-explicit-empty-parent-scope",
+      "ancestors": [{ "scope": { "version": 1, "resources": [] } }],
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1" },
+      "valid": false
+    },
+    {
+      "name": "grandchild-cannot-drop-root-exact-path",
+      "ancestors": [
+        { "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" }] } },
+        { "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1" }] } }
+      ],
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/b.go" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/b.go" },
+      "valid": false
+    },
+    {
+      "name": "grandchild-preserves-every-ancestor-exact-path",
+      "ancestors": [
+        { "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" }] } },
+        { "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" }] } }
+      ],
+      "scope": { "version": 1, "resources": [{ "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" }] },
+      "target": { "host": "github.com", "repository": "owner/repo", "repository_id": "1", "path": "src/a.go" },
+      "valid": true
+    }
+  ]
+}

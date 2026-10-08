@@ -3,6 +3,8 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { repairJson, sanitizePrototypePollution } = require("./json_repair_helpers.cjs");
+const { normalizeRuntimeMessage, readClaimScopeContext, currentClaimHandle, currentClaimAssignment } = require("./work_queue_claim_scope.cjs");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { ERR_API, ERR_PARSE } = require("./error_codes.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
@@ -14,6 +16,10 @@ const MENTION_AWARE_OUTPUT_TYPES = new Set(["add_comment", "close_discussion", "
 async function main() {
   try {
     const fs = require("fs");
+    const claimHandle = currentClaimHandle();
+    const runtimeScope = claimHandle ? null : readClaimScopeContext();
+    const queueScope = Boolean(claimHandle || runtimeScope);
+    const assignment = currentClaimAssignment() || runtimeScope?.assignment;
     const { sanitizeContent } = require("./sanitize_content.cjs");
     const { validateItem, getMaxAllowedForType, getMinRequiredForType, hasValidationConfig, MAX_BODY_LENGTH: maxBodyLength, resetValidationConfigCache } = require("./safe_output_type_validator.cjs");
     // Load validation config from file and set it in environment for the validator to read
@@ -230,14 +236,25 @@ async function main() {
       const line = lines[i].trim();
       if (line === "") continue;
       core.info(`[INGESTION] Processing line ${i + 1}: ${line.substring(0, 200)}...`);
+      let item;
+      const rejectItem = (message, code = "claim_scope_invalid") => {
+        errors.push(message);
+        if (queueScope)
+          parsedItems.push({
+            type: typeof item?.type === "string" ? item.type : "invalid",
+            ...(item && Object.hasOwn(item, "claim_handle") ? { claim_handle: item.claim_handle } : {}),
+            _claimScopeError: message,
+            _claimScopeErrorCode: code,
+          });
+      };
       try {
-        const item = parseJsonWithRepair(line);
+        item = queueScope ? sanitizePrototypePollution(parseStrictJSON(line)) : parseJsonWithRepair(line);
         if (item === undefined) {
-          errors.push(`Line ${i + 1}: Invalid JSON - JSON parsing failed`);
+          rejectItem(`Line ${i + 1}: Invalid JSON - JSON parsing failed`);
           continue;
         }
-        if (!item.type) {
-          errors.push(`Line ${i + 1}: Missing required 'type' field`);
+        if (queueScope ? !item?.type || typeof item.type !== "string" : !item.type) {
+          rejectItem(`Line ${i + 1}: ${queueScope ? "Missing or invalid" : "Missing"} required 'type' field`);
           continue;
         }
         // Normalize type to use underscores (convert any dashes to underscores for resilience)
@@ -246,20 +263,29 @@ async function main() {
         core.info(`[INGESTION] Line ${i + 1}: Original type='${originalType}', Normalized type='${itemType}'`);
         // Update item.type to normalized value
         item.type = itemType;
+        if (queueScope) {
+          try {
+            item = normalizeRuntimeMessage(item);
+          } catch (error) {
+            const message = `Line ${i + 1}: ${getErrorMessage(error)}`;
+            rejectItem(message, error.code);
+            continue;
+          }
+        }
         deferMentionFiltering = MENTION_AWARE_OUTPUT_TYPES.has(itemType);
         if (!expectedOutputTypes[itemType]) {
           core.warning(`[INGESTION] Line ${i + 1}: Type '${itemType}' not found in expected types: ${JSON.stringify(Object.keys(expectedOutputTypes))}`);
-          errors.push(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
+          rejectItem(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
           continue;
         }
-        if (itemType === "noop" && isProbingNoopMessage(item.message)) {
+        if (!queueScope && itemType === "noop" && isProbingNoopMessage(item.message)) {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
         }
-        const typeCount = parsedItems.filter(existing => existing.type === itemType).length;
+        const typeCount = parsedItems.filter(existing => existing.type === itemType && (!queueScope || (existing.claim_handle === item.claim_handle && !existing._claimScopeError))).length;
         const maxAllowed = getMaxAllowedForType(itemType, expectedOutputTypes);
         if (typeCount >= maxAllowed) {
-          errors.push(`Line ${i + 1}: Too many items of type '${itemType}'. Maximum allowed: ${maxAllowed}.`);
+          rejectItem(`Line ${i + 1}: Too many items of type '${itemType}'. Maximum allowed: ${maxAllowed}.`);
           continue;
         }
         core.info(`Line ${i + 1}: type '${itemType}'`);
@@ -289,34 +315,32 @@ async function main() {
             dataSchema: typeConfig !== null && typeof typeConfig === "object" ? typeConfig.data_schema : undefined,
           });
           if (!validationResult.isValid) {
-            if (validationResult.error) {
-              errors.push(validationResult.error);
-            }
+            rejectItem(validationResult.error || `Line ${i + 1}: Invalid ${itemType} output`);
             continue;
           }
           // Use the normalized item (with sanitized/validated fields) rather
           // than the raw input, so downstream consumers see the canonical form.
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push(validationResult.normalizedItem);
+          parsedItems.push(queueScope ? { ...validationResult.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) } : validationResult.normalizedItem);
         } else {
           // Fall back to validateItemWithSafeJobConfig for unknown types
           const jobOutputType = expectedOutputTypes[itemType];
           if (!jobOutputType) {
-            errors.push(`Line ${i + 1}: Unknown output type '${itemType}'`);
+            rejectItem(`Line ${i + 1}: Unknown output type '${itemType}'`);
             continue;
           }
           const safeJobConfig = jobOutputType;
           const validation = validateItemWithSafeJobConfig(item, safeJobConfig, i + 1);
           if (!validation.isValid) {
-            errors.push(...validation.errors);
+            for (const error of validation.errors) rejectItem(error);
             continue;
           }
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push(validation.normalizedItem);
+          parsedItems.push(queueScope ? { ...validation.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) } : validation.normalizedItem);
         }
       } catch (error) {
         const errorMsg = getErrorMessage(error);
-        errors.push(`Line ${i + 1}: Invalid JSON - ${errorMsg}`);
+        rejectItem(`Line ${i + 1}: Invalid JSON - ${errorMsg}`);
       }
     }
     if (errors.length > 0) {
@@ -326,9 +350,21 @@ async function main() {
     for (const itemType of Object.keys(expectedOutputTypes)) {
       const minRequired = getMinRequiredForType(itemType, expectedOutputTypes);
       if (minRequired > 0) {
-        const actualCount = parsedItems.filter(item => item.type === itemType).length;
-        if (actualCount < minRequired) {
-          errors.push(`Too few items of type '${itemType}'. Minimum required: ${minRequired}, found: ${actualCount}.`);
+        const handles = claimHandle ? [claimHandle] : assignment ? assignment.claims.map(member => member.handle) : [undefined];
+        for (const handle of handles) {
+          const actualCount = parsedItems.filter(item => item.type === itemType && (!queueScope || (!item._claimScopeError && item.claim_handle === handle))).length;
+          if (actualCount < minRequired) {
+            const message = `Too few items of type '${itemType}'. Minimum required: ${minRequired}, found: ${actualCount}.`;
+            errors.push(handle ? `Claim '${handle}': ${message}` : message);
+            if (handle) {
+              parsedItems.push({
+                type: itemType,
+                claim_handle: handle,
+                _claimScopeError: message,
+                _claimScopeErrorCode: "claim_scope_invalid",
+              });
+            }
+          }
         }
       }
     }
@@ -338,7 +374,7 @@ async function main() {
     let collectorDriverExitCode;
     let collectorRetryCount;
     let collectorEngineErrorType;
-    if (!parsedItems.some(item => !["missing_tool", "missing_data"].includes(item.type))) {
+    if (!queueScope && !parsedItems.some(item => !["missing_tool", "missing_data"].includes(item.type))) {
       const incompleteOutcome = buildEmptyOutputOutcome(errors);
       parsedItems.push(incompleteOutcome);
       collectorEmptyOutputCause = incompleteOutcome.reason;
@@ -381,7 +417,7 @@ async function main() {
     let hasPatch = false;
     const patchFiles = [];
     try {
-      if (fs.existsSync(patchDir)) {
+      if ((!queueScope || outputContent.trim()) && fs.existsSync(patchDir)) {
         const dirEntries = fs.readdirSync(patchDir);
         for (const entry of dirEntries) {
           if (/^aw-.+\.(patch|bundle)$/.test(entry)) {

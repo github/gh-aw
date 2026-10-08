@@ -31,6 +31,22 @@ const { checkRateLimitHeadroom } = require("./rate_limit_helpers.cjs");
 const { redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
 const nodePath = require("path");
 const fs = require("fs");
+const {
+  readClaimScopeContext,
+  normalizeClaimScope,
+  normalizeRuntimeMessage,
+  assertClaimAuthorized,
+  withClaimExecution,
+  currentClaimHandle,
+  currentClaimAssignment,
+  claimIdentity,
+  assertClaimIdentity,
+  closeClaimEffectChannel,
+} = require("./work_queue_claim_scope.cjs");
+const { withClaimEffectClients, wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
+const { readClaimControlMessages } = require("./work_queue_control_delivery.cjs");
+const { readDeliveryControlInventory, inspectClaimDelivery, createClaimDeliveryVerifier, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
+const { createClaimAdapterHandler, verifyClaimAdapterOutput, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
 
 /**
@@ -105,6 +121,7 @@ const HANDLER_MAP = {
   create_project_status_update: "./create_project_status_update.cjs",
   update_project: "./update_project.cjs",
   upload_artifact: "./upload_artifact.cjs",
+  upload_asset: "./work_queue_upload_assets.cjs",
   upload_code_coverage: "./upload_code_coverage.cjs",
 };
 
@@ -375,8 +392,34 @@ async function finalizeLedgerAppend(config, messageHandlers) {
     ledgerAppendHandler = await ledgerAppendModule.main(config.ledger_append);
   }
   if (ledgerAppendHandler && "finalize" in ledgerAppendHandler && typeof ledgerAppendHandler.finalize === "function") {
+    if (currentClaimHandle()) {
+      await assertClaimAuthorized({ type: "ledger_append", claim_handle: currentClaimHandle(), repo: getDefaultTargetRepo(config.ledger_append) });
+    }
     ledgerAppendHandler.finalize();
   }
+}
+
+function bindHandlerToFactoryScope(handler) {
+  const handle = currentClaimHandle();
+  const identity = handle ? claimIdentity(handle) : null;
+  const assertScope = () => {
+    if (currentClaimHandle() !== handle) throw new Error("Handler state cannot escape its trusted Claim factory context");
+    if (identity) assertClaimIdentity(identity);
+  };
+  const bound = (...args) => {
+    assertScope();
+    return handler(...args);
+  };
+  for (const [name, value] of Object.entries(handler)) {
+    bound[name] =
+      typeof value === "function"
+        ? (...args) => {
+            assertScope();
+            return Reflect.apply(value, handler, args);
+          }
+        : value;
+  }
+  return bound;
 }
 
 /**
@@ -400,8 +443,11 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
     // Check if this safe output type is enabled in the config
     // The presence of the config key indicates the handler should be loaded
     if (config[type]) {
+      if (type === "upload_asset" && !currentClaimHandle()) continue;
+      if (currentClaimHandle() && ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)) continue;
       try {
-        const handlerModule = require(handlerPath);
+        const effectivePath = currentClaimHandle() && type === "create_code_scanning_alert" ? "./work_queue_code_scanning.cjs" : currentClaimHandle() && type === "upload_code_coverage" ? "./work_queue_code_coverage.cjs" : handlerPath;
+        const handlerModule = require(effectivePath);
         if (handlerModule && typeof handlerModule.main === "function") {
           // Call the factory function with config to get the message handler
           const handlerConfig = { ...(config[type] || {}) };
@@ -444,7 +490,31 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
             throw error;
           }
 
-          messageHandlers.set(type, wrapWithClientRebinding(type, messageHandler, handlerGithubClient));
+          const executable = wrapWithClientRebinding(type, messageHandler, handlerGithubClient);
+          const factoryClaim = currentClaimHandle();
+          const factoryIdentity = factoryClaim ? claimIdentity(factoryClaim) : null;
+          const declaredExecutable = factoryClaim ? wrapDeclaredBuiltinHandler(type, executable) : executable;
+          const assertFactoryScope = () => {
+            if (currentClaimHandle() !== factoryClaim) throw new Error("Handler state cannot escape its trusted Claim factory context");
+            if (factoryIdentity) assertClaimIdentity(factoryIdentity);
+          };
+          const authorizedHandler = async (message, ...args) => {
+            assertFactoryScope();
+            const scopedMessage = await assertClaimAuthorized({ ...message, repo: message.repo ?? getDefaultTargetRepo(handlerConfig) });
+            return declaredExecutable(scopedMessage, ...args);
+          };
+          if (factoryClaim) {
+            for (const [name, value] of Object.entries(executable)) {
+              authorizedHandler[name] =
+                typeof value === "function"
+                  ? (...args) => {
+                      assertFactoryScope();
+                      return value(...args);
+                    }
+                  : value;
+            }
+          }
+          messageHandlers.set(type, factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable));
           core.info(`✓ Loaded and initialized handler for: ${type}`);
         } else {
           handlerLoadErrors.set(type, "handler module does not export a main function");
@@ -467,7 +537,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
 
   // Load custom script handlers from GH_AW_SAFE_OUTPUT_SCRIPTS
   // These are inline scripts defined in safe-outputs.scripts that run in the handler loop
-  const customScriptHandlers = loadCustomSafeOutputScriptHandlers();
+  const customScriptHandlers = currentClaimHandle() ? new Map() : loadCustomSafeOutputScriptHandlers();
   if (customScriptHandlers.size > 0) {
     core.info(`Loading ${customScriptHandlers.size} custom script handler(s): ${[...customScriptHandlers.keys()].join(", ")}`);
     const scriptBaseDir = nodePath.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "actions");
@@ -498,7 +568,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
             // other safe-output operations.
             core.warning(`✗ Custom script handler ${scriptType} main() did not return a function (got ${typeof messageHandler}) — this handler will be skipped`);
           } else {
-            messageHandlers.set(scriptType, messageHandler);
+            messageHandlers.set(scriptType, bindHandlerToFactoryScope(messageHandler));
             core.info(`✓ Loaded and initialized custom script handler for: ${scriptType}`);
           }
         } else {
@@ -531,7 +601,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
           if (typeof messageHandler !== "function") {
             core.warning(`✗ Custom action handler ${actionType} main() did not return a function (got ${typeof messageHandler}) — this handler will be skipped`);
           } else {
-            messageHandlers.set(actionType, messageHandler);
+            messageHandlers.set(actionType, bindHandlerToFactoryScope(messageHandler));
             core.info(`✓ Loaded and initialized custom action handler for: ${actionType}`);
           }
         } else {
@@ -541,6 +611,27 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
       } catch (error) {
         handlerLoadErrors.set(actionType, getErrorMessage(error));
         core.warning(`Failed to load custom action handler for ${actionType}: ${getErrorMessage(error)} — this handler will be skipped`);
+      }
+    }
+  }
+
+  if (currentClaimHandle()) {
+    for (const [type, adapter] of Object.entries(config.claim_adapters || {})) {
+      if (!["prepared", "script"].includes(adapter.mode)) continue;
+      messageHandlers.delete(type);
+      try {
+        const prepared = await createClaimAdapterHandler({
+          adapter,
+          github,
+          filename: preparedAdapterPath(nodePath.join("/tmp/gh-aw/claim-adapters", type, String(currentClaimAssignment().claims.findIndex(member => member.handle === currentClaimHandle()))), currentClaimHandle(), type),
+          loadEffectHandler: async effectType => {
+            const handlerModule = require(HANDLER_MAP[effectType]);
+            return handlerModule.main({ ...(config[effectType] || {}), "target-repo": adapter["target-repo"] });
+          },
+        });
+        messageHandlers.set(type, prepared);
+      } catch (error) {
+        handlerLoadErrors.set(type, getErrorMessage(error));
       }
     }
   }
@@ -600,6 +691,30 @@ function collectMissingMessages(messages) {
 
   core.info(`Collected ${missingTools.length} missing tool(s), ${missingData.length} missing data item(s), ${noopMessages.length} noop message(s), and ${reportIncomplete.length} incomplete signal(s)`);
   return { missingTools, missingData, noopMessages, reportIncomplete };
+}
+
+function rejectCrossClaimTemporaryReferences(partitions, rejected) {
+  const temporaryOwners = new Map();
+  for (const [handle, members] of partitions) {
+    for (const member of members) {
+      const id = getCreatedTemporaryId(member);
+      if (id) {
+        if (!temporaryOwners.has(id)) temporaryOwners.set(id, new Set());
+        temporaryOwners.get(id).add(handle);
+      }
+    }
+  }
+  for (const [handle, members] of partitions) {
+    partitions.set(
+      handle,
+      members.filter(member => {
+        const foreign = [...extractTemporaryIdReferences(member)].find(id => temporaryOwners.has(id) && !temporaryOwners.get(id).has(handle));
+        if (!foreign) return true;
+        rejected.push({ type: member.type, claim_handle: handle, success: false, errorCode: "claim_scope_invalid", error: "Cross-Claim temporary-ID references are forbidden; exchange data through verified DAG Results" });
+        return false;
+      })
+    );
+  }
 }
 
 /**
@@ -886,12 +1001,23 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
  */
 async function processMessages(messageHandlers, messages, onItemCreated = null) {
+  if (readClaimScopeContext() && !currentClaimHandle()) {
+    throw new Error("Queue safe outputs must execute in a trusted per-Claim handler context; use the scoped manager");
+  }
+  messages = messages.map(message => {
+    try {
+      return normalizeRuntimeMessage(message);
+    } catch (error) {
+      return { ...message, _claimScopeError: getErrorMessage(error) };
+    }
+  });
   const processingOrder = sortMessageIndicesByTemporaryIdDependencies(messages);
   const results = [];
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
 
   // Collect missing_tool, missing_data, noop, and report_incomplete messages first
-  const missings = collectMissingMessages(messages);
+  const missings = collectMissingMessages(messages.filter(message => !currentClaimHandle() || !message._claimScopeError));
+  if (currentClaimHandle()) setCollectedMissings(missings);
 
   // Initialize shared temporary ID map
   // This will be populated by handlers as they create entities with temporary IDs
@@ -938,8 +1064,23 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   // Process messages in dependency order while reporting original message indices
   for (let position = 0; position < processingOrder.length; position++) {
     const i = processingOrder[position];
-    const message = messages[i];
+    let message = messages[i];
     const messageType = message.type;
+    try {
+      if (currentClaimHandle() && message._claimScopeError) throw new Error(message._claimScopeError);
+      message = await assertClaimAuthorized(message);
+    } catch (error) {
+      results.push({
+        type: messageType,
+        messageIndex: i,
+        claim_handle: message.claim_handle,
+        success: false,
+        ...(error.suppressed
+          ? { cancelled: error.state === "cancelled", skipped: true, reason: error.state === "result" ? "Durable Result settled; effects not replayed" : "Claim cancelled; outputs suppressed", errorCode: error.code }
+          : { errorCode: message._claimScopeErrorCode || error.code || "claim_scope_invalid", error: getErrorMessage(error) }),
+      });
+      continue;
+    }
 
     if (!messageType) {
       core.warning(`Skipping message ${i + 1} without type`);
@@ -979,6 +1120,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
     if (!messageHandler) {
       // Check if this message type is handled by a standalone step
       if (STANDALONE_STEP_TYPES.has(messageType)) {
+        if (currentClaimHandle() && messageType === "noop") {
+          results.push({ type: messageType, messageIndex: i, claim_handle: currentClaimHandle(), success: true, result: { effect: "none" } });
+          continue;
+        }
         // Silently skip - this is handled by a dedicated step
         core.debug(`Message ${i + 1} (${messageType}) will be handled by standalone step`);
         results.push({
@@ -1088,6 +1233,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
       }
 
       // Call the message handler with the individual message and resolved temp IDs
+      await assertClaimAuthorized(effectiveMessage);
       const result = await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap);
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
@@ -1283,6 +1429,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         const tempIdMapSizeBefore = temporaryIdMap.size;
 
         // Call the handler again with updated temp ID map
+        await assertClaimAuthorized(deferred.message);
         const result = await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap);
 
         if (result && result.skipped === true && !result.deferred) {
@@ -1597,12 +1744,14 @@ async function updateCommentBody(github, context, repo, commentId, updatedBody, 
  * @returns {Promise<number>} Number of successful updates
  */
 async function processSyntheticUpdates(github, context, trackedOutputs, temporaryIdMap, artifactUrlMap, allowedMentionAliases = [], maxMentions = undefined) {
+  if (readClaimScopeContext() && !currentClaimHandle()) throw new Error("Synthetic queue writes require a trusted per-Claim execution context");
   let updateCount = 0;
 
   core.info(`\n=== Processing Synthetic Updates ===`);
   core.info(`Found ${trackedOutputs.length} output(s) with unresolved temporary IDs`);
 
   for (const tracked of trackedOutputs) {
+    await assertClaimAuthorized({ ...tracked.message, repo: tracked.result.repo, item_number: tracked.result.number });
     // Check if any new temporary IDs were resolved since this output was created.
     // Also trigger an update when artifact URLs have been registered (artifactUrlMap is non-empty),
     // since artifact IDs embedded in the body need to be replaced with their real URLs.
@@ -1704,7 +1853,168 @@ function recordSafeOutputFailure(report) {
  *
  * @returns {Promise<void>}
  */
-async function main() {
+/** @param {any} scope @param {any[]} messages @param {any[]} results @param {Record<string, any>} [options] */
+async function settleClaimDelivery(scope, messages, results, options = {}) {
+  const handle = currentClaimHandle();
+  const member = scope.assignment.claims.find(claim => claim.handle === handle);
+  if (!member) throw new Error("Claim delivery lost its immutable assignment member");
+  const verificationGithub = options.github || github;
+  const verificationContext = options.context || context;
+  for (const result of results) result.claim_handle = handle;
+  if (options.registerVerification) options.registerVerification(messages, results);
+  const controls = options.controlMessages || [];
+  const controlProofs = new Map();
+  const outcomes = [...results, ...controls.map((message, index) => ({ messageIndex: messages.length + index, success: true, claim_handle: handle, result: null }))];
+  const queueControls = require("./work_queue_control_receipts.cjs");
+  const delivery = await inspectClaimDelivery({
+    assignment: scope.assignment,
+    claim_handle: handle,
+    messages: [...messages, ...controls],
+    results: outcomes,
+    effects: options.effects || [],
+    effectChannel: closeClaimEffectChannel(),
+    authorize: options.authorize,
+    context: verificationContext,
+    github: verificationGithub,
+    signal: options.signal,
+    staged: isStagedMode(),
+    requireControlInventory: true,
+    readControlInventory: async () => {
+      const inventory = await (options.readControlInventory
+        ? options.readControlInventory()
+        : readDeliveryControlInventory({ assignment: scope.assignment, claim_handle: handle, github: verificationGithub, queueClient: options.queueClient, context: verificationContext, core, signal: options.signal }));
+      for (const message of controls) {
+        const proof = await queueControls.verifyClaimQueueControl({ assignment: scope.assignment, claim_handle: handle, message, inventory });
+        controlProofs.set(message.intent_id, proof);
+      }
+      return inventory;
+    },
+    verifyOutput:
+      options.verifyOutput ||
+      (input => {
+        if (["work_queue_submit", "work_queue_dispatch_next"].includes(input.message.type)) return controlProofs.get(input.message.intent_id);
+        const config = loadConfig();
+        const verification = { ...input, config: config[input.message.type], effects: options.effects || [] };
+        const adapter = config.claim_adapters?.[input.message.type];
+        if (input.message.type === "upload_asset") return require("./work_queue_upload_assets.cjs").verifyAssetDelivery(verification);
+        if (input.message.type === "upload_artifact") return require("./upload_artifact.cjs").verifyArtifactDelivery(verification);
+        if (input.message.type === "create_code_scanning_alert") return require("./work_queue_code_scanning.cjs").verifyCodeScanningDelivery(verification);
+        if (input.message.type === "upload_code_coverage") return require("./work_queue_code_coverage.cjs").verifyCodeCoverageDelivery(verification);
+        return adapter ? verifyClaimAdapterOutput({ ...verification, adapter }) : verifyBuiltinDeliveryOutput(verification);
+      }),
+    verifyDeclaredOutput: member.work.effect_contract?.outputs?.some(output => output.verification !== undefined)
+      ? options.verifyDeclaredOutput || createDeclaredAdapterVerifier(loadConfig().claim_adapters, loadConfig(), options.effects)
+      : undefined,
+  });
+  options.signal?.throwIfAborted();
+  return delivery;
+}
+
+/** @param {{claimPartition?: boolean, messages?: object[], verifyOutput?: Function, finalizeResults?: Function, controlIntentPath?: string, authorize?: (request: Record<string, unknown>) => unknown}} [options] */
+async function main(options = {}) {
+  const scope = readClaimScopeContext();
+  if (scope && !options.claimPartition) {
+    if (!scope.assignment) {
+      const output = loadAgentOutput({ partitioning: true });
+      if (output.success && output.items.length) throw new Error("Unassigned queue dispatcher cannot execute worker safe outputs");
+      return undefined;
+    }
+    const output = loadAgentOutput({ partitioning: true });
+    const messages = output.success ? output.items : [];
+    const partitions = new Map(scope.assignment.claims.map(claim => [claim.handle, []]));
+    const rejected = [];
+    const controls = readClaimControlMessages(scope.assignment, options.controlIntentPath);
+    rejected.push(...controls.errors.map(error => ({ ...error, success: false, errorCode: "claim_control_delivery_invalid" })));
+    for (const message of messages) {
+      try {
+        if (message._claimScopeError) throw new Error(message._claimScopeError);
+        const normalized = normalizeClaimScope(message, scope.assignment);
+        partitions.get(normalized.claim_handle).push(normalized);
+      } catch (error) {
+        rejected.push({ success: false, type: message.type, claim_handle: message.claim_handle, error: getErrorMessage(error), errorCode: message._claimScopeErrorCode || error.code || "claim_scope_invalid" });
+      }
+    }
+    rejectCrossClaimTemporaryReferences(partitions, rejected);
+    const settlements = [];
+    const verificationPasses = new Map();
+    for (const [handle, scopedMessages] of partitions) {
+      try {
+        const unscopedGithub = github;
+        const effects = [];
+        const authorize = options.authorize || (request => require("./finish_work_queue_claim.cjs").authorizeWorkerClaim({ ...request, github: unscopedGithub }));
+        const claimOptions = {
+          ...options,
+          authorize,
+          effects,
+          controlMessages: controls.messages.filter(message => message.claim_handle === handle),
+          registerVerification: (originalMessages, originalResults) => {
+            verificationPasses.set(handle, verification =>
+              withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () => {
+                const readbackGithub = wrapClaimEffectClient(unscopedGithub, { claim_handle: handle, authorize, authorizeGithub: unscopedGithub, context, signal: verification?.signal });
+                return settleClaimDelivery(scope, originalMessages, originalResults, { ...claimOptions, github: readbackGithub, context, signal: verification?.signal, registerVerification: undefined });
+              })
+            );
+          },
+        };
+        const settlement = await withClaimExecution({ ...scope, claim_handle: handle, authorize, effects }, () =>
+          withClaimEffectClients({ claim_handle: handle, authorize, authorizeGithub: unscopedGithub, context }, async () => {
+            try {
+              await assertClaimAuthorized({ type: "work_queue_effect_pass", claim_handle: handle }, { requireCompletion: !isStagedMode() });
+            } catch (error) {
+              return { success: !!error.suppressed, delivery: await settleClaimDelivery(scope, scopedMessages, [], claimOptions) };
+            }
+            if (isStagedMode()) {
+              core.info(`Read-only preview for Claim ${handle}: ${scopedMessages.length} scoped output(s); no handlers or terminal facts`);
+              return { success: true, messages: scopedMessages, delivery: await settleClaimDelivery(scope, scopedMessages, [], claimOptions) };
+            }
+            const result = await main({ ...claimOptions, claimPartition: true, messages: scopedMessages });
+            if (result?.delivery) return result;
+            return { ...result, delivery: await settleClaimDelivery(scope, scopedMessages, [], claimOptions) };
+          })
+        );
+        settlements.push({ claim_handle: handle, ...settlement });
+      } catch (error) {
+        settlements.push({ claim_handle: handle, success: false, error: getErrorMessage(error) });
+      }
+    }
+    let finalized;
+    if (!isStagedMode()) {
+      const finalize = options.finalizeResults || require("./finish_work_queue_claim.cjs").finalizeWorkerResults;
+      if (typeof finalize !== "function") throw new Error("Trusted per-Claim Result reconciler is unavailable");
+      const disputed = new Set(rejected.map(failure => failure.claim_handle).filter(Boolean));
+      finalized = await finalize({
+        core,
+        github,
+        context,
+        assignment: scope.assignment,
+        verifyEffects: createClaimDeliveryVerifier({
+          assignment: scope.assignment,
+          recheck: async (member, verification) => {
+            const recheck = verificationPasses.get(member.handle);
+            if (disputed.has(member.handle) || !recheck) return null;
+            const delivery = await recheck(verification);
+            const settlement = settlements.find(settlement => settlement.claim_handle === member.handle);
+            if (settlement) settlement.delivery = delivery;
+            return delivery;
+          },
+        }),
+      });
+    }
+    core.setOutput("claim_results", JSON.stringify({ settlements, reconciliation: finalized }));
+    const states = settlements.map(settlement => finalized?.claims?.[settlement.claim_handle]?.state || settlement.delivery?.verification);
+    const settled = states.every(state => state === "result" || state === "cancelled");
+    const cancelled = states.filter(state => state === "cancelled").length;
+    const outcome = isStagedMode() ? "staged_preview" : !settled ? "delivery_pending" : cancelled === states.length ? "cancelled" : cancelled ? "completed_with_cancellations" : "completed";
+    core.setOutput("work_queue_outcome", outcome);
+    if (rejected.length) {
+      core.setOutput("claim_scope_errors", JSON.stringify(rejected));
+      core.setFailed(`${rejected.length} safe-output message(s) have invalid Claim scope`);
+    }
+    if (settlements.some(settlement => settlement.success === false && !["result", "cancelled"].includes(finalized?.claims?.[settlement.claim_handle]?.state))) {
+      core.setFailed("One or more Claim-scoped safe-output passes failed; independently valid siblings were reconciled");
+    }
+    return { settlements, rejected };
+  }
   // Detect staged mode before try/finally so it's accessible in the finally block.
   // In staged mode (🎭 Staged Mode Preview) no real items are created in GitHub so no manifest should be emitted.
   const isStaged = isStagedMode();
@@ -1722,7 +2032,8 @@ async function main() {
     core.debug(`Configuration: ${JSON.stringify(Object.keys(config))}`);
 
     // Load agent output
-    const agentOutput = loadAgentOutput();
+    /** @type {any} */
+    const agentOutput = options.messages ? { success: true, items: options.messages } : loadAgentOutput();
     const agentOutputItems = agentOutput.success ? agentOutput.items : [];
     if (!agentOutput.success) {
       core.info("No agent output available from tool calls");
@@ -1730,8 +2041,9 @@ async function main() {
       core.info(`Found ${agentOutput.items.length} message(s) in agent output`);
     }
 
-    const fileBackedCommentMemoryMessages = buildCommentMemoryMessagesFromFiles(agentOutputItems, config);
+    const fileBackedCommentMemoryMessages = currentClaimHandle() ? [] : buildCommentMemoryMessagesFromFiles(agentOutputItems, config);
     const allMessages = [...agentOutputItems, ...fileBackedCommentMemoryMessages];
+    if (currentClaimHandle()) setCollectedMissings({ missingTools: [], missingData: [], noopMessages: [], reportIncomplete: [] });
     if (allMessages.length === 0) {
       core.info("No safe-output messages available - nothing to process");
       await finalizeLedgerAppend(config, new Map());
@@ -1739,7 +2051,7 @@ async function main() {
       core.setOutput("processed_count", "0");
       setSafeOutputsStatusOutputs({ itemsSucceeded: 0, itemsFailed: 0, status: "success" });
       statusOutputsSet = true;
-      return;
+      return undefined;
     }
 
     // Create the PR review buffer registry (one per-PR buffer created on demand)
@@ -1771,7 +2083,7 @@ async function main() {
       core.setOutput("processed_count", "0");
       setSafeOutputsStatusOutputs({ itemsSucceeded: 0, itemsFailed: 0, status: "success" });
       statusOutputsSet = true;
-      return;
+      return undefined;
     }
 
     // Create manifest logger for recording created items.
@@ -1802,6 +2114,7 @@ async function main() {
         /** @type {any} */
         let reviewFailureError = null;
         try {
+          await assertClaimAuthorized({ type: "submit_pull_request_review", claim_handle: currentClaimHandle(), repo: reviewRepo, pull_request_number: reviewPrNum });
           const reviewResult = await reviewBuffer.submitReview();
           if (reviewResult.success && !reviewResult.skipped) {
             logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
@@ -2003,6 +2316,10 @@ async function main() {
     // Emit named action outputs (e.g. created_issue_number, created_issue_url)
     // for the first successful result of each safe output type.
     emitSafeOutputActionOutputs(processingResult);
+    let delivery = null;
+    if (currentClaimHandle() && scope?.assignment) {
+      delivery = await settleClaimDelivery(scope, allMessages, processingResult.results, options);
+    }
 
     // Ensure the manifest file always exists for artifact upload (even if no items were created).
     // Skip in staged mode — no real items were created so no manifest should be emitted.
@@ -2013,9 +2330,10 @@ async function main() {
     if (failedOutputsMessage !== null) {
       recordSafeOutputFailure({ errorCode: SAFE_OUTPUT_E099, message: failedOutputsMessage, failures: failureDetails });
       core.setFailed(failedOutputsMessage);
-      return;
+      return { success: false, delivery };
     }
     core.info("Safe Output Handler Manager completed");
+    return { success: true, delivery };
   } catch (error) {
     const handlerError = `${ERR_VALIDATION}: Handler manager failed: ${getErrorMessage(error)}`;
     if (!statusOutputsSet) {
@@ -2024,10 +2342,11 @@ async function main() {
     if (failedOutputsMessage !== null) {
       recordSafeOutputFailure({ errorCode: ERR_VALIDATION, message: `${failedOutputsMessage}\n${handlerError}`, failures: failureDetails });
       core.setFailed(`${failedOutputsMessage}\n${handlerError}`);
-      return;
+      return undefined;
     }
     recordSafeOutputFailure({ errorCode: ERR_VALIDATION, message: handlerError, failures: failureDetails });
     core.setFailed(handlerError);
+    return undefined;
   } finally {
     // Guarantee the manifest file exists for artifact upload even when the handler fails.
     // This is a no-op if the file was already created by createManifestLogger().
@@ -2060,4 +2379,6 @@ module.exports = {
   computeSafeOutputsStatus,
   setSafeOutputsStatusOutputs,
   processSyntheticUpdates,
+  rejectCrossClaimTemporaryReferences,
+  settleClaimDelivery,
 };

@@ -15,9 +15,10 @@ var awContextLog = logger.New("workflow:compiler_aw_context")
 // It is managed internally by the agentic workflow system and should not be surfaced to users.
 const AwContextInputName = "aw_context"
 
-// WorkQueueClaimInputName is the internal workflow_dispatch input that carries
-// a trusted work queue assignment to queue-enabled workers.
-const WorkQueueClaimInputName = "work_queue_claim"
+// WorkQueueAssignmentInputName carries the immutable version-3 Claim array.
+const WorkQueueAssignmentInputName = "work_queue_assignment"
+
+const WorkQueueClaimInputName = WorkQueueAssignmentInputName
 
 // NetworkAllowedInputName is the optional workflow_call input that extends the compiled
 // network allowlist at runtime for reusable workflows.
@@ -70,7 +71,7 @@ func validateReservedWorkflowInputs(data *WorkflowData) error {
 		if !ok {
 			continue
 		}
-		for _, inputName := range []string{AwContextInputName, WorkQueueClaimInputName} {
+		for _, inputName := range []string{AwContextInputName, WorkQueueAssignmentInputName, "work_queue_claim"} {
 			if _, exists := inputs[inputName]; exists {
 				return fmt.Errorf("on.%s.inputs.%s is reserved and managed by the compiler; remove it from workflow inputs", trigger, inputName)
 			}

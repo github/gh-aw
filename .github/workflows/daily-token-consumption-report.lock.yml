@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"97992741d40e4956f61d2111285e3420cb2e23f503d1af88d8bd8c00334ee254","body_hash":"0c67e0ff5685fde6189b4d4c276b774db90b2c7e77dfa4717c623163b72f4f32","strict":true,"agent_id":"goose","agent_model":"copilot/claude-sonnet-5","engine_versions":{"goose":"1.53.0"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN","GRAFANA_SERVICE_ACCOUNT_TOKEN","GRAFANA_URL","SENTRY_ACCESS_TOKEN","SENTRY_OPENAI_API_KEY"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44","digest":"sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44@sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44","digest":"sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44@sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44","digest":"sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44@sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.29","digest":"sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.29@sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"},{"image":"grafana/mcp-grafana:1.1.0-alpine","digest":"sha256:e0eb29cdf8effbbebf115ea99a5f654a44681dfd293661b0991498d651ca6cb4","pinned_image":"grafana/mcp-grafana:1.1.0-alpine@sha256:e0eb29cdf8effbbebf115ea99a5f654a44681dfd293661b0991498d651ca6cb4"},{"image":"node:lts-alpine","digest":"sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1","pinned_image":"node:lts-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"grafana","tools":["get_datasource","list_datasources","tempo_docs-traceql","tempo_get-attribute-names","tempo_get-attribute-values","tempo_get-trace","tempo_traceql-search"]},{"name":"safeoutputs","tools":["create_discussion","create_issue","missing_data","missing_tool","noop","report_incomplete"]},{"name":"sentry","tools":["analyze_issue_with_seer","find_dsns","find_organizations","find_projects","find_releases","find_teams","get_doc","get_event_attachment","get_issue_details","get_trace_details","list_events","list_issue_events","search_docs","search_events","search_issues","whoami"]}],"threat_detection":{"mode":"enabled"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"0a34a2f23e4bb3ee89db1123edbfcecffadccdb9139604d5a07a6c6aa321a533","body_hash":"298c158acf0c5d22a735bd543419440a09255a2c5b01c57b6d2756eb53f362b1","strict":true,"agent_id":"goose","agent_model":"copilot/claude-sonnet-5","engine_versions":{"goose":"1.53.0"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN","GRAFANA_SERVICE_ACCOUNT_TOKEN","GRAFANA_URL","SENTRY_ACCESS_TOKEN","SENTRY_OPENAI_API_KEY"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44","digest":"sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44@sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44","digest":"sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44@sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44","digest":"sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44@sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.29","digest":"sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.29@sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"},{"image":"grafana/mcp-grafana:1.1.0-alpine","digest":"sha256:e0eb29cdf8effbbebf115ea99a5f654a44681dfd293661b0991498d651ca6cb4","pinned_image":"grafana/mcp-grafana:1.1.0-alpine@sha256:e0eb29cdf8effbbebf115ea99a5f654a44681dfd293661b0991498d651ca6cb4"},{"image":"node:lts-alpine","digest":"sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1","pinned_image":"node:lts-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"grafana","tools":["get_datasource","list_datasources","tempo_docs-traceql","tempo_get-attribute-names","tempo_get-attribute-values","tempo_get-trace","tempo_traceql-search"]},{"name":"safeoutputs","tools":["create_discussion","missing_data","missing_tool","noop","report_incomplete"]},{"name":"sentry","tools":["analyze_issue_with_seer","find_dsns","find_organizations","find_projects","find_releases","find_teams","get_doc","get_event_attachment","get_issue_details","get_trace_details","list_events","list_issue_events","search_docs","search_events","search_issues","whoami"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_explain","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"enabled"}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -27,6 +27,7 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/daily-report-worker.md
 #     - shared/goose.md
 #     - shared/mcp/sentry.md
 #     - shared/mcp/grafana.md
@@ -67,10 +68,13 @@
 
 name: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
 on:
-  schedule:
-    - cron: "51 11 * * 1-5"  # Friendly format: daily on weekdays (scattered)
   workflow_dispatch:
     inputs:
+      work_queue_assignment:
+        default: ""
+        description: "Trusted work queue assignment (Reserved for Agentic Workflows)."
+        required: false
+        type: string
       aw_context:
         default: ""
         description: "Agent caller context (Reserved for Agentic Workflows)."
@@ -84,7 +88,7 @@ concurrency:
   group: "gh-aw-${{ github.workflow }}"
   queue: max
 
-run-name: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
+run-name: "${{ github.event_name == 'workflow_dispatch' && inputs.work_queue_assignment != '' && format('gh-aw work-queue {0}', fromJSON(inputs.work_queue_assignment).dispatch_id) || 'gh-aw work-queue unassigned' }}"
 
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_OTEL_SENTRY_ENDPOINT }}
@@ -101,7 +105,7 @@ jobs:
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read
-      contents: read
+      contents: write
     env:
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -123,6 +127,7 @@ jobs:
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
       stale_lock_file_failed: ${{ steps.check-lock-file.outputs.stale_lock_file_failed == 'true' }}
+      work_queue_origin: ${{ steps.work_queue_snapshot.outputs.work_queue_origin }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -277,7 +282,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"}],\"system_item_count\":12}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"}],\"system_item_count\":12}"
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -287,16 +292,17 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_issue, create_discussion, missing_tool, missing_data, noop(max:2)\n"
+          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_discussion, missing_tool, missing_data, noop(max:2)\n"
           GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0005: "{{#runtime-import .github/workflows/shared/goose.md}}\n"
-          GH_AW_PROMPT_CONTENT_0006: "{{#runtime-import .github/workflows/shared/mcp/sentry.md}}\n"
-          GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import .github/workflows/shared/mcp/grafana.md}}\n"
-          GH_AW_PROMPT_CONTENT_0008: "{{#runtime-import .github/workflows/shared/reporting.md}}\n"
-          GH_AW_PROMPT_CONTENT_0009: "{{#runtime-import .github/workflows/shared/otlp.md}}\n"
-          GH_AW_PROMPT_CONTENT_0010: "{{#runtime-import .github/workflows/daily-token-consumption-report.md}}\n"
+          GH_AW_PROMPT_CONTENT_0005: "{{#runtime-import .github/workflows/shared/daily-report-worker.md}}\n"
+          GH_AW_PROMPT_CONTENT_0006: "{{#runtime-import .github/workflows/shared/goose.md}}\n"
+          GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import .github/workflows/shared/mcp/sentry.md}}\n"
+          GH_AW_PROMPT_CONTENT_0008: "{{#runtime-import .github/workflows/shared/mcp/grafana.md}}\n"
+          GH_AW_PROMPT_CONTENT_0009: "{{#runtime-import .github/workflows/shared/reporting.md}}\n"
+          GH_AW_PROMPT_CONTENT_0010: "{{#runtime-import .github/workflows/shared/otlp.md}}\n"
+          GH_AW_PROMPT_CONTENT_0011: "{{#runtime-import .github/workflows/daily-token-consumption-report.md}}\n"
         with:
           script: |
             const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
@@ -369,6 +375,20 @@ jobs:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+      - name: Snapshot work queue state
+        id: work_queue_snapshot
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "worker"
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'write_work_queue_snapshot.cjs'));
+            await main();
       - name: Upload info artifact
         if: success() || failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -389,6 +409,7 @@ jobs:
           include-hidden-files: true
           path: |
             /tmp/gh-aw/aw_info.json
+            /tmp/gh-aw/work-queue.snapshot.json
             /tmp/gh-aw/models.json
             /tmp/gh-aw/aw-prompts/prompt.txt
             /tmp/gh-aw/aw-prompts/system.txt
@@ -409,13 +430,11 @@ jobs:
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
+      actions: read
       contents: read
       copilot-requests: write
       issues: read
       pull-requests: read
-    concurrency:
-      group: "gh-aw-goose-${{ github.workflow }}"
-      queue: max
     timeout-minutes: 60
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -433,6 +452,9 @@ jobs:
       GH_AW_PR_HEAD_REPO: ""
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
       GH_AW_WORKFLOW_ID_SANITIZED: dailytokenconsumptionreport
+      GH_AW_WORK_QUEUE_ENABLED: "true"
+      GH_AW_WORK_QUEUE_INTENT_ORIGIN: "${{ needs.activation.outputs.work_queue_origin }}"
+      GH_AW_WORK_QUEUE_ROLE: "worker"
     outputs:
       ai_credits_rate_limit_error: ${{ steps.parse-mcp-gateway.outputs.ai_credits_rate_limit_error || 'false' }}
       aic: ${{ steps.parse-token-usage.outputs.aic }}
@@ -446,6 +468,7 @@ jobs:
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
       unknown_model_ai_credits: ${{ steps.parse-mcp-gateway.outputs.unknown_model_ai_credits || 'false' }}
+      work_queue_origin: ${{ steps.work_queue_intent_origin.outputs.work_queue_origin }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -511,6 +534,17 @@ jobs:
         with:
           name: activation
           path: /tmp/gh-aw
+      - name: Capture authenticated work queue intent origin
+        id: work_queue_intent_origin
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'capture_work_queue_intent_origin.cjs'));
+            await main();
       - name: Configure Git credentials
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -579,7 +613,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[token-consumption] \"},\"create_issue\":{\"close_older_issues\":true,\"expires\":24,\"labels\":[\"automation\",\"observability\",\"telemetry\"],\"max\":1,\"title_prefix\":\"[token-consumption] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[token-consumption] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
         with:
           script: |
             const path = require('path');
@@ -593,11 +627,11 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[token-consumption] \". Discussions will be created in category \"audits\".",
-                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[token-consumption] \". Labels [\"automation\" \"observability\" \"telemetry\"] will be automatically added."
+                "create_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[token-consumption] \". Discussions will be created in category \"audits\"."
               },
               "repo_params": {},
-              "dynamic_tools": []
+              "dynamic_tools": [],
+              "work_queue_scoped": true
             }
           GH_AW_VALIDATION_JSON: |
             {
@@ -627,45 +661,6 @@ jobs:
                     "maxLength": 128
                   }
                 }
-              },
-              "create_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "blocked_by": {},
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000,
-                    "minLength": 20
-                  },
-                  "fields": {
-                    "type": "array"
-                  },
-                  "labels": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 128
-                  },
-                  "parent": {
-                    "issueOrPRNumber": true
-                  },
-                  "repo": {
-                    "type": "string",
-                    "maxLength": 256
-                  },
-                  "temporary_id": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
-                  }
-                },
-                "collapseData": true
               },
               "mentions": {
                 "enabled": false
@@ -826,7 +821,7 @@ jobs:
           export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network bridge -p 127.0.0.1:'"${MCP_GATEWAY_PORT}"':'"${MCP_GATEWAY_PORT}"' --name awmg-mcpg --add-host host.docker.internal:host-gateway --user '"${MCP_GATEWAY_UID}"':'"${MCP_GATEWAY_GID}"' --group-add '"${DOCKER_SOCK_GID}"' -v '"${DOCKER_SOCK_PATH}"':/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_AGENT_ID -e MCP_GATEWAY_PAYLOAD_DIR -e MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD -e DOCKER_HOST=unix:///var/run/docker.sock -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_PR_HEAD_BASE_BRANCH -e GH_AW_PR_HEAD_BASE_SHA -e GH_AW_PR_HEAD_BASE_REPO -e GH_AW_PR_HEAD_BASE_PR_NUMBER -e GH_AW_PR_HEAD_BASE_REF -e GH_AW_PR_HEAD_REPO -e GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_GUARD_MIN_INTEGRITY -e GITHUB_MCP_GUARD_REPOS -e GH_AW_SINK_VISIBILITY -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e RUNNER_TEMP -e RUNNER_TOOL_CACHE -e MCP_GATEWAY_ALLOWED_MOUNT_ROOTS -e GITHUB_AW_OTEL_TRACE_ID -e GITHUB_AW_OTEL_PARENT_SPAN_ID -e OTEL_EXPORTER_OTLP_HEADERS -e GRAFANA_SERVICE_ACCOUNT_TOKEN -e GRAFANA_URL -e SENTRY_ACCESS_TOKEN -e SENTRY_HOST -e SENTRY_OPENAI_API_KEY -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw -v '"${RUNNER_TEMP}"'/gh-aw/safeoutputs:'"${RUNNER_TEMP}"'/gh-aw/safeoutputs:rw ghcr.io/github/gh-aw-mcpg:v0.4.29@sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3'
 
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
-          cat << GH_AW_MCP_CONFIG_3d5e6b0832003ac2_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
+          cat << GH_AW_MCP_CONFIG_289f9ee00d290821_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
           {
             "mcpServers": {
               "github": {
@@ -877,7 +872,7 @@ jobs:
               },
               "safeoutputs": {
                 "container": "ghcr.io/github/gh-aw-node",
-                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw", "/tmp/gh-aw/work-queue.snapshot.json:/tmp/gh-aw/work-queue.snapshot.json:ro"],
                 "args": ["-w", "\${GITHUB_WORKSPACE}"],
                 "entrypoint": "sh",
                 "entrypointArgs": ["-c", "sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh"],
@@ -904,7 +899,9 @@ jobs:
                   "GITHUB_SHA": "\${GITHUB_SHA}",
                   "GITHUB_TOKEN": "\${GITHUB_TOKEN}",
                   "GITHUB_WORKSPACE": "\${GITHUB_WORKSPACE}",
-                  "RUNNER_TEMP": "\${RUNNER_TEMP}"
+                  "RUNNER_TEMP": "\${RUNNER_TEMP}",
+                  "GH_AW_WORK_QUEUE_ENABLED": "true",
+                  "GH_AW_WORK_QUEUE_ROLE": "worker"
                 },
                 "guard-policies": {
                   "write-sink": {
@@ -953,6 +950,16 @@ jobs:
                     "sink-visibility": "${GH_AW_SINK_VISIBILITY}"
                   }
                 }
+              },
+              "work-queue": {
+                "container": "ghcr.io/github/gh-aw-node",
+                "mounts": ["${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro", "/tmp/gh-aw/work-queue.snapshot.json:/tmp/gh-aw/work-queue.snapshot.json:ro", "${RUNNER_TEMP}/gh-aw/safeoutputs/work-queue:${RUNNER_TEMP}/gh-aw/safeoutputs/work-queue:rw"],
+                "env": {
+                  "RUNNER_TEMP": "\${RUNNER_TEMP}",
+                  "GH_AW_WORK_QUEUE_ROLE": "worker"
+                },
+                "entrypoint": "node",
+                "entrypointArgs": ["${RUNNER_TEMP}/gh-aw/actions/work_queue_mcp_server.cjs"]
               }
             },
             "gateway": {
@@ -968,7 +975,7 @@ jobs:
               }
             }
           }
-          GH_AW_MCP_CONFIG_3d5e6b0832003ac2_EOF
+          GH_AW_MCP_CONFIG_289f9ee00d290821_EOF
       - name: Mount MCP servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true
@@ -1216,7 +1223,17 @@ jobs:
           GATEWAY_PID: ${{ steps.start-mcp-gateway.outputs.gateway-pid }}
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/stop_mcp_gateway.sh" "$GATEWAY_PID"
+      - name: Collect work queue intents
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'collect_work_queue_intents.cjs'));
+            main({ core });
       - name: Redact secrets in logs
+        id: redact_secrets
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -1246,6 +1263,17 @@ jobs:
         run: |
           mkdir -p /tmp/gh-aw
           cp "$GH_AW_SAFE_OUTPUTS" /tmp/gh-aw/safeoutputs.jsonl 2>/dev/null || true
+      - name: Copy work queue claim finish intent
+        if: always()
+        env:
+          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+        run: |
+          finish_intent_dir="$(dirname "$GH_AW_SAFE_OUTPUTS")/work-queue"
+          if cp "$finish_intent_dir/work-queue.finish.jsonl" /tmp/gh-aw/work-queue.finish.jsonl 2>/dev/null; then
+            echo 'Work queue: copied finish intent into agent artifact'
+          else
+            echo 'Work queue: no finish intent to copy (tool not called or file unavailable)'
+          fi
       - name: Ingest agent output
         id: collect_output
         if: always()
@@ -1362,7 +1390,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1384,6 +1412,17 @@ jobs:
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json
+            /tmp/gh-aw/work-queue.finish.jsonl
+            /tmp/gh-aw/work-queue.intents.jsonl
+            /tmp/gh-aw/claims/**/*.txt
+            /tmp/gh-aw/claims/**/*.json
+            /tmp/gh-aw/claims/**/*.log
+            /tmp/gh-aw/claims/**/*.md
+            /tmp/gh-aw/claims/**/*.mdx
+            /tmp/gh-aw/claims/**/*.yml
+            /tmp/gh-aw/claims/**/*.jsonl
+            /tmp/gh-aw/claims/**/*.patch
+            /tmp/gh-aw/claims/**/*.html
             /tmp/gh-aw/aw-*.patch
             /tmp/gh-aw/aw-*.bundle
             /tmp/gh-aw/awf-config.json
@@ -1411,9 +1450,7 @@ jobs:
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
-      discussions: write
-      issues: write
-      pull-requests: read
+      contents: read
     concurrency:
       group: "gh-aw-conclusion-daily-token-consumption-report"
       cancel-in-progress: false
@@ -1494,32 +1531,23 @@ jobs:
           pattern: evals
           merge-multiple: true
           path: /tmp/gh-aw/evals/
-      - name: Process no-op messages
-        id: noop
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_NOOP_MAX: "2"
-          GH_AW_WORKFLOW_NAME: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-token-consumption-report.md"
-          GH_AW_TRACKER_ID: "daily-token-consumption-report"
-          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_NOOP_REPORT_AS_ISSUE: "false"
-          GH_AW_AIC: ${{ needs.agent.outputs.aic }}
-          GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
-          GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
-          GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}
-          GH_AW_WORKFLOW_ID: "daily-token-consumption-report"
+      - name: Download activation artifact for work queue summary
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          name: activation
+          path: ${{ runner.temp }}/gh-aw-activation
+      - name: Summarize work queue activity
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'handle_noop_message.cjs'));
-            await main();
+            const { main } = require(path.join(actionsDir, 'work_queue_summary.cjs'));
+            await main({ core, githubClient: github, context, snapshotPath: '${{ runner.temp }}/gh-aw-activation/work-queue.snapshot.json' });
       - name: Log detection run
         id: detection_runs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1540,206 +1568,6 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'handle_detection_runs.cjs'));
             await main();
-      - name: Record missing tool
-        id: missing_tool
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_MISSING_TOOL_CREATE_ISSUE: "true"
-          GH_AW_WORKFLOW_NAME: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-token-consumption-report.md"
-          GH_AW_TRACKER_ID: "daily-token-consumption-report"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'missing_tool.cjs'));
-            await main();
-      - name: Record incomplete
-        id: report_incomplete
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE: "true"
-          GH_AW_WORKFLOW_NAME: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-token-consumption-report.md"
-          GH_AW_TRACKER_ID: "daily-token-consumption-report"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'report_incomplete_handler.cjs'));
-            await main();
-      - name: Handle agent failure
-        id: handle_agent_failure
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-token-consumption-report.md"
-          GH_AW_TRACKER_ID: "daily-token-consumption-report"
-          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "daily-token-consumption-report"
-          GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "12"
-          GH_AW_ENGINE_ID: "goose"
-          GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
-          GH_AW_AI_CREDITS_RATE_LIMIT_ERROR: ${{ needs.agent.outputs.ai_credits_rate_limit_error || 'false' }}
-          GH_AW_UNKNOWN_MODEL_AI_CREDITS: ${{ needs.agent.outputs.unknown_model_ai_credits || 'false' }}
-          GH_AW_AIC: ${{ needs.agent.outputs.aic }}
-          GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
-          GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
-          GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
-          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
-          GH_AW_CREATE_DISCUSSION_ERRORS: ${{ needs.safe_outputs.outputs.create_discussion_errors }}
-          GH_AW_CREATE_DISCUSSION_ERROR_COUNT: ${{ needs.safe_outputs.outputs.create_discussion_error_count }}
-          GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
-          GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.activation.outputs.oauth_token_check_failed }}
-          GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.activation.outputs.stale_lock_file_failed }}
-          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
-          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
-          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
-          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
-          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}
-          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
-          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
-          GH_AW_GROUP_REPORTS: "false"
-          GH_AW_FAILURE_REPORT_AS_ISSUE: "true"
-          GH_AW_MISSING_TOOL_REPORT_AS_FAILURE: "true"
-          GH_AW_MISSING_DATA_REPORT_AS_FAILURE: "true"
-          GH_AW_TIMEOUT_MINUTES: "30"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'handle_agent_failure.cjs'));
-            await main();
-      - name: Report failed jobs
-        id: report_failed_jobs
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-token-consumption-report.md"
-          GH_AW_TRACKER_ID: "daily-token-consumption-report"
-          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_JOB_RESULTS: ${{ toJSON(needs) }}
-          GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"Activation\",\"agent\":\"Agent\",\"check_token_telemetry\":\"Check token telemetry\",\"conclusion\":\"Conclusion\",\"detection\":\"Detection\",\"evals\":\"Evaluations\",\"pre_activation\":\"Pre-activation\",\"push_evals_state\":\"Push evaluations state\",\"push_experiments_state\":\"Push experiments state\",\"push_ledger_changes\":\"Push ledger changes\",\"push_repo_memory\":\"Push repository memory\",\"safe_outputs\":\"Safe outputs\",\"send_slack_message\":\"Send Slack message\",\"unlock\":\"Unlock\",\"update_cache_memory\":\"Update cache memory\",\"update_drive_memory\":\"Update drive memory\",\"upload_assets\":\"Upload assets\",\"upload_code_coverage\":\"Upload code coverage\",\"upload_code_scanning_sarif\":\"Upload code scanning results\"}"
-          GH_AW_REPORT_FAILED_JOBS: "true"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'report_failed_jobs.cjs'));
-            await main();
-      - name: Collect usage artifact files
-        if: always()
-        continue-on-error: true
-        env:
-          GH_AW_DETECTION_JOB_RESULT: ${{ needs.detection.result }}
-          GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
-          GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
-      - name: Generate usage activity summary and unified session
-        if: always()
-        continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
-          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
-          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
-          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}
-          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'generate_usage_artifacts.cjs'));
-            await main();
-      - name: Upload usage artifact
-        id: upload-usage-artifact
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: usage
-          path: |
-            /tmp/gh-aw/usage/aw_session.jsonl
-            /tmp/gh-aw/usage/aw_info.json
-            /tmp/gh-aw/usage/aw-info.jsonl
-            /tmp/gh-aw/usage/agent_usage.json
-            /tmp/gh-aw/usage/agent_usage.jsonl
-            /tmp/gh-aw/usage/detection_usage.jsonl
-            /tmp/gh-aw/usage/evals.jsonl
-            /tmp/gh-aw/usage/graders/grader_manifest.json
-            /tmp/gh-aw/usage/graders/grader_results.json
-            /tmp/gh-aw/usage/github_rate_limits.jsonl
-            /tmp/gh-aw/usage/agent/token_usage.jsonl
-            /tmp/gh-aw/usage/agent/model-routing.jsonl
-            /tmp/gh-aw/usage/agent/execution.json
-            /tmp/gh-aw/usage/detection/token_usage.jsonl
-            /tmp/gh-aw/usage/detection/execution.json
-            /tmp/gh-aw/usage/detection/detection_result.json
-            /tmp/gh-aw/usage/evals/token_usage.jsonl
-            /tmp/gh-aw/usage/evals/execution.json
-            /tmp/gh-aw/usage/experiment/state.jsonl
-            /tmp/gh-aw/usage/experiment/state.json
-            /tmp/gh-aw/usage/experiment/assignments.json
-            /tmp/gh-aw/usage/activity/summary.json
-          if-no-files-found: ignore
-          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
-      - name: Wait before retrying usage artifact upload
-        if: always() && steps.upload-usage-artifact.outcome == 'failure'
-        run: sleep 10
-      - name: Retry upload usage artifact
-        id: upload-usage-artifact-retry
-        if: always() && steps.upload-usage-artifact.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: usage
-          path: |
-            /tmp/gh-aw/usage/aw_session.jsonl
-            /tmp/gh-aw/usage/aw_info.json
-            /tmp/gh-aw/usage/aw-info.jsonl
-            /tmp/gh-aw/usage/agent_usage.json
-            /tmp/gh-aw/usage/agent_usage.jsonl
-            /tmp/gh-aw/usage/detection_usage.jsonl
-            /tmp/gh-aw/usage/evals.jsonl
-            /tmp/gh-aw/usage/graders/grader_manifest.json
-            /tmp/gh-aw/usage/graders/grader_results.json
-            /tmp/gh-aw/usage/github_rate_limits.jsonl
-            /tmp/gh-aw/usage/agent/token_usage.jsonl
-            /tmp/gh-aw/usage/agent/model-routing.jsonl
-            /tmp/gh-aw/usage/agent/execution.json
-            /tmp/gh-aw/usage/detection/token_usage.jsonl
-            /tmp/gh-aw/usage/detection/execution.json
-            /tmp/gh-aw/usage/detection/detection_result.json
-            /tmp/gh-aw/usage/evals/token_usage.jsonl
-            /tmp/gh-aw/usage/evals/execution.json
-            /tmp/gh-aw/usage/experiment/state.jsonl
-            /tmp/gh-aw/usage/experiment/state.json
-            /tmp/gh-aw/usage/experiment/assignments.json
-            /tmp/gh-aw/usage/activity/summary.json
-          if-no-files-found: ignore
-          overwrite: true
-          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     name: detection
@@ -2544,6 +2372,8 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
+      actions: write
+      contents: write
       discussions: write
       issues: write
     timeout-minutes: 45
@@ -2565,13 +2395,15 @@ jobs:
       GH_AW_WORKFLOW_ID: "daily-token-consumption-report"
       GH_AW_WORKFLOW_NAME: "Daily AIC Consumption Report (Sentry + Grafana OTel)"
       GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-token-consumption-report.md"
+      GH_AW_WORK_QUEUE_ENABLED: "true"
+      GH_AW_WORK_QUEUE_INTENT_ORIGIN: "${{ needs.agent.outputs.work_queue_origin }}"
+      GH_AW_WORK_QUEUE_ROLE: "worker"
+      GH_AW_WORK_QUEUE_SNAPSHOT: "/tmp/gh-aw/work-queue.snapshot.json"
     outputs:
       code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}
       code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
-      created_issue_number: ${{ steps.process_safe_outputs.outputs.created_issue_number }}
-      created_issue_url: ${{ steps.process_safe_outputs.outputs.created_issue_url }}
       process_safe_outputs_items_applied: ${{ steps.process_safe_outputs.outputs.items_applied }}
       process_safe_outputs_items_cancelled: ${{ steps.process_safe_outputs.outputs.items_cancelled }}
       process_safe_outputs_items_deferred: ${{ steps.process_safe_outputs.outputs.items_deferred }}
@@ -2624,6 +2456,45 @@ jobs:
           if [ -f "/tmp/gh-aw/agent_output.json" ]; then
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
+      - name: Download activation artifact for work queue
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: activation
+          path: /tmp/gh-aw/
+      - name: Reconcile work queue claim
+        id: work_queue_claim_reconciliation
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "worker"
+          GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'finish_work_queue_claim.cjs'));
+            await main({ core, github, context, requireAssignment: true });
+      - name: Process trusted work queue controls
+        id: work_queue_controls
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "worker"
+          GH_AW_WORK_QUEUE_INTENTS: /tmp/gh-aw/work-queue.intents.jsonl
+          GH_AW_WORK_QUEUE_CONTROL_CONFIG: "{\"aw_context_workflows\":[\"daily-token-consumption-report\"],\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"daily-token-consumption-report\"]}"
+        with:
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'work_queue_control_adapter.cjs'));
+            const config = JSON.parse(process.env.GH_AW_WORK_QUEUE_CONTROL_CONFIG);
+            await main({ core, github, context, config, maxDispatches: Number(process.env.GH_AW_WORK_QUEUE_DISPATCH_BUDGET || 1), requireAssignment: true });
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
         shell: bash
@@ -2643,7 +2514,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.githubusercontent.com,*.grafana.net,*.sentry.io,api.npms.io,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,bun.sh,cdn.jsdelivr.net,codeload.github.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,deb.nodesource.com,deno.land,docs.github.com,esm.sh,get.pnpm.io,github-cloud.githubusercontent.com,github-cloud.s3.amazonaws.com,github.blog,github.com,github.githubassets.com,googleapis.deno.dev,googlechromelabs.github.io,json-schema.org,json.schemastore.org,jsr.io,keyserver.ubuntu.com,lfs.github.com,nodejs.org,npm.pkg.github.com,npmjs.com,npmjs.org,objects.githubusercontent.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,patch-diff.githubusercontent.com,patchdiff.githubusercontent.com,ppa.launchpad.net,raw.githubusercontent.com,registry.bower.io,registry.npmjs.com,registry.npmjs.org,registry.yarnpkg.com,repo.yarnpkg.com,s.symcb.com,s.symcd.com,security.ubuntu.com,skimdb.npmjs.com,storage.googleapis.com,telemetry.vercel.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com,www.npmjs.com,www.npmjs.org,yarnpkg.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[token-consumption] \"},\"create_issue\":{\"close_older_issues\":true,\"expires\":24,\"labels\":[\"automation\",\"observability\",\"telemetry\"],\"max\":1,\"title_prefix\":\"[token-consumption] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[token-consumption] \"},\"create_report_incomplete_issue\":{},\"mentions\":{\"enabled\":false},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2654,8 +2525,24 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
-      - name: Upload Safe Outputs Items
+      - name: Redact secrets in logs
+        id: redact_secrets
         if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
+            await main();
+        env:
+          GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
+          SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Safe Outputs Items
+        if: always() && steps.redact_secrets.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: safe-outputs-items
@@ -2663,5 +2550,8 @@ jobs:
             /tmp/gh-aw/safe-output-items.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
+            /tmp/gh-aw/claims/*/safe-output-items.jsonl
+            /tmp/gh-aw/claims/*/temporary-id-map.json
+            /tmp/gh-aw/claims/*/safe-output-errors.json
           if-no-files-found: ignore
-          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}

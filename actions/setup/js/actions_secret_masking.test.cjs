@@ -34,6 +34,20 @@ describe("actions_secret_masking.cjs", () => {
     expect(setSecret).toHaveBeenCalledWith("derived-secret");
   });
 
+  it("retains the real core receiver and masks falsy scalar secrets without using the shim marker", () => {
+    const receivers = [];
+    const setSecret = vi.fn(function () {
+      receivers.push(this);
+    });
+    Object.defineProperty(setSecret, "__ghAwUnavailable", { value: false });
+    global.core = { setSecret };
+    maskSecret(0);
+    maskSecret(false);
+    for (const value of [null, undefined, ""]) maskSecret(value);
+    expect(setSecret.mock.calls).toEqual([["0"], ["false"]]);
+    expect(receivers).toEqual([global.core, global.core]);
+  });
+
   it("emits an add-mask workflow command in GitHub Actions when core.setSecret is unavailable", () => {
     process.env.GITHUB_ACTIONS = "true";
     global.core = {};

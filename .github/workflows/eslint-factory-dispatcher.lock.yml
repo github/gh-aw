@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"80dfb1f181eef8c248da66f6dbd33c36a840150c70c2f951ab6dd50f928d885c","body_hash":"0a22a2f46d94822003b9cc7b9f2d28704f3203577cf199a6f228231b713074e0","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.90"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44","digest":"sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44@sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44","digest":"sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44@sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44","digest":"sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44@sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.29","digest":"sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.29@sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["dispatch_workflow","eslint_miner","eslint_monster","eslint_refiner","missing_data","missing_tool","noop","report_incomplete"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_read"]}],"threat_detection":{"mode":"enabled"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"80dfb1f181eef8c248da66f6dbd33c36a840150c70c2f951ab6dd50f928d885c","body_hash":"0748285d57110b9f3215600877b04aaafa1d02693d0406609b6b3d4ac869c8d3","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.90"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44","digest":"sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44@sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44","digest":"sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44@sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44","digest":"sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44@sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.29","digest":"sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.29@sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["dispatch_workflow","eslint_miner","eslint_monster","eslint_refiner","missing_data","missing_tool","noop","report_incomplete"]},{"name":"work-queue","tools":["work_queue_claim_finish","work_queue_dispatch_next","work_queue_explain","work_queue_read","work_queue_submit"]}],"threat_detection":{"mode":"enabled"}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -105,6 +105,7 @@ jobs:
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
       stale_lock_file_failed: ${{ steps.check-lock-file.outputs.stale_lock_file_failed == 'true' }}
+      work_queue_origin: ${{ steps.work_queue_snapshot.outputs.work_queue_origin }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -343,7 +344,12 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
       - name: Snapshot work queue state
+        id: work_queue_snapshot
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "dispatcher"
+          GH_AW_WORK_QUEUE_DISPATCH_BUDGET: "3"
         with:
           script: |
             const path = require('path');
@@ -393,6 +399,7 @@ jobs:
     runs-on: ubuntu-latest
     # Permissions for the agent job (workflow permissions default to none).
     permissions:
+      actions: read
       contents: read
       copilot-requests: write
     concurrency:
@@ -414,6 +421,9 @@ jobs:
       GH_AW_PR_HEAD_REPO: ""
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
       GH_AW_WORKFLOW_ID_SANITIZED: eslintfactorydispatcher
+      GH_AW_WORK_QUEUE_ENABLED: "true"
+      GH_AW_WORK_QUEUE_INTENT_ORIGIN: "${{ needs.activation.outputs.work_queue_origin }}"
+      GH_AW_WORK_QUEUE_ROLE: "dispatcher"
     outputs:
       agentic_engine_timeout: ${{ steps.detect-agent-errors.outputs.agentic_engine_timeout || 'false' }}
       ai_credits_rate_limit_error: ${{ steps.parse-mcp-gateway.outputs.ai_credits_rate_limit_error || 'false' }}
@@ -437,6 +447,7 @@ jobs:
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
       shell_expansion_guard_rejected: ${{ steps.detect-agent-errors.outputs.shell_expansion_guard_rejected || 'false' }}
       unknown_model_ai_credits: ${{ steps.parse-mcp-gateway.outputs.unknown_model_ai_credits || 'false' }}
+      work_queue_origin: ${{ steps.work_queue_intent_origin.outputs.work_queue_origin }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -500,6 +511,17 @@ jobs:
         with:
           name: activation
           path: /tmp/gh-aw
+      - name: Capture authenticated work queue intent origin
+        id: work_queue_intent_origin
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'capture_work_queue_intent_origin.cjs'));
+            await main();
       - name: Configure Git credentials
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -568,7 +590,9 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"github-token\":\"${GH_AW_SECRET_GITHUB_TOKEN}\",\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${GH_AW_SECRET_GH_AW_GITHUB_TOKEN}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
+          GH_AW_SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}
+          GH_AW_SECRET_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           script: |
             const path = require('path');
@@ -583,95 +607,7 @@ jobs:
             {
               "description_suffixes": {},
               "repo_params": {},
-              "dynamic_tools": [
-                {
-                  "_workflow_name": "eslint-miner",
-                  "description": "Dispatch the 'eslint-miner' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository. Use the 'ref' parameter to target a specific branch or tag (allowed patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}).",
-                  "inputSchema": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "ref": {
-                        "description": "The git ref (branch, tag, or SHA) to dispatch the workflow on. Must match one of the configured allowed ref patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}. If omitted, the ref is resolved from the triggering context, including the pull request head for pull request comments.",
-                        "type": "string"
-                      },
-                      "work_queue": {
-                        "additionalProperties": false,
-                        "description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
-                        "properties": {
-                          "work_id": {
-                            "minLength": 1,
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "work_id"
-                        ],
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "name": "eslint_miner"
-                },
-                {
-                  "_workflow_name": "eslint-refiner",
-                  "description": "Dispatch the 'eslint-refiner' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository. Use the 'ref' parameter to target a specific branch or tag (allowed patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}).",
-                  "inputSchema": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "ref": {
-                        "description": "The git ref (branch, tag, or SHA) to dispatch the workflow on. Must match one of the configured allowed ref patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}. If omitted, the ref is resolved from the triggering context, including the pull request head for pull request comments.",
-                        "type": "string"
-                      },
-                      "work_queue": {
-                        "additionalProperties": false,
-                        "description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
-                        "properties": {
-                          "work_id": {
-                            "minLength": 1,
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "work_id"
-                        ],
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "name": "eslint_refiner"
-                },
-                {
-                  "_workflow_name": "eslint-monster",
-                  "description": "Dispatch the 'eslint-monster' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository. Use the 'ref' parameter to target a specific branch or tag (allowed patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}).",
-                  "inputSchema": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "ref": {
-                        "description": "The git ref (branch, tag, or SHA) to dispatch the workflow on. Must match one of the configured allowed ref patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}. If omitted, the ref is resolved from the triggering context, including the pull request head for pull request comments.",
-                        "type": "string"
-                      },
-                      "work_queue": {
-                        "additionalProperties": false,
-                        "description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
-                        "properties": {
-                          "work_id": {
-                            "minLength": 1,
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "work_id"
-                        ],
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "name": "eslint_monster"
-                }
-              ]
+              "dynamic_tools": []
             }
           GH_AW_VALIDATION_JSON: |
             {
@@ -773,7 +709,6 @@ jobs:
                 }
               }
             }
-          GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -832,7 +767,7 @@ jobs:
 
           mkdir -p "$HOME/.copilot"
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
-          cat << GH_AW_MCP_CONFIG_adfa20f8146f5ab5_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
+          cat << GH_AW_MCP_CONFIG_6e10a83e3f8acbc3_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
           {
             "mcpServers": {
               "github": {
@@ -855,7 +790,7 @@ jobs:
               "safeoutputs": {
                 "type": "stdio",
                 "container": "ghcr.io/github/gh-aw-node",
-                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw", "/tmp/gh-aw/work-queue.snapshot.json:/tmp/gh-aw/work-queue.snapshot.json:ro"],
                 "args": ["-w", "\${GITHUB_WORKSPACE}"],
                 "entrypoint": "sh",
                 "entrypointArgs": ["-c", "sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh"],
@@ -882,7 +817,9 @@ jobs:
                   "GITHUB_SHA": "\${GITHUB_SHA}",
                   "GITHUB_TOKEN": "\${GITHUB_TOKEN}",
                   "GITHUB_WORKSPACE": "\${GITHUB_WORKSPACE}",
-                  "RUNNER_TEMP": "\${RUNNER_TEMP}"
+                  "RUNNER_TEMP": "\${RUNNER_TEMP}",
+                  "GH_AW_WORK_QUEUE_ENABLED": "true",
+                  "GH_AW_WORK_QUEUE_ROLE": "dispatcher"
                 },
                 "guard-policies": {
                   "write-sink": {
@@ -895,11 +832,12 @@ jobs:
               },
               "work-queue": {
                 "type": "stdio",
-                "tools": ["work_queue_read", "work_queue_claim_finish"],
+                "tools": ["work_queue_read", "work_queue_explain", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"],
                 "container": "ghcr.io/github/gh-aw-node",
                 "mounts": ["${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro", "/tmp/gh-aw/work-queue.snapshot.json:/tmp/gh-aw/work-queue.snapshot.json:ro", "${RUNNER_TEMP}/gh-aw/safeoutputs/work-queue:${RUNNER_TEMP}/gh-aw/safeoutputs/work-queue:rw"],
                 "env": {
-                  "RUNNER_TEMP": "\${RUNNER_TEMP}"
+                  "RUNNER_TEMP": "\${RUNNER_TEMP}",
+                  "GH_AW_WORK_QUEUE_ROLE": "dispatcher"
                 },
                 "entrypoint": "node",
                 "entrypointArgs": ["${RUNNER_TEMP}/gh-aw/actions/work_queue_mcp_server.cjs"]
@@ -918,7 +856,7 @@ jobs:
               }
             }
           }
-          GH_AW_MCP_CONFIG_adfa20f8146f5ab5_EOF
+          GH_AW_MCP_CONFIG_6e10a83e3f8acbc3_EOF
       - name: Mount MCP servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true
@@ -1074,7 +1012,17 @@ jobs:
           GATEWAY_PID: ${{ steps.start-mcp-gateway.outputs.gateway-pid }}
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/stop_mcp_gateway.sh" "$GATEWAY_PID"
+      - name: Collect work queue intents
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'collect_work_queue_intents.cjs'));
+            main({ core });
       - name: Redact secrets in logs
+        id: redact_secrets
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -1226,7 +1174,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1252,6 +1200,16 @@ jobs:
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json
             /tmp/gh-aw/work-queue.finish.jsonl
+            /tmp/gh-aw/work-queue.intents.jsonl
+            /tmp/gh-aw/claims/**/*.txt
+            /tmp/gh-aw/claims/**/*.json
+            /tmp/gh-aw/claims/**/*.log
+            /tmp/gh-aw/claims/**/*.md
+            /tmp/gh-aw/claims/**/*.mdx
+            /tmp/gh-aw/claims/**/*.yml
+            /tmp/gh-aw/claims/**/*.jsonl
+            /tmp/gh-aw/claims/**/*.patch
+            /tmp/gh-aw/claims/**/*.html
             /tmp/gh-aw/aw-*.patch
             /tmp/gh-aw/aw-*.bundle
             /tmp/gh-aw/awf-config.json
@@ -1276,10 +1234,8 @@ jobs:
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      actions: write
+      actions: read
       contents: read
-      issues: write
-      pull-requests: read
     concurrency:
       group: "gh-aw-conclusion-eslint-factory-dispatcher"
       cancel-in-progress: false
@@ -1369,30 +1325,6 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { main } = require(path.join(actionsDir, 'work_queue_summary.cjs'));
             await main({ core, githubClient: github, context, snapshotPath: '${{ runner.temp }}/gh-aw-activation/work-queue.snapshot.json' });
-      - name: Process no-op messages
-        id: noop
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_NOOP_MAX: "2"
-          GH_AW_WORKFLOW_NAME: "ESLint Factory Dispatcher"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/eslint-factory-dispatcher.md"
-          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_NOOP_REPORT_AS_ISSUE: "true"
-          GH_AW_AIC: ${{ needs.agent.outputs.aic }}
-          GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
-          GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}
-          GH_AW_WORKFLOW_ID: "eslint-factory-dispatcher"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'handle_noop_message.cjs'));
-            await main();
       - name: Log detection run
         id: detection_runs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1412,209 +1344,6 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'handle_detection_runs.cjs'));
             await main();
-      - name: Record missing tool
-        id: missing_tool
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_MISSING_TOOL_CREATE_ISSUE: "true"
-          GH_AW_WORKFLOW_NAME: "ESLint Factory Dispatcher"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/eslint-factory-dispatcher.md"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'missing_tool.cjs'));
-            await main();
-      - name: Record incomplete
-        id: report_incomplete
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE: "true"
-          GH_AW_WORKFLOW_NAME: "ESLint Factory Dispatcher"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/eslint-factory-dispatcher.md"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'report_incomplete_handler.cjs'));
-            await main();
-      - name: Handle agent failure
-        id: handle_agent_failure
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "ESLint Factory Dispatcher"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/eslint-factory-dispatcher.md"
-          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "eslint-factory-dispatcher"
-          GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "12"
-          GH_AW_ENGINE_ID: "copilot"
-          GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
-          GH_AW_AI_CREDITS_RATE_LIMIT_ERROR: ${{ needs.agent.outputs.ai_credits_rate_limit_error || 'false' }}
-          GH_AW_UNKNOWN_MODEL_AI_CREDITS: ${{ needs.agent.outputs.unknown_model_ai_credits || 'false' }}
-          GH_AW_AIC: ${{ needs.agent.outputs.aic }}
-          GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
-          GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
-          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
-          GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
-          GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
-          GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}
-          GH_AW_MODEL_NOT_SUPPORTED_ERROR: ${{ needs.agent.outputs.model_not_supported_error }}
-          GH_AW_HTTP_400_RESPONSE_ERROR: ${{ needs.agent.outputs.http_400_response_error }}
-          GH_AW_MAX_CACHE_MISSES_EXCEEDED: ${{ needs.agent.outputs.max_cache_misses_exceeded }}
-          GH_AW_MISSING_MODEL_PRICING_ERROR: ${{ needs.agent.outputs.missing_model_pricing_error }}
-          GH_AW_MISSING_MODEL_PRICING_MODEL_NAME: ${{ needs.agent.outputs.missing_model_pricing_model_name }}
-          GH_AW_SHELL_EXPANSION_GUARD_REJECTED: ${{ needs.agent.outputs.shell_expansion_guard_rejected }}
-          GH_AW_ENGINE_API_HOSTS: "api.enterprise.githubcopilot.com,api.githubcopilot.com,api.business.githubcopilot.com,api.individual.githubcopilot.com"
-          GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
-          GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.activation.outputs.oauth_token_check_failed }}
-          GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.activation.outputs.stale_lock_file_failed }}
-          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
-          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
-          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
-          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
-          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}
-          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
-          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
-          GH_AW_GROUP_REPORTS: "false"
-          GH_AW_FAILURE_REPORT_AS_ISSUE: "true"
-          GH_AW_MISSING_TOOL_REPORT_AS_FAILURE: "true"
-          GH_AW_MISSING_DATA_REPORT_AS_FAILURE: "true"
-          GH_AW_TIMEOUT_MINUTES: "15"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'handle_agent_failure.cjs'));
-            await main();
-      - name: Report failed jobs
-        id: report_failed_jobs
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "ESLint Factory Dispatcher"
-          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/eslint-factory-dispatcher.md"
-          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_JOB_RESULTS: ${{ toJSON(needs) }}
-          GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"Activation\",\"agent\":\"Agent\",\"check_token_telemetry\":\"Check token telemetry\",\"conclusion\":\"Conclusion\",\"detection\":\"Detection\",\"evals\":\"Evaluations\",\"pre_activation\":\"Pre-activation\",\"push_evals_state\":\"Push evaluations state\",\"push_experiments_state\":\"Push experiments state\",\"push_ledger_changes\":\"Push ledger changes\",\"push_repo_memory\":\"Push repository memory\",\"safe_outputs\":\"Safe outputs\",\"send_slack_message\":\"Send Slack message\",\"unlock\":\"Unlock\",\"update_cache_memory\":\"Update cache memory\",\"update_drive_memory\":\"Update drive memory\",\"upload_assets\":\"Upload assets\",\"upload_code_coverage\":\"Upload code coverage\",\"upload_code_scanning_sarif\":\"Upload code scanning results\"}"
-          GH_AW_REPORT_FAILED_JOBS: "true"
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'report_failed_jobs.cjs'));
-            await main();
-      - name: Collect usage artifact files
-        if: always()
-        continue-on-error: true
-        env:
-          GH_AW_DETECTION_JOB_RESULT: ${{ needs.detection.result }}
-          GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
-          GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
-      - name: Generate usage activity summary and unified session
-        if: always()
-        continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
-          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
-          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
-          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}
-          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'generate_usage_artifacts.cjs'));
-            await main();
-      - name: Upload usage artifact
-        id: upload-usage-artifact
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: usage
-          path: |
-            /tmp/gh-aw/usage/aw_session.jsonl
-            /tmp/gh-aw/usage/aw_info.json
-            /tmp/gh-aw/usage/aw-info.jsonl
-            /tmp/gh-aw/usage/agent_usage.json
-            /tmp/gh-aw/usage/agent_usage.jsonl
-            /tmp/gh-aw/usage/detection_usage.jsonl
-            /tmp/gh-aw/usage/evals.jsonl
-            /tmp/gh-aw/usage/graders/grader_manifest.json
-            /tmp/gh-aw/usage/graders/grader_results.json
-            /tmp/gh-aw/usage/github_rate_limits.jsonl
-            /tmp/gh-aw/usage/agent/token_usage.jsonl
-            /tmp/gh-aw/usage/agent/model-routing.jsonl
-            /tmp/gh-aw/usage/agent/execution.json
-            /tmp/gh-aw/usage/detection/token_usage.jsonl
-            /tmp/gh-aw/usage/detection/execution.json
-            /tmp/gh-aw/usage/detection/detection_result.json
-            /tmp/gh-aw/usage/evals/token_usage.jsonl
-            /tmp/gh-aw/usage/evals/execution.json
-            /tmp/gh-aw/usage/experiment/state.jsonl
-            /tmp/gh-aw/usage/experiment/state.json
-            /tmp/gh-aw/usage/experiment/assignments.json
-            /tmp/gh-aw/usage/activity/summary.json
-          if-no-files-found: ignore
-          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
-      - name: Wait before retrying usage artifact upload
-        if: always() && steps.upload-usage-artifact.outcome == 'failure'
-        run: sleep 10
-      - name: Retry upload usage artifact
-        id: upload-usage-artifact-retry
-        if: always() && steps.upload-usage-artifact.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: usage
-          path: |
-            /tmp/gh-aw/usage/aw_session.jsonl
-            /tmp/gh-aw/usage/aw_info.json
-            /tmp/gh-aw/usage/aw-info.jsonl
-            /tmp/gh-aw/usage/agent_usage.json
-            /tmp/gh-aw/usage/agent_usage.jsonl
-            /tmp/gh-aw/usage/detection_usage.jsonl
-            /tmp/gh-aw/usage/evals.jsonl
-            /tmp/gh-aw/usage/graders/grader_manifest.json
-            /tmp/gh-aw/usage/graders/grader_results.json
-            /tmp/gh-aw/usage/github_rate_limits.jsonl
-            /tmp/gh-aw/usage/agent/token_usage.jsonl
-            /tmp/gh-aw/usage/agent/model-routing.jsonl
-            /tmp/gh-aw/usage/agent/execution.json
-            /tmp/gh-aw/usage/detection/token_usage.jsonl
-            /tmp/gh-aw/usage/detection/execution.json
-            /tmp/gh-aw/usage/detection/detection_result.json
-            /tmp/gh-aw/usage/evals/token_usage.jsonl
-            /tmp/gh-aw/usage/evals/execution.json
-            /tmp/gh-aw/usage/experiment/state.jsonl
-            /tmp/gh-aw/usage/experiment/state.json
-            /tmp/gh-aw/usage/experiment/assignments.json
-            /tmp/gh-aw/usage/activity/summary.json
-          if-no-files-found: ignore
-          overwrite: true
-          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     name: detection
@@ -1946,6 +1675,10 @@ jobs:
       GH_AW_WORKFLOW_ID: "eslint-factory-dispatcher"
       GH_AW_WORKFLOW_NAME: "ESLint Factory Dispatcher"
       GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/eslint-factory-dispatcher.md"
+      GH_AW_WORK_QUEUE_ENABLED: "true"
+      GH_AW_WORK_QUEUE_INTENT_ORIGIN: "${{ needs.agent.outputs.work_queue_origin }}"
+      GH_AW_WORK_QUEUE_ROLE: "dispatcher"
+      GH_AW_WORK_QUEUE_SNAPSHOT: "/tmp/gh-aw/work-queue.snapshot.json"
     outputs:
       code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}
       code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
@@ -2013,12 +1746,38 @@ jobs:
       - name: Reconcile work queue claim
         id: work_queue_claim_reconciliation
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "dispatcher"
+          GH_AW_WORK_QUEUE_DISPATCH_BUDGET: "3"
+          GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
         with:
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'finish_work_queue_claim.cjs'));
             await main({ core, github, context });
+      - name: Process trusted work queue controls
+        id: work_queue_controls
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "dispatcher"
+          GH_AW_WORK_QUEUE_DISPATCH_BUDGET: "3"
+          GH_AW_WORK_QUEUE_INTENTS: /tmp/gh-aw/work-queue.intents.jsonl
+          GH_AW_WORK_QUEUE_CONTROL_CONFIG: "{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\"],\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-monster\",\"eslint-refiner\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]}"
+        with:
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'work_queue_control_adapter.cjs'));
+            const config = JSON.parse(process.env.GH_AW_WORK_QUEUE_CONTROL_CONFIG);
+            await main({ core, github, context, config, maxDispatches: Number(process.env.GH_AW_WORK_QUEUE_DISPATCH_BUDGET || 1) });
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
         shell: bash
@@ -2029,7 +1788,6 @@ jobs:
           GH_HOST="${GH_HOST#http://}"
           echo "GH_HOST=${GH_HOST}" >> "$GITHUB_ENV"
       - name: Process Safe Outputs
-        if: ${{ steps.work_queue_claim_reconciliation.outputs.authorized == 'true' }}
         id: process_safe_outputs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -2039,7 +1797,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2051,7 +1809,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
       - name: Upload Safe Outputs Items
-        if: ${{ steps.work_queue_claim_reconciliation.outputs.authorized == 'true' && always() }}
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: safe-outputs-items

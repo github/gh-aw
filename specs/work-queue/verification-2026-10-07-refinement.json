@@ -1,0 +1,1078 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-07T23:16:04.326Z",
+  "baseline_commit": "4ae415cc7046e215b6056fed90c26e4b915ef06b",
+  "checkpoints": ["c30f4d78e4", "f1f35cbc03"],
+  "merged_main": "303b4028106137af47924a4bc079b8d3fdd8884c",
+  "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+  "java_version": "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment Homebrew (build 21.0.12.1)\nOpenJDK 64-Bit Server VM Homebrew (build 21.0.12.1, mixed mode, sharing)\n",
+  "settings": {
+    "workers": 2,
+    "seed": 1,
+    "fp": 0,
+    "heap": "1g"
+  },
+  "source_sha256": {
+    "specs/work-queue/BatchedAssignmentWitness.cfg": "572542f19d65213ff03d535f3f84442ad7ddf898acd179627085a4cdb3656183",
+    "specs/work-queue/BrokenAssignmentHandle.cfg": "829c90e164c6d732fcbddffa80eee0a6a0fb6d2549b4c8b8d7fc7fc776c0d87f",
+    "specs/work-queue/BrokenBatchCAS.cfg": "8b66a21c5a886731f3165baff1472704ac1db22d81cb3260f7236d5ff13f9525",
+    "specs/work-queue/BrokenBatchRelease.cfg": "e3870627e3f5b4189501857d8e20c73c2226ee26911aad36826a9e0a054a1309",
+    "specs/work-queue/BrokenBatchSelection.cfg": "bbb2b13754ea21281cdcf9577c340fbf2f975b73065b490d15cc972ab2042e0d",
+    "specs/work-queue/BrokenCAS.cfg": "452fab869a2eba57299f896ee4cdae6abedaeb0cb99bfab71ed5fdfcc9f1fc9a",
+    "specs/work-queue/BrokenCancelledClaimOutput.cfg": "3e07dbb9979f88f97658a9498f0c1e2430fb8bdde2443f8c8b0f20761f30fb15",
+    "specs/work-queue/BrokenClaimEffects.cfg": "5427ef2938d77f7401cee4a54bac3bd752535a3326e4d9ab9ae4ee23e38fdd5c",
+    "specs/work-queue/BrokenDAGCycle.cfg": "e79ea5f8f45df35d53de14bf8946734d1fb01da3fcbbb4a073650200c1b88044",
+    "specs/work-queue/BrokenDAGDependency.cfg": "d5282126d536e0512600863732f2e4571d26241bc6015295a995bc13edb9c5ff",
+    "specs/work-queue/BrokenDAGResult.cfg": "c715c02b0bbeacde683e26860739e7a6715f1063b3daf3eed044cdb934234532",
+    "specs/work-queue/BrokenExternalDependency.cfg": "fe3719d6ddadd54dcb66b25c8ceb91f0f4cf69781a604af0aa887635cd4f2b66",
+    "specs/work-queue/BrokenForeignClaimScope.cfg": "976e9e45297afa683c2c0bc23b22c706d0671bdad5e4ff1d61d01f5e5477fd93",
+    "specs/work-queue/BrokenLastOpenClaimScope.cfg": "245eb065322a2eb8a9c78f11be391fae1a5154c893af58646487bf57471728a1",
+    "specs/work-queue/BrokenLifecycleActivation.cfg": "5180c61fe4d9b97b8286129111e8b4fcac3837375d2a2267a10c30e8af8b25e2",
+    "specs/work-queue/BrokenLifecycleBinding.cfg": "fc981e98303358c13c67703f5b2642f2e8db15bf4716997fdafc2ac62934059f",
+    "specs/work-queue/BrokenLifecycleConflictRelease.cfg": "b3ef278868380148d32df978bb88f3b366d5bf72464a547af89b16899ad81027",
+    "specs/work-queue/BrokenLifecycleControl.cfg": "74d87a4eed3000fc3d6ab572eace68801912b2ad5628c8f2a08d9669dfc4ff83",
+    "specs/work-queue/BrokenLifecycleDelivery.cfg": "0a270bd18aee35687f6662dcae29278dd9e27f470570aa841a63cd2b09282748",
+    "specs/work-queue/BrokenLifecyclePrefix.cfg": "645b278655e1985a49e28e1cc6d079e3164e0a037a8ab351b795a390bc018d87",
+    "specs/work-queue/BrokenLifecycleRelease.cfg": "59eb87c07f8a89c9716ec7a1c286ca28b6f83fe5bad32ade55ed6b9f7495e49e",
+    "specs/work-queue/BrokenLifecycleReplacement.cfg": "8f80a5637686cddc542b31c7430ba8e78c6d8b62db8954ea24c9471770c32f67",
+    "specs/work-queue/BrokenLifecycleRerun.cfg": "12619bdbe510995d7f28f4229ddfdb7a5325d7e6e575bf5bb2e5d1d60cb7f842",
+    "specs/work-queue/BrokenLifecycleSender.cfg": "9ef38c4c90fd9214ab49dd254a0cdf2e16b8d1e55b8a28de41870b9b0e264760",
+    "specs/work-queue/BrokenLifecycleVerificationBudget.cfg": "b9d7b1bcf74945c056a6ec89cebb6bb8a7bae186ee9f47ee052b65f3b9a2a26c",
+    "specs/work-queue/BrokenMissingClaimScope.cfg": "97a03ac4a680558b95e9c76b51d7a9261f6b9e63f985f6bbe0cec67e58557c76",
+    "specs/work-queue/BrokenMixedDAGAdmission.cfg": "b04e08d6252827e1181a07eea7fdac323be72a28a52e851c6bc69cf3912e0b12",
+    "specs/work-queue/BrokenPRClosedAsMerged.cfg": "b9b126c291d31615283c94557633448e32c6054f4cb89a812b8f82ab7c82c08d",
+    "specs/work-queue/BrokenProjection.cfg": "0fca6075f3d0f080eacd302f5f7a83ca9dd2dd1e7a7759dff04469fec0027d99",
+    "specs/work-queue/BrokenQueueSelection.cfg": "759f74439a74758600dfbd6b1fad9257adfadaf06a67bc86b8ca0c3435c6007d",
+    "specs/work-queue/BrokenServiceShare.cfg": "73ae48c06bd452a51fe7297bf218a2e34a80bf25c6655ef9848576b5b64e5d57",
+    "specs/work-queue/BrokenTerminal.cfg": "02a611f50ca8a3a70e2bc262f38101c5c6f98ee14e50d2bb1bdd33ddefb9db25",
+    "specs/work-queue/ClaimScopeMixed.cfg": "f4989871c56cd78f5c2b9d872b61c0292523a29f5869a0d5d1970a35f4d6404a",
+    "specs/work-queue/ClaimScopeSingle.cfg": "df25d9c9b86018c3fd31f6d94f524cea3829f8a4180377b85d57cffc3c7af40f",
+    "specs/work-queue/ClaimScopedWorker.tla": "9816e82533ba5dd9b925a93bb3fb6ea543f68436bfbbc2debbbd0d85f534351e",
+    "specs/work-queue/CompetingClaimsWitness.cfg": "3f570eea2dd0acc352d2d8b0e40256343c4089c034f584ce2413cc90cecda57a",
+    "specs/work-queue/DAGJoinWitness.cfg": "5a807b4c175e5fa80d24ffcebe80dd2c70954e917b7b4bbe1df0518d3974392f",
+    "specs/work-queue/ExternalEffectWitness.cfg": "67716818ad24c4979b86f81fe62b9929883801ef7d3c6e4a647be9b952e9dbb4",
+    "specs/work-queue/FairBatch.cfg": "8b12ec55c9379d73a84b0d1be34af7407b8ce4cecf49271f0fa1d27d36088b04",
+    "specs/work-queue/FairDAGChain.cfg": "96192dfb3b7cd0261c77f3a8817f14d3985c08401f524c84bfd6b943d9561758",
+    "specs/work-queue/FairDAGFork.cfg": "ec1e7079a81ab071e376e8aa996fb0ebaeb52a80db3f684d05a987ecd61df094",
+    "specs/work-queue/FairDAGForward.cfg": "5d77de62f052b81a6a08fb74d845ad290997e2097e5a82c6f619e1f0db2b1128",
+    "specs/work-queue/FairDAGGitHub.cfg": "3b21f925b61a5bbd4c935311b9523cbcc330c773f02f178b58e1fdc968c1d4e2",
+    "specs/work-queue/FairGitHubDependencies.cfg": "cac9d9ef745d2033c67489f9fef90fe18ae0560e24f982db8d1cff5e0b159b32",
+    "specs/work-queue/FairPriority.cfg": "47d9066ab9b4ac02253550f16d8835477d3f51d25ceb233146ea14156e590c82",
+    "specs/work-queue/FairStrict.cfg": "2945050fddf02ea1ed0a67db2c9db61d1b9bb0ac848f4c4938749d66a9a64805",
+    "specs/work-queue/FairThreeClaim.cfg": "597afa3a50e12a9e927a3b7503de62a8af9a8f0b8d10c75126412244fa1404bb",
+    "specs/work-queue/FairWorkQueue.tla": "1f7dc1346d65720f6d5f74c5abe34e10f2ec68520b6e18d9b1f96037cc59c012",
+    "specs/work-queue/LifecycleActivationWitness.cfg": "3619de235b5648f86a295a3ef359ae469f4d9461e27cc436b967a10d8e459df3",
+    "specs/work-queue/LifecycleConflictWitness.cfg": "8e7b3285f29a9d023f0707b4f8ef4ad98806e586e4b2eb9dd06bfc879870d3ba",
+    "specs/work-queue/LifecycleMixedDAGWitness.cfg": "d61ec9c8a46783c7dcf18b990362a1bff79a151e67dd5053b4cb36b2122599ea",
+    "specs/work-queue/LifecyclePacked.cfg": "fcc212f6a106ec716d014168d02d5c5cf829d035886a86d9fbbfafc178a5f473",
+    "specs/work-queue/LifecycleRecurring.cfg": "8a1f632fb623c14c8076cbbf32aaa8049f2909436b758b876104c1143469a1ab",
+    "specs/work-queue/MixedClaimDAGWitness.cfg": "9797cebb852180dac91154cd85c7c921a0f36ec4893ffd2e51d309bdfc131ce6",
+    "specs/work-queue/PartialCompletionWitness.cfg": "a83baa101cd1a8379bd13cbe862747fde981eb83c3adde53130ccd06e63e9626",
+    "specs/work-queue/QueueLifecycle.tla": "5850faf4db29c207dc368ef4da00f731c53a2bfa9f72718261f09585664b5be7",
+    "specs/work-queue/QueueOrdering.cfg": "84b58855aa37b1487e8163e1d539e891f66fba534e93bf5d2bf0a6278aea2ba3",
+    "specs/work-queue/QueueService.tla": "e5dd3054dffc356e39785f51705fdb97eb464ad4c9d52143c75ce1e689aac83c",
+    "specs/work-queue/Recovery.cfg": "f6cef16b1ceef141fce309f7cb9a8a8c1da31aa99e14c1949ba6a9b74500f96f",
+    "specs/work-queue/RecoveryWitness.cfg": "d912de84ef6c0754d301a6567e9493d58df9306bce3fca8cc654c4b5e6a73629",
+    "specs/work-queue/ServiceDynamic.cfg": "f2de21384a402fe0f83bd1d3d7b66d6c7fd28d9c6eff9c4aa296fcb0083b036a",
+    "specs/work-queue/ServiceFixed.cfg": "0b8ec95784d60e3b90e21a0a7af2e4d29fdf70e95827d5c6ac4a15f265071098",
+    "specs/work-queue/SingleClaimScopeWitness.cfg": "67e508f999ff85568932c423a67da9b1e3c7ec7747d742357b84c439eee386fa",
+    "specs/work-queue/StrictServiceStarvation.cfg": "8a562f3b788a6a2debf30ab1c91a71460aa5f80f683fd54b3cc82e8068e66fb3",
+    "specs/work-queue/UnfairServiceStarvation.cfg": "0daf54d7c761df9f9fca6a717cd4a1e48ae74672c254a9d2e0a4c0c86151def4",
+    "specs/work-queue/UnpackableServiceStarvation.cfg": "872ebc19d4d07c7d61630f0aaa7cf0a5f9611591d426b7daa7108f7acabd298d",
+    "specs/work-queue/WeakOrderingWitness.cfg": "75d99577e9d2b9b1649eb0705de6c3336b939233a8664645b33ebda6e3b55ad7",
+    "specs/work-queue/WorkQueue.cfg": "774415d9e95b67132b1412c983aea4a914ff969c0faf22cfc5badec6c6e2df7b",
+    "specs/work-queue/WorkQueue.tla": "bb06bb21b34e1e157df14c9fbdbea5640a1431fe8bcef469902e1163ee1b15ce",
+    "specs/work-queue/check.sh": "9f09f424fcc927a035242aba72a96503114d25c05914496cebdd55a2c3b10b20",
+    "specs/work-queue/compare-evaluation.mjs": "a292b3cbd37d0dd5abda6f04f7afa456ffe6a881f03725613448f01011961dd6",
+    "specs/work-queue/traces.sh": "db181970e26ee97ceec06fc70ead9aa8f9d067632351eb81aa49bfebcee11e03",
+    ".github/scripts/work-queue-formal-check.cjs": "b17eea32a7a69e40f7323b70304ef87f770ec9bfdd3ffbdbe5482219827e24cc",
+    ".github/scripts/work-queue-formal-check.test.cjs": "47d48487d4216fa2a11144771200b3a18c06df24943afe04c40b8f0357def247"
+  },
+  "verdicts": {
+    "registered_configurations": 61,
+    "exhausted": 16,
+    "exact_expected_controls_and_witnesses": 43,
+    "unfinished": ["WorkQueue", "QueueOrdering"]
+  },
+  "configurations": [
+    {
+      "config": "Recovery",
+      "module": "WorkQueue",
+      "verdict": "exhausted",
+      "states": [589079, 147542, 0],
+      "elapsed_seconds": 9.133,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "BrokenCAS",
+      "module": "WorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [1390, 793, 489],
+      "elapsed_seconds": 0.941,
+      "expected_diagnostic": "TerminalPersistence"
+    },
+    {
+      "config": "BrokenTerminal",
+      "module": "WorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [23152, 11516, 7382],
+      "elapsed_seconds": 1.217,
+      "expected_diagnostic": "TerminalFreeze"
+    },
+    {
+      "config": "BrokenQueueSelection",
+      "module": "WorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [97, 37, 27],
+      "elapsed_seconds": 0.886,
+      "expected_diagnostic": "QueueSelection"
+    },
+    {
+      "config": "WeakOrderingWitness",
+      "module": "WorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [1096, 720, 490],
+      "elapsed_seconds": 1.102,
+      "expected_diagnostic": "NoOutOfOrderClaim"
+    },
+    {
+      "config": "ClaimScopeSingle",
+      "module": "ClaimScopedWorker",
+      "verdict": "exhausted",
+      "states": [317, 144, 0],
+      "elapsed_seconds": 0.878,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "ClaimScopeMixed",
+      "module": "ClaimScopedWorker",
+      "verdict": "exhausted",
+      "states": [231921, 120832, 0],
+      "elapsed_seconds": 2.5,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "BrokenMissingClaimScope",
+      "module": "ClaimScopedWorker",
+      "verdict": "expected_counterexample",
+      "states": [37, 28, 24],
+      "elapsed_seconds": 0.831,
+      "expected_diagnostic": "OutputScope"
+    },
+    {
+      "config": "BrokenForeignClaimScope",
+      "module": "ClaimScopedWorker",
+      "verdict": "expected_counterexample",
+      "states": [30, 19, 14],
+      "elapsed_seconds": 0.833,
+      "expected_diagnostic": "OutputScope"
+    },
+    {
+      "config": "BrokenLastOpenClaimScope",
+      "module": "ClaimScopedWorker",
+      "verdict": "expected_counterexample",
+      "states": [5047, 2062, 1416],
+      "elapsed_seconds": 0.959,
+      "expected_diagnostic": "OutputScope"
+    },
+    {
+      "config": "BrokenCancelledClaimOutput",
+      "module": "ClaimScopedWorker",
+      "verdict": "expected_counterexample",
+      "states": [2706, 1042, 772],
+      "elapsed_seconds": 0.914,
+      "expected_diagnostic": "EffectAuthorization"
+    },
+    {
+      "config": "BrokenMixedDAGAdmission",
+      "module": "ClaimScopedWorker",
+      "verdict": "expected_counterexample",
+      "states": [1695, 652, 496],
+      "elapsed_seconds": 0.883,
+      "expected_diagnostic": "DAGAuthorization"
+    },
+    {
+      "config": "SingleClaimScopeWitness",
+      "module": "ClaimScopedWorker",
+      "verdict": "expected_counterexample",
+      "states": [199, 92, 21],
+      "elapsed_seconds": 0.879,
+      "expected_diagnostic": "NoAutomaticScope"
+    },
+    {
+      "config": "MixedClaimDAGWitness",
+      "module": "ClaimScopedWorker",
+      "verdict": "expected_counterexample",
+      "states": [210970, 113346, 4818],
+      "elapsed_seconds": 2.358,
+      "expected_diagnostic": "NoMixedDAGProgress"
+    },
+    {
+      "config": "ServiceFixed",
+      "module": "QueueService",
+      "verdict": "exhausted",
+      "states": [31, 30, 0],
+      "elapsed_seconds": 0.933,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "ServiceDynamic",
+      "module": "QueueService",
+      "verdict": "exhausted",
+      "states": [535696, 60360, 0],
+      "elapsed_seconds": 11.245,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "BrokenServiceShare",
+      "module": "QueueService",
+      "verdict": "expected_counterexample",
+      "states": [8, 8, 0],
+      "elapsed_seconds": 0.893,
+      "expected_diagnostic": "ServiceDeviation"
+    },
+    {
+      "config": "StrictServiceStarvation",
+      "module": "QueueService",
+      "verdict": "expected_counterexample",
+      "states": [21, 20, 0],
+      "elapsed_seconds": 0.882,
+      "expected_diagnostic": "EventualService"
+    },
+    {
+      "config": "UnfairServiceStarvation",
+      "module": "QueueService",
+      "verdict": "expected_counterexample",
+      "states": [31, 30, 0],
+      "elapsed_seconds": 0.869,
+      "expected_diagnostic": "EventualService"
+    },
+    {
+      "config": "UnpackableServiceStarvation",
+      "module": "QueueService",
+      "verdict": "expected_counterexample",
+      "states": [1, 1, 0],
+      "elapsed_seconds": 0.851,
+      "expected_diagnostic": "EventualService"
+    },
+    {
+      "config": "LifecycleRecurring",
+      "module": "QueueLifecycle",
+      "verdict": "exhausted",
+      "states": [1821, 496, 0],
+      "elapsed_seconds": 0.969,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "LifecyclePacked",
+      "module": "QueueLifecycle",
+      "verdict": "exhausted",
+      "states": [1312373, 207612, 0],
+      "elapsed_seconds": 4.909,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "BrokenLifecyclePrefix",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [17, 10, 2],
+      "elapsed_seconds": 0.845,
+      "expected_diagnostic": "FairPrefixPacking"
+    },
+    {
+      "config": "BrokenLifecycleSender",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [61, 26, 2],
+      "elapsed_seconds": 0.853,
+      "expected_diagnostic": "OneSender"
+    },
+    {
+      "config": "BrokenLifecycleBinding",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [81, 36, 7],
+      "elapsed_seconds": 0.88,
+      "expected_diagnostic": "BindingAuthority"
+    },
+    {
+      "config": "BrokenLifecycleActivation",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [61, 28, 5],
+      "elapsed_seconds": 0.824,
+      "expected_diagnostic": "BindingAuthority"
+    },
+    {
+      "config": "BrokenLifecycleRerun",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [145, 67, 25],
+      "elapsed_seconds": 0.882,
+      "expected_diagnostic": "AttemptOneEffects"
+    },
+    {
+      "config": "BrokenLifecycleRelease",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [63, 30, 7],
+      "elapsed_seconds": 0.838,
+      "expected_diagnostic": "ReservationAuthority"
+    },
+    {
+      "config": "BrokenLifecycleConflictRelease",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [214, 89, 27],
+      "elapsed_seconds": 0.893,
+      "expected_diagnostic": "ReservationAuthority"
+    },
+    {
+      "config": "BrokenLifecycleControl",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [40, 21, 5],
+      "elapsed_seconds": 0.901,
+      "expected_diagnostic": "ControlNotPreemption"
+    },
+    {
+      "config": "BrokenLifecycleDelivery",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [758, 227, 32],
+      "elapsed_seconds": 0.909,
+      "expected_diagnostic": "DeliveryExclusivity"
+    },
+    {
+      "config": "BrokenLifecycleReplacement",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [587, 196, 36],
+      "elapsed_seconds": 0.897,
+      "expected_diagnostic": "ReplacementSafety"
+    },
+    {
+      "config": "BrokenLifecycleVerificationBudget",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [224, 93, 28],
+      "elapsed_seconds": 0.891,
+      "expected_diagnostic": "DeliveryFailureBudget"
+    },
+    {
+      "config": "LifecycleMixedDAGWitness",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [48219, 12116, 4400],
+      "elapsed_seconds": 1.174,
+      "expected_diagnostic": "NoMixedLifecycleWitness"
+    },
+    {
+      "config": "LifecycleActivationWitness",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [59, 26, 3],
+      "elapsed_seconds": 0.917,
+      "expected_diagnostic": "NoActivationRecoveryWitness"
+    },
+    {
+      "config": "LifecycleConflictWitness",
+      "module": "QueueLifecycle",
+      "verdict": "expected_counterexample",
+      "states": [81, 36, 7],
+      "elapsed_seconds": 0.884,
+      "expected_diagnostic": "NoConflictReservationWitness"
+    },
+    {
+      "config": "FairBatch",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [16655, 13662, 0],
+      "elapsed_seconds": 2.364,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "FairThreeClaim",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [41204, 34075, 0],
+      "elapsed_seconds": 6.244,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "FairPriority",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [880, 675, 0],
+      "elapsed_seconds": 1.285,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "FairStrict",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [880, 675, 0],
+      "elapsed_seconds": 1.287,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "FairDAGChain",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [20719, 13846, 0],
+      "elapsed_seconds": 2.752,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "FairDAGForward",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [20719, 13846, 0],
+      "elapsed_seconds": 2.688,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "FairDAGFork",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [141747, 70602, 0],
+      "elapsed_seconds": 20.29,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "FairGitHubDependencies",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [23599, 9749, 0],
+      "elapsed_seconds": 1.912,
+      "expected_diagnostic": null
+    },
+    {
+      "config": "BrokenBatchSelection",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [13, 13, 6],
+      "elapsed_seconds": 0.832,
+      "expected_diagnostic": "DecisionValidity"
+    },
+    {
+      "config": "BrokenClaimEffects",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [113, 99, 44],
+      "elapsed_seconds": 0.836,
+      "expected_diagnostic": "EffectAuthorization"
+    },
+    {
+      "config": "BrokenAssignmentHandle",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [338, 278, 156],
+      "elapsed_seconds": 0.902,
+      "expected_diagnostic": "ClaimClosureAuthority"
+    },
+    {
+      "config": "BrokenBatchCAS",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [742, 619, 361],
+      "elapsed_seconds": 0.947,
+      "expected_diagnostic": "TerminalPersistence"
+    },
+    {
+      "config": "BrokenBatchRelease",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [111, 97, 43],
+      "elapsed_seconds": 0.888,
+      "expected_diagnostic": "RunReleaseAuthority"
+    },
+    {
+      "config": "BrokenDAGDependency",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [13, 12, 4],
+      "elapsed_seconds": 0.767,
+      "expected_diagnostic": "DependencyAuthorization"
+    },
+    {
+      "config": "BrokenDAGResult",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [40, 33, 5],
+      "elapsed_seconds": 0.839,
+      "expected_diagnostic": "ResultEffectSoundness"
+    },
+    {
+      "config": "BrokenDAGCycle",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": null,
+      "elapsed_seconds": 0.353,
+      "expected_diagnostic": "DAGValidity"
+    },
+    {
+      "config": "BrokenExternalDependency",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [159, 145, 123],
+      "elapsed_seconds": 0.85,
+      "expected_diagnostic": "ExternalAuthorization"
+    },
+    {
+      "config": "BrokenPRClosedAsMerged",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [19, 19, 15],
+      "elapsed_seconds": 0.838,
+      "expected_diagnostic": "ExternalTruth"
+    },
+    {
+      "config": "BrokenProjection",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [5, 5, 1],
+      "elapsed_seconds": 0.837,
+      "expected_diagnostic": "ProjectionSoundness"
+    },
+    {
+      "config": "BatchedAssignmentWitness",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [3, 3, 0],
+      "elapsed_seconds": 0.838,
+      "expected_diagnostic": "NoBatchedAssignment"
+    },
+    {
+      "config": "PartialCompletionWitness",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [50, 43, 20],
+      "elapsed_seconds": 0.836,
+      "expected_diagnostic": "NoPartialCompletion"
+    },
+    {
+      "config": "DAGJoinWitness",
+      "module": "FairWorkQueue",
+      "verdict": "expected_counterexample",
+      "states": [4435, 3218, 611],
+      "elapsed_seconds": 1.736,
+      "expected_diagnostic": "NoJoinClaim"
+    },
+    {
+      "config": "FairDAGGitHub",
+      "module": "FairWorkQueue",
+      "verdict": "exhausted",
+      "states": [10059807, 1055182, 0],
+      "depth": 20,
+      "elapsed_seconds": 520
+    },
+    {
+      "config": "WorkQueue",
+      "module": "WorkQueue",
+      "verdict": "timed_out",
+      "latest_progress": ["22", "107050499", "38640894", "7079332"],
+      "elapsed_seconds": 1200.464,
+      "restored": true,
+      "exhausted": false
+    },
+    {
+      "config": "QueueOrdering",
+      "module": "WorkQueue",
+      "verdict": "timed_out",
+      "latest_progress": ["17", "118964875", "51756372", "23003758"],
+      "elapsed_seconds": 1200.473,
+      "restored": true,
+      "exhausted": false
+    }
+  ],
+  "independent_interrupted_searches": [
+    {
+      "config": "WorkQueue",
+      "status": "timed_out",
+      "exhausted": false,
+      "timeout_seconds": 1800,
+      "elapsed_seconds": 2226,
+      "source_sha256": {
+        "WorkQueue.tla": "bb06bb21b34e1e157df14c9fbdbea5640a1431fe8bcef469902e1163ee1b15ce",
+        "WorkQueue.cfg": "774415d9e95b67132b1412c983aea4a914ff969c0faf22cfc5badec6c6e2df7b"
+      },
+      "latest_progress": {
+        "depth": "20",
+        "states_generated": "116541667",
+        "distinct_states": "26621712",
+        "states_remaining": "7399846"
+      },
+      "checkpoints": {
+        "bytes": 2499956609,
+        "files": 1250,
+        "checkpoints": [
+          {
+            "path": "26-10-07-15-02-21/WorkQueue-0.chkpt",
+            "bytes": 16
+          },
+          {
+            "path": "26-10-07-15-02-21/WorkQueue-1.chkpt",
+            "bytes": 16
+          },
+          {
+            "path": "26-10-07-15-02-21/WorkQueue.st.chkpt",
+            "bytes": 0
+          },
+          {
+            "path": "26-10-07-15-02-21/queue.chkpt",
+            "bytes": 1817601
+          },
+          {
+            "path": "26-10-07-15-02-21/vars.chkpt",
+            "bytes": 13145
+          }
+        ],
+        "archived": false,
+        "resumable": false,
+        "recovery_validation": "not_attempted",
+        "reason": "state_size_limit"
+      }
+    },
+    {
+      "config": "QueueOrdering",
+      "status": "timed_out",
+      "exhausted": false,
+      "timeout_seconds": 1800,
+      "elapsed_seconds": 2226,
+      "source_sha256": {
+        "WorkQueue.tla": "bb06bb21b34e1e157df14c9fbdbea5640a1431fe8bcef469902e1163ee1b15ce",
+        "QueueOrdering.cfg": "84b58855aa37b1487e8163e1d539e891f66fba534e93bf5d2bf0a6278aea2ba3"
+      },
+      "latest_progress": {
+        "depth": "16",
+        "states_generated": "123173709",
+        "distinct_states": "34349382",
+        "states_remaining": "16435240"
+      },
+      "checkpoints": {
+        "bytes": 3566673477,
+        "files": 2354,
+        "checkpoints": [
+          {
+            "path": "26-10-07-15-02-21/WorkQueue-0.chkpt",
+            "bytes": 16
+          },
+          {
+            "path": "26-10-07-15-02-21/WorkQueue-1.chkpt",
+            "bytes": 16
+          },
+          {
+            "path": "26-10-07-15-02-21/WorkQueue.st.chkpt",
+            "bytes": 0
+          },
+          {
+            "path": "26-10-07-15-02-21/queue.chkpt",
+            "bytes": 1043281
+          },
+          {
+            "path": "26-10-07-15-02-21/vars.chkpt",
+            "bytes": 13145
+          }
+        ],
+        "archived": false,
+        "resumable": false,
+        "recovery_validation": "not_attempted",
+        "reason": "state_size_limit"
+      }
+    },
+    {
+      "config": "FairDAGGitHub",
+      "status": "timed_out",
+      "exhausted": false,
+      "timeout_seconds": 1800,
+      "elapsed_seconds": 2227,
+      "source_sha256": {
+        "FairWorkQueue.tla": "eb8bf790ea7d6aaedb55561243bd9b3646399b3c223809a21370fa421d6b8b45",
+        "FairDAGGitHub.cfg": "3b21f925b61a5bbd4c935311b9523cbcc330c773f02f178b58e1fdc968c1d4e2"
+      },
+      "latest_progress": {
+        "depth": "14",
+        "states_generated": "4347968",
+        "distinct_states": "649540",
+        "states_remaining": "196741"
+      },
+      "checkpoints": {
+        "bytes": 67436556,
+        "files": 40,
+        "checkpoints": [
+          {
+            "path": "26-10-07-15-02-21/FairWorkQueue-0.chkpt",
+            "bytes": 16
+          },
+          {
+            "path": "26-10-07-15-02-21/FairWorkQueue-1.chkpt",
+            "bytes": 16
+          },
+          {
+            "path": "26-10-07-15-02-21/FairWorkQueue.st.chkpt",
+            "bytes": 0
+          },
+          {
+            "path": "26-10-07-15-02-21/queue.chkpt",
+            "bytes": 1206730
+          },
+          {
+            "path": "26-10-07-15-02-21/vars.chkpt",
+            "bytes": 14366
+          }
+        ],
+        "archived": true,
+        "resumable": false,
+        "recovery_validation": "not_attempted",
+        "reason": "unvalidated_checkpoint_candidate"
+      }
+    }
+  ],
+  "checkpoint_recovery": [
+    {
+      "config": "WorkQueue",
+      "source_sha256": {
+        "WorkQueue.tla": "bb06bb21b34e1e157df14c9fbdbea5640a1431fe8bcef469902e1163ee1b15ce",
+        "WorkQueue.cfg": "774415d9e95b67132b1412c983aea4a914ff969c0faf22cfc5badec6c6e2df7b"
+      },
+      "checkpoint_sha256": {
+        "WorkQueue.st.chkpt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "queue.chkpt": "013e4b31e72abe3cb2e79e4715fabad27a189d9c6a618dc374bb8c93c8d109ec",
+        "vars.chkpt": "22250138d843b0c5b960a542ccf78d87f316b7fed119064fcf5809f2ddfc1326",
+        "WorkQueue-0.chkpt": "122da404a8d33507092e0abd211e731fa2b9cddb1a9d2a7eca1c47bf1ecf01b2",
+        "WorkQueue-1.chkpt": "93ae975a724a3d44a9790caeb60523b9ccab0763a7ec480dca0de81ef9aae9e3"
+      },
+      "recovery_completed": true,
+      "resumed_distinct_states": "24322874",
+      "resumed_remaining_states": "7177473",
+      "timeout_seconds": 1200,
+      "elapsed_seconds": 1200.464,
+      "latest_progress": ["22", "107050499", "38640894", "7079332"],
+      "exhausted": false,
+      "portable_checkpoint_archive_validated": false
+    },
+    {
+      "config": "QueueOrdering",
+      "source_sha256": {
+        "WorkQueue.tla": "bb06bb21b34e1e157df14c9fbdbea5640a1431fe8bcef469902e1163ee1b15ce",
+        "QueueOrdering.cfg": "84b58855aa37b1487e8163e1d539e891f66fba534e93bf5d2bf0a6278aea2ba3"
+      },
+      "checkpoint_sha256": {
+        "WorkQueue.st.chkpt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "queue.chkpt": "11f412d228688d86169f29910fbdead56a29bf12f4e6b258b9d671a8efac7452",
+        "vars.chkpt": "22250138d843b0c5b960a542ccf78d87f316b7fed119064fcf5809f2ddfc1326",
+        "WorkQueue-0.chkpt": "2d1b2d152f8c342bcd38bbae2ead267792ac7531e2ca79e8f51f18b7087c3ec1",
+        "WorkQueue-1.chkpt": "be6d103e86141ec9ff1dea4e3606d4fa5232211b6a0d7019a6b0d7408ca9f9f8"
+      },
+      "recovery_completed": true,
+      "resumed_distinct_states": "31418073",
+      "resumed_remaining_states": "15367077",
+      "timeout_seconds": 1200,
+      "elapsed_seconds": 1200.473,
+      "latest_progress": ["17", "118964875", "51756372", "23003758"],
+      "exhausted": false,
+      "portable_checkpoint_archive_validated": false
+    }
+  ],
+  "comparison": {
+    "complete": true,
+    "passed": true,
+    "runner_sha256": "a292b3cbd37d0dd5abda6f04f7afa456ffe6a881f03725613448f01011961dd6",
+    "cases": [
+      {
+        "config": "Recovery",
+        "module": "WorkQueue",
+        "mutation": null,
+        "baseline_sha256": "9725b33959e8ffc07d32047cf652d6fbc9260fbd3da170cf936cafe204b1a7fa",
+        "candidate_sha256": "bb06bb21b34e1e157df14c9fbdbea5640a1431fe8bcef469902e1163ee1b15ce",
+        "config_sha256": "f6cef16b1ceef141fce309f7cb9a8a8c1da31aa99e14c1949ba6a9b74500f96f",
+        "wrapper_sha256": "37402a5856bebebeed3d106ef97041d9067941ed62659aeb8fa72e44b184bd4f",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 93.377,
+        "distinct_states": "147542",
+        "passed": true
+      },
+      {
+        "config": "FairBatch",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "1f7dc1346d65720f6d5f74c5abe34e10f2ec68520b6e18d9b1f96037cc59c012",
+        "config_sha256": "8b12ec55c9379d73a84b0d1be34af7407b8ce4cecf49271f0fa1d27d36088b04",
+        "wrapper_sha256": "2a85ec41f13997287bee1539f90748727af72e1e683df661ac1532b59bb0dfad",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 68.555,
+        "distinct_states": "13662",
+        "passed": true
+      },
+      {
+        "config": "FairPriority",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "1f7dc1346d65720f6d5f74c5abe34e10f2ec68520b6e18d9b1f96037cc59c012",
+        "config_sha256": "47d9066ab9b4ac02253550f16d8835477d3f51d25ceb233146ea14156e590c82",
+        "wrapper_sha256": "2a85ec41f13997287bee1539f90748727af72e1e683df661ac1532b59bb0dfad",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 6.945,
+        "distinct_states": "675",
+        "passed": true
+      },
+      {
+        "config": "FairStrict",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "1f7dc1346d65720f6d5f74c5abe34e10f2ec68520b6e18d9b1f96037cc59c012",
+        "config_sha256": "2945050fddf02ea1ed0a67db2c9db61d1b9bb0ac848f4c4938749d66a9a64805",
+        "wrapper_sha256": "2a85ec41f13997287bee1539f90748727af72e1e683df661ac1532b59bb0dfad",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 6.636,
+        "distinct_states": "675",
+        "passed": true
+      },
+      {
+        "config": "FairGitHubDependencies",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "1f7dc1346d65720f6d5f74c5abe34e10f2ec68520b6e18d9b1f96037cc59c012",
+        "config_sha256": "cac9d9ef745d2033c67489f9fef90fe18ae0560e24f982db8d1cff5e0b159b32",
+        "wrapper_sha256": "2a85ec41f13997287bee1539f90748727af72e1e683df661ac1532b59bb0dfad",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 33.139,
+        "distinct_states": "9749",
+        "passed": true
+      },
+      {
+        "config": "Recovery",
+        "module": "WorkQueue",
+        "mutation": "missing-transition",
+        "baseline_sha256": "9725b33959e8ffc07d32047cf652d6fbc9260fbd3da170cf936cafe204b1a7fa",
+        "candidate_sha256": "c8a299c4b36160ee615336f1185f33fb1f74314e2ab0415253e94fd613f1f57b",
+        "config_sha256": "f6cef16b1ceef141fce309f7cb9a8a8c1da31aa99e14c1949ba6a9b74500f96f",
+        "wrapper_sha256": "37402a5856bebebeed3d106ef97041d9067941ed62659aeb8fa72e44b184bd4f",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "violation",
+        "exit_code": 13,
+        "signal": null,
+        "error": null,
+        "expected_exit": 13,
+        "expected_diagnostic": "Action property NextEquivalence is violated",
+        "elapsed_seconds": 0.723,
+        "distinct_states": "2",
+        "passed": true
+      },
+      {
+        "config": "FairBatch",
+        "module": "FairWorkQueue",
+        "mutation": "changed-normalization",
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "4460aaf6e042e75c813cb44c939364d3872d388d69b49198ee48ee2340a98507",
+        "config_sha256": "8b12ec55c9379d73a84b0d1be34af7407b8ce4cecf49271f0fa1d27d36088b04",
+        "wrapper_sha256": "2a85ec41f13997287bee1539f90748727af72e1e683df661ac1532b59bb0dfad",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "violation",
+        "exit_code": 12,
+        "signal": null,
+        "error": null,
+        "expected_exit": 12,
+        "expected_diagnostic": "Invariant ReplayEquivalence is violated",
+        "elapsed_seconds": 0.808,
+        "distinct_states": "4",
+        "passed": true
+      }
+    ]
+  },
+  "earlier_evaluation_comparison": {
+    "complete": true,
+    "passed": true,
+    "cases": [
+      {
+        "config": "Recovery",
+        "module": "WorkQueue",
+        "mutation": null,
+        "baseline_sha256": "9725b33959e8ffc07d32047cf652d6fbc9260fbd3da170cf936cafe204b1a7fa",
+        "candidate_sha256": "bb06bb21b34e1e157df14c9fbdbea5640a1431fe8bcef469902e1163ee1b15ce",
+        "config_sha256": "f6cef16b1ceef141fce309f7cb9a8a8c1da31aa99e14c1949ba6a9b74500f96f",
+        "wrapper_sha256": "37402a5856bebebeed3d106ef97041d9067941ed62659aeb8fa72e44b184bd4f",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 112.366,
+        "distinct_states": "147542",
+        "passed": true
+      },
+      {
+        "config": "FairBatch",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "eb8bf790ea7d6aaedb55561243bd9b3646399b3c223809a21370fa421d6b8b45",
+        "config_sha256": "8b12ec55c9379d73a84b0d1be34af7407b8ce4cecf49271f0fa1d27d36088b04",
+        "wrapper_sha256": "1ea865958306b34863388912a802a6b9048c7bdb79ef8550fdb8ea3e17e828d0",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 102.384,
+        "distinct_states": "13662",
+        "passed": true
+      },
+      {
+        "config": "FairPriority",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "eb8bf790ea7d6aaedb55561243bd9b3646399b3c223809a21370fa421d6b8b45",
+        "config_sha256": "47d9066ab9b4ac02253550f16d8835477d3f51d25ceb233146ea14156e590c82",
+        "wrapper_sha256": "1ea865958306b34863388912a802a6b9048c7bdb79ef8550fdb8ea3e17e828d0",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 11.968,
+        "distinct_states": "675",
+        "passed": true
+      },
+      {
+        "config": "FairStrict",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "eb8bf790ea7d6aaedb55561243bd9b3646399b3c223809a21370fa421d6b8b45",
+        "config_sha256": "2945050fddf02ea1ed0a67db2c9db61d1b9bb0ac848f4c4938749d66a9a64805",
+        "wrapper_sha256": "1ea865958306b34863388912a802a6b9048c7bdb79ef8550fdb8ea3e17e828d0",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 11.806,
+        "distinct_states": "675",
+        "passed": true
+      },
+      {
+        "config": "FairGitHubDependencies",
+        "module": "FairWorkQueue",
+        "mutation": null,
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "eb8bf790ea7d6aaedb55561243bd9b3646399b3c223809a21370fa421d6b8b45",
+        "config_sha256": "cac9d9ef745d2033c67489f9fef90fe18ae0560e24f982db8d1cff5e0b159b32",
+        "wrapper_sha256": "1ea865958306b34863388912a802a6b9048c7bdb79ef8550fdb8ea3e17e828d0",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "error": null,
+        "expected_exit": 0,
+        "expected_diagnostic": null,
+        "elapsed_seconds": 480.403,
+        "distinct_states": "9749",
+        "passed": true
+      },
+      {
+        "config": "Recovery",
+        "module": "WorkQueue",
+        "mutation": "missing-transition",
+        "baseline_sha256": "9725b33959e8ffc07d32047cf652d6fbc9260fbd3da170cf936cafe204b1a7fa",
+        "candidate_sha256": "c8a299c4b36160ee615336f1185f33fb1f74314e2ab0415253e94fd613f1f57b",
+        "config_sha256": "f6cef16b1ceef141fce309f7cb9a8a8c1da31aa99e14c1949ba6a9b74500f96f",
+        "wrapper_sha256": "37402a5856bebebeed3d106ef97041d9067941ed62659aeb8fa72e44b184bd4f",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "violation",
+        "exit_code": 13,
+        "signal": null,
+        "error": null,
+        "expected_exit": 13,
+        "expected_diagnostic": "Action property NextEquivalence is violated",
+        "elapsed_seconds": 0.801,
+        "distinct_states": "2",
+        "passed": true
+      },
+      {
+        "config": "FairBatch",
+        "module": "FairWorkQueue",
+        "mutation": "changed-normalization",
+        "baseline_sha256": "7f41a1106fae9cd3f9244ec6f624ce6c58582b9a43d08bf9f7d4a21c24c2e0fc",
+        "candidate_sha256": "40328ed75219db5679e481a183e83c1eee8e2317c3c86eea953b23560d038a6c",
+        "config_sha256": "8b12ec55c9379d73a84b0d1be34af7407b8ce4cecf49271f0fa1d27d36088b04",
+        "wrapper_sha256": "1ea865958306b34863388912a802a6b9048c7bdb79ef8550fdb8ea3e17e828d0",
+        "tlc_sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+        "status": "violation",
+        "exit_code": 12,
+        "signal": null,
+        "error": null,
+        "expected_exit": 12,
+        "expected_diagnostic": "Invariant ReplayEquivalence is violated",
+        "elapsed_seconds": 1.383,
+        "distinct_states": "6",
+        "passed": true
+      }
+    ]
+  },
+  "traces": {
+    "simulations": 18,
+    "historical_simulations": 3,
+    "current_abstraction_simulations": 15,
+    "sampled_states": 309,
+    "guarded_witnesses": 9,
+    "source_hashes_stable": true,
+    "depth": 32,
+    "seed": 1,
+    "workers": 1
+  },
+  "limitations": [
+    "No runtime/host refinement or deployment-security proof.",
+    "No bounds, original properties or safety conjuncts removed; no VIEW, symmetry reduction or extra exploration constraint.",
+    "Projection is uniquely derived from log and independently checked by complete replay in Safety.",
+    "Interrupted searches are not passes; fresh partial searches are not added together.",
+    "Legacy continuations loaded actual pinned checkpoints; checkpoint rollback can precede interruption progress.",
+    "Local recovery was validated; portable checkpoint archives were not validated.",
+    "Model checking uses TLC 64-bit fingerprints; FairDAGGitHub reports optimistic collision probability 5.2E-7, actual-fingerprint estimate 3.2E-8.",
+    "Go/JavaScript native conformance captures from earlier source revisions remain historical."
+  ]
+}

@@ -211,7 +211,7 @@ async function createProjectView(projectUrl, viewConfig) {
   }
 
   const layout = typeof viewConfig.layout === "string" ? viewConfig.layout.trim() : "";
-  if (!layout || !["table", "board", "roadmap"].includes(layout)) {
+  if (layout !== "table" && layout !== "board" && layout !== "roadmap") {
     throw new Error(`${ERR_VALIDATION}: Invalid view layout "${layout}". Must be one of: table, board, roadmap`);
   }
 
@@ -236,6 +236,8 @@ async function createProjectView(projectUrl, viewConfig) {
 
   const route = projectInfo.scope === "orgs" ? "POST /orgs/{org}/projectsV2/{project_number}/views" : "POST /users/{user_id}/projectsV2/{project_number}/views";
 
+  // The locked Octokit schema predates these routes; keep their payload typed explicitly.
+  /** @type {{project_number: number, name: string, layout: "table" | "board" | "roadmap", filter?: string, visible_fields?: number[]} & ({org: string} | {user_id: string})} */
   const params =
     projectInfo.scope === "orgs"
       ? {

@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "default_requested": 128,
+  "cases": [
+    { "name": "default-128", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 128, "expected": 128 },
+    { "name": "small-operation-limit", "operations": 3, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 128, "expected": 2 },
+    { "name": "explicit-zero", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 0, "expected": 0 },
+    { "name": "explicit-one", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 1, "expected": 1 },
+    { "name": "maximum-request-retains-claim-slot", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 255, "expected": 255 },
+    { "name": "first-out-of-range-request", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 256, "error": "ledger_invalid" },
+    { "name": "large-out-of-range-request", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 512, "error": "ledger_invalid" },
+    { "name": "128-operation-limit", "operations": 128, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 128, "expected": 127 },
+    { "name": "129-operation-limit", "operations": 129, "ledger_bytes": 100, "ledger_limit": 1000, "requested": 128, "expected": 128 },
+    { "name": "immediately-before-watermark", "operations": 256, "ledger_bytes": 999, "ledger_limit": 1000, "requested": 128, "expected": 128 },
+    { "name": "exact-watermark", "operations": 256, "ledger_bytes": 1000, "ledger_limit": 1000, "requested": 128, "expected": 0 },
+    { "name": "past-watermark", "operations": 256, "ledger_bytes": 1001, "ledger_limit": 1000, "requested": 128, "expected": 0 },
+    { "name": "grants-paused", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "grants_paused": true, "requested": 128, "expected": 0 },
+    { "name": "zero-and-paused", "operations": 3, "ledger_bytes": 1000, "ledger_limit": 1000, "grants_paused": true, "requested": 0, "expected": 0 },
+    { "name": "negative-request", "operations": 256, "ledger_bytes": 100, "ledger_limit": 1000, "requested": -1, "error": "ledger_invalid" }
+  ]
+}

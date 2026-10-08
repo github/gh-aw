@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM } = require("./error_codes.cjs");
-const { readInboundAwContext, readWorkQueueAssignment } = require("./aw_context.cjs");
+const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
@@ -157,14 +157,19 @@ function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_
 }
 
 function renderWorkClaim(payload) {
-  const assignment = readWorkQueueAssignment(readInboundAwContext(payload));
+  const assignment = readInboundWorkQueueAssignment(payload);
   if (!assignment) {
     return "";
   }
 
-  const work = JSON.stringify({ id: assignment.work_id, payload: assignment.work }).replace(/</g, "\\u003c");
-  const claim = JSON.stringify({ id: assignment.claim_id, work_id: assignment.work_id }).replace(/</g, "\\u003c");
-  return `<work-claim>\n${work}\n${claim}\nWhen the work is complete, call work_queue_claim_finish with outcome "completed" to record the finish intent. If you cannot complete the work, call it with outcome "cancelled". The claim is only complete after trusted reconciliation verifies it; recording intent alone does not authorize safe outputs.\n</work-claim>\n`;
+  return assignment.claims
+    .map(member => {
+      const work = JSON.stringify({ id: member.work_id, payload: member.work, result_refs: member.result_refs }).replace(/</g, "\\u003c");
+      const claim = JSON.stringify({ dispatch_id: assignment.dispatch_id, id: member.claim_id, work_id: member.work_id, claim_handle: member.handle }).replace(/</g, "\\u003c");
+      const handle = JSON.stringify(member.handle).replace(/</g, "\\u003c");
+      return `<work-claim>\n${work}\n${claim}\nWhen the work is complete, call work_queue_claim_finish with outcome "completed" and claim_handle ${handle} to record the finish intent. If you cannot complete the work, call it with outcome "cancelled" and the same claim_handle. Always include this claim_handle on safe outputs and queue-control calls. The claim is only complete after trusted reconciliation verifies it; recording intent alone does not authorize safe outputs.\n</work-claim>\n`;
+    })
+    .join("");
 }
 
 /**
