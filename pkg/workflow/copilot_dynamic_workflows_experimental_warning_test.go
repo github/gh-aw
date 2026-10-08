@@ -64,7 +64,7 @@ func TestCopilotDynamicWorkflowsExperimentalWarning(t *testing.T) {
 	}
 }
 
-func TestCopilotDynamicWorkflowsDryRunNotice(t *testing.T) {
+func TestCopilotDynamicWorkflowsDryRunWarning(t *testing.T) {
 	const notice = "Using experimental feature: copilot.dynamic-workflows"
 	for _, enabled := range []bool{false, true} {
 		for _, sdk := range []bool{false, true} {
@@ -78,7 +78,11 @@ func TestCopilotDynamicWorkflowsDryRunNotice(t *testing.T) {
 				var output bytes.Buffer
 				compiler.emitExperimentalFeatureWarningsTo(data, &output)
 
-				assert.Zero(t, compiler.GetWarningCount(), "dry-run supports explicitly enabled Copilot dynamic workflows")
+				if enabled {
+					assert.Equal(t, 1, compiler.GetWarningCount(), "experimental Copilot dynamic workflows must block dry-run compilation")
+				} else {
+					assert.Zero(t, compiler.GetWarningCount())
+				}
 				if enabled && batch {
 					assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()[notice])
 				} else {
@@ -86,7 +90,6 @@ func TestCopilotDynamicWorkflowsDryRunNotice(t *testing.T) {
 				}
 				if enabled && !batch {
 					assert.Contains(t, output.String(), notice)
-					assert.Contains(t, output.String(), "i ")
 				} else {
 					assert.Empty(t, output.String())
 				}
@@ -109,7 +112,7 @@ func TestCopilotDynamicWorkflowsDryRunPreservesOtherWarnings(t *testing.T) {
 		var output bytes.Buffer
 		compiler.emitExperimentalFeatureWarningsTo(data, &output)
 
-		assert.Equal(t, 2, compiler.GetWarningCount(), "existing diagnostics and LSP must remain blocking")
+		assert.Equal(t, 3, compiler.GetWarningCount(), "existing diagnostics, dynamic workflows, and LSP must remain blocking")
 		if batch {
 			assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()["Using experimental feature: lsp"])
 		} else {
@@ -130,5 +133,5 @@ func TestCopilotDynamicWorkflowsDryRunDiagnosticWriteFailure(t *testing.T) {
 	compiler.SetDryRun(true)
 	data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", DynamicWorkflows: &enabled}}
 	compiler.emitExperimentalFeatureWarningsTo(data, failingExperimentalFeatureWriter{})
-	assert.Equal(t, 1, compiler.GetWarningCount(), "a failed informational diagnostic must block dry-run compilation")
+	assert.Equal(t, 2, compiler.GetWarningCount(), "the experimental warning and its write failure must both be counted")
 }

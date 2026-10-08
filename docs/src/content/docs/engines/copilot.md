@@ -53,7 +53,7 @@ Copilot supports the broadest set of `gh-aw` engine-specific features: native cu
 
 ### Dynamic workflows
 
-Copilot CLI [dynamic workflows](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-dynamic-workflows) are experimental and disabled by default. Enable them explicitly with `engine.dynamic-workflows: true`. The compiler emits `Using experimental feature: copilot.dynamic-workflows` only when enabled; batch compilation includes their usage in the experimental-feature summary. In `--dry-run` compilation, this notice is informational and does not block development testing; other compiler warnings and scanner failures remain fatal.
+Copilot CLI [dynamic workflows](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-dynamic-workflows) are experimental and disabled by default. Hosted execution in gh-aw remains unverified; a successful local CLI run or extension registration does not establish that the feature works in the sandbox. Enable them explicitly with `engine.dynamic-workflows: true`. The compiler emits `Using experimental feature: copilot.dynamic-workflows` only when enabled; batch compilation includes their usage in the experimental-feature summary. This warning also blocks `--dry-run` compilation, like other experimental-feature warnings.
 
 ```yaml
 engine:
@@ -69,6 +69,8 @@ gh-aw's existing engine-config restoration snapshots the engine-declared folders
 The repository's [Copilot dynamic workflow smoke test](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-copilot-dynamic-workflow.md) invokes the packaged `smoke-copilot-dynamic-workflow` extension by name. It verifies a relative module import, a nested hidden support file, durable steps, and one structured subagent result. Run it with `gh aw run smoke-copilot-dynamic-workflow`, or dispatch **Smoke Trigger** with `dynamic-workflow: true` to exercise a feature branch before the new workflow is registered on the default branch.
 
 The main [Smoke Copilot workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-copilot.md) also enables dynamic workflows and runs the same packaged extension first as test 16, recording its run ID, status, and verified result or error in the smoke report. Its CLI arguments pre-approve `github.com` and the local Playwright fixture URL; the firewall still enforces the configured network policy.
+
+The minimal [permission reproducer](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-copilot-dynamic-workflows.md) deliberately omits CLI URL approval for one GitHub `curl` call, then independently attempts the packaged dynamic workflow. It pins Copilot CLI 1.0.90, uses staged logging-only output, and creates no GitHub resources.
 
 Current Copilot CLI releases require `engine.args: ["--experimental"]` to expose the dynamic workflow tools. Loading an extension through the `EXTENSIONS` flag alone does not expose those tools.
 

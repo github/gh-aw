@@ -533,11 +533,10 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		detectionConfigured = isFeatureInEnvironment(string(constants.GHAWDetectionFeatureFlag), false)
 	}
 	warnings := []struct {
-		enabled         bool
-		message         string
-		dryRunSupported bool
+		enabled bool
+		message string
 	}{
-		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows", dryRunSupported: true},
+		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows"},
 		{enabled: workflowData.RateLimit != nil, message: "Using experimental feature: rate limiting"},
 		{enabled: workflowData.Graders != nil && workflowData.Graders.HasGraders(), message: "Using experimental feature: graders"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.DispatchRepository != nil, message: "Using experimental feature: dispatch-repository"},
@@ -565,14 +564,10 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		if warning.enabled {
 			if c.batchMode {
 				c.featureUsage[warning.message]++
-			} else if c.dryRun && warning.dryRunSupported {
-				c.writeExperimentalFeatureDiagnostic(writer, console.FormatInfoMessage(warning.message))
 			} else {
 				c.writeExperimentalFeatureDiagnostic(writer, console.FormatWarningMessageStderr(warning.message))
 			}
-			if !c.dryRun || !warning.dryRunSupported {
-				c.IncrementWarningCount()
-			}
+			c.IncrementWarningCount()
 		}
 	}
 
