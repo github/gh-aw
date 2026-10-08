@@ -7,7 +7,7 @@ sidebar:
 
 # Priority and fairness for the gh-aw work queue
 
-For deployment and operator commands, see [Work queues](../../reference/work-queue/).
+For deployment and operator commands, see [Work queues](/gh-aw/reference/work-queue/).
 Executable contracts, models, fixtures and verification instructions remain in
 [`specs/work-queue/`](https://github.com/github/gh-aw/tree/main/specs/work-queue).
 
@@ -795,7 +795,7 @@ grant explanations use it for future class charges. Active/completed/cancelled
 Work cannot be reprioritized, and child admission still inherits the original
 definition. These operator extensions are conformance-tested but are outside
 the fixed-priority TLA+ models' action sets. See the
-[current operator reference](../../reference/work-queue/#operator-commands) for bounded
+[current operator reference](/gh-aw/reference/work-queue/#operator-commands) for bounded
 ASCII views, the keyboard master-detail browser and exact cancellation semantics.
 Deploy matching readers/writers: older current-only readers reject these new
 closed operation shapes rather than interpreting them as legacy records.
@@ -2649,7 +2649,7 @@ limit, credential-free preparation, and the existing protected `git_tree`
 adapter. Preparation validates the original Claim selector and any body Work ID;
 memory remains output data, never a second ledger or authority. Publication still
 requires Completion and immutable resource scope, and Result still requires
-independent full-tree/blob/ref readback. The [factory example](../../patterns/linter-factory/)
+independent full-tree/blob/ref readback. The [factory example](/gh-aw/patterns/linter-factory/)
 documents the schema subset and transport limits.
 
 Trusted JavaScript publication also appends bounded metadata-only Actions

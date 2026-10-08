@@ -3,131 +3,180 @@ title: Work queues
 description: Git-backed work queue roles, Claim-scoped effects, operator commands and checked keyboard actions.
 ---
 
-The Git-backed queue provides mandatory fair scheduling, immutable Work DAGs and
-Claim-scoped worker effects. The causal `work-queue.jsonl` log is its only
-authority. Defaults behave like FIFO: one priority, one accounting key and
-oldest eligible Work first. Configured weights share durable Claim opportunities,
-not CPU time or successful completions.
+Work queues can be Git-backed or issue-backed. Native `tools.work-queue` uses
+Git storage. Lightweight issue checklists and sub-issue queues use
+[WorkQueueOps](/gh-aw/patterns/workqueue-ops/) with GitHub read tools and safe
+outputs. This reference describes the native version-3 protocol, whose compiler
+and runtime reject `storage: issues`.
 
-Issues and pull requests can be dependency nodes, not queue storage. For
-lightweight issue checklists, sub-issues, Discussions or cache-memory backlogs,
-see [WorkQueueOps](../../patterns/workqueue-ops/); those progress markers do not
-provide this protocol's authority or fairness guarantees.
+The native queue enforces fair scheduling, immutable task dependency graphs,
+and worker effects authorized by individual Claims. Its only source of
+authority is `work-queue.jsonl`, a transaction log that records events in causal
+order. Defaults behave like first in, first out (FIFO): one priority, one
+accounting key, and the oldest eligible Work first. Accounting keys group tasks
+for fairness accounting. Configured weights share opportunities to receive
+durable Claims, not CPU time or successful completions.
 
-See [deployment](../../guides/deploy-work-queue/) for Policy installation, the
-[specification](../../specs/work-queue-specification/) for normative behavior and
+In the native protocol, issues and pull requests can be dependency nodes, but
+cannot store the queue. [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) supports
+issue checklists, sub-issues, Discussions, and cache-memory backlogs, but those
+progress markers do not provide native fair scheduling, Claim authority, or
+verified dependency graphs.
+
+The native protocol distinguishes the following records and lifecycle events:
+
+| Term | Meaning |
+| --- | --- |
+| Work | An immutable task definition. Tasks can form a directed acyclic graph (DAG), a dependency graph with no cycles. |
+| Claim | Authorization for one attempt at a Work item. Its original `claim_handle` identifies that attempt. |
+| Policy | Administrator-installed rules for scheduling, producer permissions, worker routing, and limits. |
+| Pool | A group of tasks with shared worker routes and capacity limits. |
+| Reservation | Native worker capacity held for an assignment, including while launch or termination is uncertain. |
+| Native launch | The request to start a GitHub Actions worker run. A committed assignment is not proof of launch. |
+| Completion | A durable record of task completion, published before the Claim's effects. It is not proof of delivery. |
+| Result | A record published only after independently verified delivery of the Claim's effects. |
+| Release | The operation that frees a native reservation after trusted evidence of exact termination or definitive nonlaunch. |
+
+See [deployment](/gh-aw/guides/deploy-work-queue/) for Policy installation, the
+[specification](/gh-aw/specs/work-queue-specification/) for normative behavior and
 implementation coverage, and the
 [formal verification reference](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md)
 for executable models, contracts and reproduction instructions.
 
 ## Workflow roles and intent tools
 
-`tools.work-queue` enables an immutable activation snapshot. Trusted
-compiler/runtime context establishes the role; snapshot metadata and
-agent-created files cannot grant authority.
+`tools.work-queue` gives the agent an immutable snapshot of the queue at
+activation. The trusted compiler and runtime establish the workflow's role.
+The agent cannot grant itself authority through snapshot metadata or files it
+creates. In this reference, *trusted processing* means queue operations
+performed by the runtime or authorized operator, rather than by the agent.
 
 | Role | Behavior |
 | --- | --- |
-| Observer | Read/explain tools only; ordinary configured report or `noop` authorization; cannot submit, dispatch or finish Work |
-| Producer/dispatcher | Stages entitled task plans and bounded pool/budget requests; trusted processing refreshes the ledger, selects by Policy and atomically commits a fair prefix |
-| Worker | Required version-3 Claim array; trusted activation authenticates the actual run/workflow/revision before scoped effects |
+| Observer | Can read and explain the queue and use normally authorized reports or `noop`. Cannot submit, dispatch, or finish Work. |
+| Producer/dispatcher | Stages task plans within producer permissions and requests assignments within pool and budget limits. Trusted processing refreshes the log, selects tasks by Policy, and commits the next fair group of assignments atomically. |
+| Worker | Requires a version-3 Claim array. Trusted activation authenticates the actual run, workflow, and revision before authorizing effects for each Claim. |
 
-Missing assignment input cannot downgrade a declared worker to an observer.
-A genuinely absent queue can be reported as uninitialized; an existing empty,
-malformed or unsupported ledger is an explicit failure, not an empty backlog.
-Unassigned dispatcher queue-control authority does not authorize arbitrary
-resource-writing outputs.
+A declared worker with missing assignment input fails; it does not become an
+observer. An absent queue can be reported as uninitialized. An existing log
+that is empty, malformed, or unsupported produces an explicit error, not an
+empty backlog. A dispatcher without a worker assignment can control the queue
+only within its authority; this does not authorize arbitrary resource writes.
 
 | MCP tool | Purpose |
 | --- | --- |
-| `work_queue_read`, `work_queue_explain` | Inspect the immutable snapshot; predictions may be stale and sorting affects only presentation |
-| `work_queue_submit` | Stage bounded immutable task/graph plans within installed producer entitlements |
-| `work_queue_dispatch_next` | Request a bounded pool prefix, without selecting winning Work or a target |
-| `work_queue_claim_finish` | Stage an original Claim's `completed` or `cancelled` outcome |
+| `work_queue_read`, `work_queue_explain` | Inspect the immutable snapshot. Predictions may be stale; sorting changes only the display order. |
+| `work_queue_submit` | Stage immutable task or graph plans within size limits and installed producer permissions. |
+| `work_queue_dispatch_next` | Request the next assignments from a pool, within a specified limit. The scheduler selects the Work and target. |
+| `work_queue_claim_finish` | Stage a `completed` or `cancelled` finish intent for an original Claim. |
 
-If `<mcp-clis>` advertises the runtime wrapper, invoke it as
-`work-queue work_queue_read '{}'`. These subcommands are MCP tools, not
-`gh aw work-queue` operator commands.
+When `<mcp-clis>` lists the runtime wrapper, the invocation is
+`work-queue work_queue_read '{}'`. These subcommands are Model Context Protocol
+(MCP) tools available to the agent, not `gh aw work-queue` operator commands.
 
 ### Claim-scoped effects and delivery
 
-The compiler supplies reserved `work_queue_assignment` and caller context.
-Assignment input alone does not authorize effects, and a rerun cannot inherit
-attempt 1's authority.
+The compiler supplies the reserved `work_queue_assignment` input and caller
+context. Assignment input alone does not authorize effects (changes made by
+safe outputs), and a rerun cannot inherit attempt 1's authority.
 
-Every safe output and finish intent belongs to one original Claim. Only an
-originally single-Claim assignment can omit the selector. Multi-Claim assignments
-require `claim_handle` on every message even after other members close.
-Malformed, null, foreign or conflicting selectors fail.
+Every safe output and finish intent belongs to one original Claim. The
+`claim_handle` selector identifies that Claim. Only an originally single-Claim
+assignment can omit it. Multi-Claim assignments require the original
+`claim_handle` on every message, even when only one member remains open.
+Malformed, null, foreign, or conflicting selectors fail.
 
-Each member finishes independently with `outcome: "completed"` or `"cancelled"`.
-Missing finish does not authorize effects. Batching defaults to one Claim and is
-enabled only for compatible Work with substantial reusable setup. Staged finish
-is an intent: trusted processing publishes Completion before scoped effects and
-Result only after independently verified delivery.
+Each Claim finishes independently with `outcome: "completed"` or `"cancelled"`.
+A missing finish intent does not authorize effects. Assignments contain one
+Claim by default. Batching multiple Claims is enabled only for compatible Work
+that can reuse substantial setup.
 
-An Issue predecessor needs fresh completed-state evidence; a PR predecessor
-needs actual merge evidence. These nodes consume no Claims. Work successors wait
-for their own predecessor Results, not a batch-wide native conclusion.
+Staging a finish intent does not make it durable. Trusted processing publishes
+Completion before authorizing that Claim's effects and publishes Result only
+after independently verified delivery. Completion is not Result.
 
-Lost launch responses, dispatcher cancellation and elapsed deadlines do not
-prove nonlaunch. Reservations remain until exact termination/nonlaunch evidence
-exists. Completion with uncertain delivery does not rerun effects; bounded
-verification yields Result or DeliveryFailure.
+A predecessor is a dependency that must be satisfied before a task can run.
+An issue predecessor needs fresh evidence that it is completed; a pull request
+predecessor needs evidence that it was actually merged. These nodes consume no
+Claims. Work waits for its own predecessors' Results, not for the overall
+worker run to conclude.
+
+A lost launch response, dispatcher cancellation, or elapsed deadline does not
+prove that a worker never launched. Cancellation does not stop a native worker
+or release its reservation. Reservations remain until exact termination or
+definitive nonlaunch evidence exists; reconciliation processes that evidence
+separately. If delivery is uncertain after Completion, effects are not rerun.
+Verification within configured bounds produces Result or DeliveryFailure, an
+explicit terminal delivery failure.
 
 ### Diagnostic artifacts
 
-Claim-scoped audit exports contain executed operations, temporary-ID references
-and structured errors, not raw handler output or proof of Result. They use private
-directories/files, decoded-field secret redaction and fail-closed final uploads
-with one-day retention by default. Protected in-memory verification evidence
-remains separate; the unused disk delivery receipt is removed.
+Audit exports for each Claim contain executed operations, temporary-ID
+references, and structured errors. They do not contain raw handler output and
+are not proof of Result. Exports use private directories and files, redact
+secrets from decoded fields, and default to one-day retention. Final uploads
+fail closed: if redaction fails, the upload does not proceed. Protected
+in-memory verification evidence remains separate, and the unused on-disk
+delivery receipt is removed.
 
-Only queue workers receive these upload paths and the final redaction step.
-Repository references are not anonymized, and opaque masks registered only in
-the safe-output job cannot be recovered from agent logs. See
-[Claim diagnostic artifacts](../../patterns/daily-report-portfolio/#claim-diagnostic-artifacts)
+Only queue workers receive the upload paths and final redaction step.
+Repository references are not anonymized. Opaque masks registered only in the
+safe-output job cannot be recovered from agent logs. See
+[Claim diagnostic artifacts](/gh-aw/patterns/daily-report-portfolio/#claim-diagnostic-artifacts)
 for file purposes and redaction limits.
 
 ## Operator commands
 
 `gh aw work-queue` defaults to branch `work-queue` and supports Git storage only.
-Select the repository with `--repo owner/repo`; an explicit `--branch` chooses a
-separate authority, not a migration. The CLI and workflow runtime share the
-closed QueueCommit contract and scheduling rules, checked against independent
-fixtures. Access failures, malformed logs and unsupported versions are explicit
-errors; commands do not silently initialize Policy over an invalid ledger.
+`--repo owner/repo` selects the repository. An explicit `--branch` selects a
+separate authoritative queue; it does not migrate an existing queue.
+
+The CLI and workflow runtime share the QueueCommit contract (the fixed
+transaction format and allowed record types) and scheduling rules. Independent
+test fixtures check both implementations. Access failures, malformed logs, and
+unsupported versions produce explicit errors. Commands do not silently
+initialize Policy over an invalid log.
 
 | Command | Purpose |
 | --- | --- |
-| `replay`, `stats` | Inspect the causal projection, typed graph nodes, independent Claims and native reservations |
-| `state [--graph GRAPH] [--pool POOL] [--state STATE] [--search TEXT]` | Metadata-only ASCII graph/Work/Claim forest; `--offset` and `--limit` paginate at most 256 rows/64 KiB |
-| `inspect --work-id ID` or `inspect --claim-id ID` | Full copyable IDs, dependency cross-references, current/historical ownership, original assignment membership and independent delivery/native barriers |
-| `tui` (alias `interactive`) | Keyboard master-detail browser; search, multi-select, live cursor details, checked cancellation and prospective priority changes |
-| `explain --pool POOL [--work-id ID]` | Evaluate the native selector or inspect a dependency path without changing passes |
-| `explain --request-id ID` or `explain --claim-id ID` | Reconstruct an exact historical grant using the authoritative prefix |
-| `trace --request-id ID` or `trace --claim-id ID` | Read bounded causal events without exposing payloads or receipt contents; use `--offset` and `--limit` for pagination |
-| `compact` | Canonicalize and deduplicate complete commits without dropping history, resetting debt or moving FIFO positions |
-| `policy --file policy.json --epoch EPOCH` | Install an authorized prospective Policy only when the queue is drained |
-| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed entitlements |
-| `submit-graph` | Atomically admit a bounded normalized graph, including Issue/PR dependency nodes |
-| `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit a deterministic fair prefix and its reservations; does not itself send a workflow-dispatch POST |
-| `control`, `cancel-work` | Apply authorized pause/cutover/cancellation decisions without refunding service or force-releasing a possible native run |
-| `cancel-claim --claim-id ID[,ID...] --reason CODE` | Atomically fence exact current Claims and terminally cancel their Work; not a retry, worker impersonation or native-run stop |
-| `reprioritize --work-id ID[,ID...] --priority 1..5 --reason CODE` | Administrator-only, compare-and-set override for future grants of available Work; preserves admitted definitions, FIFO positions, retry boundaries and accumulated debt |
-| `evidence`, `reconcile --dispatch-id ID` | Inspect authenticated run evidence and reconcile exact termination; uncertainty retains capacity |
+| `replay`, `stats` | Inspect state reconstructed from the log, typed dependency nodes, individual Claims, and native reservations. |
+| `state [--graph GRAPH] [--pool POOL] [--state STATE] [--search TEXT]` | Display an ASCII tree of graphs, Work, and Claims using metadata only. `--offset` and `--limit` paginate at most 256 rows/64 KiB. |
+| `inspect --work-id ID` or `inspect --claim-id ID` | Show full copyable IDs, dependency cross-references, current and historical ownership, original assignment membership, and separate delivery and native-run barriers. |
+| `tui` (alias `interactive`) | Browse the queue with a keyboard, search, multi-select, and view details for the focused item. Review cancellation and future priority changes before publishing. |
+| `explain --pool POOL [--work-id ID]` | Evaluate scheduler selection or inspect a dependency path without changing scheduling counters. |
+| `explain --request-id ID` or `explain --claim-id ID` | Reconstruct an exact historical grant from the authoritative log up to that point. |
+| `trace --request-id ID` or `trace --claim-id ID` | Read causal events within size limits, without exposing payloads or receipt contents. `--offset` and `--limit` control pagination. |
+| `compact` | Normalize and deduplicate complete commits without dropping history, resetting fairness accounting, or changing FIFO positions. |
+| `policy --file policy.json --epoch EPOCH` | Install an authorized Policy for future work only when the queue is quiescent. |
+| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed producer permissions. |
+| `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. |
+| `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit the next assignments selected by deterministic fair scheduling and their reservations. Does not send a workflow-dispatch POST. |
+| `control`, `cancel-work` | Apply authorized pause, cutover, or cancellation decisions without refunding accounted service or force-releasing a reservation for a possible native run. |
+| `cancel-claim --claim-id ID[,ID...] --reason CODE` | Atomically revoke the exact current Claims' authority and terminally cancel their Work. Does not retry work, impersonate a worker, or stop a native run. |
+| `reprioritize --work-id ID[,ID...] --priority 1..5 --reason CODE` | Apply an administrator-only, compare-and-set priority override to future grants of available Work. Preserves admitted definitions, FIFO positions, retry boundaries, and accumulated fairness charges. |
+| `evidence`, `reconcile --dispatch-id ID` | Inspect authenticated run evidence and reconcile exact termination. Uncertainty retains reserved capacity. |
 
-Use `--json` for structured output and `--request-id` to retain a logical
-publication handle across retries. Consult each command's `--help` for validated
-inputs. Reservation, native launch, verified binding, Completion, Result and
-Release are distinct states; successful `dispatch-next` is not proof of launch.
+`--json` returns structured output where supported. `--request-id` identifies
+the same logical publication across retries. Each command's `--help`
+describes validated inputs. Reservation, native launch, verified run binding,
+Completion, Result, and Release are distinct; successful `dispatch-next` is
+not proof of launch.
 
-Worker finish is the scoped MCP intent, not an operator impersonation command.
-Direct `claim --work-id`, scalar assignments, Issues storage, old records,
-automatic upgrades and arbitrary run-ID adoption are unsupported. Quiesce old
-writers/workflows and preserve evidence before explicit current-protocol
-deployment. Mutation permissions and trusted run evidence must be independently
-established; an operator actor string is not worker authorization.
+A Policy update requires a quiescent queue: no nonterminal (unfinished) Work,
+outstanding reservations, or unresolved delivery barriers for completed Work.
+Installing Policy does not configure or verify queue-branch writer restrictions.
+Those restrictions must be established independently; automated enforcement
+remains deferred. The agent cannot install Policy or receive queue-write
+credentials.
+
+Worker finish is a Claim-scoped MCP intent, not an operator command that can
+impersonate a worker. Direct `claim --work-id`, legacy scalar assignments
+(including agent-selected winners), Issues storage, old records, automatic
+upgrades, and arbitrary run-ID adoption are unsupported by the native protocol.
+Before deploying the current protocol, quiesce old writers and workflows and
+preserve their evidence. Permissions to change the queue and trusted run
+evidence must be established independently. An operator actor string does not
+authorize a worker.
 
 ### Keyboard browser and checked actions
 
@@ -140,11 +189,12 @@ gh aw work-queue --repo owner/repo reprioritize \
   --work-id WORK_A,WORK_B --priority 1 --reason operator_reprioritized --request-id incident-priority
 ```
 
-The TUI requires interactive stdin/stdout and at least 45 columns by 16 rows.
-At 100 columns it shows the forest beside cursor-synchronized details; narrower
-terminals switch panes with `Tab` or `Enter`. Full IDs remain in scrollable
-details, while list labels are abbreviated. Selection and focus also use text
-markers, not color alone.
+The terminal user interface (TUI) requires interactive standard input and
+output and a terminal at least 45 columns wide by 16 rows high. At 100 columns,
+it shows the tree beside details for the focused item. In narrower terminals,
+`Tab` or `Enter` switches panes. Scrollable details show full IDs; list labels
+abbreviate them. Text markers indicate selection and focus, so these states do
+not depend on color alone.
 
 | Key | Action |
 | --- | --- |
@@ -157,30 +207,41 @@ markers, not color alone.
 | `r`, `?`, `q` | Refresh, keyboard help, quit |
 | `Esc` outside a dialog | Clear search and selection |
 
-Reads refresh every 10 seconds while idle; search and action reviews freeze
-automatic reads. Every action shows its authority and exact targets, and cannot
-publish if the targets exceed the confirmation viewport. Each TUI action
-generates a stable request ID (`--json` and `--request-id` are rejected);
-uncertain acknowledgments remain visible for `explain --request-id` inspection.
-Read failures retain the previous view with an explicit stale/error status.
+The view refreshes every 10 seconds while idle. Search and action review pause
+automatic reads. Each action shows its authority and exact targets. It cannot
+publish if all targets do not fit in the confirmation view. Each TUI action
+generates a stable request ID; `tui` rejects `--json` and `--request-id`.
+Uncertain acknowledgments remain visible for inspection with
+`explain --request-id`. If a read fails, the previous view remains visible with
+an explicit stale or error status.
 
-Forest edges group graph membership and Claim attempts, not dependency
-parenthood. Shared Work dependencies and typed Issue/PR gates are explicit
-cross-references in details. These views never display payloads or receipt
-bodies; `replay --json` remains the full authoritative projection.
+The tree groups graph membership and Claim attempts, not dependencies.
+Details show cross-references for shared Work dependencies and issue or pull
+request gates. Neither view displays payloads or receipt bodies.
+`replay --json` provides the full authoritative state reconstructed from the
+log.
 
 Cancellation and reprioritization accept repeated selector flags or
-comma-separated IDs, require an administrator, and publish one all-or-nothing
-checked transaction. A Claim selector includes a durable ownership fence, so
-CAS refresh cannot cancel a replacement owner. Completed ownership cannot be
-cancelled; historical Claims cannot cancel a new attempt. Cancellation keeps
-dispatch membership, charges and native reservations; reconcile exact evidence
-separately.
+comma-separated IDs. Both require an administrator and publish one checked,
+all-or-nothing transaction. Compare-and-set (CAS) checks ensure that the
+target's state has not changed before publication. A Claim selector includes
+a durable ownership fence: a check tied to the exact owner, so refreshing
+after a conflict cannot cancel a replacement owner. Completed ownership cannot
+be cancelled, and historical Claims cannot cancel a new attempt.
 
-Priority overrides apply only to available Work, including retry-waiting Work.
-They do not edit active assignments, admitted metadata, child admission defaults,
-fairness weights or prior charges. Configured weights determine class shares;
-defaults favor lower numbers without strict-preemption semantics. Competing
-grants or priority changes reject stale actions rather than redirecting them.
-Go/JavaScript protocol tests cover these administrator extensions; the existing
-fixed-priority TLA+ models do not model arbitrary operator reprioritization.
+Cancellation preserves dispatch membership, fairness charges, and native
+reservations. It does not stop the native worker or free reserved capacity.
+Exact termination or definitive nonlaunch evidence requires separate
+reconciliation.
+
+Priority overrides apply only to available Work, including Work waiting for a
+retry. They do not change active assignments, admitted metadata, defaults for
+child Work admission, fairness weights, or prior charges. Configured weights
+determine each priority class's share. Defaults favor lower priority numbers
+but do not guarantee strict priority ordering. If another grant or priority
+change makes an action stale, the action is rejected rather than applied to a
+different target.
+
+Go and JavaScript protocol tests cover these administrator extensions. The
+existing fixed-priority TLA+ models do not model arbitrary operator
+reprioritization.

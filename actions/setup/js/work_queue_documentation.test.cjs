@@ -37,6 +37,8 @@ describe("work-queue deployment documentation", () => {
     const instructions = readRepositoryFile(instructionsPath);
     expect(instructions.trim().split(/\s+/).length).toBeLessThanOrEqual(800);
     expect(instructions).not.toContain("```json");
+    expect(instructions).toContain("issue-backed WorkQueueOps");
+    expect(readRepositoryFile(referencePath)).toContain("Work queues can be Git-backed or issue-backed");
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       expect(instructions).toContain(file.replace(/^docs\//, "../../docs/"));
     }
@@ -83,13 +85,14 @@ describe("work-queue deployment documentation", () => {
         let target;
         const repositoryURL = destination.match(/^https:\/\/github\.com\/github\/gh-aw\/(?:blob|tree)\/main\/(.+)$/);
         if (repositoryURL) target = path.join(repositoryRoot, repositoryURL[1]);
+        else if (destination.startsWith("/gh-aw/")) target = path.resolve(repositoryRoot, "docs/src/content/docs", destination.slice("/gh-aw/".length));
         else if (/^[a-z]+:/.test(destination) || destination.startsWith("/")) continue;
-        else {
-          const base = file.startsWith("docs/src/content/docs/") ? file.replace(/\.md$/, "") : path.dirname(file);
-          target = destination ? path.resolve(repositoryRoot, base, destination) : path.join(repositoryRoot, file);
-        }
+        else target = destination ? path.resolve(repositoryRoot, path.dirname(file), destination) : path.join(repositoryRoot, file);
 
-        if (destination.endsWith("/") && !fs.existsSync(target)) target = `${target}.md`;
+        if (destination.endsWith("/")) {
+          const candidates = [`${target}.md`, `${target}.mdx`, path.join(target, "index.md"), path.join(target, "index.mdx")];
+          target = candidates.find(candidate => fs.existsSync(candidate)) ?? target;
+        }
         expect(fs.existsSync(target), `${file}: ${link}`).toBe(true);
         if (anchor && target.endsWith(".md")) {
           const headings = [...fs.readFileSync(target, "utf8").matchAll(/^#{1,6} (.+)$/gm)].map(([, heading]) =>

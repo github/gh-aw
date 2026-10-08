@@ -4,12 +4,16 @@ description: Agent instructions for Git-backed work queue producers, dispatchers
 
 # Work Queue
 
+Choose the queue pattern first: use native Git storage for fair scheduling and
+Claim authority, or [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md)
+for issue-backed checklists/sub-issues, Discussions or cache-memory backlogs.
+
 Use `tools.work-queue` for durable fair scheduling, immutable Work DAGs and
 Claim-scoped effects. Treat the causal `work-queue.jsonl` log as the only
 authority. Defaults are FIFO-like; configured weights share Claim opportunities,
-not CPU time or successful completions. Use Issues/PRs as dependency nodes, never
-queue storage. For lightweight checklists/backlogs instead, load
-[WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md).
+not CPU time or successful completions. In this version-3 native protocol,
+Issues/PRs are dependency nodes; `storage: issues` is unsupported. Do not confuse
+that restriction with issue-backed WorkQueueOps.
 
 ## Select the role
 
