@@ -9,6 +9,40 @@ import (
 	"testing"
 )
 
+func TestValidateIncludedFileFrontmatter_InternalMCPInfrastructureCapability(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		{name: "omitted"},
+		{name: "enabled rejected", value: true, wantErr: true},
+		{name: "disabled rejected", value: false, wantErr: true},
+		{name: "string rejected", value: "true", wantErr: true},
+		{name: "number rejected", value: 1, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			capabilities := map[string]any{}
+			if tt.value != nil {
+				capabilities["cli-only-mcp-infrastructure"] = tt.value
+			}
+			err := ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{
+				"engine": map[string]any{
+					"id":           "custom-capability-engine",
+					"display-name": "Custom capability engine",
+					"behaviors": map[string]any{
+						"execution":    map[string]any{"command-name": "custom-capability-engine"},
+						"capabilities": capabilities,
+					},
+				},
+			}, "workflow.md")
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validation error = %v, wantErr %t", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateMainWorkflowFrontmatter_IssueFieldActivityTypes(t *testing.T) {
 	frontmatter := map[string]any{
 		"on": map[string]any{

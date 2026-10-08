@@ -71,9 +71,12 @@ the runner's step summary only after secret redaction, matching other built-in e
 
 Configured HTTP MCP servers are translated from the gh-aw gateway into
 owner-only `.agents/mcp_config.json`, using native `serverUrl` entries and
-validated headers. CLI-mounted infrastructure tools, including `safeoutputs`
-and `mcpscripts`, are omitted from native MCP configuration. Repository MCP
-configuration is replaced by the explicitly configured gateway servers.
+validated headers. All configured MCP servers, including `safeoutputs`,
+`mcpscripts`, custom servers and `awf-enclave`, remain available through native
+MCP. Only explicit `tools.cli-proxy` excludes CLI-mounted servers from the native
+configuration; the existence of an infrastructure CLI wrapper does not exclude
+its native MCP route.
+Repository MCP configuration is replaced by the explicitly configured gateway servers.
 `AGENTS.md`, `GEMINI.md`, `.agents/` and `.gemini/` are protected instruction
 and configuration surfaces.
 
@@ -135,7 +138,13 @@ inference accounting, native and CLI-mounted MCP round trips, and staged safe
 outputs. Runs are bounded to ten minutes and fifty AI credits; results are recorded
 in the step summary and conformance artifacts, not published as issues or comments.
 
-Both checkers require the exact staged noop receipt, not an empty output file.
+Both checkers require exactly one staged noop receipt, not an empty output file
+or duplicate completion messages. Complete all probes before emitting that noop
+through Agy's native `safeoutputs` MCP server, not its CLI wrapper.
+The native checker requires completed `call_mcp_tool` events for both the custom
+`agy-native` server and the built-in `mcpscripts` server, with the expected tools
+and fixture nonce and responses matching their recorded receipts. It also verifies
+the native `safeoutputs(noop)` event and exact staged output.
 The native MCP allowlist uses `native_challenge`, matching the underscore-normalized
 name exposed by the MCP scripts server; the script's authored name remains
 `native-challenge`.
