@@ -4220,7 +4220,7 @@ describe("safe_outputs_handlers", () => {
   });
 
   describe("updateIssueHandler", () => {
-    it.each([undefined, null, {}, { issue_number: 42 }, { operation: "append" }, { secrecy: "public", integrity: "high" }, { status: "" }, { labels: " " }, { milestone: null }])(
+    it.each([undefined, null, {}, { issue_number: 42 }, { operation: "append" }, { secrecy: "public", integrity: "high" }, { status: "" }, { labels: " " }, { milestone: " \t\n" }])(
       "should reject calls without update fields before recording an output: %j",
       args => {
         const wildcardHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
@@ -4236,7 +4236,7 @@ describe("safe_outputs_handlers", () => {
       }
     );
 
-    it.each([{ status: "open" }, { title: "Updated title" }, { body: "Updated body" }, { body: "" }, { labels: [] }, { assignees: [] }, { milestone: 1 }])(
+    it.each([{ status: "open" }, { title: "Updated title" }, { body: "Updated body" }, { body: "" }, { labels: [] }, { assignees: [] }, { milestone: 1 }, { milestone: null }])(
       "should accept each update field independently, including explicit clears: %j",
       update => {
         const wildcardHandlers = createHandlers(mockServer, mockAppendSafeOutput, {

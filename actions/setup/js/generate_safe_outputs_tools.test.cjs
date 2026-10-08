@@ -112,6 +112,8 @@ describe("generate_safe_outputs_tools", () => {
       expect(tool.inputSchema).not.toHaveProperty(keyword);
     }
     expect(tool.description).toContain("REQUIRED: Provide at least one of: status, title, body, labels, assignees, or milestone.");
+    expect(tool.inputSchema.properties.milestone.type).toEqual(["number", "string", "null"]);
+    expect(tool.inputSchema.properties.milestone.description).toContain("Use null to clear.");
   });
 
   it("mounts dedicated built-in ledger tools without exposing the low-level append tool", () => {

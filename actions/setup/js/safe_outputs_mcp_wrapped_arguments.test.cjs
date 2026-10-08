@@ -81,6 +81,51 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
     expect(written.temporary_id).toMatch(/^aw_[A-Za-z0-9_]{3,12}$/);
   });
 
+  it("rejects blank-only issue updates at the handler boundary and records explicit milestone clears", async () => {
+    const configPath = path.join(tempDir, "config.json");
+    const toolsPath = path.join(tempDir, "tools.json");
+    const outputPath = path.join(tempDir, "output.jsonl");
+    const tools = JSON.parse(fs.readFileSync(path.join(process.cwd(), "safe_outputs_tools.json"), "utf8"));
+    fs.writeFileSync(configPath, JSON.stringify({ update_issue: { enabled: true, target: "*" } }));
+    fs.writeFileSync(toolsPath, JSON.stringify(tools.filter(tool => tool.name === "update_issue")));
+    process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH = configPath;
+    process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH = toolsPath;
+    process.env.GH_AW_SAFE_OUTPUTS = outputPath;
+
+    const { server } = createMCPServer();
+    const request = update => ({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "update_issue", arguments: { issue_number: 42, ...update } },
+    });
+    for (const update of [{}, { status: "" }, { labels: " \t\n" }, { assignees: "" }, { milestone: " " }]) {
+      const rejected = await server.handleRequest(request(update));
+      expect(rejected).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: {
+          code: -32602,
+          message: "ERR_VALIDATION: update_issue requires at least one of: status, title, body, labels, assignees, milestone fields",
+        },
+      });
+      expect(fs.existsSync(outputPath)).toBe(false);
+    }
+
+    for (const update of [{ milestone: null }, { title: "Updated title" }, { body: "" }, { labels: [] }, { assignees: [] }]) {
+      const response = await server.handleRequest(request(update));
+      expect(response.error).toBeUndefined();
+      expect(response.result.isError).toBe(false);
+    }
+    expect(fs.readFileSync(outputPath, "utf8").trim().split("\n").map(JSON.parse)).toEqual([
+      { type: "update_issue", issue_number: 42, milestone: null },
+      { type: "update_issue", issue_number: 42, title: "Updated title" },
+      { type: "update_issue", issue_number: 42, body: "" },
+      { type: "update_issue", issue_number: 42, labels: [] },
+      { type: "update_issue", issue_number: 42, assignees: [] },
+    ]);
+  });
+
   it("maps configured parameter synonyms to canonical field names", () => {
     const debug = vi.fn();
     const normalized = normalizeSafeOutputToolArguments(

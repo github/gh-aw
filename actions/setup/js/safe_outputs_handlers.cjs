@@ -3013,7 +3013,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
   const updateIssueHandler = args => {
     const normalizedArgs = normalizeBlankOptionalFields(args, safeOutputsToolMap.get("update_issue").inputSchema.properties);
     const updateFields = ["status", "title", "body", "labels", "assignees", "milestone"];
-    if (!updateFields.some(field => normalizedArgs[field] !== undefined && normalizedArgs[field] !== null && normalizedArgs[field] !== false)) {
+    if (!updateFields.some(field => normalizedArgs[field] !== undefined && normalizedArgs[field] !== false && (normalizedArgs[field] !== null || field === "milestone"))) {
       throw {
         code: -32602,
         message: `${ERR_VALIDATION}: update_issue requires at least one of: ${updateFields.join(", ")} fields`,

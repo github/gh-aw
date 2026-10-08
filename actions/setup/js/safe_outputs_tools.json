@@ -1351,7 +1351,7 @@
           "description": "Replace the issue assignees with this list of GitHub usernames (e.g., ['octocat', 'mona'])."
         },
         "milestone": {
-          "type": ["number", "string"],
+          "type": ["number", "string", "null"],
           "description": "Milestone number to assign (e.g., 1). Use null to clear."
         },
         "issue_number": {

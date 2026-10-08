@@ -512,6 +512,10 @@ func TestUpdateIssueValidationConfig(t *testing.T) {
 	if _, ok := config.Fields["labels"]; !ok {
 		t.Error("update_issue Fields is missing the 'labels' field")
 	}
+	milestone, ok := config.Fields["milestone"]
+	if !ok || !milestone.OptionalPositiveInteger || !milestone.AllowNull {
+		t.Errorf("update_issue milestone must accept positive integers and preserve explicit null, got %+v", milestone)
+	}
 }
 
 func TestIssueIntentValidationFields(t *testing.T) {
