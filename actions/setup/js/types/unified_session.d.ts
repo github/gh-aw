@@ -29,8 +29,24 @@ export interface UnifiedSessionUsage {
   overflowedTokens?: string[];
 }
 
-export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials"> {
+export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics"> {
   usage?: UnifiedSessionUsage | null;
+}
+
+export interface UnifiedMessageData extends Pick<MessageData, "content"> {
+  delta?: JsonValue;
+  partial?: JsonValue;
+  messageId?: JsonValue;
+  contentIndex?: JsonValue;
+  channel?: JsonValue;
+  sessionId?: JsonValue;
+  agentId?: JsonValue;
+  parentToolUseId?: JsonValue;
+  model?: JsonValue;
+  apiCallId?: JsonValue;
+  interactionId?: JsonValue;
+  turnId?: JsonValue;
+  parentToolCallId?: JsonValue;
 }
 
 export interface DynamicWorkflowTaskData {
@@ -249,14 +265,14 @@ export interface CollectionData {
 export interface UnifiedSessionEventDataMap {
   "session.format": SessionFileFormatData;
   "agent.execution": AgentExecutionData;
-  "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd">;
-  "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd">;
+  "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
+  "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
   "user.message": Pick<MessageData, "content">;
   "prompt.system": Pick<MessageData, "content">;
   "prompt.user": Pick<MessageData, "content">;
-  "assistant.message": Pick<MessageData, "content">;
+  "assistant.message": UnifiedMessageData;
   "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial">;
-  "assistant.reasoning": Pick<MessageData, "content">;
+  "assistant.reasoning": UnifiedMessageData;
   "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName">;
   "tool.execution_complete": Pick<
     ToolExecutionCompleteData,
