@@ -1,13 +1,17 @@
 ---
 title: Staged Mode
-description: Preview safe output operations without making any changes, so you can see exactly what a workflow would do before it acts.
+description: Preview built-in safe output operations without applying their writes; custom jobs and other workflow effects require separate controls.
 sidebar:
   order: 820
 ---
 
-Staged mode lets you run a workflow and preview the [safe outputs](/gh-aw/reference/safe-outputs/) it would create — issues, comments, pull requests, and more — without making any changes. Every write operation is skipped and replaced with a detailed 🎭 preview in the GitHub Actions step summary.
+Staged mode lets you run a workflow and preview the built-in [safe outputs](/gh-aw/reference/safe-outputs/) it would create — issues, comments, pull requests, and more — without applying those writes. Staged built-in operations are replaced with a detailed 🎭 preview in the GitHub Actions step summary.
 
-Use it to validate a new workflow before it has any real effect, or to share what a workflow *would* do before enabling it in production.
+Use it to review proposed safe outputs before enabling their production writes.
+Staging is not a sandbox: custom jobs, scripts, external MCP servers, custom
+credentials, memory/cache persistence, and diagnostic exports require separate
+controls. [Compile dry-run](/gh-aw/reference/compilation-process/#development-testing-mode)
+disables additional compiler-managed mutations but does not sandbox custom code.
 
 ## Enabling Staged Mode
 
@@ -45,7 +49,11 @@ safe-outputs:
 ---
 ```
 
-A type-level `staged` setting overrides the global one, so you can pilot one risky output type while keeping other outputs fully active.
+A built-in output is staged when either the global setting or its type-level
+setting is true. With global staging false or unset, type-level staging lets you
+preview one output type while keeping others active. Type-level `staged: false`
+cannot disable global staging, including staging forced by compile `--staged`
+or `--dry-run`.
 
 ## What the Preview Looks Like
 
@@ -108,6 +116,8 @@ Staged mode is supported by all built-in safe output types:
 | [`create-agent-session`](/gh-aw/reference/copilot-cloud-agent/#create-agent-session) | Session details |
 
 [Custom safe output jobs](/gh-aw/reference/custom-safe-outputs/) receive the `GH_AW_SAFE_OUTPUTS_STAGED` environment variable set to `"true"` when staged mode is active, allowing you to implement your own preview behavior.
+They are not automatically skipped: their code must honor the staging signal,
+and their credentials and external effects still require review.
 
 ## Staged Mode for Custom Safe Output Jobs
 

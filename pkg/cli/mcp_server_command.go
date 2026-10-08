@@ -31,6 +31,7 @@ The server provides the following tools:
   - logs        - Download and analyze workflow logs (requires write access or higher)
   - audit       - Investigate a workflow run, job, or step and generate a report (requires write access or higher)
   - checks      - Classify CI check state for a pull request
+  - work-queue  - Read Git-backed work queue state or inspect Work/Claim metadata (read-only)
   - mcp-inspect - Inspect MCP servers in workflows and list available tools
   - add         - Add workflows from remote repositories to .github/workflows
   - update      - Update workflows from their source repositories

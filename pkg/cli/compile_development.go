@@ -67,6 +67,9 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 		return nil
 	}
 	appendDevelopmentCompilerDiagnostics(compiler, stats, results)
+	if len(config.modelValidationWarnings) > 0 {
+		appendDevelopmentBatchDiagnostics("models", modelInventoryWarnings(config), stats, results)
+	}
 	for _, err := range scanErrors {
 		for _, issue := range appendValidationErrors(nil, "scanner_error", err) {
 			if !hasDevelopmentBatchDiagnostic(*results, issue.Message) {
@@ -150,4 +153,12 @@ func appendDevelopmentBatchDiagnostics(source string, issues []ValidationIssue, 
 		Scope: "batch", Workflow: source, Valid: false, Errors: issues, Warnings: []ValidationIssue{},
 	})
 	stats.Errors += len(issues)
+}
+
+func modelInventoryWarnings(config CompileConfig) []ValidationIssue {
+	issues := make([]ValidationIssue, 0, len(config.modelValidationWarnings))
+	for _, message := range config.modelValidationWarnings {
+		issues = append(issues, ValidationIssue{Type: "model_inventory_warning", Message: message})
+	}
+	return issues
 }

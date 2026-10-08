@@ -16,7 +16,7 @@ const engines = [
 <LandingSection id="how-it-works" title="How it works" lede="Prompt your coding agent to create a workflow. GitHub compiles it into an Actions workflow and runs it.">
   <ol class="aw-steps">
     <li class="aw-step">
-      <div class="aw-frag aw-card" role="img" aria-label="A GitHub Copilot prompt: slash agentic workflows, create a daily status workflow. Followed by slash agentic workflow, optimize it.">
+      <div class="aw-frag aw-card" role="img" data-slideshow-snippet="Coding agent prompt" aria-label="A GitHub Copilot prompt: slash agentic workflows, create a daily status workflow. Followed by slash agentic workflow, optimize it.">
         <div class="aw-bar">GitHub Copilot</div>
         <div class="aw-prompt-body" aria-hidden="true">
           <p class="aw-prompt-command aw-pill">/agentic-workflows</p>
@@ -29,7 +29,7 @@ const engines = [
     </li>
 
     <li class="aw-step">
-      <div class="aw-frag aw-card" role="img" aria-label="Terminal: running gh aw compile prints a check mark and triage.lock.yml, pinned, validated GitHub Actions YAML.">
+      <div class="aw-frag aw-card" role="img" data-slideshow-snippet="Compile in the terminal" aria-label="Terminal: running gh aw compile prints a check mark and triage.lock.yml, pinned, validated GitHub Actions YAML.">
         <div class="aw-bar"><Octicon name="terminal" />Terminal</div>
         <div class="aw-term-body" aria-hidden="true">
           <div class="aw-cmd"><span class="m">$</span> gh aw compile</div>
@@ -42,7 +42,7 @@ const engines = [
     </li>
 
     <li class="aw-step">
-      <div class="aw-frag aw-card" role="img" aria-label="An Actions run: triage, agent, succeeded in 48 seconds, applied the label type: bug.">
+      <div class="aw-frag aw-card" role="img" data-slideshow-snippet="GitHub Actions run" aria-label="An Actions run: triage, agent, succeeded in 48 seconds, applied the label type: bug.">
         <div class="aw-bar"><Octicon name="play" />Actions</div>
         <div class="aw-run-body" aria-hidden="true">
           <div class="aw-row">
@@ -79,7 +79,7 @@ const engines = [
         );
       })}
     </ul>
-    <p class="aw-importable">
+    <p class="aw-importable" data-slideshow-hide>
       <a class="aw-link" href={`${base}/reference/engines/#shared-imported-engines`}>Bring your own engine <span aria-hidden="true">→</span></a>
       <span>Import OpenCode, Cursor, Kiro, Aider, Crush or your own definition.</span>
     </p>

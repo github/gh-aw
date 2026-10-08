@@ -79,7 +79,7 @@ Alternatively, create `.github/mcp.json` manually:
       "type": "local",
       "command": "gh",
       "args": ["aw", "mcp-server"],
-      "tools": ["compile", "audit", "logs", "inspect", "status", "audit-diff"]
+      "tools": ["compile", "audit", "logs", "inspect", "status", "audit-diff", "work-queue"]
     }
   }
 }
@@ -118,6 +118,7 @@ The MCP server exposes these workflow-management tools:
 | `audit` | Audit one or more workflow runs; with multiple runs, compare each run to the first. | `run_ids_or_urls` (preferred), `run_id`, deprecated `run_id_or_url`, plus `artifacts`, `experiment`, `variant`, `jq` | Single-run JSON audit or multi-run diff JSON. |
 | `checks` | Normalize CI check state for a pull request. | `pr_number`, `repo` | JSON with `state`, `required_state`, `pr_number`, `head_sha`, `check_runs`, `statuses`, `total_count`. |
 | `mcp-inspect` | List MCP servers in workflows and inspect their tools, resources, and roots. | `workflow_file`, `server`, `tool` | Formatted text output. |
+| `work-queue` | Read the Git-backed work queue without publishing or changing queue state. | `operation`, `repo`, `branch`, and operation-specific selectors or filters | The selected CLI operation's JSON output. |
 | `add` | Add workflows from remote repositories to `.github/workflows`. | `workflows`, `number`, `name` | Added workflow files. |
 | `update` | Update sourced workflows and check for gh-aw updates. | `workflows`, `major`, `force` | Updated workflow files and version checks. |
 | `fix` | Apply automatic codemod-style fixes. | `workflows`, `write`, `list_codemods` | Dry-run or written fixes. |
@@ -130,6 +131,31 @@ For `audit`, each run identifier may be a numeric run ID, a run URL, a job URL, 
 For `checks`, normalized states are `success`, `failed`, `pending`, `no_checks`, and `policy_blocked`. Use `required_state` as the authoritative CI verdict when optional third-party deployments are present.
 
 Available `fix` codemods include `timeout-minutes-migration`, `network-firewall-migration`, `mcp-scripts-mode-removal`, and `steps-run-secrets-to-env`.
+
+### Read-only work queue
+
+The `work-queue` tool requires `operation` and `repo` (`owner/repo`), matching the CLI's explicit repository selection. The optional `branch` defaults to `work-queue`. Git storage uses the server's existing credentials; private repositories require read access. Actor validation for log and audit tools does not gate this tool because its operations are read-only and repository access is already bounded by those Git credentials.
+
+| Operation | Options | Returns |
+| --- | --- | --- |
+| `state` | `graph`, `pool`, `state`, `search`, `offset`, `limit` | Bounded metadata-only Work/Claim forest with counts, queue tip, and `next_offset` when more rows remain. |
+| `inspect` | Exactly one of `work_id` or `claim_id` | Metadata, dependencies, assignment membership, and delivery barriers. |
+
+Options belonging to another operation are rejected. For `state`, the `state` filter accepts `available`, `claimed`, `completed`, or `cancelled`. Pagination uses a nonnegative `offset` and a `limit` of 1–256 (default 80).
+
+```json wrap
+{
+  "name": "work-queue",
+  "arguments": {
+    "operation": "state",
+    "repo": "owner/repo",
+    "state": "available",
+    "limit": 20
+  }
+}
+```
+
+Only `state` and `inspect` are exposed through MCP. Other read-only operations (`replay`, `stats`, `explain`, `trace`, and `evidence`) remain CLI-only, as do all mutating operations.
 
 ## Using GH-AW as an MCP from an Agentic Workflow
 
