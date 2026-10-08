@@ -266,6 +266,17 @@ func CheckAndPrepareDockerImages(ctx context.Context, opts DockerImagesOptions) 
 		return nil
 	}
 
+	// Compatible native scanners do not require Docker or image downloads.
+	if opts.Zizmor && localScannerPath(ctxutil.OrBackground(ctx), "zizmor") != "" {
+		opts.Zizmor = false
+	}
+	if opts.Poutine && localScannerPath(ctxutil.OrBackground(ctx), "poutine") != "" {
+		opts.Poutine = false
+	}
+	if !opts.Zizmor && !opts.Poutine && !opts.Actionlint && !opts.RunnerGuard && !opts.Syft && !opts.Grype && !opts.Grant && !opts.Yamllint {
+		return nil
+	}
+
 	// Check if Docker daemon is available before attempting any image operations
 	if !IsDockerAvailable(ctx) {
 		var requestedTools []string

@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -149,7 +150,7 @@ func interpretZizmorRunError(runErr error, totalWarnings, highSeverityCount int,
 	return nil
 }
 
-// buildZizmorCommand assembles the validated `docker run` invocation for the zizmor
+// buildZizmorCommand assembles the validated invocation for the zizmor
 // scanner along with the repository-relative paths used for progress reporting.
 func buildZizmorCommand(lockFiles []string) (cmd *exec.Cmd, relPaths []string, dockerArgs []string, err error) {
 	// Find git root to get the absolute path for Docker volume mount
@@ -167,6 +168,13 @@ func buildZizmorCommand(lockFiles []string) (cmd *exec.Cmd, relPaths []string, d
 	relPaths, containerPaths, err := zizmorScanPaths(gitRoot, lockFiles)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+
+	if localPath := localScannerPath(context.Background(), "zizmor"); localPath != "" {
+		args := append([]string{"--persona", "auditor", "--format", "json"}, containerPaths...)
+		cmd = exec.Command(localPath, args...)
+		cmd.Dir = gitRoot
+		return cmd, relPaths, append([]string{localPath}, args...), nil
 	}
 
 	// Build the Docker command with JSON output for easier parsing
@@ -196,10 +204,12 @@ func buildZizmorCommand(lockFiles []string) (cmd *exec.Cmd, relPaths []string, d
 	// image constant validated by validateDockerImageRef. containerPaths are derived from
 	// filepath.Rel(gitRoot, lockFile), confined to the repository root, and prefixed with "./" to
 	// prevent option injection. exec.Command passes args directly to the OS (no shell).
-	return exec.Command(dockerPath, dockerArgs...), relPaths, dockerArgs, nil
+	cmd = exec.Command(dockerPath, dockerArgs...)
+	cmd.Dir = gitRoot
+	return cmd, relPaths, append([]string{dockerPath}, dockerArgs...), nil
 }
 
-// runZizmorOnFiles runs the zizmor security scanner on one or more .lock.yml files using Docker
+// runZizmorOnFiles runs the zizmor security scanner on one or more .lock.yml files
 func runZizmorOnFiles(lockFiles []string, verbose bool, strict bool) error {
 	if len(lockFiles) == 0 {
 		return nil
@@ -221,8 +231,7 @@ func runZizmorOnFiles(lockFiles []string, verbose bool, strict bool) error {
 
 	// In verbose mode, also show the command that users can run directly
 	if verbose {
-		dockerCmd := shellJoinArgs(append([]string{"docker"}, dockerArgs...))
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run zizmor directly: "+dockerCmd))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run zizmor directly: "+shellJoinArgs(dockerArgs)))
 	}
 
 	// Capture output
@@ -254,7 +263,7 @@ func runZizmorOnFiles(lockFiles []string, verbose bool, strict bool) error {
 	return interpretZizmorRunError(runErr, totalWarnings, highSeverityCount, fileDescription, strict)
 }
 
-// runZizmorOnFile runs the zizmor security scanner on a single .lock.yml file using Docker
+// runZizmorOnFile runs the zizmor security scanner on a single .lock.yml file
 // This is a wrapper around runZizmorOnFiles for backward compatibility
 func runZizmorOnFile(lockFile string, verbose bool, strict bool) error {
 	zizmorLog.Printf("Running zizmor security scanner: file=%s, strict=%v", lockFile, strict)

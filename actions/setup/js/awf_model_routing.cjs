@@ -38,9 +38,10 @@ function mapAWFRoutingEffort(engine, effort) {
  * @param {any} reflectData
  * @param {boolean} routingRequired
  * @param {string[]|null} [allowedEndpoints]
- * @returns {{selection: {provider: string, model: string, wire_model: string, effort: string|null, endpoint: string}|null, error: string|null}}
+ * @param {boolean} [allowEndpointOverride]
+ * @returns {{selection: {provider: string, model: string, wire_model: string, effort: string|null, endpoint: string, selected_endpoint: string}|null, error: string|null}}
  */
-function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, allowedEndpoints = null) {
+function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, allowedEndpoints = null, allowEndpointOverride = false) {
   const routing = reflectData && typeof reflectData === "object" ? reflectData.routing : null;
   if (routing == null) {
     return routingRequired ? { selection: null, error: "AWF /reflect did not return the required model-routing selection" } : { selection: null, error: null };
@@ -59,17 +60,76 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   if (!["copilot", "github-copilot", "github"].includes(provider) || !wireModel || !endpoint) {
     return { selection: null, error: "AWF /reflect returned an incomplete or unsupported Copilot routing selection" };
   }
-  if (allowedEndpoints && !allowedEndpoints.includes(endpoint)) {
-    return { selection: null, error: `AWF /reflect selected endpoint ${endpoint}, which is not supported by this engine` };
-  }
   if (!isModelAvailableInReflectData(wireModel, reflectData, REFLECT_PROVIDER_ALIASES.github)) {
     return { selection: null, error: `AWF /reflect selected unavailable Copilot wire model ${wireModel}` };
+  }
+  const routingModelAmbiguity = getAWFRoutingModelAmbiguityError(reflectData, wireModel);
+  if (routingModelAmbiguity) return { selection: null, error: routingModelAmbiguity };
+  let effectiveEndpoint = endpoint;
+  if (allowedEndpoints && !allowedEndpoints.includes(endpoint)) {
+    if (!allowEndpointOverride) {
+      return { selection: null, error: `AWF /reflect selected endpoint ${endpoint}, which is not supported by this engine` };
+    }
+    const routingModel = getAWFRoutingModel(reflectData, wireModel);
+    const supportedEndpoints = routingModel?.supported_endpoints;
+    if (routingModel?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
+      return { selection: null, error: `AWF /reflect cannot verify endpoints for model ${wireModel}; candidate metadata is incomplete for engine API ${allowedEndpoints.join(", ")}` };
+    }
+    effectiveEndpoint = allowedEndpoints.find(candidate => supportedEndpoints.includes(candidate)) || "";
+    if (!effectiveEndpoint) {
+      return {
+        selection: null,
+        error: `AWF model ${wireModel} advertises endpoints [${supportedEndpoints.join(", ")}], none compatible with this engine API [${allowedEndpoints.join(", ")}]`,
+      };
+    }
   }
   const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
   if (effort && !isRoutingReasoningEffort(effort)) {
     return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort}` };
   }
-  return { selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint }, error: null };
+  return {
+    selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint: effectiveEndpoint, selected_endpoint: endpoint },
+    error: null,
+  };
+}
+
+/**
+ * @param {any} reflectData
+ * @param {string} wireModel
+ * @returns {any|null}
+ */
+function getAWFRoutingModel(reflectData, wireModel) {
+  const matches = getAWFRoutingModelMatches(reflectData, wireModel);
+  return matches.length === 1 ? matches[0].model : null;
+}
+
+/**
+ * @param {any} reflectData
+ * @param {string} wireModel
+ * @returns {string|null}
+ */
+function getAWFRoutingModelAmbiguityError(reflectData, wireModel) {
+  const matches = getAWFRoutingModelMatches(reflectData, wireModel);
+  if (matches.length <= 1) return null;
+  const endpoints = matches.map(match => match.endpoint).join(", ");
+  return `AWF /reflect has ambiguous routing metadata for model ${wireModel}; configured GitHub endpoints [${endpoints}] all list this model`;
+}
+
+/**
+ * @param {any} reflectData
+ * @param {string} wireModel
+ * @returns {{endpoint: string, model: any}[]}
+ */
+function getAWFRoutingModelMatches(reflectData, wireModel) {
+  const endpoints = Array.isArray(reflectData?.endpoints) ? reflectData.endpoints : [];
+  const normalizedModel = wireModel.toLowerCase();
+  const matches = [];
+  for (const endpoint of endpoints) {
+    if (endpoint?.configured !== true || !REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(endpoint.provider))) continue;
+    const model = endpoint.routing_models?.find(candidate => typeof candidate?.model_id === "string" && candidate.model_id.toLowerCase() === normalizedModel);
+    if (model) matches.push({ endpoint: typeof endpoint.provider === "string" ? endpoint.provider.trim().toLowerCase() : "unknown", model });
+  }
+  return matches;
 }
 
 /**
@@ -93,5 +153,7 @@ module.exports = {
   isRoutingReasoningEffort,
   mapAWFRoutingEffort,
   resolveAWFModelRoutingSelection,
+  getAWFRoutingModel,
+  getAWFRoutingModelAmbiguityError,
   isModelAvailableInReflectData,
 };

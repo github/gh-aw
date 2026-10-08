@@ -377,7 +377,7 @@ async function buildClaudeChildEnv(reflectData, env = process.env, logger = log,
   const childEnv = { ...env };
   applyClaudeRuntimeTimeouts(childEnv);
   if (env.GH_AW_MODEL_ROUTING === "1") {
-    const result = modelRoutingSelection ? { selection: modelRoutingSelection, error: null } : resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_ENDPOINTS);
+    const result = modelRoutingSelection ? { selection: modelRoutingSelection, error: null } : resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_ENDPOINTS, true);
     if (result.error || !result.selection) {
       throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Claude`);
     }
@@ -387,7 +387,8 @@ async function buildClaudeChildEnv(reflectData, env = process.env, logger = log,
     delete childEnv.GH_AW_MODEL_FALLBACK;
     if (mappedEffort.effort) childEnv.CLAUDE_CODE_EFFORT_LEVEL = mappedEffort.effort;
     else delete childEnv.CLAUDE_CODE_EFFORT_LEVEL;
-    logger(`inference routing: mode=awf-routed model=${result.selection.wire_model} effort=${result.selection.effort || "(unset)"}`);
+    const endpointOverride = result.selection.selected_endpoint && result.selection.selected_endpoint !== result.selection.endpoint ? ` selected_endpoint=${result.selection.selected_endpoint}` : "";
+    logger(`inference routing: mode=awf-routed model=${result.selection.wire_model} effort=${result.selection.effort || "(unset)"} endpoint=${result.selection.endpoint}${endpointOverride}`);
   } else {
     applyModelFallback(childEnv, "ANTHROPIC_MODEL", logger);
   }
@@ -464,7 +465,7 @@ async function main() {
     /** @type {any} */
     let modelRoutingSelection = null;
     if (process.env.GH_AW_MODEL_ROUTING === "1") {
-      const result = resolveAWFModelRoutingSelection(reflection.reflectData, true, CLAUDE_ROUTING_ENDPOINTS);
+      const result = resolveAWFModelRoutingSelection(reflection.reflectData, true, CLAUDE_ROUTING_ENDPOINTS, true);
       if (result.error || !result.selection) {
         throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Claude`);
       }
