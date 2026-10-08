@@ -423,6 +423,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "codex"
+          GH_AW_SUB_AGENT_DIR: ".codex/agents"
+          GH_AW_SUB_AGENT_EXT: ".md"
+          GH_AW_SKILL_DIR: ".codex/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}

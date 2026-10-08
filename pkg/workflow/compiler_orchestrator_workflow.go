@@ -175,6 +175,7 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 		c.validateEngineMCPSessionTimeout,
 		c.validateEngineMCPToolTimeout,
 		validateCopilotSDKEngineArgs,
+		validatePiSubagents,
 	}
 	for _, check := range checks {
 		if err := check(workflowData); err != nil {

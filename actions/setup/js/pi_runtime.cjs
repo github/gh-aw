@@ -128,14 +128,31 @@ function preparePiRuntime(config = parsePiConfig()) {
   }
   writeSecureOutput(path.join(agentDir, "mcp.json"), JSON.stringify(gateway, null, 2));
 
-  const skillsDir = "/tmp/gh-aw/.pi/skills";
-  if (fs.existsSync(skillsDir)) fs.cpSync(skillsDir, path.join(agentDir, "skills"), { recursive: true, dereference: false });
+  for (const kind of ["skills", "agents"]) {
+    const source = path.join(process.env.GH_AW_PI_STAGING_DIR || "/tmp/gh-aw/.pi", kind);
+    if (fs.existsSync(source)) fs.cpSync(source, path.join(agentDir, kind), { recursive: true, dereference: false });
+  }
   return { agentDir, settings, config };
 }
 
 async function main() {
   verifyPiVersion();
-  preparePiRuntime();
+  const { agentDir } = preparePiRuntime();
+  if (process.env.AWF_REFLECT_ENABLED !== "1" && fs.existsSync(path.join(agentDir, "agents"))) {
+    const sdk = await loadPiSDK();
+    const runtime = await sdk.ModelRuntime.create({ modelsPath: null });
+    const provider = process.env.GH_AW_PI_NATIVE_PROVIDER || nativePiProvider("copilot");
+    const { preparePiSubagents } = require("./pi_subagent_config.cjs");
+    preparePiSubagents({
+      agentDir,
+      sdk,
+      provider,
+      catalog: runtime.getModels(provider).map(model => `${model.provider}/${model.id}`),
+      gateway: false,
+      parentModel: process.env.GH_AW_PI_MODEL || "",
+      logger: message => process.stderr.write(`[gh-aw/pi-subagent] ${message}\n`),
+    });
+  }
 }
 
 if (require.main === module) {

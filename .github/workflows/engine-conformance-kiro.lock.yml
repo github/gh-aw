@@ -300,6 +300,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "kiro"
+          GH_AW_SUB_AGENT_DIR: ".kiro/agents"
+          GH_AW_SUB_AGENT_EXT: ".agent.md"
+          GH_AW_SKILL_DIR: ".kiro/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
         with:
           script: |
             const path = require('path');

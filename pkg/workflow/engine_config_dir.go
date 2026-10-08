@@ -17,6 +17,9 @@ func engineConfigBaseDir(engineID string) string {
 }
 
 func engineConfigBaseDirForRegistry(registry *EngineRegistry, engineID string) string {
+	if registry == nil {
+		registry = GetGlobalEngineRegistry()
+	}
 	engine, err := registry.GetEngine(strings.ToLower(engineID))
 	if err == nil {
 		if provider, ok := engine.(AgentFileProvider); ok {
@@ -57,4 +60,13 @@ func GetEngineSkillDir(engineID string) string {
 //	others       → .github/agents  (Copilot default)
 func GetEngineSubAgentDir(engineID string) string {
 	return engineConfigBaseDir(engineID) + "/agents"
+}
+
+func engineInlineSkillExt(engineID string) string {
+	switch strings.ToLower(engineID) {
+	case "claude", "gemini":
+		return ".md"
+	default:
+		return "/SKILL.md"
+	}
 }

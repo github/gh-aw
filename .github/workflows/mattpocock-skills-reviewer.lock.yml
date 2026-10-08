@@ -189,6 +189,7 @@ jobs:
           GH_AW_COMPILED_STRICT: "true"
           GH_AW_INFO_FEATURES: '{"gh-aw-detection":true}'
           GH_AW_INFO_SKILLS: '["mattpocock/skills/diagnosing-bugs@801dca688564c529fa84f247f64472520d9ebe28","mattpocock/skills/tdd@801dca688564c529fa84f247f64472520d9ebe28","mattpocock/skills/improve-codebase-architecture@801dca688564c529fa84f247f64472520d9ebe28","mattpocock/skills/grill-with-docs@801dca688564c529fa84f247f64472520d9ebe28","mattpocock/skills/codebase-design@801dca688564c529fa84f247f64472520d9ebe28"]'
+          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"claude-haiku-4.5\",\"name\":\"pr-triage\",\"patterns\":[\"github-copilot/claude-haiku-4.5\"]}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -468,6 +469,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "copilot"
+          GH_AW_SUB_AGENT_DIR: ".github/agents"
+          GH_AW_SUB_AGENT_EXT: ".agent.md"
+          GH_AW_SKILL_DIR: ".github/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}

@@ -47,24 +47,26 @@ type AmbientContextMetrics struct {
 
 // TokenUsageSummary contains aggregated token usage from the firewall proxy
 type TokenUsageSummary struct {
-	TotalInputTokens      int                         `json:"total_input_tokens" console:"header:Input Tokens,format:number"`
-	TotalOutputTokens     int                         `json:"total_output_tokens" console:"header:Output Tokens,format:number"`
-	TotalCacheReadTokens  int                         `json:"total_cache_read_tokens" console:"header:Cache Read,format:number"`
-	TotalCacheWriteTokens int                         `json:"total_cache_write_tokens" console:"header:Cache Write,format:number"`
-	TotalRequests         int                         `json:"total_requests" console:"header:Requests"`
-	TotalSteeringEvents   int                         `json:"total_steering_events,omitempty" console:"header:Steering Events,format:number,omitempty"`
-	SteeringEventCounts   map[string]int              `json:"steering_event_counts,omitempty" console:"-"`
-	TotalDurationMs       int                         `json:"total_duration_ms"`
-	TotalResponseBytes    int                         `json:"total_response_bytes"`
-	CacheEfficiency       float64                     `json:"cache_efficiency"`
-	TotalAIC              float64                     `json:"total_aic,omitempty"`
-	AICFound              bool                        `json:"-"`
-	AmbientContext        *AmbientContextMetrics      `json:"ambient_context,omitempty"`
-	ByModel               map[string]*ModelTokenUsage `json:"by_model"`
-	SubagentModelRequests []SubagentModelRequest      `json:"subagent_model_requests,omitempty"`
-	SubagentModelActuals  []SubagentModelActual       `json:"subagent_model_actuals,omitempty"`
-	MismatchCount         int                         `json:"mismatch_count,omitempty"`
-	Warnings              []string                    `json:"warnings,omitempty"`
+	TotalInputTokens       int                         `json:"total_input_tokens" console:"header:Input Tokens,format:number"`
+	TotalOutputTokens      int                         `json:"total_output_tokens" console:"header:Output Tokens,format:number"`
+	TotalCacheReadTokens   int                         `json:"total_cache_read_tokens" console:"header:Cache Read,format:number"`
+	TotalCacheWriteTokens  int                         `json:"total_cache_write_tokens" console:"header:Cache Write,format:number"`
+	TotalRequests          int                         `json:"total_requests" console:"header:Requests"`
+	TotalSteeringEvents    int                         `json:"total_steering_events,omitempty" console:"header:Steering Events,format:number,omitempty"`
+	SteeringEventCounts    map[string]int              `json:"steering_event_counts,omitempty" console:"-"`
+	TotalDurationMs        int                         `json:"total_duration_ms"`
+	TotalResponseBytes     int                         `json:"total_response_bytes"`
+	CacheEfficiency        float64                     `json:"cache_efficiency"`
+	TotalAIC               float64                     `json:"total_aic,omitempty"`
+	AICFound               bool                        `json:"-"`
+	AmbientContext         *AmbientContextMetrics      `json:"ambient_context,omitempty"`
+	ByModel                map[string]*ModelTokenUsage `json:"by_model"`
+	SubagentModelRequests  []SubagentModelRequest      `json:"subagent_model_requests,omitempty"`
+	DeclaredSubagentModels []SubagentModelRequest      `json:"declared_subagent_models,omitempty"`
+	SubagentModelActuals   []SubagentModelActual       `json:"subagent_model_actuals,omitempty"`
+	MismatchCount          int                         `json:"mismatch_count,omitempty"`
+	Warnings               []string                    `json:"warnings,omitempty"`
+	agentModels            map[string]*ModelTokenUsage
 }
 
 // ModelTokenUsage contains per-model token usage statistics
@@ -95,6 +97,7 @@ type ModelTokenUsageRow struct {
 type SubagentModelRequest struct {
 	AgentName       string `json:"agent_name"`
 	RequestedModel  string `json:"requested_model"`
+	ResolvedModel   string `json:"resolved_model,omitempty"`
 	InvocationCount int    `json:"invocation_count"`
 	EffectiveModel  string `json:"effective_model,omitempty"`
 	ReasonCode      string `json:"reason_code,omitempty"`

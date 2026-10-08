@@ -315,6 +315,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "copilot"
+          GH_AW_SUB_AGENT_DIR: ".github/agents"
+          GH_AW_SUB_AGENT_EXT: ".agent.md"
+          GH_AW_SKILL_DIR: ".github/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_EVENT_INPUTS_AUDIT_DATE: ${{ github.event.inputs.audit_date }}
           GH_AW_GITHUB_EVENT_INPUTS_MAX_ISSUES: ${{ github.event.inputs.max_issues }}
           GH_AW_GITHUB_EVENT_INPUTS_SEVERITY_THRESHOLD: ${{ github.event.inputs.severity_threshold }}

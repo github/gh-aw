@@ -130,6 +130,24 @@ func validatePiSessionConfig(raw json.RawMessage) error {
 
 func (e *PiEngine) applyPiConfigEnv(env map[string]string, data *WorkflowData) {
 	env["GH_AW_PI_CONFIG"] = "{}"
+	aliases, err := json.Marshal(data.ModelMappings)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode Pi model aliases: %v", err))
+	}
+	env["GH_AW_PI_MODEL_ALIASES"] = string(aliases)
+	childData := *data
+	if data.EngineConfig != nil {
+		childConfig := *data.EngineConfig
+		childConfig.Config = ""
+		childConfig.Args = nil
+		childData.EngineConfig = &childConfig
+	}
+	childArgs, err := json.Marshal(e.buildPiArgs(&childData))
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode Pi sub-agent arguments: %v", err))
+	}
+	env["GH_AW_PI_SUBAGENT_ARGS"] = string(childArgs)
+	env["GH_AW_PI_TOOL_BUDGET_DIR"] = constants.TmpPiAgentDir + "/tool-budget"
 	if data.EngineConfig == nil {
 		return
 	}

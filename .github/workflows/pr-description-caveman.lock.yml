@@ -162,6 +162,7 @@ jobs:
           GH_AW_INFO_AGENT_RUNTIME: ""
           GH_AW_COMPILED_STRICT: "true"
           GH_AW_INFO_FEATURES: '{"gh-aw-detection":true}'
+          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"claude-haiku-4.5\",\"name\":\"chunk-analyzer\",\"patterns\":[\"github-copilot/claude-haiku-4.5\"]},{\"model\":\"large\",\"name\":\"pr-description-synthesizer\",\"patterns\":[\"github-copilot/*sonnet*\",\"anthropic/*sonnet*\",\"github-copilot/gpt-6*\",\"openai/gpt-6*\",\"github-copilot/gpt-5*pro*\",\"openai/gpt-5*pro*\",\"github-copilot/gpt-5*\",\"openai/gpt-5*\",\"github-copilot/gemini-*pro*\",\"google/gemini-*pro*\",\"gemini/gemini-*pro*\"]}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -318,6 +319,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "copilot"
+          GH_AW_SUB_AGENT_DIR: ".github/agents"
+          GH_AW_SUB_AGENT_EXT: ".agent.md"
+          GH_AW_SKILL_DIR: ".github/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}

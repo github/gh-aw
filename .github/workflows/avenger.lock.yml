@@ -340,6 +340,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "codex"
+          GH_AW_SUB_AGENT_DIR: ".codex/agents"
+          GH_AW_SUB_AGENT_EXT: ".md"
+          GH_AW_SKILL_DIR: ".codex/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_RUN_ID: ${{ needs.check_ci_status.outputs.ci_run_id }}

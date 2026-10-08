@@ -366,6 +366,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "claude"
+          GH_AW_SUB_AGENT_DIR: ".claude/agents"
+          GH_AW_SUB_AGENT_EXT: ".md"
+          GH_AW_SKILL_DIR: ".claude/skills"
+          GH_AW_SKILL_EXT: ".md"
           GH_AW_ENV_GH_AW_WORKFLOW_ID_SANITIZED: ${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_EXPERIMENTS_OUTPUT_FORMAT: ${{ steps.pick-experiment.outputs.output_format }}

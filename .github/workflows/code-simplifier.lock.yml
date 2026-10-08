@@ -177,6 +177,7 @@ jobs:
           GH_AW_INFO_AGENT_RUNTIME: ""
           GH_AW_INFO_FRONTMATTER_EMOJI: "🔧"
           GH_AW_COMPILED_STRICT: "true"
+          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"claude-haiku-4.5\",\"name\":\"scope-filter\",\"patterns\":[\"github-copilot/claude-haiku-4.5\"]},{\"model\":\"claude-haiku-4.5\",\"name\":\"simplification-scout\",\"patterns\":[\"github-copilot/claude-haiku-4.5\"]}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -340,6 +341,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "copilot"
+          GH_AW_SUB_AGENT_DIR: ".github/agents"
+          GH_AW_SUB_AGENT_EXT: ".agent.md"
+          GH_AW_SKILL_DIR: ".github/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
         with:
           script: |
             const path = require('path');

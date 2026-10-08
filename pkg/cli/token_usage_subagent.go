@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"os"
 	"regexp"
@@ -15,10 +16,17 @@ var tokenUsageSubagentLog = logger.New("cli:token_usage_subagent")
 
 var subagentDispatchPattern = regexp.MustCompile(`([A-Za-z0-9][A-Za-z0-9._-]*)\(([A-Za-z0-9][A-Za-z0-9._:-]*)\)`)
 
+type subagentDispatchKey struct {
+	agent    string
+	model    string
+	resolved string
+}
+
 func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) {
 	if summary == nil {
 		return
 	}
+	augmentDeclaredSubagentModels(runDir, summary)
 
 	requests := extractSubagentModelRequests(runDir)
 	if len(requests) == 0 {
@@ -27,35 +35,7 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	}
 	addTokenUsageWarning(summary, subagentStdioWarning)
 
-	actuals := make([]SubagentModelActual, 0, len(summary.ByModel))
-	observedModels := make(map[string]string, len(summary.ByModel))
-	for model, usage := range summary.ByModel {
-		if usage == nil || model == "" {
-			continue
-		}
-		actuals = append(actuals, SubagentModelActual{
-			Model:    model,
-			Provider: usage.Provider,
-			Requests: usage.Requests,
-		})
-		observedModels[model] = usage.Provider
-	}
-	slices.SortStableFunc(actuals, func(a, b SubagentModelActual) int {
-		if a.Requests != b.Requests {
-			if a.Requests > b.Requests {
-				return -1
-			}
-			return 1
-		}
-		switch {
-		case a.Model < b.Model:
-			return -1
-		case a.Model > b.Model:
-			return 1
-		default:
-			return 0
-		}
-	})
+	actuals, observedModels := collectSubagentModelActuals(summary)
 	summary.SubagentModelActuals = actuals
 
 	var fallbackEffectiveModel string
@@ -68,8 +48,12 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	requestRows := make([]SubagentModelRequest, 0, len(requests))
 	mismatchCount := 0
 	for _, row := range requests {
-		if _, ok := observedModels[row.RequestedModel]; ok {
-			row.EffectiveModel = row.RequestedModel
+		requested := row.RequestedModel
+		if row.ResolvedModel != "" {
+			requested = row.ResolvedModel
+		}
+		if _, ok := observedModels[requested]; ok {
+			row.EffectiveModel = requested
 		} else {
 			row.EffectiveModel = fallbackEffectiveModel
 			if len(observedModels) == 0 {
@@ -110,29 +94,14 @@ func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
 	}
 	defer file.Close()
 
-	type key struct {
-		agent string
-		model string
-	}
-	counts := make(map[key]int)
+	counts := make(map[subagentDispatchKey]int)
 
 	reader := bufio.NewReader(file)
 	for {
 		line, readErr := reader.ReadString('\n')
 		line = strings.TrimSpace(line)
 		if line != "" {
-			matches := subagentDispatchPattern.FindAllStringSubmatch(line, -1)
-			for _, m := range matches {
-				if len(m) < 3 {
-					continue
-				}
-				agentName := strings.TrimSpace(m[1])
-				requestedModel := strings.TrimSpace(m[2])
-				if agentName == "" || requestedModel == "" {
-					continue
-				}
-				counts[key{agent: agentName, model: requestedModel}]++
-			}
+			countSubagentDispatchLine(counts, line)
 		}
 
 		if readErr == io.EOF {
@@ -148,6 +117,7 @@ func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
 		rows = append(rows, SubagentModelRequest{
 			AgentName:       k.agent,
 			RequestedModel:  k.model,
+			ResolvedModel:   k.resolved,
 			InvocationCount: n,
 		})
 	}
@@ -164,8 +134,52 @@ func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
 		case a.RequestedModel > b.RequestedModel:
 			return 1
 		default:
-			return 0
+			return strings.Compare(a.ResolvedModel, b.ResolvedModel)
 		}
 	})
 	return rows
+}
+
+func collectSubagentModelActuals(summary *TokenUsageSummary) ([]SubagentModelActual, map[string]string) {
+	actuals := make([]SubagentModelActual, 0, len(summary.ByModel))
+	observedModels := make(map[string]string, len(summary.ByModel))
+	for model, usage := range subagentObservedModels(summary) {
+		if usage == nil || model == "" || usage.Requests == 0 {
+			continue
+		}
+		actuals = append(actuals, SubagentModelActual{
+			Model: model, Provider: usage.Provider, Requests: usage.Requests,
+		})
+		observedModels[model] = usage.Provider
+	}
+	slices.SortStableFunc(actuals, func(a, b SubagentModelActual) int {
+		if a.Requests > b.Requests {
+			return -1
+		}
+		if a.Requests < b.Requests {
+			return 1
+		}
+		return strings.Compare(a.Model, b.Model)
+	})
+	return actuals, observedModels
+}
+
+func countSubagentDispatchLine(counts map[subagentDispatchKey]int, line string) {
+	var dispatch struct {
+		Type      string `json:"type"`
+		Agent     string `json:"agent"`
+		Requested string `json:"requested_model"`
+		Resolved  string `json:"resolved_model"`
+	}
+	if json.Unmarshal([]byte(line), &dispatch) == nil && dispatch.Type == "gh_aw_subagent_dispatch" {
+		if dispatch.Agent != "" && dispatch.Requested != "" {
+			counts[subagentDispatchKey{agent: dispatch.Agent, model: dispatch.Requested, resolved: dispatch.Resolved}]++
+		}
+		return
+	}
+	for _, match := range subagentDispatchPattern.FindAllString(line, -1) {
+		agent, model, _ := strings.Cut(match, "(")
+		model = strings.TrimSuffix(model, ")")
+		counts[subagentDispatchKey{agent: agent, model: model}]++
+	}
 }

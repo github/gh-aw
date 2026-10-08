@@ -8,6 +8,20 @@ const parse = records => parsePiLog(records.map(record => JSON.stringify(record)
 const byType = (events, type) => events.filter(event => event.type === type);
 
 describe("Pi CI stream regressions", () => {
+  it("preserves child model evidence without counting child answers as parent messages or usage", () => {
+    const parent = { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Parent answer" }], usage: { input: 10, output: 3 } } };
+    const child = {
+      type: "gh_aw_subagent_event",
+      agent: "reader",
+      event: { type: "message_end", message: { role: "assistant", model: "claude-haiku-4.5", content: [{ type: "text", text: "Child answer" }], usage: { input: 5, output: 2 } } },
+    };
+    const records = [{ type: "gh_aw_subagent_dispatch", agent: "reader", requested_model: "small", resolved_model: "claude-haiku-4.5" }, child, parent];
+    const events = transformPiV3Entries(records);
+    expect(byType(events, "pi.subagent_dispatch")[0].data).toMatchObject({ requestedModel: "small", resolvedModel: "claude-haiku-4.5" });
+    expect(byType(events, "pi.subagent_event")[0].data.event).toEqual(child.event);
+    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["Parent answer"]);
+    expect(computePiV3Stats(records).usage.input_tokens).toBe(10);
+  });
   // https://github.com/github/gh-aw/actions/runs/36884805242 (success)
   // https://github.com/github/gh-aw/actions/runs/36447274044 (provider failure)
   // Both agent artifacts expose pi-streaming.jsonl; fixture strings are replacements.

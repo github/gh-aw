@@ -168,6 +168,7 @@ jobs:
           GH_AW_INFO_FRONTMATTER_EMOJI: "🔒"
           GH_AW_COMPILED_STRICT: "true"
           GH_AW_INFO_FEATURES: '{"gh-aw-detection":true}'
+          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"small\",\"name\":\"firewall-chart-generator\",\"patterns\":[\"github-copilot/*haiku*\",\"anthropic/*haiku*\",\"github-copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\",\"github-copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\",\"github-copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"]},{\"model\":\"small\",\"name\":\"firewall-data-aggregator\",\"patterns\":[\"github-copilot/*haiku*\",\"anthropic/*haiku*\",\"github-copilot/gpt-5*mini*\",\"openai/gpt-5*mini*\",\"github-copilot/gpt-5*nano*\",\"openai/gpt-5*nano*\",\"github-copilot/gemini-*flash*lite*\",\"google/gemini-*flash*lite*\",\"gemini/gemini-*flash*lite*\"]}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -311,6 +312,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "copilot"
+          GH_AW_SUB_AGENT_DIR: ".github/agents"
+          GH_AW_SUB_AGENT_EXT: ".agent.md"
+          GH_AW_SKILL_DIR: ".github/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
         with:
           script: |
             const path = require('path');

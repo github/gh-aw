@@ -168,6 +168,7 @@ jobs:
           GH_AW_INFO_AGENT_RUNTIME: ""
           GH_AW_INFO_CACHE_MEMORY: "true"
           GH_AW_COMPILED_STRICT: "true"
+          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"copilot/mai-code-1-flash-picker\",\"name\":\"discussion-miner\",\"patterns\":[\"github-copilot/mai-code-1-flash-picker\"]},{\"model\":\"copilot/mai-code-1-flash-picker\",\"name\":\"code-pattern-scanner\",\"patterns\":[\"github-copilot/mai-code-1-flash-picker\"]},{\"model\":\"copilot/mai-code-1-flash-picker\",\"name\":\"linter-writer\",\"patterns\":[\"github-copilot/mai-code-1-flash-picker\"]}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -322,6 +323,10 @@ jobs:
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "copilot"
+          GH_AW_SUB_AGENT_DIR: ".github/agents"
+          GH_AW_SUB_AGENT_EXT: ".agent.md"
+          GH_AW_SKILL_DIR: ".github/skills"
+          GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
