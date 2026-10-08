@@ -106,6 +106,12 @@ describe("mcp_cli_bridge.cjs", () => {
     expect(parseToolArgs(["--stack_position", "3", "--stack_position", ""], properties, null, options).args).toEqual({ stack_position: 3 });
   });
 
+  it("preserves blank arbitrary-JSON values in safeoutputs CLI inputs", () => {
+    const properties = { value: { type: ["object", "array", "string", "number", "boolean", "null"], "x-preserve-blank": true } };
+    const options = { omitBlankOptionalFields: true };
+    expect(parseToolArgs(['{"operation":"append","value":""}'], properties, null, options).args).toEqual({ operation: "append", value: "" });
+  });
+
   it("rejects partially malformed safeoutputs flags instead of silently dropping positional payloads", () => {
     expect(() => parseToolArgs(["--message", "done", "private payload"], { message: { type: "string" } }, null, { rejectPositionalArguments: true })).toThrow(
       "Unexpected positional argument. Pass a single quoted JSON object or use --key value flags."

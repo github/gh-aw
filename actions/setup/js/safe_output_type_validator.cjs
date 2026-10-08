@@ -203,6 +203,7 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
 /**
  * @typedef {Object} FieldValidation
  * @property {boolean} [required] - Whether the field is required
+ * @property {boolean} [allowEmpty] - Whether a required string may be explicitly empty
  * @property {string} [type] - Expected type: 'string', 'number', 'boolean', 'array'
  * @property {string} [typeHint] - Overrides the type description in error messages (e.g. "GraphQL node ID string")
  * @property {boolean} [sanitize] - Whether to sanitize string content
@@ -471,7 +472,7 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
   }
 
   // Handle required check for other fields
-  if (validation.required && (value === undefined || value === null || (!validation.minLength && typeof value === "string" && value.trim() === ""))) {
+  if (validation.required && (value === undefined || value === null || (!validation.allowEmpty && !validation.minLength && typeof value === "string" && value.trim() === ""))) {
     const fieldType = validation.typeHint || validation.type || "string";
     return {
       isValid: false,
@@ -779,7 +780,10 @@ function validateItem(item, itemType, lineNum, options) {
     return { isValid: true, normalizedItem: item };
   }
 
-  item = normalizeBlankOptionalFields(item, typeConfig.fields);
+  const runtimeDataSchema = options?.dataSchema;
+  const dataEnabled = options?.dataEnabled === true || runtimeDataSchema !== undefined || typeConfig.dataEnabled === true || typeConfig.dataSchema !== undefined;
+  const normalizationFields = dataEnabled ? { ...typeConfig.fields, data: { type: "object" } } : typeConfig.fields;
+  item = normalizeBlankOptionalFields(item, normalizationFields);
 
   // Build the downstream payload from the declared contract. The raw item is
   // agent-controlled, so forwarding undeclared fields would let consumers act

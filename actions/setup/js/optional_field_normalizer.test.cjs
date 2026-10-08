@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import safeOutputTools from "./safe_outputs_tools.json";
 import { isBlankOptionalField, normalizeBlankOptionalFields } from "./optional_field_normalizer.cjs";
-import { normalizeSafeOutputToolArguments } from "./safe_outputs_mcp_arguments.cjs";
+import { normalizeSafeOutputToolArguments, stripInternalSafeOutputSchemaMetadata } from "./safe_outputs_mcp_arguments.cjs";
 import { validateField } from "./safe_output_type_validator.cjs";
 
 describe("blank optional fields", () => {
@@ -39,6 +40,17 @@ describe("blank optional fields", () => {
     const args = { body: "", description: " \t", unknown: "" };
     expect(normalizeBlankOptionalFields(args, { body: { type: "string" }, description: { type: "string", maxLength: 256 } })).toEqual(args);
     expect(normalizeBlankOptionalFields({ value: "" }, { value: { type: "number" } })).toEqual({});
+  });
+
+  it("preserves blank arbitrary-JSON values when the schema opts out", () => {
+    const properties = { value: { type: ["object", "array", "string", "number", "boolean", "null"], "x-preserve-blank": true } };
+    const args = { operation: "append", value: "" };
+    expect(normalizeBlankOptionalFields(args, properties)).toEqual(args);
+    expect(normalizeSafeOutputToolArguments("ledger_append", args, undefined, { properties })).toEqual(args);
+
+    const ledgerSchema = safeOutputTools.find(tool => tool.name === "ledger_append").inputSchema;
+    expect(normalizeSafeOutputToolArguments("ledger_append", args, undefined, ledgerSchema)).toEqual(args);
+    expect(stripInternalSafeOutputSchemaMetadata(ledgerSchema).properties.value["x-preserve-blank"]).toBe(true);
   });
 
   it("treats blank stack roots as absent branch references, but leaves required roots unchanged", () => {

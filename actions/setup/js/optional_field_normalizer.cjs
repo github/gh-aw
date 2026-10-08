@@ -10,7 +10,7 @@
  * @returns {boolean}
  */
 function isBlankOptionalField(value, field, required = false, fieldName) {
-  if (!field || required || field.required === true || typeof value !== "string" || value.trim() !== "") {
+  if (!field || field["x-preserve-blank"] === true || required || field.required === true || typeof value !== "string" || value.trim() !== "") {
     return false;
   }
   return (

@@ -254,4 +254,29 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
       message: "test",
     });
   });
+
+  it.each([
+    ["status", { status: "" }],
+    ["labels", { labels: "" }],
+  ])("rejects update_issue with only a normalized-away %s field", async (_field, update) => {
+    const configPath = path.join(tempDir, "config.json");
+    const toolsPath = path.join(tempDir, "tools.json");
+    const outputPath = path.join(tempDir, "output.jsonl");
+    const tools = JSON.parse(fs.readFileSync(path.join(process.cwd(), "safe_outputs_tools.json"), "utf8"));
+    fs.writeFileSync(configPath, JSON.stringify({ update_issue: { enabled: true, target: "*" } }));
+    fs.writeFileSync(toolsPath, JSON.stringify(tools.filter(tool => tool.name === "update_issue")));
+    process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH = configPath;
+    process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH = toolsPath;
+    process.env.GH_AW_SAFE_OUTPUTS = outputPath;
+
+    const { server } = createMCPServer();
+    const response = await server.handleRequest({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "update_issue", arguments: { issue_number: 42, ...update } },
+    });
+    expect(response.error || response.result?.isError).toBeTruthy();
+    expect(fs.existsSync(outputPath)).toBe(false);
+  });
 });
