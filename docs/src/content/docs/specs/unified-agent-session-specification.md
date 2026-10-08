@@ -817,6 +817,10 @@ Nested SDK sessions can share the root `session_id`. Available `sessionId`,
 `parentToolUseId`, and caller `agentId` remain on messages, tools, initialization,
 refusals, and results in both representations. A subagent lifecycle envelope's
 `agentId` identifies its target; its payload context identifies the caller.
+Lifecycle observations fall back to stored start or launch context for omitted
+scope and launcher fields; incomplete observations do not erase known values.
+Explicit notification context wins, including a null root parent. A changed
+parent invalidates a stored caller unless the notification explicitly supplies it.
 Caller identity is inferred from launcher observations only when unambiguous.
 Message reconciliation and tool pairing use the complete caller scope, never
 display names or unscoped IDs. Native IDs remain unchanged; legacy display copies

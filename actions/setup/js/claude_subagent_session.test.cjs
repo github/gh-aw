@@ -29,6 +29,110 @@ describe("Claude subagents and nested sessions", () => {
     expect(compact(events).find(event => event.type === "subagent.failed").data).toMatchObject({ totalTokens: 203, totalToolCalls: 1 });
   });
 
+  it.each(["completed", "failed", "stopped"].flatMap(status => ["native start", "normalized start", "launcher only"].map(registration => [status, registration])))(
+    "preserves nested %s context from %s despite incomplete observations",
+    (status, registration) => {
+      const start = subagents.find(record => record.task_id === "agent-grandchild");
+      const launch = subagents.find(record => record.tool_use_result?.agentId === "agent-grandchild");
+      const registered =
+        registration === "native start"
+          ? start
+          : registration === "launcher only"
+            ? launch
+            : { type: "subagent.started", agentId: start.task_id, data: { task_type: "local_agent", sessionId: start.session_id, parentToolUseId: start.parent_tool_use_id, agentId: "agent-a", toolCallId: start.tool_use_id } };
+      const notification = {
+        type: "system",
+        subtype: "task_notification",
+        session_id: start.session_id,
+        task_type: "local_agent",
+        task_id: start.task_id,
+        parent_tool_use_id: undefined,
+        tool_use_id: undefined,
+        agentId: undefined,
+        status,
+        uuid: "notification-id",
+        usage: { total_tokens: 13, tool_uses: 2, duration_ms: 7 },
+      };
+      const records = [
+        subagents.find(record => record.task_id === "agent-a"),
+        registered,
+        { type: "user", session_id: start.session_id, tool_use_result: { agentId: start.task_id, resolvedModel: "observed-model" }, message: { content: [{ type: "tool_result", content: "Launched" }] } },
+        notification,
+      ];
+      const original = structuredClone(records);
+      const events = normalizeClaudeSession(records);
+      const lifecycle = events.filter(event => event.type === (status === "failed" ? "subagent.failed" : "subagent.completed"));
+      expect(lifecycle).toHaveLength(1);
+      expect(sessionContext(lifecycle[0])).toStrictEqual({ sessionId: start.session_id, parentToolUseId: "launch-a", agentId: "agent-a" });
+      expect(lifecycle[0].agentId).toBe("agent-grandchild");
+      expect(lifecycle[0].data).toMatchObject({ toolCallId: "launch-grandchild", status, totalTokens: 13, totalToolCalls: 2, durationMs: 7 });
+      expect(lifecycle[0].data.cancelled).toBe(status === "stopped" ? true : undefined);
+      expect(lifecycle[0].uuid).toBe(notification.uuid);
+      expect(lifecycle[0].usage).toStrictEqual(notification.usage);
+      expect(lifecycle[0].parent_tool_use_id).toBeUndefined();
+      const configured = events.filter(event => event.type === "subagent.configured").at(-1);
+      expect(sessionContext(configured)).toStrictEqual(sessionContext(lifecycle[0]));
+      expect(configured.data.toolCallId).toBe("launch-grandchild");
+      expect(configured.data.model).toBe("observed-model");
+      expect(records).toStrictEqual(original);
+      const roundTrip = JSON.parse(JSON.stringify(events));
+      expect(JSON.parse(JSON.stringify(normalizeClaudeSession(JSON.parse(JSON.stringify(records)))))).toStrictEqual(roundTrip);
+      expect(normalizeClaudeSession(events)).toStrictEqual(events);
+      expect(normalizeClaudeSession(roundTrip)).toStrictEqual(roundTrip);
+      const projected = compact(events);
+      const grouped = scopedAgentSessions(projected).find(group => group.label.includes("parentToolUseId=launch-a"));
+      expect(grouped.events.find(event => event.type === lifecycle[0].type).agentId).toBe("agent-grandchild");
+      for (const [kind, session] of [
+        ["agent", events],
+        ["unified", projected],
+      ]) {
+        const validate = createSessionValidator(kind).event;
+        for (const event of session) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+      }
+    }
+  );
+
+  it.each(
+    [
+      [
+        { parent_tool_use_id: "launch-b", agentId: "explicit-caller" },
+        { parentToolUseId: "launch-b", agentId: "explicit-caller" },
+      ],
+      [{ parent_tool_use_id: "launch-b" }, { parentToolUseId: "launch-b", agentId: "agent-b" }],
+      [{ parent_tool_use_id: null }, { parentToolUseId: null }],
+      [{ data: { parentToolUseId: null } }, { parentToolUseId: null }],
+      [{ parent_tool_use_id: "unknown" }, { parentToolUseId: "unknown" }],
+      [{ data: { parentToolUseId: "launch-b", agentId: "payload-caller" } }, { parentToolUseId: "launch-b", agentId: "payload-caller" }],
+    ].flatMap(([context, expected]) => [undefined, "local_agent"].map(task_type => [{ ...context, task_type }, expected]))
+  )("lets explicit notification context %j override stored caller scope", (context, expected) => {
+    const start = subagents.find(record => record.task_id === "agent-grandchild");
+    const events = normalizeClaudeSession([
+      ...subagents.filter(record => record.subtype === "task_started"),
+      { ...start, agentId: "agent-a" },
+      { type: "system", subtype: "task_notification", session_id: start.session_id, task_id: start.task_id, status: "completed", ...context },
+    ]);
+    const completed = events.find(event => event.type === "subagent.completed");
+    expect(completed.agentId).toBe("agent-grandchild");
+    expect(sessionContext(completed)).toStrictEqual({ sessionId: start.session_id, ...expected });
+    expect(sessionContext(compact(events).find(event => event.type === "subagent.completed"))).toStrictEqual(sessionContext(completed));
+  });
+
+  it("does not infer ambiguous callers or mix repeated task IDs across sessions", () => {
+    const records = ["first", "second"].flatMap(session_id => [
+      { type: "system", subtype: "task_started", session_id, task_id: "caller-a", tool_use_id: "shared-launcher", task_type: "local_agent" },
+      ...(session_id === "first" ? [{ type: "system", subtype: "task_started", session_id, task_id: "caller-b", tool_use_id: "shared-launcher", task_type: "local_agent" }] : []),
+      { type: "system", subtype: "task_started", session_id, parent_tool_use_id: "shared-launcher", task_id: "repeated-target", tool_use_id: `${session_id}-launcher`, task_type: "local_agent" },
+      { type: "system", subtype: "task_notification", session_id, task_id: "repeated-target", status: "completed" },
+    ]);
+    const completed = normalizeClaudeSession(records).filter(event => event.type === "subagent.completed");
+    expect(completed.map(sessionContext)).toStrictEqual([
+      { sessionId: "first", parentToolUseId: "shared-launcher" },
+      { sessionId: "second", parentToolUseId: "shared-launcher", agentId: "caller-a" },
+    ]);
+    expect(completed.map(event => event.data.toolCallId)).toEqual(["first-launcher", "second-launcher"]);
+    expect(completed.map(event => event.agentId)).toEqual(["repeated-target", "repeated-target"]);
+  });
+
   it("retains caller scope on compact tools, results, refusals and initialization", () => {
     const records = [
       ...subagents,
@@ -216,5 +320,13 @@ describe("Claude subagents and nested sessions", () => {
     expect(sessionContext(record)).toEqual({ sessionId: "root", parentToolUseId: "child" });
     expect(sessionContext(JSON.parse(JSON.stringify(record)))).toEqual(sessionContext(record));
     expect(() => normalizeClaudeSession([record, ...subagents])).not.toThrow();
+  });
+
+  it.each([
+    { sessionId: null, parentToolUseId: null, session_id: "ignored", parent_tool_use_id: "ignored" },
+    { session_id: null, parent_tool_use_id: null, data: { session_id: "ignored", parent_tool_use_id: "ignored" } },
+  ])("retains explicit null scope in the shared context helper for %j", source => {
+    expect(sessionContext(source)).toStrictEqual({ sessionId: null, parentToolUseId: null });
+    expect(sessionContext(JSON.parse(JSON.stringify(source)))).toStrictEqual(sessionContext(source));
   });
 });

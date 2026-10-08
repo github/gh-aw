@@ -68,7 +68,12 @@ function normalizeClaudeSession(records) {
   const registerAgent = (source, id, toolId, fields) => {
     if (typeof id !== "string") return;
     const key = taskKey(source, id);
-    agentTasks.set(key, { ...agentTasks.get(key), ...fields, task_id: id, ...(typeof toolId === "string" ? { tool_use_id: toolId } : {}) });
+    const stored = agentTasks.get(key);
+    const context = sessionContext(source);
+    const observed = Object.fromEntries(Object.entries({ ...fields, ...context }).filter(([, value]) => value !== undefined));
+    const task = { ...stored, ...observed, task_id: id, ...(typeof toolId === "string" ? { tool_use_id: toolId } : {}) };
+    if (context.agentId === undefined && context.parentToolUseId !== undefined && context.parentToolUseId !== sessionContext({ data: stored }).parentToolUseId) delete task.agentId;
+    agentTasks.set(key, task);
     if (typeof toolId !== "string") return;
     const tool = taskKey(source, toolId);
     const ids = agentsByTool.get(tool) ?? new Set();
@@ -94,7 +99,14 @@ function normalizeClaudeSession(records) {
   };
   const native = (source, type) => emit(source, type, sourceFields(source));
   const emitSubagent = (source, type, task, fields) => {
-    const event = emit(source, type, { ...sourceFields(source), toolCallId: task.tool_use_id, ...fields });
+    const stored = sessionContext({ data: task });
+    const explicit = sessionContext(source);
+    const context = { ...stored, ...explicit };
+    // A different explicit parent invalidates the stored caller, including a root override.
+    if (explicit.agentId === undefined && explicit.parentToolUseId !== undefined && explicit.parentToolUseId !== stored.parentToolUseId) delete context.agentId;
+    const caller = context.agentId ?? parentAgent({ data: context });
+    if (caller !== undefined) context.agentId = caller;
+    const event = emit(source, type, { ...sourceFields(source), toolCallId: task.tool_use_id, ...fields, ...context });
     event.agentId = task.task_id;
     return event;
   };
@@ -136,7 +148,7 @@ function normalizeClaudeSession(records) {
         ...(workflow ? { taskId: workflow.taskId, taskType: workflow.taskType, workflowName: workflow.workflowName, workflowRunId: workflow.runId, status: workflow.status } : {}),
         ...(agent ? { taskId: agent.agentId, taskType: "local_agent", status: agent.status } : {}),
       });
-      if (agent && typeof agent.resolvedModel === "string") emitSubagent(source, "subagent.configured", { task_id: agent.agentId, tool_use_id: block.tool_use_id }, { model: agent.resolvedModel });
+      if (agent && typeof agent.resolvedModel === "string") emitSubagent(source, "subagent.configured", agentTasks.get(taskKey(source, agent.agentId)), { model: agent.resolvedModel });
       return event;
     }
     return emit(source, "claude.content_block", data);
