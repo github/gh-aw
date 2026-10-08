@@ -96,6 +96,113 @@ A `noop` or an empty output batch is not automatically a verified success.
 The installed Work contract must permit the no-write outcome; required output
 minimums and independent verification still apply.
 
+## Calls and dispatch input
+
+Each object below is the `params` of an individual MCP `tools/call` request;
+the arrays only group examples for display. Queue tools belong to the
+`work-queue` server; output tools belong to `safeoutputs`. IDs and task payloads
+are illustrative. Assume the installed policy names the approved refiner
+profile `eslint-refiner`. `WORK_A` and `WORK_B` stand for the generated Work
+IDs returned by queue reads, not caller-chosen task names.
+
+### Read, explain, and admit
+
+Reads and explanations use the activation snapshot, not a fresh reservation.
+An authorized producer can separately submit the two independent roots:
+
+```json wrap
+[
+  {"name":"work_queue_read","arguments":{"pool":"default","limit":3}},
+  {"name":"work_queue_explain","arguments":{"work":"WORK_A","pool":"default"}},
+  {"name":"work_queue_submit","arguments":{"nodes":[
+    {"graph_id":"eslint-refinement","node_key":"parser-edge-cases","worker_profile":"eslint-refiner","payload":{"plan":"Check parser edge cases"}},
+    {"graph_id":"eslint-refinement","node_key":"diagnostic-wording","worker_profile":"eslint-refiner","payload":{"plan":"Check diagnostic wording"}}
+  ]}}
+]
+```
+
+Submission stages an intent; it does not install policy, bypass entitlements,
+or give the producer a Claim.
+
+### Ask for the next fair prefix
+
+```json
+{"name":"work_queue_dispatch_next","arguments":{"pool":"default","max_claims":3,"max_dispatches":3}}
+```
+
+The immediate MCP text result decodes to a staging acknowledgement, not an
+assignment:
+
+```json
+{"intent_id":"intent:example","status":"staged"}
+```
+
+The trusted publisher subsequently selects and records Claims. If policy
+permits a compatible two-Claim batch, the decoded assignment has this shape:
+
+```json wrap
+{
+  "version": 3,
+  "dispatch_id": "d_example_1",
+  "request_id": "request:example",
+  "commit_id": "commit:example",
+  "policy_epoch": "factory-v1",
+  "pool": "default",
+  "worker_profile": "eslint-refiner",
+  "claims": [
+    {"handle":"h1","claim_id":"c_example_1","work_id":"WORK_A","work":{"plan":"Check parser edge cases"},"result_refs":[]},
+    {"handle":"h2","claim_id":"c_example_2","work_id":"WORK_B","work":{"plan":"Check diagnostic wording"},"result_refs":[]}
+  ]
+}
+```
+
+Each `work` is the exact admitted payload, including any output contract;
+`result_refs` carries independently verified predecessor Results when present.
+This example is not an authenticated grant and must not be manually replayed.
+
+### Pass the assignment through `workflow_dispatch`
+
+The protected publisher sends **one JSON string**, not a nested input object.
+This excerpt shows native request fields, not an agent-accessible dispatch tool:
+
+```javascript
+await dispatchClient.rest.actions.createWorkflowDispatch({
+  owner: "github",
+  repo: "gh-aw",
+  workflow_id: profile.workflow,
+  ref: profile.ref,
+  inputs: { work_queue_assignment: canonical(assignment) },
+  headers: { "X-GitHub-Api-Version": "2026-03-10" },
+  request: { retries: 0, retryCount: 0, timeout: 30000 }
+});
+```
+
+`profile.workflow` selects the compiled refiner workflow and `profile.ref` is
+its installed immutable commit SHA. The runtime fences the sender in the
+ledger before POST and verifies the returned
+run before binding it. The compiler reserves `work_queue_assignment` as a
+string input; supplied JSON alone cannot authorize worker outputs.
+
+### Attribute outputs and finish each member
+
+For the batch above, the refiner stages an issue and memory for `h1`, completes
+that member, and cancels `h2` independently:
+
+```json wrap
+[
+  {"name":"create_issue","arguments":{"claim_handle":"h1","title":"Handle optional-chain parser edge case","body":"The rule flags a valid optional-chain expression. Add a regression case and preserve the intended diagnostic."}},
+  {"name":"persist_eslint_memory","arguments":{"claim_handle":"h1","memory":"{\"work_id\":\"WORK_A\",\"strategy\":\"parser-edge-cases\",\"findings\":[\"Optional-chain false positive\"]}"}},
+  {"name":"work_queue_claim_finish","arguments":{"claim_handle":"h1","outcome":"completed"}},
+  {"name":"work_queue_claim_finish","arguments":{"claim_handle":"h2","outcome":"cancelled"}}
+]
+```
+
+The memory argument is itself an encoded JSON object. Copy each original
+`handle` into `claim_handle`; do not substitute `claim_id` or `work_id`. These
+calls stage intentions, not immediate GitHub writes or Result. Any additional
+outputs required by the immutable contract must also be staged before finish.
+No MCP call lets the worker assert its own Completion or verified Result.
+
 ## Singleton and mixed-Claim outcomes
 
 Batching shares a worker run, not completion or output authority. In this
