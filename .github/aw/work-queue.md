@@ -202,6 +202,78 @@ the resulting queue state.
 
 ## Worker workflows
 
+### Daily discussion-report portfolio
+
+The [public walkthrough](../../docs/src/content/docs/patterns/daily-report-portfolio.md)
+includes Mermaid diagrams, AW source and prompt excerpts, MCP calls and
+singleton dispatch/Claim examples.
+
+[`daily-report-dispatcher.md`](../workflows/daily-report-dispatcher.md) is the sole
+daily scheduler for ten dispatch-only report workers:
+
+| Worker | Discussion report |
+| --- | --- |
+| `daily-compiler-quality` | Compiler quality and consistency |
+| `daily-evals-report` | Evals adoption, pass rates and investigation steps |
+| `daily-firewall-report` | Firewall operation and charts |
+| `daily-issues-report` | Issue activity and analysis |
+| `daily-observability-report` | Workflow observability |
+| `daily-regulatory` | Discussion/report compliance |
+| `daily-repo-chronicle` | Repository activity and trends |
+| `daily-secrets-analysis` | Secret-reference patterns, never secret values |
+| `daily-team-evolution-insights` | Team evolution and collaboration |
+| `daily-token-consumption-report` | AI Credit consumption from telemetry |
+
+The trusted preparation step derives the previous complete UTC report date from
+the original run's GitHub API `created_at`. The rotation starts at
+`(UTC epoch day * 3) % 10` and admits three consecutive profiles. Each profile
+receives exactly three admission slots in any ten consecutive days, including
+weekends; former individual weekday schedules no longer apply. Date/profile
+graph identities and immutable payloads make duplicate admissions idempotent.
+The rotation selects admissions, not winners: the native scheduler selects the
+eligible equal-weight pool prefix and logs Work, Claims and reservations in the
+same `work-queue.jsonl` authority.
+
+The original daily activation requests at most three singleton launches. Its
+run-attempt gate skips whole-run reruns, and there is no manual-dispatch trigger.
+This is not a queue-enforced calendar quota: adding triggers or dispatchers
+requires a new budget design. Capacity, pause/drain, retained uncertain launches
+or backlog can produce fewer launches or older report dates. Three launches do
+not guarantee three discussions. Missing data cancels that day's one-attempt
+Work; only independently verified discussion delivery produces Result.
+
+Deploy the compiled workers and current setup runtime on the default branch
+before enabling the portfolio. Then obtain the immutable deployed revision and
+independently verify the producer and native launch principal's numeric IDs.
+Generate a **dedicated-queue** policy using those explicit bindings:
+
+```bash
+node actions/setup/js/daily_report_portfolio.cjs policy \
+  OWNER/REPO IMMUTABLE_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID > daily-report-policy.json
+gh aw work-queue --repo OWNER/REPO policy \
+  --file daily-report-policy.json --epoch daily-reports-v1
+```
+
+The generator validates its Policy but does not authenticate these supplied
+identities or install anything. It limits active native/logical reservations to
+three, each worker to one original Claim, each profile to equal accounting
+weight and each Work to one attempt. It permits thirty pending nodes so missed
+days remain bounded. Do not install this standalone policy over a shared queue:
+merge its pool, producer entitlements and accounting keys into the complete
+existing policy, preserve other pools/limits, and quiesce before an update.
+Frontmatter never provisions policy or writer restrictions; missing policy is
+an explicit deployment failure.
+
+Workers retain their report engines, categories and analysis logic. Their
+shared [Claim instructions](../workflows/shared/daily-report-worker.md) require
+one scoped discussion and a scoped finish intent, with charts authorized only
+where configured. Compiler-quality's issue fallback is disabled; evals and
+token-consumption publish Discussions instead of issues. The evals evaluator
+questions remain unchanged. No hosted launches or policy installation are
+performed by compiling these sources.
+
+### Claim-scoped worker contract
+
 Declare the workflow as a queue worker. The compiler supplies reserved
 `work_queue_assignment` and caller context; do not construct or override them.
 The immutable assignment contains bounded Claims with canonical handles and their

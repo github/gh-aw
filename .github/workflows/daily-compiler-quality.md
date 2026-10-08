@@ -1,6 +1,5 @@
 ---
 on:
-  schedule: daily
   workflow_dispatch: null
 max-ai-credits: 1000
 max-daily-ai-credits: 10000
@@ -11,6 +10,7 @@ permissions:
   pull-requests: read
   copilot-requests: write
 imports:
+- shared/daily-report-worker.md
 - shared/reporting.md
 - uses: shared/daily-audit-base.md
   with:
@@ -23,7 +23,7 @@ safe-outputs:
     category: audits
     close-older-discussions: true
     expires: 1d
-    fallback-to-issue: true
+    fallback-to-issue: false
     max: 1
     min-body-length: 200
     title-prefix: "[daily-compiler-quality] "
@@ -69,6 +69,10 @@ name: Daily Compiler Quality Check
 strict: true
 timeout-minutes: 30
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   bash:
   - set
   - find

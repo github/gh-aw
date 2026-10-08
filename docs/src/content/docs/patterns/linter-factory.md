@@ -10,6 +10,10 @@ dispatcher requests eligible work for three worker profiles; each worker
 processes an authenticated assignment and attributes its outputs to the
 original Claim.
 
+The [Daily Report Portfolio](/gh-aw/patterns/daily-report-portfolio/) uses the
+same ledger to orchestrate three of ten Discussion-report workers per daily
+activation, with date-keyed admissions and singleton Claims.
+
 Unlike the lightweight [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) patterns,
 this example uses one authoritative `work-queue.jsonl` transaction log on the
 `work-queue` branch. Scheduling decisions, Claims, run bindings, Completion,

@@ -3,7 +3,6 @@ private: true
 emoji: "📊"
 description: Daily analysis of repository changes to extract insights about team evolution and working patterns
 on:
-  schedule: daily
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +25,10 @@ network:
     - defaults
     - github
 tools:
+  work-queue:
+    storage: git
+    worker: true
+    require-assignment: true
   cli-proxy: true
   github:
     mode: local
@@ -35,6 +38,7 @@ max-ai-credits: 1500
 features:
   gh-aw-detection: true
 imports:
+  - shared/daily-report-worker.md
   - shared/goose.md
   - uses: shared/daily-audit-base.md
     with:

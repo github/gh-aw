@@ -441,6 +441,7 @@ export default defineConfig({
             { label: "BatchOps", link: "/patterns/batch-ops/" },
             { label: "CentralRepoOps", link: "/patterns/central-repo-ops/" },
             { label: "ChatOps", link: "/patterns/chat-ops/" },
+            { label: "Daily Report Portfolio", link: "/patterns/daily-report-portfolio/" },
             { label: "DeterministicOps", link: "/patterns/deterministic-ops/" },
             { label: "DispatchOps", link: "/patterns/dispatch-ops/" },
             { label: "IssueOps", link: "/patterns/issue-ops/" },
