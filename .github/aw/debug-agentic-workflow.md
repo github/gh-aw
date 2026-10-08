@@ -25,7 +25,7 @@ URLs before replay/report. Never retrieve secrets.
 
 ## Strategy
 
-1. **Anchor the failure.** Record revisions, versions, trigger/inputs. [Collect existing evidence](#collect-existing-evidence) from supplied accessible runs or cached logs; otherwise start from source/fixtures, never dispatch for evidence. Compare existing runs with `gh aw audit RUN_ID RUN_ID_2 --group` for recurrence. Label observed/local/fixture/inferred/unavailable evidence.
+1. **Anchor intent and failure.** First [capture developer intent from the current session](debug-security-review.md#capture-session-intent-first); clarify unclear goal/scope/authorization with the user before affected edits/testing. Record revisions, versions, trigger/inputs. [Collect existing evidence](#collect-existing-evidence) from supplied accessible runs or cached logs; otherwise start from source/fixtures, never dispatch for evidence. Compare existing runs with `gh aw audit RUN_ID RUN_ID_2 --group` for recurrence. Label observed/local/fixture/inferred/unavailable evidence.
 
 2. **Preflight MCP startup.** Read declarations/imports, credential references, startup commands/destinations without resolving secrets. Follow the [agentic security-review instructions](debug-security-review.md) before executing changed code or starting servers, including local reproductions and dry-run tooling. Before `gh aw mcp list WORKFLOW`, `gh aw mcp list-tools WORKFLOW --server NAME` or `gh aw mcp inspect WORKFLOW --server NAME`, account for startup/connections. Require isolated scoped test bindings, reviewed startup effects and metadata-only calls; otherwise use cached schemas. Do not mutate ambient credentials.
 
