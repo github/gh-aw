@@ -13,7 +13,7 @@ timeout-minutes: 10
 jobs:
   agent:
     timeout-minutes: 10
-max-ai-credits: 5
+max-ai-credits: 50
 features:
   gh-aw-detection: false
 engine:

@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,10 +164,13 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 	assert.Equal(t, map[string]string{"actions": "read", "contents": "read"}, binding.Permissions)
 	assert.Equal(t, "${{ inputs['agy-conformance'] }}", binding.If)
 	assert.Equal(t, "./.github/workflows/agy-conformance-reusable.lock.yml", binding.Uses)
-	for _, entry := range []struct{ id, trigger string }{
-		{"engine-conformance-agy", "workflow_dispatch"},
-		{"agy-conformance-reusable", "workflow_call"},
-		{"smoke-agy", "workflow_dispatch"},
+	for _, entry := range []struct {
+		id, trigger string
+		credits     int
+	}{
+		{"engine-conformance-agy", "workflow_dispatch", 5},
+		{"agy-conformance-reusable", "workflow_call", 5},
+		{"smoke-agy", "workflow_dispatch", 50},
 	} {
 		t.Run(entry.id, func(t *testing.T) {
 			lock, err := os.ReadFile("../../.github/workflows/" + entry.id + ".lock.yml")
@@ -187,7 +191,7 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 			}
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
 			assert.Equal(t, 2, callee.Jobs["safe_outputs"].TimeoutMinutes)
-			assert.Contains(t, string(lock), `"maxAiCredits":5`)
+			assert.Contains(t, string(lock), fmt.Sprintf(`"maxAiCredits":%d,`, entry.credits))
 			assert.Contains(t, string(lock), `"maxCacheMisses":12`)
 			assert.Contains(t, string(lock), `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
 			assert.Contains(t, string(lock), `"threat_detection":{"mode":"disabled"}`)
@@ -202,21 +206,28 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 	readConformanceFrontmatter(t, "../../.github/workflows/engine-conformance-agy.md", &canonical)
 	assert.Equal(t, map[string]any{"workflow_dispatch": nil}, canonical["on"])
 	assert.Equal(t, []any{"shared/agy-conformance.md"}, canonical["imports"])
+	assert.EqualValues(t, 5, canonical["max-ai-credits"])
 	delete(canonical, "name")
 	delete(canonical, "description")
 	delete(canonical, "on")
-	for _, entry := range []struct{ id, trigger string }{
-		{"agy-conformance-reusable", "workflow_call"},
-		{"smoke-agy", "workflow_dispatch"},
+	delete(canonical, "max-ai-credits")
+	for _, entry := range []struct {
+		id, trigger string
+		credits     int
+	}{
+		{"agy-conformance-reusable", "workflow_call", 5},
+		{"smoke-agy", "workflow_dispatch", 50},
 	} {
 		t.Run(entry.id, func(t *testing.T) {
 			var source map[string]any
 			readConformanceFrontmatter(t, "../../.github/workflows/"+entry.id+".md", &source)
 			assert.Equal(t, map[string]any{entry.trigger: nil}, source["on"])
 			assert.Equal(t, []any{"shared/agy-conformance.md"}, source["imports"])
+			assert.EqualValues(t, entry.credits, source["max-ai-credits"])
 			delete(source, "name")
 			delete(source, "description")
 			delete(source, "on")
+			delete(source, "max-ai-credits")
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})
 	}
