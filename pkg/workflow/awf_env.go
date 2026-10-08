@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/goccy/go-yaml"
+
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
@@ -67,7 +69,10 @@ func injectMaxAICreditsExpression(awfConfigJSON string, expr string) string {
 // Env var names are included when their step-env values contain a ${{ secrets.* }} reference
 // OR a ${{ needs.JOB.outputs.OUTPUT }} job-output expression (which commonly carries
 // ephemeral tokens such as GitHub App installation tokens).  Non-secret static vars
-// (e.g. GH_DEBUG: "1" in mcp-scripts) are never excluded.
+// (e.g. GH_DEBUG: "1" in mcp-scripts) are not excluded on this basis.
+// Runtime setup actions also contribute host-only path variables (such as uv's
+// cache and Python install directories), unless env, engine.env, or sandbox.agent.env
+// explicitly overrides them. Overrides never cancel secret or excluded-env exclusions.
 //
 // Parameters:
 //   - workflowData: the workflow being compiled
@@ -81,6 +86,7 @@ func injectMaxAICreditsExpression(awfConfigJSON string, expr string) string {
 //   - engine.env var names whose values contain ${{ secrets.* }} or a job-output expression
 //   - agent.env var names whose values contain ${{ secrets.* }} or a job-output expression
 //   - names listed in the frontmatter excluded-env field (unconditionally)
+//   - host-only env var names exported by generated or custom runtime setup actions
 func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames []string) []string { //nolint:largefunc // Existing environment classification logic is intentionally kept together.
 	seen := make(map[string]struct {
 	})
@@ -189,7 +195,64 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 		addUnique(name)
 	}
 
+	frontmatterEnv := parseEnvYAMLSection(workflowData.Env)
+	for _, name := range runtimeHostOnlyEnvVarNames(workflowData) {
+		if value, overridden := frontmatterEnv[name]; overridden {
+			if value, ok := value.(string); ok && (strings.Contains(value, "${{ secrets.") || ContainsJobOutputExpr(value)) {
+				addUnique(name)
+			}
+			continue
+		}
+		if workflowData.EngineConfig != nil {
+			if _, overridden := workflowData.EngineConfig.Env[name]; overridden {
+				continue
+			}
+		}
+		if agentConfig != nil {
+			if _, overridden := agentConfig.Env[name]; overridden {
+				continue
+			}
+		}
+		addUnique(name)
+	}
+
 	awfHelpersLog.Printf("Computed %d AWF env vars to exclude", len(names))
+	return names
+}
+
+func runtimeHostOnlyEnvVarNames(workflowData *WorkflowData) []string {
+	var names []string
+	// Detection is cached before custom setup deduplication mutates CustomSteps.
+	for _, requirement := range detectRuntimeRequirementsCached(workflowData) {
+		if requirement.Runtime != nil {
+			names = append(names, requirement.Runtime.HostOnlyEnvVars...)
+		}
+	}
+
+	// Setup actions alone do not imply a detected runtime command. Inspect preserved
+	// custom actions too, matching the actual repository rather than a substring.
+	type setupStep struct {
+		Uses string `yaml:"uses"`
+	}
+	for _, section := range []string{workflowData.PreSteps, workflowData.CustomSteps, workflowData.PreAgentSteps} {
+		var blocks map[string][]setupStep
+		if err := yaml.Unmarshal([]byte(section), &blocks); err != nil {
+			continue
+		}
+		for _, steps := range blocks {
+			for _, step := range steps {
+				repo, ref, hasRef := strings.Cut(step.Uses, "@")
+				if !hasRef || ref == "" {
+					continue
+				}
+				for _, runtime := range knownRuntimes {
+					if strings.EqualFold(repo, runtime.ActionRepo) {
+						names = append(names, runtime.HostOnlyEnvVars...)
+					}
+				}
+			}
+		}
+	}
 	return names
 }
 

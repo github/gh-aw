@@ -462,6 +462,8 @@ Environment variables can be defined at multiple scopes (workflow, job, step, en
 
 Lists environment variable names that must be excluded from the AWF agent container even when the compiler cannot infer that they contain sensitive values. Names are deduplicated and merged with automatically excluded variables detected from `secrets.*` and `needs.*.outputs.*` references.
 
+When setup-uv runs before the agent, the compiler also excludes its host-only `UV_CACHE_DIR` and `UV_PYTHON_INSTALL_DIR` paths, unless the workflow explicitly sets them in `env:`, `engine.env`, or `sandbox.agent.env`. Explicit `excluded-env` entries still take precedence. Automatic exclusions require AWF v0.25.3 or later.
+
 ```yaml wrap
 excluded-env:
   - MY_DISPATCH_TOKEN
@@ -656,7 +658,7 @@ Each runtime takes a required `version` string plus optional `action-repo` and `
 | `node` | 24 | `actions/setup-node@v7` |
 | `python` | 3.12 | `actions/setup-python@v5` |
 | `go` | 1.25 | `actions/setup-go@v5` |
-| `uv` | latest | `astral-sh/setup-uv@v5` |
+| `uv` | latest | `astral-sh/setup-uv@v10.2.0` |
 | `bun` | 1.1 | `oven-sh/setup-bun@v2` |
 | `deno` | 2.x | `denoland/setup-deno@v2` |
 | `ruby` | 3.3 | `ruby/setup-ruby@v1` |
@@ -678,6 +680,12 @@ runtimes:
 ```
 
 Omitted runtimes use the defaults above. Runtimes from imported shared workflows are merged with your workflow's configuration.
+
+Generated setup actions disable GitHub Actions caching for Go, Node.js, and uv to prevent agent-written cache content from affecting other repository jobs. Removed duplicate setup-uv steps cannot re-enable caching. Preserved custom setup-uv steps must set `enable-cache: false`; otherwise compilation emits a warning, or an error in strict mode.
+
+Inside the sandbox, uv uses its default cache and managed interpreter directories under `HOME` (`~/.cache/uv` and `~/.local/share/uv/python`) unless explicitly configured otherwise. Interpreters installed by host steps are not visible unless installed at a sandbox-accessible path. Downloading managed interpreters also requires the download host to be allowed by `network:`.
+
+For Cloud Hypervisor, the compiler adds the workspace's `.awf-home/` directory to the checkout's local git exclusions so tool state does not appear in normal git status or patches.
 
 ### `run-install-scripts`
 

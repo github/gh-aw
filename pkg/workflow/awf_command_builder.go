@@ -259,7 +259,18 @@ func buildCloudHypervisorFilesystemMkdirScript(workflowData *WorkflowData) strin
 	for _, target := range targets {
 		quoted = append(quoted, shellEscapeArgWithVarsPreserved(target, "GITHUB_WORKSPACE"))
 	}
-	return "mkdir -p " + strings.Join(quoted, " ")
+	script := "mkdir -p " + strings.Join(quoted, " ")
+	if _, hasHome := seen["${GITHUB_WORKSPACE}/.awf-home"]; hasHome {
+		// HOME tool state must not be staged by git add or included in agent patches.
+		script += `
+if GH_AW_GIT_EXCLUDE="$(git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude 2>/dev/null)"; then
+  mkdir -p "$(dirname "$GH_AW_GIT_EXCLUDE")"
+  if [ ! -f "$GH_AW_GIT_EXCLUDE" ] || ! grep -qxF '/.awf-home/' "$GH_AW_GIT_EXCLUDE"; then
+    printf '\n%s\n' '/.awf-home/' >> "$GH_AW_GIT_EXCLUDE"
+  fi
+fi`
+	}
+	return script
 }
 
 // cloudHypervisorAllowWriteHostMkdirTarget maps a filesystem.allowWrite guest path to the

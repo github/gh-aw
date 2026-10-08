@@ -180,6 +180,9 @@ func DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps string, runtimeRequ
 							if req.Runtime.ID == "go" && (key == "go-version-file" || key == "cache") {
 								continue
 							}
+							if req.Runtime.ID == "uv" && key == "enable-cache" {
+								continue
+							}
 							// Carry over any other fields
 							req.ExtraFields[key] = value
 							runtimeDeduplicationLog.Printf("  Capturing extra field from setup step: %s = %v", key, value)

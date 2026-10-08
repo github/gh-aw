@@ -29,6 +29,169 @@ func TestApplyDefaultMaxAICreditsEnvToMapHandlesNilMap(t *testing.T) {
 	})
 }
 
+func TestComputeAWFExcludeEnvVarNamesUVHostPaths(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    WorkflowData
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "generated setup from uv command",
+			data: WorkflowData{CustomSteps: "steps:\n  - run: uv sync\n"},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "generated setup survives custom step mutation",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - run: echo done\n",
+				CachedRuntimeRequirements: []RuntimeRequirement{
+					{Runtime: findRuntimeByID("uv")},
+				},
+				CachedRuntimeRequirementsSet: true,
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "custom setup without uv command and empty detection cache",
+			data: WorkflowData{
+				CustomSteps:                  "steps:\n  - uses: 'astral-sh/setup-uv@v7' # pinned later\n    with:\n      version: '0.8.0'\n",
+				CachedRuntimeRequirementsSet: true,
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "custom setup repository is case insensitive",
+			data: WorkflowData{CustomSteps: "steps:\n  - uses: Astral-Sh/Setup-UV@v5\n"},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "custom pre-step setup",
+			data: WorkflowData{PreSteps: "pre-steps:\n  - uses: astral-sh/setup-uv@v5\n"},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "custom pre-agent setup",
+			data: WorkflowData{PreAgentSteps: "pre-agent-steps:\n  - uses: astral-sh/setup-uv@v5\n"},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name:    "post-step setup does not affect agent",
+			data:    WorkflowData{PostSteps: "post-steps:\n  - uses: astral-sh/setup-uv@v5\n"},
+			notWant: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name:    "no uv setup",
+			data:    WorkflowData{CustomSteps: "steps:\n  - run: python script.py\n"},
+			notWant: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "impostor repositories and run text do not match",
+			data: WorkflowData{CustomSteps: `steps:
+  - uses: impostor/astral-sh/setup-uv@v7
+  - uses: astral-sh/setup-uv-impostor@v7
+  - uses: astral-sh/setup-uv/subaction@v7
+  - run: echo astral-sh/setup-uv@v7
+`},
+			notWant: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "frontmatter override including empty value",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - run: uv sync\n",
+				Env:         "env:\n  UV_CACHE_DIR: ''\n",
+			},
+			want:    []string{"UV_PYTHON_INSTALL_DIR"},
+			notWant: []string{"UV_CACHE_DIR"},
+		},
+		{
+			name: "engine override",
+			data: WorkflowData{
+				CustomSteps:  "steps:\n  - run: uv sync\n",
+				EngineConfig: &EngineConfig{Env: map[string]string{"UV_CACHE_DIR": "/cache"}},
+			},
+			want:    []string{"UV_PYTHON_INSTALL_DIR"},
+			notWant: []string{"UV_CACHE_DIR"},
+		},
+		{
+			name: "sandbox agent override",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - run: uv sync\n",
+				SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
+					Env: map[string]string{"UV_PYTHON_INSTALL_DIR": "/python"},
+				}},
+			},
+			want:    []string{"UV_CACHE_DIR"},
+			notWant: []string{"UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "explicit exclusion wins over override",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - run: uv sync\n",
+				Env:         "env:\n  UV_CACHE_DIR: /cache\n",
+				ExcludedEnv: []string{"UV_CACHE_DIR"},
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "frontmatter secret override remains excluded",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - run: uv sync\n",
+				Env:         "env:\n  UV_CACHE_DIR: ${{ secrets.CACHE }}\n",
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "engine secret exclusion survives frontmatter override",
+			data: WorkflowData{
+				CustomSteps:  "steps:\n  - run: uv sync\n",
+				Env:          "env:\n  UV_CACHE_DIR: /cache\n",
+				EngineConfig: &EngineConfig{Env: map[string]string{"UV_CACHE_DIR": "${{ secrets.CACHE }}"}},
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "sandbox job-output override remains excluded",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - run: uv sync\n",
+				SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
+					Env: map[string]string{"UV_PYTHON_INSTALL_DIR": "${{ needs.setup.outputs.path }}"},
+				}},
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ComputeAWFExcludeEnvVarNames(&tt.data, nil)
+			for _, name := range tt.want {
+				assert.Contains(t, got, name)
+				assert.Equal(t, 1, strings.Count(","+strings.Join(got, ",")+",", ","+name+","))
+			}
+			for _, name := range tt.notWant {
+				assert.NotContains(t, got, name)
+			}
+		})
+	}
+}
+
+func TestComputeAWFExcludeEnvVarNamesUVAfterSetupDeduplication(t *testing.T) {
+	for _, customVersion := range []string{"", "    with:\n      version: '0.8.0'\n"} {
+		t.Run(customVersion, func(t *testing.T) {
+			data := &WorkflowData{
+				CustomSteps: "steps:\n  - uses: astral-sh/setup-uv@v7\n" + customVersion + "  - run: uv sync\n",
+			}
+			requirements := detectRuntimeRequirementsCached(data)
+			steps, _, err := DeduplicateRuntimeSetupStepsFromCustomSteps(data.CustomSteps, requirements)
+			require.NoError(t, err)
+			data.CustomSteps = steps
+			got := ComputeAWFExcludeEnvVarNames(data, nil)
+			assert.Contains(t, got, "UV_CACHE_DIR")
+			assert.Contains(t, got, "UV_PYTHON_INSTALL_DIR")
+		})
+	}
+}
+
 func TestApplyDefaultMaxAICreditsEnvToMap(t *testing.T) {
 	t.Run("sets default agent expression when max-ai-credits is unset", func(t *testing.T) {
 		env := map[string]string{}

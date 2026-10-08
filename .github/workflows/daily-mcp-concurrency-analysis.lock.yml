@@ -1151,6 +1151,12 @@ jobs:
           export COPILOT_API_KEY="$COPILOT_DUMMY_BYOK"
           (umask 177 && touch /tmp/gh-aw/agent-stdio.log)
           mkdir -p "${GITHUB_WORKSPACE}/.awf-home" "/tmp/gh-aw/agent" "/tmp/gh-aw/cache-memory" "/tmp/gh-aw/sandbox/agent/logs"
+          if GH_AW_GIT_EXCLUDE="$(git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude 2>/dev/null)"; then
+            mkdir -p "$(dirname "$GH_AW_GIT_EXCLUDE")"
+            if [ ! -f "$GH_AW_GIT_EXCLUDE" ] || ! grep -qxF '/.awf-home/' "$GH_AW_GIT_EXCLUDE"; then
+              printf '\n%s\n' '/.awf-home/' >> "$GH_AW_GIT_EXCLUDE"
+            fi
+          fi
           GH_AW_MAX_AI_CREDITS="${GH_AW_MAX_AI_CREDITS:-1000}"
           if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then
             GH_AW_MAX_AI_CREDITS="1000"

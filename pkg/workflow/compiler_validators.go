@@ -186,6 +186,9 @@ func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdow
 	if err := c.validateAgentFile(workflowData, markdownPath); err != nil {
 		return err
 	}
+	if err := c.validateRuntimeSetupCaches(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	if err := c.validateCoreToolConfiguration(workflowData, markdownPath); err != nil {
 		return err
 	}

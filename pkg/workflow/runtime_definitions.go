@@ -20,6 +20,7 @@ type Runtime struct {
 	DefaultVersion    string            // Default version to use
 	Commands          []string          // Commands that indicate this runtime is needed
 	ExtraWithFields   map[string]string // Additional 'with' fields for the action
+	HostOnlyEnvVars   []string          // Setup-action path variables excluded from the sandbox unless explicitly configured
 	ManifestFiles     []string          // Package manifest file names for this runtime (matched by filename, no path)
 	UnverifiedCreator bool              // True if the action creator is not GitHub-verified; triggers zizmor suppression
 }
@@ -161,13 +162,17 @@ var knownRuntimes = []*Runtime{
 		ManifestFiles:  []string{"Gemfile", "Gemfile.lock"},
 	},
 	{
-		ID:                "uv",
-		Name:              "uv",
-		ActionRepo:        "astral-sh/setup-uv",
-		ActionVersion:     "v5",
-		VersionField:      "version",
-		DefaultVersion:    "", // Uses latest
-		Commands:          []string{"uv", "uvx"},
+		ID:             "uv",
+		Name:           "uv",
+		ActionRepo:     "astral-sh/setup-uv",
+		ActionVersion:  "v5",
+		VersionField:   "version",
+		DefaultVersion: "", // Uses latest
+		Commands:       []string{"uv", "uvx"},
+		ExtraWithFields: map[string]string{
+			"enable-cache": "false", // Disable caching to prevent cache poisoning in agentic workflows
+		},
+		HostOnlyEnvVars:   []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
 		ManifestFiles:     []string{"pyproject.toml", "uv.lock"},
 		UnverifiedCreator: true, // astral-sh org is not GitHub-verified on the Marketplace
 	},

@@ -363,6 +363,19 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			checkContent: []string{
 				"Setup uv",
 				"astral-sh/setup-uv@",
+				"enable-cache: false",
+			},
+		},
+		{
+			name: "generates uv setup with version",
+			requirements: []RuntimeRequirement{
+				{Runtime: findRuntimeByID("uv"), Version: "0.10.0"},
+			},
+			expectSteps: 1,
+			checkContent: []string{
+				"astral-sh/setup-uv@",
+				"version: '0.10.0'",
+				"enable-cache: false",
 			},
 		},
 		{
@@ -563,6 +576,22 @@ func TestGenerateRuntimeSetupSteps_GoVersionFileFromExtraFieldsWhenGoModFileNotS
 	content := strings.Join(steps[0], "\n")
 	assert.Contains(t, content, "go-version-file: 'go.work.mod'")
 	assert.Equal(t, 1, strings.Count(content, "go-version-file:"))
+}
+
+func TestDeduplicateUVDisablesCache(t *testing.T) {
+	for _, cacheValue := range []string{"true", "auto", "'true'"} {
+		t.Run(cacheValue, func(t *testing.T) {
+			customSteps := "steps:\n  - uses: astral-sh/setup-uv@v10\n    with:\n      enable-cache: " + cacheValue + "\n      cache-local-path: /host/cache\n"
+			steps, requirements, err := DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps, []RuntimeRequirement{{Runtime: findRuntimeByID("uv")}})
+			require.NoError(t, err)
+			assert.NotContains(t, steps, "astral-sh/setup-uv")
+			require.Len(t, requirements, 1)
+			assert.NotContains(t, requirements[0].ExtraFields, "enable-cache")
+			content := stepsToString(GenerateRuntimeSetupSteps(requirements, nil))
+			assert.Contains(t, content, "enable-cache: false")
+			assert.Contains(t, content, "cache-local-path: '/host/cache'")
+		})
+	}
 }
 
 func TestGenerateRuntimeSetupSteps_UVWithoutVersionRendersRuntimeExtraWithFields(t *testing.T) {

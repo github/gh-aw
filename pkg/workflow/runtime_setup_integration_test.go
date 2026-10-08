@@ -5,15 +5,279 @@ package workflow
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
 
 	"github.com/github/gh-aw/pkg/testutil"
 )
+
+func TestRuntimeSetupUVHostEnvIntegration(t *testing.T) {
+	topologies := []struct {
+		name        string
+		frontmatter string
+		marker      string
+	}{
+		{name: "docker"},
+		{
+			name:        "cloud-hypervisor",
+			frontmatter: "sandbox:\n  agent:\n    runtime: cloud-hypervisor\n",
+			marker:      "--container-runtime cloud-hypervisor",
+		},
+		{
+			name:        "arc-dind",
+			frontmatter: "runs-on: arc-scale-set\nrunner:\n  topology: arc-dind\n",
+			marker:      "patch_awf_chroot_config.cjs",
+		},
+	}
+	scenarios := []struct {
+		name        string
+		frontmatter string
+		steps       string
+		wantCache   bool
+		wantPython  bool
+		wantSetup   bool
+	}{
+		{
+			name:      "generated",
+			steps:     "  - run: uv sync\n",
+			wantCache: true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:      "custom without detected uv",
+			steps:     "  - uses: astral-sh/setup-uv@v5\n    with:\n      version: '0.8.0'\n",
+			wantCache: true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:      "custom preserved after deduplication",
+			steps:     "  - uses: astral-sh/setup-uv@v5\n    with:\n      version: '0.8.0'\n  - run: uv sync\n",
+			wantCache: true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:      "custom replaced after deduplication",
+			steps:     "  - uses: astral-sh/setup-uv@v5\n  - run: uv sync\n",
+			wantCache: true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:        "custom pre-step",
+			frontmatter: "pre-steps:\n  - uses: astral-sh/setup-uv@v5\n",
+			steps:       "  - run: echo ready\n",
+			wantCache:   true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:        "custom pre-agent step",
+			frontmatter: "pre-agent-steps:\n  - uses: astral-sh/setup-uv@v5\n",
+			steps:       "  - run: echo ready\n",
+			wantCache:   true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:        "frontmatter override",
+			frontmatter: "env:\n  UV_CACHE_DIR: /cache\n",
+			steps:       "  - run: uv sync\n",
+			wantPython:  true, wantSetup: true,
+		},
+		{
+			name:        "engine override",
+			frontmatter: "engine:\n  id: copilot\n  env:\n    UV_PYTHON_INSTALL_DIR: /python\n",
+			steps:       "  - run: uv sync\n",
+			wantCache:   true, wantSetup: true,
+		},
+		{
+			name:        "explicit exclusion beats override",
+			frontmatter: "env:\n  UV_CACHE_DIR: /cache\nexcluded-env:\n  - UV_CACHE_DIR\n",
+			steps:       "  - run: uv sync\n",
+			wantCache:   true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:        "frontmatter secret remains excluded",
+			frontmatter: "env:\n  UV_CACHE_DIR: ${{ secrets.CACHE }}\n",
+			steps:       "  - run: uv sync\n",
+			wantCache:   true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:        "engine secret remains excluded",
+			frontmatter: "engine:\n  id: copilot\n  env:\n    UV_CACHE_DIR: ${{ secrets.CACHE }}\n",
+			steps:       "  - run: uv sync\n",
+			wantCache:   true, wantPython: true, wantSetup: true,
+		},
+		{
+			name:  "impostor action",
+			steps: "  - uses: astral-sh/setup-uv-impostor@v5\n",
+		},
+		{
+			name:  "no setup",
+			steps: "  - run: echo ready\n",
+		},
+	}
+	for _, topology := range topologies {
+		for _, scenario := range scenarios {
+			t.Run(topology.name+"/"+scenario.name, func(t *testing.T) {
+				engine := "engine: copilot\n"
+				if strings.HasPrefix(scenario.frontmatter, "engine:") {
+					engine = ""
+				}
+				markdown := "---\non:\n  workflow_dispatch:\nstrict: false\n" + engine +
+					topology.frontmatter + scenario.frontmatter + "steps:\n" + scenario.steps + "---\n\n# Test uv host paths\n"
+				lock, agentRun := compileUVHostEnvWorkflow(t, markdown)
+				require.Contains(t, agentRun, "--env-all")
+				for name, excluded := range map[string]bool{
+					"UV_CACHE_DIR": scenario.wantCache, "UV_PYTHON_INSTALL_DIR": scenario.wantPython,
+				} {
+					assert.Equal(t, excluded, strings.Contains(agentRun, "--exclude-env "+name), name)
+					assert.LessOrEqual(t, strings.Count(agentRun, "--exclude-env "+name), 1, name)
+				}
+				if scenario.wantSetup {
+					assert.Equal(t, 1, countInNonCommentLines(lock, "uses: astral-sh/setup-uv@"))
+				} else {
+					assert.Zero(t, countInNonCommentLines(lock, "uses: astral-sh/setup-uv@"))
+				}
+				if topology.marker != "" {
+					assert.Contains(t, lock, topology.marker)
+				}
+				if topology.name == "cloud-hypervisor" {
+					assert.Contains(t, agentRun, `/workspace/.awf-home`)
+					assert.NotContains(t, agentRun, "--exclude-env HOME")
+				}
+			})
+		}
+	}
+}
+
+func TestRuntimeSetupUVSandboxEnvOverrideIntegration(t *testing.T) {
+	for _, runtime := range []string{"docker", "cloud-hypervisor", "arc-dind"} {
+		t.Run(runtime, func(t *testing.T) {
+			runner := ""
+			agentRuntime := runtime
+			if runtime == "arc-dind" {
+				runner = "runs-on: arc-scale-set\nrunner:\n  topology: arc-dind\n"
+				agentRuntime = "docker"
+			}
+			markdown := "---\non:\n  workflow_dispatch:\nstrict: false\nengine: copilot\nsandbox:\n  agent:\n    runtime: " +
+				agentRuntime + "\n    env:\n      UV_CACHE_DIR: /cache\n      UV_PYTHON_INSTALL_DIR: /python\n" + runner +
+				"steps:\n  - run: uv sync\n---\n\n# Test uv overrides\n"
+			_, run := compileUVHostEnvWorkflow(t, markdown)
+			assert.NotContains(t, run, "--exclude-env UV_CACHE_DIR")
+			assert.NotContains(t, run, "--exclude-env UV_PYTHON_INSTALL_DIR")
+		})
+	}
+}
+
+func TestRuntimeSetupUVExcludeEnvVersionGateIntegration(t *testing.T) {
+	require.Equal(t, "v0.25.3", string(constants.AWFExcludeEnvMinVersion))
+	for _, version := range []string{"v0.25.2", "v0.25.3"} {
+		t.Run(version, func(t *testing.T) {
+			markdown := "---\non:\n  workflow_dispatch:\nstrict: false\nengine: copilot\nsandbox:\n  agent:\n    version: " +
+				version + "\nsteps:\n  - run: uv sync\n---\n\n# Test uv version gate\n"
+			_, run := compileUVHostEnvWorkflow(t, markdown)
+			for _, name := range []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"} {
+				assert.Equal(t, version == "v0.25.3", strings.Contains(run, "--exclude-env "+name))
+			}
+		})
+	}
+}
+
+func TestRuntimeSetupUVCacheValidationIntegration(t *testing.T) {
+	scenarios := []struct {
+		name       string
+		with       string
+		runCommand string
+	}{
+		{
+			name:       "custom version preserved after deduplication",
+			with:       "      version: '0.8.0'\n",
+			runCommand: "  - run: uv sync\n",
+		},
+		{
+			name: "custom version without detected uv",
+			with: "      version: '0.8.0'\n",
+		},
+		{name: "setup action without detected uv"},
+	}
+	const cacheDiagnostic = "Actions caches can save agent-written files"
+	for _, scenario := range scenarios {
+		for _, strict := range []bool{true, false} {
+			for _, disabled := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/strict=%t/cache-disabled=%t", scenario.name, strict, disabled), func(t *testing.T) {
+					with := scenario.with
+					if disabled {
+						with += "      enable-cache: false\n"
+					}
+					steps := "steps:\n  - name: Custom uv setup\n    uses: astral-sh/setup-uv@v5\n"
+					if with != "" {
+						steps += "    with:\n" + with
+					}
+					steps += scenario.runCommand
+					markdown := fmt.Sprintf("---\non:\n  workflow_dispatch:\nengine: copilot\nstrict: %t\n%s---\n\n# Test uv cache validation\n", strict, steps)
+					dir := testutil.TempDir(t, "uv-cache-validation-*")
+					path := filepath.Join(dir, "workflow.md")
+					require.NoError(t, os.WriteFile(path, []byte(markdown), 0o644))
+					compiler := NewCompiler()
+					var compileErr error
+					stderr := testutil.CaptureStderr(t, func() {
+						compileErr = compiler.CompileWorkflow(path)
+					})
+					if strict && !disabled {
+						require.ErrorContains(t, compileErr, "strict mode:")
+						assert.ErrorContains(t, compileErr, cacheDiagnostic)
+						assert.ErrorContains(t, compileErr, "Custom uv setup")
+						assert.ErrorContains(t, compileErr, "enable-cache: false")
+						_, err := os.Stat(stringutil.MarkdownToLockFile(path))
+						assert.True(t, os.IsNotExist(err), "rejected workflow must not produce a lock file")
+						return
+					}
+					require.NoError(t, compileErr)
+					if disabled {
+						assert.NotContains(t, stderr, cacheDiagnostic)
+					} else {
+						assert.Contains(t, stderr, cacheDiagnostic)
+						assert.Contains(t, stderr, "Custom uv setup")
+						assert.Contains(t, stderr, "enable-cache: false")
+						assert.Positive(t, compiler.GetWarningCount())
+					}
+					content, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+					require.NoError(t, err)
+					assert.Equal(t, 1, countInNonCommentLines(string(content), "uses: astral-sh/setup-uv@"))
+					if scenario.with != "" {
+						assert.Contains(t, string(content), "0.8.0", "preserved custom setup must retain its version")
+					}
+				})
+			}
+		}
+	}
+}
+
+func compileUVHostEnvWorkflow(t *testing.T, markdown string) (string, string) {
+	t.Helper()
+	dir := testutil.TempDir(t, "uv-host-env-*")
+	path := filepath.Join(dir, "workflow.md")
+	require.NoError(t, os.WriteFile(path, []byte(markdown), 0o644))
+	require.NoError(t, NewCompiler().CompileWorkflow(path))
+	content, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+	require.NoError(t, err)
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Run string `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal(content, &workflow))
+	var agentRuns []string
+	for _, step := range workflow.Jobs["agent"].Steps {
+		if strings.Contains(step.Run, "--env-all") {
+			agentRuns = append(agentRuns, step.Run)
+		}
+	}
+	require.Len(t, agentRuns, 1)
+	return string(content), agentRuns[0]
+}
 
 // countInNonCommentLines counts occurrences of a string in non-comment lines
 // A comment line is one that starts with '#' (after trimming leading whitespace)
