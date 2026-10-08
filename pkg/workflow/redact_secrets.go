@@ -161,7 +161,11 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/redact_secrets.cjs');\n")
-	yaml.WriteString("            await main();\n")
+	if data.SecretMasking != nil && len(data.SecretMasking.Steps) > 0 {
+		yaml.WriteString("            await main({ prepareForCustomMasking: true });\n")
+	} else {
+		yaml.WriteString("            await main();\n")
+	}
 
 	// Add environment variables (only when secrets are present, since a step's
 	// `env` must be a mapping and an empty `env:` parses as null)

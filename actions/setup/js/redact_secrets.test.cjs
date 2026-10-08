@@ -76,7 +76,7 @@ describe("redact_secrets.cjs", () => {
         fs.chmodSync(moduleDir, 0o555);
         const inode = fs.statSync(file).ino;
         try {
-          expect(processFile(file, hasSecrets ? ["secret-value"] : [])).toBe(hasSecrets ? 1 : 0);
+          expect(processFile(file, hasSecrets ? ["secret-value"] : [], [], true)).toBe(hasSecrets ? 1 : 0);
           expect(fs.readFileSync(file, "utf8")).toBe(hasSecrets ? "***REDACTED***" : "secret-value");
           expect(fs.statSync(file).ino).toBe(inode);
           expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -100,7 +100,7 @@ describe("redact_secrets.cjs", () => {
           return access(target, mode);
         });
         try {
-          expect(processFile(file, [])).toBe(0);
+          expect(processFile(file, [], [], true)).toBe(0);
           expect(fs.readFileSync(file, "utf8")).toBe("custom-sensitive-text");
           expect(fs.statSync(file).ino).not.toBe(inode);
           expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -163,6 +163,41 @@ describe("redact_secrets.cjs", () => {
         expect(after.ino).toBe(before.ino);
         expect(after.mode).toBe(before.mode);
         expect(after.mtimeMs).toBe(before.mtimeMs);
+      });
+      it.each(["EACCES", "EPERM"])("does not require write access to sanitized files without custom masking (%s)", code => {
+        const { processFile } = require("./redact_secrets.cjs");
+        const directory = path.join(tempDir, "container-logs");
+        fs.mkdirSync(directory);
+        const file = path.join(directory, "server.log");
+        fs.writeFileSync(file, "safe log content", { mode: 0o444 });
+        fs.chmodSync(directory, 0o555);
+        const before = fs.statSync(file);
+        const access = vi.spyOn(fs, "accessSync").mockImplementation(() => {
+          throw Object.assign(new Error("permission denied"), { code });
+        });
+        const chmod = vi.spyOn(fs, "chmodSync").mockImplementation(() => {
+          throw Object.assign(new Error("container-owned file"), { code });
+        });
+        const unlink = vi.spyOn(fs, "unlinkSync").mockImplementation(() => {
+          throw Object.assign(new Error("container-owned directory"), { code });
+        });
+        try {
+          expect(processFile(file, ["secret-value"], ["runtime-mask"])).toBe(0);
+          expect(fs.readFileSync(file, "utf8")).toBe("safe log content");
+          const after = fs.statSync(file);
+          expect(after.ino).toBe(before.ino);
+          expect(after.mode).toBe(before.mode);
+          expect(after.mtimeMs).toBe(before.mtimeMs);
+          expect(access).not.toHaveBeenCalled();
+          expect(chmod).not.toHaveBeenCalled();
+          expect(unlink).not.toHaveBeenCalled();
+          expect(mockCore.setFailed).not.toHaveBeenCalled();
+        } finally {
+          access.mockRestore();
+          chmod.mockRestore();
+          unlink.mockRestore();
+          fs.chmodSync(directory, 0o700);
+        }
       });
       it.each(["missing.log", "missing.html"])("tolerates disappeared files even with runtime masks (%s)", name => {
         const { processFile } = require("./redact_secrets.cjs");
@@ -227,6 +262,24 @@ describe("redact_secrets.cjs", () => {
       });
     }),
     describe("main function integration", () => {
+      it.each([false, true])("prepares unchanged files only when custom masking is configured (%s)", prepareForCustomMasking => {
+        const { processFile } = require("./redact_secrets.cjs");
+        const file = path.join(tempDir, "server.log");
+        fs.writeFileSync(file, "custom-sensitive-text", { mode: 0o444 });
+        expect(processFile(file, [], [], prepareForCustomMasking)).toBe(0);
+        expect(fs.readFileSync(file, "utf8")).toBe("custom-sensitive-text");
+        expect(fs.statSync(file).mode & 0o777).toBe(prepareForCustomMasking ? 0o600 : 0o444);
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+      });
+      it.each([false, true])("passes custom masking configuration through the full scan (%s)", prepareForCustomMasking => {
+        const file = path.join(tempDir, "server.log");
+        fs.writeFileSync(file, "custom-sensitive-text", { mode: 0o444 });
+        const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
+        return eval(`(async () => { ${modifiedScript}; await main({ prepareForCustomMasking: ${prepareForCustomMasking} }); })()`).then(() => {
+          expect(fs.statSync(file).mode & 0o777).toBe(prepareForCustomMasking ? 0o600 : 0o444);
+          expect(mockCore.setFailed).not.toHaveBeenCalled();
+        });
+      });
       it("continues scanning when a nested directory disappears", () => {
         const { findFiles } = require("./redact_secrets.cjs");
         const missing = path.join(tempDir, "missing");

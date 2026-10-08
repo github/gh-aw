@@ -344,9 +344,10 @@ function writeProcessedFile(filePath, content, changed) {
  * @param {string} filePath - Path to the file
  * @param {string[]} secretValues - Array of secret values to redact
  * @param {string[]} [maskedValues] - Runtime masks collected before any file is sanitized
+ * @param {boolean} [prepareForCustomMasking] - Prepare unchanged files for configured custom redactors
  * @returns {number} Number of redactions made
  */
-function processFile(filePath, secretValues, maskedValues = []) {
+function processFile(filePath, secretValues, maskedValues = [], prepareForCustomMasking = false) {
   try {
     const content = fs.readFileSync(filePath, "utf8");
     const encodedResult =
@@ -369,7 +370,9 @@ function processFile(filePath, secretValues, maskedValues = []) {
     redacted = customResult.content;
     totalRedactions += customResult.redactionCount;
 
-    writeProcessedFile(filePath, redacted, totalRedactions > 0);
+    if (totalRedactions > 0 || prepareForCustomMasking) {
+      writeProcessedFile(filePath, redacted, totalRedactions > 0);
+    }
     if (totalRedactions > 0) {
       core.info(`Processed ${filePath}: ${totalRedactions} redaction(s)`);
     }
@@ -396,8 +399,9 @@ function processFile(filePath, secretValues, maskedValues = []) {
 
 /**
  * Main function
+ * @param {{prepareForCustomMasking?: boolean}} [options]
  */
-async function main() {
+async function main({ prepareForCustomMasking = false } = {}) {
   // Get the list of secret names from environment variable
   const secretNames = process.env.GH_AW_SECRET_NAMES;
 
@@ -465,7 +469,7 @@ async function main() {
     const maskedValues = [...masks].sort((a, b) => b.length - a.length);
     // Process each file
     for (const file of files) {
-      const redactionCount = processFile(file, secretValues, maskedValues);
+      const redactionCount = processFile(file, secretValues, maskedValues, prepareForCustomMasking);
       if (redactionCount > 0) {
         filesWithRedactions++;
         totalRedactions += redactionCount;
