@@ -14,6 +14,24 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/gh-aw/");
 });
 
+test("dims the toolbar only when neither hovered nor focused", async ({ page }) => {
+  await startSlideshow(page);
+  const controls = presentation(page).getByRole("group", { name: "Slide navigation" });
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await expect(controls).toHaveCSS("opacity", "0.1");
+
+  await controls.hover();
+  await expect(controls).toHaveCSS("opacity", "1");
+  await page.mouse.move(0, 0);
+  await expect(controls).toHaveCSS("opacity", "0.1");
+
+  await controls.getByRole("button", { name: "Exit slideshow" }).focus();
+  await expect(controls).toHaveCSS("opacity", "1");
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await expect(controls).toHaveCSS("opacity", "0.1");
+});
+
 test("loads the complete slideshow runtime only on first use", async ({ page }) => {
   const initialAssets = await page.evaluate(pattern => {
     const matcher = new RegExp(pattern);
