@@ -1,8 +1,7 @@
 {
-  "generated_on": "2026-10-07",
-  "issues_opened_in_sample_window": 197,
-  "issues_closed_in_sample_window": 100,
-  "prs_opened_in_sample_window": 94,
-  "prs_merged_in_sample_window": 50,
-  "commits_30d": 725
+  "date": "2026-10-08",
+  "open_prs": 4,
+  "commits_30d": 762,
+  "latest_release": "v0.91.5",
+  "cascade_suspected_open": 17
 }
