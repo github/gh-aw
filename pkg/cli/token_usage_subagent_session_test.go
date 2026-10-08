@@ -213,7 +213,7 @@ func TestSessionSubagentModels(t *testing.T) {
 		root := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(root, "usage", "aw_session.jsonl"), []byte(subagentSessionHeader+"invalid\n"), 0o644))
-		require.NoError(t, os.WriteFile(filepath.Join(root, "agent-stdio.log"), []byte("● Research (model: opus) Research routing\n[INFO] container(s)\nclass RoutingProfile(StrictModel)\nlen(d)\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "agent-stdio.log"), []byte("● Check repository status (shell)\n● Read OpenAPI spec (head)\n● Research (model: opus) Research routing\n[INFO] container(s)\nclass RoutingProfile(StrictModel)\nlen(d)\n"), 0o644))
 		summary := &TokenUsageSummary{ByModel: map[string]*ModelTokenUsage{"opus": {Requests: 1}}}
 		augmentSubagentModelAttribution(root, summary)
 		require.Len(t, summary.SubagentModelRequests, 1)
@@ -268,6 +268,22 @@ func TestSessionSubagentFailuresAreNotReportedAsServed(t *testing.T) {
 	require.Equal(t, AuditFindingSubagentFailed, findings[0].Code)
 	require.Contains(t, findings[0].Description, "file-summarizer failed 1 invocation")
 	require.Contains(t, findings[0].Description, "HTTP 400 Cannot translate request")
+}
+
+func TestCopilotToolExecutionObjectErrorDoesNotRejectSubagentEvents(t *testing.T) {
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"subagent.started","agentId":"worker","data":{"agentDisplayName":"Research","model":"opus"}}`) +
+		subagentSessionRecord(`{"type":"tool.execution_complete","data":{"toolCallId":"tool-1","success":false,"error":{"message":"tool execution failed","code":"tool_error"}}}`) +
+		subagentSessionRecord(`{"type":"subagent.failed","agentId":"worker","data":{"error":{"message":"HTTP 400 Cannot translate request","code":"bad_request"}}}`)
+
+	requests, _, _, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, requests, 1)
+	require.Equal(t, "Research", requests[0].AgentName)
+	require.Equal(t, 1, requests[0].FailedCount)
+	require.Equal(t, "HTTP 400 Cannot translate request", requests[0].Error)
 }
 
 func TestSessionAgentUsageIncludesMainAndSubagents(t *testing.T) {

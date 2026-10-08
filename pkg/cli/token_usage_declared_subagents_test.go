@@ -4,6 +4,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -413,6 +414,56 @@ func TestPiFailedSubagentsStillAttributeMainAgentCredits(t *testing.T) {
 	require.InDelta(t, 1.7, summary.TotalAIC, 0.000001)
 }
 
+func TestPiConcurrentSubagentRequestsMatchProxyEntriesOutOfOrder(t *testing.T) {
+	usageEvent := func(agent, timestamp string, input, output int) string {
+		record := subagentSessionRecord(fmt.Sprintf(`{"type":"pi.subagent_event","data":{"agent":%q,"event":{"message":{"model":"claude-haiku-4-5-20251001","usage":{"input":%d,"output":%d}}}}}`, agent, input, output))
+		return strings.Replace(record, `"data":`, `"timestamp":`+fmt.Sprintf("%q", timestamp)+`,"data":`, 1)
+	}
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"invocationId":"summary","agent":"file-summarizer","requestedModel":"claude-haiku-4.5","resolvedModel":"claude-haiku-4.5"}}`) +
+		subagentSessionRecord(`{"type":"pi.subagent_dispatch","data":{"invocationId":"quick","agent":"quick-checker","requestedModel":"small","resolvedModel":"claude-haiku-4.5"}}`) +
+		usageEvent("file-summarizer", "2026-10-08T10:02:00Z", 20, 3) +
+		usageEvent("quick-checker", "2026-10-08T10:03:00Z", 10, 2) +
+		usageEvent("file-summarizer", "2026-10-08T10:04:00Z", 40, 5) +
+		usageEvent("quick-checker", "2026-10-08T10:05:00Z", 30, 4)
+
+	_, _, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	entries := []TokenUsageEntry{
+		{Timestamp: "2026-10-08T10:01:00Z", Provider: "anthropic", Model: "claude-haiku-4-5-20251001", Path: "/v1/messages", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 30, OutputTokens: 4}, AICreditsThisResponse: json.RawMessage(`0.558`)},
+		{Timestamp: "2026-10-08T10:02:00Z", Provider: "anthropic", Model: "claude-haiku-4-5-20251001", Path: "/v1/messages", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 40, OutputTokens: 5}, AICreditsThisResponse: json.RawMessage(`0.45`)},
+		{Timestamp: "2026-10-08T10:03:00Z", Provider: "anthropic", Model: "claude-haiku-4-5-20251001", Path: "/v1/messages", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10, OutputTokens: 2}, AICreditsThisResponse: json.RawMessage(`0.799`)},
+		{Timestamp: "2026-10-08T10:06:00Z", Provider: "anthropic", Model: "claude-haiku-4-5-20251001", Path: "/v1/messages", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 20, OutputTokens: 3}, AICreditsThisResponse: json.RawMessage(`0.619`)},
+		{Timestamp: "2026-10-08T10:00:00Z", Provider: "github-copilot", Model: "gpt-5.6-luna", Path: "/responses", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 100, OutputTokens: 10}, AICreditsThisResponse: json.RawMessage(`0.1063`)},
+		{Timestamp: "2026-10-08T10:00:01Z", Provider: "github-copilot", Model: "gpt-5.6-luna", Path: "/responses", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 101, OutputTokens: 10}, AICreditsThisResponse: json.RawMessage(`0.1063`)},
+		{Timestamp: "2026-10-08T10:00:02Z", Provider: "github-copilot", Model: "gpt-5.6-luna", Path: "/responses", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 102, OutputTokens: 10}, AICreditsThisResponse: json.RawMessage(`0.1064`)},
+	}
+	summary := &TokenUsageSummary{AICFound: true, TotalAIC: 2.745, AgentUsage: agents}
+	resolver := newModelIdentityResolver("")
+	actuals := resolveSubagentActualModels(subagentActualsFromAgentUsage(agents), resolver)
+	require.Len(t, actuals, 1)
+	require.Equal(t, 4, actuals[0].Requests)
+
+	matchPiAgentUsageCredits(summary, entries, resolver)
+	reconcileAgentUsageCredits(summary, entries)
+
+	creditsByAgent := make(map[string]float64)
+	for _, agent := range summary.AgentUsage {
+		creditsByAgent[agent.AgentName] = agent.AIC
+	}
+	require.InDelta(t, 1.069, creditsByAgent["file-summarizer"], 0.000001)
+	require.InDelta(t, 1.357, creditsByAgent["quick-checker"], 0.000001)
+	require.InDelta(t, 0.319, creditsByAgent["main"], 0.000001)
+	for _, agent := range summary.AgentUsage {
+		if agent.AgentName == "main" {
+			require.Equal(t, 3, agent.Requests)
+		}
+	}
+	require.Empty(t, summary.Warnings)
+}
+
 func TestCombineSubagentEffortKeepsMixedState(t *testing.T) {
 	require.Equal(t, "mixed", combineSubagentEffort(combineSubagentEffort("low", "high"), "high"))
 	require.Equal(t, "mixed", combineSubagentEffort(combineSubagentEffort("high", "low"), "low"))
@@ -428,6 +479,10 @@ func TestSubagentDispatchLine(t *testing.T) {
 	}{
 		{"compact dispatch", "● Agent-alpha(claude-haiku-4.5) Get model name", subagentDispatchKey{agent: "Agent-alpha", model: "claude-haiku-4.5"}, 1},
 		{"labelled dispatch", "● Research worker (model: opus) Research routing", subagentDispatchKey{agent: "Research worker", model: "opus"}, 1},
+		{"compact alias preserves agent case", "● Quick-Checker(small) Inspect the project", subagentDispatchKey{agent: "Quick-Checker", model: "small"}, 1},
+		{"shell tool call", "● Check repository status (shell)", subagentDispatchKey{}, 0},
+		{"read tool call", "● Read OpenAPI spec (read)", subagentDispatchKey{}, 0},
+		{"other tool label", "● Read OpenAPI spec (head)", subagentDispatchKey{}, 0},
 		{"ordinary prose", "class RoutingProfile(StrictModel)", subagentDispatchKey{}, 0},
 		{"quoted dispatch", "Example: ● Research (model: opus)", subagentDispatchKey{}, 0},
 	} {

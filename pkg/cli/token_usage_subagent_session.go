@@ -43,7 +43,7 @@ type sessionSubagentData struct {
 	Outcome          string                                `json:"outcome"`
 	ErrorMessage     string                                `json:"errorMessage"`
 	ReasoningEffort  string                                `json:"reasoningEffort"`
-	Error            string                                `json:"error"`
+	Error            json.RawMessage                       `json:"error"`
 	Agent            string                                `json:"agent"`
 	ToolName         string                                `json:"toolName"`
 	Input            json.RawMessage                       `json:"input"`
@@ -505,7 +505,7 @@ func observeLifecycleOutcome(row *SubagentModelRequest, agentUsage *AgentUsageBr
 	if event.Type == "subagent.failed" {
 		row.FailedCount++
 		row.IncompleteCount = max(0, row.IncompleteCount-1)
-		row.Error = sanitizeSubagentError(firstNonEmptyModel(data.Error, data.ErrorMessage))
+		row.Error = sanitizeSubagentError(firstNonEmptyModel(subagentErrorMessage(data.Error), data.ErrorMessage))
 		agentUsage.FailedCount++
 		agentUsage.IncompleteCount = max(0, agentUsage.IncompleteCount-1)
 	}
@@ -633,9 +633,9 @@ func (models *subagentSessionModels) observePiResult(event sessionSubagentEvent,
 		models.agents[identity] = row
 	}
 	row.IncompleteCount = max(0, row.IncompleteCount-1)
-	if data.Outcome == "failed" || data.Error != "" || data.ErrorMessage != "" {
+	if data.Outcome == "failed" || len(data.Error) > 0 || data.ErrorMessage != "" {
 		row.FailedCount = 1
-		row.Error = sanitizeSubagentError(firstNonEmptyModel(data.Error, data.ErrorMessage))
+		row.Error = sanitizeSubagentError(firstNonEmptyModel(subagentErrorMessage(data.Error), data.ErrorMessage))
 	} else {
 		row.CompletedCount = 1
 	}
@@ -715,6 +715,28 @@ func (models *subagentSessionModels) piInvocationIdentity(event sessionSubagentE
 	identity := fmt.Sprintf("legacy:%s:%d", agent, models.legacyPiCount[agent])
 	models.legacyPiActive[agent] = identity
 	return identity
+}
+
+func subagentErrorMessage(raw json.RawMessage) string {
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return ""
+	}
+	var message string
+	if json.Unmarshal(raw, &message) == nil {
+		return message
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return ""
+	}
+	for _, key := range []string{"message", "error_description", "detail", "error"} {
+		if value := fields[key]; len(value) > 0 {
+			if message := subagentErrorMessage(value); message != "" {
+				return message
+			}
+		}
+	}
+	return ""
 }
 
 func sanitizeSubagentError(message string) string {

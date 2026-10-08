@@ -16,7 +16,7 @@ import (
 
 var tokenUsageSubagentLog = logger.New("cli:token_usage_subagent")
 
-var subagentDispatchPattern = regexp.MustCompile(`^●\s+([A-Za-z0-9][A-Za-z0-9._ -]*?)\s*\((?:model:\s*)?([A-Za-z0-9][A-Za-z0-9._:-]*)\)`)
+var subagentDispatchPattern = regexp.MustCompile(`^●\s+([A-Za-z0-9][A-Za-z0-9._ -]*?)\s*\((model:\s*)?([A-Za-z0-9][A-Za-z0-9._:-]*)\)`)
 
 type subagentDispatchKey struct {
 	agent    string
@@ -449,22 +449,14 @@ func sortProxyUsageEntries(entries []TokenUsageEntry) {
 
 func matchPiSubagentRequests(summary *TokenUsageSummary, entries []TokenUsageEntry, requests []indexedPiRequest, resolver *modelIdentityResolver) map[int]bool {
 	used := make(map[int]bool)
-	lastMatchedEntry := -1
 	for _, indexed := range requests {
 		request := indexed.usage
-		afterIndex := lastMatchedEntry
-		if request.Timestamp.IsZero() {
-			afterIndex = -1
-		}
-		entryIndex, entry, matched := matchingProxyUsageEntry(entries, used, request, resolver, afterIndex)
+		entryIndex, entry, matched := matchingProxyUsageEntry(entries, used, request, resolver)
 		if !matched {
 			addTokenUsageWarning(summary, fmt.Sprintf("could not match pi sub-agent %s model %s usage to proxy token usage; credits were not inferred", indexed.agent.AgentName, request.Model))
 			continue
 		}
 		used[entryIndex] = true
-		if !request.Timestamp.IsZero() {
-			lastMatchedEntry = entryIndex
-		}
 		credits := tokenUsageEntryCredits(entry)
 		indexed.agent.AIC += credits
 		indexed.agent.TotalApiDurationMs += entry.DurationMs
@@ -479,12 +471,9 @@ func matchPiSubagentRequests(summary *TokenUsageSummary, entries []TokenUsageEnt
 	return used
 }
 
-func matchingProxyUsageEntry(entries []TokenUsageEntry, used map[int]bool, request agentRequestUsage, resolver *modelIdentityResolver, afterIndex int) (int, TokenUsageEntry, bool) {
+func matchingProxyUsageEntry(entries []TokenUsageEntry, used map[int]bool, request agentRequestUsage, resolver *modelIdentityResolver) (int, TokenUsageEntry, bool) {
 	for index, entry := range entries {
 		if used[index] || entry.Purpose == "routing_classification" || entry.Model == "" {
-			continue
-		}
-		if index <= afterIndex {
 			continue
 		}
 		if !resolver.matches(request.Model, modelNameWithoutProvider(entry.Model), entry.Provider) {
@@ -696,16 +685,35 @@ func countSubagentDispatchLine(counts map[subagentDispatchKey]int, line string) 
 		}
 		return
 	}
-	agentName, requestedModel := "", ""
-	for index, match := range subagentDispatchPattern.FindStringSubmatch(line) {
+	match := subagentDispatchPattern.FindStringSubmatch(line)
+	if len(match) < 4 {
+		return
+	}
+	agentName, modelLabel, modelName := "", "", ""
+	for index, value := range match {
 		switch index {
 		case 1:
-			agentName = strings.TrimSpace(match)
+			agentName = strings.TrimSpace(value)
 		case 2:
-			requestedModel = strings.TrimSpace(match)
+			modelLabel = value
+		case 3:
+			modelName = strings.TrimSpace(value)
 		}
+	}
+	requestedModel := ""
+	if modelLabel != "" || isLegacyModelName(modelName) {
+		requestedModel = modelName
 	}
 	if agentName != "" && requestedModel != "" {
 		counts[subagentDispatchKey{agent: agentName, model: requestedModel}]++
+	}
+}
+
+func isLegacyModelName(model string) bool {
+	switch strings.ToLower(model) {
+	case "apply_patch", "bash", "browser", "cat", "command", "edit", "exec", "fetch", "find", "glob", "grep", "head", "http", "list", "mcp", "memory", "open", "patch", "read", "run", "search", "shell", "task", "terminal", "tool", "url", "view", "write":
+		return false
+	default:
+		return true
 	}
 }
