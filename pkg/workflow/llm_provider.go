@@ -133,7 +133,7 @@ func llmProviderGatewayBaseURL(provider LLMProvider, workflowData *WorkflowData)
 func llmGatewayBaseURL(port int, workflowData *WorkflowData) string {
 	host := "host.docker.internal"
 	if isAWFNetworkIsolationEnabled(workflowData) {
-		host = "api-proxy"
+		host = constants.AWFAPIProxyHostname
 	}
 	return "http://" + net.JoinHostPort(host, strconv.Itoa(port))
 }

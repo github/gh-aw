@@ -90,7 +90,7 @@ describe("claude_harness.cjs", () => {
       ],
     };
 
-    it.each(["auto", "copilot/auto"])("starts the real harness with %s resolved in environment and CLI model inputs", model => {
+    it.each(["auto", "copilot/auto"])("starts the real harness with an unset bootstrap URL and %s resolved in environment and CLI model inputs", model => {
       const reflect = { endpoints: [{ ...reflectData.endpoints[1], models: ["gpt-6.1-sol", "claude-sonnet-5"] }] };
       const stubScript = `
         const fs = require("fs");

@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Keep this topology contract paired with the unset-bootstrap URL check in
+// actions/setup/js/claude_harness.test.cjs.
 func TestLLMProviderGatewayBaseURLFollowsNetworkTopology(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -21,7 +23,7 @@ func TestLLMProviderGatewayBaseURLFollowsNetworkTopology(t *testing.T) {
 				SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
 			},
 			provider:    LLMProviderGitHub,
-			expectedURL: "http://api-proxy:" + strconv.Itoa(constants.CopilotLLMGatewayPort),
+			expectedURL: "http://" + constants.AWFAPIProxyHostname + ":" + strconv.Itoa(constants.CopilotLLMGatewayPort),
 		},
 		{
 			name: "host-access runtime",
