@@ -11,8 +11,8 @@
     "allOf": [
       { "$ref": "#/definitions/EventMetadata" },
       { "if": { "properties": { "type": { "const": "agent.execution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AgentExecutionData" } } } },
-      { "if": { "properties": { "type": { "const": "assistant.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
-      { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      { "if": { "properties": { "type": { "const": "assistant.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedMessageData" } } } },
+      { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedMessageData" } } } },
       {
         "if": { "properties": { "type": { "const": "assistant.refusal" } }, "required": ["type"] },
         "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CAssistantRefusalData%2C(%22reason%22%7C%22content%22%7C%22policyCategory%22%7C%22explanation%22%7C%22partial%22)%3E" } } }
@@ -52,12 +52,12 @@
       { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
       {
         "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22)%3E" } } }
+        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22%7C%22reasoningEffort%22)%3E" } } }
       },
       { "if": { "properties": { "type": { "const": "session.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedSessionResultData" } } } },
       {
         "if": { "properties": { "type": { "const": "session.start" } }, "required": ["type"] },
-        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22)%3E" } } }
+        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22%7C%22reasoningEffort%22)%3E" } } }
       },
       {
         "if": { "properties": { "type": { "const": "tool.execution_complete" } }, "required": ["type"] },
@@ -347,9 +347,9 @@
       "additionalProperties": false
     },
     "Pick<MessageData,\"content\">": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": false },
-    "Pick<SessionInitData,(\"sourceEngine\"|\"model\"|\"sessionId\"|\"cwd\")>": {
+    "Pick<SessionInitData,(\"sourceEngine\"|\"model\"|\"sessionId\"|\"cwd\"|\"reasoningEffort\")>": {
       "type": "object",
-      "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" } },
+      "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" }, "reasoningEffort": { "type": "string" } },
       "additionalProperties": false
     },
     "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\"|\"taskId\"|\"taskType\"|\"workflowName\"|\"workflowRunId\")>": {
@@ -446,6 +446,26 @@
       "additionalProperties": false,
       "description": "Collector metadata is separate from native engine event metadata."
     },
+    "UnifiedMessageData": {
+      "type": "object",
+      "properties": {
+        "content": { "$ref": "#/definitions/JsonValue" },
+        "delta": { "$ref": "#/definitions/JsonValue" },
+        "partial": { "$ref": "#/definitions/JsonValue" },
+        "messageId": { "$ref": "#/definitions/JsonValue" },
+        "contentIndex": { "$ref": "#/definitions/JsonValue" },
+        "channel": { "$ref": "#/definitions/JsonValue" },
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "model": { "$ref": "#/definitions/JsonValue" },
+        "apiCallId": { "$ref": "#/definitions/JsonValue" },
+        "interactionId": { "$ref": "#/definitions/JsonValue" },
+        "turnId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
     "UnifiedSessionResultData": {
       "type": "object",
       "properties": {
@@ -456,6 +476,7 @@
         "sourceType": { "type": "string" },
         "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "permissionDenials": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "agentMetrics": { "$ref": "#/definitions/JsonValue", "description": "Exact per-agent accounting snapshot supplied by the engine, not additive usage." },
         "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
       },
       "additionalProperties": false
