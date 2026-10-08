@@ -23,13 +23,6 @@ func currentWorkQueueTestDir(t *testing.T) string {
 	return t.TempDir()
 }
 
-func mustWorkQueueOperation(t testing.TB, value any) workqueue.Operation {
-	t.Helper()
-	operation, err := workqueue.Op(value)
-	require.NoError(t, err)
-	return operation
-}
-
 func TestWorkQueueSnapshotEqualityPreservesValuesAndNilShape(t *testing.T) {
 	sha, claim, attempt, enqueued := "snapshot-sha", "historical-claim", "historical-attempt", int64(7)
 	seed := WorkQueueSnapshot{

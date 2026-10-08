@@ -230,7 +230,8 @@ async function createProjectView(projectUrl, viewConfig) {
 
   const route = projectInfo.scope === "orgs" ? "POST /orgs/{org}/projectsV2/{project_number}/views" : "POST /users/{user_id}/projectsV2/{project_number}/views";
 
-  /** @type {import("@octokit/types").Endpoints[typeof route]["parameters"]} */
+  // The locked Octokit schema predates these routes; keep their payload typed explicitly.
+  /** @type {{project_number: number, name: string, layout: "table" | "board" | "roadmap", filter?: string, visible_fields?: number[]} & ({org: string} | {user_id: string})} */
   const params =
     projectInfo.scope === "orgs"
       ? {

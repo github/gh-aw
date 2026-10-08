@@ -22,6 +22,15 @@ func (f workAPIRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 	return f(request)
 }
 
+func mustWorkQueueOperation(t testing.TB, value any) workqueue.Operation {
+	t.Helper()
+	operation, err := workqueue.Op(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return operation
+}
+
 func TestWorkCommandClosedOperatorSurfaces(t *testing.T) {
 	command := NewWorkCommand()
 	for _, required := range []string{"compact", "trace", "explain"} {
