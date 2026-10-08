@@ -198,13 +198,15 @@ function registerTests({ describe, it }) {
         function copy(name) {
           if (copied.has(name)) return;
           copied.add(name);
-          assert.match(name, /^work_queue_[a-z_]+\.cjs$/);
+          assert.match(name, /^(?:work_queue_[a-z_]+|mcp_logger|error_helpers)\.cjs$/);
           const source = fs.readFileSync(path.join(__dirname, name), "utf8");
           fs.writeFileSync(path.join(directory, name), source);
-          for (const match of source.matchAll(/require\(["']\.\/(work_queue_[a-z_]+\.cjs)["']\)/g)) copy(match[1]);
+          for (const match of source.matchAll(/require\(["']\.\/([a-z_]+\.cjs)["']\)/g)) copy(match[1]);
         }
         copy("work_queue_provisioning.cjs");
         assert.ok(copied.has("work_queue_yaml.cjs"));
+        assert.ok(copied.has("work_queue_logging.cjs"));
+        assert.ok(copied.has("mcp_logger.cjs"));
         const script = `
           const assert = require("node:assert/strict");
           const Module = require("node:module");

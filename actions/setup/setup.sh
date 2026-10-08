@@ -415,6 +415,7 @@ SAFE_OUTPUTS_FILES=(
   "work_queue_indexes.cjs"
   "work_queue_intents.cjs"
   "work_queue_limits.cjs"
+  "work_queue_logging.cjs"
   "work_queue_mcp_server.cjs"
   "work_queue_native.cjs"
   "work_queue_policy.cjs"
