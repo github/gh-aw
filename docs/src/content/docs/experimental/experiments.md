@@ -185,6 +185,12 @@ Read the given file and return a concise summary.
 See [Inline Sub-Agents](/gh-aw/reference/inline-sub-agents/) for the full
 syntax.
 
+With Copilot, you can also declare `subagent_model: [small, large]` in
+`experiments` and set the sub-agent's `model` to
+`${{ experiments.subagent_model }}`. The selected variant is used in the
+sub-agent definition and recorded in the run's declared-model metadata.
+Pi sub-agents require literal models or aliases, not expressions.
+
 ### Try different subskills
 
 This pattern compares two reusable instruction blocks, sometimes called

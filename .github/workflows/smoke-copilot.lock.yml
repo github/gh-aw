@@ -241,7 +241,7 @@ jobs:
           GH_AW_COMPILED_STRICT: "true"
           GH_AW_INFO_MODEL_COSTS: '{"providers":{"anthropic":{"models":{"my-custom-claude":{"cost":{"cache_read":"3e-07","cache_write":"3.75e-06","input":"3e-06","output":"1.5e-05"}}}}}}'
           GH_AW_INFO_FEATURES: '{"gh-aw-detection":false}'
-          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"${{ experiments.subagent_model }}\",\"name\":\"file-summarizer\",\"patterns\":null}]"
+          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"${{ steps.pick-experiment.outputs.subagent_model }}\",\"name\":\"file-summarizer\",\"patterns\":null}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |

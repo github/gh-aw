@@ -235,7 +235,7 @@ jobs:
           GH_AW_INFO_FRONTMATTER_EMOJI: "🧪"
           GH_AW_COMPILED_STRICT: "true"
           GH_AW_INFO_FEATURES: '{"gh-aw-detection":false}'
-          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"${{ experiments.subagent_model }}\",\"name\":\"file-summarizer\",\"patterns\":null}]"
+          GH_AW_INFO_SUB_AGENT_MODELS: "[{\"model\":\"${{ steps.pick-experiment.outputs.subagent_model }}\",\"name\":\"file-summarizer\",\"patterns\":null}]"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
