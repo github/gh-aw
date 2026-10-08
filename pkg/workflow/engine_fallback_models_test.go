@@ -187,16 +187,23 @@ Say hello.
 
 func TestCodexHasNoImplicitFallbackModel(t *testing.T) {
 	require.Empty(t, constants.CodexDefaultModel)
-	for _, phase := range []struct{ detection, evals bool }{{}, {detection: true}, {evals: true}} {
+	for _, phase := range []struct {
+		modelVar         string
+		detection, evals bool
+	}{
+		{modelVar: constants.EnvVarModelAgentCodex},
+		{modelVar: constants.EnvVarModelDetectionCodex, detection: true},
+		{modelVar: constants.EnvVarModelEvalsCodex, evals: true},
+	} {
 		data := &WorkflowData{
 			EngineConfig:   &EngineConfig{ID: "codex"},
-			Model:          "${{ inputs.model }}",
+			Model:          "${{ vars.POISON_PRIMARY }}",
 			IsDetectionRun: phase.detection,
 			IsEvalsRun:     phase.evals,
 		}
-		env := NewCodexEngine().buildCodexExecutionEnv(data, false, true, constants.EnvVarModelAgentCodex)
-		require.NotContains(t, env[constants.EnvVarModelFallback], "gpt-5.4")
-		require.Contains(t, env[constants.EnvVarModelFallback], "|| ''")
-		require.NotContains(t, buildEvalsModelFallbackExpression("codex"), "gpt-5.4")
+		env := NewCodexEngine().buildCodexExecutionEnv(data, false, true, phase.modelVar)
+		require.Equal(t, data.Model, env[phase.modelVar])
+		require.Equal(t, "${{ vars."+phase.modelVar+" || vars.GH_AW_DEFAULT_MODEL_CODEX }}", env[constants.EnvVarModelFallback])
 	}
+	require.Equal(t, "${{ vars.GH_AW_MODEL_EVALS_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX }}", buildEvalsModelFallbackExpression("codex"))
 }
