@@ -54,12 +54,16 @@ provisioning secrets, escalating credentials, or retrying dispatch.
 
 ## Live Debug Loop
 
-Before each upload/dispatch, require a completed [agentic security review](debug-security-review.md) for the current source/lock hashes and human validation: source/lock hashes,
+Before each upload/dispatch, require a completed [agentic security review](debug-security-review.md) for the current source/lock hashes and valid human authorization: source/lock hashes,
 triggers/imports/pins, permissions/OIDC, declared credential sources and flows, destinations,
 external writes and changed approval protections. The agent gathers and reviews
 this evidence; the human validates the agent-prepared packet and authorizes
 effects, rather than performing the technical review. Specify run-count, time/spend
 caps and monitoring deadline/poll interval; default to one run.
+An explicit [session authorization](debug-security-review.md#session-authorization)
+may cover subsequent agent-reviewed iterations within the recorded scope and
+bounds without repeated human approval. Any compiler security warning revokes it;
+a later clean compile does not reinstate it.
 Record host/repo, workflow, inputs, reviewed commit and remote ref. Recheck the
 ref before `gh aw run WORKFLOW --ref REVIEWED_REF`; verify the resulting run SHA.
 
@@ -129,6 +133,13 @@ Review that emitted lock, not the previously published normal lock. If a live
 test is permitted, upload and dispatch the exact reviewed revision; restoring
 the normal lock before dispatch does not apply dry-run suppression to it.
 `aw_info.json` records `dry_run: true`.
+Daily credit accounting and its ledger/app wiring are removed. Existing per-run
+caps/expressions are retained; configured/imported daily limits replace an absent
+or disabled per-run cap, otherwise the normal per-run default applies.
+Manual dispatch is enabled, existing inputs are preserved, and actor authorization
+is narrowed to maintainer/admin roles without bot exemptions.
+Use `DEBUG=workflow:compiler_development,cli:compile_development` for mutation logs;
+they report changed fields/keys and forced flags without configuration values.
 Compile text output reports excluded effects and scanner invocation coverage.
 `--json` adds a batch `workflow: "dry-run"` summary: `dry_run.gate` includes
 workflow and batch failures; scanner statuses distinguish `passed`, `failed`

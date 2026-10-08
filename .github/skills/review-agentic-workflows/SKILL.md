@@ -26,6 +26,14 @@ the [shared security-review guidance](../../aw/debug-security-review.md);
 the agent prepares the evidence for human validation rather than asking the
 user to conduct the review.
 
+The user may explicitly authorize live debugging for the current session rather
+than approve each run. Record the grant and agreed scope/bounds; reuse it for
+in-scope revisions only after the agent repeats the required technical review.
+Any compiler security warning invalidates session approval immediately, even if
+later fixed: resolve it, re-review, and obtain fresh explicit authorization.
+Follow the shared [session authorization rules](../../aw/debug-security-review.md#session-authorization);
+a request to update this skill is not itself a session-wide execution grant.
+
 Workflow registration/activation and secret presence, validity, or expiry are
 runtime readiness checks, not pre-dispatch review gates. Do not require workflow
 or secret inventories, organization-admin access, or proof of usable credentials

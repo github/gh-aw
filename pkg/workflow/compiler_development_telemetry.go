@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	goyaml "github.com/goccy/go-yaml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,6 +21,16 @@ func (c *Compiler) prepareDryRunWorkflowData(data *WorkflowData) (*WorkflowData,
 		return data, nil
 	}
 	result := c.dryRunWorkflowData(data)
+	before := *result
+	before.RawFrontmatter = maps.Clone(result.RawFrontmatter)
+	if result.ParsedFrontmatter != nil {
+		frontmatter := *result.ParsedFrontmatter
+		before.ParsedFrontmatter = &frontmatter
+	}
+	defer logDryRunWorkflowChanges(&before, result)
+	if err := prepareDryRunWorkflowDispatch(result); err != nil {
+		return nil, err
+	}
 	if result.Env != "" {
 		env, err := removeDryRunTelemetryEnv(result.Env)
 		if err != nil {
@@ -34,6 +45,60 @@ func (c *Compiler) prepareDryRunWorkflowData(data *WorkflowData) (*WorkflowData,
 		}
 	}
 	return result, nil
+}
+
+func prepareDryRunWorkflowDispatch(data *WorkflowData) error {
+	var document map[string]any
+	if err := goyaml.Unmarshal([]byte(data.On), &document); err != nil {
+		return fmt.Errorf("cannot enable dry-run workflow_dispatch: %w", err)
+	}
+	on := make(map[string]any)
+	switch value := document["on"].(type) {
+	case map[string]any:
+		on = value
+	case string:
+		on[value] = nil
+	case []any:
+		for _, event := range value {
+			name, ok := event.(string)
+			if !ok {
+				return errors.New("dry-run workflow triggers must be event names")
+			}
+			on[name] = nil
+		}
+	case nil:
+	default:
+		return errors.New("dry-run workflow triggers must be a mapping, event name, or event list")
+	}
+	if _, exists := on["workflow_dispatch"]; !exists {
+		var dispatch any
+		if call, ok := on["workflow_call"].(map[string]any); ok {
+			if inputs, exists := call["inputs"]; exists {
+				dispatch = map[string]any{"inputs": inputs}
+			}
+		}
+		on["workflow_dispatch"] = dispatch
+	}
+	rendered, err := MarshalWithFieldOrder(map[string]any{"on": on}, []string{"on"})
+	if err != nil {
+		return fmt.Errorf("cannot render dry-run workflow_dispatch: %w", err)
+	}
+	data.On = strings.TrimSuffix(string(rendered), "\n")
+	rawOn := maps.Clone(on)
+	if configured, ok := data.RawFrontmatter["on"].(map[string]any); ok && configured != nil {
+		rawOn = maps.Clone(configured)
+	}
+	rawOn["workflow_dispatch"] = on["workflow_dispatch"]
+	rawOn["roles"] = data.Roles
+	delete(rawOn, "bots")
+	if data.RawFrontmatter == nil {
+		data.RawFrontmatter = make(map[string]any)
+	}
+	data.RawFrontmatter["on"] = rawOn
+	if data.ParsedFrontmatter != nil {
+		data.ParsedFrontmatter.On = rawOn
+	}
+	return nil
 }
 
 func isDryRunTelemetryEnv(name string) bool {
@@ -112,13 +177,14 @@ func dryRunEnvOwners(root *yaml.Node) []*yaml.Node {
 }
 
 func dryRunTelemetryEnvEdit(key, value *yaml.Node, lines []string) (*dryRunEnvEdit, error) {
-	var env map[string]any
+	var env map[string]string
 	if err := value.Decode(&env); err != nil {
 		return nil, fmt.Errorf("dry-run telemetry filtering requires an env mapping on line %d: %w", key.Line, err)
 	}
 	removed := false
 	for name := range env {
 		if isDryRunTelemetryEnv(name) {
+			compilerDevelopmentLog.Printf("Dry-run mutation: removed env key %q on line %d", name, key.Line)
 			delete(env, name)
 			removed = true
 		}
@@ -130,6 +196,7 @@ func dryRunTelemetryEnvEdit(key, value *yaml.Node, lines []string) (*dryRunEnvEd
 	if err != nil {
 		return nil, fmt.Errorf("cannot render dry-run environment on line %d: %w", key.Line, err)
 	}
+	rendered = []byte(quoteEnvValuesContainingColonSpace(string(rendered)))
 	if value.Anchor != "" {
 		rendered = []byte(strings.Replace(string(rendered), "env:", "env: &"+value.Anchor, 1))
 	}

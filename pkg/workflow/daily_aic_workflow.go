@@ -206,33 +206,41 @@ func resolveMaxDailyAICFromRaw(raw any) (*string, bool) {
 }
 
 func resolveMaxDailyAIC(frontmatter map[string]any, importedJSON string) *string {
+	value, _ := resolveMaxDailyAICWithSource(frontmatter, importedJSON)
+	return value
+}
+
+func resolveMaxDailyAICWithSource(frontmatter map[string]any, importedJSON string) (*string, bool) {
 	if value, found := resolveMaxDailyAICFromRaw(frontmatter[maxDailyAICreditsField]); found {
 		dailyAICWorkflowLog.Print("Resolved max-daily-ai-credits from workflow frontmatter")
-		return value
+		return value, true
 	}
 	if importedJSON == "" {
 		dailyAICWorkflowLog.Print("No frontmatter value and no imported config; falling back to default max-daily-ai-credits")
 		expr := compilerenv.BuildDefaultMaxDailyAICreditsExpression(constants.DefaultMaxDailyAICredits)
-		return parseMaxDailyAICValue(expr)
+		return parseMaxDailyAICValue(expr), false
 	}
 	var imported any
 	if err := json.Unmarshal([]byte(importedJSON), &imported); err != nil {
 		dailyAICWorkflowLog.Printf("Failed to unmarshal imported max-daily-ai-credits JSON, using default: %v", err)
 		expr := compilerenv.BuildDefaultMaxDailyAICreditsExpression(constants.DefaultMaxDailyAICredits)
-		return parseMaxDailyAICValue(expr)
+		return parseMaxDailyAICValue(expr), false
 	}
 	if value, found := resolveMaxDailyAICFromRaw(imported); found {
 		dailyAICWorkflowLog.Print("Resolved max-daily-ai-credits from imported config")
-		return value
+		return value, true
 	}
 	dailyAICWorkflowLog.Print("Imported config did not provide a usable value; falling back to default max-daily-ai-credits")
 	expr := compilerenv.BuildDefaultMaxDailyAICreditsExpression(constants.DefaultMaxDailyAICredits)
-	return parseMaxDailyAICValue(expr)
+	return parseMaxDailyAICValue(expr), false
 }
 
 // hasMaxDailyAICGuardrail reports whether compiler should emit the
 // daily AI Credits guardrail wiring. The guardrail is enabled by default.
 func hasMaxDailyAICGuardrail(data *WorkflowData) bool {
+	if data != nil && data.DryRun {
+		return false
+	}
 	return !hasWorkflowExplicitMaxDailyAICDisable(data)
 }
 

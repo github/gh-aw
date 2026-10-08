@@ -24,6 +24,11 @@ dispatch retries. Missing readiness metadata alone is not a safety finding.
 Declared credential flows, authorized destinations, permissions, source/lock
 review, and human live-validation gates remain in scope.
 
+The user may grant explicit [session authorization](../../aw/debug-security-review.md#session-authorization)
+for bounded in-scope debug iterations without repeated approval. Re-review every
+changed source/lock revision; any compiler security warning invalidates the grant
+and requires fresh authorization after resolution.
+
 Always provide separate short user-visible result sentences for each security
 review and dry-run attempt, including failed, blocked, or unavailable outcomes.
 Name the artifact/scope, checks actually performed, and material findings or

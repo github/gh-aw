@@ -307,6 +307,24 @@ issue locking. `aw_info.json` records the boolean `dry_run` flag. Failure handli
 local diagnostics, step summaries, and run artifacts remain enabled. No new
 memory-tool fields are required; ordinary compilation preserves persistence.
 
+Dry-run compilation adds `workflow_dispatch`, preserves existing manual inputs,
+and copies reusable-workflow inputs when adding manual dispatch. Actor roles are
+restricted to `admin`/`maintainer` (including `maintain`); an existing narrower
+subset is preserved and bot exemptions are removed. Other triggers remain intact.
+This does not upload the lock or authorize a live run.
+
+Daily credit accounting, its ledger/app wiring, and `max-daily-ai-credits` are
+removed from the diagnostic configuration. An existing positive per-run
+`max-ai-credits` cap or expression is preserved. Otherwise an explicitly configured
+or imported daily limit becomes the per-run cap, including runtime expressions.
+The ordinary per-run default remains when the daily limit was only a default;
+an active default daily guard replaces an explicitly disabled per-run cap with
+the standard per-run cap. Explicitly disabling both limits remains unchanged.
+
+Set `DEBUG=workflow:compiler_development,cli:compile_development` to log each
+dry-run configuration mutation, removed environment key, disabled job, and forced
+CLI flag to stderr. Logs identify changed fields/keys, never their values.
+
 Dry-run locks omit `OTEL_*` and `GH_AW_OTLP_*` variables from workflow, job,
 step, container, and service environment mappings, including user-defined values.
 Workflow environment suppression occurs before job and header generation so
