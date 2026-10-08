@@ -135,6 +135,9 @@ outputs. Runs are bounded to ten minutes and fifty AI credits; results are recor
 in the step summary and conformance artifacts, not published as issues or comments.
 
 Both checkers require the exact staged noop receipt, not an empty output file.
+The native MCP allowlist uses `native_challenge`, matching the underscore-normalized
+name exposed by the MCP scripts server; the script's authored name remains
+`native-challenge`.
 The Agy gate explicitly disables the separate Copilot threat-detection job;
 it forwards only the Gemini key and retains its own bounded, read-only checks.
 
