@@ -165,7 +165,7 @@ function validateSchemaNode(value, schema, path, options = {}) {
     /** @type {Array<{path: string, message: string, expected?: string, received?: string}>} */
     const errors = [];
     for (const subSchema of schema.oneOf) {
-      const error = validateSchemaNode(value, subSchema, path, options);
+      const error = validateSchemaNode(value, subSchema, path, { ...options, skipRequiredAtRoot: false });
       if (!error) {
         successCount += 1;
         continue;
@@ -186,7 +186,7 @@ function validateSchemaNode(value, schema, path, options = {}) {
     /** @type {Array<{path: string, message: string, expected?: string, received?: string}>} */
     const errors = [];
     for (const subSchema of schema.anyOf) {
-      const error = validateSchemaNode(value, subSchema, path, options);
+      const error = validateSchemaNode(value, subSchema, path, { ...options, skipRequiredAtRoot: false });
       if (!error) {
         return null;
       }
