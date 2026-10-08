@@ -14,6 +14,10 @@ reproduction, fixes, uploads, and live tests. This page is an evidence and CLI
 reference, not a separate execution policy. Respect explicit no-dispatch contexts.
 Apply its live-outcome table, credential triage and untrusted-evidence rules.
 Without accessible existing logs, use source/fixtures; never dispatch for evidence.
+For changes under test, run the [dry-team micro threat review](../../aw/security-review.md):
+independent fresh-context small-model detectors, binary predicate comparison and
+fresh decision-worker reconciliation. A blocked, incomplete or stale review
+prevents debug upload/live testing, not safe local diagnosis.
 
 ## Table of Contents
 

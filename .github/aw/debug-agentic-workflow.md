@@ -31,13 +31,16 @@ URLs before replay/report. Never retrieve secrets.
 
 3. **Reproduce one boundary.** Choose compilation/prompt/MCP/agent/safe outputs. Run the real component with existing edge test doubles, minimal inputs, output assertions, disposable files and a timeout. Mock missing context/APIs/credentials. Never contact production or disable the firewall; leave OIDC, approvals, hosted tokens and runners unverified.
 
-4. **Fix and gate.** Add a minimal fix/regression. Compile current source with `--dry-run`: strict, staged, source validation, shellcheck and model checks, warnings as errors. Docker-based checks are optional; Docker unavailability does not block the gate. When Docker is available, recommend `gh aw validate WORKFLOW` for source checks and `gh aw compile WORKFLOW --dry-run --zizmor --actionlint --poutine` for scanner checks. Run these scanners if possible; `validate` itself skips them. Unsupported `--dry-run`, missing required checks or failed compilation blocks live testing, not local diagnosis. Existing/generated locks need a successful gate for current hashes. Never downgrade required checks, suppress findings, substitute `strict: true`, use `--approve`, or commit to erase warnings.
+4. **Fix and gate.** Add a minimal fix/regression. Compile current source with `--dry-run`: strict, staged, source validation, shellcheck and model checks, warnings as errors. Docker-based checks are optional; Docker unavailability does not block the gate. When Docker is available, recommend `gh aw validate WORKFLOW` for source checks and `gh aw compile WORKFLOW --dry-run --zizmor --actionlint --poutine` for scanner checks. Run these scanners if possible; `validate` itself skips them. Then run the [dry-team micro threat review](security-review.md): two fresh-context small-model detectors compare the exact changes under test, followed by a fresh small-model decision worker for evidence-based reconciliation. Review changed startup/harness effects before locally executing them, and refresh the review on the final compiled snapshot. Confirmed threats or incomplete review block upload/live testing, not safe local diagnosis. Unsupported `--dry-run`, missing required checks or failed compilation also blocks live testing. Existing/generated locks need a successful gate for current hashes. Never downgrade required checks, suppress findings, substitute `strict: true`, use `--approve`, or commit to erase warnings.
 
 5. **Constrain credentials.** Recommend, not require, a protected test environment and rotated, restricted development credentials. Inspect environments; provision only with authorization and revoke replaced credentials at their issuer. Never copy/rotate production secrets. Authorized repository/organization/enterprise shared secrets remain job-scoped, not automatically OS-exported; test environments do not isolate them. Keep production/dispatch credentials out of harnesses.
 
 ## Live Debug Loop
 
-Before each upload/dispatch, require human validation: source/lock hashes,
+Before each upload/dispatch, require a `pass` from the
+[dry-team review](security-review.md) matching the current source/lock snapshot.
+Missing, unresolved or stale reviews do not grant clearance; rerun with fresh
+workers after changes. This does not replace human validation: source/lock hashes,
 triggers/imports/pins, permissions/OIDC, credentials/expiry, destinations,
 external writes and changed approval protections. Specify run-count, time/spend
 caps and monitoring deadline/poll interval; default to one run.
