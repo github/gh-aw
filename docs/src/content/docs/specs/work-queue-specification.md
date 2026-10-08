@@ -500,12 +500,7 @@ When policy configuration is omitted for a new queue, trusted initialization MUS
 
 One scheduling **pool** is one durable decision domain with a fixed worker-capability class, worker-routing policy, capacity model, and authoritative policy epoch. All dispatchers in that domain MUST use the same policy. Arbitrary agent-chosen filters MUST NOT redefine the competition set.
 
-The protocol uses the **Git backend** exclusively. `tools.work-queue` MUST NOT expose a `storage` selector; the compiler MUST reject that field for every value, including `git`, without legacy compatibility or automatic migration. The Git backend MUST enforce the full scheduler contract; advisory display, unscheduled FIFO operation, or weakened consistency is not a permitted fallback.
-
-The runtime MUST reject a supplied `storage` option or
-`GH_AW_WORK_QUEUE_STORAGE` environment variable for every value before reading,
-publishing, initializing, or authorizing queue effects. Stale selectors MUST NOT
-silently switch the authoritative queue to Git.
+The protocol uses the **Git backend** exclusively. `tools.work-queue` MUST NOT expose a `storage` selector. There is no backend selection or legacy-selector handling in the compiler or runtime. The Git backend MUST enforce the full scheduler contract; advisory display, unscheduled FIFO operation, or weakened consistency is not a permitted fallback.
 
 Support exactly these scheduling modes:
 

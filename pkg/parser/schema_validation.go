@@ -191,9 +191,6 @@ func ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter map[string
 	if err := validateMetadataDocs(filtered); err != nil {
 		return err
 	}
-	if err := validateRemovedWorkQueueStorage(filtered); err != nil {
-		return err
-	}
 
 	// Then run the standard schema validation with location
 	if err := validateWithSchemaAndLocation(filtered, mainWorkflowSchema, "main workflow file", filePath); err != nil {
@@ -202,13 +199,6 @@ func ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter map[string
 
 	// Finally run other custom validation rules
 	return validateEngineSpecificRules(filtered)
-}
-
-func validateRemovedWorkQueueStorage(frontmatter map[string]any) error {
-	if fieldExistsAtPath(frontmatter, []string{"tools", "work-queue", "storage"}) {
-		return errors.New("tools.work-queue.storage has been removed. Git is the only supported backend. Remove storage from tools.work-queue. Example:\ntools:\n  work-queue: true")
-	}
-	return nil
 }
 
 func validateMetadataDocs(frontmatter map[string]any) error {
@@ -252,9 +242,6 @@ func ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter map[string
 		return err
 	}
 	if err := validateMetadataDocs(filtered); err != nil {
-		return err
-	}
-	if err := validateRemovedWorkQueueStorage(filtered); err != nil {
 		return err
 	}
 
