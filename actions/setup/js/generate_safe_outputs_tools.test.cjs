@@ -98,6 +98,24 @@ describe("generate_safe_outputs_tools", () => {
     expect(result.map((/** @type {{name: string}} */ t) => t.name)).not.toContain("missing_tool");
   });
 
+  it("generates an Anthropic-compatible update_issue schema with update-field guidance", () => {
+    fs.copyFileSync(path.join(__dirname, "safe_outputs_tools.json"), toolsSourcePath);
+    fs.writeFileSync(configPath, JSON.stringify({ update_issue: { target: "*" } }));
+
+    runScript();
+
+    const [tool] = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(tool.name).toBe("update_issue");
+    expect(tool.inputSchema.type).toBe("object");
+    expect(tool.inputSchema.additionalProperties).toBe(false);
+    for (const keyword of ["anyOf", "oneOf", "allOf"]) {
+      expect(tool.inputSchema).not.toHaveProperty(keyword);
+    }
+    expect(tool.description).toContain("REQUIRED: Provide at least one of: status, title, body, labels, assignees, or milestone.");
+    expect(tool.inputSchema.properties.milestone.type).toEqual(["number", "string", "null"]);
+    expect(tool.inputSchema.properties.milestone.description).toContain("Use null to clear.");
+  });
+
   it("mounts dedicated built-in ledger tools without exposing the low-level append tool", () => {
     fs.writeFileSync(toolsSourcePath, JSON.stringify([...sampleSourceTools, { name: "ledger_append", inputSchema: { type: "object", properties: { ledger: { type: "string" } } } }]));
     const builtin = { name: "ledger_map_put", _ledger_type: "map", _ledger_operation: "put", inputSchema: { type: "object", properties: { key: { type: "string" } } } };

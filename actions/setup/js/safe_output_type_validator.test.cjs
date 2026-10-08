@@ -70,7 +70,7 @@ const SAMPLE_VALIDATION_CONFIG = {
       body: { type: "string", sanitize: true, maxLength: 65000 },
       labels: { type: "array" },
       assignees: { type: "array", itemType: "string", itemSanitize: true, itemMaxLength: 39 },
-      milestone: { optionalPositiveInteger: true },
+      milestone: { optionalPositiveInteger: true, allowNull: true },
       issue_number: { issueOrPRNumber: true },
     },
   },
@@ -1125,9 +1125,19 @@ describe("safe_output_type_validator", () => {
       expect(result.error).toContain("requires at least one of");
     });
 
+    it.each([null, 1, "1"])("should preserve a milestone clear or assignment: %j", async milestone => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const result = validateItem({ type: "update_issue", issue_number: 42, milestone }, "update_issue", 1);
+      expect(result).toEqual({
+        isValid: true,
+        normalizedItem: { type: "update_issue", issue_number: 42, milestone: milestone === null ? null : 1 },
+      });
+    });
+
     it.each([
       ["status", { status: "" }],
       ["labels", { labels: "" }],
+      ["milestone", { milestone: " \t\n" }],
     ])("should reject update_issue when only its blank %s field is present", async (_field, update) => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
       const result = validateItem({ type: "update_issue", issue_number: 42, ...update }, "update_issue", 1);

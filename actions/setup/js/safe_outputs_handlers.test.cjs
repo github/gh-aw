@@ -4220,6 +4220,34 @@ describe("safe_outputs_handlers", () => {
   });
 
   describe("updateIssueHandler", () => {
+    it.each([undefined, null, {}, { issue_number: 42 }, { operation: "append" }, { secrecy: "public", integrity: "high" }, { status: "" }, { labels: " " }, { milestone: " \t\n" }])(
+      "should reject calls without update fields before recording an output: %j",
+      args => {
+        const wildcardHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
+          "update-issue": { target: "*" },
+        });
+        expect(() => wildcardHandlers.updateIssueHandler(args)).toThrow(
+          expect.objectContaining({
+            code: -32602,
+            message: expect.stringContaining("update_issue requires at least one of"),
+          })
+        );
+        expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([{ status: "open" }, { title: "Updated title" }, { body: "Updated body" }, { body: "" }, { labels: [] }, { assignees: [] }, { milestone: 1 }, { milestone: null }])(
+      "should accept each update field independently, including explicit clears: %j",
+      update => {
+        const wildcardHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
+          "update-issue": { target: "*" },
+        });
+        const result = wildcardHandlers.updateIssueHandler({ issue_number: 42, ...update });
+        expect(result.isError).toBeUndefined();
+        expect(mockAppendSafeOutput).toHaveBeenCalledWith({ type: "update_issue", issue_number: 42, ...update });
+      }
+    );
+
     it("should return intent error when target is triggering (default) and not in issue context", () => {
       // global.context has eventName: "push" (not an issue context)
       const result = handlers.updateIssueHandler({ body: "Updated body" });
