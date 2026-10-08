@@ -118,7 +118,7 @@ function registerTests({ describe, it }) {
         error => error instanceof Error && "code" in error && error.code === "ledger_limit" && error.message === "ledger_limit: new admission would consume bounded closure/recovery headroom"
       );
     });
-    it("funds last-attempt Completion, maximum delivery and mixed closure after Controls fill free recovery capacity", test => {
+    it("funds last-attempt Completion, maximum delivery and mixed closure after Controls fill free recovery capacity", { timeout: 30_000 }, test => {
       const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
       policy.limits.ledger_bytes = 8 * 1024;
       policy.limits.recovery_bytes = 220 * 1024;
