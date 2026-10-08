@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workqueue"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -16,7 +17,7 @@ import (
 type workQueueArgs struct {
 	Operation string `json:"operation" jsonschema:"Read-only operation: state or inspect"`
 	Repo      string `json:"repo" jsonschema:"GitHub repository owner/repo"`
-	Branch    string `json:"branch,omitempty" jsonschema:"Queue branch (defaults to work-queue; an explicit branch is a separate authority)"`
+	Branch    string `json:"branch,omitempty"`
 	WorkID    string `json:"work_id,omitempty" jsonschema:"Exact Work ID for inspect"`
 	ClaimID   string `json:"claim_id,omitempty" jsonschema:"Exact Claim ID for inspect"`
 	Pool      string `json:"pool,omitempty" jsonschema:"Exact scheduling pool for state"`
@@ -34,6 +35,7 @@ func registerWorkQueueTool(server *mcp.Server, execCmd execCmdFunc) error {
 		return err
 	}
 	schema.Properties["operation"].Enum = []any{"state", "inspect"}
+	schema.Properties["branch"].Description = workQueueBranchDescription + ". Defaults to " + workqueue.DefaultBranch + "."
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "work-queue",
 		InputSchema: schema,

@@ -134,7 +134,7 @@ Available `fix` codemods include `timeout-minutes-migration`, `network-firewall-
 
 ### Read-only work queue
 
-The `work-queue` tool requires `operation` and `repo` (`owner/repo`), matching the CLI's explicit repository selection. The optional `branch` defaults to `work-queue`. Git storage uses the server's existing credentials; private repositories require read access. Actor validation for log and audit tools does not gate this tool.
+The `work-queue` tool requires `operation` and `repo` (`owner/repo`), matching the CLI's explicit repository selection. The optional `branch` defaults to `work-queue`. Git storage uses the server's existing credentials; private repositories require read access. Actor validation for log and audit tools does not gate this tool because its operations are read-only and repository access is already bounded by those Git credentials.
 
 | Operation | Options | Returns |
 | --- | --- | --- |

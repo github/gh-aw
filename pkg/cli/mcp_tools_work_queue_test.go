@@ -191,12 +191,16 @@ func TestWorkQueueToolSchema(t *testing.T) {
 	var schema struct {
 		Required   []string `json:"required"`
 		Properties map[string]struct {
-			Enum []string `json:"enum"`
+			Enum        []string `json:"enum"`
+			Description string   `json:"description"`
 		} `json:"properties"`
 	}
 	require.NoError(t, json.Unmarshal(encoded, &schema))
 	assert.ElementsMatch(t, []string{"operation", "repo"}, schema.Required)
 	assert.ElementsMatch(t, []string{"state", "inspect"}, schema.Properties["operation"].Enum)
+	branchFlag := NewWorkCommand().PersistentFlags().Lookup("branch")
+	require.NotNil(t, branchFlag)
+	assert.Equal(t, branchFlag.Usage+". Defaults to "+branchFlag.DefValue+".", schema.Properties["branch"].Description)
 	for _, removed := range []string{"request_id", "before_claim", "dispatch_id"} {
 		assert.NotContains(t, schema.Properties, removed)
 	}
