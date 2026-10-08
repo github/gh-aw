@@ -47,6 +47,9 @@ const {
   DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
   MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
   MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS,
+  removeCodexRoutingOverrides,
+  applyCodexRoutingEffort,
+  resolveCodexModelRouting,
 } = require("./codex_harness.cjs");
 const { detectNonRetryableHarnessGuard } = require("./harness_retry_guard.cjs");
 
@@ -78,7 +81,7 @@ function spawnSync(command, args, options) {
   return spawnProcessSync(command, args, { ...options, env });
 }
 
-function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {} } = {}) {
+function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}, reflectData } = {}) {
   const dir = makeHarnessTempDir("runtime-");
   const executable = path.join(dir, "codex-stub.cjs");
   const promptPath = path.join(dir, "prompt.txt");
@@ -89,22 +92,31 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
   );
   fs.chmodSync(executable, 0o700);
   fs.writeFileSync(promptPath, prompt);
+  const childEnv = {
+    ...process.env,
+    CODEX_API_KEY: "fake-key",
+    AWF_REFLECT_ENABLED: "0",
+    RUNNER_TEMP: dir,
+    CODEX_HOME: path.join(dir, "codex-home"),
+    GH_AW_CODEX_CONTEXT_REBUILD_CIRCUIT_BREAKER: "false",
+    GH_AW_HARNESS_MAX_RETRIES: "1",
+    GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
+    GH_AW_LLM_PROVIDER_EXPLICIT: "0",
+    GH_AW_SAFE_OUTPUTS: "",
+    CODEX_HARNESS_STUB_CALLS: callsPath,
+    ...env,
+  };
+  if (reflectData) {
+    const reflectPreload = path.join(dir, "reflect-fixture.cjs");
+    fs.writeFileSync(
+      reflectPreload,
+      `const fs=require("fs");const path=require("path");const reflect=require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))});const data=${JSON.stringify(reflectData)};reflect.fetchAWFReflect=async()=>{fs.mkdirSync(path.dirname(reflect.AWF_REFLECT_OUTPUT_PATH),{recursive:true});fs.writeFileSync(reflect.AWF_REFLECT_OUTPUT_PATH,JSON.stringify(data));return {ok:true,reflectData:data};};`
+    );
+    childEnv.NODE_OPTIONS = `${childEnv.NODE_OPTIONS || ""} --require=${JSON.stringify(reflectPreload)}`;
+  }
   const result = spawnSync(process.execPath, ["codex_harness.cjs", executable, "exec", ...args, "--prompt-file", promptPath], {
     cwd: path.dirname(require.resolve("./codex_harness.cjs")),
-    env: {
-      ...process.env,
-      CODEX_API_KEY: "fake-key",
-      AWF_REFLECT_ENABLED: "0",
-      RUNNER_TEMP: dir,
-      CODEX_HOME: path.join(dir, "codex-home"),
-      GH_AW_CODEX_CONTEXT_REBUILD_CIRCUIT_BREAKER: "false",
-      GH_AW_HARNESS_MAX_RETRIES: "1",
-      GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
-      GH_AW_LLM_PROVIDER_EXPLICIT: "0",
-      GH_AW_SAFE_OUTPUTS: "",
-      CODEX_HARNESS_STUB_CALLS: callsPath,
-      ...env,
-    },
+    env: childEnv,
     encoding: "utf8",
     timeout: 15000,
     maxBuffer: 12 * 1024 * 1024,
@@ -120,6 +132,65 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 }
 
 describe("codex_harness.cjs", () => {
+  describe("AWF model routing", () => {
+    const reflectData = {
+      endpoints: [{ provider: "github", configured: true, models: ["gpt-5.6-sol"] }],
+      routing: {
+        status: "selected",
+        selection: { provider: "github", model: "github-copilot/gpt-5.6-sol", wire_model: "gpt-5.6-sol", effort: "xhigh", endpoint: "/responses" },
+      },
+    };
+
+    it("applies the routed model and reasoning effort over fixed args", () => {
+      const result = resolveCodexModelRouting(reflectData, ["exec", "--model", "fixed-model", "-c", 'model_reasoning_effort="low"', "--json", "-"]);
+      expect(result.error).toBeNull();
+      expect(result.model).toBe("gpt-5.6-sol");
+      expect(result.args).toEqual(["exec", "-c", 'model_reasoning_effort="xhigh"', "--model", "gpt-5.6-sol", "--json", "-"]);
+    });
+
+    it.each([
+      [null, "required model-routing selection"],
+      [{ endpoints: reflectData.endpoints, routing: { status: "pending" } }, "pending"],
+      [{ ...reflectData, routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/v1/messages" } } }, "not supported by this engine"],
+      [{ ...reflectData, endpoints: [{ provider: "github", configured: true, models: [] }] }, "unavailable Copilot wire model"],
+    ])("fails closed when routing data is invalid: %s", (reflect, error) => {
+      expect(resolveCodexModelRouting(reflect, ["exec", "--model", "fixed"]).error).toContain(error);
+    });
+
+    it("drops fixed model and reasoning-effort configuration", () => {
+      const args = removeCodexRoutingOverrides(["exec", "-m", "fixed", "-c", 'model_reasoning_effort="low"', "--json"]);
+      expect(args).toEqual(["exec", "--json"]);
+      expect(applyCodexRoutingEffort(["exec", "--json"], "high")).toEqual(["exec", "-c", 'model_reasoning_effort="high"', "--json"]);
+    });
+
+    it("rejects an effort that Codex does not support", () => {
+      const reflect = {
+        ...reflectData,
+        routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, effort: "max" } },
+      };
+      expect(resolveCodexModelRouting(reflect, ["exec"]).error).toContain('"max"');
+    });
+
+    it("starts Codex with the routed model and effort from AWF reflection", () => {
+      const reflect = {
+        ...reflectData,
+        endpoints: [{ provider: "github", configured: true, port: 10002, base_url: "http://api-proxy:10002", models: ["gpt-5.6-sol"] }],
+      };
+      const { result, calls } = runHarnessFixture("process.exit(0);", {
+        args: ["--model", "fixed-model", "-c", 'model_reasoning_effort="low"'],
+        env: { GH_AW_MODEL_ROUTING: "1", GH_AW_MODEL_AGENT_CODEX: "fixed-model", GH_AW_LLM_PROVIDER: "github" },
+        reflectData: reflect,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].args).toContain("--model");
+      expect(calls[0].args).toContain("gpt-5.6-sol");
+      expect(calls[0].args).toContain('model_reasoning_effort="xhigh"');
+      expect(calls[0].args).not.toContain("fixed-model");
+      expect(result.stderr).toContain("inference routing: mode=awf-routed model=gpt-5.6-sol effort=xhigh");
+    });
+  });
+
   describe("MCP call watchdog", () => {
     it("times out only an outstanding MCP call, not other output or completed calls", () => {
       let time = 0;
