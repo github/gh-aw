@@ -86,7 +86,11 @@ model and controlled endpoint routing. That evidence does not prove AWF or MCP.
 Release of Agy and Gemini soft deprecation together requires bounded production
 conformance through the actual installer, Gemini AWF endpoint, native MCP,
 CLI-mounted MCP and staged safe outputs. The manual
-`engine-conformance-agy.md` workflow prepares that gate. Production conformance
+`engine-conformance-agy.md` workflow prepares that gate and remains dispatch-only.
+Credentials Check calls the feature-branch `agy-conformance-reusable.lock.yml`.
+Both entry points import `shared/agy-conformance.md`, preserving one copy of the
+native/shared probes and prompt without importing a trigger-bearing workflow.
+Production conformance
 has not passed; no Gemini deprecation notice or release changeset is enabled by
 this implementation checkpoint.
 

@@ -74,8 +74,11 @@ production-engine conformance test. The separate built-in `engine: agy`
 integration remains experimental. Its production gate additionally requires
 native MCP transport, inference usage and requested-model evidence through AWF.
 
-The `agy-conformance` input calls `engine-conformance-agy.lock.yml` from the
-selected branch; it does not run the legacy credential jobs. Both Agy selectors
+The `agy-conformance` input calls `agy-conformance-reusable.lock.yml` from the
+selected branch; it does not run the legacy credential jobs. The canonical
+`engine-conformance-agy.md` remains dispatch-only. Both entry points import the
+same probes and prompt from `shared/agy-conformance.md`; trigger-bearing
+workflows cannot be imported as shared Markdown. Both Agy selectors
 have isolated, ref-specific concurrency. The production gate has a ten-minute
 job timeout, five-credit budget, and staged safe outputs. Native authentication
 has passed; production conformance and Gemini soft deprecation remain pending.

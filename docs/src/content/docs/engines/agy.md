@@ -89,7 +89,9 @@ credential inside the agent.
 The manual native authentication probe checks real inference and negative
 authentication/model cases. `engine-conformance-agy.md` separately exercises the
 production installer, AWF, native MCP, CLI-mounted MCP tools and staged safe
-outputs. Release and Gemini deprecation are gated on that production path, not
+outputs. It remains dispatch-only; Credentials Check calls the feature-branch
+`agy-conformance-reusable.lock.yml`, compiled from the same shared probes and
+prompt. Release and Gemini deprecation are gated on that production path, not
 on mocked tests or native authentication alone.
 
 See the [engine reference](/gh-aw/reference/engines/) and

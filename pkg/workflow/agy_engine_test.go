@@ -118,35 +118,151 @@ func TestAgyCLIOverrideUsesBuiltInDefaults(t *testing.T) {
 	assert.NotContains(t, string(lock), "@google/gemini-cli")
 }
 
+type agyConformanceJob struct {
+	Permissions    map[string]string `yaml:"permissions"`
+	TimeoutMinutes int               `yaml:"timeout-minutes"`
+	Secrets        map[string]string `yaml:"secrets"`
+	Uses           string            `yaml:"uses"`
+	If             string            `yaml:"if"`
+	Steps          []map[string]any  `yaml:"steps"`
+}
+
+type agyConformanceWorkflow struct {
+	On          map[string]any               `yaml:"on"`
+	Permissions map[string]string            `yaml:"permissions"`
+	Concurrency map[string]string            `yaml:"concurrency"`
+	Jobs        map[string]agyConformanceJob `yaml:"jobs"`
+}
+
 func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
-	type job struct {
-		Permissions    map[string]string `yaml:"permissions"`
-		TimeoutMinutes int               `yaml:"timeout-minutes"`
-		Secrets        map[string]string `yaml:"secrets"`
-	}
-	var callee, caller struct {
-		Jobs map[string]job `yaml:"jobs"`
-	}
-	lock, err := os.ReadFile("../../.github/workflows/engine-conformance-agy.lock.yml")
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(lock, &callee))
-	for name, config := range callee.Jobs {
-		for permission, level := range config.Permissions {
-			assert.NotEqual(t, "write", level, "%s must not grant %s write permission", name, permission)
-		}
-	}
-	assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
-	assert.Equal(t, 2, callee.Jobs["safe_outputs"].TimeoutMinutes)
-	assert.Contains(t, string(lock), `"maxAiCredits":5`)
-	assert.Contains(t, string(lock), `"maxCacheMisses":12`)
+	var caller agyConformanceWorkflow
 	parent, err := os.ReadFile("../../.github/workflows/credentials-check.yml")
 	require.NoError(t, err)
 	require.NoError(t, yaml.Unmarshal(parent, &caller))
 	binding := caller.Jobs["agy-conformance"]
 	assert.Equal(t, map[string]string{"GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}"}, binding.Secrets)
-	for name, config := range callee.Jobs {
-		for permission, level := range config.Permissions {
-			assert.Equal(t, level, binding.Permissions[permission], "caller must allow %s required by %s", permission, name)
+	assert.Equal(t, map[string]string{"actions": "read", "contents": "read"}, binding.Permissions)
+	assert.Equal(t, "${{ inputs['agy-conformance'] }}", binding.If)
+	assert.Equal(t, "./.github/workflows/agy-conformance-reusable.lock.yml", binding.Uses)
+	for _, entry := range []struct{ id, trigger string }{
+		{"engine-conformance-agy", "workflow_dispatch"},
+		{"agy-conformance-reusable", "workflow_call"},
+	} {
+		t.Run(entry.id, func(t *testing.T) {
+			lock, err := os.ReadFile("../../.github/workflows/" + entry.id + ".lock.yml")
+			require.NoError(t, err)
+			var callee agyConformanceWorkflow
+			require.NoError(t, yaml.Unmarshal(lock, &callee))
+			require.Len(t, callee.On, 1)
+			assert.Contains(t, callee.On, entry.trigger)
+			assert.Empty(t, callee.Permissions)
+			if entry.trigger == "workflow_call" {
+				assert.Contains(t, callee.Concurrency["group"], "${{ github.run_id }}")
+			}
+			for name, config := range callee.Jobs {
+				for permission, level := range config.Permissions {
+					assert.NotEqual(t, "write", level, "%s must not grant %s write permission", name, permission)
+					assert.Equal(t, level, binding.Permissions[permission], "caller must allow %s required by %s", permission, name)
+				}
+			}
+			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
+			assert.Equal(t, 2, callee.Jobs["safe_outputs"].TimeoutMinutes)
+			assert.Contains(t, string(lock), `"maxAiCredits":5`)
+			assert.Contains(t, string(lock), `"maxCacheMisses":12`)
+			assert.Contains(t, string(lock), `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
+			assert.Contains(t, string(lock), `"threat_detection":{"mode":"enabled"}`)
+			assertAgyConformanceProbes(t, callee)
+		})
+	}
+}
+
+func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
+	var canonical, reusable map[string]any
+	readConformanceFrontmatter(t, "../../.github/workflows/engine-conformance-agy.md", &canonical)
+	readConformanceFrontmatter(t, "../../.github/workflows/agy-conformance-reusable.md", &reusable)
+	for key, trigger := range map[string]string{"canonical": "workflow_dispatch", "reusable": "workflow_call"} {
+		source := canonical
+		if key == "reusable" {
+			source = reusable
+		}
+		assert.Equal(t, map[string]any{trigger: nil}, source["on"])
+		assert.Equal(t, []any{"shared/agy-conformance.md"}, source["imports"])
+		delete(source, "name")
+		delete(source, "description")
+		delete(source, "on")
+	}
+	assert.Equal(t, canonical, reusable, "both compilation paths must retain identical gate configuration")
+}
+
+func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {
+	t.Helper()
+	steps, environment, commands := agyConformanceStepContent(compiled)
+	execution := steps["Execute experimental Agy CLI"]
+	require.NotNil(t, execution)
+	assert.Equal(t, "agentic_execution", execution["id"])
+	assert.EqualValues(t, 10, execution["timeout-minutes"])
+	for _, path := range []string{"shared/agy-conformance.md", "shared/engine-conformance.md"} {
+		var source struct {
+			PreAgentSteps []map[string]any `yaml:"pre-agent-steps"`
+			PostSteps     []map[string]any `yaml:"post-steps"`
+			MCPScripts    map[string]struct {
+				Script string `yaml:"script"`
+			} `yaml:"mcp-scripts"`
+		}
+		readConformanceFrontmatter(t, "../../.github/workflows/"+path, &source)
+		for _, expected := range append(source.PreAgentSteps, source.PostSteps...) {
+			assertAgyConformanceStep(t, steps[expected["name"].(string)], expected)
+		}
+		for name, tool := range source.MCPScripts {
+			indented := strings.ReplaceAll(strings.TrimSpace(tool.Script), "\n", "\n    ")
+			assert.Contains(t, commands, indented, "%s handler must survive compilation", name)
+		}
+	}
+	for _, expected := range []string{"conformance-agy", "mcpscripts conformance-challenge", "safeoutputs noop", "native MCP server `agy-native`"} {
+		assert.Contains(t, environment, expected, "compiled environment/prompt must retain %s", expected)
+	}
+	for _, expected := range []string{`"agy-native"`, `"native-challenge"`, "--exclude-env GEMINI_API_KEY"} {
+		assert.Contains(t, commands, expected, "compiled commands must retain %s", expected)
+	}
+}
+
+func agyConformanceStepContent(compiled agyConformanceWorkflow) (map[string]map[string]any, string, string) {
+	steps := make(map[string]map[string]any)
+	var environment, commands strings.Builder
+	for _, config := range compiled.Jobs {
+		for _, step := range config.Steps {
+			if name, ok := step["name"].(string); ok {
+				steps[name] = step
+			}
+			if env, ok := step["env"].(map[string]any); ok {
+				for _, value := range env {
+					if text, ok := value.(string); ok {
+						environment.WriteString(text + "\n")
+					}
+				}
+			}
+			if run, ok := step["run"].(string); ok {
+				commands.WriteString(run + "\n")
+			}
+		}
+	}
+	return steps, environment.String(), commands.String()
+}
+
+func assertAgyConformanceStep(t *testing.T, actual, expected map[string]any) {
+	t.Helper()
+	name := expected["name"].(string)
+	require.NotNil(t, actual, "compiled gate must retain %s", name)
+	encoded, err := yaml.Marshal(expected)
+	require.NoError(t, err)
+	encoded = []byte(strings.ReplaceAll(string(encoded), "${{ github.aw.import-inputs.engine-id }}", "agy"))
+	require.NoError(t, yaml.Unmarshal(encoded, &expected))
+	if with, ok := expected["with"].(map[string]any); ok {
+		with["retention-days"] = "${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '2' }}"
+	}
+	for _, key := range []string{"run", "if", "env", "with"} {
+		if value, exists := expected[key]; exists {
+			assert.Equal(t, value, actual[key], "%s must retain %s", name, key)
 		}
 	}
 }

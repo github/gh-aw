@@ -1,8 +1,8 @@
 ---
-name: Engine Conformance Agy (Experimental)
-description: Bounded production authentication, AWF, MCP and safe-output gate for experimental Agy.
+name: Agy Conformance Reusable (Experimental)
+description: Feature-branch reusable entry point for the canonical experimental Agy conformance gate.
 on:
-  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 concurrency:
