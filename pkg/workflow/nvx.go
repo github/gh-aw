@@ -14,7 +14,25 @@ const (
 	defaultNVXSignerWorkflow = "github/gh-aw-firewall/.github/workflows/release.yml"
 	defaultNVXMountPolicy    = "workspace-only"
 	defaultNVXContainerDir   = "/workspace"
+	defaultNVXLayerPath      = "${{ runner.temp }}/nvx/guest-layer"
+	defaultNVXOpenVMMPath    = "${{ runner.temp }}/nvx/openvmm"
+	defaultNVXKernelPath     = "${{ runner.temp }}/nvx/vmlinux"
+	defaultNVXInitramfsPath  = "${{ runner.temp }}/nvx/initramfs.cpio.gz"
+	defaultNVXManifestPath   = "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.json"
+	defaultNVXBundlePath     = "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.sigstore.jsonl"
 )
+
+var defaultNVXConfig = AgentNVXConfig{
+	PreviewEnabled:             true,
+	NetworkIsolation:           true,
+	APIProxy:                   true,
+	LayerPath:                  defaultNVXLayerPath,
+	OpenVMMPath:                defaultNVXOpenVMMPath,
+	KernelPath:                 defaultNVXKernelPath,
+	InitramfsPath:              defaultNVXInitramfsPath,
+	ArtifactManifestPath:       defaultNVXManifestPath,
+	ArtifactManifestBundlePath: defaultNVXBundlePath,
+}
 
 var trustedNVXSignerWorkflows = map[string]struct{}{
 	defaultNVXSignerWorkflow: {},
@@ -34,13 +52,7 @@ func validateNVXRuntimeConfig(workflowData *WorkflowData, agentConfig *AgentSand
 		return nil
 	}
 
-	nvx := agentConfig.NVX
-	if nvx == nil {
-		return nvxValidationError("sandbox.agent.nvx", "", "NVX requires explicit runtime configuration", "Set preview, network-isolation, api-proxy, layer-path, openvmm-path, kernel-path, initramfs-path, artifact-manifest-path, and artifact-manifest-bundle-path.")
-	}
-	if err := validateNVXSecurityOptions(nvx); err != nil {
-		return err
-	}
+	nvx := effectiveNVXConfig(agentConfig.NVX)
 	if err := validateNVXPathInputs(nvx); err != nil {
 		return err
 	}
@@ -48,23 +60,6 @@ func validateNVXRuntimeConfig(workflowData *WorkflowData, agentConfig *AgentSand
 		return err
 	}
 	return validateNVXCompatibility(workflowData, agentConfig)
-}
-
-func validateNVXSecurityOptions(nvx *AgentNVXConfig) error {
-	for _, required := range []struct {
-		path    string
-		value   bool
-		message string
-	}{
-		{"sandbox.agent.nvx.preview", nvx.PreviewEnabled, "NVX requires explicit preview opt-in"},
-		{"sandbox.agent.nvx.network-isolation", nvx.NetworkIsolation, "NVX requires strict network isolation"},
-		{"sandbox.agent.nvx.api-proxy", nvx.APIProxy, "NVX requires API proxy credential isolation"},
-	} {
-		if !required.value {
-			return nvxValidationError(required.path, "false", required.message, "Set the field to true; NVX never disables these protections.")
-		}
-	}
-	return nil
 }
 
 func validateNVXPathInputs(nvx *AgentNVXConfig) error {
@@ -183,10 +178,31 @@ func nvxValidationError(field, value, message, suggestion string) error {
 }
 
 func effectiveNVXConfig(nvx *AgentNVXConfig) *AgentNVXConfig {
-	if nvx == nil {
-		return nil
+	result := defaultNVXConfig
+	if nvx != nil {
+		result = *nvx
+		if result.LayerPath == "" {
+			result.LayerPath = defaultNVXConfig.LayerPath
+		}
+		if result.OpenVMMPath == "" {
+			result.OpenVMMPath = defaultNVXConfig.OpenVMMPath
+		}
+		if result.KernelPath == "" {
+			result.KernelPath = defaultNVXConfig.KernelPath
+		}
+		if result.InitramfsPath == "" {
+			result.InitramfsPath = defaultNVXConfig.InitramfsPath
+		}
+		if result.ArtifactManifestPath == "" {
+			result.ArtifactManifestPath = defaultNVXConfig.ArtifactManifestPath
+		}
+		if result.ArtifactManifestBundlePath == "" {
+			result.ArtifactManifestBundlePath = defaultNVXConfig.ArtifactManifestBundlePath
+		}
 	}
-	result := *nvx
+	result.PreviewEnabled = true
+	result.NetworkIsolation = true
+	result.APIProxy = true
 	if result.MountPolicy == "" {
 		result.MountPolicy = defaultNVXMountPolicy
 	}
@@ -208,24 +224,8 @@ func effectiveNVXConfig(nvx *AgentNVXConfig) *AgentNVXConfig {
 	return &result
 }
 
-func isNVXConfigComplete(nvx *AgentNVXConfig) bool {
-	return nvx != nil &&
-		nvx.PreviewEnabled &&
-		nvx.NetworkIsolation &&
-		nvx.APIProxy &&
-		strings.TrimSpace(nvx.LayerPath) != "" &&
-		strings.TrimSpace(nvx.OpenVMMPath) != "" &&
-		strings.TrimSpace(nvx.KernelPath) != "" &&
-		strings.TrimSpace(nvx.InitramfsPath) != "" &&
-		strings.TrimSpace(nvx.ArtifactManifestPath) != "" &&
-		strings.TrimSpace(nvx.ArtifactManifestBundlePath) != ""
-}
-
 func buildAWFNVXConfig(nvx *AgentNVXConfig) *AWFNVXConfig {
 	effective := effectiveNVXConfig(nvx)
-	if effective == nil {
-		return nil
-	}
 	return &AWFNVXConfig{
 		PreviewEnabled:             effective.PreviewEnabled,
 		MountPolicy:                effective.MountPolicy,
@@ -245,9 +245,6 @@ func buildAWFNVXConfig(nvx *AgentNVXConfig) *AWFNVXConfig {
 
 func generateNVXSetupStep(nvx *AgentNVXConfig, awfVersion string) GitHubActionStep {
 	effective := effectiveNVXConfig(nvx)
-	if effective == nil {
-		return nil
-	}
 	env := map[string]string{
 		"GH_AW_AWF_VERSION":                         awfVersion,
 		"GH_AW_NVX_LAYER_SOURCE":                    effective.LayerPath,
@@ -284,4 +281,38 @@ func generateNVXRuntimeSetupSteps(workflowData *WorkflowData) []GitHubActionStep
 		return nil
 	}
 	return []GitHubActionStep{generateNVXSetupStep(agentConfig.NVX, getAWFVersionForSetup(workflowData))}
+}
+
+func generateNVXRuntimeCleanupStep(workflowData *WorkflowData) GitHubActionStep {
+	if !isNVXRuntime(workflowData) {
+		return nil
+	}
+	return GitHubActionStep{
+		"      - name: Remove staged NVX artifacts",
+		"        if: always()",
+		"        run: |",
+		`          stage_dir="${GH_AW_NVX_STAGE_DIR:-}"`,
+		`          if [[ -n "$stage_dir" ]]; then`,
+		`            if [[ ! "$stage_dir" =~ ^/tmp/gh-aw-nvx\.[[:alnum:]]{10}$ || ! -d "$stage_dir" || -L "$stage_dir" ]]; then`,
+		`              echo "::error::refusing to remove an unexpected NVX staging path"`,
+		"              exit 1",
+		"            fi",
+		`            rm_bin="${GH_AW_NVX_RM:-}"`,
+		`            case "$rm_bin" in /usr/sbin/rm|/usr/bin/rm|/sbin/rm|/bin/rm) ;; *) echo "::error::refusing an untrusted NVX cleanup tool"; exit 1 ;; esac`,
+		`            resolved_rm="$(/usr/bin/realpath -- "$rm_bin")"`,
+		`            case "$resolved_rm" in /usr/sbin/rm|/usr/bin/rm|/sbin/rm|/bin/rm) ;; *) echo "::error::refusing an untrusted NVX cleanup tool"; exit 1 ;; esac`,
+		`            rm_metadata="$(/usr/bin/stat -c '%u:%a' -- "$resolved_rm")"`,
+		`            rm_mode="${rm_metadata##*:}"`,
+		`            if [[ "$rm_metadata" != 0:* || ! "$rm_mode" =~ ^[0-7]{3,4}$ ]] || (( (8#$rm_mode & 0022) != 0 || (8#$rm_mode & 0111) == 0 )); then`,
+		`              echo "::error::NVX cleanup tool is not trusted"`,
+		"              exit 1",
+		"            fi",
+		`            stage_metadata="$(/usr/bin/stat -c '%u:%a' -- "$stage_dir")"`,
+		`            if [[ "$stage_metadata" != "0:555" ]]; then`,
+		`              echo "::error::NVX staging directory is not root-owned and read-only"`,
+		"              exit 1",
+		"            fi",
+		`            sudo -n "$resolved_rm" -rf -- "$stage_dir"`,
+		"          fi",
+	}
 }

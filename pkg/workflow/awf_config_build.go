@@ -5,7 +5,6 @@
 package workflow
 
 import (
-	"errors"
 	"fmt"
 	"maps"
 	"strconv"
@@ -28,13 +27,6 @@ var awfConfigLog = logger.New("workflow:awf_config")
 // by the AWF --config flag. See BuildAWFCommand for how this is wired together.
 func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:largefunc // Assembles the full AWF config by section.
 	awfConfigLog.Printf("Building AWF config JSON: engine=%s, allowed_domains=%q", config.EngineName, config.AllowedDomains)
-
-	if isNVXRuntime(config.WorkflowData) {
-		agentConfig := getAgentConfig(config.WorkflowData)
-		if agentConfig == nil || !isNVXConfigComplete(agentConfig.NVX) {
-			return "", errors.New("NVX runtime requires explicit preview, network isolation, API proxy, guest layer, and attested artifact paths")
-		}
-	}
 
 	// Resolve firewall config once — used for both the schema URL and the container image tag.
 	firewallConfig := getFirewallConfig(config.WorkflowData)

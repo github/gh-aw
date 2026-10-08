@@ -76,7 +76,7 @@ type AgentSandboxConfig struct {
 	Version        string                                `yaml:"version,omitempty"`        // AWF version override used to install and run the matching firewall version
 	Platform       string                                `yaml:"platform,omitempty"`       // AWF platform.type override (github.com, ghes, ghec, ghec-self-hosted)
 	Runtime        AgentRuntime                          `yaml:"runtime,omitempty"`        // Sandbox runtime profile for the agent container (see sandbox_runtime_profile.go)
-	NVX            *AgentNVXConfig                       `yaml:"nvx,omitempty"`            // Explicit fail-closed NVX preview configuration
+	NVX            *AgentNVXConfig                       `yaml:"nvx,omitempty"`            // Optional NVX settings; safe defaults apply when omitted
 	AllowHostPorts []int                                 `yaml:"-"`                        // Additional host TCP ports the agent may connect to (docker-sudo-iptables only).
 	Disabled       bool                                  `yaml:"-"`                        // True when agent is explicitly set to false (disables firewall). This is a runtime flag, not serialized to YAML.
 	Config         *SandboxRuntimeConfig                 `yaml:"config,omitempty"`         // Custom SRT config (optional)
@@ -92,7 +92,7 @@ type AgentSandboxConfig struct {
 	CACert         string                                `yaml:"ca-cert,omitempty"`        // Host path to an additional CA certificate for API proxy upstream TLS verification (maps to apiProxy.caCert, AWF v0.28.10+)
 }
 
-// AgentNVXConfig contains the explicit inputs required by AWF's NVX preview runtime.
+// AgentNVXConfig contains optional overrides for AWF's NVX preview runtime defaults.
 type AgentNVXConfig struct {
 	PreviewEnabled             bool   `yaml:"preview,omitempty" json:"preview,omitempty"`
 	NetworkIsolation           bool   `yaml:"network-isolation,omitempty" json:"network-isolation,omitempty"`

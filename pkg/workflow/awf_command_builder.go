@@ -135,15 +135,12 @@ func appendExpandableServiceAndHypervisorArgs(config AWFCommandConfig, isCloudHy
 			` --cloud-hypervisor-artifact-release-tag "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG}"`
 	}
 	if isNVXRuntime(config.WorkflowData) {
-		agentConfig := getAgentConfig(config.WorkflowData)
-		if agentConfig != nil && isNVXConfigComplete(agentConfig.NVX) {
-			expandableArgs += ` --nvx-layer "${GH_AW_NVX_LAYER}"` +
-				` --nvx-openvmm "${GH_AW_NVX_OPENVMM}"` +
-				` --nvx-kernel "${GH_AW_NVX_KERNEL}"` +
-				` --nvx-initramfs "${GH_AW_NVX_INITRAMFS}"` +
-				` --nvx-artifact-manifest "${GH_AW_NVX_ARTIFACT_MANIFEST}"` +
-				` --nvx-artifact-manifest-bundle "${GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE}"`
-		}
+		expandableArgs += ` --nvx-layer "${GH_AW_NVX_LAYER}"` +
+			` --nvx-openvmm "${GH_AW_NVX_OPENVMM}"` +
+			` --nvx-kernel "${GH_AW_NVX_KERNEL}"` +
+			` --nvx-initramfs "${GH_AW_NVX_INITRAMFS}"` +
+			` --nvx-artifact-manifest "${GH_AW_NVX_ARTIFACT_MANIFEST}"` +
+			` --nvx-artifact-manifest-bundle "${GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE}"`
 	}
 	return expandableArgs
 }
@@ -518,15 +515,12 @@ func appendTTYAndContainerRuntimeArgs(config AWFCommandConfig, firewallConfig *F
 		awfHelpersLog.Printf("Skipping cloud-hypervisor runtime flags: AWF version %q is older than required minimum %s", getAWFImageTag(firewallConfig), constants.AWFCloudHypervisorMinVersion)
 	}
 	if isNVXRuntime(config.WorkflowData) {
-		agentConfig := getAgentConfig(config.WorkflowData)
-		if agentConfig != nil && isNVXConfigComplete(agentConfig.NVX) {
-			awfArgs = append(awfArgs,
-				"--container-runtime", string(AgentRuntimeNVX),
-				"--nvx-preview",
-				"--network-isolation",
-				"--enable-api-proxy",
-			)
-		}
+		awfArgs = append(awfArgs,
+			"--container-runtime", string(AgentRuntimeNVX),
+			"--nvx-preview",
+			"--network-isolation",
+			"--enable-api-proxy",
+		)
 	}
 	return awfArgs
 }

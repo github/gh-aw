@@ -108,7 +108,7 @@ If the runner does not meet these requirements, omit the runtime to use Docker.
 
 NVX runs the agent in AWF's fail-closed, one-shot microVM runtime. It requires AWF `v0.28.49` or newer and a Linux x86_64 host with effective UID 0 for AWF, read/write access to `/dev/kvm`, cgroup v2 `cpu`, `memory`, and `pids` controllers, and seccomp `kill_process` support. Generated preflight checks these requirements and fails the job with an actionable diagnostic; NVX never falls back to Docker or Cloud Hypervisor.
 
-Configure the workload-specific guest layer and all five files from the exact AWF release before the generated AWF invocation. The artifact manifest and Sigstore bundle are verified offline with `gh attestation verify`; hashes alone are not accepted. The setup stages trusted files root-owned and read-only. Install these host packages before pre-agent setup: `acl bubblewrap e2fsprogs erofs-utils jq nftables uidmap`. The required host tools are resolved only from `/usr/sbin`, `/usr/bin`, `/sbin`, or `/bin`.
+Set only the runtime to use secure NVX defaults:
 
 ```aw wrap
 ---
@@ -120,30 +120,14 @@ sandbox:
   agent:
     id: awf
     runtime: nvx
-    nvx:
-      preview: true
-      network-isolation: true
-      api-proxy: true
-      mount-policy: workspace-only
-      layer-path: "${{ runner.temp }}/nvx/guest-layer"
-      openvmm-path: "${{ runner.temp }}/nvx/openvmm"
-      kernel-path: "${{ runner.temp }}/nvx/vmlinux"
-      initramfs-path: "${{ runner.temp }}/nvx/initramfs.cpio.gz"
-      artifact-manifest-path: "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.json"
-      artifact-manifest-bundle-path: "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.sigstore.jsonl"
-      signer-workflow: github/gh-aw-firewall/.github/workflows/release.yml
-      memory-mib: 512
-      memory-max-bytes: 536870912
-      pids-max: 128
-      # Optional:
-      # scratch-bytes: 536870912
-      # container-workdir: /workspace/build
 ---
 
 Run the workload in the pre-provisioned NVX guest.
 ```
 
-Path fields accept GitHub Actions expressions. Download and extract the trusted assets from the same pinned AWF release used by the workflow, then build the guest layer before the generated preflight step. `workspace-only` gives the guest the live workspace read-write at `/workspace`; `workspace-and-tool-cache` additionally exports the existing runner tool cache read-only.
+The defaults expect the workload-specific guest layer and the five trusted assets under `${{ runner.temp }}/nvx/` (`guest-layer`, `openvmm`, `vmlinux`, `initramfs.cpio.gz`, and the manifest and Sigstore bundle). Download and extract the trusted assets from the same pinned AWF release used by the workflow, then build the guest layer before the generated preflight step. The manifest and bundle are verified offline with `gh attestation verify`; hashes alone are not accepted. Setup stages the verified files root-owned and read-only, and removes the staging directory after agent execution. Install these host packages before pre-agent setup: `acl bubblewrap e2fsprogs erofs-utils jq nftables uidmap`. The required host tools are resolved only from `/usr/sbin`, `/usr/bin`, `/sbin`, or `/bin`.
+
+Optional `sandbox.agent.nvx` overrides support alternate paths, mount policy, resource limits, and working directory. Preview mode, strict network isolation, and the API proxy always remain enabled.
 
 For migration from the firewall repository's manual smoke workflows, keep each workflow's custom artifact-building job and workload-specific layer build, declare the artifact job under `on.needs`, and replace the manual AWF NVX command with the declarative runtime above. The Copilot smoke layer must still contain its pinned Copilot CLI; the build-test layer must still contain its pinned Node.js and Go toolchains. Download the workflow-attested AWF assets and restore the paths before pre-agent setup finishes. Do not pass provider credentials into the guest; the required API proxy keeps real credentials in its sidecar.
 

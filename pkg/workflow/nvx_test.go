@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -35,35 +36,6 @@ func validNVXWorkflowData() *WorkflowData {
 				},
 			},
 		},
-	}
-}
-
-func TestValidateNVXRuntimeConfigRequiresExplicitSecurityAndArtifactInputs(t *testing.T) {
-	tests := []struct {
-		name  string
-		clear func(*AgentNVXConfig)
-		field string
-	}{
-		{"preview opt-in", func(n *AgentNVXConfig) { n.PreviewEnabled = false }, "preview"},
-		{"network isolation", func(n *AgentNVXConfig) { n.NetworkIsolation = false }, "network-isolation"},
-		{"API proxy", func(n *AgentNVXConfig) { n.APIProxy = false }, "api-proxy"},
-		{"guest layer", func(n *AgentNVXConfig) { n.LayerPath = "" }, "layer-path"},
-		{"OpenVMM binary", func(n *AgentNVXConfig) { n.OpenVMMPath = "" }, "openvmm-path"},
-		{"kernel", func(n *AgentNVXConfig) { n.KernelPath = "" }, "kernel-path"},
-		{"initramfs", func(n *AgentNVXConfig) { n.InitramfsPath = "" }, "initramfs-path"},
-		{"artifact manifest", func(n *AgentNVXConfig) { n.ArtifactManifestPath = "" }, "artifact-manifest-path"},
-		{"attestation bundle", func(n *AgentNVXConfig) { n.ArtifactManifestBundlePath = "" }, "artifact-manifest-bundle-path"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			data := validNVXWorkflowData()
-			tt.clear(data.SandboxConfig.Agent.NVX)
-
-			err := validateNVXRuntimeConfig(data, data.SandboxConfig.Agent)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.field)
-		})
 	}
 }
 
@@ -135,6 +107,47 @@ func TestValidateNVXRuntimeConfig(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "v0.28.49")
 	})
+}
+
+func TestNVXRuntimeDefaultsWithoutConfiguration(t *testing.T) {
+	data := validNVXWorkflowData()
+	data.SandboxConfig.Agent.NVX = nil
+
+	require.NoError(t, validateNVXRuntimeConfig(data, data.SandboxConfig.Agent))
+
+	effective := effectiveNVXConfig(nil)
+	assert.True(t, effective.PreviewEnabled)
+	assert.True(t, effective.NetworkIsolation)
+	assert.True(t, effective.APIProxy)
+	assert.Equal(t, "${{ runner.temp }}/nvx/guest-layer", effective.LayerPath)
+	assert.Equal(t, "${{ runner.temp }}/nvx/openvmm", effective.OpenVMMPath)
+	assert.Equal(t, "${{ runner.temp }}/nvx/vmlinux", effective.KernelPath)
+	assert.Equal(t, "${{ runner.temp }}/nvx/initramfs.cpio.gz", effective.InitramfsPath)
+	assert.Equal(t, "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.json", effective.ArtifactManifestPath)
+	assert.Equal(t, "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.sigstore.jsonl", effective.ArtifactManifestBundlePath)
+
+	config := AWFCommandConfig{EngineName: "copilot", WorkflowData: data}
+	command := BuildAWFCommand(config)
+	assert.Contains(t, command, "--container-runtime nvx")
+	assert.Contains(t, command, "--nvx-artifact-manifest-bundle")
+
+	steps := generateNVXRuntimeSetupSteps(data)
+	require.Len(t, steps, 1)
+	step := strings.Join(steps[0], "\n")
+	assert.Contains(t, step, `${{ runner.temp }}/nvx/guest-layer`)
+	assert.Contains(t, step, `${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.json`)
+
+	cleanupStep := strings.Join(generateNVXRuntimeCleanupStep(data), "\n")
+	assert.Contains(t, cleanupStep, "if: always()")
+	assert.Contains(t, cleanupStep, `sudo -n "$resolved_rm" -rf -- "$stage_dir"`)
+	assert.Contains(t, cleanupStep, `^/tmp/gh-aw-nvx\.[[:alnum:]]{10}$`)
+
+	var cleanupScript strings.Builder
+	for _, line := range generateNVXRuntimeCleanupStep(data)[3:] {
+		cleanupScript.WriteString(strings.TrimPrefix(line, "          "))
+		cleanupScript.WriteByte('\n')
+	}
+	require.NoError(t, exec.Command("bash", "-n", "-c", cleanupScript.String()).Run())
 }
 
 func TestValidateNVXRuntimeIncompatibleFeatures(t *testing.T) {

@@ -7,7 +7,7 @@ trusted_dirs=(/usr/sbin /usr/bin /sbin /bin)
 required_tools=(
   bwrap flock getfacl getent gh groupdel id ip iptables mkfs.erofs mke2fs nft
   setfacl setpriv sysctl useradd userdel
-  chmod install jq mktemp realpath sha256sum stat sudo uname
+  chmod install jq mktemp realpath rm sha256sum stat sudo uname
 )
 declare -A trusted_tools
 
@@ -50,6 +50,16 @@ tool() {
   shift
   "${trusted_tools[$name]}" "$@"
 }
+
+stage_dir=""
+cleanup_failed_stage() {
+  local status=$?
+  if (( status != 0 )) && [[ -n "$stage_dir" ]]; then
+    tool sudo -n "${trusted_tools[rm]}" -rf -- "$stage_dir" ||
+      echo "::warning::failed to remove incomplete NVX staging directory"
+  fi
+}
+trap cleanup_failed_stage EXIT
 
 if [[ "$(tool uname -s)" != "Linux" ]]; then
   echo "::error::NVX requires a Linux host."
@@ -145,13 +155,18 @@ for index in "${!artifact_paths[@]}"; do
   fi
 done
 
-stage_dir="$("${trusted_tools[mktemp]}" -d)"
-"${trusted_tools[chmod]}" 700 "$stage_dir"
-"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_OPENVMM_SOURCE" "${stage_dir}/openvmm"
-"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_KERNEL_SOURCE" "${stage_dir}/vmlinux"
-"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_INITRAMFS_SOURCE" "${stage_dir}/initramfs.cpio.gz"
-"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE" "${stage_dir}/manifest.json"
-"${trusted_tools[install]}" -m 600 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE_SOURCE" "${stage_dir}/manifest.sigstore.jsonl"
+stage_dir="$(tool sudo -n "${trusted_tools[mktemp]}" -d /tmp/gh-aw-nvx.XXXXXXXXXX)"
+tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0555 -- "$GH_AW_NVX_OPENVMM_SOURCE" "${stage_dir}/openvmm"
+tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_KERNEL_SOURCE" "${stage_dir}/vmlinux"
+tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_INITRAMFS_SOURCE" "${stage_dir}/initramfs.cpio.gz"
+tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE" "${stage_dir}/manifest.json"
+tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE_SOURCE" "${stage_dir}/manifest.sigstore.jsonl"
+tool sudo -n "${trusted_tools[chmod]}" 0555 "$stage_dir"
+stage_metadata="$(tool stat -c '%u:%a' -- "$stage_dir")"
+if [[ "$stage_metadata" != "0:555" ]]; then
+  echo "::error::NVX staging directory is not root-owned and read-only."
+  exit 1
+fi
 
 if ! "${trusted_tools[gh]}" attestation verify "${stage_dir}/manifest.json" \
   --repo github/gh-aw-firewall \
@@ -196,37 +211,12 @@ fi
 
 for name in openvmm kernel initramfs; do
   case "$name" in
-    openvmm) source="$GH_AW_NVX_OPENVMM_SOURCE"; role="openvmm" ;;
-    kernel) source="$GH_AW_NVX_KERNEL_SOURCE"; role="kernel" ;;
-    initramfs) source="$GH_AW_NVX_INITRAMFS_SOURCE"; role="initramfs" ;;
-  esac
-  expected_size="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sizeBytes" "$verified_manifest")"
-  expected_digest="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sha256" "$verified_manifest")"
-  source_size="$(tool stat -c '%s' -- "$source")"
-  source_digest="$(tool sha256sum -- "$source")"
-  source_digest="${source_digest%% *}"
-  if [[ "$source_size" != "$expected_size" || "$source_digest" != "$expected_digest" ]]; then
-    echo "::error::NVX ${role} source artifact size or SHA-256 does not match the attested manifest."
-    exit 1
-  fi
-done
-
-stage_dir="$(tool sudo -n "${trusted_tools[mktemp]}" -d /tmp/gh-aw-nvx.XXXXXXXXXX)"
-tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0555 -- "$GH_AW_NVX_OPENVMM_SOURCE" "${stage_dir}/openvmm"
-tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_KERNEL_SOURCE" "${stage_dir}/vmlinux"
-tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_INITRAMFS_SOURCE" "${stage_dir}/initramfs.cpio.gz"
-tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_SOURCE" "${stage_dir}/manifest.json"
-tool sudo -n "${trusted_tools[install]}" -o 0 -g 0 -m 0444 -- "$GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE_SOURCE" "${stage_dir}/manifest.sigstore.jsonl"
-tool sudo -n "${trusted_tools[chmod]}" 0555 "$stage_dir"
-
-for name in openvmm kernel initramfs; do
-  case "$name" in
     openvmm) file="${stage_dir}/openvmm"; role="openvmm" ;;
     kernel) file="${stage_dir}/vmlinux"; role="kernel" ;;
     initramfs) file="${stage_dir}/initramfs.cpio.gz"; role="initramfs" ;;
   esac
-  expected_size="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sizeBytes" "${stage_dir}/manifest.json")"
-  expected_digest="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sha256" "${stage_dir}/manifest.json")"
+  expected_size="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sizeBytes" "$verified_manifest")"
+  expected_digest="$("${trusted_tools[jq]}" -er ".artifacts.${role}.sha256" "$verified_manifest")"
   actual_size="$(tool stat -c '%s' -- "$file")"
   actual_digest="$(tool sha256sum -- "$file")"
   actual_digest="${actual_digest%% *}"
@@ -257,6 +247,8 @@ fi
   printf 'GH_AW_NVX_INITRAMFS=%s/initramfs.cpio.gz\n' "$stage_dir"
   printf 'GH_AW_NVX_ARTIFACT_MANIFEST=%s/manifest.json\n' "$stage_dir"
   printf 'GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE=%s/manifest.sigstore.jsonl\n' "$stage_dir"
+  printf 'GH_AW_NVX_STAGE_DIR=%s\n' "$stage_dir"
+  printf 'GH_AW_NVX_RM=%s\n' "${trusted_tools[rm]}"
 } >> "${GITHUB_ENV:?GITHUB_ENV is required}"
 
 echo "NVX host and attested artifacts validated; AWF will fail closed if runtime startup fails."
