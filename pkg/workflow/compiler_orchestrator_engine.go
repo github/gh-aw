@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
@@ -48,19 +49,8 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	}
 	engineSetting, engineConfig = c.applyEngineOverride(engineSetting, engineConfig)
 	engineSetting, engineConfig = c.injectBuiltinEngineImportIfNeeded(result.Frontmatter, engineSetting, engineConfig)
-	// Validate the engine name early — before import processing — so that a typo in
-	// `engine:` is always reported, even when imports also fail. The check is skipped
-	// when engineSetting is empty (engine may come from an import) or when a
-	// command-line --engine override is active (it will be validated later).
-	// The resolved value is intentionally discarded here because import defaults can
-	// still mutate engineConfig before the final resolveEngineRuntimeConfig call.
-	// Workflows that import a shared engine definition register the engine only after
-	// import processing, so the early check is skipped when imports are declared.
-	if engineSetting != "" && c.engineOverride == "" && !frontmatterDeclaresImports(result.Frontmatter) {
-		if _, err := c.engineCatalog.Resolve(engineSetting, engineConfig); err != nil {
-			orchestratorEngineLog.Printf("Early engine validation failed for %q: %v", engineSetting, err)
-			return nil, err
-		}
+	if err := c.validateEarlyEngineSetting(result.Frontmatter, engineSetting, engineConfig); err != nil {
+		return nil, err
 	}
 	importsResult, networkPermissions, err := c.processEngineImportsAndMerge(result, cleanPath, content, markdownDir, engineSetting, networkPermissions)
 	if err != nil {
@@ -86,6 +76,9 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 	if err != nil {
 		return nil, err
 	}
+	if behaviorEngine, ok := agenticEngine.(*BehaviorDefinedEngine); ok && model == "" && parser.BuiltinVirtualFileExists(builtinEnginePath(agenticEngine.GetID())) {
+		model = behaviorEngine.definition.Models.Default
+	}
 	if err := c.runPostEngineValidations(result.Frontmatter, engineSetting, engineConfig, networkPermissions, sandboxConfig, agenticEngine, importsResult); err != nil {
 		return nil, err
 	}
@@ -99,6 +92,19 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		importsResult:      importsResult,
 		configSteps:        configSteps,
 	}, nil
+}
+
+// Import defaults can still change the engine config after this typo check.
+// Imported definitions are registered later and must skip early resolution.
+func (c *Compiler) validateEarlyEngineSetting(frontmatter map[string]any, engineSetting string, engineConfig *EngineConfig) error {
+	if engineSetting == "" || c.engineOverride != "" || frontmatterDeclaresImports(frontmatter) {
+		return nil
+	}
+	_, err := c.engineCatalog.Resolve(engineSetting, engineConfig)
+	if err != nil {
+		orchestratorEngineLog.Printf("Early engine validation failed for %q: %v", engineSetting, err)
+	}
+	return err
 }
 
 // frontmatterDeclaresImports reports whether the workflow frontmatter declares any
@@ -377,7 +383,10 @@ func (c *Compiler) mergeImportedEngineConfig(
 	engineConfig *EngineConfig,
 	model string,
 ) (*EngineConfig, string, error) {
-	if len(allEngines) == 0 {
+	firstEngine := ""
+	if len(allEngines) > 0 {
+		firstEngine = allEngines[0]
+	} else {
 		return engineConfig, model, nil
 	}
 	overrideConfig := engineConfig
@@ -389,7 +398,7 @@ func (c *Compiler) mergeImportedEngineConfig(
 		// the model from the imported engine config when the main workflow does not
 		// pin one, so that an engine.model pin in an import is not silently dropped.
 		if model == "" {
-			if _, extractedModel, extractErr := c.extractEngineConfigFromJSON(allEngines[0]); extractErr == nil && extractedModel != "" {
+			if _, extractedModel, extractErr := c.extractEngineConfigFromJSON(firstEngine); extractErr == nil && extractedModel != "" {
 				model = extractedModel
 				orchestratorEngineLog.Printf("Applied model from imported engine config: %s", model)
 			}
@@ -397,7 +406,7 @@ func (c *Compiler) mergeImportedEngineConfig(
 		return engineConfig, model, nil
 	}
 	orchestratorEngineLog.Printf("Extracting engine config from included file")
-	importedConfig, extractedModel, err := c.extractEngineConfigFromJSON(allEngines[0])
+	importedConfig, extractedModel, err := c.extractEngineConfigFromJSON(firstEngine)
 	if err != nil {
 		orchestratorEngineLog.Printf("Failed to extract engine config: %v", err)
 		return nil, "", fmt.Errorf("failed to extract engine config from included file: %w", err)
@@ -513,6 +522,29 @@ func (c *Compiler) applyEngineImportDefaults(opts engineImportDefaultsOptions) (
 	if engineConfig == nil {
 		engineConfig = &EngineConfig{ID: opts.engineSetting}
 	}
+	applyEngineBudgetImportDefaults(engineConfig, opts)
+	if engineConfig.MCPToolTimeout == "" && opts.importsResult.MergedEngineMCPToolTimeout != "" {
+		engineConfig.MCPToolTimeout = opts.importsResult.MergedEngineMCPToolTimeout
+		orchestratorEngineLog.Printf("Applied engine.mcp.tool-timeout from import: %s", engineConfig.MCPToolTimeout)
+	}
+	if engineConfig.MCPSessionTimeout == "" && opts.importsResult.MergedEngineMCPSessionTimeout != "" {
+		engineConfig.MCPSessionTimeout = opts.importsResult.MergedEngineMCPSessionTimeout
+		orchestratorEngineLog.Printf("Applied engine.mcp.session-timeout from import: %s", engineConfig.MCPSessionTimeout)
+	}
+	if model == "" && opts.importsResult.MergedEngineModel != "" {
+		model = opts.importsResult.MergedEngineModel
+		orchestratorEngineLog.Printf("Applied model preference from import: %s", model)
+	}
+	if engineConfig.Version == "" && engineConfig.ID != "" {
+		if def := findImportedEngineDefinition(opts.importedEngineDefinitions, engineConfig.ID); def != nil && def.Version != "" {
+			engineConfig.Version = def.Version
+			orchestratorEngineLog.Printf("Applied default engine version from engine definition %q: %s", engineConfig.ID, engineConfig.Version)
+		}
+	}
+	return engineConfig, model
+}
+
+func applyEngineBudgetImportDefaults(engineConfig *EngineConfig, opts engineImportDefaultsOptions) {
 	if opts.preservedMaxTurns != "" {
 		engineConfig.MaxTurns = opts.preservedMaxTurns
 	}
@@ -571,25 +603,6 @@ func (c *Compiler) applyEngineImportDefaults(opts engineImportDefaultsOptions) (
 			}
 		}
 	}
-	if engineConfig.MCPToolTimeout == "" && opts.importsResult.MergedEngineMCPToolTimeout != "" {
-		engineConfig.MCPToolTimeout = opts.importsResult.MergedEngineMCPToolTimeout
-		orchestratorEngineLog.Printf("Applied engine.mcp.tool-timeout from import: %s", engineConfig.MCPToolTimeout)
-	}
-	if engineConfig.MCPSessionTimeout == "" && opts.importsResult.MergedEngineMCPSessionTimeout != "" {
-		engineConfig.MCPSessionTimeout = opts.importsResult.MergedEngineMCPSessionTimeout
-		orchestratorEngineLog.Printf("Applied engine.mcp.session-timeout from import: %s", engineConfig.MCPSessionTimeout)
-	}
-	if model == "" && opts.importsResult.MergedEngineModel != "" {
-		model = opts.importsResult.MergedEngineModel
-		orchestratorEngineLog.Printf("Applied model preference from import: %s", model)
-	}
-	if engineConfig.Version == "" && engineConfig.ID != "" {
-		if def := findImportedEngineDefinition(opts.importedEngineDefinitions, engineConfig.ID); def != nil && def.Version != "" {
-			engineConfig.Version = def.Version
-			orchestratorEngineLog.Printf("Applied default engine version from engine definition %q: %s", engineConfig.ID, engineConfig.Version)
-		}
-	}
-	return engineConfig, model
 }
 
 func applyImportedMaxToolCalls(engineConfig *EngineConfig, importsResult *parser.ImportsResult) {
@@ -624,6 +637,14 @@ func (c *Compiler) resolveEngineRuntimeConfig(engineSetting string, engineConfig
 		return nil, nil, err
 	}
 	agenticEngine := resolvedEngine.Runtime
+	if _, ok := agenticEngine.(*BehaviorDefinedEngine); ok && engineConfig != nil && engineConfig.Version == "" && parser.BuiltinVirtualFileExists(builtinEnginePath(agenticEngine.GetID())) {
+		engineConfig.Version = resolvedEngine.Definition.Version
+	}
+	if agenticEngine.GetID() == string(constants.AgyEngine) {
+		if err := validateAgyEngineConfig(engineConfig); err != nil {
+			return nil, nil, err
+		}
+	}
 	const noDefaultMaxTurns = ""
 	if engineConfig != nil && engineConfig.MaxTurns == "" && agenticEngine.GetCapabilities().MaxTurns {
 		engineConfig.MaxTurns = compilerenv.ResolveDefaultMaxTurns(noDefaultMaxTurns)
@@ -635,7 +656,9 @@ func (c *Compiler) resolveEngineRuntimeConfig(engineSetting string, engineConfig
 		return nil, nil, fmt.Errorf("engine %s RenderConfig failed: %w", engineSetting, err)
 	}
 	workflowLog.Printf("AI engine: %s (%s)", agenticEngine.GetDisplayName(), engineSetting)
-	if agenticEngine.IsExperimental() && c.verbose {
+	if agenticEngine.GetID() == string(constants.AgyEngine) {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Using experimental engine: "+agenticEngine.GetDisplayName()+" (Gemini API key only; retain engine: gemini for WIF)"))
+	} else if agenticEngine.IsExperimental() && c.verbose {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Using experimental engine: "+agenticEngine.GetDisplayName()))
 		c.IncrementWarningCount()
 	}
@@ -723,11 +746,11 @@ func addImportToFrontmatter(frontmatter map[string]any, importPath string) {
 	case []any:
 		frontmatter["imports"] = append(v, importPath)
 	case []string:
-		newSlice := make([]any, len(v)+1)
-		for i, s := range v {
-			newSlice[i] = s
+		newSlice := make([]any, 0, len(v)+1)
+		for _, s := range v {
+			newSlice = append(newSlice, s)
 		}
-		newSlice[len(v)] = importPath
+		newSlice = append(newSlice, importPath)
 		frontmatter["imports"] = newSlice
 	case string:
 		// Single string import — preserve it and append the new one.
@@ -739,11 +762,11 @@ func addImportToFrontmatter(frontmatter map[string]any, importPath string) {
 			case []any:
 				v["aw"] = append(aw, importPath)
 			case []string:
-				newSlice := make([]any, len(aw)+1)
-				for i, s := range aw {
-					newSlice[i] = s
+				newSlice := make([]any, 0, len(aw)+1)
+				for _, s := range aw {
+					newSlice = append(newSlice, s)
 				}
-				newSlice[len(aw)] = importPath
+				newSlice = append(newSlice, importPath)
 				v["aw"] = newSlice
 			}
 		} else {

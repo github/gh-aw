@@ -31,6 +31,10 @@ function parseCustomLog(logContent, engine = "") {
     return { ...pydanticResult, markdown: `### Custom Engine Log (Pydantic AI format)\n\n${pydanticResult.markdown}` };
   }
   const entries = parseLogEntries(logContent) ?? [];
+  const { isAgyEvent, parseAgyLog } = require("./parse_agy_log.cjs");
+  if (entries.some(isAgyEvent)) {
+    return parseAgyLog(logContent);
+  }
   const { isGooseEvent, parseGooseLog } = require("./parse_goose_log.cjs");
   if (entries.some(entry => isGooseEvent(entry) && entry.type !== "error")) {
     const result = parseGooseLog(logContent);

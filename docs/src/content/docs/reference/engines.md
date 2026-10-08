@@ -1,6 +1,6 @@
 ---
 title: AI Engines
-description: Compare the built-in AI engines for GitHub Agentic Workflows, including selection, authentication, capabilities, limitations, and examples for Copilot, Claude Code, Codex, Gemini, and Pi.
+description: Compare the built-in AI engines for GitHub Agentic Workflows, including selection, authentication, capabilities, limitations, and examples for Copilot, Claude Code, Codex, Gemini, Pi, and experimental Agy.
 sidebar:
   order: 600
 ---
@@ -17,6 +17,7 @@ Set `engine:` in workflow frontmatter and configure the corresponding authentica
 | [Claude Code](https://www.anthropic.com/index/claude) | `claude` | [`ANTHROPIC_API_KEY`](/gh-aw/reference/auth/#anthropic_api_key) or [Anthropic WIF](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif) | [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/) |
 | [OpenAI Codex](https://openai.com/blog/openai-codex) | `codex` | `CODEX_API_KEY` or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key) | [Using OpenAI Codex with GitHub Agentic Workflows](/gh-aw/engines/codex/) |
 | [Google Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` | [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key) or [Google WIF](/gh-aw/reference/auth/#google-workload-identity-federation-wif) | [Using Google Gemini with GitHub Agentic Workflows](/gh-aw/engines/gemini/) |
+| [Google Antigravity CLI](https://github.com/google-antigravity/antigravity-cli) (experimental) | `agy` | [`GEMINI_API_KEY`](/gh-aw/reference/auth/#gemini_api_key) only; no ADC/WIF | [Using experimental Agy](/gh-aw/engines/agy/) |
 | [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) | `pi` | Copilot authentication by default; Anthropic or OpenAI/Codex key for a provider-prefixed `model:` | [Using Pi with GitHub Agentic Workflows](/gh-aw/engines/pi/) |
 
 Copilot CLI is the default, so `engine:` can be omitted when using Copilot. Copilot SDK mode is an execution mode of the Copilot engine, not a separate engine; enable it with `engine: copilot` and `copilot-sdk: true`. See [Copilot SDK support](#copilot-sdk-support).
@@ -26,7 +27,7 @@ Copilot also supports experimental per-run model and reasoning-effort selection 
 ## Configuration conformance workflows
 
 This repository provides manual-only `engine-conformance-<engine-id>.md`
-workflows for all five built-in engines and the eight runnable imported engines:
+workflows for the built-in engines and the eight runnable imported engines:
 Aider, Crush, Cursor, DeepSeek Harness, Goose, Kiro, OpenCode, and Pydantic AI.
 Each imports `shared/engine-conformance.md` and uses its normal engine installer,
 configuration renderer, and execution harness. No additional CLI command is
@@ -69,9 +70,16 @@ controlled Gemini endpoint.
 The two-day `agy-native-authentication` artifact contains allowlisted event
 metadata, not API keys, prompts, tool payloads, or raw diagnostics. This is a
 native authentication feasibility gate, not an AWF, MCP, permissions, or
-production-engine conformance test. It does not register `engine: agy` or
-deprecate Gemini. Agy integration remains experimental and gated on live
-authentication and production sandbox evidence.
+production-engine conformance test. The separate built-in `engine: agy`
+integration remains experimental. Its production gate additionally requires
+native MCP transport, inference usage and requested-model evidence through AWF.
+
+The `agy-conformance` input calls `engine-conformance-agy.lock.yml` from the
+selected branch; it does not run the legacy credential jobs. Both Agy selectors
+have isolated, ref-specific concurrency. The production gate has a ten-minute
+job timeout, five-credit budget, and staged safe outputs. Native authentication
+has passed; production conformance and Gemini soft deprecation remain pending.
+The new engine and deprecation must not be released independently of that gate.
 
 ## Unsupported engine samples
 
@@ -126,28 +134,34 @@ secret is required.
 
 Choose the engine that matches the required capabilities, identity mechanism, and existing provider access. Copilot supports native agent selection, custom harnesses, and continuation mode. Claude Code and Codex provide native web search when enabled. Gemini supports Google WIF and per-command bash restrictions. Pi supports multiple providers, native MCP, codemode, and SDK/RPC execution.
 
+Agy is experimental, Linux x64 only, and supports the verified native v1.3.1
+Gemini API-key profile. It is not a Gemini alias or feature-equivalent replacement.
+Retain Gemini for WIF or native shell restrictions. See the
+[Agy capability and configuration limits](/gh-aw/engines/agy/#tools-configuration-and-limits)
+before considering a migration.
+
 Changing engines requires updating `engine:` and may also require different authentication, tools, model names, or network access. Review the setup guide and comparison before switching.
 
 ## Engine Feature Comparison
 
 Not all features are available across all engines. The table below summarizes per-engine support for commonly used workflow options:
 
-| Feature | Copilot | Claude | Codex | Gemini | Pi |
-|---------|:-------:|:------:|:-----:|:------:|:--:|
-| `max-turns` (top-level AWF invocation cap; `max-runs` deprecated) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `engine.max-turns` (deprecated nested alias) | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `max-continuations` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `tools.web-fetch` | SDK custom tool only | ✅ | ✅ | ✅ | ✅ |
-| `tools.web-search` | via MCP only | ✅ (native) | ✅ (native, opt-in) | via MCP | ❌ |
-| `engine.agent` (native custom-agent selection) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `engine.api-target` (custom endpoint) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `engine.bare` (disable context loading) | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `engine.harness` (custom harness script) | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Per-command `tools.bash` allowlist | ✅ | ✅ | ❌ (disable only) | ✅ | ✅ (restricted shell syntax) |
-| Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Feature | Copilot | Claude | Codex | Gemini | Pi | Agy (experimental) |
+|---------|:-------:|:------:|:-----:|:------:|:--:|:------------------:|
+| `max-turns` (top-level AWF invocation cap; `max-runs` deprecated) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `engine.max-turns` (deprecated nested alias) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `max-continuations` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tools.web-fetch` | SDK custom tool only | ✅ | ✅ | ✅ | ✅ | Native profile; disabling rejected |
+| `tools.web-search` | via MCP only | ✅ (native) | ✅ (native, opt-in) | via MCP | ❌ | Native profile; disabling rejected |
+| `engine.agent` (native custom-agent selection) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `engine.api-target` (custom endpoint) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `engine.bare` (disable context loading) | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `engine.harness` (custom harness script) | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Per-command `tools.bash` allowlist | ✅ | ✅ | ❌ (disable only) | ✅ | ✅ (restricted shell syntax) | ❌ (restrictions rejected) |
+| Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ✅ | Release gated on production conformance |
+| Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 
-`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude and Codex have native web search support. Copilot's offline BYOK mode disables native web tools: use an MCP server for search, or `engine.copilot-sdk: true` for the custom proxy-aware `tools.web-fetch` implementation. Codex enables shared search/browsing through either `tools.web-search` or `tools.web-fetch`. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
+`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by the stable built-in engines. Experimental Agy supports credit and cache-miss limits, but rejects `max-turns` and uses a fixed native timeout. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude and Codex have native web search support. Copilot's offline BYOK mode disables native web tools: use an MCP server for search, or `engine.copilot-sdk: true` for the custom proxy-aware `tools.web-fetch` implementation. Codex enables shared search/browsing through either `tools.web-search` or `tools.web-fetch`. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
 
 ## Shared imported engines
 
@@ -166,7 +180,7 @@ imports:
 Do not treat imported definitions as supported unless their engine owner explicitly supports them. The OpenCode, Aider, Crush, Cursor, and Kiro files listed above remain samples; copy or adapt them only under the maintenance and support terms provided by their respective owners.
 
 > [!NOTE]
-> There is no flat `engine: custom` value. `engine:` in string form only accepts a built-in engine ID (`copilot`, `claude`, `codex`, `gemini`, `pi`); any other value fails compilation. Third-party and self-defined engines always use the nested object form with `engine.id` set to the ID declared by an imported engine definition, as shown above.
+> There is no flat `engine: custom` value. `engine:` in string form only accepts a built-in engine ID (`copilot`, `claude`, `codex`, `gemini`, `pi`, `agy`); any other value fails compilation. Third-party and self-defined engines always use the nested object form with `engine.id` set to the ID declared by an imported engine definition, as shown above.
 
 ## Extended Coding Agent Configuration
 

@@ -66,7 +66,7 @@ func TestLogsCommandFlags(t *testing.T) {
 		t.Fatal("Engine flag not found")
 	}
 
-	if engineFlag.Usage != "Filter logs by AI engine (copilot, claude, codex, gemini, pi)" {
+	if engineFlag.Usage != EngineFlagFilterUsage {
 		t.Errorf("Unexpected engine flag usage text: %s", engineFlag.Usage)
 	}
 

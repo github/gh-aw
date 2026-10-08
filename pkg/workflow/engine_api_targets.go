@@ -268,6 +268,11 @@ const DefaultGeminiAPITarget = "generativelanguage.googleapis.com"
 // Returns empty string if the engine is not Gemini and no custom GEMINI_API_BASE_URL is configured.
 func GetGeminiAPITarget(workflowData *WorkflowData, engineName string) string {
 	awfHelpersLog.Printf("Getting Gemini API target for engine: %s", engineName)
+	if engineName == string(constants.AgyEngine) {
+		if customTarget := extractAPITargetHost(workflowData, "GOOGLE_GEMINI_BASE_URL"); customTarget != "" {
+			return customTarget
+		}
+	}
 	// Check for custom GEMINI_API_BASE_URL in engine.env
 	if customTarget := extractAPITargetHost(workflowData, "GEMINI_API_BASE_URL"); customTarget != "" {
 		awfHelpersLog.Printf("Using custom Gemini API target from GEMINI_API_BASE_URL: %s", customTarget)
@@ -275,7 +280,7 @@ func GetGeminiAPITarget(workflowData *WorkflowData, engineName string) string {
 	}
 
 	// Default to the standard Gemini API endpoint when engine is Gemini
-	if engineName == "gemini" {
+	if engineName == "gemini" || engineName == string(constants.AgyEngine) {
 		awfHelpersLog.Printf("Using default Gemini API target: %s", DefaultGeminiAPITarget)
 		return DefaultGeminiAPITarget
 	}
@@ -303,7 +308,12 @@ func getEngineAPIHosts(data *WorkflowData, engine CodingAgentEngine) []string {
 		return []string{data.EngineConfig.APITarget}
 	}
 
-	switch engine.(type) {
+	switch typedEngine := engine.(type) {
+	case *BehaviorDefinedEngine:
+		if typedEngine.behavior().SecretStrategy == behaviorSecretStrategyGeminiAPIKey {
+			return []string{GetGeminiAPITarget(data, engine.GetID())}
+		}
+		return nil
 	case *CopilotEngine:
 		// Return the full set of known Copilot inference endpoints so that any variant
 		// (enterprise, business, individual, or the routing hub) is covered.

@@ -18,6 +18,7 @@ import (
 
 const (
 	behaviorSecretStrategyUniversalLLMConsumer  = "universal-llm-consumer"
+	behaviorSecretStrategyGeminiAPIKey          = "gemini-api-key"
 	behaviorProviderEnvModeUniversalLLMConsumer = "universal-llm-consumer"
 	behaviorConfigMergeJSON                     = "json-merge"
 )
@@ -703,10 +704,12 @@ func (e *BehaviorDefinedEngine) buildFirewallCommand(exec *EngineExecutionDefini
 	}
 
 	excludedSecretNames := e.GetRequiredSecretNames(workflowData)
-	for _, binding := range e.definition.Auth {
-		excludedSecretNames = slices.DeleteFunc(excludedSecretNames, func(secretName string) bool {
-			return secretName == binding.Secret
-		})
+	if e.behavior().SecretStrategy != behaviorSecretStrategyGeminiAPIKey {
+		for _, binding := range e.definition.Auth {
+			excludedSecretNames = slices.DeleteFunc(excludedSecretNames, func(secretName string) bool {
+				return secretName == binding.Secret
+			})
+		}
 	}
 
 	return BuildAWFCommand(AWFCommandConfig{

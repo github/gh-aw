@@ -400,6 +400,7 @@ export default defineConfig({
             { label: "Claude Code", link: "/engines/claude/" },
             { label: "OpenAI Codex", link: "/engines/codex/" },
             { label: "Google Gemini", link: "/engines/gemini/" },
+            { label: "Agy (experimental)", link: "/engines/agy/" },
             { label: "Pi", link: "/engines/pi/" },
           ],
         },
