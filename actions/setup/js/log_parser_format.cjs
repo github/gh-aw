@@ -1,7 +1,7 @@
 // @ts-check
 
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
-const { normalizeSessionUsage, sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult } = require("./agent_session.cjs");
+const { normalizeSessionUsage, sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult, sessionContext, isSingleNestedSession } = require("./agent_session.cjs");
 const { collapseStreamedMessages, escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
 const { isUnifiedSessionTrace, publicationAgentSessions, renderUnifiedSession } = require("./unified_session_render.cjs");
 const { renderSubagentSummary } = require("./subagent_session_render.cjs");
@@ -189,6 +189,20 @@ function createLogParserFormatters(deps) {
       return addContent(buildStepSummaryDetailsSection(title, truncatedBody));
     }
 
+    const groups = publicationAgentSessions(logEntries);
+    if (groups.length > 1 && groups.some(group => group.events.some(event => sessionContext(event).parentToolUseId))) {
+      const commandSummary = [];
+      for (const group of groups) {
+        const section = generateConversationMarkdown(group.events, { ...options, summaryTracker: createSummaryTracker() });
+        if (!addDetailsSectionFitting(`Agent conversation: ${escapeSummaryText(group.label).replace(/[\r\n]/g, " ")}`, section.markdown)) {
+          markdown += SIZE_LIMIT_WARNING;
+          break;
+        }
+        commandSummary.push(...section.commandSummary);
+        sizeLimitReached ||= section.sizeLimitReached;
+      }
+      return { markdown, commandSummary, sizeLimitReached };
+    }
     const initEntry = renderEntries.find(entry => entry.type === "system" && entry.subtype === "init");
     if (initEntry && formatInitCallback) {
       const initResult = formatInitCallback(initEntry);
@@ -198,7 +212,7 @@ function createLogParserFormatters(deps) {
         return { markdown, commandSummary: [], sizeLimitReached };
       }
     }
-    const observedModel = observedSessionModel(logEntries);
+    const observedModel = observedSessionModel(logEntries, { includeNested: isSingleNestedSession(logEntries) });
     if (observedModel && observedModel !== initEntry?.model) {
       if (!addDetailsSectionFitting("Model", `**Observed Model:** ${escapeSummaryText(observedModel)}\n`)) {
         markdown += SIZE_LIMIT_WARNING;
@@ -307,7 +321,7 @@ function createLogParserFormatters(deps) {
       return { markdown, commandSummary, sizeLimitReached: true };
     }
     if (options.includeInformation ?? standard) {
-      const info = generateInformationSection(projectSessionResult(logEntries));
+      const info = generateInformationSection(projectSessionResult(logEntries, { includeNested: isSingleNestedSession(logEntries) }));
       if (!addContent(info)) {
         markdown += SIZE_LIMIT_WARNING;
         return { markdown, commandSummary, sizeLimitReached: true };
@@ -657,6 +671,10 @@ function createLogParserFormatters(deps) {
   }
 
   function generateSummaryLines(logEntries, includeStatistics = true) {
+    const groups = publicationAgentSessions(logEntries);
+    if (groups.length > 1 && groups.some(group => group.events.some(event => sessionContext(event).parentToolUseId))) {
+      return groups.flatMap(group => [`Agent conversation: ${group.label.replace(/[\r\n]/g, " ")}`, "", ...generateSummaryLines(group.events, includeStatistics), ""]);
+    }
     const renderEntries = normalizeEntriesForRendering(logEntries);
     const lines = [];
     const toolUsePairs = collectToolUsePairs(renderEntries);
