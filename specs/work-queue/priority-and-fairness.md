@@ -2623,6 +2623,23 @@ separate later capabilities.
 
 ### 9.1 Implementation coverage and remaining requirements
 
+Queue workers may declare `tools.work-queue.memory` with a fixed JSON path,
+repository, immutable base revision, branch namespace, and bounded inline typed
+schema. The compiler generates a structured memory output tool, one-per-Claim
+limit, credential-free preparation, and the existing protected `git_tree`
+adapter. Preparation validates the original Claim selector and any body Work ID;
+memory remains output data, never a second ledger or authority. Publication still
+requires Completion and immutable resource scope, and Result still requires
+independent full-tree/blob/ref readback. The [factory example](../../docs/src/content/docs/patterns/linter-factory.md)
+documents the schema subset and transport limits.
+
+Trusted JavaScript publication also appends bounded metadata-only Actions
+summaries after checked commits, including positively recovered ambiguous
+writes. Tentative, staged, rejected, losing, and idempotently replayed requests
+produce no extra update views. Conclusion independently reads current ledger
+state. Rendering has no authority, and summary I/O failure cannot change
+committed ownership, charge, or launch fencing.
+
 This table is a release checklist, not a claim that the whole specification is
 already implemented or proved. Update a row only when its runtime path and
 corresponding evidence exist. A green ordinary CI run does not discharge an

@@ -59,7 +59,7 @@ Build and scan fixtures reuse existing source/dependencies via symlinks as build
 | Completion/success cannot replace readback | Missing exact receipts/verifier remain unknown; the protected two-argument delivery facade rejects untrusted nominal success |
 | CJS coverage excludes tests; generic JS/TS goals are broader | Actual resolved ESLint configs and package-script fixture scans; changed scan omits nested CJS |
 | Warning-only lint exits zero | Actual library scan and precheck flag probes; `require-http-response-error-listener` is an error, other configured rules warn |
-| Refiner memory is a declared git-tree adapter | Parsed script-mode adapter, canonical repository, immutable legacy base commit and `memory/eslint-refiner-runs` prefix; no remote memory verification is exercised |
+| Refiner memory is declarative, lowering to a protected git-tree adapter | Parsed `tools.work-queue.memory` is compared with the actual compiled preparation job's adapter and immutable target. The real collector preserves structured objects and checks the compiled one-per-Claim maximum independently for two Claims; no remote memory verification is exercised |
 
 `comparison.json` separates fact mismatches from documentation observations and assumptions. The README's rule-link table is compared with registered IDs as table coverage only, not a semantic audit of all rule descriptions. Prompts' final-action wording, nonduplicate issues, three total monster assignments, build/tests, quality bars and downstream remediation success are not claimed to be enforced. No installed policy/profile artifact is present in this comparison; actual deployed permissions and contracts remain outside its evidence.
 

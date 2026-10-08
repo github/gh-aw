@@ -4,6 +4,7 @@
 const { loadWorkQueueSnapshot } = require("./work_queue_mcp_server.cjs");
 const { newState, replayTransactions } = require("./work_queue_replay.cjs");
 const { readWorkQueueLog } = require("./work_queue_store.cjs");
+const { renderWorkQueue } = require("./work_queue_summary_renderer.cjs");
 
 function countState(states, state) {
   return [...states.values()].filter(value => value.state === state).length;
@@ -66,7 +67,7 @@ async function main(options = {}) {
     const repositoryContext = options.context || context;
     const latest = await (options.readWorkQueueLog || readWorkQueueLog)({ githubClient, owner: repositoryContext.repo.owner, repo: repositoryContext.repo.repo, core: coreApi });
     const current = snapshot.role === "observer" && snapshot.sha === null && latest.sha === null && latest.transactions.length === 0 ? newState() : replayTransactions(latest.transactions);
-    await coreApi.summary.addRaw(renderSummary(snapshot, current)).write();
+    await coreApi.summary.addRaw(renderSummary(snapshot, current) + "\n" + renderWorkQueue(current)).write();
   } catch (error) {
     coreApi.warning("Work queue activity is unavailable; snapshot or authoritative ledger validation failed.");
     await coreApi.summary.addRaw("### Work queue activity\n\n<details>\n<summary>Show queue activity</summary>\n\nActivity is unavailable; no successful queue state is inferred from an unreadable ledger.\n\n</details>\n").write();

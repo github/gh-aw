@@ -1357,4 +1357,4 @@ function registerTests({ describe, it }) {
 }
 
 if (require.main === module) registerTests(require("node:test"));
-module.exports = { fakeGitHub, registerTests };
+module.exports = { fakeGitHub, options, registerTests };

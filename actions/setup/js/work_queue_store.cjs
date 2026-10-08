@@ -8,6 +8,7 @@ const { actorFromContext, defaultPolicy, validatePolicy, validateRequestRole, va
 const { assignmentsForRequest } = require("./work_queue_scheduler.cjs");
 const { validateEffectResource } = require("./work_queue_resource_scope.cjs");
 const { verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
+const { writeWorkQueueUpdateSummary } = require("./work_queue_summary_renderer.cjs");
 const {
   appendCommit,
   generateRequestOperations,
@@ -29,7 +30,7 @@ const LEGACY_BRANCHES = ["dispatch-coordinator", "gh-aw-work-queue"];
 const LEGACY_LOGS = ["dispatch-work-coordinator.jsonl"];
 const DEFAULT_MAX_RETRIES = 5;
 
-/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, storage?: string, core?: {info(message: string): void}}} QueueReadOptions */
+/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, storage?: string, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
 
 function storageSupported(storage = process.env.GH_AW_WORK_QUEUE_STORAGE || "git") {
   if (storage !== "git") throw queueError("unsupported_backend", "only the mandatory fair Git queue backend is supported");
@@ -298,10 +299,9 @@ async function publishWorkQueueRequest({
     const candidate = { version: 3, id, previous: current.state.tip || null, request: stable, actor: stableActor, policy_epoch: policyOp?.epoch ?? current.state.policy_epoch, at, operations: decision.operations };
     const checked = appendCommit(current.transactions, candidate);
     if (policyOp) await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
+    let sha;
     try {
-      const sha = await writeCandidate({ githubClient, owner, repo, current, transactions: checked.transactions });
-      coreApi?.info(`Work queue: published checked request (${decision.operations.length} operations)`);
-      return { ...decision, ...checked, assignments: assignmentsForRequest(checked.state, stable.id), sha, publishedNow: true, reused: false, persisted: true, recovered: false, rejected: [] };
+      sha = await writeCandidate({ githubClient, owner, repo, current, transactions: checked.transactions });
     } catch (error) {
       if (!refConflict(error) && !ambiguousWrite(error)) throw new Error("Failed to publish checked work queue request", { cause: error });
       lastConflict = error;
@@ -310,10 +310,17 @@ async function publishWorkQueueRequest({
       const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
       validateExtendingPrefix(observedPrefix, refreshed.transactions, "queue history was rewritten during publication");
       const committed = stableRequestResult(refreshed, stable, stableActor);
-      if (committed) return committed;
+      if (committed) {
+        await writeWorkQueueUpdateSummary(coreApi, committed.state, committed.commit);
+        return committed;
+      }
       observedPrefix = refreshed.transactions;
       if (attempt < maxRetries) await sleepFn(Math.min(1000, 50 * 2 ** attempt));
+      continue;
     }
+    coreApi?.info(`Work queue: published checked request (${decision.operations.length} operations)`);
+    await writeWorkQueueUpdateSummary(coreApi, checked.state, checked.commit);
+    return { ...decision, ...checked, assignments: assignmentsForRequest(checked.state, stable.id), sha, publishedNow: true, reused: false, persisted: true, recovered: false, rejected: [] };
   }
   throw new Error("publication_unresolved: queue CAS retries exhausted without a committed stable request", { cause: lastConflict });
 }

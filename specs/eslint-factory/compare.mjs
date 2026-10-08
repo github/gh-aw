@@ -109,6 +109,8 @@ export function compareFacts(facts) {
   expect("native collector counts each Claim separately", facts.runtimeProbes.collector.acceptedPerClaim, [3, 3]);
   expect("native collector rejects scoped overflow", facts.runtimeProbes.collector.overflowRejected, true);
   expect("native collector checks sibling minimum independently", facts.runtimeProbes.collector.siblingMinimumRejected, true);
+  expect("native collector preserves one structured memory per Claim", facts.runtimeProbes.collector.memoryPerClaim, [1, 1]);
+  expect("native collector rejects same-Claim memory overflow", facts.runtimeProbes.collector.memoryOverflowRejected, true);
   expect("warning-only ESLint exits zero", facts.scanProbes.warning.status, 0);
   expect("hard-error ESLint exits nonzero", facts.scanProbes.error.status, 1);
   expect("changed scan excludes nested CJS", facts.scanProbes.changed.status, 0);
@@ -282,7 +284,15 @@ export async function analyze(artifacts) {
     boundaryFunctions[file] = Object.fromEntries(names.map(name => [name, executableFunction(text, name)]));
   }
   const runtimeProbes = await probeRuntime(sourceFiles, artifacts);
-  const adapter = workflows.refiner.frontmatter["safe-outputs"]["claim-adapters"].persist_eslint_memory;
+  const compiledRefiner = yaml.parse(read(path.join(root, ".github/workflows/eslint-refiner.lock.yml")));
+  const preparation = compiledRefiner.jobs.work_queue_prepare_persist_eslint_memory_0.steps.find(step => step.id === "claim_adapter_context");
+  assert.ok(preparation, "Declarative memory must lower to the protected preparation job");
+  const adapter = JSON.parse(preparation.env.GH_AW_CLAIM_ADAPTER_CONFIG);
+  const memory = workflows.refiner.frontmatter.tools["work-queue"].memory;
+  assert.equal(memory.name, "persist_eslint_memory");
+  assert.equal(adapter["target-repo"], memory["target-repo"]);
+  assert.equal(adapter["git-tree"]["base-revision"], memory["base-revision"]);
+  assert.equal(adapter["git-tree"]["branch-prefix"], memory["branch-prefix"]);
   const facts = {
     sourceRules,
     runtimeRules: Object.keys(plugin.rules).sort(),
@@ -547,10 +557,36 @@ async function probeCollector(assignment, artifacts, sourceFiles) {
     assert.equal(overflow.filter(item => item.claim_handle === members[1].handle && !item._claimScopeError).length, 3);
     const missing = await collect("missing-sibling", messages.slice(0, 3));
     assert.ok(missing.some(item => item.claim_handle === members[1].handle && item._claimScopeError?.includes("Too few items")));
+    const compiledFile = path.join(root, ".github/workflows/eslint-refiner.lock.yml");
+    sourceFiles.add(compiledFile);
+    const compiled = yaml.parse(fs.readFileSync(compiledFile, "utf8"));
+    const configStep = compiled.jobs.agent.steps.find(step => step.env?.GH_AW_SAFE_OUTPUTS_CONFIG);
+    assert.ok(configStep, "Compiled refiner must supply its collector configuration");
+    const memoryConfig = JSON.parse(configStep.env.GH_AW_SAFE_OUTPUTS_CONFIG).persist_eslint_memory;
+    assert.equal(memoryConfig.max, 1);
+    assert.equal(memoryConfig.inputs.memory.type, "object");
+    write(environment.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ persist_eslint_memory: memoryConfig }));
+    const memories = members.map(claim => ({
+      type: "persist_eslint_memory",
+      claim_handle: claim.handle,
+      memory: { work_id: claim.work_id, strategy: "inert fixture", findings: [], metrics: {}, next_actions: [] },
+    }));
+    const acceptedMemory = await collect("memory-per-claim", memories);
+    assert.deepEqual(
+      acceptedMemory.map(item => item.memory),
+      memories.map(item => item.memory)
+    );
+    const memoryPerClaim = members.map(claim => acceptedMemory.filter(item => !item._claimScopeError && item.claim_handle === claim.handle).length);
+    assert.deepEqual(memoryPerClaim, [1, 1]);
+    const excessMemory = await collect("memory-overflow", [memories[0], memories[0], memories[1]]);
+    assert.ok(excessMemory.some(item => item.claim_handle === members[0].handle && item._claimScopeError?.includes("Too many items")));
+    assert.equal(excessMemory.filter(item => item.claim_handle === members[1].handle && !item._claimScopeError).length, 1);
     return {
       acceptedPerClaim,
       overflowRejected: true,
       siblingMinimumRejected: true,
+      memoryPerClaim,
+      memoryOverflowRejected: true,
       caveat: "Actual collector main with fixture-supplied trusted assignment, artifact output root and nonexistent legacy patch directory; no live resource effect.",
     };
   } finally {

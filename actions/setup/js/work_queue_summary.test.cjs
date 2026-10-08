@@ -77,6 +77,8 @@ describe("fair DAG queue lifecycle summaries", () => {
     await main({ snapshotPath, githubClient: fixture.githubClient, context: fixture.workerContext, readWorkQueueLog: fixture.readWorkQueueLog, core: { summary: { addRaw }, warning: vi.fn() } });
     expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("<details>"));
     expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("1 new checked commits"));
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("Work nodes"));
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining(fixture.assignment.claims[0].work_id.slice(0, 12)));
   });
 
   it("reports ledger validation failure without inventing a successful state", async () => {

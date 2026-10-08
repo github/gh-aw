@@ -224,6 +224,9 @@ func addSafeScriptsConfig(safeOutputsConfig map[string]any, scripts map[string]*
 		normalizedName := stringutil.NormalizeSafeOutputIdentifier(scriptName)
 		safeOutputsConfigLog.Printf("Generating config for safe script: %s (normalized: %s)", scriptName, normalizedName)
 		safeScriptConfigMap := map[string]any{}
+		if scriptConfig.Max > 0 {
+			safeScriptConfigMap["max"] = scriptConfig.Max
+		}
 		if scriptConfig.Description != "" {
 			safeScriptConfigMap["description"] = scriptConfig.Description
 		}

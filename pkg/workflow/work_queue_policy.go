@@ -32,6 +32,9 @@ func validateWorkQueueConfiguration(data *WorkflowData) error {
 	if data == nil {
 		return nil
 	}
+	if err := configureWorkQueueMemory(data); err != nil {
+		return err
+	}
 	if data.SafeOutputs != nil && data.SafeOutputs.claimAdaptersParseError != nil {
 		return data.SafeOutputs.claimAdaptersParseError
 	}

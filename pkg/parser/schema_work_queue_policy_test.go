@@ -14,6 +14,7 @@ func TestWorkQueuePolicySchema(t *testing.T) {
 			"on": "workflow_dispatch", "tools": map[string]any{"work-queue": tool},
 		}, "worker.md"))
 	}
+
 	for _, tool := range []any{false, map[string]any{"storage": "issues"}, map[string]any{"scheduler": false}} {
 		require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 			"on": "workflow_dispatch", "tools": map[string]any{"work-queue": tool},
@@ -31,6 +32,26 @@ func TestWorkQueuePolicySchema(t *testing.T) {
 			"outstanding":        map[string]any{"claims": 8, "dispatches": 4},
 		},
 	}, "worker.md"))
+}
+
+func TestWorkQueueMemorySchema(t *testing.T) {
+	memory := map[string]any{"path": "memory.json", "target-repo": "owner/repo", "base-revision": strings.Repeat("a", 40), "branch-prefix": "memory/runs", "schema": map[string]any{"type": "object"}}
+	validate := func(config map[string]any) error {
+		return ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+			"on": "workflow_dispatch", "tools": map[string]any{"work-queue": map[string]any{"worker": true, "memory": config}},
+		}, "worker.md")
+	}
+	require.NoError(t, validate(memory))
+	for _, field := range []string{"path", "target-repo", "base-revision", "branch-prefix", "schema"} {
+		invalid := maps.Clone(memory)
+		delete(invalid, field)
+		require.Error(t, validate(invalid))
+	}
+	for field, value := range map[string]any{"unknown": true, "max-bytes": 262145, "base-revision": "main", "name": "../tool", "schema": "object"} {
+		invalid := maps.Clone(memory)
+		invalid[field] = value
+		require.Error(t, validate(invalid))
+	}
 }
 
 func TestWorkQueueClaimAdapterSchema(t *testing.T) {

@@ -5248,6 +5248,24 @@
                 "worker": {
                   "type": "boolean",
                   "description": "Declare this workflow as a work-queue worker eligible to receive trusted queue claims."
+                },
+                "memory": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "Declare one schema-validated JSON memory snapshot per Claim. The compiler supplies credential-free preparation and protected immutable git-tree delivery.",
+                  "required": ["path", "target-repo", "base-revision", "branch-prefix", "schema"],
+                  "properties": {
+                    "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z_0-9]*$", "maxLength": 64, "default": "persist_work_queue_memory" },
+                    "path": { "type": "string", "minLength": 1, "maxLength": 256, "description": "Fixed relative JSON file path in the snapshot tree." },
+                    "target-repo": { "type": "string", "description": "Fixed repository also authorized by the installed immutable Work scope." },
+                    "base-revision": { "type": "string", "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$" },
+                    "branch-prefix": { "type": "string", "minLength": 1 },
+                    "max-bytes": { "type": "integer", "minimum": 1, "maximum": 262144, "default": 262144 },
+                    "schema": {
+                      "type": "object",
+                      "description": "Bounded inline typed JSON Schema subset: object properties/required/additionalProperties, array items, scalar enum, numeric ranges, and string/array length bounds. No references, regexes, or executable validators."
+                    }
+                  }
                 }
               }
             }
