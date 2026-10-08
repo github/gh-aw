@@ -50,7 +50,7 @@ for (const [type, { fields }] of Object.entries(config)) {
         assert.equal(collector.isValid, true, type + "." + field);
         continue;
       }
-      if (tool.inputSchema.anyOf) continue;
+      if (tool.inputSchema.anyOf || tool.inputSchema["x-requires-one-of"]) continue;
       const args = normalizeSafeOutputToolArguments(type, { [field]: blank }, undefined, tool.inputSchema);
       const mcpAccepted = !validateArgumentsAgainstSchema(args, tool.inputSchema) &&
         validateStringMinLengths(args, tool.inputSchema).length === 0;
@@ -82,8 +82,11 @@ assert.equal(blankUpdate.isValid, false, "blank fields must not satisfy requires
 const updateTool = tools.find(tool => tool.name === "update_issue");
 for (const field of ["status", "labels"]) {
   const raw = { type: "update_issue", issue_number: 42, [field]: "" };
-  const normalized = normalizeSafeOutputToolArguments("update_issue", raw, undefined, updateTool.inputSchema);
-  assert.ok(validateArgumentsAgainstSchema(normalized, updateTool.inputSchema), "normalized update_issue must fail MCP cross-field validation: " + field);
+  assert.throws(
+    () => normalizeSafeOutputToolArguments("update_issue", raw, undefined, updateTool.inputSchema),
+    /requires at least one of/,
+    "MCP normalization must reject update_issue with only a blank field: " + field
+  );
   assert.equal(validateItem(raw, raw.type, 1).isValid, false, "update_issue collector must reject a sole blank field: " + field);
 }
 const clearedIssueType = validateItem({ type: "set_issue_type", issue_type: "" }, "set_issue_type", 1);

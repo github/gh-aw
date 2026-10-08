@@ -68,7 +68,12 @@ function normalizeSafeOutputToolArguments(toolName, args, logger, inputSchema) {
     logger?.debug?.(`Recovered safe-output parameter synonyms for '${normalizedToolName}': ${JSON.stringify(remapped)}`);
   }
 
-  return normalizeBlankOptionalFields(remappedArgs, inputSchema.properties, inputSchema.required);
+  const normalized = normalizeBlankOptionalFields(remappedArgs, inputSchema.properties, inputSchema.required);
+  const requiredOneOf = inputSchema["x-requires-one-of"];
+  if (Array.isArray(requiredOneOf) && !requiredOneOf.some(field => normalized[field] !== undefined && normalized[field] !== false)) {
+    throw new Error(`Invalid arguments for ${normalizedToolName}: requires at least one of ${requiredOneOf.join(", ")}`);
+  }
+  return normalized;
 }
 
 /**
@@ -86,7 +91,7 @@ function stripInternalSafeOutputSchemaMetadata(schema) {
 
   const cleaned = {};
   for (const [key, value] of Object.entries(schema)) {
-    if (key === "x-synonyms") {
+    if (key === "x-synonyms" || key === "x-requires-one-of") {
       continue;
     }
     cleaned[key] = stripInternalSafeOutputSchemaMetadata(value);

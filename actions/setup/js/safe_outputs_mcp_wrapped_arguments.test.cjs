@@ -270,9 +270,18 @@ describe("safe_outputs_mcp wrapped tool arguments", () => {
     process.env.GH_AW_SAFE_OUTPUTS = outputPath;
 
     const { server } = createMCPServer();
-    const response = await server.handleRequest({
+    const toolsList = await server.handleRequest({
       jsonrpc: "2.0",
       id: 1,
+      method: "tools/list",
+      params: {},
+    });
+    const listedTool = toolsList.result.tools.find(tool => tool.name === "update_issue");
+    expect(listedTool.inputSchema).not.toHaveProperty("x-requires-one-of");
+
+    const response = await server.handleRequest({
+      jsonrpc: "2.0",
+      id: 2,
       method: "tools/call",
       params: { name: "update_issue", arguments: { issue_number: 42, ...update } },
     });
