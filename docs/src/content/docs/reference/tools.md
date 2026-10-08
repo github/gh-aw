@@ -113,6 +113,116 @@ tools:
 
 Use wildcards like `git:*` for command families or `:*` for unrestricted access.
 
+### Tasks (`tasks:`)
+
+Exposes fixed workflow-owned commands as the native MCP tool `tasks.run_task`.
+The agent selects a task name; it cannot supply executable arguments, environment
+variables, a working directory, or execution limits.
+
+```aw wrap
+engine:
+  id: copilot
+  copilot-sdk: true
+tools:
+  bash: false
+  cli-proxy: false
+  tasks:
+    go: true
+    check:
+      description: Check a specific Go package
+      command: go
+      args: [test, -count=1, ./pkg/example/...]
+      timeout: 120
+```
+
+`engine: pi` is also supported, including its bundled SDK and RPC drivers.
+Tasks require the AWF Docker runtime on a standard Linux runner, one
+current-repository checkout at the workspace root, and explicit
+`tools.cli-proxy: false`. Cloud Hypervisor, ARC/DinD, sampled execution,
+custom engine commands/drivers/extensions, custom sandbox mounts, and working
+directory overrides are not supported. Tasks are not exposed to detection or
+evaluation runs.
+
+| Task field | Meaning |
+|---|---|
+| `description` | Required nonempty description, at most 1024 bytes |
+| `command` | Required executable name on the prepared PATH, without a path |
+| `args` | Literal argument list; defaults to `[]`, at most 128 arguments |
+| `timeout` | Whole seconds, from 1 to 600; defaults to 60 |
+
+Names start with a letter and contain at most 64 letters, digits, dots,
+underscores, or hyphens. Arguments contain at most 8192 bytes each. Actions
+expressions and NUL bytes are rejected. Up to 64 expanded tasks fit in a
+1 MiB manifest. `constructor`, `prototype`, and built-in Go task names are
+reserved.
+
+The compiler stages the manifest and server outside the checkout, mounts them
+read-only, and starts the shared server **inside AWF**, not on the runner host.
+The endpoint is loopback-only with a per-run authorization token. Tasks run
+sequentially at the checkout root without implicit shell expansion. Executables
+must resolve outside the checkout. Standard output and error share a 256 KiB
+budget; timeout, cancellation, and output-limit failures terminate the process
+group and return a tool error. Results contain the task name, exit code,
+standard output, standard error, and duration in milliseconds.
+
+#### Built-in Go set
+
+`tools.tasks.go: true` expands these definitions:
+
+| Task | Command | Timeout |
+|---|---|---|
+| `go.test` | `go test -count=1 ./...` | 300 seconds |
+| `go.vet` | `go vet ./...` | 300 seconds |
+| `go.build` | `go build ./...` | 300 seconds |
+| `go.fmt` | `gofmt -w .` | 60 seconds |
+| `go.readiness` | `go test -run ^$ ./...` | 300 seconds |
+
+Prepare Go, dependencies, and caches in workflow setup before the agent starts.
+The Go set does not install a toolchain or download modules. Task subprocesses
+use `GOTOOLCHAIN=local`, `GOFLAGS=-mod=readonly`, `GOWORK=off`,
+`GOPROXY=off`, `GOSUMDB=off`, and `GOENV=off`.
+Prepared `GOROOT`, `GOPATH`, `GOCACHE`, and `GOMODCACHE` environment paths
+must exist outside the checkout and be available inside AWF. Set `GOMODCACHE`
+to the prepared dependency cache and use a writable `GOCACHE`.
+
+Tasks receive a private HOME and a restricted environment, without inherited
+provider tokens, Actions command-file variables, or Node loader settings.
+This is not a separate security boundary from the agent sandbox: task code
+has access to the same sandbox filesystem and allowed network destinations.
+
+> [!NOTE]
+> `go.fmt` modifies source files, and builds or tests can create files.
+> `go.readiness` still runs package initialization and `TestMain`.
+> Passing a task does not certify the exact tree later published in a pull request.
+
+#### Shared task imports
+
+Tasks use the existing workflow `imports:` mechanism. For example, a shared
+fragment can declare:
+
+```aw wrap title=".github/workflows/shared/go-tasks.md"
+tools:
+  tasks:
+    go: true
+```
+
+The consuming workflow imports that fragment and selects a supported engine:
+
+```aw wrap
+engine: pi
+imports:
+  - shared/go-tasks.md
+tools:
+  cli-proxy: false
+```
+
+Nested imports and import inputs follow the existing import rules. Distinct
+task names are combined; identical definitions are deduplicated. Conflicting
+definitions fail compilation instead of concatenating argument lists.
+`tools.tasks: false` disables the entire imported capability.
+`tools.tasks.go: false` disables the imported Go set while retaining custom
+tasks. Built-in task definitions cannot be individually overridden.
+
 ### Web Tools
 
 Enable web content fetching and search capabilities:

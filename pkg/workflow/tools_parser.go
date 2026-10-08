@@ -56,6 +56,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
 )
 
@@ -90,6 +91,7 @@ func toAnySlice(ss []string) []any {
 // knownTools is the set of built-in tool names that NewTools handles explicitly.
 // It is a package-level variable to avoid re-allocating this map on every call.
 var knownTools = map[string]struct{}{
+	"tasks":             {},
 	"github":            {},
 	"bash":              {},
 	"web-fetch":         {},
@@ -125,6 +127,13 @@ func NewTools(toolsMap map[string]any) *Tools { //nolint:largefunc // Existing t
 
 	// Copy raw map
 	maps.Copy(tools.raw, toolsMap)
+	if val, exists := toolsMap["tasks"]; exists {
+		definitions, err := parser.ResolveTasks(val)
+		tools.tasksParseErr = err
+		if err == nil && len(definitions) > 0 {
+			tools.Tasks = &TasksToolConfig{Definitions: definitions, Raw: val}
+		}
+	}
 
 	// Extract and parse known tools
 	if val, exists := toolsMap["github"]; exists {

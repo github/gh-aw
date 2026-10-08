@@ -45,7 +45,7 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 		awfHelpersLog.Print("Using AWF config file (--config flag)")
 	}
 	modelsJSONPathExport := buildModelsJSONPathExportScript(isArcDind)
-	engineCommand := rewriteEngineCommandForRuntime(config.EngineCommand, isArcDind)
+	engineCommand := rewriteEngineCommandForRuntime(wrapTasksEngineCommand(config.WorkflowData, config.EngineCommand), isArcDind)
 	shellWrappedCommand := WrapCommandInShell(engineCommand)
 	preCreateLog := fmt.Sprintf("(umask 177 && touch %s)", shellEscapeArg(config.LogFile))
 	writeAgentCLIStartMs := "printf '%s' \"$(date +%s%3N)\" > " + shellEscapeArg(AgentCLIStartMsPath)
@@ -70,7 +70,7 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 	})
 
 	awfHelpersLog.Print("Successfully built AWF command")
-	return command
+	return buildTasksAWFSetup(config.WorkflowData) + command
 }
 
 func usesBuiltInEngineHarness(engineName, engineCommand string) bool {

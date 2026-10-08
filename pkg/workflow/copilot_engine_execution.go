@@ -114,7 +114,11 @@ func buildCopilotMCPConfigExport(workflowData *WorkflowData) string {
 	var b strings.Builder
 	b.WriteString("export XDG_CONFIG_HOME=\"$HOME\"\n")
 	if HasMCPServers(workflowData) {
-		b.WriteString("export GH_AW_MCP_CONFIG=\"$HOME/.copilot/mcp-config.json\"\n")
+		if hasWorkflowTasks(workflowData) && workflowData.EngineConfig.CopilotSDK {
+			b.WriteString("export GH_AW_MCP_CONFIG=\"${RUNNER_TEMP}/gh-aw/tasks/copilot-mcp.json\"\n")
+		} else {
+			b.WriteString("export GH_AW_MCP_CONFIG=\"$HOME/.copilot/mcp-config.json\"\n")
+		}
 	}
 	return b.String()
 }
@@ -385,6 +389,9 @@ func (e *CopilotEngine) buildCopilotExecPrefix(workflowData *WorkflowData, comma
 	runtimeResolutionCommand := nodeRuntimeResolutionCommand
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.CopilotSDK {
 		runtimeResolutionCommand = nodeRuntimeResolutionCommandForCopilotSDK
+		if hasWorkflowTasks(workflowData) {
+			runtimeResolutionCommand = strings.Replace(runtimeResolutionCommand, nodePathSetupCommandForCopilotSDK, `export NODE_PATH="${RUNNER_TEMP}/gh-aw/copilot-sdk/node_modules"; `+nodePathSetupCommand, 1)
+		}
 		return e.buildCopilotSDKExecPrefix(workflowData, commandName, harnessScriptPath, runtimeResolutionCommand)
 	}
 	return fmt.Sprintf(`%s %s %s`, runtimeResolutionCommand, harnessScriptPath, commandName)

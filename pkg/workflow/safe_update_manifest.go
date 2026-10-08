@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
 )
 
@@ -85,6 +86,7 @@ type GHAWManifest struct {
 	HasPullRequestTarget        bool                                 `json:"has_pull_request_target,omitempty"`   // whether on: includes pull_request_target
 	MemoryValidationScripts     []GHAWManifestMemoryValidationScript `json:"memory_validation_scripts,omitempty"` // custom repo/cache memory validation scripts, hashed
 	MCPServers                  []GHAWManifestMCPServer              `json:"mcp_servers"`                         // MCP servers/tools exposed to the agent, independent of engine-specific allowlist syntax
+	Tasks                       map[string]parser.TaskDefinition     `json:"tasks,omitempty"`
 	ThreatDetectionSuppressions []ThreatDetectionSuppression         `json:"threat_detection_suppressions,omitempty"`
 	ThreatDetection             *GHAWManifestDetectionPolicy         `json:"threat_detection,omitempty"`
 }

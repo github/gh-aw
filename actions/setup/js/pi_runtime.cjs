@@ -7,6 +7,8 @@ const { pathToFileURL } = require("node:url");
 const { execFileSync } = require("node:child_process");
 const { writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { addTasksMCPServer } = require("./tasks_runtime.cjs");
+const { isRecord } = require("./tasks_config.cjs");
 
 const DEFAULT_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const DEFAULT_SESSION_DIR = "/tmp/gh-aw/agent/pi-sessions";
@@ -122,7 +124,14 @@ function preparePiRuntime(config = parsePiConfig()) {
   } catch (error) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
   }
+  gateway.mcpServers = addTasksMCPServer(gateway.mcpServers || {});
   for (const [name, server] of Object.entries(gateway.mcpServers || {})) {
+    if (!isRecord(server)) throw new Error("Pi MCP server configuration must be an object");
+    if (name === "tasks") {
+      if (config.mcp?.toolExposure?.tasks || config.mcp?.exposure === "hidden") throw new Error("Pi tasks MCP exposure cannot be hidden or overridden");
+      server.exposure = "direct";
+      continue;
+    }
     server.exposure = config.mcp?.exposure || server.exposure || "deferred";
     if (config.mcp?.toolExposure?.[name]) server.toolExposure = config.mcp.toolExposure[name];
   }

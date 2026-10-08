@@ -4939,6 +4939,29 @@
             }
           ]
         },
+        "tasks": {
+          "description": "Named commands executed through native MCP inside AWF. Enable the built-in Go set with go: true.",
+          "oneOf": [
+            { "const": false },
+            {
+              "type": "object",
+              "maxProperties": 64,
+              "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$" },
+              "properties": { "go": { "type": "boolean" } },
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["description", "command"],
+                "properties": {
+                  "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                  "command": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.+-]{0,127}$" },
+                  "args": { "type": "array", "maxItems": 128, "items": { "type": "string", "maxLength": 8192 } },
+                  "timeout": { "type": "integer", "minimum": 1, "maximum": 600 }
+                }
+              }
+            }
+          ]
+        },
         "bash": {
           "description": "Bash shell command execution tool. Supports wildcards: '*' (all commands), 'command *' (command with any args, e.g., 'date *', 'echo *'). Default safe commands: echo, ls, pwd, cat, head, tail, grep, wc, sort, uniq, date.",
           "oneOf": [

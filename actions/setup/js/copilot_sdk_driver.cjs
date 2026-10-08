@@ -30,6 +30,7 @@ const fs = require("fs");
 const { runWithCopilotSDK, extractPromptFromArgs } = require("./copilot_sdk_session.cjs");
 const { parsePermissionConfigFromServerArgs } = require("./copilot_sdk_permissions.cjs");
 const { parseCopilotSDKToolConfig } = require("./copilot_sdk_tool_config.cjs");
+const { loadCopilotSDKMCPConfig } = require("./copilot_sdk_mcp_config.cjs");
 const { parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { resolveRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
@@ -135,6 +136,7 @@ async function main() {
     models: sdkModels,
     permissionConfig,
     toolConfig,
+    ...(process.env.GH_AW_TASKS_MCP ? { mcpServers: loadCopilotSDKMCPConfig(process.env.GH_AW_MCP_CONFIG) } : {}),
   });
 
   process.exit(result.exitCode);

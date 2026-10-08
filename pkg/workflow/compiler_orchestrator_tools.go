@@ -230,6 +230,10 @@ func (c *Compiler) resolveToolsConfiguration(
 	tools, err := c.mergeToolsAndMCPServers(topTools, resolvedMCPServers, allIncludedTools)
 	if err != nil {
 		orchestratorToolsLog.Printf("Tools merge failed: %v", err)
+		sources := append(append([]string{}, importsResult.ImportedFiles...), includedToolFiles...)
+		if len(sources) > 0 {
+			return nil, fmt.Errorf("failed to merge tools from %s: %w", strings.Join(sources, ", "), err)
+		}
 		return nil, fmt.Errorf("failed to merge tools: %w", err)
 	}
 	if err := expandLinearTool(tools); err != nil {

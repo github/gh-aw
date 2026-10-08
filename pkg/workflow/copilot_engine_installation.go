@@ -198,6 +198,11 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	if workflowData == nil || workflowData.EngineConfig == nil || !workflowData.EngineConfig.CopilotSDK {
 		return GitHubActionStep{}
 	}
+	if hasWorkflowTasks(workflowData) {
+		spec := getCopilotSDKInstallSpec("")
+		spec.command = strings.Replace(spec.command, workspaceCommandPrefix, `mkdir -p "${RUNNER_TEMP}/gh-aw/copilot-sdk" && cd "${RUNNER_TEMP}/gh-aw/copilot-sdk" && `, 1)
+		return specToInstallStep(spec)
+	}
 	if inlineRuntimeID := copilotSDKInlineDriverRuntimeID(workflowData); inlineRuntimeID != "" {
 		spec := getInlineCopilotSDKInstallSpec(inlineRuntimeID)
 		copilotInstallLog.Printf("copilot-sdk enabled with inline driver; runtime=%s; install command=%s", spec.runtimeID, spec.command)

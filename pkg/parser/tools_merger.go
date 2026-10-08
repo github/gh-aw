@@ -118,6 +118,10 @@ func mergeToolObjectList(jsonObjects []map[string]any) (map[string]any, error) {
 }
 
 func mergeExistingToolValue(key string, existingValue, newValue any) (any, bool, error) {
+	if key == "tasks" {
+		merged, err := mergeTaskConfigurations(existingValue, newValue)
+		return merged, true, err
+	}
 	if existingArray, ok := existingValue.([]any); ok {
 		if newArray, ok := newValue.([]any); ok {
 			return mergeAllowedArrays(existingArray, newArray), true, nil

@@ -221,6 +221,7 @@ func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, mar
 		validateFn func() error
 	}{
 		{logMessage: "Validating sandbox configuration", validateFn: func() error { return validateSandboxConfig(workflowData) }},
+		{logMessage: "Validating tasks configuration", validateFn: func() error { return validateTasks(workflowData) }},
 		{logMessage: "Validating GitHub CLI proxy version", validateFn: func() error { return validateGitHubCLIProxyVersion(workflowData) }},
 		{logMessage: "Validating safe-outputs target fields", validateFn: func() error { return validateSafeOutputsTarget(workflowData.SafeOutputs) }},
 		{logMessage: "Validating safe-outputs max fields", validateFn: func() error { return validateSafeOutputsMax(workflowData.SafeOutputs) }},

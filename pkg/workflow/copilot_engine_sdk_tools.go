@@ -106,6 +106,9 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 	if workflowData == nil {
 		return false
 	}
+	if hasWorkflowTasks(workflowData) {
+		return true
+	}
 	if HasSafeOutputsEnabled(workflowData.SafeOutputs) || IsMCPScriptsEnabled(workflowData.MCPScripts) {
 		return true
 	}
@@ -122,7 +125,7 @@ func hasCopilotSDKMCPTools(workflowData *WorkflowData) bool {
 				continue
 			}
 			return true
-		case "bash", "edit", "web-fetch", "web-search", "playwright",
+		case "tasks", "bash", "edit", "web-fetch", "web-search", "playwright",
 			"agentic-workflows", "cache-memory", "drive-memory", "repo-memory",
 			"comment-memory", "cli-proxy", "timeout", "startup-timeout":
 			continue

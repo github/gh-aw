@@ -64,6 +64,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	}
 
 	var args []string
+	args = append(args, tasksSDKPermission(workflowData)...)
 	hasRestrictedBashAllowlist := false
 	hasUnrestrictedBash := false
 
@@ -182,6 +183,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 	// Note: native web-search is unavailable in offline BYOK mode
 	builtInTools := map[string]struct {
 	}{
+		"tasks":        {},
 		"bash":         {},
 		"edit":         {},
 		"web-search":   {},

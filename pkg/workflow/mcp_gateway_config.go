@@ -257,6 +257,9 @@ func buildMCPGatewayConfig(workflowData *WorkflowData) *MCPGatewayRuntimeConfig 
 		manifestServers := collectMCPServersForManifest(workflowData)
 		primaryServers := make([]string, 0, len(manifestServers))
 		for _, server := range manifestServers {
+			if server.Name == "tasks" {
+				continue // Tasks run inside AWF, not through the runner-host gateway.
+			}
 			primaryServers = append(primaryServers, server.Name)
 		}
 		primaryGitHubEnabled := primaryGitHubMCPEnabled(workflowData)

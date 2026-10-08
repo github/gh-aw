@@ -37,6 +37,7 @@ const path = require("path");
 const os = require("os");
 const { buildCopilotSDKPermissionHandler, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
 const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.cjs");
+const { restrictTaskCatalog } = require("./copilot_sdk_task_catalog.cjs");
 const { buildCopilotSDKToolCallBudget } = require("./copilot_sdk_tool_budget.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { extractShellCommandFromToolData, extractStructuredToolInput } = require("./tool_call_details.cjs");
@@ -130,6 +131,7 @@ function extractPromptFromArgs(args) {
  *     defineTool?: typeof import("@github/copilot-sdk").defineTool,
  *   },
  *   sessionStateBaseDir?: string,
+ *   mcpServers?: Record<string, import("@github/copilot-sdk").MCPServerConfig>,
  * }} options
  * @returns {Promise<{exitCode: number, output: string, hasOutput: boolean, durationMs: number}>}
  */
@@ -150,6 +152,7 @@ async function runWithCopilotSDK({
   coreLogger,
   sdkModule,
   sessionStateBaseDir,
+  mcpServers,
 }) {
   // Lazy-require to avoid loading the SDK when it is not needed.
   // The SDK is large and has side-effects on import (worker threads, etc.).
@@ -320,11 +323,14 @@ async function runWithCopilotSDK({
      * Build the session on-permission handler from configuration input.
      * @type {import("@github/copilot-sdk").PermissionHandler}
      */
+    /** @type {NonNullable<import("@github/copilot-sdk").ToolInvocation["availableTools"]>} */
+    let verifiedMCPMetadata = [];
     const onPermissionRequest = buildCopilotSDKPermissionHandler(permissionConfig, approveAll, {
       coreLogger,
       logger: log,
       onDenied: requestSummary => recordToolDenial(`permission denied: ${requestSummary}`),
       workspaceRoot: process.env.GITHUB_WORKSPACE,
+      ...(mcpServers?.tasks ? { getMCPToolMetadata: () => verifiedMCPMetadata } : {}),
     });
     const toolCallBudget = buildCopilotSDKToolCallBudget(toolConfig?.maxToolCalls, event => {
       writeDriverEvent(event.exhausted ? "guard.tool_call_budget_exceeded" : "guard.tool_call_budget_debit", event);
@@ -339,6 +345,7 @@ async function runWithCopilotSDK({
       ...(sdkReasoningEffort ? { reasoningEffort: sdkReasoningEffort } : {}),
       providers,
       models: providerModels,
+      ...(mcpServers ? { mcpServers } : {}),
       onPermissionRequest,
       ...(toolCallBudget ? { hooks: { onPreToolUse: toolCallBudget.onPreToolUse } } : {}),
       ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
@@ -346,6 +353,18 @@ async function runWithCopilotSDK({
     log(`creating session with model="${sessionConfig.model || "(none)"}" providers=${providers?.length ?? 0} models=${providerModels?.length ?? 0}`);
     session = await client.createSession(sessionConfig);
     log(`session created: sessionId=${session.sessionId}`);
+    if (mcpServers?.tasks) {
+      if (!sdk.ToolSet || !sessionConfig.availableTools || Array.isArray(sessionConfig.availableTools) || !toolConfig) {
+        throw new Error("Tasks require the compiler-controlled SDK tool catalog");
+      }
+      verifiedMCPMetadata = await restrictTaskCatalog(session, {
+        ToolSet: sdk.ToolSet,
+        availableTools: sessionConfig.availableTools,
+        allowedTools: toolConfig.permissions.allowedTools,
+        mcpServers,
+      });
+      log("verified native tasks MCP catalog before inference");
+    }
 
     // Prepare JSONL output file for this session.
     const sessionDir = path.join(sessionStateBase, session.sessionId);
