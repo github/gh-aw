@@ -1,11 +1,11 @@
 ---
 title: Inline Sub-Agents
-description: Define Copilot sub-agents directly inside a workflow markdown file using a level-2 heading delimiter.
+description: Define sub-agents directly inside a workflow markdown file using a level-2 heading delimiter.
 sidebar:
   order: 645
 ---
 
-An inline Copilot sub-agent is a named agent definition embedded directly in a workflow markdown file. Instead of creating a separate file in `.github/agents/`, you define the agent's frontmatter and instructions in a dedicated section of the same workflow file.
+An inline sub-agent is a named agent definition embedded directly in a workflow markdown file. Instead of creating a separate agent file, you define the agent's frontmatter and instructions in a dedicated section of the same workflow file.
 
 ## Syntax
 
@@ -66,7 +66,8 @@ contents. Be concise and factual.
 | Field | Required | Description |
 |---|---|---|
 | `model` | No | AI model to use (e.g. `claude-haiku-4.5`). Defaults to the parent workflow's model. |
-| `description` | No | Short description of the sub-agent's purpose. |
+| `description` | For Pi | Short description of the sub-agent's purpose. |
+| `tools` | No | Pi accepts a comma-separated string or list of tool names, restricted by the parent workflow's tool policy. |
 
 ## Runtime behavior
 
@@ -78,6 +79,9 @@ At runtime, each inline sub-agent block is extracted to a location that the AI e
 | `claude` | `.claude/agents/<name>.md` |
 | `codex` | `.codex/agents/<name>.md` |
 | `gemini` | `.gemini/agents/<name>.md` |
+| `pi` | `.pi/agents/<name>.md`, restored into the managed Pi user scope |
+
+Pi exposes a managed `subagent` tool in the built-in CLI, SDK, and RPC modes, including bare mode. It accepts one declared agent and task: `{"agent":"file-summarizer","task":"Summarize README.md"}`. Model aliases such as `small` resolve against the parent's provider inventory; cross-provider delegation is rejected. See [Pi sub-agents](/gh-aw/engines/pi/#sub-agents) for controls and limitations.
 
 To use a sub-agent, instruct the parent workflow's prompt to invoke it by name:
 

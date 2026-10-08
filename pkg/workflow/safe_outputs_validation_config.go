@@ -333,7 +333,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"operation":    {Type: "string", Enum: []string{"replace", "append", "prepend", "replace-island"}},
 			"labels":       {Type: "array"},
 			"assignees":    {Type: "array", ItemType: "string", ItemSanitize: true, ItemMaxLength: MaxGitHubUsernameLength},
-			"milestone":    {OptionalPositiveInteger: true},
+			"milestone":    {OptionalPositiveInteger: true, AllowNull: true},
 			"issue_number": {IssueOrPRNumber: true},
 			"repo":         {Type: "string", MaxLength: 256}, // Optional: target repository in format "owner/repo"
 		},

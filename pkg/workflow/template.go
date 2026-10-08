@@ -2,11 +2,13 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/setutil"
 )
 
@@ -127,6 +129,12 @@ func (c *Compiler) generateInterpolationAndTemplateStep(yaml *strings.Builder, e
 	if data.EngineConfig != nil && data.EngineConfig.ID != "" {
 		fmt.Fprintf(yaml, "          GH_AW_ENGINE_ID: \"%s\"\n", data.EngineConfig.ID)
 	}
+	engineID := resolveActivationEngineID(data)
+	baseDir := engineConfigBaseDirForRegistry(c.engineRegistry, engineID)
+	yaml.WriteString(formatYAMLEnv("          ", "GH_AW_SUB_AGENT_DIR", path.Join(baseDir, "agents")))
+	yaml.WriteString(formatYAMLEnv("          ", "GH_AW_SUB_AGENT_EXT", parser.GetEngineSubAgentExt(engineID)))
+	yaml.WriteString(formatYAMLEnv("          ", "GH_AW_SKILL_DIR", path.Join(baseDir, "skills")))
+	yaml.WriteString(formatYAMLEnv("          ", "GH_AW_SKILL_EXT", engineInlineSkillExt(engineID)))
 
 	// Add environment variables for extracted expressions (deduplicated by EnvVar)
 	seen := make(map[string]struct{})

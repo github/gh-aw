@@ -46,7 +46,7 @@ describe("Pi RPC driver", () => {
       return client;
     });
     await main({ sdk: { RpcClient }, cliPath: "/pi/dist/bundle/cli.js", emit: vi.fn() });
-    expect(RpcClient).toHaveBeenCalledWith(expect.objectContaining({ args: expect.arrayContaining(["--no-approve", path.join(dir, "gh-aw/actions/pi_tool_policy.cjs")]) }));
+    expect(RpcClient).toHaveBeenCalledWith(expect.objectContaining({ args: expect.arrayContaining(["--no-approve", path.join(dir, "gh-aw/actions/pi_tool_policy.cjs"), path.join(dir, "gh-aw/actions/pi_subagent_extension.cjs")]) }));
     expect(client.waitForIdle).not.toHaveBeenCalled();
     expect(client.stop).toHaveBeenCalledOnce();
   });

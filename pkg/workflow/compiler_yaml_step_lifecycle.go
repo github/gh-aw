@@ -256,6 +256,7 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 			compilerYamlStepLifecycleLog.Printf("Failed to marshal skills for GH_AW_INFO_SKILLS, engine will not receive skill list: %v", err)
 		}
 	}
+	writeSubagentModelDeclarations(yaml, data, engineID)
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
@@ -263,6 +264,31 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/generate_aw_info.cjs');\n")
 	yaml.WriteString("            await main(core, context);\n")
+}
+
+func writeSubagentModelDeclarations(yaml *strings.Builder, data *WorkflowData, engineID string) {
+	if len(data.SubAgentModels) == 0 || (engineID != "pi" && engineID != "copilot") {
+		return
+	}
+	declarations := make([]map[string]any, 0, len(data.SubAgentModels))
+	provider := "github-copilot"
+	if engineID == "pi" {
+		provider = piSubagentProvider(piConfiguredProvider(data))
+		if provider == "copilot" {
+			provider = "github-copilot"
+		}
+	}
+	for _, agent := range data.SubAgentModels {
+		declarations = append(declarations, map[string]any{
+			"name": agent.Name, "model": agent.Model,
+			"patterns": expandModelPatterns(agent.Model, data.ModelMappings, provider),
+		})
+	}
+	encoded, err := json.Marshal(declarations)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode sub-agent model declarations: %v", err))
+	}
+	yaml.WriteString(formatYAMLEnv("          ", "GH_AW_INFO_SUB_AGENT_MODELS", string(encoded)))
 }
 
 func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *WorkflowData) error { //nolint:largefunc // Existing artifact collection keeps related output paths and ordering together.

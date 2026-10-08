@@ -38,6 +38,9 @@ func piToolPolicyJSON(data *WorkflowData) string {
 				policy[name] = value
 			}
 		}
+		if data.BashDisabled {
+			policy["bash"] = false
+		}
 	}
 	encoded, err := json.Marshal(policy)
 	if err != nil {
@@ -55,7 +58,7 @@ func (c *Compiler) validatePiEngineConfig(data *WorkflowData) error {
 		return errors.New("engine.model-routing requires the built-in Pi CLI, SDK, or RPC driver")
 	}
 	if config.Driver != "" && config.Driver != "pi_agent_core_driver.cjs" && config.Driver != "pi_rpc_driver.cjs" &&
-		(HasBashExplicitRestriction(data.Tools) || data.Tools["edit"] == false) {
+		(data.BashDisabled || HasBashExplicitRestriction(data.Tools) || data.Tools["edit"] == false) {
 		return errors.New("engine 'pi' tool restrictions require the built-in CLI, SDK, or RPC driver; custom drivers must implement their own tool policy")
 	}
 	if config.Driver == "pi_agent_core_driver.cjs" && len(config.Args) > 0 {
@@ -133,6 +136,24 @@ func validatePiSessionConfig(raw json.RawMessage) error {
 
 func (e *PiEngine) applyPiConfigEnv(env map[string]string, data *WorkflowData) {
 	env["GH_AW_PI_CONFIG"] = "{}"
+	aliases, err := json.Marshal(data.ModelMappings)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode Pi model aliases: %v", err))
+	}
+	env["GH_AW_PI_MODEL_ALIASES"] = string(aliases)
+	childData := *data
+	if data.EngineConfig != nil {
+		childConfig := *data.EngineConfig
+		childConfig.Config = ""
+		childConfig.Args = nil
+		childData.EngineConfig = &childConfig
+	}
+	childArgs, err := json.Marshal(e.buildPiArgs(&childData))
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode Pi sub-agent arguments: %v", err))
+	}
+	env["GH_AW_PI_SUBAGENT_ARGS"] = string(childArgs)
+	env["GH_AW_PI_TOOL_BUDGET_DIR"] = constants.TmpPiAgentDir + "/tool-budget"
 	if data.EngineConfig == nil {
 		return
 	}

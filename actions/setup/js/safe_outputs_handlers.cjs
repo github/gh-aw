@@ -31,6 +31,7 @@ const { resolveInvocationContext } = require("./invocation_context_helpers.cjs")
 const { lstatGuard } = require("./symlink_guard.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
+const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
 const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 const { normalizeRuntimeMessage, readClaimScopeContext, withClaimExecution, currentClaimHandle, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
@@ -3021,6 +3022,15 @@ function createHandlers(server, appendSafeOutput, config = {}) {
    * instead of a downstream Process Safe Outputs failure.
    */
   const updateIssueHandler = args => {
+    const normalizedArgs = normalizeBlankOptionalFields(args, safeOutputsToolMap.get("update_issue").inputSchema.properties);
+    const updateFields = ["status", "title", "body", "labels", "assignees", "milestone"];
+    if (!updateFields.some(field => normalizedArgs[field] !== undefined && normalizedArgs[field] !== false && (normalizedArgs[field] !== null || field === "milestone"))) {
+      throw {
+        code: -32602,
+        message: `${ERR_VALIDATION}: update_issue requires at least one of: ${updateFields.join(", ")} fields`,
+      };
+    }
+
     const updateIssueConfig = getSafeOutputsToolConfig(config, "update_issue");
     const effectiveTarget = updateIssueConfig.target || "triggering";
 
@@ -3053,7 +3063,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       }
     }
 
-    return defaultHandler("update_issue")(args || {});
+    return defaultHandler("update_issue")(normalizedArgs);
   };
 
   const jiraCreateIssueHandler = args => {

@@ -533,6 +533,51 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("main", () => {
+    it.each([false, true])("stages delegated models with their own gateway protocol (routing=%s)", async routing => {
+      if (routing) process.env.GH_AW_MODEL_ROUTING = "1";
+      else delete process.env.GH_AW_MODEL_ROUTING;
+      process.env.GH_AW_PI_MODEL_ID = "gpt-5.6-luna";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      process.env.GH_AW_PI_CONFIG = "{}";
+      process.env.GH_AW_PI_MODEL_ALIASES = '{"small":["copilot/*haiku*"]}';
+      process.env.GH_AW_PI_STAGING_DIR = path.join(tmpDir, "staged");
+      process.env.GH_AW_PI_MODEL_ROUTING_MODEL_FILE = path.join(tmpDir, "routing-model");
+      delete process.env.AWF_REFLECT_ENABLED;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+      fs.mkdirSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents"), { recursive: true });
+      fs.writeFileSync(path.join(process.env.GH_AW_PI_STAGING_DIR, "agents/reader.md"), "Fixture");
+      const catalog = [
+        { provider: "github-copilot", id: "gpt-5.6-luna", api: "openai-responses", reasoning: true, input: ["text"], contextWindow: 128000, maxTokens: 32000 },
+        { provider: "github-copilot", id: "claude-haiku-4.5", api: "openai-completions", reasoning: false, input: ["text"], contextWindow: 200000, maxTokens: 8192 },
+      ];
+      const sdk = {
+        parseFrontmatter: () => ({ frontmatter: { description: "Read files", model: "small" }, body: "Read only." }),
+        ModelRuntime: { create: async () => ({ getModels: () => catalog, getModel: (_provider, id) => catalog.find(model => model.id === id) }) },
+      };
+      await piModelsJson.main({
+        loadSDK: async () => sdk,
+        loadModelsJson: () => ({ providers: {} }),
+        fetchReflect: async () => ({
+          ok: true,
+          reflectData: {
+            models_fetch_complete: true,
+            endpoints: [{ provider: "copilot", configured: true, port: 10002, models: catalog.map(model => model.id) }],
+            routing: { status: "selected", selection: { provider: "github", wire_model: "gpt-5.6-luna", effort: "none", endpoint: "/responses" } },
+          },
+        }),
+      });
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8")).providers["aw-gateway"];
+      expect(written.api).toBe("openai-responses");
+      expect(written.models).toEqual([
+        expect.objectContaining({ id: "gpt-5.6-luna", compat: { supportsOpenAIGrammarTools: false } }),
+        expect.objectContaining({ id: "claude-haiku-4.5", api: "openai-completions", contextWindow: 200000, maxTokens: 8192 }),
+      ]);
+      expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "subagents.json"), "utf8"))[0]).toMatchObject({ declaredModel: "small", model: "aw-gateway/claude-haiku-4.5" });
+    });
+
     it.each(["auto", "auto?effort=high"])("writes the Copilot %s gateway model when completed discovery only advertises concrete models", async modelId => {
       process.env.GH_AW_PI_MODEL_ID = modelId;
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";

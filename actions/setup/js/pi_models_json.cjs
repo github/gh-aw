@@ -35,7 +35,9 @@ const path = require("path");
 const { fetchAWFReflect, getCatalogModelEntry, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES, resolveProviderEndpointFromReflect } = require("./awf_reflect.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
-const { loadPiSDK, nativePiProvider, parsePiConfig } = require("./pi_runtime.cjs");
+const { loadPiSDK, nativePiProvider, parsePiConfig, stagePiArtifacts } = require("./pi_runtime.cjs");
+const { preparePiSubagents } = require("./pi_subagent_config.cjs");
+const { buildCatalogFromReflect } = require("./resolve_model_alias.cjs");
 const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
@@ -90,7 +92,7 @@ function resolveGatewayBaseUrl(options) {
  * "COPILOT_GITHUB_TOKEN") causes Pi to automatically use the value that is
  * already present in the container environment.
  *
- * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, nativeProvider?: string, contextWindow?: number|string, metadata?: Record<string, any>, logger?: (msg: string) => void }} options
+ * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, nativeProvider?: string, contextWindow?: number|string, metadata?: Record<string, any>, models?: Record<string, any>[], logger?: (msg: string) => void }} options
  * @returns {string}
  */
 function buildModelsJSON(options) {
@@ -114,6 +116,7 @@ function buildModelsJSON(options) {
             // Copilot's Responses adapter only supports apply_patch custom tools.
             ...(provider === "github" && api === "openai-responses" ? { compat: { ...metadata.compat, supportsOpenAIGrammarTools: false } } : {}),
           },
+          ...(options.models || []),
         ],
       },
       ...(nativeProvider && !["github-copilot", "anthropic", "openai", "google"].includes(nativeProvider) ? { [nativeProvider]: { baseUrl, apiKey: "awf-proxy" } } : {}),
@@ -391,7 +394,33 @@ async function main(options = {}) {
   } else {
     logger(`awf-reflect: reasoning metadata unavailable; retaining Pi model configuration (provider=${provider}, model=${modelId})`);
   }
-  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, nativeProvider, contextWindow, metadata, logger });
+  const models = [];
+  stagePiArtifacts(agentDir);
+  if (fs.existsSync(path.join(agentDir, "agents"))) {
+    const sdk = await (options.loadSDK || loadPiSDK)();
+    const runtime = await sdk.ModelRuntime.create({ modelsPath: null });
+    const catalog = reflectData?.models_fetch_complete === true ? buildCatalogFromReflect(reflectData) : runtime.getModels(nativeProvider).map(model => `${model.provider}/${model.id}`);
+    const agents = preparePiSubagents({ agentDir, sdk, provider: nativeProvider, catalog, gateway: true, parentModel: `${nativeProvider}/${modelId}`, logger });
+    const seen = new Set([modelId]);
+    for (const agent of agents) {
+      if (seen.has(agent.modelId)) continue;
+      seen.add(agent.modelId);
+      validatePiModelAvailability({ provider, modelId: agent.modelId, reflectData, logger });
+      const catalogModel = runtime.getModel(nativeProvider, agent.modelId);
+      const childApi = resolvePiApiForModel({ provider, modelId: agent.modelId, model: catalogModel, modelsJson, logger });
+      const childMetadata = {};
+      if (catalogModel) {
+        for (const key of ["name", "reasoning", "thinkingLevelMap", "input", "inputLimits", "cost", "promptCache", "contextWindow", "maxTokens", "samplingParams", "compat"]) {
+          if (catalogModel[key] !== undefined) childMetadata[key] = catalogModel[key];
+        }
+      }
+      const childReasoning = resolvePiReasoningForModel({ provider, modelId: agent.modelId, reflectData });
+      if (childReasoning !== undefined) childMetadata.reasoning = childReasoning;
+      const payload = JSON.parse(buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId: agent.modelId, api: childApi, provider, metadata: childMetadata, logger }));
+      models.push({ ...payload.providers["aw-gateway"].models[0], api: childApi });
+    }
+  }
+  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, nativeProvider, contextWindow, metadata, models, logger });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, modelsJSON, { encoding: "utf8", mode: 0o600 });
   if (routingSelection) {

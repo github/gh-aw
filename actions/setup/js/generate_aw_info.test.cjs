@@ -51,6 +51,15 @@ describe("generate_aw_info.cjs", () => {
   let main;
   let awInfoPath;
 
+  it("persists declared sub-agent models without configured skills", async () => {
+    const models = [{ name: "reader", model: "small", patterns: ["github-copilot/*haiku*"] }];
+    process.env.GH_AW_INFO_SUB_AGENT_MODELS = JSON.stringify(models);
+    await main(mockCore, mockContext);
+    const info = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(info.sub_agent_models).toEqual(models);
+    expect(info.skills).toBeUndefined();
+  });
+
   beforeEach(async () => {
     vi.clearAllMocks();
     // Keep compiler-fixed runner paths in memory; never write to the host's /tmp.

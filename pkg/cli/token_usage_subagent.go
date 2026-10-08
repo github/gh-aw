@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"os"
 	"regexp"
@@ -15,10 +16,17 @@ var tokenUsageSubagentLog = logger.New("cli:token_usage_subagent")
 
 var subagentDispatchPattern = regexp.MustCompile(`^●\s+([A-Za-z0-9][A-Za-z0-9._ -]*?)\s*\((?:model:\s*)?([A-Za-z0-9][A-Za-z0-9._:-]*)\)`)
 
+type subagentDispatchKey struct {
+	agent    string
+	model    string
+	resolved string
+}
+
 func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) {
 	if summary == nil {
 		return
 	}
+	augmentDeclaredSubagentModels(runDir, summary)
 
 	requests, actuals, found, err := readSessionSubagentModels(runDir)
 	if err != nil {
@@ -43,20 +51,7 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, summary *TokenUsageSummary) {
 	addTokenUsageWarning(summary, subagentStdioWarning)
 
-	actuals := make([]SubagentModelActual, 0, len(summary.ByModel))
-	observedModels := make(map[string]string, len(summary.ByModel))
-	for model, usage := range summary.ByModel {
-		if usage == nil || model == "" {
-			continue
-		}
-		actuals = append(actuals, SubagentModelActual{
-			Model:    model,
-			Provider: usage.Provider,
-			Requests: usage.Requests,
-		})
-		observedModels[model] = usage.Provider
-	}
-	sortSubagentModelActuals(actuals)
+	actuals, observedModels := collectSubagentModelActuals(summary)
 	summary.SubagentModelActuals = actuals
 
 	var fallbackEffectiveModel string
@@ -69,8 +64,12 @@ func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, s
 	requestRows := make([]SubagentModelRequest, 0, len(requests))
 	mismatchCount := 0
 	for _, row := range requests {
-		if _, ok := observedModels[row.RequestedModel]; ok {
-			row.EffectiveModel = row.RequestedModel
+		requested := row.RequestedModel
+		if row.ResolvedModel != "" {
+			requested = row.ResolvedModel
+		}
+		if _, ok := observedModels[requested]; ok {
+			row.EffectiveModel = requested
 		} else {
 			row.EffectiveModel = fallbackEffectiveModel
 			if len(observedModels) == 0 {
@@ -128,23 +127,14 @@ func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
 	}
 	defer file.Close()
 
-	counts := make(map[subagentModelKey]int)
+	counts := make(map[subagentDispatchKey]int)
 
 	reader := bufio.NewReader(file)
 	for {
 		line, readErr := reader.ReadString('\n')
 		line = strings.TrimSpace(line)
-		agentName, requestedModel := "", ""
-		for index, match := range subagentDispatchPattern.FindStringSubmatch(line) {
-			switch index {
-			case 1:
-				agentName = strings.TrimSpace(match)
-			case 2:
-				requestedModel = strings.TrimSpace(match)
-			}
-		}
-		if agentName != "" && requestedModel != "" {
-			counts[subagentModelKey{agent: agentName, model: requestedModel}]++
+		if line != "" {
+			countSubagentDispatchLine(counts, line)
 		}
 
 		if readErr == io.EOF {
@@ -159,12 +149,13 @@ func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
 	return subagentModelRequestRows(counts)
 }
 
-func subagentModelRequestRows(counts map[subagentModelKey]int) []SubagentModelRequest {
+func subagentModelRequestRows(counts map[subagentDispatchKey]int) []SubagentModelRequest {
 	rows := make([]SubagentModelRequest, 0, len(counts))
 	for k, n := range counts {
 		rows = append(rows, SubagentModelRequest{
 			AgentName:       k.agent,
 			RequestedModel:  k.model,
+			ResolvedModel:   k.resolved,
 			InvocationCount: n,
 		})
 	}
@@ -181,8 +172,51 @@ func subagentModelRequestRows(counts map[subagentModelKey]int) []SubagentModelRe
 		case a.RequestedModel > b.RequestedModel:
 			return 1
 		default:
-			return 0
+			return strings.Compare(a.ResolvedModel, b.ResolvedModel)
 		}
 	})
 	return rows
+}
+
+func collectSubagentModelActuals(summary *TokenUsageSummary) ([]SubagentModelActual, map[string]string) {
+	actuals := make([]SubagentModelActual, 0, len(summary.ByModel))
+	observedModels := make(map[string]string, len(summary.ByModel))
+	for model, usage := range subagentObservedModels(summary) {
+		if usage == nil || model == "" || usage.Requests == 0 {
+			continue
+		}
+		actuals = append(actuals, SubagentModelActual{
+			Model: model, Provider: usage.Provider, Requests: usage.Requests,
+		})
+		observedModels[model] = usage.Provider
+	}
+	sortSubagentModelActuals(actuals)
+	return actuals, observedModels
+}
+
+func countSubagentDispatchLine(counts map[subagentDispatchKey]int, line string) {
+	var dispatch struct {
+		Type      string `json:"type"`
+		Agent     string `json:"agent"`
+		Requested string `json:"requested_model"`
+		Resolved  string `json:"resolved_model"`
+	}
+	if json.Unmarshal([]byte(line), &dispatch) == nil && dispatch.Type == "gh_aw_subagent_dispatch" {
+		if dispatch.Agent != "" && dispatch.Requested != "" {
+			counts[subagentDispatchKey{agent: dispatch.Agent, model: dispatch.Requested, resolved: dispatch.Resolved}]++
+		}
+		return
+	}
+	agentName, requestedModel := "", ""
+	for index, match := range subagentDispatchPattern.FindStringSubmatch(line) {
+		switch index {
+		case 1:
+			agentName = strings.TrimSpace(match)
+		case 2:
+			requestedModel = strings.TrimSpace(match)
+		}
+	}
+	if agentName != "" && requestedModel != "" {
+		counts[subagentDispatchKey{agent: agentName, model: requestedModel}]++
+	}
 }

@@ -10,6 +10,7 @@ beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-runtime-"));
   vi.stubEnv("PI_CODING_AGENT_DIR", path.join(dir, "agent"));
   vi.stubEnv("RUNNER_TEMP", dir);
+  vi.stubEnv("GH_AW_PI_STAGING_DIR", path.join(dir, "staging"));
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -17,6 +18,15 @@ afterEach(() => {
 });
 
 describe("Pi runtime configuration", () => {
+  it("copies activation-staged agents and skills into the managed user scope", () => {
+    fs.mkdirSync(path.join(dir, "staging/agents"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "staging/skills/report"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "staging/agents/reader.md"), "Agent.");
+    fs.writeFileSync(path.join(dir, "staging/skills/report/SKILL.md"), "Skill.");
+    preparePiRuntime({});
+    expect(fs.readFileSync(path.join(dir, "agent/agents/reader.md"), "utf8")).toBe("Agent.");
+    expect(fs.readFileSync(path.join(dir, "agent/skills/report/SKILL.md"), "utf8")).toBe("Skill.");
+  });
   it.each(["0.99.2", "1.0.0-beta.1", "unexpected"])("rejects an incompatible actual CLI version: %s", version => {
     expect(() => verifyPiVersion("pi", () => version)).toThrow("v1.0.0 or newer");
   });
