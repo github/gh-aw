@@ -15,8 +15,23 @@ import (
 
 const subagentSessionHeader = `{"type":"session.format","data":{"version":1},"provenance":{"component":"collector"}}` + "\n"
 
+const copilotSubagentIntegrationMetrics = `{
+	"main":{"totalNanoAiu":389122000000,"modelMetrics":{"opus":{"requests":{"count":41},"usage":{"inputTokens":4100,"outputTokens":410,"cacheReadTokens":41,"cacheWriteTokens":82}}}},
+	"research":{"agentName":"research","agentDisplayName":"subagent-research","totalNanoAiu":494207000000,"modelMetrics":{"opus":{"requests":{"count":45},"usage":{"inputTokens":4500,"outputTokens":450,"cacheReadTokens":45,"cacheWriteTokens":90}}}},
+	"ghaw":{"agentName":"explore","agentDisplayName":"ghaw-issues","totalNanoAiu":9141000000,"modelMetrics":{"opus":{"requests":{"count":3},"usage":{"inputTokens":300,"outputTokens":30,"cacheReadTokens":3,"cacheWriteTokens":6}}}},
+	"awf":{"agentName":"explore","agentDisplayName":"awf-routing","totalNanoAiu":40977000000,"modelMetrics":{"opus":{"requests":{"count":12},"usage":{"inputTokens":1200,"outputTokens":120,"cacheReadTokens":12,"cacheWriteTokens":24}}}}
+}`
+
 func subagentSessionRecord(record string) string {
 	return strings.TrimSuffix(record, "}") + `,"provenance":{"component":"agent","phase":"agent"}}` + "\n"
+}
+
+func tokenUsageEntryModels(entries []TokenUsageEntry) []string {
+	models := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		models = appendUnique(models, entry.Model)
+	}
+	return models
 }
 
 func TestSessionSubagentModelsInterleavedRetries(t *testing.T) {
@@ -465,6 +480,7 @@ func TestCopilotAgentMetricsWithoutLifecycleRetainAttribution(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))
 	content := subagentSessionHeader +
 		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"metrics-only"}}`) +
+		subagentSessionRecord(`{"type":"subagent.configured","data":{"agentName":"identity-less","model":"opus"}}`) +
 		subagentSessionRecord(`{"type":"session.shutdown","data":{"agentMetrics":`+strings.ReplaceAll(copilotSubagentIntegrationMetrics, "\n", "")+`}}`)
 	require.NoError(t, os.WriteFile(filepath.Join(root, "usage", "aw_session.jsonl"), []byte(content), 0o644))
 

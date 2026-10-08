@@ -335,13 +335,6 @@ func TestSessionParserDoesNotInferSubagentsFromStdio(t *testing.T) {
 	}
 }
 
-const copilotSubagentIntegrationMetrics = `{
-	"main":{"totalNanoAiu":389122000000,"modelMetrics":{"opus":{"requests":{"count":41},"usage":{"inputTokens":4100,"outputTokens":410,"cacheReadTokens":41,"cacheWriteTokens":82}}}},
-	"research":{"agentName":"research","agentDisplayName":"subagent-research","totalNanoAiu":494207000000,"modelMetrics":{"opus":{"requests":{"count":45},"usage":{"inputTokens":4500,"outputTokens":450,"cacheReadTokens":45,"cacheWriteTokens":90}}}},
-	"ghaw":{"agentName":"explore","agentDisplayName":"ghaw-issues","totalNanoAiu":9141000000,"modelMetrics":{"opus":{"requests":{"count":3},"usage":{"inputTokens":300,"outputTokens":30,"cacheReadTokens":3,"cacheWriteTokens":6}}}},
-	"awf":{"agentName":"explore","agentDisplayName":"awf-routing","totalNanoAiu":40977000000,"modelMetrics":{"opus":{"requests":{"count":12},"usage":{"inputTokens":1200,"outputTokens":120,"cacheReadTokens":12,"cacheWriteTokens":24}}}}
-}`
-
 func copilotSubagentIntegrationEvents(t *testing.T) string {
 	t.Helper()
 	shutdown, err := json.Marshal(map[string]any{

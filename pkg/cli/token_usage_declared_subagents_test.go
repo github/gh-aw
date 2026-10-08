@@ -384,14 +384,6 @@ func TestPiInvocationIDAttributionFixture(t *testing.T) {
 	require.Equal(t, 1, agents[1].CompletedCount)
 }
 
-func tokenUsageEntryModels(entries []TokenUsageEntry) []string {
-	models := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		models = appendUnique(models, entry.Model)
-	}
-	return models
-}
-
 func TestPiFailedSubagentsStillAttributeMainAgentCredits(t *testing.T) {
 	entries := []TokenUsageEntry{
 		{Model: "gpt-5.4-mini", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10}, AICreditsThisResponse: json.RawMessage(`1.2`)},

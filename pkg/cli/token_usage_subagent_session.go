@@ -687,12 +687,10 @@ func (models *subagentSessionModels) resetAgentUsageMetrics() {
 
 func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent, data sessionSubagentData) error {
 	models.found = true
-	identity := event.AgentID
+	identity := firstNonEmptyModel(event.AgentID, data.InvocationID, data.ToolCallID)
 	if identity == "" {
-		identity = data.ToolCallID
-	}
-	if identity == "" {
-		return errors.New("missing agent or tool call identity")
+		tokenUsageSubagentLog.Printf("ignoring %s without sub-agent identity", event.Type)
+		return nil
 	}
 	row := models.agents[identity]
 	if row == nil {
