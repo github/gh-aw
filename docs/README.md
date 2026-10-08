@@ -47,7 +47,13 @@ normal behavior. The presentation icon is hidden below the desktop menu breakpoi
 (50rem), and resizing to mobile exits the slideshow.
 Supported browsers animate slide changes with directional CSS View Transitions;
 reduced-motion preferences disable these animations.
-The floating toolbar is semi-transparent until hovered or focused with the keyboard.
+The bottom toolbar overlays the slide without reserving footer space. It is
+semi-transparent until hovered or focused with the keyboard.
+Add `data-slideshow-hide` to any element to omit secondary content from the
+presentation without hiding it on the normal page. On a whole slide section,
+the attribute skips that slide and updates the navigation count. Guided-form
+notes, lengthy workflow descriptions, the extra workflow catalog, and the
+custom-engine footnote already use this annotation.
 When a demo tab is focused, Left/Right select tabs; Up/Down and Page Up/Page Down
 still navigate slides, and Tab/Shift+Tab leave the tablist.
 

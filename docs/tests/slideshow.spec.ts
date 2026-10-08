@@ -116,6 +116,11 @@ test("floats a translucent toolbar that becomes opaque on hover and keyboard foc
   await trigger.click();
   const toolbar = presentation(page).getByRole("group", { name: "Slide navigation" });
   await expect(toolbar).toHaveCSS("position", "absolute");
+  const viewportBounds = await presentation(page).locator("[data-slideshow-viewport]").boundingBox();
+  const toolbarBounds = await toolbar.boundingBox();
+  if (!viewportBounds || !toolbarBounds) throw new Error("Presentation viewport and toolbar must be visible");
+  expect(toolbarBounds.y).toBeLessThan(viewportBounds.y + viewportBounds.height);
+  expect(toolbarBounds.y + toolbarBounds.height).toBeLessThanOrEqual(viewportBounds.y + viewportBounds.height + 1);
   await page.mouse.move(0, 0);
   await expect(toolbar).toHaveCSS("opacity", "0.65");
   await toolbar.hover();
@@ -150,6 +155,44 @@ test("lets keyboard users leave demo tabs and navigate slides without a trap", a
   await watchTabs.first().focus();
   await page.keyboard.press("PageUp");
   await expect(dialog.locator("[data-slideshow-status]")).toContainText("2 / 9");
+});
+
+test("hides annotated secondary content only during the presentation", async ({ page }) => {
+  await expect(page.locator(".aw-hero .aw-cta-note:visible")).toHaveCount(1);
+  await expect(page.locator(".wf-detail:visible")).toHaveCount(1);
+  await expect(page.locator(".ma")).toBeVisible();
+  await page.getByRole("button", { name: "Start slideshow" }).click();
+  const dialog = presentation(page);
+  await expect(dialog.locator("[data-slideshow-hide]:visible")).toHaveCount(0);
+  await page.keyboard.press("PageDown");
+  await expect(dialog.locator("[data-slideshow-status]")).toContainText("2 / 9");
+  await expect(dialog.locator(".wf-outcome:visible")).toHaveCount(1);
+  await expect(dialog.locator(".wf-detail:visible")).toHaveCount(0);
+  await expect(dialog.locator(".ma")).not.toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".aw-hero .aw-cta-note:visible")).toHaveCount(1);
+  await expect(page.locator(".wf-detail:visible")).toHaveCount(1);
+  await expect(page.locator(".ma")).toBeVisible();
+});
+
+test("skips annotated slide sections and restores them on exit", async ({ page }) => {
+  await page.evaluate(() => {
+    document.querySelector("#watch")?.setAttribute("data-slideshow-hide", "");
+    document.dispatchEvent(new Event("astro:page-load"));
+  });
+  await page.getByRole("button", { name: "Start slideshow" }).click();
+  const dialog = presentation(page);
+  await expect(dialog.locator("[data-slideshow-status]")).toContainText("1 / 8");
+  await page.keyboard.press("PageDown");
+  await expect(dialog.locator("[data-slideshow-status]")).toContainText("2 / 8");
+  await page.keyboard.press("PageDown");
+  await expect(dialog.locator("[data-slideshow-status]")).toContainText("3 / 8");
+  await expect(dialog.locator("[data-slideshow-status]")).not.toContainText("Watch it run");
+  await expect(dialog.locator("#watch")).not.toBeVisible();
+  await page.keyboard.press("End");
+  await expect(dialog.locator("[data-slideshow-status]")).toContainText("8 / 8");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("main #watch")).toBeVisible();
 });
 
 test("uses directional CSS View Transitions and handles rapid navigation", async ({ page }) => {

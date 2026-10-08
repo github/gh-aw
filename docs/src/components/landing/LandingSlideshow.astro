@@ -59,7 +59,7 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     const close = dialog?.querySelector<HTMLButtonElement>('[data-slideshow-close]');
     const status = dialog?.querySelector<HTMLElement>('[data-slideshow-status]');
     if (!trigger || !dialog || !deck || !viewport || !stage || !ink || !previous || !next || !close || !status) return;
-    const slides = Array.from(deck.querySelectorAll<HTMLElement>(':scope > section'));
+    const slides = Array.from(deck.querySelectorAll<HTMLElement>(':scope > section:not([data-slideshow-hide])'));
     if (!slides.length) return;
 
     const controller = new AbortController();
@@ -255,7 +255,7 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     justify-content: center;
     flex: 1;
     min-height: 0;
-    margin: 1rem 1rem 5.5rem;
+    margin: 1rem;
     overflow: hidden;
   }
   .slideshow-stage { position: relative; flex: none; }
@@ -285,6 +285,7 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     padding-block: 2rem;
   }
   dialog :global([data-slideshow-slides] > section[hidden]) { display: none; }
+  :global(#landing-slideshow[open] [data-slideshow-hide]) { display: none !important; }
   .slideshow-controls {
     position: absolute;
     inset-inline: 1rem;
