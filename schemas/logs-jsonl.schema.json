@@ -6218,6 +6218,9 @@
                     "endpoint": {
                       "type": "string"
                     },
+                    "selected_endpoint": {
+                      "type": "string"
+                    },
                     "mode": {
                       "type": "string"
                     },
