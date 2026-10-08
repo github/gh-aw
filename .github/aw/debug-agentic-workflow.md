@@ -32,6 +32,14 @@ technical steps. Prepare a concise evidence packet for any required human
 validation; retain genuine authorization and protected-environment gates.
 Report a concrete unresolved blocker, not a generic preflight checklist.
 
+Workflow registration/activation and secret presence, validity, or expiry are
+not pre-dispatch gates. Let dispatch and workflow startup/authentication establish
+readiness; do not require inventories or organization-admin metadata access.
+Missing readiness metadata alone does not block an otherwise authorized run.
+Credential-flow review, destination authorization, and the live gates below still
+apply. Report actual readiness failures without automatically enabling workflows,
+provisioning secrets, escalating credentials, or retrying dispatch.
+
 ## Strategy
 
 1. **Anchor intent and failure.** First [capture developer intent from the current session](debug-security-review.md#capture-session-intent-first). Clarification is optional when the user is available; otherwise record unknown intent, continue static diagnosis/clearly authorized work and block uncertain execution/upload/effects. Record revisions, versions, trigger/inputs. [Collect existing evidence](#collect-existing-evidence) from supplied accessible runs or cached logs; otherwise start from source/fixtures, never dispatch for evidence. Compare existing runs with `gh aw audit RUN_ID RUN_ID_2 --group` for recurrence. Label observed/local/fixture/inferred/unavailable evidence.
@@ -47,7 +55,7 @@ Report a concrete unresolved blocker, not a generic preflight checklist.
 ## Live Debug Loop
 
 Before each upload/dispatch, require a completed [agentic security review](debug-security-review.md) for the current source/lock hashes and human validation: source/lock hashes,
-triggers/imports/pins, permissions/OIDC, credentials/expiry, destinations,
+triggers/imports/pins, permissions/OIDC, declared credential sources and flows, destinations,
 external writes and changed approval protections. The agent gathers and reviews
 this evidence; the human validates the agent-prepared packet and authorizes
 effects, rather than performing the technical review. Specify run-count, time/spend

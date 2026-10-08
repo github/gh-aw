@@ -26,6 +26,15 @@ the [shared security-review guidance](../../aw/debug-security-review.md);
 the agent prepares the evidence for human validation rather than asking the
 user to conduct the review.
 
+Workflow registration/activation and secret presence, validity, or expiry are
+runtime readiness checks, not pre-dispatch review gates. Do not require workflow
+or secret inventories, organization-admin access, or proof of usable credentials
+before an otherwise authorized run. Dispatch and the workflow's startup/authentication
+checks establish readiness; report their actual failures without automatic retries
+or enabling workflows. Continue to review declared credential flows, authorized
+destinations, permissions, and redaction without retrieving secret values. Missing
+readiness metadata alone is not a security finding or an UNKNOWN safety verdict.
+
 ## Self-contained setup (do not assume environment is ready)
 
 ### Step 0) Verify CLI availability

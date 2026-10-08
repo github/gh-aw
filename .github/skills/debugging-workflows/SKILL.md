@@ -15,6 +15,15 @@ reference, not a separate execution policy. Respect explicit no-dispatch context
 Apply its live-outcome table, credential triage and untrusted-evidence rules.
 Without accessible existing logs, use source/fixtures; never dispatch for evidence.
 
+Workflow registration/activation and secret presence, validity, or expiry are
+runtime readiness checks, not pre-dispatch prerequisites. Do not require workflow
+or secret inventories or organization-admin metadata access. An otherwise
+authorized dispatch and the workflow's startup/authentication checks determine
+readiness; report their failures without automatic enabling, provisioning, or
+dispatch retries. Missing readiness metadata alone is not a safety finding.
+Declared credential flows, authorized destinations, permissions, source/lock
+review, and human live-validation gates remain in scope.
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)

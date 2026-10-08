@@ -29,6 +29,21 @@ validation remains required for live execution; it is not a request for the
 user to perform the technical review. Never retrieve secret values or claim
 to have verified credential validity/expiry when metadata cannot establish it.
 
+## Runtime Readiness Is Not a Review Gate
+
+Do not require proof that a workflow is registered or active, or that its secrets
+exist, are valid, or are unexpired before an otherwise authorized dispatch.
+These checks belong to dispatch and workflow startup/authentication. Workflow
+and secret inventories are optional diagnostic evidence; unavailable metadata,
+including organization-secret listing permissions, does not by itself block
+execution or make a safety question UNKNOWN.
+
+Review declared credential sources, transmission paths, authorized destinations,
+permissions, and redaction instead. This does not waive destination authorization,
+source/lock review, human live validation, or explicit no-dispatch restrictions.
+Report actual dispatch/runtime readiness failures; do not automatically enable
+workflows, provision secrets, elevate credentials, or retry dispatch.
+
 ## Compile-Only Validation
 
 The agent may run the installed, trusted `gh aw compile WORKFLOW --dry-run`
