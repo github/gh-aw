@@ -45,28 +45,41 @@ jobs:
           node-version: '24'
 
       - name: Verify simulator invariants
+        id: invariants
         run: |
           mkdir -p stress-results
-          node --test .github/scripts/work-queue-stress.test.cjs \
+          node --test .github/scripts/work-queue-stress.test.cjs .github/scripts/work-queue-stress-summary.test.cjs \
             | tee stress-results/invariants.tap
 
       - name: Replay 100000 retained Work and Claim items
+        id: history
         run: |
           node .github/scripts/work-queue-stress.cjs \
             --mode history --items 100000 --workers 2 --seed 7 \
             --timeout-seconds 300 > stress-results/history.json
 
       - name: Complete 1024 concurrent worker lifecycles
+        id: lifecycle
         run: |
           node .github/scripts/work-queue-stress.cjs \
             --items 1024 --workers 4 --queue-items 64 --seed 7 \
             --timeout-seconds 600 > stress-results/lifecycle.json
 
       - name: Verify single-queue admission saturation
+        id: saturation
         run: |
           node .github/scripts/work-queue-stress.cjs \
             --mode saturation --items 100000 --workers 4 --seed 7 \
             --timeout-seconds 60 > stress-results/saturation.json
+
+      - name: Publish stress performance summary
+        if: always()
+        env:
+          INVARIANTS_OUTCOME: ${{ steps.invariants.outcome }}
+          HISTORY_OUTCOME: ${{ steps.history.outcome }}
+          LIFECYCLE_OUTCOME: ${{ steps.lifecycle.outcome }}
+          SATURATION_OUTCOME: ${{ steps.saturation.outcome }}
+        run: node .github/scripts/work-queue-stress-summary.cjs stress-results
 
       - name: Upload stress diagnostics
         if: always()

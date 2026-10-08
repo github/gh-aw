@@ -145,9 +145,18 @@ failure. Canonicalization must preserve the complete causal history and projecti
 The separate [Work Queue Stress workflow](../../.github/workflows/work-queue-stress.yml)
 runs on pull requests and `main` pushes changing `actions/setup/js` JavaScript,
 the simulator, its workflow or protocol fixtures. It runs the 100,000-item history
-profile, 1,024 live lifecycles and admission saturation independently, and uploads
-diagnostics even on failure. It uses read-only checkout credentials and does not
-dispatch actual GitHub workflow runs.
+profile, 1,024 live lifecycles and admission saturation independently. Its step
+summary reports profile outcomes, measured workload, elapsed time, throughput and
+peak memory, with phase timings and Git contention in a collapsible section.
+History validation throughput is separate from live Work completion throughput;
+failed or skipped profiles never imply successful completion. The summary and
+JSON diagnostics are uploaded even on failure. It uses read-only checkout
+credentials and does not dispatch actual GitHub workflow runs.
+
+Render saved JSON diagnostics locally with
+`node .github/scripts/work-queue-stress-summary.cjs stress-results`. The command
+writes `stress-results/summary.md` and appends the same report to
+`GITHUB_STEP_SUMMARY` when that environment variable is set.
 
 ## Runtime scaling and compaction
 

@@ -54,4 +54,17 @@ describe("local work queue stress CI", () => {
     expect(commands.some(command => command.includes("--mode saturation --items 100000 --workers 4") && command.includes("--timeout-seconds 60"))).toBe(true);
     expect(commands.some(command => command.includes("node --test .github/scripts/work-queue-stress.test.cjs"))).toBe(true);
   });
+
+  it("publishes a human-readable performance summary even when a profile fails", () => {
+    const steps = workflow.jobs.stress.steps;
+    const summary = steps.find(step => step.run?.includes("work-queue-stress-summary.cjs"));
+    expect(summary.if).toBe("always()");
+    for (const name of ["invariants", "history", "lifecycle", "saturation"]) {
+      expect(steps.some(step => step.id === name)).toBe(true);
+      expect(summary.env[`${name.toUpperCase()}_OUTCOME`]).toBe(`\${{ steps.${name}.outcome }}`);
+    }
+    expect(steps.indexOf(summary)).toBeLessThan(steps.findIndex(step => step.uses?.startsWith("actions/upload-artifact@")));
+    expect(steps.find(step => step.id === "invariants").run).toContain(".github/scripts/work-queue-stress-summary.test.cjs");
+    expect(workflow.on.pull_request.paths.some(pattern => minimatch(".github/scripts/work-queue-stress-summary.cjs", pattern))).toBe(true);
+  });
 });
