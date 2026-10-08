@@ -36,14 +36,18 @@ export function createSlideshow(trigger: HTMLButtonElement): SlideshowController
 
   const fit = () => {
     if (!dialog.open) return;
+    deck.style.removeProperty("--aw-slide-width");
+    deck.style.removeProperty("--aw-slide-height");
     const width = deck.offsetWidth;
     const height = deck.offsetHeight;
     if (!width || !height) return;
-    const scale = Math.min(1, viewport.clientWidth / width, viewport.clientHeight / height);
-    stage.style.width = `${width * scale}px`;
-    stage.style.height = `${height * scale}px`;
+    const scale = Math.min(viewport.clientWidth / width, viewport.clientHeight / height);
+    const slideWidth = viewport.clientWidth / scale;
+    const slideHeight = viewport.clientHeight / scale;
+    deck.style.setProperty("--aw-slide-width", `${slideWidth}px`);
+    deck.style.setProperty("--aw-slide-height", `${slideHeight}px`);
     deck.style.transform = `scale(${scale})`;
-    ink.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    ink.setAttribute("viewBox", `0 0 ${slideWidth} ${slideHeight}`);
   };
 
   const observer = new ResizeObserver(fit);
@@ -106,6 +110,8 @@ export function createSlideshow(trigger: HTMLButtonElement): SlideshowController
       slide.hidden = false;
     });
     deck.style.removeProperty("transform");
+    deck.style.removeProperty("--aw-slide-width");
+    deck.style.removeProperty("--aw-slide-height");
     placeholder.replaceWith(deck);
     dialog.dispatchEvent(new Event("slideshow:reset"));
     window.scrollTo({ top: scrollY, behavior: "instant" });

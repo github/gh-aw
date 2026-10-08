@@ -162,10 +162,14 @@ test("fits every slide to desktop and short windows in either theme", async ({ p
               !!viewport &&
               slide.width > 0 &&
               slide.height > 0 &&
-              slide.x >= viewport.x - 1 &&
-              slide.y >= viewport.y - 1 &&
-              slide.x + slide.width <= viewport.x + viewport.width + 1 &&
-              slide.y + slide.height <= viewport.y + viewport.height + 1
+              viewport.x === 0 &&
+              viewport.y === 0 &&
+              viewport.width === size.width &&
+              viewport.height === size.height &&
+              Math.abs(slide.x) < 1 &&
+              Math.abs(slide.y) < 1 &&
+              Math.abs(slide.width - size.width) < 1 &&
+              Math.abs(slide.height - size.height) < 1
             );
           })
           .toBe(true);
@@ -217,6 +221,7 @@ test("floats a translucent toolbar that becomes opaque on hover and keyboard foc
   await startSlideshow(page);
   const toolbar = presentation(page).getByRole("group", { name: "Slide navigation" });
   await expect(toolbar).toHaveCSS("position", "absolute");
+  await expect(toolbar).toHaveCSS("border-radius", "16px");
   const viewportBounds = await presentation(page).locator("[data-slideshow-viewport]").boundingBox();
   const toolbarBounds = await toolbar.boundingBox();
   if (!viewportBounds || !toolbarBounds) throw new Error("Presentation viewport and toolbar must be visible");
@@ -229,11 +234,11 @@ test("floats a translucent toolbar that becomes opaque on hover and keyboard foc
   expect(Math.abs(toolbarBounds.x + toolbarBounds.width / 2 - size.width / 2)).toBeLessThan(1);
   expect(size.height - toolbarBounds.y - toolbarBounds.height).toBeGreaterThan(16);
   await page.mouse.move(0, 0);
-  await expect(toolbar).toHaveCSS("opacity", "0.12");
+  await expect(toolbar).toHaveCSS("opacity", "0.65");
   await toolbar.hover();
   await expect(toolbar).toHaveCSS("opacity", "1");
   await page.mouse.move(0, 0);
-  await expect(toolbar).toHaveCSS("opacity", "0.12");
+  await expect(toolbar).toHaveCSS("opacity", "0.65");
   await page.keyboard.press("Shift+Tab");
   await expect(toolbar).toHaveCSS("opacity", "1");
   await toolbar.getByRole("button", { name: "Drawing tools", exact: true }).click();
@@ -329,9 +334,22 @@ test("uses directional CSS View Transitions and handles rapid navigation", async
       )
     )
     .toContain("aw-slide-in");
+  await expect(page.locator("html")).toHaveCSS("--aw-slide-offset", "100vw");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const animation = document.getAnimations().find(animation => animation instanceof CSSAnimation && animation.animationName === "aw-slide-in");
+        const frame = (animation?.effect as KeyframeEffect | null)?.getKeyframes()[0];
+        if (!frame?.transform) return null;
+        const transform = new DOMMatrix(String(frame.transform));
+        return { x: transform.m41, scaleX: transform.m11, scaleY: transform.m22 };
+      })
+    )
+    .toEqual({ x: page.viewportSize()!.width, scaleX: 1, scaleY: 1 });
   await page.keyboard.press("ArrowLeft");
   await expect(presentation(page).locator("[data-slideshow-status]")).toContainText("1 / 9");
   await expect(page.locator("html")).toHaveAttribute("data-last-slide-direction", "backward");
+  await expect(page.locator("html")).toHaveCSS("--aw-slide-offset", "-100vw");
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");

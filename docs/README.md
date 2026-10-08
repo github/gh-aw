@@ -41,16 +41,16 @@ All commands are run from the root of the project, from a terminal:
 On desktop, select the presentation icon in the homepage header to present the
 landing page as a nine-slide deck. The slideshow runtime, drawing tools, and
 snippet expansion JavaScript are loaded on demand on the first click, not
-when browsing the page. Slides fit the window and retain their
+when browsing the page. Slides fill the window edge to edge and retain their
 interactive examples. Use the previous/next buttons, arrow keys or Page Up/Page
 Down to navigate, Home/End to jump to the first/last slide, and Escape or the
 close button to return to the page. Keyboard controls inside demos keep their
 normal behavior. The presentation icon is hidden below the desktop menu breakpoint
 (50rem), and resizing to mobile exits the slideshow.
-Supported browsers animate slide changes with directional CSS View Transitions;
+Supported browsers slide the full frame left or right with CSS View Transitions;
 reduced-motion preferences disable these animations.
-The compact toolbar floats above the bottom of the slide without reserving
-footer space. It rests at 12% opacity and becomes opaque on hover, keyboard
+The rounded, compact toolbar floats at the bottom center without reserving
+footer space. It rests at 65% opacity and becomes opaque on hover, keyboard
 focus, or while its drawing palette is open.
 Add `data-slideshow-hide` to any element to omit secondary content from the
 presentation without hiding it on the normal page. On a whole slide section,
