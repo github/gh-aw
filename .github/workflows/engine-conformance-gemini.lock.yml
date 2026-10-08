@@ -952,7 +952,7 @@ jobs:
         env:
           DEBUG: gemini-cli:*
           ENGINE_CONFORMANCE_SENTINEL: conformance-gemini
-          GEMINI_API_BASE_URL: http://host.docker.internal:10003
+          GEMINI_API_BASE_URL: http://api-proxy:10003
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_CLI_TRUST_WORKSPACE: true
           GH_AW_MAX_TURNS: 30

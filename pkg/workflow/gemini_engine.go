@@ -336,7 +336,7 @@ touch %s
 	// When the firewall (AWF) is enabled with --enable-api-proxy, point Gemini CLI at the
 	// LLM gateway sidecar instead of the real googleapis.com endpoint.
 	if firewallEnabled {
-		env["GEMINI_API_BASE_URL"] = fmt.Sprintf("http://host.docker.internal:%d", constants.GeminiLLMGatewayPort)
+		env["GEMINI_API_BASE_URL"] = llmGatewayBaseURL(constants.GeminiLLMGatewayPort, workflowData)
 
 		// Set git identity environment variables so the first git commit succeeds inside the
 		// container. AWF's --env-all forwards these to the container, ensuring git does not

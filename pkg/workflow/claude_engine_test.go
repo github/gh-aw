@@ -205,6 +205,9 @@ func TestClaudeEngineLLMProviderGitHubUsesCopilotCredentials(t *testing.T) {
 		NetworkPermissions: &NetworkPermissions{
 			Firewall: &FirewallConfig{Enabled: true},
 		},
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{ID: "awf"},
+		},
 	}
 
 	steps := engine.GetExecutionSteps(workflowData, "test-log")
@@ -215,7 +218,62 @@ func TestClaudeEngineLLMProviderGitHubUsesCopilotCredentials(t *testing.T) {
 	assert.Contains(t, stepContent, "COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
 	assert.NotContains(t, stepContent, "ANTHROPIC_API_KEY:")
 	assert.Contains(t, stepContent, `export ANTHROPIC_API_KEY="$COPILOT_DUMMY_BYOK"`)
-	assert.Contains(t, stepContent, fmt.Sprintf("ANTHROPIC_BASE_URL: http://host.docker.internal:%d", constants.CopilotLLMGatewayPort))
+	assert.Contains(t, stepContent, fmt.Sprintf("ANTHROPIC_BASE_URL: http://api-proxy:%d", constants.CopilotLLMGatewayPort))
+
+	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{EngineName: "claude", WorkflowData: workflowData})
+	require.NoError(t, err)
+	assert.Contains(t, configJSON, `"isolation":true`)
+}
+
+func TestClaudeEngineCopilotModelPrefixUsesIsolatedGateway(t *testing.T) {
+	engine := NewClaudeEngine()
+	workflowData := &WorkflowData{
+		Name:  "test-workflow",
+		Model: "copilot/claude-haiku-4.5",
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true},
+		},
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+	}
+
+	steps := engine.GetExecutionSteps(workflowData, "test-log")
+	require.Len(t, steps, 1)
+	stepContent := strings.Join([]string(steps[0]), "\n")
+	assert.Contains(t, stepContent, "GH_AW_LLM_PROVIDER: github")
+	assert.Contains(t, stepContent, fmt.Sprintf("ANTHROPIC_BASE_URL: http://api-proxy:%d", constants.CopilotLLMGatewayPort))
+	assert.NotContains(t, stepContent, "ANTHROPIC_BASE_URL: http://host.docker.internal:")
+}
+
+func TestClaudeEngineCopilotCustomCommandUsesIsolatedGatewayBootstrap(t *testing.T) {
+	engine := NewClaudeEngine()
+	workflowData := &WorkflowData{
+		Name: "test-workflow",
+		EngineConfig: &EngineConfig{
+			LLMProvider: LLMProviderGitHub,
+			Command:     "custom-claude",
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+		SandboxConfig:      &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+	}
+
+	steps := engine.GetExecutionSteps(workflowData, "test-log")
+	require.Len(t, steps, 1)
+	stepContent := strings.Join([]string(steps[0]), "\n")
+	assert.Contains(t, stepContent, "custom-claude")
+	assert.Contains(t, stepContent, fmt.Sprintf("ANTHROPIC_BASE_URL: http://api-proxy:%d", constants.CopilotLLMGatewayPort))
+}
+
+func TestClaudeEngineDoesNotSetGatewayURLWithoutFirewall(t *testing.T) {
+	engine := NewClaudeEngine()
+	workflowData := &WorkflowData{
+		Name:         "test-workflow",
+		EngineConfig: &EngineConfig{LLMProvider: LLMProviderGitHub},
+		SandboxConfig: &SandboxConfig{
+			Agent: &AgentSandboxConfig{Disabled: true},
+		},
+	}
+
+	assert.NotContains(t, engine.buildClaudeCommandEnv(workflowData), "ANTHROPIC_BASE_URL")
 }
 
 func TestClaudeEngineAllowsMountedMCPCLICommandsInRestrictedBash(t *testing.T) {
