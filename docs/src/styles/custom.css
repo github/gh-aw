@@ -189,11 +189,6 @@ body {
   overflow-wrap: anywhere;
 }
 
-.sl-markdown-content td:not(.not-content *) code:not(pre code) {
-  white-space: nowrap;
-  overflow-wrap: normal;
-}
-
 /* Tables - scroll wrapper (no-JS fallback; mirrors what responsive-tables.ts would inject) */
 .sl-markdown-content .table-scroll-wrapper {
   width: 100%;
