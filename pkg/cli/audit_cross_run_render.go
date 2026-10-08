@@ -31,8 +31,8 @@ func renderCrossRunReportMarkdown(report *CrossRunAuditReport) {
 
 func renderCrossRunReportMarkdownToWriter(w io.Writer, report *CrossRunAuditReport) {
 	crossRunRenderLog.Printf("Rendering cross-run report as markdown: runs_analyzed=%d, domains=%d", report.RunsAnalyzed, len(report.DomainInventory))
-	fmt.Fprintln(w, "# Audit Report — Cross-Run Analysis")
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "%s\n", "# Audit Report — Cross-Run Analysis")
+	writeModelRoutingReportLine(w, "\n")
 
 	renderMarkdownExecutiveSummaryToWriter(w, report)
 	renderMarkdownMetricsTrendToWriter(w, report.MetricsTrend)
@@ -80,7 +80,7 @@ func renderMarkdownModelRoutingToWriter(w io.Writer, routing *ModelRoutingLogsSu
 
 func writeModelRoutingReportLine(w io.Writer, format string, values ...any) {
 	if _, err := fmt.Fprintf(w, format, values...); err != nil {
-		crossRunRenderLog.Printf("Failed to write model routing report: %v", err)
+		crossRunRenderLog.Printf("Failed to write report: %v", err)
 	}
 }
 
@@ -89,19 +89,19 @@ func modelRoutingMarkdownCell(value string) string {
 }
 
 func renderMarkdownExecutiveSummaryToWriter(w io.Writer, report *CrossRunAuditReport) {
-	fmt.Fprintln(w, "## Executive Summary")
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "| Metric | Value |\n")
-	fmt.Fprintf(w, "|--------|-------|\n")
-	fmt.Fprintf(w, "| Runs analyzed | %d |\n", report.RunsAnalyzed)
-	fmt.Fprintf(w, "| Runs with firewall data | %d |\n", report.RunsWithData)
-	fmt.Fprintf(w, "| Runs without firewall data | %d |\n", report.RunsWithoutData)
-	fmt.Fprintf(w, "| Total requests | %d |\n", report.Summary.TotalRequests)
-	fmt.Fprintf(w, "| Allowed requests | %d |\n", report.Summary.TotalAllowed)
-	fmt.Fprintf(w, "| Blocked requests | %d |\n", report.Summary.TotalBlocked)
-	fmt.Fprintf(w, "| Overall denial rate | %.1f%% |\n", report.Summary.OverallDenyRate*100)
-	fmt.Fprintf(w, "| Unique domains | %d |\n", report.Summary.UniqueDomains)
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "## Executive Summary\n")
+	writeModelRoutingReportLine(w, "\n")
+	writeModelRoutingReportLine(w, "| Metric | Value |\n")
+	writeModelRoutingReportLine(w, "|--------|-------|\n")
+	writeModelRoutingReportLine(w, "| Runs analyzed | %d |\n", report.RunsAnalyzed)
+	writeModelRoutingReportLine(w, "| Runs with firewall data | %d |\n", report.RunsWithData)
+	writeModelRoutingReportLine(w, "| Runs without firewall data | %d |\n", report.RunsWithoutData)
+	writeModelRoutingReportLine(w, "| Total requests | %d |\n", report.Summary.TotalRequests)
+	writeModelRoutingReportLine(w, "| Allowed requests | %d |\n", report.Summary.TotalAllowed)
+	writeModelRoutingReportLine(w, "| Blocked requests | %d |\n", report.Summary.TotalBlocked)
+	writeModelRoutingReportLine(w, "| Overall denial rate | %.1f%% |\n", report.Summary.OverallDenyRate*100)
+	writeModelRoutingReportLine(w, "| Unique domains | %d |\n", report.Summary.UniqueDomains)
+	writeModelRoutingReportLine(w, "\n")
 }
 
 func renderMarkdownMetricsTrendToWriter(w io.Writer, mt MetricsTrendData) {
@@ -109,48 +109,48 @@ func renderMarkdownMetricsTrendToWriter(w io.Writer, mt MetricsTrendData) {
 		return
 	}
 
-	fmt.Fprintln(w, "## Metrics Trends")
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "| Metric | Total | Avg/run | Min | Max | Spikes |\n")
-	fmt.Fprintf(w, "|--------|-------|---------|-----|-----|--------|\n")
+	writeModelRoutingReportLine(w, "## Metrics Trends\n")
+	writeModelRoutingReportLine(w, "\n")
+	writeModelRoutingReportLine(w, "| Metric | Total | Avg/run | Min | Max | Spikes |\n")
+	writeModelRoutingReportLine(w, "|--------|-------|---------|-----|-----|--------|\n")
 	if mt.TotalTokens > 0 {
 		spikes := "—"
 		if len(mt.TokenSpikes) > 0 {
 			spikes = "⚠ " + formatRunIDs(mt.TokenSpikes)
 		}
-		fmt.Fprintf(w, "| Token Trend | %d | %d | %d | %d | %s |\n",
+		writeModelRoutingReportLine(w, "| Token Trend | %d | %d | %d | %d | %s |\n",
 			mt.TotalTokens, mt.AvgTokens, mt.MinTokens, mt.MaxTokens, spikes)
 	}
 	if mt.TotalTurns > 0 {
-		fmt.Fprintf(w, "| Turns | %d | %.1f | — | %d | — |\n",
+		writeModelRoutingReportLine(w, "| Turns | %d | %.1f | — | %d | — |\n",
 			mt.TotalTurns, mt.AvgTurns, mt.MaxTurns)
 	}
 	if mt.AvgDurationNs > 0 {
-		fmt.Fprintf(w, "| Duration | — | %s | %s | %s | — |\n",
+		writeModelRoutingReportLine(w, "| Duration | — | %s | %s | %s | — |\n",
 			timeutil.FormatDurationNs(mt.AvgDurationNs),
 			timeutil.FormatDurationNs(mt.MinDurationNs),
 			timeutil.FormatDurationNs(mt.MaxDurationNs))
 	}
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "\n")
 }
 
 func renderMarkdownMCPHealthToWriter(w io.Writer, report *CrossRunAuditReport) {
 	if len(report.MCPHealth) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "## MCP Server Health (%d runs)\n\n", report.RunsAnalyzed)
-	fmt.Fprintf(w, "| Server | Connected | Error Rate | Total Calls | Errors | Status |\n")
-	fmt.Fprintf(w, "|--------|-----------|------------|-------------|--------|--------|\n")
+	writeModelRoutingReportLine(w, "## MCP Server Health (%d runs)\n\n", report.RunsAnalyzed)
+	writeModelRoutingReportLine(w, "| Server | Connected | Error Rate | Total Calls | Errors | Status |\n")
+	writeModelRoutingReportLine(w, "|--------|-----------|------------|-------------|--------|--------|\n")
 	for _, h := range report.MCPHealth {
 		status := "✅ ok"
 		if h.Unreliable {
 			status = "⚠ unreliable"
 		}
-		fmt.Fprintf(w, "| `%s` | %d/%d | %.1f%% | %d | %d | %s |\n",
+		writeModelRoutingReportLine(w, "| `%s` | %d/%d | %.1f%% | %d | %d | %s |\n",
 			h.ServerName, h.RunsConnected, h.TotalRuns,
 			h.ErrorRate*100, h.ToolCallCount, h.ErrorCount, status)
 	}
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "\n")
 }
 
 func renderMarkdownErrorTrendToWriter(w io.Writer, report *CrossRunAuditReport) {
@@ -158,36 +158,36 @@ func renderMarkdownErrorTrendToWriter(w io.Writer, report *CrossRunAuditReport) 
 	if et.TotalErrors == 0 && et.TotalWarnings == 0 {
 		return
 	}
-	fmt.Fprintln(w, "## Error Trend")
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "| Metric | Value |\n")
-	fmt.Fprintf(w, "|--------|-------|\n")
-	fmt.Fprintf(w, "| Runs with errors | %d/%d (%.0f%%) |\n",
+	writeModelRoutingReportLine(w, "## Error Trend\n")
+	writeModelRoutingReportLine(w, "\n")
+	writeModelRoutingReportLine(w, "| Metric | Value |\n")
+	writeModelRoutingReportLine(w, "|--------|-------|\n")
+	writeModelRoutingReportLine(w, "| Runs with errors | %d/%d (%.0f%%) |\n",
 		et.RunsWithErrors, report.RunsAnalyzed,
 		safePercent(et.RunsWithErrors, report.RunsAnalyzed))
-	fmt.Fprintf(w, "| Total errors | %d |\n", et.TotalErrors)
-	fmt.Fprintf(w, "| Avg errors/run | %.2f |\n", et.AvgErrorsPerRun)
+	writeModelRoutingReportLine(w, "| Total errors | %d |\n", et.TotalErrors)
+	writeModelRoutingReportLine(w, "| Avg errors/run | %.2f |\n", et.AvgErrorsPerRun)
 	if et.TotalWarnings > 0 {
-		fmt.Fprintf(w, "| Runs with warnings | %d/%d |\n", et.RunsWithWarnings, report.RunsAnalyzed)
-		fmt.Fprintf(w, "| Total warnings | %d |\n", et.TotalWarnings)
+		writeModelRoutingReportLine(w, "| Runs with warnings | %d/%d |\n", et.RunsWithWarnings, report.RunsAnalyzed)
+		writeModelRoutingReportLine(w, "| Total warnings | %d |\n", et.TotalWarnings)
 	}
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "\n")
 }
 
 func renderMarkdownDomainInventoryToWriter(w io.Writer, report *CrossRunAuditReport) {
 	if len(report.DomainInventory) == 0 {
 		return
 	}
-	fmt.Fprintln(w, "## Domain Inventory")
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "| Domain | Status | Seen In | Allowed | Blocked |\n")
-	fmt.Fprintf(w, "|--------|--------|---------|---------|--------|\n")
+	writeModelRoutingReportLine(w, "## Domain Inventory\n")
+	writeModelRoutingReportLine(w, "\n")
+	writeModelRoutingReportLine(w, "| Domain | Status | Seen In | Allowed | Blocked |\n")
+	writeModelRoutingReportLine(w, "|--------|--------|---------|---------|--------|\n")
 	for _, entry := range report.DomainInventory {
-		fmt.Fprintf(w, "| `%s` | %s %s | %d/%d runs | %d | %d |\n",
+		writeModelRoutingReportLine(w, "| `%s` | %s %s | %d/%d runs | %d | %d |\n",
 			entry.Domain, firewallStatusEmoji(entry.OverallStatus), entry.OverallStatus,
 			entry.SeenInRuns, report.RunsAnalyzed, entry.TotalAllowed, entry.TotalBlocked)
 	}
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "\n")
 }
 
 func renderMarkdownDrain3InsightsToWriter(w io.Writer, insights []ObservabilityInsight) {
@@ -195,37 +195,37 @@ func renderMarkdownDrain3InsightsToWriter(w io.Writer, insights []ObservabilityI
 		return
 	}
 	crossRunRenderLog.Printf("Rendering markdown drain3 insights: count=%d", len(insights))
-	fmt.Fprintln(w, "## Agent Event Pattern Analysis")
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "| Severity | Category | Title | Summary |\n")
-	fmt.Fprintf(w, "|----------|----------|-------|--------|\n")
+	writeModelRoutingReportLine(w, "## Agent Event Pattern Analysis\n")
+	writeModelRoutingReportLine(w, "\n")
+	writeModelRoutingReportLine(w, "| Severity | Category | Title | Summary |\n")
+	writeModelRoutingReportLine(w, "|----------|----------|-------|--------|\n")
 	for _, insight := range insights {
 		summary := insight.Summary
 		if insight.Evidence != "" {
 			summary += " (" + insight.Evidence + ")"
 		}
-		fmt.Fprintf(w, "| %s %s | %s | %s | %s |\n",
+		writeModelRoutingReportLine(w, "| %s %s | %s | %s | %s |\n",
 			renderSeverityIcon(insight.Severity), insight.Severity, insight.Category, insight.Title, summary)
 	}
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "\n")
 }
 
 func renderMarkdownPerRunBreakdownToWriter(w io.Writer, runs []PerRunFirewallBreakdown) {
 	if len(runs) == 0 {
 		return
 	}
-	fmt.Fprintln(w, "## Per-Run Breakdown")
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "| Run ID | Workflow | Conclusion | Duration | Firewall | Tokens | Turns | MCP Err | Errors |\n")
-	fmt.Fprintf(w, "|--------|----------|------------|----------|----------|--------|-------|---------|--------|\n")
+	writeModelRoutingReportLine(w, "## Per-Run Breakdown\n")
+	writeModelRoutingReportLine(w, "\n")
+	writeModelRoutingReportLine(w, "| Run ID | Workflow | Conclusion | Duration | Firewall | Tokens | Turns | MCP Err | Errors |\n")
+	writeModelRoutingReportLine(w, "|--------|----------|------------|----------|----------|--------|-------|---------|--------|\n")
 	for _, run := range runs {
 		firewallCol, tokenStr, turnsStr, durStr := markdownPerRunFields(run)
-		fmt.Fprintf(w, "| %d | %s | %s | %s | %s | %s | %s | %d | %d |\n",
+		writeModelRoutingReportLine(w, "| %d | %s | %s | %s | %s | %s | %s | %d | %d |\n",
 			run.RunID, run.WorkflowName, run.Conclusion, durStr,
 			firewallCol, tokenStr, turnsStr,
 			run.MCPErrors, run.ErrorCount)
 	}
-	fmt.Fprintln(w)
+	writeModelRoutingReportLine(w, "\n")
 }
 
 func markdownPerRunFields(run PerRunFirewallBreakdown) (string, string, string, string) {
@@ -469,9 +469,9 @@ func renderPrettyFinalStatus(report *CrossRunAuditReport) {
 
 // formatRunIDs formats a slice of run IDs as a comma-separated string.
 func formatRunIDs(ids []int64) string {
-	parts := make([]string, len(ids))
-	for i, id := range ids {
-		parts[i] = fmt.Sprintf("#%d", id)
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, fmt.Sprintf("#%d", id))
 	}
 	return strings.Join(parts, ", ")
 }

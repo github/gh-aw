@@ -219,12 +219,12 @@ func TestSessionParserCopilotSubagentAttribution(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, summary)
 			require.Equal(t, []SubagentModelRequest{
-				{AgentName: "awf-routing", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, CompletedCount: 1, Effort: "low"},
-				{AgentName: "ghaw-issues", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "low"},
-				{AgentName: "subagent-research", RequestedModel: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "xhigh"},
+				{AgentName: "awf-routing", RequestedModel: "opus", ResolvedModel: "opus", EffectiveModel: "opus", InvocationCount: 1, CompletedCount: 1, Effort: "low"},
+				{AgentName: "ghaw-issues", RequestedModel: "opus", ResolvedModel: "opus", EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "low"},
+				{AgentName: "subagent-research", RequestedModel: "opus", ResolvedModel: "opus", EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "xhigh"},
 			}, summary.SubagentModelRequests)
 			require.Equal(t, []SubagentModelActual{{
-				Model: "opus", ResolvedModel: "opus", ServedModels: []string{"opus"}, Requests: 60,
+				Model: "opus", ResolvedModel: "opus", Requests: 60,
 				TokenCoreMetrics: TokenCoreMetrics{InputTokens: 6000, OutputTokens: 600, CacheReadTokens: 60, CacheWriteTokens: 120},
 			}}, summary.SubagentModelActuals)
 			require.Zero(t, summary.MismatchCount)

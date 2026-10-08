@@ -334,7 +334,10 @@ func selectAuditComparisonBaseline(current ProcessedRun, candidates []auditCompa
 		}
 	})
 
-	return &candidates[0]
+	for _, candidate := range candidates {
+		return &candidate
+	}
+	return nil
 }
 
 func sameAuditComparisonWorkflow(left WorkflowRun, right WorkflowRun) bool {
@@ -387,9 +390,49 @@ func buildAuditComparison(currentConclusion string, current auditComparisonSnaps
 		return &AuditComparisonData{BaselineFound: false}
 	}
 
-	reasonCodes := make([]string, 0, 4)
 	currentConclusion = strings.TrimSpace(strings.ToLower(currentConclusion))
 	currentRunUnsuccessful := currentConclusion != "" && currentConclusion != "success"
+	delta, reasonCodes := buildAuditComparisonDelta(current, *baseline, currentRunUnsuccessful)
+	newMCPFailure := len(baseline.MCPFailures) == 0 && len(current.MCPFailures) > 0
+	mcpFailuresResolved := len(baseline.MCPFailures) > 0 && len(current.MCPFailures) == 0
+	if newMCPFailure || len(baseline.MCPFailures) > 0 || len(current.MCPFailures) > 0 {
+		delta.MCPFailure = &AuditComparisonMCPFailureDelta{
+			Before:       baseline.MCPFailures,
+			After:        current.MCPFailures,
+			NewlyPresent: newMCPFailure,
+		}
+	}
+	if newMCPFailure {
+		reasonCodes = append(reasonCodes, "new_mcp_failure")
+	} else if mcpFailuresResolved {
+		reasonCodes = append(reasonCodes, "mcp_failures_resolved")
+	}
+	label := classifyAuditComparison(currentRunUnsuccessful, newMCPFailure, mcpFailuresResolved, current, *baseline, delta, reasonCodes)
+
+	return &AuditComparisonData{
+		BaselineFound: true,
+		Baseline: &AuditComparisonBaseline{
+			RunID:        baselineRun.DatabaseID,
+			WorkflowName: baselineRun.WorkflowName,
+			Conclusion:   baselineRun.Conclusion,
+			CreatedAt:    baselineRun.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Selection:    "latest_success",
+			ModelRouting: baseline.ModelRouting,
+		},
+		ModelRouting: current.ModelRouting,
+		Delta:        delta,
+		Classification: &AuditComparisonClassification{
+			Label:       label,
+			ReasonCodes: reasonCodes,
+		},
+		Recommendation: &AuditComparisonRecommendation{
+			Action: recommendAuditComparisonAction(label, currentConclusion, delta),
+		},
+	}
+}
+
+func buildAuditComparisonDelta(current, baseline auditComparisonSnapshot, currentRunUnsuccessful bool) (*AuditComparisonDelta, []string) {
+	reasonCodes := make([]string, 0, 4)
 	delta := &AuditComparisonDelta{
 		Turns: AuditComparisonIntDelta{
 			Before:  baseline.Turns,
@@ -434,22 +477,10 @@ func buildAuditComparison(currentConclusion string, current auditComparisonSnaps
 	if currentRunUnsuccessful {
 		reasonCodes = append(reasonCodes, "run_unsuccessful")
 	}
+	return delta, reasonCodes
+}
 
-	newMCPFailure := len(baseline.MCPFailures) == 0 && len(current.MCPFailures) > 0
-	mcpFailuresResolved := len(baseline.MCPFailures) > 0 && len(current.MCPFailures) == 0
-	if newMCPFailure || len(baseline.MCPFailures) > 0 || len(current.MCPFailures) > 0 {
-		delta.MCPFailure = &AuditComparisonMCPFailureDelta{
-			Before:       baseline.MCPFailures,
-			After:        current.MCPFailures,
-			NewlyPresent: newMCPFailure,
-		}
-	}
-	if newMCPFailure {
-		reasonCodes = append(reasonCodes, "new_mcp_failure")
-	} else if mcpFailuresResolved {
-		reasonCodes = append(reasonCodes, "mcp_failures_resolved")
-	}
-
+func classifyAuditComparison(currentRunUnsuccessful, newMCPFailure, mcpFailuresResolved bool, current, baseline auditComparisonSnapshot, delta *AuditComparisonDelta, reasonCodes []string) string {
 	label := "stable"
 	switch {
 	case currentRunUnsuccessful:
@@ -469,27 +500,7 @@ func buildAuditComparison(currentConclusion string, current auditComparisonSnaps
 	case len(reasonCodes) > 0:
 		label = "changed"
 	}
-
-	return &AuditComparisonData{
-		BaselineFound: true,
-		Baseline: &AuditComparisonBaseline{
-			RunID:        baselineRun.DatabaseID,
-			WorkflowName: baselineRun.WorkflowName,
-			Conclusion:   baselineRun.Conclusion,
-			CreatedAt:    baselineRun.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			Selection:    "latest_success",
-			ModelRouting: baseline.ModelRouting,
-		},
-		ModelRouting: current.ModelRouting,
-		Delta:        delta,
-		Classification: &AuditComparisonClassification{
-			Label:       label,
-			ReasonCodes: reasonCodes,
-		},
-		Recommendation: &AuditComparisonRecommendation{
-			Action: recommendAuditComparisonAction(label, currentConclusion, delta),
-		},
-	}
+	return label
 }
 
 func recommendAuditComparisonAction(label, currentConclusion string, delta *AuditComparisonDelta) string {

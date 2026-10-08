@@ -418,15 +418,17 @@ func normalizeLegacyEndpointDeviation(summary *ModelRoutingSummary, request *mod
 	}
 }
 
+type modelRoutingRouteKey struct {
+	taskType, scope, complexity, mode, model, effort, routerVersion string
+}
+
+type modelRoutingRouteTotals struct {
+	count int
+	aic   float64
+}
+
 func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary {
-	type routeKey struct {
-		taskType, scope, complexity, mode, model, effort, routerVersion string
-	}
-	type routeTotals struct {
-		count int
-		aic   float64
-	}
-	totals := make(map[routeKey]routeTotals)
+	totals := make(map[modelRoutingRouteKey]modelRoutingRouteTotals)
 	subagentTotals := make(map[string]ModelRoutingAgentCost)
 	result := &ModelRoutingLogsSummary{}
 	for _, run := range runs {
@@ -437,22 +439,7 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 		result.EndpointOnlyNormalized = result.EndpointOnlyNormalized || routing.EndpointOnlyDeviationNormalized
 		result.ClassifierAIC += routing.ClassifierCost.AIC
 		addModelRoutingCost(&result.MainAgentCost, routing.MainAgentCost)
-		for _, agent := range routing.SubagentCosts {
-			key := agent.AgentName + "\x00" + agent.Effort
-			total := subagentTotals[key]
-			if total.AgentName == "" {
-				total.AgentName = agent.AgentName
-				total.AgentType = agent.AgentType
-				total.Effort = agent.Effort
-			}
-			total.InstanceCount += agent.InstanceCount
-			total.CompletedCount += agent.CompletedCount
-			total.FailedCount += agent.FailedCount
-			total.IncompleteCount += agent.IncompleteCount
-			total.Models = appendUniqueStrings(total.Models, agent.Models...)
-			addModelRoutingCost(&total.ModelRoutingCost, agent.ModelRoutingCost)
-			subagentTotals[key] = total
-		}
+		addModelRoutingSubagentTotals(subagentTotals, routing.SubagentCosts)
 		requests := 0
 		for _, count := range routing.RoutedCounts {
 			requests += count
@@ -462,7 +449,7 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 		if routing.Status != "selected" || routing.SelectedModel == "" {
 			continue
 		}
-		key := routeKey{
+		key := modelRoutingRouteKey{
 			routing.Labels.TaskType, routing.Labels.Scope, routing.Labels.TaskComplexity,
 			routing.Mode, routing.SelectedModel, routing.SelectedEffort, routing.RouterVersion,
 		}
@@ -474,32 +461,59 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 	if len(totals) == 0 && result.TotalRequests == 0 && result.ClassifierAIC == 0 && result.MainAgentCost.Requests == 0 && len(subagentTotals) == 0 {
 		return nil
 	}
-	for _, cost := range subagentTotals {
-		slices.Sort(cost.Models)
-		result.SubagentCosts = append(result.SubagentCosts, cost)
+	appendModelRoutingSubagentCosts(result, subagentTotals)
+	appendModelRoutingRouteSummaries(result, totals)
+	if result.TotalRequests > 0 {
+		result.DeviatedTrafficShare = float64(result.DeviatedRequests) / float64(result.TotalRequests)
 	}
-	slices.SortFunc(result.SubagentCosts, func(a, b ModelRoutingAgentCost) int {
+	return result
+}
+
+func addModelRoutingSubagentTotals(totals map[string]ModelRoutingAgentCost, agents []ModelRoutingAgentCost) {
+	for _, agent := range agents {
+		key := agent.AgentName + "\x00" + agent.Effort
+		total := totals[key]
+		if total.AgentName == "" {
+			total.AgentName = agent.AgentName
+			total.AgentType = agent.AgentType
+			total.Effort = agent.Effort
+		}
+		total.InstanceCount += agent.InstanceCount
+		total.CompletedCount += agent.CompletedCount
+		total.FailedCount += agent.FailedCount
+		total.IncompleteCount += agent.IncompleteCount
+		total.Models = appendUniqueStrings(total.Models, agent.Models...)
+		addModelRoutingCost(&total.ModelRoutingCost, agent.ModelRoutingCost)
+		totals[key] = total
+	}
+}
+
+func appendModelRoutingSubagentCosts(summary *ModelRoutingLogsSummary, totals map[string]ModelRoutingAgentCost) {
+	for _, cost := range totals {
+		slices.Sort(cost.Models)
+		summary.SubagentCosts = append(summary.SubagentCosts, cost)
+	}
+	slices.SortFunc(summary.SubagentCosts, func(a, b ModelRoutingAgentCost) int {
 		if order := strings.Compare(a.AgentName, b.AgentName); order != 0 {
 			return order
 		}
 		return strings.Compare(a.Effort, b.Effort)
 	})
+}
+
+func appendModelRoutingRouteSummaries(summary *ModelRoutingLogsSummary, totals map[modelRoutingRouteKey]modelRoutingRouteTotals) {
 	for key, route := range totals {
-		result.Routes = append(result.Routes, ModelRoutingRouteSummary{
+		summary.Routes = append(summary.Routes, ModelRoutingRouteSummary{
 			TaskType: key.taskType, Scope: key.scope, Complexity: key.complexity, Mode: key.mode,
 			Model: key.model, Effort: key.effort, RouterVersion: key.routerVersion,
 			RunCount: route.count, TotalAIC: route.aic, AverageAIC: route.aic / float64(route.count),
 		})
 	}
-	slices.SortFunc(result.Routes, func(left, right ModelRoutingRouteSummary) int {
+	slices.SortFunc(summary.Routes, func(left, right ModelRoutingRouteSummary) int {
 		leftKey := strings.Join([]string{left.TaskType, left.Scope, left.Complexity, left.Mode, left.Model, left.Effort, left.RouterVersion}, "\x00")
 		rightKey := strings.Join([]string{right.TaskType, right.Scope, right.Complexity, right.Mode, right.Model, right.Effort, right.RouterVersion}, "\x00")
 		return strings.Compare(leftKey, rightKey)
 	})
-	if result.TotalRequests > 0 {
-		result.DeviatedTrafficShare = float64(result.DeviatedRequests) / float64(result.TotalRequests)
-	}
-	return result
 }
 
 func addModelRoutingCost(total *ModelRoutingCost, next ModelRoutingCost) {

@@ -1,0 +1,8 @@
+{"timestamp":"2026-10-08T10:01:01Z","purpose":"subagent","provider":"anthropic","model":"claude-haiku-4-5-20251001","path":"/v1/messages","input_tokens":10,"output_tokens":2,"ai_credits_this_response":0.5}
+{"timestamp":"2026-10-08T10:02:01Z","purpose":"subagent","provider":"anthropic","model":"claude-haiku-4-5-20251001","path":"/v1/messages","input_tokens":20,"output_tokens":3,"ai_credits_this_response":0.7}
+{"timestamp":"2026-10-08T10:03:01Z","purpose":"subagent","provider":"anthropic","model":"claude-haiku-4-5-20251001","path":"/v1/messages","input_tokens":30,"output_tokens":4,"ai_credits_this_response":0.501}
+{"timestamp":"2026-10-08T10:04:01Z","purpose":"subagent","provider":"anthropic","model":"claude-haiku-4-5-20251001","path":"/v1/messages","input_tokens":40,"output_tokens":5,"ai_credits_this_response":0.693}
+{"timestamp":"2026-10-08T10:00:01Z","purpose":"agent","provider":"github-copilot","model":"gpt-5.6-luna","path":"/responses","input_tokens":100,"output_tokens":10,"ai_credits_this_response":0.0825}
+{"timestamp":"2026-10-08T10:00:02Z","purpose":"agent","provider":"github-copilot","model":"gpt-5.6-luna","path":"/responses","input_tokens":101,"output_tokens":10,"ai_credits_this_response":0.0825}
+{"timestamp":"2026-10-08T10:00:03Z","purpose":"agent","provider":"github-copilot","model":"gpt-5.6-luna","path":"/responses","input_tokens":102,"output_tokens":10,"ai_credits_this_response":0.0825}
+{"timestamp":"2026-10-08T10:00:04Z","purpose":"agent","provider":"github-copilot","model":"gpt-5.6-luna","path":"/responses","input_tokens":103,"output_tokens":10,"ai_credits_this_response":0.0825}

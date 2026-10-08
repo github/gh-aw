@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,7 +95,9 @@ func TestModelIdentityResolverFoldsAliasAndDatedIDs(t *testing.T) {
 	require.Equal(t, "gpt-5.4-mini", actuals[0].Model)
 	require.Equal(t, 4, actuals[0].Requests)
 	require.InDelta(t, 1.144, actuals[0].AIC, 0.000001)
-	require.ElementsMatch(t, []string{"small", "gpt-5.4-mini"}, actuals[0].ServedModels)
+	require.Empty(t, actuals[0].ServedModels)
+	withWireID := resolveSubagentActualModels(actuals, resolver, "gpt-5.4-mini-2026-03-17")
+	require.Equal(t, []string{"gpt-5.4-mini-2026-03-17"}, withWireID[0].ServedModels)
 }
 
 func TestResolveAgentUsagePrefersPerAgentModelEvidence(t *testing.T) {
@@ -220,6 +223,44 @@ func TestMatchPiAgentUsageCreditsUsesResponseModelAndProxyTimeOrder(t *testing.T
 	require.Zero(t, unmatched.AgentUsage[0].AIC)
 }
 
+func TestMatchPiAgentUsageCreditsKeepsMainAgentWhenOneChildDoesNotMatch(t *testing.T) {
+	entries := []TokenUsageEntry{
+		{Provider: "anthropic", Model: "claude-haiku-4-5-20251001", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10}, AICreditsThisResponse: json.RawMessage(`0.6`)},
+		{Provider: "github-copilot", Model: "gpt-5.6-luna", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 30}, AICreditsThisResponse: json.RawMessage(`0.1`)},
+		{Provider: "github-copilot", Model: "gpt-5.6-luna", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 31}, AICreditsThisResponse: json.RawMessage(`0.1`)},
+		{Provider: "github-copilot", Model: "gpt-5.6-luna", TokenCoreMetrics: TokenCoreMetrics{InputTokens: 32}, AICreditsThisResponse: json.RawMessage(`0.12`)},
+	}
+	summary := &TokenUsageSummary{AgentUsage: []AgentUsageBreakdown{
+		{
+			AgentName: "file-summarizer", AgentType: "subagent", SourceEngine: "pi",
+			requestUsages: []agentRequestUsage{{
+				Model:            "claude-haiku-4-5-20251001",
+				TokenCoreMetrics: TokenCoreMetrics{InputTokens: 10},
+			}},
+		},
+		{
+			AgentName: "quick-checker", AgentType: "subagent", SourceEngine: "pi",
+			RequestedModels: []string{"small"},
+			ResolvedModels:  []string{"claude-haiku-4.5"},
+			requestUsages: []agentRequestUsage{{
+				Model:            "claude-haiku-4-5-20251001",
+				TokenCoreMetrics: TokenCoreMetrics{InputTokens: 20},
+			}},
+		},
+	}}
+
+	matchPiAgentUsageCredits(summary, entries, newModelIdentityResolver(""))
+
+	require.Len(t, summary.Warnings, 1)
+	require.Contains(t, summary.Warnings[0], "quick-checker")
+	require.Len(t, summary.AgentUsage, 3)
+	main := summary.AgentUsage[2]
+	require.Equal(t, "main", main.AgentType)
+	require.Equal(t, 3, main.Requests)
+	require.InDelta(t, 0.32, main.AIC, 0.000001)
+	require.NotContains(t, main.Models, AgentModelUsage{Model: "claude-haiku-4-5-20251001"})
+}
+
 func TestReconcileAgentUsageCreditsNamesEndpoint(t *testing.T) {
 	summary := &TokenUsageSummary{
 		AICFound: true, TotalAIC: 2.576, endpoint: "/responses",
@@ -229,6 +270,125 @@ func TestReconcileAgentUsageCreditsNamesEndpoint(t *testing.T) {
 	require.Len(t, summary.Warnings, 1)
 	require.Contains(t, summary.Warnings[0], "/responses")
 	require.Contains(t, summary.Warnings[0], "differ from non-classifier proxy total")
+}
+
+func TestReconcileAgentUsageCreditsIgnoresClassifierEndpoint(t *testing.T) {
+	summary := &TokenUsageSummary{
+		AICFound: true, TotalAIC: 17.058, endpoint: "/responses",
+		AgentUsage: []AgentUsageBreakdown{{AgentName: "main", AIC: 17.018}},
+	}
+	entries := []TokenUsageEntry{
+		{Purpose: "routing_classification", Path: "/responses", AICreditsThisResponse: json.RawMessage(`0.04`)},
+		{Purpose: "agent", Path: "/v1/messages", AICreditsThisResponse: json.RawMessage(`17.018`)},
+	}
+
+	reconcileAgentUsageCredits(summary, entries)
+
+	require.Empty(t, summary.Warnings)
+}
+
+func TestReconcileAgentUsageCreditsNamesAgentEndpoint(t *testing.T) {
+	summary := &TokenUsageSummary{
+		AICFound: true, TotalAIC: 17.118, endpoint: "/responses",
+		AgentUsage: []AgentUsageBreakdown{{AgentName: "main", AIC: 17.018}},
+	}
+	entries := []TokenUsageEntry{
+		{Purpose: "routing_classification", Path: "/responses", AICreditsThisResponse: json.RawMessage(`0.04`)},
+		{Purpose: "agent", Path: "/v1/messages", AICreditsThisResponse: json.RawMessage(`17.078`)},
+	}
+
+	reconcileAgentUsageCredits(summary, entries)
+
+	require.Len(t, summary.Warnings, 1)
+	require.Contains(t, summary.Warnings[0], "/v1/messages")
+	require.NotContains(t, summary.Warnings[0], "/responses")
+}
+
+func TestLegacyPiAttributionFixture(t *testing.T) {
+	fixture := filepath.Join("testdata", "subagent_attribution", "37733652548")
+	session, err := os.ReadFile(filepath.Join(fixture, "agent-session.jsonl"))
+	require.NoError(t, err)
+	requests, _, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(string(session)), false)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, requests, 2)
+	require.Equal(t, 1, requests[0].CompletedCount)
+	require.Equal(t, 1, requests[1].CompletedCount)
+
+	usage, err := os.ReadFile(filepath.Join(fixture, "token-usage.jsonl"))
+	require.NoError(t, err)
+	entries := make([]TokenUsageEntry, 0)
+	for line := range strings.SplitSeq(strings.TrimSpace(string(usage)), "\n") {
+		var entry TokenUsageEntry
+		require.NoError(t, json.Unmarshal([]byte(line), &entry))
+		entries = append(entries, entry)
+	}
+
+	resolver := newModelIdentityResolver(fixture)
+	agents = resolveAgentUsageModels(agents, resolver, tokenUsageEntryModels(entries)...)
+	actuals := subagentActualsFromAgentUsage(agents)
+	requests = resolveSubagentRequestModels(requests, actuals, resolver, tokenUsageEntryModels(entries)...)
+	actuals = resolveSubagentActualModels(actuals, resolver, tokenUsageEntryModels(entries)...)
+	summary := &TokenUsageSummary{AgentUsage: agents, AICFound: true}
+	for _, entry := range entries {
+		summary.TotalAIC += tokenUsageEntryCredits(entry)
+	}
+	matchPiAgentUsageCredits(summary, entries, resolver)
+	reconcileAgentUsageCredits(summary, entries)
+
+	require.Len(t, actuals, 1)
+	require.Equal(t, 4, actuals[0].Requests)
+	require.Equal(t, "claude-haiku-4.5", actuals[0].Model)
+	require.NotContains(t, actuals[0].ServedModels, "small")
+	require.Len(t, summary.AgentUsage, 3)
+	creditsByAgent := make(map[string]float64)
+	var quickCheckerRequest SubagentModelRequest
+	for _, request := range requests {
+		if request.AgentName == "quick-checker" {
+			quickCheckerRequest = request
+			break
+		}
+	}
+	require.Equal(t, "quick-checker", quickCheckerRequest.AgentName)
+	require.Equal(t, "claude-haiku-4.5", quickCheckerRequest.EffectiveModel)
+	require.NotContains(t, quickCheckerRequest.ServedModels, "small")
+	require.Contains(t, quickCheckerRequest.ServedModels, "claude-haiku-4-5-20251001")
+	for _, agent := range summary.AgentUsage {
+		creditsByAgent[agent.AgentName] = agent.AIC
+		if agent.AgentName == "quick-checker" {
+			require.NotContains(t, agent.ServedModels, "small")
+			require.Contains(t, agent.ServedModels, "claude-haiku-4-5-20251001")
+		}
+	}
+	require.InDelta(t, 1.393, creditsByAgent["file-summarizer"], 0.000001)
+	require.InDelta(t, 1.001, creditsByAgent["quick-checker"], 0.000001)
+	require.Empty(t, summary.Warnings)
+}
+
+func TestPiInvocationIDAttributionFixture(t *testing.T) {
+	path := filepath.Join("testdata", "subagent_attribution", "pi-invocation-ids", "agent-session.jsonl")
+	session, err := os.ReadFile(path)
+	require.NoError(t, err)
+	requests, _, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(string(session)), false)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, requests, 2)
+	require.Equal(t, "file-summarizer", requests[0].AgentName)
+	require.Equal(t, 1, requests[0].FailedCount)
+	require.Equal(t, "quick-checker", requests[1].AgentName)
+	require.Equal(t, 1, requests[1].CompletedCount)
+	require.Equal(t, "file-summarizer", agents[0].AgentName)
+	require.Equal(t, 1, agents[0].FailedCount)
+	require.Equal(t, "quick-checker", agents[1].AgentName)
+	require.Equal(t, 1, agents[1].CompletedCount)
+}
+
+func tokenUsageEntryModels(entries []TokenUsageEntry) []string {
+	models := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		models = appendUnique(models, entry.Model)
+	}
+	return models
 }
 
 func TestPiFailedSubagentsStillAttributeMainAgentCredits(t *testing.T) {

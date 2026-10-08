@@ -249,7 +249,11 @@ func extractAmbientContextMetrics(entries []TokenUsageEntry) *AmbientContextMetr
 		return 0
 	})
 
-	firstCall := ordered[0].entry
+	var firstCall TokenUsageEntry
+	for _, entry := range ordered {
+		firstCall = entry.entry
+		break
+	}
 	return &AmbientContextMetrics{
 		InputTokens:  firstCall.InputTokens,
 		CachedTokens: firstCall.CacheReadTokens,

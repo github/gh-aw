@@ -298,6 +298,7 @@ func TestSessionAgentUsageIncludesMainAndSubagents(t *testing.T) {
 	agents = resolveAgentUsageModels(agents, resolver, modelID)
 	require.Equal(t, "gpt-5.4-mini", requests[0].EffectiveModel)
 	require.Contains(t, requests[0].ServedModels, modelID)
+	require.NotContains(t, requests[0].ServedModels, "small")
 	require.Len(t, actuals, 1)
 	require.Equal(t, 4, actuals[0].Requests)
 	require.InDelta(t, 1.144, actuals[0].AIC, 0.000001)
@@ -305,6 +306,7 @@ func TestSessionAgentUsageIncludesMainAndSubagents(t *testing.T) {
 	require.Len(t, agents[1].Models, 1)
 	require.Equal(t, "gpt-5.4-mini", agents[1].Models[0].Model)
 	require.Contains(t, agents[1].ServedModels, modelID)
+	require.NotContains(t, agents[1].ServedModels, "small")
 }
 
 func TestPiLegacySubagentEventsCorrelateByAgent(t *testing.T) {

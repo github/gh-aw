@@ -30,41 +30,64 @@ type sessionSubagentEvent struct {
 }
 
 type sessionSubagentData struct {
-	SourceEngine     string          `json:"sourceEngine"`
-	SessionID        string          `json:"sessionId"`
-	InvocationID     string          `json:"invocationId"`
-	ToolCallID       string          `json:"toolCallId"`
-	AgentName        string          `json:"agentName"`
-	AgentDisplayName string          `json:"agentDisplayName"`
-	Model            string          `json:"model"`
-	NewModel         string          `json:"newModel"`
-	RequestedModel   string          `json:"requestedModel"`
-	ResolvedModel    string          `json:"resolvedModel"`
-	Outcome          string          `json:"outcome"`
-	ErrorMessage     string          `json:"errorMessage"`
-	ReasoningEffort  string          `json:"reasoningEffort"`
-	Error            string          `json:"error"`
-	Agent            string          `json:"agent"`
-	Event            json.RawMessage `json:"event"`
-	AgentMetrics     map[string]struct {
-		AgentName          string `json:"agentName"`
-		AgentDisplayName   string `json:"agentDisplayName"`
-		TotalNanoAiu       int64  `json:"totalNanoAiu"`
-		TotalApiDurationMs int    `json:"totalApiDurationMs"`
-		ModelMetrics       map[string]struct {
-			Requests struct {
-				Count *int `json:"count"`
-			} `json:"requests"`
-			Usage struct {
-				InputTokens      int `json:"inputTokens"`
-				OutputTokens     int `json:"outputTokens"`
-				CacheReadTokens  int `json:"cacheReadTokens"`
-				CacheWriteTokens int `json:"cacheWriteTokens"`
-				ReasoningTokens  int `json:"reasoningTokens"`
-			} `json:"usage"`
-			TotalNanoAiu int64 `json:"totalNanoAiu"`
-		} `json:"modelMetrics"`
-	} `json:"agentMetrics"`
+	SourceEngine     string                                `json:"sourceEngine"`
+	SessionID        string                                `json:"sessionId"`
+	InvocationID     string                                `json:"invocationId"`
+	ToolCallID       string                                `json:"toolCallId"`
+	AgentName        string                                `json:"agentName"`
+	AgentDisplayName string                                `json:"agentDisplayName"`
+	Model            string                                `json:"model"`
+	NewModel         string                                `json:"newModel"`
+	RequestedModel   string                                `json:"requestedModel"`
+	ResolvedModel    string                                `json:"resolvedModel"`
+	Outcome          string                                `json:"outcome"`
+	ErrorMessage     string                                `json:"errorMessage"`
+	ReasoningEffort  string                                `json:"reasoningEffort"`
+	Error            string                                `json:"error"`
+	Agent            string                                `json:"agent"`
+	ToolName         string                                `json:"toolName"`
+	Input            json.RawMessage                       `json:"input"`
+	Success          *bool                                 `json:"success"`
+	Event            json.RawMessage                       `json:"event"`
+	AgentMetrics     map[string]sessionSubagentAgentMetric `json:"agentMetrics"`
+}
+
+type sessionSubagentAgentMetric struct {
+	AgentName          string                                `json:"agentName"`
+	AgentDisplayName   string                                `json:"agentDisplayName"`
+	TotalNanoAiu       int64                                 `json:"totalNanoAiu"`
+	TotalApiDurationMs int                                   `json:"totalApiDurationMs"`
+	ModelMetrics       map[string]sessionSubagentModelMetric `json:"modelMetrics"`
+}
+
+type sessionSubagentModelMetric struct {
+	Requests struct {
+		Count *int `json:"count"`
+	} `json:"requests"`
+	Usage struct {
+		InputTokens      int `json:"inputTokens"`
+		OutputTokens     int `json:"outputTokens"`
+		CacheReadTokens  int `json:"cacheReadTokens"`
+		CacheWriteTokens int `json:"cacheWriteTokens"`
+		ReasoningTokens  int `json:"reasoningTokens"`
+	} `json:"usage"`
+	TotalNanoAiu int64 `json:"totalNanoAiu"`
+}
+
+type piSubagentEventPayload struct {
+	Message struct {
+		Model         string          `json:"model"`
+		ResponseModel string          `json:"responseModel"`
+		Timestamp     json.RawMessage `json:"timestamp"`
+		StopReason    string          `json:"stopReason"`
+		ErrorMessage  string          `json:"errorMessage"`
+		Usage         struct {
+			Input      int `json:"input"`
+			Output     int `json:"output"`
+			CacheRead  int `json:"cacheRead"`
+			CacheWrite int `json:"cacheWrite"`
+		} `json:"usage"`
+	} `json:"message"`
 }
 
 // Unified conclusion evidence precedes the canonical bootstrap trace. Neither
@@ -134,6 +157,7 @@ type subagentSessionModels struct {
 	agentUsage     map[string]*AgentUsageBreakdown
 	legacyPiActive map[string]string
 	legacyPiCount  map[string]int
+	legacyPiTools  map[string]string
 	sourceEngine   string
 	found          bool
 }
@@ -230,6 +254,7 @@ func (sessions *subagentSessionSelection) observe(event sessionSubagentEvent) er
 			actualModels:   make(map[string]map[string]SubagentModelActual),
 			agentUsage:     make(map[string]*AgentUsageBreakdown),
 			legacyPiActive: make(map[string]string), legacyPiCount: make(map[string]int),
+			legacyPiTools: make(map[string]string),
 		}
 		sessions.scopes[scope] = models
 		if len(sessions.scopes) == 1 {
@@ -265,7 +290,7 @@ func subagentSessionStart(event sessionSubagentEvent) (time.Time, error) {
 
 func (models *subagentSessionModels) observe(event sessionSubagentEvent) error {
 	switch event.Type {
-	case "session.start", "session.init", "subagent.started", "subagent.configured", "subagent.completed", "subagent.failed", "session.model_change", "session.result", "session.shutdown", "pi.subagent_dispatch", "pi.subagent_event", "pi.subagent_result":
+	case "session.start", "session.init", "subagent.started", "subagent.configured", "subagent.completed", "subagent.failed", "session.model_change", "session.result", "session.shutdown", "pi.subagent_dispatch", "pi.subagent_event", "pi.subagent_result", "tool.execution_start", "tool.execution_complete":
 	default:
 		return nil
 	}
@@ -282,6 +307,7 @@ func (models *subagentSessionModels) observe(event sessionSubagentEvent) error {
 			models.agentUsage = make(map[string]*AgentUsageBreakdown)
 			models.legacyPiActive = make(map[string]string)
 			models.legacyPiCount = make(map[string]int)
+			models.legacyPiTools = make(map[string]string)
 		}
 		models.found = true
 	}
@@ -298,6 +324,8 @@ func (models *subagentSessionModels) observe(event sessionSubagentEvent) error {
 		return models.observePiUsage(event, data)
 	case "pi.subagent_result":
 		return models.observePiResult(event, data)
+	case "tool.execution_start", "tool.execution_complete":
+		return models.observePiToolEvent(event, data)
 	}
 	if strings.HasPrefix(event.Type, "subagent.") || (event.Type == "session.model_change" && event.AgentID != "") {
 		return models.observeLifecycle(event, data)
@@ -313,78 +341,87 @@ func (models *subagentSessionModels) observeMetrics(data sessionSubagentData) er
 		models.resetAgentUsageMetrics()
 	}
 	for agentID, metric := range data.AgentMetrics {
-		if agentID != "main" && models.agents[agentID] == nil && metric.AgentName != "" {
-			name := metric.AgentDisplayName
-			if name == "" {
-				name = metric.AgentName
-			}
-			models.agents[agentID] = &SubagentModelRequest{AgentName: name, InvocationCount: 1}
+		if err := models.observeAgentMetric(agentID, metric); err != nil {
+			return err
 		}
-		name := metric.AgentDisplayName
-		if name == "" {
-			name = metric.AgentName
-		}
-		role := "subagent"
-		if agentID == "main" {
-			name, role = "main", "main"
-		} else if name == "" && models.agents[agentID] != nil {
-			name = models.agents[agentID].AgentName
-		}
-		agentUsage := models.agentUsage[agentID]
-		if agentUsage == nil {
-			agentUsage = &AgentUsageBreakdown{}
-			models.agentUsage[agentID] = agentUsage
-		}
-		if name == "" && models.agents[agentID] != nil {
-			name = models.agents[agentID].AgentName
-		}
-		agentUsage.AgentName = name
-		agentUsage.AgentType = role
-		agentUsage.SourceEngine = models.sourceEngine
-		agentUsage.InstanceCount = max(agentUsage.InstanceCount, 1)
-		agentUsage.AIC = float64(metric.TotalNanoAiu) / 1e9
-		agentUsage.TotalApiDurationMs = metric.TotalApiDurationMs
-		agentUsage.Requests, agentUsage.InputTokens, agentUsage.OutputTokens = 0, 0, 0
-		agentUsage.CacheReadTokens, agentUsage.CacheWriteTokens, agentUsage.ReasoningTokens = 0, 0, 0
-		agentUsage.Models = nil
-		counts := make(map[string]int)
-		actuals := make(map[string]SubagentModelActual)
-		for model, usage := range metric.ModelMetrics {
-			requestCount := 0
-			if usage.Requests.Count != nil {
-				requestCount = *usage.Requests.Count
-			}
-			if requestCount < 0 {
-				return errors.New("negative agent request count")
-			}
-			counts[model] = requestCount
-			actual := SubagentModelActual{Model: model, Requests: requestCount}
-			actual.TokenCoreMetrics = TokenCoreMetrics{
-				InputTokens: usage.Usage.InputTokens, OutputTokens: usage.Usage.OutputTokens,
-				CacheReadTokens: usage.Usage.CacheReadTokens, CacheWriteTokens: usage.Usage.CacheWriteTokens,
-				ReasoningTokens: usage.Usage.ReasoningTokens,
-			}
-			actual.AIC = float64(usage.TotalNanoAiu) / 1e9
-			if agentID != "main" {
-				actuals[model] = actual
-			}
-			agentUsage.Models = append(agentUsage.Models, AgentModelUsage{
-				Model: model, Requests: requestCount, TokenCoreMetrics: actual.TokenCoreMetrics, AIC: actual.AIC,
-			})
-			agentUsage.Requests += requestCount
-			agentUsage.InputTokens += usage.Usage.InputTokens
-			agentUsage.OutputTokens += usage.Usage.OutputTokens
-			agentUsage.CacheReadTokens += usage.Usage.CacheReadTokens
-			agentUsage.CacheWriteTokens += usage.Usage.CacheWriteTokens
-			agentUsage.ReasoningTokens += usage.Usage.ReasoningTokens
-		}
-		if agentID != "main" {
-			models.actualCounts[agentID] = counts
-			models.actualModels[agentID] = actuals
-		}
-		models.agentUsage[agentID] = agentUsage
 	}
 	return nil
+}
+
+func (models *subagentSessionModels) observeAgentMetric(agentID string, metric sessionSubagentAgentMetric) error {
+	if agentID != "main" && models.agents[agentID] == nil && metric.AgentName != "" {
+		name := firstNonEmptyModel(metric.AgentDisplayName, metric.AgentName)
+		models.agents[agentID] = &SubagentModelRequest{AgentName: name, InvocationCount: 1}
+	}
+	name := firstNonEmptyModel(metric.AgentDisplayName, metric.AgentName)
+	role := "subagent"
+	if agentID == "main" {
+		name, role = "main", "main"
+	} else if name == "" && models.agents[agentID] != nil {
+		name = models.agents[agentID].AgentName
+	}
+	agentUsage := models.agentUsage[agentID]
+	if agentUsage == nil {
+		agentUsage = &AgentUsageBreakdown{}
+		models.agentUsage[agentID] = agentUsage
+	}
+	if name == "" && models.agents[agentID] != nil {
+		name = models.agents[agentID].AgentName
+	}
+	agentUsage.AgentName = name
+	agentUsage.AgentType = role
+	agentUsage.SourceEngine = models.sourceEngine
+	agentUsage.InstanceCount = max(agentUsage.InstanceCount, 1)
+	agentUsage.AIC = float64(metric.TotalNanoAiu) / 1e9
+	agentUsage.TotalApiDurationMs = metric.TotalApiDurationMs
+	agentUsage.Requests, agentUsage.InputTokens, agentUsage.OutputTokens = 0, 0, 0
+	agentUsage.CacheReadTokens, agentUsage.CacheWriteTokens, agentUsage.ReasoningTokens = 0, 0, 0
+	agentUsage.Models = nil
+	return models.addAgentMetricModelUsage(agentID, metric, agentUsage)
+}
+
+func (models *subagentSessionModels) addAgentMetricModelUsage(agentID string, metric sessionSubagentAgentMetric, agentUsage *AgentUsageBreakdown) error {
+	counts := make(map[string]int)
+	actuals := make(map[string]SubagentModelActual)
+	for model, usage := range metric.ModelMetrics {
+		requestCount := 0
+		if usage.Requests.Count != nil {
+			requestCount = *usage.Requests.Count
+		}
+		if requestCount < 0 {
+			return errors.New("negative agent request count")
+		}
+		counts[model] = requestCount
+		actual := SubagentModelActual{Model: model, Requests: requestCount}
+		actual.TokenCoreMetrics = TokenCoreMetrics{
+			InputTokens: usage.Usage.InputTokens, OutputTokens: usage.Usage.OutputTokens,
+			CacheReadTokens: usage.Usage.CacheReadTokens, CacheWriteTokens: usage.Usage.CacheWriteTokens,
+			ReasoningTokens: usage.Usage.ReasoningTokens,
+		}
+		actual.AIC = float64(usage.TotalNanoAiu) / 1e9
+		if agentID != "main" {
+			actuals[model] = actual
+		}
+		agentUsage.Models = append(agentUsage.Models, AgentModelUsage{
+			Model: model, Requests: requestCount, TokenCoreMetrics: actual.TokenCoreMetrics, AIC: actual.AIC,
+		})
+		accumulateAgentMetricTokenUsage(agentUsage, usage, requestCount)
+	}
+	if agentID != "main" {
+		models.actualCounts[agentID] = counts
+		models.actualModels[agentID] = actuals
+	}
+	models.agentUsage[agentID] = agentUsage
+	return nil
+}
+
+func accumulateAgentMetricTokenUsage(agentUsage *AgentUsageBreakdown, usage sessionSubagentModelMetric, requests int) {
+	agentUsage.Requests += requests
+	agentUsage.InputTokens += usage.Usage.InputTokens
+	agentUsage.OutputTokens += usage.Usage.OutputTokens
+	agentUsage.CacheReadTokens += usage.Usage.CacheReadTokens
+	agentUsage.CacheWriteTokens += usage.Usage.CacheWriteTokens
+	agentUsage.ReasoningTokens += usage.Usage.ReasoningTokens
 }
 
 func (models *subagentSessionModels) resetAgentUsageMetrics() {
@@ -452,6 +489,13 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 			}
 		}
 	}
+	if event.Type == "subagent.completed" || event.Type == "subagent.failed" {
+		observeLifecycleOutcome(row, agentUsage, event, data)
+	}
+	return nil
+}
+
+func observeLifecycleOutcome(row *SubagentModelRequest, agentUsage *AgentUsageBreakdown, event sessionSubagentEvent, data sessionSubagentData) {
 	if event.Type == "subagent.completed" {
 		row.CompletedCount++
 		row.IncompleteCount = max(0, row.IncompleteCount-1)
@@ -465,12 +509,11 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 		agentUsage.FailedCount++
 		agentUsage.IncompleteCount = max(0, agentUsage.IncompleteCount-1)
 	}
-	return nil
 }
 
 func (models *subagentSessionModels) observePiDispatch(event sessionSubagentEvent, data sessionSubagentData) error {
 	identity := models.piInvocationIdentity(event, data, true)
-	agentName := firstNonEmptyModel(data.Agent, "unknown")
+	agentName := firstNonEmptyModel(data.Agent, data.AgentName, "unknown")
 	row := models.agents[identity]
 	if row == nil {
 		row = &SubagentModelRequest{InvocationCount: 1, IncompleteCount: 1}
@@ -499,25 +542,12 @@ func (models *subagentSessionModels) observePiDispatch(event sessionSubagentEven
 }
 
 func (models *subagentSessionModels) observePiUsage(event sessionSubagentEvent, data sessionSubagentData) error {
-	var payload struct {
-		Message struct {
-			Model         string `json:"model"`
-			ResponseModel string `json:"responseModel"`
-			StopReason    string `json:"stopReason"`
-			ErrorMessage  string `json:"errorMessage"`
-			Usage         struct {
-				Input      int `json:"input"`
-				Output     int `json:"output"`
-				CacheRead  int `json:"cacheRead"`
-				CacheWrite int `json:"cacheWrite"`
-			} `json:"usage"`
-		} `json:"message"`
-	}
+	var payload piSubagentEventPayload
 	if err := json.Unmarshal(data.Event, &payload); err != nil {
 		return err
 	}
 	identity := models.piInvocationIdentity(event, data, false)
-	agentName := firstNonEmptyModel(data.Agent, "unknown")
+	agentName := firstNonEmptyModel(data.Agent, data.AgentName, "unknown")
 	row := models.agents[identity]
 	if row == nil {
 		row = &SubagentModelRequest{AgentName: agentName, InvocationCount: 1, IncompleteCount: 1}
@@ -549,6 +579,17 @@ func (models *subagentSessionModels) observePiUsage(event sessionSubagentEvent, 
 	actual.CacheReadTokens += payload.Message.Usage.CacheRead
 	actual.CacheWriteTokens += payload.Message.Usage.CacheWrite
 	byModel[model] = actual
+	models.recordPiAgentUsage(identity, agentName, model, event, payload)
+	counts := models.actualCounts[identity]
+	if counts == nil {
+		counts = make(map[string]int)
+		models.actualCounts[identity] = counts
+	}
+	counts[model] = actual.Requests
+	return nil
+}
+
+func (models *subagentSessionModels) recordPiAgentUsage(identity, agentName, model string, event sessionSubagentEvent, payload piSubagentEventPayload) {
 	agentUsage := models.agentUsage[identity]
 	if agentUsage == nil {
 		agentUsage = &AgentUsageBreakdown{AgentName: agentName, AgentType: "subagent", InstanceCount: 1, IncompleteCount: 1}
@@ -569,7 +610,11 @@ func (models *subagentSessionModels) observePiUsage(event sessionSubagentEvent, 
 			CacheReadTokens: payload.Message.Usage.CacheRead, CacheWriteTokens: payload.Message.Usage.CacheWrite,
 		},
 	})
-	timestamp, _ := subagentSessionStart(event)
+	timestampEvent := event
+	if len(timestampEvent.Timestamp) == 0 || bytes.Equal(timestampEvent.Timestamp, []byte("null")) {
+		timestampEvent.Timestamp = payload.Message.Timestamp
+	}
+	timestamp, _ := subagentSessionStart(timestampEvent)
 	agentUsage.requestUsages = append(agentUsage.requestUsages, agentRequestUsage{
 		Model: model, Timestamp: timestamp,
 		TokenCoreMetrics: TokenCoreMetrics{
@@ -577,18 +622,11 @@ func (models *subagentSessionModels) observePiUsage(event sessionSubagentEvent, 
 			CacheReadTokens: payload.Message.Usage.CacheRead, CacheWriteTokens: payload.Message.Usage.CacheWrite,
 		},
 	})
-	counts := models.actualCounts[identity]
-	if counts == nil {
-		counts = make(map[string]int)
-		models.actualCounts[identity] = counts
-	}
-	counts[model] = actual.Requests
-	return nil
 }
 
 func (models *subagentSessionModels) observePiResult(event sessionSubagentEvent, data sessionSubagentData) error {
 	identity := models.piInvocationIdentity(event, data, false)
-	agentName := firstNonEmptyModel(data.Agent, "unknown")
+	agentName := firstNonEmptyModel(data.Agent, data.AgentName, "unknown")
 	row := models.agents[identity]
 	if row == nil {
 		row = &SubagentModelRequest{AgentName: agentName, InvocationCount: 1}
@@ -619,11 +657,49 @@ func (models *subagentSessionModels) observePiResult(event sessionSubagentEvent,
 	return nil
 }
 
+func (models *subagentSessionModels) observePiToolEvent(event sessionSubagentEvent, data sessionSubagentData) error {
+	if models.sourceEngine != "pi" {
+		return nil
+	}
+	if models.legacyPiTools == nil {
+		models.legacyPiTools = make(map[string]string)
+	}
+	if event.Type == "tool.execution_start" {
+		if data.ToolName != "subagent" {
+			return nil
+		}
+		var input struct {
+			Agent string `json:"agent"`
+		}
+		if err := json.Unmarshal(data.Input, &input); err != nil {
+			return err
+		}
+		if input.Agent != "" && data.ToolCallID != "" {
+			models.legacyPiTools[data.ToolCallID] = input.Agent
+		}
+		return nil
+	}
+	agentName := models.legacyPiTools[data.ToolCallID]
+	delete(models.legacyPiTools, data.ToolCallID)
+	identity := models.legacyPiActive[agentName]
+	if agentName == "" || identity == "" || data.Success == nil {
+		return nil
+	}
+	agentData := sessionSubagentData{Agent: agentName}
+	if *data.Success {
+		agentData.Outcome = "completed"
+	} else {
+		agentData.Outcome = "failed"
+		agentData.Error = data.Error
+	}
+	return models.observePiResult(event, agentData)
+}
+
 func (models *subagentSessionModels) piInvocationIdentity(event sessionSubagentEvent, data sessionSubagentData, dispatch bool) string {
 	if identity := firstNonEmptyModel(data.InvocationID, event.AgentID); identity != "" {
 		return identity
 	}
-	agent := firstNonEmptyModel(data.Agent, "unknown")
+	agent := firstNonEmptyModel(data.Agent, data.AgentName, "unknown")
 	if models.legacyPiActive == nil {
 		models.legacyPiActive = make(map[string]string)
 	}
@@ -660,44 +736,54 @@ func (models *subagentSessionModels) rows() ([]SubagentModelRequest, []SubagentM
 	effectiveModels := make(map[subagentModelKey]map[string]struct{})
 	for agentID, row := range models.agents {
 		if row.AgentName != "" {
-			effectiveModel := ""
-			observedModels := make([]string, 0, len(models.actualCounts[agentID]))
-			for model := range models.actualCounts[agentID] {
-				observedModels = append(observedModels, model)
-			}
-			slices.Sort(observedModels)
-			for _, model := range observedModels {
-				if models.actualCounts[agentID][model] > 0 {
-					effectiveModel = model
-					break
-				}
-			}
-			key := subagentModelKey{agent: row.AgentName, model: row.RequestedModel}
-			if effectiveModel != "" {
-				if effectiveModels[key] == nil {
-					effectiveModels[key] = make(map[string]struct{})
-				}
-				effectiveModels[key][effectiveModel] = struct{}{}
-			}
-			current := *row
-			current.EffectiveModel = ""
-			current.ReasonCode = ""
-			combined := grouped[key]
-			if combined.InvocationCount == 0 {
-				combined = current
-			} else {
-				combined.InvocationCount += current.InvocationCount
-				combined.CompletedCount += current.CompletedCount
-				combined.FailedCount += current.FailedCount
-				combined.IncompleteCount += current.IncompleteCount
-				combined.Effort = combineSubagentEffort(combined.Effort, current.Effort)
-				if combined.Error == "" && current.Error != "" {
-					combined.Error = current.Error
-				}
-			}
-			grouped[key] = combined
+			addSubagentRequestGroup(grouped, effectiveModels, row, models.actualCounts[agentID])
 		}
 	}
+	applySubagentEffectiveModels(grouped, effectiveModels)
+	requests := sortedSubagentRequests(grouped, len(models.agents))
+	return requests, models.actualRows()
+}
+
+func addSubagentRequestGroup(grouped map[subagentModelKey]SubagentModelRequest, effectiveModels map[subagentModelKey]map[string]struct{}, row *SubagentModelRequest, counts map[string]int) {
+	effectiveModel := ""
+	observedModels := make([]string, 0, len(counts))
+	for model := range counts {
+		observedModels = append(observedModels, model)
+	}
+	slices.Sort(observedModels)
+	for _, model := range observedModels {
+		if counts[model] > 0 {
+			effectiveModel = model
+			break
+		}
+	}
+	key := subagentModelKey{agent: row.AgentName, model: row.RequestedModel}
+	if effectiveModel != "" {
+		if effectiveModels[key] == nil {
+			effectiveModels[key] = make(map[string]struct{})
+		}
+		effectiveModels[key][effectiveModel] = struct{}{}
+	}
+	current := *row
+	current.EffectiveModel = ""
+	current.ReasonCode = ""
+	combined := grouped[key]
+	if combined.InvocationCount == 0 {
+		combined = current
+	} else {
+		combined.InvocationCount += current.InvocationCount
+		combined.CompletedCount += current.CompletedCount
+		combined.FailedCount += current.FailedCount
+		combined.IncompleteCount += current.IncompleteCount
+		combined.Effort = combineSubagentEffort(combined.Effort, current.Effort)
+		if combined.Error == "" && current.Error != "" {
+			combined.Error = current.Error
+		}
+	}
+	grouped[key] = combined
+}
+
+func applySubagentEffectiveModels(grouped map[subagentModelKey]SubagentModelRequest, effectiveModels map[subagentModelKey]map[string]struct{}) {
 	for key, row := range grouped {
 		switch len(effectiveModels[key]) {
 		case 1:
@@ -711,7 +797,10 @@ func (models *subagentSessionModels) rows() ([]SubagentModelRequest, []SubagentM
 		}
 		grouped[key] = row
 	}
-	requests := make([]SubagentModelRequest, 0, len(models.agents))
+}
+
+func sortedSubagentRequests(grouped map[subagentModelKey]SubagentModelRequest, capacity int) []SubagentModelRequest {
+	requests := make([]SubagentModelRequest, 0, capacity)
 	for _, row := range grouped {
 		requests = append(requests, row)
 	}
@@ -724,7 +813,7 @@ func (models *subagentSessionModels) rows() ([]SubagentModelRequest, []SubagentM
 		}
 		return strings.Compare(a.EffectiveModel, b.EffectiveModel)
 	})
-	return requests, models.actualRows()
+	return requests
 }
 
 func (models *subagentSessionModels) agentRows() []AgentUsageBreakdown {
@@ -739,41 +828,7 @@ func (models *subagentSessionModels) agentRows() []AgentUsageBreakdown {
 			row = &AgentUsageBreakdown{AgentName: usage.AgentName, AgentType: usage.AgentType, SourceEngine: usage.SourceEngine}
 			grouped[key] = row
 		}
-		row.InstanceCount += usage.InstanceCount
-		if row.SourceEngine == "" {
-			row.SourceEngine = usage.SourceEngine
-		}
-		row.CompletedCount += usage.CompletedCount
-		row.FailedCount += usage.FailedCount
-		row.IncompleteCount += usage.IncompleteCount
-		row.Requests += usage.Requests
-		row.InputTokens += usage.InputTokens
-		row.OutputTokens += usage.OutputTokens
-		row.CacheReadTokens += usage.CacheReadTokens
-		row.CacheWriteTokens += usage.CacheWriteTokens
-		row.ReasoningTokens += usage.ReasoningTokens
-		row.AIC += usage.AIC
-		row.TotalApiDurationMs += usage.TotalApiDurationMs
-		row.Effort = combineSubagentEffort(row.Effort, usage.Effort)
-		row.requestUsages = append(row.requestUsages, usage.requestUsages...)
-		for _, model := range usage.RequestedModels {
-			row.RequestedModels = appendUnique(row.RequestedModels, model)
-		}
-		for _, model := range usage.ResolvedModels {
-			row.ResolvedModels = appendUnique(row.ResolvedModels, model)
-		}
-		for _, model := range usage.Models {
-			row.Models = appendAgentModelUsage(row.Models, model)
-			if model.Requests > 0 {
-				row.ServedModels = appendUnique(row.ServedModels, model.Model)
-			}
-		}
-		if request := models.agents[agentID]; request != nil {
-			row.RequestedModels = appendUnique(row.RequestedModels, request.RequestedModel)
-			row.ResolvedModels = appendUnique(row.ResolvedModels, request.ResolvedModel)
-			row.ServedModels = appendUnique(row.ServedModels, request.EffectiveModel)
-			row.Effort = combineSubagentEffort(row.Effort, request.Effort)
-		}
+		mergeAgentUsageBreakdown(row, usage, models.agents[agentID])
 	}
 	result := make([]AgentUsageBreakdown, 0, len(grouped))
 	for _, row := range grouped {
@@ -795,6 +850,44 @@ func (models *subagentSessionModels) agentRows() []AgentUsageBreakdown {
 		return strings.Compare(a.AgentName, b.AgentName)
 	})
 	return result
+}
+
+func mergeAgentUsageBreakdown(row, usage *AgentUsageBreakdown, request *SubagentModelRequest) {
+	row.InstanceCount += usage.InstanceCount
+	if row.SourceEngine == "" {
+		row.SourceEngine = usage.SourceEngine
+	}
+	row.CompletedCount += usage.CompletedCount
+	row.FailedCount += usage.FailedCount
+	row.IncompleteCount += usage.IncompleteCount
+	row.Requests += usage.Requests
+	row.InputTokens += usage.InputTokens
+	row.OutputTokens += usage.OutputTokens
+	row.CacheReadTokens += usage.CacheReadTokens
+	row.CacheWriteTokens += usage.CacheWriteTokens
+	row.ReasoningTokens += usage.ReasoningTokens
+	row.AIC += usage.AIC
+	row.TotalApiDurationMs += usage.TotalApiDurationMs
+	row.Effort = combineSubagentEffort(row.Effort, usage.Effort)
+	row.requestUsages = append(row.requestUsages, usage.requestUsages...)
+	for _, model := range usage.RequestedModels {
+		row.RequestedModels = appendUnique(row.RequestedModels, model)
+	}
+	for _, model := range usage.ResolvedModels {
+		row.ResolvedModels = appendUnique(row.ResolvedModels, model)
+	}
+	for _, model := range usage.Models {
+		row.Models = appendAgentModelUsage(row.Models, model)
+		if model.Requests > 0 {
+			row.ServedModels = appendUnique(row.ServedModels, model.Model)
+		}
+	}
+	if request != nil {
+		row.RequestedModels = appendUnique(row.RequestedModels, request.RequestedModel)
+		row.ResolvedModels = appendUnique(row.ResolvedModels, request.ResolvedModel)
+		row.ServedModels = appendUnique(row.ServedModels, request.EffectiveModel)
+		row.Effort = combineSubagentEffort(row.Effort, request.Effort)
+	}
 }
 
 func appendAgentModelUsage(models []AgentModelUsage, next AgentModelUsage) []AgentModelUsage {

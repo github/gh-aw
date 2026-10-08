@@ -120,9 +120,10 @@ type SubagentModelActual struct {
 	ResolvedModel string   `json:"resolved_model,omitempty"`
 	ServedModels  []string `json:"served_models,omitempty"`
 	TokenCoreMetrics
-	AIC             float64 `json:"aic,omitempty"`
-	TotalDurationMs int     `json:"total_duration_ms,omitempty"`
-	agentName       string
+	AIC              float64 `json:"aic,omitempty"`
+	TotalDurationMs  int     `json:"total_duration_ms,omitempty"`
+	agentName        string
+	identityEvidence []string
 }
 
 type AgentUsageBreakdown struct {

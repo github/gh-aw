@@ -1,0 +1,6 @@
+{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}
+{"type":"pi.subagent_dispatch","data":{"invocationId":"invocation-quick","agent":"quick-checker","requestedModel":"small","resolvedModel":"gpt-5.4-mini"}}
+{"type":"pi.subagent_event","timestamp":"2026-10-08T11:00:00Z","data":{"invocationId":"invocation-quick","agent":"quick-checker","event":{"message":{"model":"gpt-5.4-mini","responseModel":"gpt-5.4-mini-2026-03-17","usage":{"input":100,"output":10}}}}}
+{"type":"pi.subagent_result","data":{"invocationId":"invocation-quick","agent":"quick-checker","outcome":"completed"}}
+{"type":"pi.subagent_dispatch","data":{"invocationId":"invocation-summary","agent":"file-summarizer","requestedModel":"claude-haiku-4.5","resolvedModel":"claude-haiku-4.5"}}
+{"type":"pi.subagent_result","data":{"invocationId":"invocation-summary","agent":"file-summarizer","outcome":"failed","error":"fixture failure"}}

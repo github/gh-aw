@@ -70,6 +70,7 @@ func subagentActualsFromAgentUsage(agents []AgentUsageBreakdown) []SubagentModel
 			actuals = append(actuals, SubagentModelActual{
 				Model: model.Model, ResolvedModel: model.ResolvedModel, Requests: model.Requests,
 				TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC, agentName: agent.AgentName,
+				identityEvidence: agent.ResolvedModels,
 			})
 		}
 	}
@@ -160,21 +161,21 @@ func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []Sub
 		if row.EffectiveModel != "" {
 			row.EffectiveModel = resolver.resolve(row.EffectiveModel, "", localObserved)
 			for _, candidate := range localObserved {
-				if resolver.matches(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), candidate, "") {
+				if !isModelIdentityAlias(resolver, candidate) && resolver.matches(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), candidate, "") {
 					row.ServedModels = appendUnique(row.ServedModels, candidate)
 				}
 			}
 		} else {
 			row.EffectiveModel = firstMatchingObservedModel(requested, localObserved, resolver)
 			for _, candidate := range localObserved {
-				if resolver.matches(requested, candidate, "") {
+				if !isModelIdentityAlias(resolver, candidate) && resolver.matches(requested, candidate, "") {
 					row.ServedModels = appendUnique(row.ServedModels, candidate)
 				}
 			}
 		}
 		if row.EffectiveModel != "" {
 			for _, candidate := range candidates {
-				if resolver.matches(row.EffectiveModel, candidate, "") {
+				if !isModelIdentityAlias(resolver, candidate) && resolver.matches(row.EffectiveModel, candidate, "") {
 					row.ServedModels = appendUnique(row.ServedModels, candidate)
 				}
 			}
@@ -206,9 +207,17 @@ func firstNonEmptyModel(values ...string) string {
 
 func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelIdentityResolver, candidates ...string) []SubagentModelActual {
 	observedByAgent := make(map[string][]string)
+	servedByAgent := make(map[string][]string)
 	for _, actual := range actuals {
 		observedByAgent[actual.agentName] = append(observedByAgent[actual.agentName], actual.Model)
 		observedByAgent[actual.agentName] = append(observedByAgent[actual.agentName], actual.ServedModels...)
+		observedByAgent[actual.agentName] = append(observedByAgent[actual.agentName], actual.identityEvidence...)
+		if actual.Requests > 0 {
+			if actual.ResolvedModel == "" || normalizeModelIdentity(actual.Model) != normalizeModelIdentity(actual.ResolvedModel) {
+				servedByAgent[actual.agentName] = append(servedByAgent[actual.agentName], actual.Model)
+			}
+			servedByAgent[actual.agentName] = append(servedByAgent[actual.agentName], actual.ServedModels...)
+		}
 	}
 	for agent := range observedByAgent {
 		slices.Sort(observedByAgent[agent])
@@ -233,20 +242,7 @@ func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelI
 		combined.ReasoningTokens += actual.ReasoningTokens
 		combined.AIC += actual.AIC
 		combined.TotalDurationMs += actual.TotalDurationMs
-		combined.ServedModels = appendUnique(combined.ServedModels, actual.Model)
-		for _, model := range actual.ServedModels {
-			combined.ServedModels = appendUnique(combined.ServedModels, model)
-		}
-		for _, candidate := range localObserved {
-			if resolver.matches(actual.Model, candidate, actual.Provider) {
-				combined.ServedModels = appendUnique(combined.ServedModels, candidate)
-			}
-		}
-		for _, candidate := range candidates {
-			if resolver.matches(resolved, candidate, actual.Provider) {
-				combined.ServedModels = appendUnique(combined.ServedModels, candidate)
-			}
-		}
+		addSubagentServedModels(&combined, actual, resolved, servedByAgent[actual.agentName], resolver, candidates)
 		grouped[resolved] = combined
 	}
 	result := make([]SubagentModelActual, 0, len(grouped))
@@ -255,6 +251,41 @@ func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelI
 	}
 	sortSubagentModelActuals(result)
 	return result
+}
+
+func addSubagentServedModels(combined *SubagentModelActual, actual SubagentModelActual, resolved string, agentCandidates []string, resolver *modelIdentityResolver, candidates []string) {
+	if actual.Requests == 0 {
+		return
+	}
+	if !isModelIdentityAlias(resolver, actual.Model) &&
+		(actual.ResolvedModel == "" || normalizeModelIdentity(actual.Model) != normalizeModelIdentity(actual.ResolvedModel)) {
+		combined.ServedModels = appendUnique(combined.ServedModels, actual.Model)
+	}
+	for _, model := range actual.ServedModels {
+		if !isModelIdentityAlias(resolver, model) {
+			combined.ServedModels = appendUnique(combined.ServedModels, model)
+		}
+	}
+	appendMatchingServedModels(combined, resolved, actual.Provider, agentCandidates, resolver)
+	appendMatchingServedModels(combined, resolved, actual.Provider, candidates, resolver)
+}
+
+func appendMatchingServedModels(combined *SubagentModelActual, resolved, provider string, candidates []string, resolver *modelIdentityResolver) {
+	for _, candidate := range candidates {
+		if !isModelIdentityAlias(resolver, candidate) && resolver.matches(resolved, candidate, provider) {
+			combined.ServedModels = appendUnique(combined.ServedModels, candidate)
+		}
+	}
+}
+
+func isModelIdentityAlias(resolver *modelIdentityResolver, model string) bool {
+	if resolver == nil {
+		return false
+	}
+	name := modelNameWithoutProvider(model)
+	lowered := strings.ToLower(strings.TrimSpace(name))
+	normalized := normalizeModelIdentity(name)
+	return lowered == normalized && len(resolver.patternsFor(normalized)) > 0
 }
 
 func appendUnique(values []string, value string) []string {
@@ -267,12 +298,15 @@ func appendUnique(values []string, value string) []string {
 func resolveAgentUsageModels(agents []AgentUsageBreakdown, resolver *modelIdentityResolver, candidates ...string) []AgentUsageBreakdown {
 	for i := range agents {
 		agent := &agents[i]
-		observed := make([]string, 0, len(agent.Models))
+		agent.ServedModels = nil
+		observed := make([]string, 0, len(agent.Models)+len(agent.ResolvedModels))
+		observed = append(observed, agent.ResolvedModels...)
 		actuals := make([]SubagentModelActual, 0, len(agent.Models))
 		for _, model := range agent.Models {
 			observed = append(observed, model.Model)
 			actuals = append(actuals, SubagentModelActual{
 				Model: model.Model, Requests: model.Requests, TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC,
+				agentName: agent.AgentName, identityEvidence: agent.ResolvedModels,
 			})
 		}
 		resolved := resolveSubagentActualModels(actuals, resolver)
@@ -283,7 +317,7 @@ func resolveAgentUsageModels(agents []AgentUsageBreakdown, resolver *modelIdenti
 				TokenCoreMetrics: model.TokenCoreMetrics, AIC: model.AIC,
 			})
 			for _, served := range append(model.ServedModels, candidates...) {
-				if model.Requests > 0 {
+				if model.Requests > 0 && !isModelIdentityAlias(resolver, served) {
 					if resolver.matches(firstNonEmptyModel(model.ResolvedModel, model.Model), served, "") {
 						agent.ServedModels = appendUnique(agent.ServedModels, served)
 					}
@@ -321,60 +355,82 @@ func reconcileAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsage
 		attributed += agent.AIC
 	}
 	expected := summary.TotalAIC
+	var endpoints []string
 	for _, entry := range entries {
 		if entry.Purpose == "routing_classification" {
 			expected -= tokenUsageEntryCredits(entry)
+		} else if entry.Path != "" {
+			endpoints = appendUnique(endpoints, entry.Path)
 		}
 	}
 	if attributed == 0 || math.Abs(attributed-expected) <= 0.01 {
 		return
 	}
-	endpoint := summary.endpoint
+	slices.Sort(endpoints)
+	endpoint := strings.Join(endpoints, ", ")
 	if endpoint == "" {
-		endpoint = "unknown endpoint"
+		endpoint = summary.endpoint
+		if endpoint == "" {
+			endpoint = "unknown endpoint"
+		}
 	}
 	addTokenUsageWarning(summary, fmt.Sprintf("per-agent AI credits (%.3f) differ from non-classifier proxy total (%.3f) for endpoint %s", attributed, expected, endpoint))
+}
+
+type indexedPiRequest struct {
+	agent *AgentUsageBreakdown
+	usage agentRequestUsage
 }
 
 func matchPiAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsageEntry, resolver *modelIdentityResolver) {
 	if summary == nil || len(entries) == 0 {
 		return
 	}
-	type indexedRequest struct {
-		agentIndex int
-		usage      agentRequestUsage
+	piAgents, requests := collectPiAgentRequests(summary)
+	if len(piAgents) == 0 || (len(requests) == 0 && !confirmedZeroUsagePiFailures(piAgents)) {
+		return
 	}
-	piAgents := make([]int, 0)
-	requests := make([]indexedRequest, 0)
+	slices.SortFunc(requests, func(a, b indexedPiRequest) int {
+		if order := a.usage.Timestamp.Compare(b.usage.Timestamp); order != 0 {
+			return order
+		}
+		return strings.Compare(a.agent.AgentName, b.agent.AgentName)
+	})
+	entries = append([]TokenUsageEntry(nil), entries...)
+	sortProxyUsageEntries(entries)
+	used := matchPiSubagentRequests(summary, entries, requests, resolver)
+	appendPiMainAgentUsage(summary, entries, used, piAgents, requests, resolver)
+}
+
+func collectPiAgentRequests(summary *TokenUsageSummary) ([]*AgentUsageBreakdown, []indexedPiRequest) {
+	agents := make([]*AgentUsageBreakdown, 0)
+	requests := make([]indexedPiRequest, 0)
 	for i := range summary.AgentUsage {
 		agent := &summary.AgentUsage[i]
 		if agent.SourceEngine != "pi" || agent.AgentType != "subagent" {
 			continue
 		}
-		piAgents = append(piAgents, i)
+		agents = append(agents, agent)
 		for _, request := range agent.requestUsages {
-			requests = append(requests, indexedRequest{agentIndex: i, usage: request})
+			requests = append(requests, indexedPiRequest{agent: agent, usage: request})
 		}
 	}
-	confirmedZeroUsageFailures := len(piAgents) > 0 && len(requests) == 0
-	if confirmedZeroUsageFailures {
-		for _, index := range piAgents {
-			if summary.AgentUsage[index].FailedCount == 0 {
-				confirmedZeroUsageFailures = false
-				break
-			}
+	return agents, requests
+}
+
+func confirmedZeroUsagePiFailures(agents []*AgentUsageBreakdown) bool {
+	if len(agents) == 0 {
+		return false
+	}
+	for _, agent := range agents {
+		if agent.FailedCount == 0 {
+			return false
 		}
 	}
-	if len(piAgents) == 0 || (len(requests) == 0 && !confirmedZeroUsageFailures) {
-		return
-	}
-	slices.SortFunc(requests, func(a, b indexedRequest) int {
-		if order := a.usage.Timestamp.Compare(b.usage.Timestamp); order != 0 {
-			return order
-		}
-		return strings.Compare(summary.AgentUsage[a.agentIndex].AgentName, summary.AgentUsage[b.agentIndex].AgentName)
-	})
-	entries = append([]TokenUsageEntry(nil), entries...)
+	return true
+}
+
+func sortProxyUsageEntries(entries []TokenUsageEntry) {
 	slices.SortStableFunc(entries, func(a, b TokenUsageEntry) int {
 		aTime, aValid := parseTokenUsageTimestamp(a.Timestamp)
 		bTime, bValid := parseTokenUsageTimestamp(b.Timestamp)
@@ -389,63 +445,46 @@ func matchPiAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsageEn
 		}
 		return aTime.Compare(bTime)
 	})
+}
+
+func matchPiSubagentRequests(summary *TokenUsageSummary, entries []TokenUsageEntry, requests []indexedPiRequest, resolver *modelIdentityResolver) map[int]bool {
 	used := make(map[int]bool)
-	matched := 0
 	lastMatchedEntry := -1
 	for _, indexed := range requests {
-		agent := &summary.AgentUsage[indexed.agentIndex]
 		request := indexed.usage
-		entryIndex := matchingProxyUsageEntry(entries, used, request, resolver, lastMatchedEntry)
-		if entryIndex < 0 {
-			addTokenUsageWarning(summary, fmt.Sprintf("could not match pi sub-agent %s model %s usage to proxy token usage; credits were not inferred", agent.AgentName, request.Model))
+		afterIndex := lastMatchedEntry
+		if request.Timestamp.IsZero() {
+			afterIndex = -1
+		}
+		entryIndex, entry, matched := matchingProxyUsageEntry(entries, used, request, resolver, afterIndex)
+		if !matched {
+			addTokenUsageWarning(summary, fmt.Sprintf("could not match pi sub-agent %s model %s usage to proxy token usage; credits were not inferred", indexed.agent.AgentName, request.Model))
 			continue
 		}
 		used[entryIndex] = true
-		lastMatchedEntry = entryIndex
-		matched++
-		entry := entries[entryIndex]
+		if !request.Timestamp.IsZero() {
+			lastMatchedEntry = entryIndex
+		}
 		credits := tokenUsageEntryCredits(entry)
-		agent.AIC += credits
-		agent.TotalApiDurationMs += entry.DurationMs
-		for modelIndex := range agent.Models {
-			if normalizeModelIdentity(agent.Models[modelIndex].Model) == normalizeModelIdentity(request.Model) {
-				agent.Models[modelIndex].AIC += credits
+		indexed.agent.AIC += credits
+		indexed.agent.TotalApiDurationMs += entry.DurationMs
+		for modelIndex := range indexed.agent.Models {
+			model := &indexed.agent.Models[modelIndex]
+			if resolver.matches(model.Model, request.Model, entry.Provider) {
+				model.AIC += credits
 				break
 			}
 		}
 	}
-	if matched != len(requests) {
-		return
-	}
-	main := AgentUsageBreakdown{AgentName: "main", AgentType: "main", SourceEngine: "pi", InstanceCount: 1}
+	return used
+}
+
+func matchingProxyUsageEntry(entries []TokenUsageEntry, used map[int]bool, request agentRequestUsage, resolver *modelIdentityResolver, afterIndex int) (int, TokenUsageEntry, bool) {
 	for index, entry := range entries {
 		if used[index] || entry.Purpose == "routing_classification" || entry.Model == "" {
 			continue
 		}
-		main.Requests++
-		main.InputTokens += entry.InputTokens
-		main.OutputTokens += entry.OutputTokens
-		main.CacheReadTokens += entry.CacheReadTokens
-		main.CacheWriteTokens += entry.CacheWriteTokens
-		main.ReasoningTokens += entry.ReasoningTokens
-		main.AIC += tokenUsageEntryCredits(entry)
-		main.TotalApiDurationMs += entry.DurationMs
-		main.Models = appendAgentModelUsage(main.Models, AgentModelUsage{
-			Model: entry.Model, ResolvedModel: normalizeModelIdentity(modelNameWithoutProvider(entry.Model)),
-			Requests: 1, TokenCoreMetrics: TokenCoreMetrics{
-				InputTokens: entry.InputTokens, OutputTokens: entry.OutputTokens,
-				CacheReadTokens: entry.CacheReadTokens, CacheWriteTokens: entry.CacheWriteTokens,
-				ReasoningTokens: entry.ReasoningTokens,
-			}, AIC: tokenUsageEntryCredits(entry),
-		})
-	}
-	summary.AgentUsage = append(summary.AgentUsage, main)
-}
-
-func matchingProxyUsageEntry(entries []TokenUsageEntry, used map[int]bool, request agentRequestUsage, resolver *modelIdentityResolver, afterIndex int) int {
-	for index := afterIndex + 1; index < len(entries); index++ {
-		entry := entries[index]
-		if used[index] || entry.Purpose == "routing_classification" || entry.Model == "" {
+		if index <= afterIndex {
 			continue
 		}
 		if !resolver.matches(request.Model, modelNameWithoutProvider(entry.Model), entry.Provider) {
@@ -453,10 +492,74 @@ func matchingProxyUsageEntry(entries []TokenUsageEntry, used map[int]bool, reque
 		}
 		if request.InputTokens == entry.InputTokens && request.OutputTokens == entry.OutputTokens &&
 			request.CacheReadTokens == entry.CacheReadTokens && request.CacheWriteTokens == entry.CacheWriteTokens {
-			return index
+			return index, entry, true
 		}
 	}
-	return -1
+	return -1, TokenUsageEntry{}, false
+}
+
+func piSubagentModelIdentities(agents []*AgentUsageBreakdown, requests []indexedPiRequest) []string {
+	models := make([]string, 0, len(requests))
+	for _, request := range requests {
+		models = appendUnique(models, request.usage.Model)
+	}
+	for _, agent := range agents {
+		models = append(models, agent.RequestedModels...)
+		models = append(models, agent.ResolvedModels...)
+		for _, model := range agent.Models {
+			if model.Requests > 0 {
+				models = appendUnique(models, model.Model)
+			}
+		}
+	}
+	return models
+}
+
+func appendPiMainAgentUsage(summary *TokenUsageSummary, entries []TokenUsageEntry, used map[int]bool, agents []*AgentUsageBreakdown, requests []indexedPiRequest, resolver *modelIdentityResolver) {
+	if len(requests) == 0 && !confirmedZeroUsagePiFailures(agents) {
+		return
+	}
+	subagentModels := piSubagentModelIdentities(agents, requests)
+	main := AgentUsageBreakdown{AgentName: "main", AgentType: "main", SourceEngine: "pi", InstanceCount: 1}
+	for index, entry := range entries {
+		if used[index] || entry.Purpose == "routing_classification" || entry.Model == "" {
+			continue
+		}
+		if isPiSubagentModel(entry, subagentModels, resolver) {
+			continue
+		}
+		accumulatePiMainUsage(&main, entry)
+	}
+	summary.AgentUsage = append(summary.AgentUsage, main)
+}
+
+func isPiSubagentModel(entry TokenUsageEntry, models []string, resolver *modelIdentityResolver) bool {
+	for _, model := range models {
+		if resolver.matches(model, modelNameWithoutProvider(entry.Model), entry.Provider) {
+			return true
+		}
+	}
+	return false
+}
+
+func accumulatePiMainUsage(main *AgentUsageBreakdown, entry TokenUsageEntry) {
+	credits := tokenUsageEntryCredits(entry)
+	main.Requests++
+	main.InputTokens += entry.InputTokens
+	main.OutputTokens += entry.OutputTokens
+	main.CacheReadTokens += entry.CacheReadTokens
+	main.CacheWriteTokens += entry.CacheWriteTokens
+	main.ReasoningTokens += entry.ReasoningTokens
+	main.AIC += credits
+	main.TotalApiDurationMs += entry.DurationMs
+	main.Models = appendAgentModelUsage(main.Models, AgentModelUsage{
+		Model: entry.Model, ResolvedModel: normalizeModelIdentity(modelNameWithoutProvider(entry.Model)),
+		Requests: 1, TokenCoreMetrics: TokenCoreMetrics{
+			InputTokens: entry.InputTokens, OutputTokens: entry.OutputTokens,
+			CacheReadTokens: entry.CacheReadTokens, CacheWriteTokens: entry.CacheWriteTokens,
+			ReasoningTokens: entry.ReasoningTokens,
+		}, AIC: credits,
+	})
 }
 
 func tokenUsageEntryCredits(entry TokenUsageEntry) float64 {

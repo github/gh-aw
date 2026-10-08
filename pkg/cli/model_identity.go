@@ -80,14 +80,14 @@ func (resolver *modelIdentityResolver) matches(pattern, observed, provider strin
 
 func (resolver *modelIdentityResolver) patternsFor(model string) []string {
 	var patterns []string
-	visited := make(map[string]bool)
+	visited := make(map[string]struct{})
 	var expand func(string)
 	expand = func(alias string) {
 		alias = normalizeModelIdentity(alias)
-		if visited[alias] {
+		if _, ok := visited[alias]; ok {
 			return
 		}
-		visited[alias] = true
+		visited[alias] = struct{}{}
 		for _, pattern := range resolver.aliases[alias] {
 			nested := normalizeModelIdentity(pattern)
 			if !strings.ContainsAny(pattern, "/*?") && len(resolver.aliases[nested]) > 0 {
