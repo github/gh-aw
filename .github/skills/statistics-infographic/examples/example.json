@@ -1,0 +1,78 @@
+{
+  "origins": {
+    "repository": "example/metrics",
+    "snapshot_date": "2026-10-08",
+    "assumption": "For this synthetic example, all CCA PRs without an identified issue are assumed human-started.",
+    "total_prs": 100,
+    "breakdown": [
+      { "origin": "AW-started", "prs": 45 },
+      { "origin": "Human-started, including assumed direct sessions", "prs": 50 },
+      { "origin": "Other / unattributed", "prs": 5 }
+    ],
+    "components": {
+      "direct_aw_prs": 15,
+      "cca_aw_issue_prs": 30,
+      "cca_human_issue_prs": 10,
+      "cca_no_issue_assumed_human_prs": 40,
+      "other_account_prs": 3,
+      "dependabot_prs": 1,
+      "mix_prs": 1
+    },
+    "outcomes": [
+      { "origin": "AW-started", "merged": 30, "closed_without_merging": 15, "open": 0 },
+      { "origin": "Human-started, including assumed direct sessions", "merged": 40, "closed_without_merging": 8, "open": 2 },
+      { "origin": "Other / unattributed", "merged": 3, "closed_without_merging": 1, "open": 1 }
+    ]
+  },
+  "histogram": {
+    "repository": "example/metrics",
+    "snapshot_date": "2026-10-08",
+    "merged_pr_count": 73,
+    "summary_hours": { "median": 2, "p90": 40.4 },
+    "histogram": [
+      { "bin": "<15 min", "lower_hours_inclusive": 0, "upper_hours_exclusive": 0.25, "count": 10 },
+      { "bin": "15-60 min", "lower_hours_inclusive": 0.25, "upper_hours_exclusive": 1, "count": 20 },
+      { "bin": "1-6 hours", "lower_hours_inclusive": 1, "upper_hours_exclusive": 6, "count": 25 },
+      { "bin": "6-24 hours", "lower_hours_inclusive": 6, "upper_hours_exclusive": 24, "count": 10 },
+      { "bin": "1-3 days", "lower_hours_inclusive": 24, "upper_hours_exclusive": 72, "count": 4 },
+      { "bin": "3-7 days", "lower_hours_inclusive": 72, "upper_hours_exclusive": 168, "count": 2 },
+      { "bin": "7-30 days", "lower_hours_inclusive": 168, "upper_hours_exclusive": 720, "count": 2 },
+      { "bin": "30+ days", "lower_hours_inclusive": 720, "upper_hours_exclusive": null, "count": 0 }
+    ]
+  },
+  "community": {
+    "repository": "example/metrics",
+    "collected_at": "2026-10-08T21:19:30Z",
+    "all_labelled_issues": 40,
+    "third_party_issues": 30,
+    "third_party_author_accounts": 12,
+    "third_party_issues_landed_main": 20,
+    "closed_without_merged_main_link": 9,
+    "third_party_open_issues": 1,
+    "unique_merged_main_delivery_prs": 18,
+    "copilot_authored_delivery_prs": 16
+  },
+  "structure": {
+    "repository": "example/metrics",
+    "commit": "1111111111111111111111111111111111111111",
+    "included_files": 75,
+    "nonblank_lines": 20000,
+    "groups": [
+      { "language": "Go", "role": "Implementation", "files": 20, "nonblank_lines": 6000 },
+      { "language": "Go", "role": "Tests", "files": 30, "nonblank_lines": 8000 },
+      { "language": "JavaScript", "role": "Implementation", "files": 10, "nonblank_lines": 2000 },
+      { "language": "JavaScript", "role": "Tests", "files": 15, "nonblank_lines": 4000 }
+    ]
+  },
+  "history": {
+    "repository": "example/metrics",
+    "commit": "1111111111111111111111111111111111111111",
+    "week_count": 2,
+    "total_added": 34000,
+    "total_deleted": 14000,
+    "weeks": [
+      { "week_start": "2026-09-28", "added": 30000, "deleted": 12000 },
+      { "week_start": "2026-10-05", "added": 4000, "deleted": 2000 }
+    ]
+  }
+}
