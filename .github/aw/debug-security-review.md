@@ -11,6 +11,21 @@ code execution. Follow [debugger restrictions](debug-agentic-workflow.md).
 PASS grants no dispatch permission; retain scanners, isolation, credential
 restrictions and human live-validation gates.
 
+## Dry-Run Dangerous Features
+
+In dry-run mode, `dangerously-*` features are prohibited and must be refused by
+strict validation, including flags embedded in engine harnesses or imported
+executable payloads. An outer sandbox, unchanged engine defaults, or human
+authorization does not exempt them. Do not remove the flag without establishing
+that the engine can operate with the required permission protections.
+
+If strict compilation succeeds but emits a prohibited feature, report an
+enforcement gap, not a passed security gate or a compiler rejection that did not
+occur. Block execution/upload and link the executable source that introduces
+the feature, naming the exact flag and the permission protection it bypasses.
+The agent owns investigation of a supported safe engine configuration or a
+compiler correction; never downgrade strict mode or bypass this prohibition.
+
 ## Agent Ownership
 
 The agent performs the review: capture intent, inspect source and reachable
@@ -201,3 +216,44 @@ replies, and do not imply that review authorizes execution.
 
 Example: "Security review passed for the emitted dry-run lock: credential flows,
 executable provenance, and sandbox controls were checked, with no confirmed issues."
+
+### Explain Blocked or Unavailable Debugging
+
+A refusal must explain **why** the requested execution or upload is blocked.
+"Security review failed", "inconsistent judgments", or "missing coverage" alone
+is not an actionable explanation. After the result sentence, identify each
+material blocker:
+
+| Required detail | What to report |
+| --- | --- |
+| Cause | The failed question or gate and whether it is a confirmed code defect, missing evidence, unavailable review tooling, or missing authorization. |
+| Source evidence | A clickable source link with line numbers and the reviewed commit, plus the relevant operation, credential flow, or control. |
+| Consequence | The concrete unsafe effect, or the exact property that remains unverified; name which execution/upload is withheld. |
+| Resolution | The smallest necessary fix, evidence, tool capability, or authorization, and whether the agent or human owns it. |
+
+Use revision-pinned repository links for published source, for example
+`https://<host>/<owner>/<repo>/blob/<reviewed-sha>/<path>#L10-L20`.
+For unpublished generated locks, link the preserved diagnostic artifact when
+supported and report its path, line range and hash; do not link a different
+published revision as though it contains the reviewed code. Redact sensitive
+values from excerpts.
+
+Trace negative findings to executable behavior before calling source problematic.
+Metadata alone does not establish a missing firewall; inspect the actual AWF
+configuration and invocation. Distinguish unchanged intentional controls from
+new regressions, but apply the [dry-run dangerous-feature prohibition](#dry-run-dangerous-features)
+even to unchanged native permission-skipping defaults inside an outer sandbox.
+Explain contradictory vote/reason pairs without silently changing votes or
+counting them as a passed gate.
+
+When no code defect is confirmed, say so. Link the gate that requires withholding
+execution and identify the unresolved question and missing evidence instead of
+inventing a problematic source line. For example: "Live dispatch is blocked by
+the [two-affirmative-vote requirement](#decision): `secret_disclosure` has unresolved
+review coverage for the [artifact redaction path](<revision-pinned-source-url>).
+No credential leak is confirmed. The agent must resolve that source coverage
+before dispatch; additional user authorization cannot replace the review."
+
+Keep compile-only results separate from live outcomes. State whether a run was
+dispatched, and never ask the user to perform technical review or bypass a failed
+gate.

@@ -35,6 +35,17 @@ Name the artifact/scope, checks actually performed, and material findings or
 coverage gaps; do not leave the result only in logs or artifacts or imply live
 execution. Follow the shared [review result](../../aw/debug-security-review.md#user-visible-result)
 and [dry-run result](../../aw/debug-agentic-workflow.md#user-visible-dry-run-result) rules.
+When debugging is refused, follow the
+[blocked-result requirements](../../aw/debug-security-review.md#explain-blocked-or-unavailable-debugging):
+explain each concrete cause, link the reviewed source and lines, distinguish
+confirmed defects from incomplete evidence or authorization, and name the
+necessary resolution and its owner. Do not report disagreement alone as a code
+vulnerability.
+In dry-run mode, reject `dangerously-*` features, including engine harness flags,
+under the [strict security gate](../../aw/debug-security-review.md#dry-run-dangerous-features).
+An outer sandbox is not an exemption. If compilation emits them successfully,
+report the enforcement gap and link their executable source; do not claim strict
+validation rejected them when it did not.
 
 ## Table of Contents
 
