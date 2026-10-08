@@ -158,9 +158,11 @@ function transformPiV3Entries(records) {
       events.push(event);
       if (event.type === "tool.execution_start" && event.data.toolCallId !== undefined) calls.set(event.data.toolCallId, event);
     } else if (raw.type === "gh_aw_subagent_dispatch") {
-      emit(raw, "pi.subagent_dispatch", { agent: raw.agent, requestedModel: raw.requested_model, resolvedModel: raw.resolved_model });
+      emit(raw, "pi.subagent_dispatch", { invocationId: raw.invocation_id, agent: raw.agent, requestedModel: raw.requested_model, resolvedModel: raw.resolved_model });
     } else if (raw.type === "gh_aw_subagent_event") {
-      emit(raw, "pi.subagent_event", { agent: raw.agent, event: raw.event });
+      emit(raw, "pi.subagent_event", { invocationId: raw.invocation_id, agent: raw.agent, event: raw.event });
+    } else if (raw.type === "gh_aw_subagent_result") {
+      emit(raw, "pi.subagent_result", { invocationId: raw.invocation_id, agent: raw.agent, outcome: raw.outcome, error: raw.error });
     } else if (raw.type === "session") emit(raw, "session.init", { sourceEngine: "pi", sessionId: raw.id, cwd: raw.cwd, model: raw.model });
     else if (raw.type === "turn_start") {
       assistantState = activeState = newMessageState();

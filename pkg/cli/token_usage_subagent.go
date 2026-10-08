@@ -26,38 +26,40 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	if summary == nil {
 		return
 	}
-	augmentDeclaredSubagentModels(runDir, summary)
-
 	requests, actuals, found, err := readSessionSubagentModels(runDir)
 	if err != nil {
 		addTokenUsageWarning(summary, "failed to parse unified subagent information: "+err.Error())
 		tokenUsageSubagentLog.Printf("failed to parse unified subagent information: %v", err)
 	}
 	if found {
-		summary.SubagentModelRequests = requests
-		summary.SubagentModelActuals = actuals
+		resolver := newModelIdentityResolver(runDir)
+		summary.SubagentModelRequests = resolveSubagentRequestModels(requests, actuals, resolver)
+		summary.SubagentModelActuals = resolveSubagentActualModels(actuals, resolver)
 		summary.MismatchCount = 0
+		augmentDeclaredSubagentModels(runDir, summary)
 		return
 	}
 
+	augmentDeclaredSubagentModels(runDir, summary)
 	requests = extractSubagentModelRequests(runDir)
 	if len(requests) == 0 {
 		tokenUsageSubagentLog.Print("no subagent model dispatch requests found, skipping attribution")
 		return
 	}
-	augmentHeuristicSubagentModelAttribution(requests, summary)
+	augmentHeuristicSubagentModelAttribution(requests, summary, newModelIdentityResolver(runDir))
 }
 
-func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, summary *TokenUsageSummary) {
+func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, summary *TokenUsageSummary, resolver *modelIdentityResolver) {
 	addTokenUsageWarning(summary, subagentStdioWarning)
 
-	actuals, observedModels := collectSubagentModelActuals(summary)
+	actuals, _ := collectSubagentModelActuals(summary)
+	actuals = filterSubagentActualModels(actuals, requests, resolver)
+	actuals = resolveSubagentActualModels(actuals, resolver)
 	summary.SubagentModelActuals = actuals
-
-	var fallbackEffectiveModel string
-	if len(observedModels) == 1 {
-		for model := range observedModels {
-			fallbackEffectiveModel = model
+	observedModels := make(map[string]string, len(actuals))
+	for _, actual := range actuals {
+		if actual.Requests > 0 {
+			observedModels[actual.Model] = actual.Provider
 		}
 	}
 
@@ -68,10 +70,16 @@ func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, s
 		if row.ResolvedModel != "" {
 			requested = row.ResolvedModel
 		}
-		if _, ok := observedModels[requested]; ok {
-			row.EffectiveModel = requested
+		var observedNames []string
+		for model := range observedModels {
+			observedNames = append(observedNames, model)
+		}
+		resolved := resolver.resolve(requested, "", observedNames)
+		if _, ok := observedModels[resolved]; ok {
+			row.ResolvedModel = resolved
+			row.EffectiveModel = resolved
+			row.ServedModels = []string{resolved}
 		} else {
-			row.EffectiveModel = fallbackEffectiveModel
 			if len(observedModels) == 0 {
 				row.ReasonCode = modelMismatchReasonTokenUsageMissing
 			} else {
@@ -84,6 +92,94 @@ func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, s
 	summary.SubagentModelRequests = requestRows
 	summary.MismatchCount = mismatchCount
 	tokenUsageSubagentLog.Printf("attributed %d subagent request(s), %d mismatch(es)", len(requestRows), mismatchCount)
+}
+
+func filterSubagentActualModels(actuals []SubagentModelActual, requests []SubagentModelRequest, resolver *modelIdentityResolver) []SubagentModelActual {
+	filtered := make([]SubagentModelActual, 0, len(actuals))
+	for _, actual := range actuals {
+		for _, request := range requests {
+			model := firstNonEmptyModel(request.ResolvedModel, request.RequestedModel)
+			if resolver.matches(model, actual.Model, actual.Provider) {
+				filtered = append(filtered, actual)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
+func resolveSubagentRequestModels(requests []SubagentModelRequest, actuals []SubagentModelActual, resolver *modelIdentityResolver) []SubagentModelRequest {
+	observed := make([]string, 0, len(actuals)*2)
+	for _, actual := range actuals {
+		observed = append(observed, actual.Model)
+		observed = append(observed, actual.ServedModels...)
+	}
+	for i := range requests {
+		row := &requests[i]
+		row.ResolvedModel = resolver.resolve(firstNonEmptyModel(row.ResolvedModel, row.RequestedModel), "", observed)
+		if row.EffectiveModel != "" {
+			row.EffectiveModel = resolver.resolve(row.EffectiveModel, "", observed)
+			row.ServedModels = []string{row.EffectiveModel}
+		}
+		if row.FailedCount > 0 && row.CompletedCount == 0 && row.EffectiveModel == "" {
+			row.ReasonCode = modelMismatchReasonSubagentFailed
+		}
+	}
+	return requests
+}
+
+func firstNonEmptyModel(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func resolveSubagentActualModels(actuals []SubagentModelActual, resolver *modelIdentityResolver) []SubagentModelActual {
+	observed := make([]string, 0, len(actuals))
+	for _, actual := range actuals {
+		observed = append(observed, actual.Model)
+		observed = append(observed, actual.ServedModels...)
+	}
+	grouped := make(map[string]SubagentModelActual, len(actuals))
+	for _, actual := range actuals {
+		resolved := resolver.resolve(actual.Model, actual.Provider, observed)
+		if resolved == "" {
+			resolved = normalizeModelIdentity(actual.Model)
+		}
+		combined := grouped[resolved]
+		combined.Model = resolved
+		combined.ResolvedModel = resolved
+		combined.Provider = actual.Provider
+		combined.Requests += actual.Requests
+		combined.InputTokens += actual.InputTokens
+		combined.OutputTokens += actual.OutputTokens
+		combined.CacheReadTokens += actual.CacheReadTokens
+		combined.CacheWriteTokens += actual.CacheWriteTokens
+		combined.ReasoningTokens += actual.ReasoningTokens
+		combined.AIC += actual.AIC
+		combined.TotalDurationMs += actual.TotalDurationMs
+		combined.ServedModels = appendUnique(combined.ServedModels, actual.Model)
+		for _, model := range actual.ServedModels {
+			combined.ServedModels = appendUnique(combined.ServedModels, model)
+		}
+		grouped[resolved] = combined
+	}
+	result := make([]SubagentModelActual, 0, len(grouped))
+	for _, actual := range grouped {
+		result = append(result, actual)
+	}
+	sortSubagentModelActuals(result)
+	return result
+}
+
+func appendUnique(values []string, value string) []string {
+	if value == "" || slices.Contains(values, value) {
+		return values
+	}
+	return append(values, value)
 }
 
 func sortSubagentModelActuals(actuals []SubagentModelActual) {
@@ -187,6 +283,8 @@ func collectSubagentModelActuals(summary *TokenUsageSummary) ([]SubagentModelAct
 		}
 		actuals = append(actuals, SubagentModelActual{
 			Model: model, Provider: usage.Provider, Requests: usage.Requests,
+			TokenCoreMetrics: usage.TokenCoreMetrics, AIC: usage.AIC,
+			TotalDurationMs: usage.DurationMs,
 		})
 		observedModels[model] = usage.Provider
 	}

@@ -77,9 +77,31 @@ func TestMatchesDeclaredModelEffectiveIDs(t *testing.T) {
 	}
 }
 
+func TestModelIdentityResolverFoldsAliasAndDatedIDs(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(`{"sub_agent_models":[{"name":"quick-checker","model":"small","patterns":["copilot/gpt-5.4-mini"]}]}`), 0600))
+	resolver := newModelIdentityResolver(dir)
+	require.Equal(t, "gpt-5.4-mini", resolver.resolve("small", "", []string{"small", "gpt-5.4-mini-2026-03-17"}))
+	require.Equal(t, "claude-haiku-4.5", normalizeModelIdentity("claude-haiku-4-5-20251001"))
+
+	actuals := resolveSubagentActualModels([]SubagentModelActual{
+		{Model: "small", Requests: 4, TokenCoreMetrics: TokenCoreMetrics{InputTokens: 100}},
+		{Model: "gpt-5.4-mini", AIC: 1.144},
+	}, resolver)
+	require.Len(t, actuals, 1)
+	require.Equal(t, "gpt-5.4-mini", actuals[0].Model)
+	require.Equal(t, 4, actuals[0].Requests)
+	require.InDelta(t, 1.144, actuals[0].AIC, 0.000001)
+	require.ElementsMatch(t, []string{"small", "gpt-5.4-mini"}, actuals[0].ServedModels)
+}
+
 func TestPiStructuredSubagentModelAttribution(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-session.jsonl"), []byte("{\"type\":\"session.init\",\"data\":{\"sourceEngine\":\"pi\",\"sessionId\":\"parent\"}}\n{\"type\":\"pi.subagent_dispatch\",\"data\":{\"agent\":\"reader\",\"requestedModel\":\"small\",\"resolvedModel\":\"claude-haiku-4.5\"}}\n"), 0600))
+	session := `{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}` + "\n" +
+		`{"type":"pi.subagent_dispatch","data":{"invocationId":"call-1","agent":"reader","requestedModel":"small","resolvedModel":"claude-haiku-4.5"}}` + "\n" +
+		`{"type":"pi.subagent_event","data":{"invocationId":"call-1","event":{"message":{"model":"claude-haiku-4-5-20251001","usage":{"input":10,"output":2}}}}}` + "\n" +
+		`{"type":"pi.subagent_result","data":{"invocationId":"call-1","agent":"reader","outcome":"completed"}}` + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-session.jsonl"), []byte(session), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-stdio.log"), []byte("{\"type\":\"gh_aw_subagent_dispatch\",\"agent\":\"reader\",\"requested_model\":\"small\",\"resolved_model\":\"claude-haiku-4.5\"}\n"), 0600))
 	summary := &TokenUsageSummary{ByModel: map[string]*ModelTokenUsage{"claude-haiku-4.5": {Provider: "github-copilot", Requests: 1}}}
 	augmentSubagentModelAttribution(dir, summary)
@@ -88,8 +110,34 @@ func TestPiStructuredSubagentModelAttribution(t *testing.T) {
 	require.Equal(t, "small", row.RequestedModel)
 	require.Equal(t, "claude-haiku-4.5", row.ResolvedModel)
 	require.Equal(t, row.ResolvedModel, row.EffectiveModel)
+	require.Equal(t, 1, row.CompletedCount)
 	require.Empty(t, row.ReasonCode)
 	require.Zero(t, summary.MismatchCount)
+}
+
+func TestPiStructuredSubagentUsageAndTerminalResult(t *testing.T) {
+	dir := t.TempDir()
+	session := `{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}` + "\n" +
+		`{"type":"pi.subagent_dispatch","data":{"invocationId":"call-1","agent":"reader","requestedModel":"small","resolvedModel":"claude-haiku-4.5"}}` + "\n" +
+		`{"type":"pi.subagent_event","data":{"invocationId":"call-1","event":{"message":{"model":"claude-haiku-4-5-20251001","usage":{"input":10,"output":2,"cacheRead":3,"cacheWrite":4}}}}}` + "\n" +
+		`{"type":"pi.subagent_result","data":{"invocationId":"call-1","agent":"reader","outcome":"completed"}}` + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-session.jsonl"), []byte(session), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "agent-stdio.log"), []byte("● Fake (model: wrong)"), 0600))
+	summary := &TokenUsageSummary{ByModel: map[string]*ModelTokenUsage{
+		"claude-haiku-4-5-20251001": {Provider: "github-copilot", Requests: 2},
+		"gpt-5.6-luna":              {Provider: "github-copilot", Requests: 4},
+	}}
+	augmentSubagentModelAttribution(dir, summary)
+	require.Empty(t, summary.Warnings)
+	require.Len(t, summary.SubagentModelRequests, 1)
+	require.Equal(t, 1, summary.SubagentModelRequests[0].CompletedCount)
+	require.Equal(t, "claude-haiku-4.5", summary.SubagentModelRequests[0].EffectiveModel)
+	require.Empty(t, summary.SubagentModelRequests[0].ReasonCode)
+	require.Len(t, summary.SubagentModelActuals, 1)
+	require.Equal(t, "claude-haiku-4.5", summary.SubagentModelActuals[0].Model)
+	require.Equal(t, 1, summary.SubagentModelActuals[0].Requests)
+	require.Equal(t, 10, summary.SubagentModelActuals[0].InputTokens)
+	require.Equal(t, 2, summary.SubagentModelActuals[0].OutputTokens)
 }
 
 func TestSubagentDispatchLine(t *testing.T) {

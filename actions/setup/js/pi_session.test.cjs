@@ -12,13 +12,21 @@ describe("Pi CI stream regressions", () => {
     const parent = { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Parent answer" }], usage: { input: 10, output: 3 } } };
     const child = {
       type: "gh_aw_subagent_event",
+      invocation_id: "invocation-1",
       agent: "reader",
       event: { type: "message_end", message: { role: "assistant", model: "claude-haiku-4.5", content: [{ type: "text", text: "Child answer" }], usage: { input: 5, output: 2 } } },
     };
-    const records = [{ type: "gh_aw_subagent_dispatch", agent: "reader", requested_model: "small", resolved_model: "claude-haiku-4.5" }, child, parent];
+    const records = [
+      { type: "gh_aw_subagent_dispatch", invocation_id: "invocation-1", agent: "reader", requested_model: "small", resolved_model: "claude-haiku-4.5" },
+      child,
+      { type: "gh_aw_subagent_result", invocation_id: "invocation-1", agent: "reader", outcome: "completed" },
+      parent,
+    ];
     const events = transformPiV3Entries(records);
-    expect(byType(events, "pi.subagent_dispatch")[0].data).toMatchObject({ requestedModel: "small", resolvedModel: "claude-haiku-4.5" });
+    expect(byType(events, "pi.subagent_dispatch")[0].data).toMatchObject({ invocationId: "invocation-1", requestedModel: "small", resolvedModel: "claude-haiku-4.5" });
     expect(byType(events, "pi.subagent_event")[0].data.event).toEqual(child.event);
+    expect(byType(events, "pi.subagent_event")[0].data.invocationId).toBe("invocation-1");
+    expect(byType(events, "pi.subagent_result")[0].data).toMatchObject({ invocationId: "invocation-1", outcome: "completed" });
     expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["Parent answer"]);
     expect(computePiV3Stats(records).usage.input_tokens).toBe(10);
   });

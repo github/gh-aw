@@ -45,7 +45,7 @@ func TestSessionSubagentModelsInterleavedRetries(t *testing.T) {
 			requests, actuals, found, err := parseSessionSubagentModels(strings.NewReader(content), true)
 			require.NoError(t, err)
 			require.True(t, found)
-			require.Equal(t, []SubagentModelRequest{{AgentName: "final-worker", RequestedModel: "haiku", EffectiveModel: "haiku", InvocationCount: 1}}, requests)
+			require.Equal(t, []SubagentModelRequest{{AgentName: "final-worker", RequestedModel: "haiku", EffectiveModel: "haiku", InvocationCount: 1, IncompleteCount: 1}}, requests)
 			require.Equal(t, []SubagentModelActual{{Model: "haiku", Requests: 7}}, actuals)
 		})
 	}
@@ -96,7 +96,7 @@ func TestSessionSubagentModels(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, found)
 		require.Len(t, requests, 2)
-		assert.Equal(t, SubagentModelRequest{AgentName: "routing-research", RequestedModel: "opus", EffectiveModel: "sonnet", InvocationCount: 1}, requests[1])
+		assert.Equal(t, SubagentModelRequest{AgentName: "routing-research", RequestedModel: "opus", ResolvedModel: "sonnet", EffectiveModel: "sonnet", InvocationCount: 1, IncompleteCount: 1, Effort: "low"}, requests[1])
 		assert.Equal(t, []SubagentModelActual{{Model: "haiku", Requests: 3}, {Model: "sonnet", Requests: 45}}, actuals)
 	})
 
@@ -106,6 +106,7 @@ func TestSessionSubagentModels(t *testing.T) {
 			if finalAttemptHasSubagent {
 				name = "with different subagent"
 			}
+
 			t.Run(name, func(t *testing.T) {
 				firstInit := subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"first"}}`)
 				finalInit := subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"final"}}`)
@@ -123,7 +124,7 @@ func TestSessionSubagentModels(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, found)
 				if finalAttemptHasSubagent {
-					assert.Equal(t, []SubagentModelRequest{{AgentName: "final-worker", RequestedModel: "haiku", EffectiveModel: "haiku", InvocationCount: 1}}, requests)
+					assert.Equal(t, []SubagentModelRequest{{AgentName: "final-worker", RequestedModel: "haiku", EffectiveModel: "haiku", InvocationCount: 1, IncompleteCount: 1}}, requests)
 					assert.Equal(t, []SubagentModelActual{{Model: "haiku", Requests: 7}}, actuals)
 				} else {
 					assert.Empty(t, requests)
@@ -139,7 +140,7 @@ func TestSessionSubagentModels(t *testing.T) {
 		requests, _, found, err := parseSessionSubagentModels(strings.NewReader(subagentSessionHeader+first+second), true)
 		require.NoError(t, err)
 		require.True(t, found)
-		assert.Equal(t, []SubagentModelRequest{{AgentName: "routing-research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 2}}, requests)
+		assert.Equal(t, []SubagentModelRequest{{AgentName: "routing-research", RequestedModel: "opus", InvocationCount: 2, IncompleteCount: 2}}, requests)
 	})
 
 	t.Run("prefers usage artifact over canonical trace and log", func(t *testing.T) {
@@ -153,7 +154,9 @@ func TestSessionSubagentModels(t *testing.T) {
 		require.Len(t, summary.SubagentModelRequests, 2)
 		assert.Empty(t, summary.Warnings)
 		assert.Zero(t, summary.MismatchCount)
-		assert.Equal(t, []SubagentModelActual{{Model: "haiku", Requests: 3}, {Model: "sonnet", Requests: 45}}, summary.SubagentModelActuals)
+		require.Len(t, summary.SubagentModelActuals, 2)
+		assert.Equal(t, []string{"sonnet", "haiku"}, []string{summary.SubagentModelActuals[0].Model, summary.SubagentModelActuals[1].Model})
+		assert.Equal(t, []int{45, 3}, []int{summary.SubagentModelActuals[0].Requests, summary.SubagentModelActuals[1].Requests})
 	})
 
 	t.Run("uses canonical bootstrap trace without conclusion artifact", func(t *testing.T) {
@@ -163,7 +166,7 @@ func TestSessionSubagentModels(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, found)
 		require.Len(t, requests, 1)
-		assert.Equal(t, "sonnet", requests[0].EffectiveModel)
+		assert.Empty(t, requests[0].EffectiveModel)
 	})
 
 	t.Run("continues to canonical trace after malformed usage artifact", func(t *testing.T) {
@@ -174,9 +177,8 @@ func TestSessionSubagentModels(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(root, "agent-stdio.log"), []byte("● Fake (model: wrong)"), 0o644))
 		summary := &TokenUsageSummary{}
 		augmentSubagentModelAttribution(root, summary)
-		require.Equal(t, []SubagentModelRequest{{AgentName: "routing-research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1}}, summary.SubagentModelRequests)
-		require.Len(t, summary.Warnings, 1)
-		assert.Contains(t, summary.Warnings[0], "failed to parse unified subagent information")
+		require.Equal(t, []SubagentModelRequest{{AgentName: "routing-research", RequestedModel: "opus", ResolvedModel: "opus", InvocationCount: 1, IncompleteCount: 1}}, summary.SubagentModelRequests)
+		assert.Empty(t, summary.Warnings, "a later valid source suppresses diagnostics from an earlier source")
 	})
 
 	t.Run("does not add native and projected snapshots", func(t *testing.T) {
@@ -228,4 +230,41 @@ func TestSessionSubagentModels(t *testing.T) {
 		_, _, _, err := readSessionSubagentModels(root)
 		require.ErrorContains(t, err, "symbolic link")
 	})
+}
+
+func TestSessionSubagentFailuresAreNotReportedAsServed(t *testing.T) {
+	content := subagentSessionHeader +
+		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"failed-run"}}`) +
+		subagentSessionRecord(`{"type":"subagent.started","agentId":"failed-1","data":{"agentDisplayName":"file-summarizer","model":"claude-haiku-4.5"}}`) +
+		subagentSessionRecord(`{"type":"subagent.failed","agentId":"failed-1","data":{"error":"HTTP 400\nCannot translate request"}}`) +
+		subagentSessionRecord(`{"type":"subagent.started","agentId":"quick-1","data":{"agentDisplayName":"quick-checker","model":"small"}}`) +
+		subagentSessionRecord(`{"type":"subagent.completed","agentId":"quick-1","data":{}}`) +
+		subagentSessionRecord(`{"type":"session.shutdown","data":{"agentMetrics":{"failed-1":{"agentDisplayName":"file-summarizer","modelMetrics":{"claude-haiku-4.5":{"requests":{"count":0}}}},"quick-1":{"agentDisplayName":"quick-checker","modelMetrics":{"small":{"requests":{"count":2},"usage":{"inputTokens":10,"outputTokens":3}},"gpt-5.4-mini":{"requests":{"count":0},"totalNanoAiu":1144000000}}}}}}`)
+
+	requests, actuals, found, err := parseSessionSubagentModels(strings.NewReader(content), true)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, requests, 2)
+	failed := requests[0]
+	require.Equal(t, "file-summarizer", failed.AgentName)
+	require.Equal(t, "SUBAGENT_FAILED", failed.ReasonCode)
+	require.Equal(t, 1, failed.FailedCount)
+	require.Empty(t, failed.EffectiveModel)
+	require.Equal(t, "HTTP 400 Cannot translate request", failed.Error)
+	completed := requests[1]
+	require.Equal(t, "quick-checker", completed.AgentName)
+	require.Equal(t, 1, completed.CompletedCount)
+	require.Equal(t, "small", completed.EffectiveModel)
+	require.Len(t, actuals, 3)
+	findings := generateSubagentModelFindings(&TokenUsageSummary{
+		SubagentModelRequests: requests,
+		DeclaredSubagentModels: []SubagentModelRequest{{
+			AgentName: "file-summarizer", RequestedModel: "claude-haiku-4.5",
+			ReasonCode: modelMismatchReasonModelNotObserved,
+		}},
+	})
+	require.Len(t, findings, 2)
+	require.Equal(t, AuditFindingSubagentFailed, findings[0].Code)
+	require.Contains(t, findings[0].Description, "file-summarizer failed 1 invocation")
+	require.Contains(t, findings[0].Description, "HTTP 400 Cannot translate request")
 }

@@ -85,12 +85,23 @@ describe("Pi managed delegation", () => {
     expect(result).toMatchObject({ content: [{ type: "text", text: "Python 3.12" }], details: { requestedModel: "small", model: "claude-haiku-4.5" } });
     expect(process.stdout.write).toHaveBeenCalledWith(expect.stringContaining('"type":"gh_aw_subagent_dispatch"'));
     expect(process.stdout.write).toHaveBeenCalledWith(expect.stringContaining('"resolved_model":"claude-haiku-4.5"'));
+    const records = process.stdout.write.mock.calls.map(([line]) => JSON.parse(line));
+    const dispatch = records.find(record => record.type === "gh_aw_subagent_dispatch");
+    const resultEvent = records.find(record => record.type === "gh_aw_subagent_result");
+    expect(dispatch.invocation_id).toBeTruthy();
+    expect(resultEvent).toMatchObject({ invocation_id: dispatch.invocation_id, outcome: "completed", agent: "reader" });
     expect(launch.mock.calls[0][2]).toMatchObject({ shell: false, cwd: dir });
     expect(fs.existsSync(launch.mock.calls[0][1].at(-1))).toBe(false);
   });
 
   it("does not claim success when inference ends with an error and CLI exits zero", async () => {
     await expect(runPiSubagent(agent, "Read.", { cwd: dir }, undefined, launcher({ stopReason: "error", errorMessage: "Model unavailable" }))).rejects.toThrow("Model unavailable");
+    const records = process.stdout.write.mock.calls.map(([line]) => JSON.parse(line));
+    expect(records.find(record => record.type === "gh_aw_subagent_result")).toMatchObject({
+      invocation_id: records.find(record => record.type === "gh_aw_subagent_dispatch").invocation_id,
+      outcome: "failed",
+      error: "Model unavailable",
+    });
   });
 
   it("inherits workflow controls without making the child finalize the workflow", async () => {

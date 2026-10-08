@@ -4,6 +4,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const { randomUUID } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeProviderErrorMessage } = require("./pi_provider_error.cjs");
@@ -32,6 +33,21 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
   if (signal?.aborted) throw new Error("Pi sub-agent was aborted before dispatch");
   const minutes = Number(process.env.GH_AW_TIMEOUT_MINUTES || "30");
   if (!Number.isFinite(minutes) || minutes <= 0) throw new Error("GH_AW_TIMEOUT_MINUTES must be positive");
+  const invocationId = randomUUID();
+  let resultEmitted = false;
+  const emitResult = (outcome, error = "") => {
+    if (resultEmitted) return;
+    resultEmitted = true;
+    process.stdout.write(
+      JSON.stringify({
+        type: "gh_aw_subagent_result",
+        invocation_id: invocationId,
+        agent: agent.name,
+        outcome,
+        ...(error ? { error: sanitizeProviderErrorMessage(error).slice(0, 300) } : {}),
+      }) + "\n"
+    );
+  };
   let dir;
   try {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-pi-subagent-"));
@@ -43,7 +59,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
       "The parent is responsible for finalizing the workflow and its required safe-output reporting. Do not emit noop safe outputs or workflow-completion reports for this child session. " +
       "Safe-output actions required to perform the delegated task remain permitted.";
     fs.writeFileSync(promptPath, system + agent.prompt + "\n\n" + delegationScope, { mode: 0o600 });
-    process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_dispatch", agent: agent.name, requested_model: agent.declaredModel || agent.modelId, resolved_model: agent.modelId }) + "\n");
+    process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_dispatch", invocation_id: invocationId, agent: agent.name, requested_model: agent.declaredModel || agent.modelId, resolved_model: agent.modelId }) + "\n");
     return await new Promise((resolve, reject) => {
       const child = launch(process.env.GH_AW_PI_COMMAND || "pi", subagentArgs(agent, promptPath), {
         cwd: ctx.cwd,
@@ -91,7 +107,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
           if (["error", "aborted"].includes(event.message.stopReason))
             failure = typeof event.message.errorMessage === "string" && event.message.errorMessage ? event.message.errorMessage : `Pi sub-agent ended with ${event.message.stopReason}`;
           // Preserve child telemetry without mixing it with the parent's session events.
-          process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_event", agent: agent.name, event }) + "\n");
+          process.stdout.write(JSON.stringify({ type: "gh_aw_subagent_event", invocation_id: invocationId, agent: agent.name, event }) + "\n");
         }
       };
       child.stdout.on("data", data => {
@@ -123,6 +139,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
         clearTimeout(timeout);
         clearTimeout(killTimer);
         signal?.removeEventListener("abort", abort);
+        emitResult("failed", getErrorMessage(error));
         reject(new Error(`Cannot launch Pi sub-agent "${agent.name}": ${getErrorMessage(error)}`, { cause: error }));
       });
       child.on("close", (code, terminationSignal) => {
@@ -131,8 +148,11 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
         signal?.removeEventListener("abort", abort);
         if (buffer.trim()) parseLine(buffer);
         if (code !== 0 || terminationSignal || failure || !output.trim()) {
-          reject(new Error(sanitizeProviderErrorMessage(failure || stderr || `Pi sub-agent exited ${code ?? terminationSignal} without an answer`)));
+          const error = sanitizeProviderErrorMessage(failure || stderr || `Pi sub-agent exited ${code ?? terminationSignal} without an answer`);
+          emitResult("failed", error);
+          reject(new Error(error));
         } else {
+          emitResult("completed");
           const text = output.length > 64000 ? output.slice(0, 64000) + "\n[Sub-agent output truncated at 64000 characters]" : output;
           resolve({ content: [{ type: "text", text }], details: { agent: agent.name, requestedModel: agent.declaredModel, model: agent.modelId } });
         }
@@ -144,6 +164,7 @@ async function runPiSubagent(agent, task, ctx, signal, launch = spawn) {
       if (signal?.aborted) abort();
     });
   } catch (error) {
+    emitResult("failed", getErrorMessage(error));
     throw new Error(`Pi sub-agent "${agent.name}" failed: ${getErrorMessage(error)}`, { cause: error });
   } finally {
     if (dir) {

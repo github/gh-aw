@@ -95,19 +95,30 @@ type ModelTokenUsageRow struct {
 
 // SubagentModelRequest captures requested/effective model attribution for a sub-agent.
 type SubagentModelRequest struct {
-	AgentName       string `json:"agent_name"`
-	RequestedModel  string `json:"requested_model"`
-	ResolvedModel   string `json:"resolved_model,omitempty"`
-	InvocationCount int    `json:"invocation_count"`
-	EffectiveModel  string `json:"effective_model,omitempty"`
-	ReasonCode      string `json:"reason_code,omitempty"`
+	AgentName       string   `json:"agent_name"`
+	RequestedModel  string   `json:"requested_model"`
+	ResolvedModel   string   `json:"resolved_model,omitempty"`
+	ServedModels    []string `json:"served_models,omitempty"`
+	InvocationCount int      `json:"invocation_count"`
+	CompletedCount  int      `json:"completed_count,omitempty"`
+	FailedCount     int      `json:"failed_count,omitempty"`
+	IncompleteCount int      `json:"incomplete_count,omitempty"`
+	Effort          string   `json:"effort,omitempty"`
+	Error           string   `json:"error,omitempty"`
+	EffectiveModel  string   `json:"effective_model,omitempty"`
+	ReasonCode      string   `json:"reason_code,omitempty"`
 }
 
 // SubagentModelActual captures model usage observed in token-usage logs.
 type SubagentModelActual struct {
-	Model    string `json:"model"`
-	Provider string `json:"provider,omitempty"`
-	Requests int    `json:"requests"`
+	Model         string   `json:"model"`
+	Provider      string   `json:"provider,omitempty"`
+	Requests      int      `json:"requests"`
+	ResolvedModel string   `json:"resolved_model,omitempty"`
+	ServedModels  []string `json:"served_models,omitempty"`
+	TokenCoreMetrics
+	AIC             float64 `json:"aic,omitempty"`
+	TotalDurationMs int     `json:"total_duration_ms,omitempty"`
 }
 
 // agentUsageEntry is the JSON structure written by parse_token_usage.cjs to
@@ -152,6 +163,7 @@ const proxyEventLogsJSONLPath = "api-proxy-logs/event-logs.jsonl"
 const agentUsageJSONPath = "agent_usage.json"
 const modelMismatchReasonTokenUsageMissing = "TOKEN_USAGE_MISSING"
 const modelMismatchReasonModelNotObserved = "REQUESTED_MODEL_NOT_OBSERVED"
+const modelMismatchReasonSubagentFailed = "SUBAGENT_FAILED"
 const subagentStdioWarning = "partial or incorrect data: sub-agent model requests are inferred from agent-stdio.log; use token_usage.jsonl for reliable token consumption"
 const tokenSteeringEventName = "token_steering"
 const timeoutSteeringEventName = "timeout_steering"
