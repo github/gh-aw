@@ -39,7 +39,12 @@ function createWorkQueueLogger(component) {
   function failure(event, error) {
     if (!debugEnabled(namespace)) return;
     // Do not use debugError: API errors may contain request bodies and tokens.
-    const status = error && typeof error === "object" ? Object.getOwnPropertyDescriptor(error, "status")?.value : undefined;
+    let status;
+    try {
+      status = error && typeof error === "object" ? Object.getOwnPropertyDescriptor(error, "status")?.value : undefined;
+    } catch {
+      // Proxied or revoked errors can throw during descriptor inspection.
+    }
     debug(event, { failed: true, ...(Number.isInteger(status) && status >= 100 && status <= 599 ? { http_status: status } : {}) });
   }
   return { debug, failure };

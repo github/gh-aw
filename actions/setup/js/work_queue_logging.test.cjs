@@ -104,6 +104,39 @@ describe("privacy-preserving work queue logging", () => {
     expect(output()).not.toContain("private");
   });
 
+  it("logs a failure without propagating descriptor trap errors", () => {
+    vi.stubEnv("DEBUG", "work-queue:*");
+    const getOwnPropertyDescriptor = vi.fn(() => {
+      throw new Error("private-descriptor-error");
+    });
+    const error = new Proxy({}, { getOwnPropertyDescriptor });
+    expect(() => createWorkQueueLogger("store").failure("read.failed", error)).not.toThrow();
+    expect(getOwnPropertyDescriptor).toHaveBeenCalledWith({}, "status");
+    expect(output()).toContain("read.failed failed=true");
+    expect(output()).not.toContain("http_status");
+    expect(output()).not.toContain("private-descriptor-error");
+  });
+
+  it("logs a failure without propagating revoked proxy errors", () => {
+    vi.stubEnv("DEBUG", "work-queue:*");
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    expect(() => createWorkQueueLogger("store").failure("read.failed", proxy)).not.toThrow();
+    expect(output()).toContain("read.failed failed=true");
+    expect(output()).not.toContain("http_status");
+    expect(output()).not.toContain("TypeError");
+  });
+
+  it("does not inspect a proxy when debug logging is disabled", () => {
+    const getOwnPropertyDescriptor = vi.fn(() => {
+      throw new Error("private");
+    });
+    const error = new Proxy({}, { getOwnPropertyDescriptor });
+    expect(() => createWorkQueueLogger("store").failure("read.failed", error)).not.toThrow();
+    expect(getOwnPropertyDescriptor).not.toHaveBeenCalled();
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
   it("traces durable publication and idempotent recovery without Work payloads or identities", async () => {
     vi.stubEnv("DEBUG", "work-queue:store");
     const initial = [genesis()];
