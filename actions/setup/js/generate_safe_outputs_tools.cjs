@@ -503,7 +503,8 @@ async function main() {
         type: "string",
         minLength: 1,
         maxLength: 256,
-        description: "Immutable assignment Claim handle. May be omitted only for an originally single-Claim assignment.",
+        "x-preserve-blank": true,
+        description: "Immutable assignment Claim handle. May be omitted only for an originally single-Claim assignment. Explicit blank or foreign handles are rejected.",
       };
     }
   }
