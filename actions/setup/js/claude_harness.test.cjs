@@ -201,6 +201,19 @@ describe("claude_harness.cjs", () => {
       expect(removeClaudeRoutingOverrides(["--model", "fixed", "--effort=low", "--print"])).toEqual(["--print"]);
     });
 
+    it("uses the Messages endpoint for a routed model selected on Chat Completions", async () => {
+      const reflect = {
+        ...routedReflect,
+        candidate_metadata_complete: true,
+        endpoints: [{ ...routedReflect.endpoints[0], routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/chat/completions", "/v1/messages"] }] }],
+        routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, effort: "max", endpoint: "/chat/completions" } },
+      };
+      const messages = [];
+      const child = await buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github" }, message => messages.push(message));
+      expect(child).toMatchObject({ ANTHROPIC_MODEL: "claude-opus-5", CLAUDE_CODE_EFFORT_LEVEL: "max" });
+      expect(messages[0]).toContain("endpoint=/v1/messages selected_endpoint=/chat/completions");
+    });
+
     it("starts the harness with the routed model and refuses an endpoint mismatch", () => {
       const stubScript = `
         const fs = require("fs");
@@ -222,17 +235,22 @@ describe("claude_harness.cjs", () => {
 
       const mismatch = runHarnessWithStub({
         stubScript,
-        reflectData: { ...routedReflect, routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, endpoint: "/responses" } } },
+        reflectData: {
+          ...routedReflect,
+          candidate_metadata_complete: true,
+          endpoints: [{ ...routedReflect.endpoints[0], routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/responses"] }] }],
+          routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, endpoint: "/responses" } },
+        },
         extraEnv: { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github", GH_AW_SAFE_OUTPUTS: "" },
       });
       expect(mismatch.result.status).not.toBe(0);
-      expect(mismatch.result.stderr).toContain("not supported by this engine");
+      expect(mismatch.result.stderr).toContain("advertises endpoints [/responses]");
       expect(mismatch.calls).toHaveLength(0);
     });
 
     it.each([
       [{ endpoints: routedReflect.endpoints, routing: { status: "pending" } }, "pending"],
-      [{ endpoints: routedReflect.endpoints, routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, endpoint: "/responses" } } }, "not supported by this engine"],
+      [{ endpoints: routedReflect.endpoints, routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, endpoint: "/responses" } } }, "candidate metadata is incomplete"],
       [{ ...routedReflect, endpoints: [{ ...routedReflect.endpoints[0], models: ["gpt-5.6-sol"] }] }, "unavailable Copilot wire model"],
     ])("fails closed when routing is invalid: %s", async (reflect, error) => {
       await expect(buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github" }, () => {})).rejects.toThrow(error);

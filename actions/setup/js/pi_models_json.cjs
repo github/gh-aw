@@ -38,7 +38,7 @@ const { loadModelsJson } = require("./model_costs.cjs");
 const { loadPiSDK, nativePiProvider, parsePiConfig, stagePiArtifacts } = require("./pi_runtime.cjs");
 const { preparePiSubagents } = require("./pi_subagent_config.cjs");
 const { buildCatalogFromReflect } = require("./resolve_model_alias.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, getAWFRoutingModel, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const PI_ROUTING_ENDPOINT_APIS = Object.freeze({
@@ -46,6 +46,7 @@ const PI_ROUTING_ENDPOINT_APIS = Object.freeze({
   "/responses": "openai-responses",
   "/chat/completions": "openai-completions",
 });
+const PI_API_ROUTING_ENDPOINTS = Object.freeze(Object.fromEntries(Object.entries(PI_ROUTING_ENDPOINT_APIS).map(([endpoint, api]) => [api, endpoint])));
 const PI_ROUTING_ENDPOINTS = Object.keys(PI_ROUTING_ENDPOINT_APIS);
 const COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW = 1000000;
 
@@ -222,14 +223,14 @@ function validatePiModelAvailability(options) {
  * Resolve a model-specific Pi API from model metadata, rejecting an explicit
  * chat-completions override when the model only supports the Responses API.
  *
- * @param {{ provider: string, modelId: string, model?: any, modelsJson?: any, overrideApi?: string, strictOverrideApi?: boolean, logger?: (msg: string) => void }} options
+ * @param {{ provider: string, modelId: string, model?: any, modelsJson?: any, wireApi?: string, overrideApi?: string, strictOverrideApi?: boolean, logger?: (msg: string) => void }} options
  * @returns {string}
  */
 function resolvePiApiForModel(options) {
-  const { provider, modelId, model, modelsJson, overrideApi, strictOverrideApi = false, logger = () => {} } = options;
+  const { provider, modelId, model, modelsJson, wireApi: reflectedWireApi, overrideApi, strictOverrideApi = false, logger = () => {} } = options;
   const catalogProvider = ["github", "copilot", "github-copilot"].includes(provider) ? "github-copilot" : provider;
   const catalogEntry = getCatalogModelEntry(modelsJson, modelId, catalogProvider);
-  const wireApi = String(catalogEntry?.wire_api || catalogEntry?.wireApi || "")
+  const wireApi = String(catalogEntry?.wire_api || catalogEntry?.wireApi || reflectedWireApi || "")
     .toLowerCase()
     .trim();
   const requiresResponses = model?.api === "openai-responses" || wireApi === "responses";
@@ -249,8 +250,8 @@ function resolvePiApiForModel(options) {
     logger(`warning: Pi model API override conflicts with Responses-only model (model=${modelId}, override_api=${overrideApi})`);
     throw new Error(`Pi model "${modelId}" requires the OpenAI Responses API, but engine.config.model.api is "${overrideApi}"`);
   }
-  const api = requiresResponses ? "openai-responses" : overrideApi || model?.api || resolvePiApiForProvider(provider);
-  const source = overrideApi ? "engine.config.model.api" : model?.api ? "Pi model catalog" : wireApi === "responses" ? "AWF model catalog" : "provider default";
+  const api = requiresResponses ? "openai-responses" : overrideApi || model?.api || wireApiFamily || resolvePiApiForProvider(provider);
+  const source = overrideApi ? "engine.config.model.api" : model?.api ? "Pi model catalog" : wireApiFamily ? "AWF model catalog" : "provider default";
   logger(`resolved model API=${api} (provider=${provider}, model=${modelId}, source=${source})`);
   return api;
 }
@@ -281,18 +282,37 @@ function resolvePiReasoningForModel({ provider, modelId, reflectData }) {
 
 /**
  * @param {any} reflectData
- * @returns {{selection: any, api: string, error: string|null}}
+ * @returns {{selection: any, error: string|null}}
  */
 function resolvePiModelRouting(reflectData) {
   const result = resolveAWFModelRoutingSelection(reflectData, true, PI_ROUTING_ENDPOINTS);
-  if (result.error || !result.selection) return { selection: null, api: "", error: result.error || "AWF model routing selection is missing" };
+  if (result.error || !result.selection) return { selection: null, error: result.error || "AWF model routing selection is missing" };
   const mappedEffort = mapAWFRoutingEffort("pi", result.selection.effort);
-  if (mappedEffort.error) return { selection: null, api: "", error: mappedEffort.error };
+  if (mappedEffort.error) return { selection: null, error: mappedEffort.error };
   return {
     selection: { ...result.selection, mapped_effort: mappedEffort.effort },
-    api: PI_ROUTING_ENDPOINT_APIS[result.selection.endpoint],
     error: null,
   };
+}
+
+/**
+ * @param {{ reflectData: any, modelId: string, api: string }} options
+ * @returns {{ endpoint: string|null, error: string|null }}
+ */
+function resolvePiRoutingEndpoint({ reflectData, modelId, api }) {
+  const endpoint = PI_API_ROUTING_ENDPOINTS[api] || null;
+  const routingModel = getAWFRoutingModel(reflectData, modelId);
+  const supportedEndpoints = routingModel?.supported_endpoints;
+  if (reflectData?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
+    return { endpoint, error: `AWF /reflect cannot verify endpoints for Pi model ${modelId}; candidate metadata is incomplete` };
+  }
+  if (!endpoint || !supportedEndpoints.includes(endpoint)) {
+    return {
+      endpoint,
+      error: `Pi model "${modelId}" API "${api}" maps to endpoint ${endpoint || "(unsupported)"}, which is not advertised in supported_endpoints [${supportedEndpoints.join(", ")}]`,
+    };
+  }
+  return { endpoint, error: null };
 }
 
 /** @param {{ loadSDK?: typeof loadPiSDK, loadModelsJson?: typeof loadModelsJson, fetchReflect?: typeof fetchAWFReflect, logger?: (message: string) => void }} [options] */
@@ -328,14 +348,11 @@ async function main(options = {}) {
 
   /** @type {any} */
   let routingSelection = null;
-  let routedApi;
   if (routingRequired) {
     const result = resolvePiModelRouting(reflectData);
     if (result.error || !result.selection) throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Pi`);
     routingSelection = result.selection;
     modelId = routingSelection.wire_model;
-    routedApi = result.api;
-    logger(`inference routing: mode=awf-routed model=${modelId} effort=${routingSelection.effort || "(unset)"}`);
   }
 
   validatePiModelAvailability({ provider, modelId, reflectData, logger });
@@ -353,18 +370,20 @@ async function main(options = {}) {
     const runtime = await sdk.ModelRuntime.create({ modelsPath: null });
     catalogModel = runtime.getModel(nativeProvider, modelId.split("?")[0]);
   }
-  const expectedApi = routingRequired ? routedApi : undefined;
   let api = resolvePiApiForModel({
     provider,
     modelId,
     model: catalogModel,
     modelsJson,
-    overrideApi: expectedApi || overrides.api,
-    strictOverrideApi: routingRequired,
+    wireApi: routingRequired ? getAWFRoutingModel(reflectData, modelId)?.wire_api : undefined,
+    overrideApi: routingRequired ? undefined : overrides.api,
     logger,
   });
-  if (routingRequired && api !== expectedApi) {
-    throw new Error(`Pi model ${modelId} API ${api} does not match routed endpoint ${routingSelection.endpoint} (${expectedApi})`);
+  if (routingRequired) {
+    const result = resolvePiRoutingEndpoint({ reflectData, modelId, api });
+    if (result.error) throw new Error(`${result.error}; refusing to start Pi`);
+    const endpointOverride = routingSelection.selected_endpoint && routingSelection.selected_endpoint !== result.endpoint ? ` selected_endpoint=${routingSelection.selected_endpoint}` : "";
+    logger(`inference routing: mode=awf-routed model=${modelId} effort=${routingSelection.effort || "(unset)"} endpoint=${result.endpoint}${endpointOverride}`);
   }
   logger(`resolved gateway api=${api} (provider=${provider}, model=${modelId})`);
   const metadata = {};
@@ -439,4 +458,15 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, resolvePiApiForProvider, resolvePiApiForModel, resolvePiModelRouting, resolvePiReasoningForModel, validatePiModelAvailability, DEFAULT_PI_CODING_AGENT_DIR };
+module.exports = {
+  main,
+  resolveGatewayBaseUrl,
+  buildModelsJSON,
+  resolvePiApiForProvider,
+  resolvePiApiForModel,
+  resolvePiModelRouting,
+  resolvePiRoutingEndpoint,
+  resolvePiReasoningForModel,
+  validatePiModelAvailability,
+  DEFAULT_PI_CODING_AGENT_DIR,
+};

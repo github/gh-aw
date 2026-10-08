@@ -151,10 +151,30 @@ describe("codex_harness.cjs", () => {
     it.each([
       [null, "required model-routing selection"],
       [{ endpoints: reflectData.endpoints, routing: { status: "pending" } }, "pending"],
-      [{ ...reflectData, routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/v1/messages" } } }, "not supported by this engine"],
+      [
+        {
+          ...reflectData,
+          candidate_metadata_complete: true,
+          endpoints: [{ ...reflectData.endpoints[0], routing_models: [{ model_id: "gpt-5.6-sol", supported_endpoints: ["/v1/messages"] }] }],
+          routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/v1/messages" } },
+        },
+        "advertises endpoints [/v1/messages]",
+      ],
       [{ ...reflectData, endpoints: [{ provider: "github", configured: true, models: [] }] }, "unavailable Copilot wire model"],
     ])("fails closed when routing data is invalid: %s", (reflect, error) => {
       expect(resolveCodexModelRouting(reflect, ["exec", "--model", "fixed"]).error).toContain(error);
+    });
+
+    it("uses the Responses endpoint for a routed GPT model selected on Chat Completions", () => {
+      const reflect = {
+        ...reflectData,
+        candidate_metadata_complete: true,
+        endpoints: [{ ...reflectData.endpoints[0], routing_models: [{ model_id: "gpt-5.6-sol", supported_endpoints: ["/chat/completions", "/responses"] }] }],
+        routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" } },
+      };
+      const result = resolveCodexModelRouting(reflect, ["exec"]);
+      expect(result.error).toBeNull();
+      expect(result.selection).toMatchObject({ endpoint: "/responses", selected_endpoint: "/chat/completions" });
     });
 
     it("drops fixed model and reasoning-effort configuration", () => {
@@ -187,7 +207,7 @@ describe("codex_harness.cjs", () => {
       expect(calls[0].args).toContain("gpt-5.6-sol");
       expect(calls[0].args).toContain('model_reasoning_effort="xhigh"');
       expect(calls[0].args).not.toContain("fixed-model");
-      expect(result.stderr).toContain("inference routing: mode=awf-routed model=gpt-5.6-sol effort=xhigh");
+      expect(result.stderr).toContain("inference routing: mode=awf-routed model=gpt-5.6-sol effort=xhigh endpoint=/responses");
     });
   });
 

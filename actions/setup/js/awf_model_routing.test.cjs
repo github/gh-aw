@@ -23,6 +23,41 @@ describe("awf_model_routing.cjs", () => {
     expect(resolveAWFModelRoutingSelection(reflectData, true, ["/responses"]).error).toContain("not supported by this engine");
   });
 
+  it("uses an engine-compatible endpoint from complete routing metadata and preserves AWF's selection", () => {
+    const reflect = {
+      ...reflectData,
+      candidate_metadata_complete: true,
+      endpoints: [
+        {
+          ...reflectData.endpoints[0],
+          routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/v1/messages", "/chat/completions"] }],
+        },
+      ],
+      routing: {
+        ...reflectData.routing,
+        selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" },
+      },
+    };
+    expect(resolveAWFModelRoutingSelection(reflect, true, ["/v1/messages"], true).selection).toMatchObject({
+      endpoint: "/v1/messages",
+      selected_endpoint: "/chat/completions",
+    });
+  });
+
+  it.each([
+    [{ candidate_metadata_complete: false, routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/v1/messages"] }] }, "metadata is incomplete"],
+    [{ candidate_metadata_complete: true, routing_models: [{ model_id: "claude-opus-5", supported_endpoints: ["/responses"] }] }, "advertises endpoints"],
+    [{ candidate_metadata_complete: true, routing_models: [] }, "metadata is incomplete"],
+  ])("fails closed when the model endpoint metadata cannot verify a compatible endpoint: %s", ({ candidate_metadata_complete, routing_models }, error) => {
+    const reflect = {
+      ...reflectData,
+      candidate_metadata_complete,
+      endpoints: [{ ...reflectData.endpoints[0], routing_models }],
+      routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" } },
+    };
+    expect(resolveAWFModelRoutingSelection(reflect, true, ["/v1/messages"], true).error).toContain(error);
+  });
+
   it("checks routed model availability only against configured GitHub provider aliases", () => {
     const mixedProviders = {
       ...reflectData,
