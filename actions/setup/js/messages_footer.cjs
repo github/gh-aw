@@ -16,7 +16,7 @@ const { formatCompactInteger } = require("./compact_numbers.cjs");
 const { formatAIC } = require("./model_costs.cjs");
 const { reduceModelNameToIdentifier } = require("./model_aliases.cjs");
 const { getDetectionWarningMessage } = require("./messages_run_status.cjs");
-const { getFallbackModel, validateModelIdentifier } = require("./model_attribution.cjs");
+const { getEffectiveModelLabel, resolveEffectiveModel, validateModelIdentifier } = require("./model_attribution.cjs");
 
 /**
  * Get the detection caution alert if the detection job found a potential issue.
@@ -115,8 +115,9 @@ function buildAICEntry(label, value, modelAlias) {
  * }}
  */
 function getAICFromEnv() {
-  const aiModel = getFallbackModel() || process.env.GH_AW_PRIMARY_MODEL || process.env.GH_AW_ENGINE_MODEL || undefined;
-  const compressedModelName = reduceModelNameToIdentifier(aiModel);
+  const attribution = resolveEffectiveModel();
+  const aiModel = attribution.model || undefined;
+  const compressedModelName = getEffectiveModelLabel();
   const agenticEngine = process.env.GH_AW_ENGINE_ID || undefined;
   const agentModelIdentifier = [agenticEngine, compressedModelName].filter(Boolean).join(" · ");
   const totalAIC = parsePositiveAIC(process.env.GH_AW_AIC);
@@ -614,7 +615,8 @@ function generateXMLMarker(workflowName, runUrl) {
   // Read engine metadata from environment variables
   const engineId = process.env.GH_AW_ENGINE_ID || "";
   const engineVersion = process.env.GH_AW_ENGINE_VERSION || "";
-  const engineModel = getFallbackModel() || validateModelIdentifier(process.env.GH_AW_ENGINE_MODEL);
+  const attribution = resolveEffectiveModel();
+  const engineModel = attribution.model || (attribution.routing ? attribution.requestedModel : validateModelIdentifier(process.env.GH_AW_ENGINE_MODEL));
   const trackerId = process.env.GH_AW_TRACKER_ID || "";
   const runId = process.env.GITHUB_RUN_ID || "";
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
@@ -643,6 +645,12 @@ function generateXMLMarker(workflowName, runUrl) {
   // Add model if available
   if (engineModel) {
     parts.push(`model: ${engineModel}`);
+  }
+  if (attribution.routing?.status === "selected") {
+    if (attribution.effort) parts.push(`effort: ${attribution.effort}`);
+    parts.push("routed: true");
+  } else if (attribution.routing) {
+    parts.push(`routed: ${attribution.routing.status}`);
   }
 
   // Add numeric run ID if available

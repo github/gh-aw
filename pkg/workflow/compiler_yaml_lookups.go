@@ -42,6 +42,8 @@ func getVersionForSetup(data *WorkflowData, registry *EngineRegistry) string {
 		return string(constants.DefaultCodexVersion)
 	case string(constants.GeminiEngine):
 		return string(constants.DefaultGeminiVersion)
+	case string(constants.AgyEngine):
+		return string(constants.DefaultAgyVersion)
 	case string(constants.PiEngine):
 		return string(constants.DefaultPiVersion)
 	default:
@@ -110,6 +112,8 @@ func getInstallationVersion(data *WorkflowData, engine CodingAgentEngine, regist
 		return string(constants.DefaultCodexVersion)
 	case string(constants.PiEngine):
 		return string(constants.DefaultPiVersion)
+	case string(constants.AgyEngine):
+		return string(constants.DefaultAgyVersion)
 	default:
 		if version := behaviorEngineDefaultVersion(engineID, registry); version != "" {
 			return version
@@ -133,6 +137,8 @@ func getDefaultAgentModel(engineID string) string {
 		return constants.AgentDefaultModel
 	case string(constants.CodexEngine):
 		return constants.CodexDefaultModel
+	case string(constants.AgyEngine):
+		return constants.AgyDefaultModel
 	default:
 		return ""
 	}

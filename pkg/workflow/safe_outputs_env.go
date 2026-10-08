@@ -201,13 +201,30 @@ func buildEngineMetadataEnvVars(engineConfig *EngineConfig, model string) []stri
 	// Add engine model: prefer explicit compile-time config; fall back to the runtime model
 	// captured by the activation job so safe-output footers can show the actual model used
 	// (e.g. the value of the GH_AW_MODEL_AGENT_* variable) rather than showing nothing.
-	if model != "" {
+	if model != "" && engineConfig.ModelRouting == nil {
 		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_ENGINE_MODEL: %q\n", model))
 	} else {
 		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_ENGINE_MODEL: ${{ needs.%s.outputs.model }}\n", string(constants.AgentJobName)))
 	}
+	if engineConfig.ModelRouting != nil {
+		customEnvVars = append(customEnvVars,
+			fmt.Sprintf("          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.%s.outputs.model_effort }}\n", string(constants.AgentJobName)),
+			fmt.Sprintf("          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.%s.outputs.model_routing_status }}\n", string(constants.AgentJobName)),
+		)
+	}
 
 	return customEnvVars
+}
+
+func buildModelRoutingOutputEnvVars(engineConfig *EngineConfig, mainJobName string) []string {
+	if engineConfig == nil || engineConfig.ModelRouting == nil {
+		return nil
+	}
+	return []string{
+		fmt.Sprintf("          GH_AW_ENGINE_MODEL: ${{ needs.%s.outputs.model }}\n", mainJobName),
+		fmt.Sprintf("          GH_AW_ENGINE_MODEL_EFFORT: ${{ needs.%s.outputs.model_effort }}\n", mainJobName),
+		fmt.Sprintf("          GH_AW_MODEL_ROUTING_STATUS: ${{ needs.%s.outputs.model_routing_status }}\n", mainJobName),
+	}
 }
 
 // ========================================

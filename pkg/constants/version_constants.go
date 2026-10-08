@@ -50,6 +50,10 @@ const DefaultCodexVersion Version = "0.159.3"
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.62.0"
 
+const DefaultAgyVersion Version = "1.3.1"
+
+const AgyDefaultModel = "gemini-3.8-flash-medium"
+
 // DefaultPiVersion is the default version of the Pi CLI
 const DefaultPiVersion Version = "1.0.0"
 
@@ -64,7 +68,7 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.44"
+const DefaultFirewallVersion Version = "v0.28.49"
 
 // AWFFallbackModelsMinVersion is the first AWF release with ordered request-level fallback.
 const AWFFallbackModelsMinVersion Version = "v0.28.31"
@@ -125,6 +129,9 @@ const AWFArcDindMinVersion Version = "v0.27.20"
 // AWFCloudHypervisorMinVersion is the minimum AWF version that supports the
 // cloud-hypervisor preview runtime and its release assets.
 const AWFCloudHypervisorMinVersion Version = "v0.28.11"
+
+// AWFNVXMinVersion is the minimum AWF release with the fail-closed NVX runtime.
+const AWFNVXMinVersion Version = "v0.28.49"
 
 // AWFEnclaveCloudHypervisorMinVersion is the minimum AWF version supporting
 // the release-attested Cloud Hypervisor enclave executor preview.
@@ -228,7 +235,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.4.29"
+const DefaultMCPGatewayVersion Version = "v0.4.30"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

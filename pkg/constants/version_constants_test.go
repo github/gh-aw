@@ -20,11 +20,12 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Copilot SDK", DefaultCopilotSDKVersion, "1.0.16"},
 		{"Codex", DefaultCodexVersion, "0.159.3"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.62.0"},
+		{"Agy CLI", DefaultAgyVersion, "1.3.1"},
 		{"Pi CLI", DefaultPiVersion, "1.0.0"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.2"},
-		{"Firewall", DefaultFirewallVersion, "v0.28.44"},
+		{"Firewall", DefaultFirewallVersion, "v0.28.49"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.29"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.30"},
 		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.2"},
 	}
 

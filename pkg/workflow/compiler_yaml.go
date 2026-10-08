@@ -21,7 +21,10 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 	c.jobManager = NewJobManager()
 
 	// Build all jobs
-	data = c.dryRunWorkflowData(data)
+	data, err := c.prepareDryRunWorkflowData(data)
+	if err != nil {
+		return err
+	}
 	if err := c.buildJobs(data, markdownPath); err != nil {
 		compilerYamlLog.Printf("Failed to build jobs: %v", err)
 		return fmt.Errorf("job generation could not complete; check that each configured job has valid step fields such as run, uses, and with: %w", err)
@@ -167,6 +170,10 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	data.FrontmatterHash = frontmatterHash
 	data.BodyHash = bodyHash
 	data = workflowDataWithArtifactRetention(data, repoConfig)
+	data, err = c.prepareDryRunWorkflowData(data)
+	if err != nil {
+		return "", nil, nil, err
+	}
 
 	// Build all jobs and validate dependencies
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
@@ -195,6 +202,12 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, err
 	}
+	if c.dryRun {
+		bodyContent, err = removeDryRunTelemetryEnv(bodyContent)
+		if err != nil {
+			return "", nil, nil, err
+		}
+	}
 
 	// Collect secrets and external action references from the generated body.
 	// These are returned to the caller so they can be used for safe update enforcement
@@ -216,6 +229,12 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 			bodyContent, err = applyArtifactRetention(body.String(), repoConfig)
 			if err != nil {
 				return "", nil, nil, err
+			}
+			if c.dryRun {
+				bodyContent, err = removeDryRunTelemetryEnv(bodyContent)
+				if err != nil {
+					return "", nil, nil, err
+				}
 			}
 			compilerYamlLog.Printf("Regenerated workflow body with on.workflow_call.secrets declarations")
 		}

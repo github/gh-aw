@@ -28,3 +28,11 @@ func TestNewMCPServerCommand_AuditToolListedInHelp(t *testing.T) {
 
 	assert.Contains(t, cmd.Long, "audit", "mcp-server long description should list the audit tool")
 }
+
+func TestNewMCPServerCommand_WorkQueueToolListedInHelp(t *testing.T) {
+	t.Parallel()
+	cmd := NewMCPServerCommand()
+	require.NotNil(t, cmd)
+
+	assert.Contains(t, cmd.Long, "  - work-queue  - Read Git-backed work queue state or inspect Work/Claim metadata (read-only)")
+}

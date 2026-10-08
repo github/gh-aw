@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const log = require("./work_queue_logging.cjs").createWorkQueueLogger("intents");
 
 const fs = require("fs");
 const path = require("path");
@@ -13,7 +14,11 @@ const MAX_INTENTS = 256;
 const INTENT_KINDS = ["submit", "dispatch_next", "finish"];
 
 function readIntentLines(filename) {
-  if (!fs.existsSync(filename)) return [];
+  log.debug("intents.read.start");
+  if (!fs.existsSync(filename)) {
+    log.debug("intents.read.absent");
+    return [];
+  }
   const stat = fs.statSync(filename);
   if (!stat.isFile() || stat.size > MAX_INTENT_BYTES) throw new Error("work_queue_intent_limit");
   const bytes = fs.readFileSync(filename);
@@ -26,6 +31,7 @@ function readIntentLines(filename) {
   }
   const lines = text.split("\n");
   if (lines.filter(line => line.trim()).length > MAX_INTENTS) throw new Error("work_queue_intent_limit");
+  log.debug("intents.read.complete", { bytes: bytes.length, lines: lines.length });
   return lines;
 }
 
@@ -50,7 +56,8 @@ function readStagedIntentBatch(filename) {
       } else if (!previous) {
         ids.set(intentId, { intent, line: index + 1 });
       }
-    } catch {
+    } catch (error) {
+      log.failure("intent.parse.failed", error);
       if (intentId !== undefined) invalid.add(intentId);
       errors.push({ line: index + 1, ...(intentId === undefined ? {} : { intent_id: intentId }), reason: "work_queue_intent_invalid" });
     }
@@ -59,7 +66,9 @@ function readStagedIntentBatch(filename) {
     const previous = ids.get(id);
     if (previous) errors.push({ line: previous.line, intent_id: id, reason: "work_queue_intent_conflict" });
   }
-  return { intents: [...ids.values()].filter(entry => !invalid.has(entry.intent.intent_id)).map(entry => entry.intent), errors: errors.sort((left, right) => left.line - right.line) };
+  const intents = [...ids.values()].filter(entry => !invalid.has(entry.intent.intent_id)).map(entry => entry.intent);
+  log.debug("intents.parse.complete", { intents: intents.length, errors: errors.length });
+  return { intents, errors: errors.sort((left, right) => left.line - right.line) };
 }
 
 function readStagedIntents(filename) {
@@ -69,11 +78,13 @@ function readStagedIntents(filename) {
 }
 
 function stageIntent(filename, intent) {
+  log.debug("intent.stage.start");
   const previous = readStagedIntents(filename);
   if (previous.length >= MAX_INTENTS || Buffer.byteLength(canonical(intent)) + (fs.existsSync(filename) ? fs.statSync(filename).size : 0) > MAX_INTENT_BYTES) throw new Error("work_queue_intent_limit");
   fs.mkdirSync(path.dirname(filename), { recursive: true });
   fs.appendFileSync(filename, `${canonical(intent)}\n`, { mode: 0o644, encoding: "utf8" });
   fs.chmodSync(filename, 0o644);
+  log.debug("intent.stage.complete", { staged_intents: previous.length + 1 });
 }
 
 function requestIdForIntent(trustedContext, intentId) {

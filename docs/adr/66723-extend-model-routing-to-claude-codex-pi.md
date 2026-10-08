@@ -12,7 +12,7 @@
 
 ### Decision
 
-We will allow `engine.model-routing` on the `copilot`, `claude`, `codex`, and `pi` engines whenever the engine resolves to GitHub Copilot inference, and we will enforce API compatibility at two layers rather than one. At compile time, `validateModelRouting` accepts the four engines, rejects non-GitHub providers, and rejects literal `allowed-models` candidates incompatible with the engine's API family (`claude-*` for Claude, `gpt-*` for Codex, any model for Copilot and pi); fixed-model and fixed-effort overrides, plus incompatible sub-agent models, produce warnings instead of errors. At runtime, a new shared `actions/setup/js/awf_model_routing.cjs` module resolves the `/reflect` selection, verifies the selected wire model is advertised by a configured endpoint, checks the selected endpoint against the engine's allowed endpoints, and maps routed effort onto engine-specific settings. The primary driver is correctness under heterogeneous wire APIs: unsupported selections fail closed rather than being clamped or silently substituted. Threat-detection jobs intentionally remain unrouted.
+We will allow `engine.model-routing` on the `copilot`, `claude`, `codex`, and `pi` engines whenever the engine resolves to GitHub Copilot inference, and we will enforce API compatibility at two layers rather than one. At compile time, `validateModelRouting` accepts the four engines, rejects non-GitHub providers, and rejects literal `allowed-models` candidates incompatible with the engine's API family (`claude-*` for Claude, `gpt-*` for Codex, any model for Copilot and pi); fixed-model and fixed-effort overrides, plus incompatible sub-agent models, produce warnings instead of errors. At runtime, a new shared `actions/setup/js/awf_model_routing.cjs` module resolves the `/reflect` selection and verifies the selected wire model is advertised by a configured endpoint. For Claude and Codex, AWF's selected endpoint is advisory: complete `/reflect` `routing_models.supported_endpoints` metadata must show that the model supports the engine's API, which becomes the effective endpoint. Pi resolves the API from its model catalog and verifies the corresponding endpoint against the same metadata. The original AWF endpoint is retained for diagnostics. Routed effort maps onto engine-specific settings, and unsupported selections fail closed rather than being clamped or silently substituted. Threat-detection jobs intentionally remain unrouted.
 
 ### Alternatives Considered
 
@@ -34,13 +34,13 @@ The status quo — reject routing on other engines and tell authors to use the C
 
 - Claude, Codex, and pi workflows on GitHub Copilot inference can use `engine.model-routing` without changing engines.
 - Incompatible literal candidates (for example a `gpt-*` model under Claude) are caught at compile time with an actionable validation error instead of failing mid-run.
-- Runtime verification of the selected wire model and endpoint turns previously opaque upstream 400s into explicit, readable failures, and each engine now logs the routed `model`/`effort` before inference.
+- Runtime verification of the selected wire model and engine-compatible endpoint turns previously opaque upstream 400s into explicit, readable failures, and non-Copilot harnesses log the effective endpoint and any differing AWF selection.
 - Effort semantics stay faithful: an unsupported routed effort fails rather than quietly degrading or inflating cost.
 
 #### Negative
 
 - API-compatibility knowledge is now duplicated in two places — `modelRoutingEngineSupportsModel` in Go and `mapAWFRoutingEffort` / `resolveAWFModelRoutingSelection` in JavaScript — so new engines or model families must be updated in both or they will drift.
-- Fail-closed effort mapping makes routed runs on Claude and Codex abort when the router picks an effort outside their supported set, so a router-side change can break previously green workflows.
+- AWF still ranks model-and-effort arms without an engine-specific effort filter. Fail-closed effort mapping therefore makes routed Claude and Codex runs abort when the router picks an effort outside their supported set; resolving this requires an AWF configuration capability so unsupported arms can be removed before ranking.
 - The model-family prefix checks (`claude-`, `gpt-`) are heuristics over model IDs; a future Copilot model that does not follow these naming conventions will be misclassified.
 - The compiler can say nothing about expression-valued `allowed-models`, so those configurations get runtime-only protection and a weaker authoring experience.
 

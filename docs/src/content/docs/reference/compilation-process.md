@@ -229,7 +229,7 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 | `gh aw compile my-workflow` | Compile specific workflow |
 | `gh aw compile --verbose` | Enable verbose output |
 | `gh aw compile --strict` | Enhanced security validation |
-| `gh aw compile my-workflow --dry-run` | Compile for development testing with staging, all analysis tools, and warnings as errors |
+| `gh aw compile my-workflow --dry-run` | Compile for development testing with staging, mandatory validation/shellcheck/model checks, and warnings as errors; Docker scanners are opt-in |
 | `gh aw compile my-workflow --environment gh-aw-debug` | Replace the environment on every generated job |
 | `gh aw compile --no-emit` | Validate without generating files |
 | `gh aw compile --actionlint --zizmor --poutine --grant` | Run security scanners |
@@ -261,6 +261,9 @@ rather than silently skipping checks. Model checking uses the observed active
 model inventory; development compilation fails if that inventory is unavailable
 and the workflow declares `models` policies or `engine.models`. It does not prove
 live model availability.
+Observed-inventory refresh and collection warnings are also reported: they fail
+the dry-run gate even when cached observations remain available. Ordinary
+`--models` compilation reports them as warnings instead.
 
 Docker-based scanners and `--validate-images` remain opt-in. Docker unavailability
 does not block the dry-run gate; install native `shellcheck` for required run-step
@@ -304,6 +307,39 @@ issue locking. `aw_info.json` records the boolean `dry_run` flag. Failure handli
 local diagnostics, step summaries, and run artifacts remain enabled. No new
 memory-tool fields are required; ordinary compilation preserves persistence.
 
+Dry-run compilation adds `workflow_dispatch`, preserves existing manual inputs,
+and copies reusable-workflow inputs when adding manual dispatch. Actor roles are
+restricted to `admin`/`maintainer` (including `maintain`); an existing narrower
+subset is preserved and bot exemptions are removed. Other triggers remain intact.
+This does not upload the lock or authorize a live run.
+
+Daily credit accounting, its ledger/app wiring, and `max-daily-ai-credits` are
+removed from the diagnostic configuration. An existing positive per-run
+`max-ai-credits` cap or expression is preserved. Otherwise an explicitly configured
+or imported daily limit becomes the per-run cap, including runtime expressions.
+The ordinary per-run default remains when the daily limit was only a default;
+an active default daily guard replaces an explicitly disabled per-run cap with
+the standard per-run cap. Explicitly disabling both limits remains unchanged.
+
+Set `DEBUG=workflow:compiler_development,cli:compile_development` to log each
+dry-run configuration mutation, removed environment key, disabled job, and forced
+CLI flag to stderr. Logs identify changed fields/keys, never their values.
+
+Dry-run locks omit `OTEL_*` and `GH_AW_OTLP_*` variables from workflow, job,
+step, container, and service environment mappings, including user-defined values.
+Workflow environment suppression occurs before job and header generation so
+telemetry-only masking steps and environment-source entries are also omitted.
+Automatic OTLP export configuration and telemetry authentication steps are also
+disabled. Existing network permissions, local diagnostics, summaries, and artifacts remain
+available; ordinary compilation preserves telemetry configuration. This does not
+rewrite custom scripts that configure their own exporters.
+
+Suppression applies to the lock emitted by `--dry-run`, not a previously compiled
+normal lock on GitHub. Restoring that normal lock after diagnostic compilation
+does not disable its telemetry. Any permitted live test must review and execute
+the same emitted lock revision; dispatching an unchanged remote ref executes its
+existing lock instead.
+
 Custom scripts/jobs, agent shell commands, external MCP servers, and custom
 credentials remain unverified and are explicitly reported at runtime. Dry-run is
 not an execution sandbox or a guarantee that those extensions cannot mutate GitHub.
@@ -314,6 +350,33 @@ safe-update baseline. It is distinct from `--action-mode dev`, does not change
 action reference mode, and does not upload, push, dispatch, or run workflows.
 Generated files remain available for inspection after failed checks and must not
 be treated as approved artifacts.
+
+#### Dry-run coverage output
+
+Compilation prints its limited effect scope before checks and a scanner-coverage
+summary afterward. With `--json`, the existing result array gains a batch-scoped
+`workflow: "dry-run"` entry containing `dry_run.gate`, forced `required_flags`,
+and a `scanners` map. Each scanner has `requested` and `status` fields:
+
+| Status | Meaning |
+|---|---|
+| `passed` | The scanner invocation completed successfully against emitted inputs |
+| `failed` | The invocation reported findings or an execution failure, including unavailable tooling |
+| `not_run` | The scanner was not requested, was not reached, or had no emitted inputs |
+
+This is invocation coverage, not per-script or per-image coverage. Optional image
+validation is identified separately by `validate_images_required`; the summary
+does not attest individual image checks. `model_inventory_available` indicates
+an observed inventory exists, not that runtime models are authorized or available.
+
+`dry_run.gate` reflects both workflow and batch failures. Check the command exit
+status and the entire result array, not only individual workflow `valid` fields.
+Preflight failures can stop compilation before this summary is emitted.
+`compile_only` is true and `execution_authorized` is false even when the gate
+passes. `unverified_effects` lists excluded surfaces, not a per-workflow effect
+inventory; custom code, hosted identity/approvals, live model availability, and
+diagnostic exports remain unverified. Ordinary compilation keeps its existing
+output shape.
 
 For diagnosis/patching versus active debugging, live-test review gates, and
 Codespaces/SAML triage, follow the

@@ -33,6 +33,9 @@ describe("messages.cjs", () => {
     delete process.env.GH_AW_ENGINE_VERSION;
     delete process.env.GH_AW_ENGINE_MODEL;
     delete process.env.GH_AW_PRIMARY_MODEL;
+    delete process.env.GH_AW_ENGINE_MODEL_EFFORT;
+    delete process.env.GH_AW_MODEL_ROUTING_STATUS;
+    delete process.env.GH_AW_TMP_DIR;
     delete process.env.GH_AW_TRACKER_ID;
     delete process.env.GITHUB_RUN_ID;
     delete process.env.GH_AW_WORKFLOW_ID;
@@ -1242,6 +1245,40 @@ describe("messages.cjs", () => {
       });
 
       expect(result).toBe("> Generated from [Test Workflow](https://github.com/test/repo/actions/runs/123) · sonnet46 · 1.25 AIC · ⊞ 900");
+    });
+
+    it("identifies the routed model and effort in the visible failure footer", async () => {
+      process.env.GH_AW_TMP_DIR = path.join(process.cwd(), ".missing-routed-attribution");
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      process.env.GH_AW_ENGINE_MODEL = "gpt-5.6-luna";
+      process.env.GH_AW_ENGINE_MODEL_EFFORT = "xhigh";
+      process.env.GH_AW_MODEL_ROUTING_STATUS = "selected";
+      process.env.GH_AW_AIC = "2.64";
+
+      const { getFooterAgentFailureIssueMessage } = await import("./messages.cjs");
+      const result = getFooterAgentFailureIssueMessage({
+        workflowName: "Test Workflow",
+        runUrl: "https://github.com/test/repo/actions/runs/123",
+      });
+
+      expect(result).toContain("copilot · routed: gpt56 xhigh · 2.64 AIC");
+    });
+
+    it("does not display a configured placeholder when routing failed", async () => {
+      process.env.GH_AW_TMP_DIR = path.join(process.cwd(), ".missing-routed-attribution");
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      process.env.GH_AW_ENGINE_MODEL = "auto";
+      process.env.GH_AW_MODEL_ROUTING_STATUS = "failed";
+      process.env.GH_AW_AIC = "0.50";
+
+      const { getFooterAgentFailureIssueMessage } = await import("./messages.cjs");
+      const result = getFooterAgentFailureIssueMessage({
+        workflowName: "Test Workflow",
+        runUrl: "https://github.com/test/repo/actions/runs/123",
+      });
+
+      expect(result).toContain("copilot · routing failed");
+      expect(result).not.toContain("copilot · auto");
     });
 
     it("should include evals AI Credits in the default footer when available", async () => {

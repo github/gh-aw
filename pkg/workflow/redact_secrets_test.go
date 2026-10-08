@@ -389,3 +389,38 @@ func TestSecretRedactionEmitsEnvMappingWithWorkflowSecrets(t *testing.T) {
 		t.Errorf("Expected the secret value to be passed as SECRET_MY_TOKEN, got %#v", env)
 	}
 }
+
+func TestSecretRedactionPreparesFilesOnlyForCustomMasking(t *testing.T) {
+	tests := []struct {
+		name    string
+		masking *SecretMaskingConfig
+		prepare bool
+	}{
+		{name: "no custom masking"},
+		{name: "empty custom masking", masking: &SecretMaskingConfig{}},
+		{
+			name:    "configured custom masking",
+			masking: &SecretMaskingConfig{Steps: []map[string]any{{"name": "Custom masking", "run": "echo redacting"}}},
+			prepare: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var builder strings.Builder
+			compiler := NewCompiler()
+			compiler.generateSecretRedactionStep(&builder, "", &WorkflowData{SecretMasking: tt.masking})
+			steps := parseGeneratedSteps(t, builder.String())
+			with := steps[0]["with"].(map[string]any)
+			script := with["script"].(string)
+			if got := strings.Contains(script, "await main({ prepareForCustomMasking: true });"); got != tt.prepare {
+				t.Errorf("Expected custom masking preparation %v, got script:\n%s", tt.prepare, script)
+			}
+			if !tt.prepare && !strings.Contains(script, "await main();") {
+				t.Errorf("Expected default redaction without custom masking, got script:\n%s", script)
+			}
+			if tt.prepare && len(steps) != 2 {
+				t.Errorf("Expected built-in redaction and custom hook, got %d steps", len(steps))
+			}
+		})
+	}
+}

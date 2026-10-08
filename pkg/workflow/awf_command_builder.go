@@ -26,13 +26,18 @@ const copilotAWFSessionStateDir = constants.TmpGhAwDir + "/sandbox/agent/session
 //   - string: Complete AWF command with arguments and wrapped engine command
 func BuildAWFCommand(config AWFCommandConfig) string {
 	awfHelpersLog.Printf("Building AWF command for engine: %s", config.EngineName)
+	if isNVXRuntime(config.WorkflowData) {
+		if err := validateNVXRuntimeConfig(config.WorkflowData, getAgentConfig(config.WorkflowData)); err != nil {
+			return "echo " + shellEscapeArg("NVX configuration is invalid: "+err.Error()) + " >&2; exit 1"
+		}
+	}
 	isArcDind := isArcDindTopology(config.WorkflowData)
 	awfCommand := GetAWFCommandPrefix(config.WorkflowData)
 	awfArgs := BuildAWFArgs(config)
 	firewallConfig := getFirewallConfig(config.WorkflowData)
 	isCloudHypervisor := isCloudHypervisorRuntime(config.WorkflowData)
 	arcDindPrefixProbe, arcDindDockerHostProbe, arcDindDockerHostRef := buildArcDindDockerHostSettings(config, firewallConfig)
-	toolCacheMountProbe, toolCacheMountRef := buildToolCacheMountSettings(isCloudHypervisor)
+	toolCacheMountProbe, toolCacheMountRef := buildToolCacheMountSettings(isCloudHypervisor || isNVXRuntime(config.WorkflowData))
 	var expandableArgs string
 	expandableArgs, arcDindDockerHostProbe = buildExpandableAWFArgs(config, isCloudHypervisor, isArcDind, arcDindDockerHostProbe)
 	var configFileSetup string
@@ -91,7 +96,13 @@ func usesBuiltInEngineHarness(engineName, engineCommand string) bool {
 func buildExpandableAWFArgs(config AWFCommandConfig, isCloudHypervisor, isArcDind bool, arcDindDockerHostProbe string) (string, string) {
 	ghAwDir := constants.GhAwRootDirShell
 	expandableArgs := `--container-workdir "${GITHUB_WORKSPACE}"`
-	if !isCloudHypervisor {
+	if isNVXRuntime(config.WorkflowData) {
+		agentConfig := getAgentConfig(config.WorkflowData)
+		if agentConfig != nil && agentConfig.NVX != nil {
+			nvx := effectiveNVXConfig(agentConfig.NVX)
+			expandableArgs = "--container-workdir " + shellEscapeArg(nvx.ContainerWorkDir)
+		}
+	} else if !isCloudHypervisor {
 		expandableArgs += fmt.Sprintf(` --mount "%s:%s:ro" --mount "%s:/host%s:ro"`, ghAwDir, ghAwDir, ghAwDir, ghAwDir)
 	}
 	expandableArgs, arcDindDockerHostProbe = appendArcDindMountSettings(expandableArgs, arcDindDockerHostProbe, isArcDind)
@@ -99,7 +110,7 @@ func buildExpandableAWFArgs(config AWFCommandConfig, isCloudHypervisor, isArcDin
 		detectionDir := rewriteArcDindPath(constants.ThreatDetectionDir)
 		expandableArgs += fmt.Sprintf(` --mount "%s:%s:rw"`, detectionDir, detectionDir)
 	}
-	if !isCloudHypervisor && config.WorkflowData != nil && usesSafeOutputsArtifactStaging(config.WorkflowData.SafeOutputs) {
+	if !isCloudHypervisor && !isNVXRuntime(config.WorkflowData) && config.WorkflowData != nil && usesSafeOutputsArtifactStaging(config.WorkflowData.SafeOutputs) {
 		stagingDir := SafeOutputsUploadArtifactsDir
 		expandableArgs += fmt.Sprintf(` --mount "%s:%s:rw"`, stagingDir, stagingDir)
 		awfHelpersLog.Print("Added read-write mount for upload_artifact staging directory")
@@ -122,6 +133,14 @@ func appendExpandableServiceAndHypervisorArgs(config AWFCommandConfig, isCloudHy
 			` --cloud-hypervisor-artifact-manifest "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST}"` +
 			` --cloud-hypervisor-artifact-manifest-bundle "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST_BUNDLE}"` +
 			` --cloud-hypervisor-artifact-release-tag "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG}"`
+	}
+	if isNVXRuntime(config.WorkflowData) {
+		expandableArgs += ` --nvx-layer "${GH_AW_NVX_LAYER}"` +
+			` --nvx-openvmm "${GH_AW_NVX_OPENVMM}"` +
+			` --nvx-kernel "${GH_AW_NVX_KERNEL}"` +
+			` --nvx-initramfs "${GH_AW_NVX_INITRAMFS}"` +
+			` --nvx-artifact-manifest "${GH_AW_NVX_ARTIFACT_MANIFEST}"` +
+			` --nvx-artifact-manifest-bundle "${GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE}"`
 	}
 	return expandableArgs
 }
@@ -315,6 +334,12 @@ func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) s
 		"GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST",
 		"GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST_BUNDLE",
 		"GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG",
+		"GH_AW_NVX_LAYER",
+		"GH_AW_NVX_OPENVMM",
+		"GH_AW_NVX_KERNEL",
+		"GH_AW_NVX_INITRAMFS",
+		"GH_AW_NVX_ARTIFACT_MANIFEST",
+		"GH_AW_NVX_ARTIFACT_MANIFEST_BUNDLE",
 	} {
 		if strings.Contains(awfConfigJSON, "${"+name+"}") {
 			preservedVars = append(preservedVars, name)
@@ -480,7 +505,7 @@ func appendCopilotSessionStateArgs(config AWFCommandConfig, firewallConfig *Fire
 
 func appendTTYAndContainerRuntimeArgs(config AWFCommandConfig, firewallConfig *FirewallConfig) []string {
 	var awfArgs []string
-	if config.UsesTTY && !isCloudHypervisorRuntime(config.WorkflowData) {
+	if config.UsesTTY && !isCloudHypervisorRuntime(config.WorkflowData) && !isNVXRuntime(config.WorkflowData) {
 		awfArgs = append(awfArgs, "--tty")
 	}
 	if isCloudHypervisorRuntime(config.WorkflowData) && awfSupportsCloudHypervisor(firewallConfig) {
@@ -488,6 +513,14 @@ func appendTTYAndContainerRuntimeArgs(config AWFCommandConfig, firewallConfig *F
 		awfHelpersLog.Print("Added cloud-hypervisor runtime arguments")
 	} else if isCloudHypervisorRuntime(config.WorkflowData) {
 		awfHelpersLog.Printf("Skipping cloud-hypervisor runtime flags: AWF version %q is older than required minimum %s", getAWFImageTag(firewallConfig), constants.AWFCloudHypervisorMinVersion)
+	}
+	if isNVXRuntime(config.WorkflowData) {
+		awfArgs = append(awfArgs,
+			"--container-runtime", string(AgentRuntimeNVX),
+			"--nvx-preview",
+			"--network-isolation",
+			"--enable-api-proxy",
+		)
 	}
 	return awfArgs
 }
@@ -504,14 +537,14 @@ func appendEnvAndMountArgs(config AWFCommandConfig, firewallConfig *FirewallConf
 	} else {
 		awfHelpersLog.Printf("Skipping --exclude-env: AWF version %q is older than minimum %s", getAWFImageTag(firewallConfig), constants.AWFExcludeEnvMinVersion)
 	}
-	if !isCloudHypervisorRuntime(config.WorkflowData) {
+	if !isCloudHypervisorRuntime(config.WorkflowData) && !isNVXRuntime(config.WorkflowData) {
 		awfArgs = append(awfArgs, "--mount", constants.DefaultTmpGhAwMount)
 	}
 	return appendCustomMountArgs(config.WorkflowData, agentConfig, awfArgs)
 }
 
 func appendCustomMountArgs(workflowData *WorkflowData, agentConfig *AgentSandboxConfig, awfArgs []string) []string {
-	if isCloudHypervisorRuntime(workflowData) || agentConfig == nil || len(agentConfig.Mounts) == 0 {
+	if isCloudHypervisorRuntime(workflowData) || isNVXRuntime(workflowData) || agentConfig == nil || len(agentConfig.Mounts) == 0 {
 		return awfArgs
 	}
 	sortedMounts := make([]string, len(agentConfig.Mounts))

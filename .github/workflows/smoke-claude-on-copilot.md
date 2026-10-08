@@ -37,15 +37,15 @@ sandbox:
 
 # Smoke Test: Claude on GitHub Inference PR Summary
 
-Goal: validate that Claude with `model-provider: github` can read the current pull request and post one concise summary comment.
+Goal: validate that Claude with `model-provider: github` can reach GitHub inference through AWF and, for pull requests, post one concise summary comment.
 
-1. If this run is not in PR context, call `noop` and stop.
-2. Read the current PR details for `${{ github.event.pull_request.number }}` from `${{ github.repository }}`.
-3. Produce a short summary with:
+1. For a pull request, read its details and produce a short summary with:
    - PR title
    - author
    - file count
    - a 2-3 sentence high-level summary of what changed
-4. Post exactly one `add_comment` safe output to the current PR with this summary.
+   Post exactly one `add_comment` safe output to that PR with the summary.
+2. For a scheduled run, make a concise, model-generated observation about this Claude-on-Copilot smoke check and its AWF provider gateway, then submit that observation through the `noop` safe output. Do not claim the check succeeded unless the run itself provides evidence.
+3. For any other context without a pull request, call `noop`.
 
 Keep the comment compact (max 8 lines).

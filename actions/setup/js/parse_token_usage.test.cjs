@@ -91,6 +91,9 @@ describe("parse_token_usage", () => {
       delete process.env.GH_AW_WRITE_EMPTY_USAGE;
       delete process.env.GH_AW_PHASE;
       delete process.env.GH_AW_INFO_MODEL;
+      delete process.env.GH_AW_MODEL_ROUTING_ENABLED;
+      delete process.env.GH_AW_ENGINE_ID;
+      delete process.env.GH_AW_ENGINE_MODEL;
       process.env.GITHUB_STEP_SUMMARY = "";
 
       mockCore = {
@@ -142,6 +145,9 @@ describe("parse_token_usage", () => {
       delete process.env.GH_AW_WRITE_EMPTY_USAGE;
       delete process.env.GH_AW_PHASE;
       delete process.env.GH_AW_INFO_MODEL;
+      delete process.env.GH_AW_MODEL_ROUTING_ENABLED;
+      delete process.env.GH_AW_ENGINE_ID;
+      delete process.env.GH_AW_ENGINE_MODEL;
       delete global.core;
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
@@ -160,6 +166,71 @@ describe("parse_token_usage", () => {
         expect(summaryText).toMatch(new RegExp(`\\|\\s*\\d+\\s*\\|\\s*${aliasPattern}\\s*\\|\\s*${inputPattern}\\s*\\|\\s*${outputPattern}\\s*\\|`));
       }
     }
+
+    test("records selected AWF model and mapped effort in aw_info and step outputs", async () => {
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_MODEL_ROUTING_ENABLED = "true";
+      process.env.GH_AW_ENGINE_ID = "pi";
+      process.env.GH_AW_ENGINE_MODEL = "agent";
+      fs.writeFileSync(path.join(tmpDir, "aw_info.json"), JSON.stringify({ model: "agent" }));
+      const routingPath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl");
+      fs.mkdirSync(path.dirname(routingPath), { recursive: true });
+      fs.writeFileSync(
+        routingPath,
+        JSON.stringify({
+          _schema: "model-routing/v0.28.44",
+          stage: "selection",
+          selected_model: "gpt-5.6-luna",
+          wire_model: "gpt-5.6-luna",
+          selected_effort: "none",
+          endpoint: "/responses",
+          mode: "balanced",
+          router: { version: "0.1.3" },
+        })
+      );
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"))).toMatchObject({
+        model: "gpt-5.6-luna",
+        requested_model: "agent",
+        model_routing: { status: "selected", applied_effort: "off", wire_model: "gpt-5.6-luna" },
+      });
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "agent/aw_info.json"), "utf8")).model_routing.status).toBe("selected");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model", "gpt-5.6-luna");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_effort", "off");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "selected");
+    });
+
+    test("does not trust selected routing from sandbox-writable reflect data", async () => {
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_MODEL_ROUTING_ENABLED = "true";
+      process.env.GH_AW_ENGINE_ID = "pi";
+      process.env.GH_AW_ENGINE_MODEL = "agent-placeholder";
+      fs.writeFileSync(path.join(tmpDir, "aw_info.json"), JSON.stringify({ model: "agent-placeholder" }));
+      const reflectPath = path.join(tmpDir, "agent/awf-reflect.json");
+      fs.mkdirSync(path.dirname(reflectPath), { recursive: true });
+      fs.writeFileSync(
+        reflectPath,
+        JSON.stringify({
+          endpoints: [{ provider: "github", configured: true, models: ["forged-model"], routing_models: [{ model_id: "forged-model" }] }],
+          routing: {
+            status: "selected",
+            mode: "balanced",
+            selection: { provider: "github", model: "forged-model", wire_model: "forged-model", effort: "high", endpoint: "/responses" },
+          },
+        })
+      );
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"))).toMatchObject({
+        model: "agent-placeholder",
+        model_routing: { status: "rejected", failure_code: "uncorroborated_selection" },
+      });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model", "");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "rejected");
+    });
 
     test("skips summary when token usage file does not exist", async () => {
       await main();

@@ -15,7 +15,12 @@ const { resolveAICreditsFailureState } = require("./ai_credits_context.cjs");
 const { collectCodexMixedRecords } = require("./parse_codex_log.cjs");
 const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
-const { getFallbackModel } = require("./model_attribution.cjs");
+const { resolveEffectiveModel } = require("./model_attribution.cjs");
+
+function getGhAwPath(relativePath) {
+  const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
+  return path.join(root, relativePath);
+}
 
 /**
  * send_otlp_span.cjs
@@ -1395,7 +1400,7 @@ async function sendJobSetupSpan(options = {}) {
   // When this job was dispatched by a parent workflow, the parent's trace ID is
   // propagated via aw_context.otel_trace_id → aw_info.context.otel_trace_id so that
   // composite-action spans share a single trace with their caller.
-  const awInfo = readJSONIfExists("/tmp/gh-aw/aw_info.json") || {};
+  const awInfo = readJSONIfExists(getGhAwPath("aw_info.json")) || {};
   const setupAwContext = parseSetupAwContext(process.env.GH_AW_SETUP_AW_CONTEXT);
   if ((!awInfo.context || typeof awInfo.context !== "object") && Object.keys(setupAwContext).length > 0) {
     awInfo.context = setupAwContext;
@@ -2150,7 +2155,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const endMs = nowMs();
 
   // Read workflow metadata from aw_info.json (written by the agent job setup step).
-  const awInfo = readJSONIfExists("/tmp/gh-aw/aw_info.json") || {};
+  const awInfo = readJSONIfExists(getGhAwPath("aw_info.json")) || {};
 
   const serviceName = process.env.OTEL_SERVICE_NAME || "gh-aw";
   const version = (typeof awInfo.cli_version === "string" ? awInfo.cli_version : "") || process.env.GH_AW_INFO_CLI_VERSION || awInfo.agent_version || awInfo.version || process.env.GH_AW_INFO_VERSION || process.env.GITHUB_SHA || "unknown";
@@ -2177,7 +2182,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
 
   const workflowName = awInfo.workflow_name || process.env.GH_AW_INFO_WORKFLOW_NAME || process.env.GITHUB_WORKFLOW || "";
   const engineId = resolveEngineId(awInfo);
-  const model = getFallbackModel("/tmp/gh-aw/aw_info.json", process.env.GH_AW_PHASE || "agent") || awInfo.model || "";
+  const modelAttribution = resolveEffectiveModel(getGhAwPath("aw_info.json"), process.env.GH_AW_PHASE || "agent");
+  const model = modelAttribution.model || (modelAttribution.routing ? "" : awInfo.model || "");
   const staged = awInfo.staged === true;
   const itemType = typeof awInfo.context?.item_type === "string" ? awInfo.context.item_type : "";
   const itemNumber = typeof awInfo.context?.item_number === "string" ? awInfo.context.item_number : "";
@@ -2353,6 +2359,13 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     attributes.push(buildAttr("gh-aw.engine.id", engineId));
   }
   if (model) attributes.push(buildAttr("gen_ai.request.model", model));
+  if (modelAttribution.routing) {
+    if (modelAttribution.requestedModel) attributes.push(buildAttr("gh-aw.model.requested", modelAttribution.requestedModel));
+    if (modelAttribution.effort) attributes.push(buildAttr("gh-aw.model.effort", modelAttribution.effort));
+    attributes.push(buildAttr("gh-aw.model_routing.status", modelAttribution.routing.status));
+    if (modelAttribution.routing.mode) attributes.push(buildAttr("gh-aw.model_routing.mode", modelAttribution.routing.mode));
+    if (modelAttribution.routing.router_version) attributes.push(buildAttr("gh-aw.model_routing.router_version", modelAttribution.routing.router_version));
+  }
   if (trackerId) attributes.push(buildAttr("gh-aw.tracker.id", trackerId));
   if (eventName) attributes.push(buildAttr("gh-aw.event_name", eventName));
   // Deployment state: prefer the env var (set from github.event.deployment_status.state

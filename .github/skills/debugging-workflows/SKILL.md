@@ -15,6 +15,39 @@ reference, not a separate execution policy. Respect explicit no-dispatch context
 Apply its live-outcome table, credential triage and untrusted-evidence rules.
 Without accessible existing logs, use source/fixtures; never dispatch for evidence.
 
+Workflow registration/activation and secret presence, validity, or expiry are
+runtime readiness checks, not pre-dispatch prerequisites. Do not require workflow
+or secret inventories or organization-admin metadata access. An otherwise
+authorized dispatch and the workflow's startup/authentication checks determine
+readiness; report their failures without automatic enabling, provisioning, or
+dispatch retries. Missing readiness metadata alone is not a safety finding.
+Declared credential flows, authorized destinations, permissions, source/lock
+review, and human live-validation gates remain in scope.
+
+The user may grant explicit [session authorization](../../aw/debug-security-review.md#session-authorization)
+for bounded in-scope debug iterations without repeated approval. Re-review every
+changed source/lock revision; any compiler security warning invalidates the grant
+and requires fresh authorization after resolution.
+
+Always provide separate short user-visible result sentences for each security
+review and dry-run attempt, including failed, blocked, or unavailable outcomes.
+Name the artifact/scope, checks actually performed, and material findings or
+coverage gaps; do not leave the result only in logs or artifacts or imply live
+execution. Follow the shared [review result](../../aw/debug-security-review.md#user-visible-result)
+and [dry-run result](../../aw/debug-agentic-workflow.md#user-visible-dry-run-result) rules.
+When debugging is refused, follow the
+[blocked-result requirements](../../aw/debug-security-review.md#explain-blocked-or-unavailable-debugging):
+explain each concrete cause, link the reviewed source and lines, distinguish
+confirmed defects from incomplete evidence or authorization, and name the
+necessary resolution and its owner. Do not report disagreement alone as a code
+vulnerability.
+In dry-run mode, reject enabled `dangerously-*` entries in workflow Markdown
+configuration, including imported configuration,
+under the [strict security gate](../../aw/debug-security-review.md#dry-run-dangerous-features).
+This filter does not reject implementation-internal flags used by trusted
+built-in engines. Review their runtime isolation separately. Link the authored
+field responsible for a refusal; do not claim compiler rejection when none occurred.
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)

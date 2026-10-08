@@ -23,7 +23,7 @@ func agyHarnessCommand(t *testing.T, body string, reflectJSON string) (*exec.Cmd
 	t.Helper()
 	dir := t.TempDir()
 	harness := filepath.Join(dir, "agy_harness.cjs")
-	require.NoError(t, os.WriteFile(harness, []byte(agyDefinition(t).Behaviors.HarnessScript), 0o600))
+	require.NoError(t, os.WriteFile(harness, agyRuntimeScript(t, "agy_harness.cjs"), 0o600))
 	actionsDir, err := filepath.Abs("../../actions/setup/js")
 	require.NoError(t, err)
 	module, err := json.Marshal(filepath.Join(actionsDir, "awf_reflect.cjs"))
@@ -45,6 +45,13 @@ func agyHarnessCommand(t *testing.T, body string, reflectJSON string) (*exec.Cmd
 		"AWF_REFLECT_ENABLED=1", "AGY_TEST_REFLECT=" + reflectJSON,
 	}
 	return cmd, dir
+}
+
+func agyRuntimeScript(t *testing.T, name string) []byte {
+	t.Helper()
+	script, err := os.ReadFile(filepath.Join("../../actions/setup/js", name))
+	require.NoError(t, err)
+	return script
 }
 
 func TestAgyHarnessPrivateConfigurationAndLiteralInput(t *testing.T) {
@@ -142,6 +149,33 @@ process.kill(process.ppid, "SIGINT");`
 	})
 }
 
+func TestAgyHarnessStdoutBufferGuard(t *testing.T) {
+	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
+	for _, tt := range []struct {
+		name    string
+		size    int
+		failure bool
+	}{
+		{"below limit", 2*1024*1024 - 1024, false},
+		{"above limit", 2*1024*1024 + 1024, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			body := `const result = () => console.log(JSON.stringify({event:"result",result:{status:"SUCCESS",num_turns:1,usage:{input_tokens:10,output_tokens:2}}}));
+process.stdout.write(JSON.stringify({event:"init",padding:"x".repeat(` + strconv.Itoa(tt.size) + `)}) + "\n", result);`
+			cmd, _ := agyHarnessCommand(t, body, validReflect)
+			out, err := cmd.CombinedOutput()
+			if tt.failure {
+				require.Error(t, err)
+				assert.Contains(t, string(out), "session.error")
+			} else {
+				require.NoError(t, err)
+				assert.NotContains(t, string(out), "session.error")
+				assert.Contains(t, string(out), `"status":"SUCCESS"`)
+			}
+		})
+	}
+}
+
 func TestAgyHarnessBoundsDescendantPipes(t *testing.T) {
 	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
 	for _, detached := range []bool{false, true} {
@@ -203,14 +237,14 @@ func TestAgyHarnessRejectsWrongCustomExecutableVersion(t *testing.T) {
 	assert.NotContains(t, string(out), "must not execute")
 }
 
-func TestAgyEmbeddedScriptsHaveValidSyntax(t *testing.T) {
-	for name, script := range map[string]string{
-		"harness": agyDefinition(t).Behaviors.HarnessScript,
-		"adapter": agyDefinition(t).Behaviors.MCP.ConfigAdapter,
+func TestAgyRuntimeScriptsHaveValidSyntax(t *testing.T) {
+	for name, script := range map[string][]byte{
+		"harness": agyRuntimeScript(t, "agy_harness.cjs"),
+		"adapter": agyRuntimeScript(t, "convert_gateway_config_agy.cjs"),
 	} {
 		t.Run(name, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), name+".cjs")
-			require.NoError(t, os.WriteFile(file, []byte(script), 0o600))
+			require.NoError(t, os.WriteFile(file, script, 0o600))
 			out, err := exec.Command("node", "--check", file).CombinedOutput()
 			require.NoError(t, err, "%s", out)
 		})
@@ -218,21 +252,36 @@ func TestAgyEmbeddedScriptsHaveValidSyntax(t *testing.T) {
 }
 
 func TestAgyMCPConfigurationAdapter(t *testing.T) {
+	nativeServers := `{"mcpServers":{
+		"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":"test-gateway-token"}},
+		"safeoutputs":{"url":"http://gateway:8080/mcp/safeoutputs","headers":{"Authorization":"safeoutputs-token"}},
+		"mcpscripts":{"url":"http://gateway:8080/mcp/mcpscripts","headers":{"Authorization":"mcpscripts-token"}},
+		"awf-enclave":{"url":"http://gateway:8080/mcp/awf-enclave","headers":{"Authorization":"enclave-token"}}
+	}}`
 	for _, tt := range []struct {
-		name, config   string
-		valid, symlink bool
+		name, config, cliServers, expected string
+		valid, symlink                     bool
 	}{
-		{"gateway", `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":"test-gateway-token"}},"safeoutputs":{"command":"ignored"}}}`, true, false},
-		{"invalid root", `{"mcpServers":[]}`, false, false},
-		{"stdio", `{"mcpServers":{"native":{"command":"node"}}}`, false, false},
-		{"nonstring header", `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":123}}}}`, false, false},
-		{"external endpoint", `{"mcpServers":{"native":{"url":"https://outside.example/mcp/native"}}}`, false, false},
-		{"dangling symlink", `{"mcpServers":{}}`, false, true},
+		{name: "gateway", config: `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":"test-gateway-token"}},"safeoutputs":{"command":"ignored"}}}`, cliServers: `["safeoutputs"]`, valid: true,
+			expected: `{"mcpServers":{"native":{"serverUrl":"http://host.docker.internal:80/mcp/native","headers":{"Authorization":"test-gateway-token"}}}}`},
+		{name: "native infrastructure custom and enclave servers", config: nativeServers, valid: true,
+			expected: `{"mcpServers":{
+				"native":{"serverUrl":"http://host.docker.internal:80/mcp/native","headers":{"Authorization":"test-gateway-token"}},
+				"safeoutputs":{"serverUrl":"http://host.docker.internal:80/mcp/safeoutputs","headers":{"Authorization":"safeoutputs-token"}},
+				"mcpscripts":{"serverUrl":"http://host.docker.internal:80/mcp/mcpscripts","headers":{"Authorization":"mcpscripts-token"}},
+				"awf-enclave":{"serverUrl":"http://host.docker.internal:80/mcp/awf-enclave","headers":{"Authorization":"enclave-token"}}
+			}}`},
+		{name: "explicit cli exclusion", config: nativeServers, cliServers: `["native","safeoutputs","mcpscripts","awf-enclave"]`, valid: true, expected: `{"mcpServers":{}}`},
+		{name: "invalid root", config: `{"mcpServers":[]}`},
+		{name: "stdio", config: `{"mcpServers":{"native":{"command":"node"}}}`},
+		{name: "nonstring header", config: `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":123}}}}`},
+		{name: "external endpoint", config: `{"mcpServers":{"native":{"url":"https://outside.example/mcp/native"}}}`},
+		{name: "dangling symlink", config: `{"mcpServers":{}}`, symlink: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			adapter := filepath.Join(dir, "adapter.cjs")
-			require.NoError(t, os.WriteFile(adapter, []byte(agyDefinition(t).Behaviors.MCP.ConfigAdapter), 0o600))
+			require.NoError(t, os.WriteFile(adapter, agyRuntimeScript(t, "convert_gateway_config_agy.cjs"), 0o600))
 			shared, err := filepath.Abs("../../actions/setup/js/convert_gateway_config_shared.cjs")
 			require.NoError(t, err)
 			require.NoError(t, os.Symlink(shared, filepath.Join(dir, "convert_gateway_config_shared.cjs")))
@@ -244,7 +293,10 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 			cmd := exec.Command("node", adapter)
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_WORKSPACE=" + dir,
 				"MCP_GATEWAY_OUTPUT=" + gateway, "MCP_GATEWAY_DOMAIN=host.docker.internal",
-				"MCP_GATEWAY_PORT=80", `GH_AW_MCP_CLI_SERVERS=["safeoutputs"]`}
+				"MCP_GATEWAY_PORT=80"}
+			if tt.cliServers != "" {
+				cmd.Env = append(cmd.Env, "GH_AW_MCP_CLI_SERVERS="+tt.cliServers)
+			}
 			out, err := cmd.CombinedOutput()
 			if !tt.valid {
 				require.Error(t, err)
@@ -254,7 +306,7 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 			file := filepath.Join(dir, ".agents", "mcp_config.json")
 			data, err := os.ReadFile(file)
 			require.NoError(t, err)
-			assert.JSONEq(t, `{"mcpServers":{"native":{"serverUrl":"http://host.docker.internal:80/mcp/native","headers":{"Authorization":"test-gateway-token"}}}}`, string(data))
+			assert.JSONEq(t, tt.expected, string(data))
 			stat, err := os.Stat(file)
 			require.NoError(t, err)
 			assert.Equal(t, os.FileMode(0o600), stat.Mode().Perm())

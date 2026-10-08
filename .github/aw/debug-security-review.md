@@ -11,6 +11,102 @@ code execution. Follow [debugger restrictions](debug-agentic-workflow.md).
 PASS grants no dispatch permission; retain scanners, isolation, credential
 restrictions and human live-validation gates.
 
+## Dry-Run Dangerous Features
+
+In dry-run mode, enabled `dangerously-*` entries authored in workflow Markdown
+configuration, including imported workflow configuration, are prohibited and
+must be refused by strict validation. Report the exact field, link the Markdown
+source that enables it, and explain which protection it disables. Do not silently
+strip the entry or downgrade strict validation to obtain a successful compile.
+
+This filter does not inspect or prohibit implementation-internal flags supplied
+by trusted built-in engines, such as Agy's native permission-skipping flag.
+Do not reject an engine solely because its harness uses such a flag or call that
+an enforcement gap. Review the actual runtime sandbox, credential isolation and
+reachable effects separately; internal flags are not an exemption from those
+security checks. A passing dry-run still grants no live-dispatch permission.
+
+## Agent Ownership
+
+The agent performs the review: capture intent, inspect source and reachable
+runtime dependencies, prepare the evidence packet, run independent judges,
+resolve findings and missing coverage, execute permitted compilation/scanners,
+and record the result. Do not hand these steps to the user as a checklist.
+An incomplete judge response is missing review evidence, not a confirmed
+vulnerability or a reason to ask the user to inspect code. Gather the missing
+evidence within the judge limits below; never turn UNKNOWN into PASS.
+
+The agent also prepares exact revisions, hashes, credential-source/destination
+metadata, permissions, protections and run bounds for any required human
+validation. Ask only for decisions or authorization the agent cannot supply,
+such as protected-environment approval or authentication repair. Human
+validation remains required for live execution; it is not a request for the
+user to perform the technical review. Never retrieve secret values or claim
+to have verified credential validity/expiry when metadata cannot establish it.
+
+## Session Authorization
+
+The user may explicitly grant live-debug authorization for the current session.
+Record the originating message, session ID, workflow/ref scope, allowed effects
+and destinations, run/time/spend caps, and monitoring bounds in session artifacts.
+Use the agreed bounds; extending authorization's lifetime does not increase them.
+No response or request to change guidance grants execution permission.
+
+While the grant remains valid, do not ask for repeated approval of in-scope
+iterations. Source/lock changes still require fresh agent review, compilation,
+and exact revision/hash tracking before each upload/dispatch. Session approval
+covers that agent-led revalidation, not unreviewed revisions, new destinations,
+broader effects, or bypassing host restrictions or protected-environment gates.
+
+Any compiler security warning immediately invalidates the session grant. Record
+the warning and stop affected uploads/dispatches; fixing it or obtaining a clean
+compile does not restore approval. Resolve the warning, re-review the revision,
+and obtain fresh explicit user authorization before resuming. Other failed checks
+still block execution under their existing gates.
+
+The grant also ends on revocation, exhausted bounds, or session end, and is not
+inherited by other sessions. Request new authorization for out-of-scope effects.
+For example: "Allow smoke-agy debugging for this session, up to three runs with
+the reviewed destinations and existing per-run limits." Report its remaining
+bounds and any invalidation separately from technical review results.
+
+## Runtime Readiness Is Not a Review Gate
+
+Do not require proof that a workflow is registered or active, or that its secrets
+exist, are valid, or are unexpired before an otherwise authorized dispatch.
+These checks belong to dispatch and workflow startup/authentication. Workflow
+and secret inventories are optional diagnostic evidence; unavailable metadata,
+including organization-secret listing permissions, does not by itself block
+execution or make a safety question UNKNOWN.
+
+Review declared credential sources, transmission paths, authorized destinations,
+permissions, and redaction instead. This does not waive destination authorization,
+source/lock review, human live validation, or explicit no-dispatch restrictions.
+Report actual dispatch/runtime readiness failures; do not automatically enable
+workflows, provision secrets, elevate credentials, or retry dispatch.
+
+## Compile-Only Validation
+
+The agent may run the installed, trusted `gh aw compile WORKFLOW --dry-run`
+to obtain emitted locks and compiler/scanner evidence before the final
+source/lock review. This permission covers compilation, not execution of
+workflow scripts, changed compiler code, build hooks, harnesses or MCP servers.
+Review those separately before running them. The judges remain read-only.
+
+Emission is required: do not combine `--dry-run` with `--no-emit`. Compilation
+may run in the current checkout; a disposable checkout is optional, not a
+prerequisite or work to delegate to the user. Snapshot the pre-command contents
+and existence of every file the compiler can modify, including pre-existing
+user edits and untracked files. Preserve the diagnostic locks and results in
+session artifacts, then restore only compiler-generated changes to that
+snapshot. Remove only known files created by this invocation; never reset the
+worktree or overwrite concurrent edits. If ownership is unclear, stop cleanup
+and report the conflict.
+
+Record hashes of both the diagnostic output and the restored files. Reverting
+diagnostic output does not erase findings, satisfy a failed gate, or transfer
+the diagnostic lock's review verdict to a different live lock.
+
 ## Capture Session Intent First
 
 - At session start, before edits/testing, capture the user's current-session
@@ -108,3 +204,56 @@ Absent path: YES only with code-grounded not-applicable explanation.
   never commit raw logs.
 - Intent/code/import/dependency/lock changes invalidate affected verdicts. Review new
   revision, including fixes, before execution/upload.
+
+## User-Visible Result
+
+After every security-review attempt, always give the user one short result
+sentence naming the reviewed artifact/scope, PASS/BLOCKED/UNAVAILABLE outcome,
+controls actually examined, and any confirmed finding or material unresolved gap.
+Report this even when nothing was found; incomplete coverage is not a clean bill
+of health. Include it in the user handoff, not only in private artifacts or judge
+replies, and do not imply that review authorizes execution.
+
+Example: "Security review passed for the emitted dry-run lock: credential flows,
+executable provenance, and sandbox controls were checked, with no confirmed issues."
+
+### Explain Blocked or Unavailable Debugging
+
+A refusal must explain **why** the requested execution or upload is blocked.
+"Security review failed", "inconsistent judgments", or "missing coverage" alone
+is not an actionable explanation. After the result sentence, identify each
+material blocker:
+
+| Required detail | What to report |
+| --- | --- |
+| Cause | The failed question or gate and whether it is a confirmed code defect, missing evidence, unavailable review tooling, or missing authorization. |
+| Source evidence | A clickable source link with line numbers and the reviewed commit, plus the relevant operation, credential flow, or control. |
+| Consequence | The concrete unsafe effect, or the exact property that remains unverified; name which execution/upload is withheld. |
+| Resolution | The smallest necessary fix, evidence, tool capability, or authorization, and whether the agent or human owns it. |
+
+Use revision-pinned repository links for published source, for example
+`https://<host>/<owner>/<repo>/blob/<reviewed-sha>/<path>#L10-L20`.
+For unpublished generated locks, link the preserved diagnostic artifact when
+supported and report its path, line range and hash; do not link a different
+published revision as though it contains the reviewed code. Redact sensitive
+values from excerpts.
+
+Trace negative findings to executable behavior before calling source problematic.
+Metadata alone does not establish a missing firewall; inspect the actual AWF
+configuration and invocation. Distinguish unchanged intentional controls from
+new regressions. Apply the [dry-run dangerous-feature filter](#dry-run-dangerous-features)
+to authored workflow configuration, not built-in engine implementation flags.
+Explain contradictory vote/reason pairs without silently changing votes or
+counting them as a passed gate.
+
+When no code defect is confirmed, say so. Link the gate that requires withholding
+execution and identify the unresolved question and missing evidence instead of
+inventing a problematic source line. For example: "Live dispatch is blocked by
+the [two-affirmative-vote requirement](#decision): `secret_disclosure` has unresolved
+review coverage for the [artifact redaction path](<revision-pinned-source-url>).
+No credential leak is confirmed. The agent must resolve that source coverage
+before dispatch; additional user authorization cannot replace the review."
+
+Keep compile-only results separate from live outcomes. State whether a run was
+dispatched, and never ask the user to perform technical review or bypass a failed
+gate.

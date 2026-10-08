@@ -51,9 +51,6 @@ func validateWorkQueueConfiguration(data *WorkflowData) error {
 		}
 		return nil
 	}
-	if workQueueStorage(data) != "git" {
-		return errors.New("tools.work-queue.storage: only the version-3 Git backend is supported; Issues storage is unsupported")
-	}
 	if isWorkQueueWorker(data) {
 		if _, configured := data.RawFrontmatter["run-name"]; configured {
 			return errors.New("work-queue: worker run-name is reserved for immutable dispatch correlation; remove run-name from frontmatter")

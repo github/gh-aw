@@ -81,6 +81,13 @@ const REFLECT_PROVIDER_ANTHROPIC = "anthropic";
 /**
  * @typedef {{
  *   endpoints?: ReflectEndpoint[],
+ *   routing?: {
+ *     status?: string,
+ *     failure_code?: string,
+ *     mode?: string,
+ *     selection?: { id?: string },
+ *     router?: { version?: string },
+ *   },
  * }} ReflectData
  */
 
@@ -373,7 +380,7 @@ async function enrichReflectModels(reflectData, timeoutMs, logger) {
  *   reflectUrl: string,
  *   outputPath: string,
  *   bytesWritten?: number,
- *   reflectData?: object,
+ *   reflectData?: ReflectData,
  *   reason?: "disabled"|"unexpected_status"|"timeout"|"request_failed",
  *   status?: number,
  *   error?: string,

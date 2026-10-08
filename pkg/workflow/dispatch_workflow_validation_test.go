@@ -226,7 +226,6 @@ func TestDispatchWorkflowValidation_RequiresWorkerOptInForQueueClaims(t *testing
 on: workflow_dispatch
 tools:
   work-queue:
-    storage: git
 ` + tc.worker + `---
 Run assigned work.
 `

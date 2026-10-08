@@ -73,7 +73,7 @@ const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { applyModelFallback, normalizeClaudeModel, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 
 const CLAUDE_ROUTING_ENDPOINTS = ["/v1/messages"];
 
@@ -377,17 +377,23 @@ async function buildClaudeChildEnv(reflectData, env = process.env, logger = log,
   const childEnv = { ...env };
   applyClaudeRuntimeTimeouts(childEnv);
   if (env.GH_AW_MODEL_ROUTING === "1") {
-    const result = modelRoutingSelection ? { selection: modelRoutingSelection, error: null } : resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_ENDPOINTS);
+    const result = modelRoutingSelection ? { selection: modelRoutingSelection, error: null } : resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_ENDPOINTS, true);
     if (result.error || !result.selection) {
+      recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
       throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Claude`);
     }
     const mappedEffort = mapAWFRoutingEffort("claude", result.selection.effort);
-    if (mappedEffort.error) throw new Error(`${mappedEffort.error}; refusing to start Claude`);
+    if (mappedEffort.error) {
+      recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort", detail: mappedEffort.error });
+      throw new Error(`${mappedEffort.error}; refusing to start Claude`);
+    }
     childEnv.ANTHROPIC_MODEL = result.selection.wire_model;
     delete childEnv.GH_AW_MODEL_FALLBACK;
     if (mappedEffort.effort) childEnv.CLAUDE_CODE_EFFORT_LEVEL = mappedEffort.effort;
     else delete childEnv.CLAUDE_CODE_EFFORT_LEVEL;
-    logger(`inference routing: mode=awf-routed model=${result.selection.wire_model} effort=${result.selection.effort || "(unset)"}`);
+    recordAWFModelRoutingOutcome({ status: "selected", wire_model: result.selection.wire_model, effort: result.selection.effort, applied_effort: mappedEffort.effort }, env);
+    const endpointOverride = result.selection.selected_endpoint && result.selection.selected_endpoint !== result.selection.endpoint ? ` selected_endpoint=${result.selection.selected_endpoint}` : "";
+    logger(`inference routing: mode=awf-routed model=${result.selection.wire_model} effort=${result.selection.effort || "(unset)"} endpoint=${result.selection.endpoint}${endpointOverride}`);
   } else {
     applyModelFallback(childEnv, "ANTHROPIC_MODEL", logger);
   }
@@ -464,8 +470,9 @@ async function main() {
     /** @type {any} */
     let modelRoutingSelection = null;
     if (process.env.GH_AW_MODEL_ROUTING === "1") {
-      const result = resolveAWFModelRoutingSelection(reflection.reflectData, true, CLAUDE_ROUTING_ENDPOINTS);
+      const result = resolveAWFModelRoutingSelection(reflection.reflectData, true, CLAUDE_ROUTING_ENDPOINTS, true);
       if (result.error || !result.selection) {
+        recordAWFModelRoutingOutcome({ status: reflection.reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflection.reflectData?.routing?.failure_code, detail: result.error });
         throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Claude`);
       }
       modelRoutingSelection = result.selection;

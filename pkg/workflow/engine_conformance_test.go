@@ -190,11 +190,14 @@ func TestAgyNativeConformanceRequiresStagedNoop(t *testing.T) {
 			logPath := filepath.Join(dir, "native.jsonl")
 			outputPath := filepath.Join(dir, "outputs.jsonl")
 			for name, content := range map[string]string{
-				"expected.json":       `{"fileNonce":"fixture"}`,
-				"native-receipt.json": `{"fileNonce":"fixture","toolNonce":"` + strings.Repeat("a", 48) + `"}`,
-				"outputs.jsonl":       item.output,
+				"expected.json":                      `{"fileNonce":"fixture"}`,
+				"native-receipt.json":                `{"fileNonce":"fixture","toolNonce":"` + strings.Repeat("a", 48) + `"}`,
+				"native-infrastructure-receipt.json": `{"fileNonce":"fixture","toolNonce":"` + strings.Repeat("b", 48) + `"}`,
+				"outputs.jsonl":                      item.output,
 				"native.jsonl": `{"event":"init","init":{"model":"gemini-3.8-flash-medium"}}
-	{"event":"step_update","step_update":{"step_type":"tool","tool_info":{"name":"agy_native_native_challenge"}}}
+	{"event":"step_update","step_update":{"step_type":"tool","state":"DONE","tool_info":{"name":"call_mcp_tool","parameters":{"ServerName":"agy-native","ToolName":"native_challenge","Arguments":{"file_nonce":"fixture"}},"output":"{\"toolNonce\":\"` + strings.Repeat("a", 48) + `\"}"}}}
+	{"event":"step_update","step_update":{"step_type":"tool","state":"DONE","tool_info":{"name":"call_mcp_tool","parameters":{"ServerName":"mcpscripts","ToolName":"native_infrastructure_challenge","Arguments":{"file_nonce":"fixture"}},"output":"{\"toolNonce\":\"` + strings.Repeat("b", 48) + `\"}"}}}
+	{"event":"step_update","step_update":{"step_type":"tool","state":"DONE","tool_info":{"name":"call_mcp_tool","parameters":{"ServerName":"safeoutputs","ToolName":"noop","Arguments":{"message":"Conformance probes completed"}},"output":"{}"}}}
 	{"event":"result","result":{"status":"SUCCESS","num_turns":1,"usage":{"input_tokens":10,"output_tokens":2}}}`,
 			} {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
@@ -216,6 +219,171 @@ func TestAgyNativeConformanceRequiresStagedNoop(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAgyNativeConformanceRequiresCompletedNativeCall(t *testing.T) {
+	var suite conformanceSuite
+	readConformanceFrontmatter(t, "../../.github/workflows/shared/agy-conformance.md", &suite)
+	verify := conformanceNodeScript(t, suite.PostSteps[0].Run)
+	for _, item := range []struct {
+		name, mutate string
+		passed       bool
+	}{
+		{name: "actual native event", passed: true},
+		{name: "active call", mutate: `step.state = "ACTIVE";`},
+		{name: "missing state", mutate: `delete step.state;`},
+		{name: "CLI wrapper", mutate: `info.name = "run_command";`},
+		{name: "wrong server", mutate: `info.parameters.ServerName = "mcpscripts";`},
+		{name: "wrong tool", mutate: `info.parameters.ToolName = "conformance_challenge";`},
+		{name: "wrong nonce", mutate: `info.parameters.Arguments.file_nonce = "guessed";`},
+		{name: "missing parameters", mutate: `delete info.parameters;`},
+		{name: "failed tool", mutate: `info.error = { type: "ERROR", message: "failed" };`},
+		{name: "wrong receipt", mutate: `info.output = JSON.stringify({ toolNonce: "guessed" });`},
+		{name: "invalid response", mutate: `info.output = "not JSON";`},
+		{name: "active infrastructure call", mutate: `infrastructure.state = "ACTIVE";`},
+		{name: "wrong infrastructure server", mutate: `infrastructure.tool_info.parameters.ServerName = "agy-native";`},
+		{name: "wrong infrastructure nonce", mutate: `infrastructure.tool_info.parameters.Arguments.file_nonce = "guessed";`},
+		{name: "wrong infrastructure receipt", mutate: `infrastructure.tool_info.output = JSON.stringify({ toolNonce: "guessed" });`},
+		{name: "failed infrastructure call", mutate: `infrastructure.tool_info.error = { message: "failed" };`},
+		{name: "CLI safe output", mutate: `noop.tool_info.name = "run_command";`},
+		{name: "active safe output", mutate: `noop.state = "ACTIVE";`},
+		{name: "wrong safe-output message", mutate: `noop.tool_info.parameters.Arguments.message = "guessed";`},
+		{name: "failed safe output", mutate: `noop.tool_info.error = { message: "failed" };`},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			dir := t.TempDir()
+			logPath := filepath.Join(dir, "native.jsonl")
+			outputPath := filepath.Join(dir, "outputs.jsonl")
+			prepare := `
+const fs = require("node:fs");
+const path = require("node:path");
+const host = process.env.CONFORMANCE_STATE;
+const toolNonce = "a".repeat(48);
+const info = {
+  name: "call_mcp_tool",
+  parameters: { ServerName: "agy-native", ToolName: "native_challenge", Arguments: { file_nonce: "fixture" } },
+  output: JSON.stringify({ toolNonce }),
+};
+const step = { step_type: "tool", state: "DONE", tool_info: info };
+const infrastructureNonce = "b".repeat(48);
+const infrastructure = { step_type: "tool", state: "DONE", tool_info: {
+  name: "call_mcp_tool",
+  parameters: { ServerName: "mcpscripts", ToolName: "native_infrastructure_challenge", Arguments: { file_nonce: "fixture" } },
+  output: JSON.stringify({ toolNonce: infrastructureNonce }),
+} };
+const noop = { step_type: "tool", state: "DONE", tool_info: {
+  name: "call_mcp_tool",
+  parameters: { ServerName: "safeoutputs", ToolName: "noop", Arguments: { message: "Conformance probes completed" } },
+  output: "{}",
+} };
+` + item.mutate + `
+const entries = [
+  { event: "init", init: { model: "gemini-3.8-flash-medium" } },
+  { event: "step_update", step_update: step },
+  { event: "step_update", step_update: infrastructure },
+  { event: "step_update", step_update: noop },
+  { event: "result", result: { status: "SUCCESS", num_turns: 1, usage: { input_tokens: 10, output_tokens: 2 } } },
+];
+fs.writeFileSync(path.join(host, "native.jsonl"), entries.map(entry => JSON.stringify(entry)).join("\n"));
+fs.writeFileSync(path.join(host, "expected.json"), JSON.stringify({ fileNonce: "fixture" }));
+fs.writeFileSync(path.join(host, "native-receipt.json"), JSON.stringify({ fileNonce: "fixture", toolNonce }));
+fs.writeFileSync(path.join(host, "native-infrastructure-receipt.json"), JSON.stringify({ fileNonce: "fixture", toolNonce: infrastructureNonce }));
+fs.writeFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, JSON.stringify({ type: "noop", message: "Conformance probes completed" }) + "\n");
+`
+			env := []string{"CONFORMANCE_STATE=" + dir, "CONFORMANCE_SAFE_OUTPUTS=" + outputPath}
+			out, err := runConformanceNode(t, env, "-e", prepare)
+			require.NoError(t, err, "%s", out)
+			encodedPath, err := json.Marshal(logPath)
+			require.NoError(t, err)
+			script := strings.ReplaceAll(verify, `"/tmp/gh-aw/agent-stdio.log"`, string(encodedPath))
+			out, err = runConformanceNode(t, env, "-e", script)
+			if item.passed {
+				require.NoError(t, err, "%s", out)
+			} else {
+				require.Error(t, err, "%s", out)
+				_, statErr := os.Stat(filepath.Join(dir, "native-report.json"))
+				require.True(t, os.IsNotExist(statErr), "invalid native calls must not produce a passing report")
+			}
+		})
+	}
+}
+
+func TestAgyNativeConformanceChallengeScripts(t *testing.T) {
+	var suite conformanceSuite
+	readConformanceFrontmatter(t, "../../.github/workflows/shared/agy-conformance.md", &suite)
+	for name, receipt := range map[string]string{
+		"native-challenge":                "native-receipt.json",
+		"native-infrastructure-challenge": "native-infrastructure-receipt.json",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "expected.json"), []byte(`{"fileNonce":"fixture"}`), 0o600))
+			tool := suite.MCPScripts[name]
+			require.NotEmpty(t, tool.Script)
+			encodedReceipt, err := json.Marshal(receipt)
+			require.NoError(t, err)
+			script := `
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+async function execute(file_nonce) {
+` + tool.Script + `
+}
+(async () => {
+  await assert.rejects(execute("wrong"), /nonce does not match/);
+  const proof = await execute("fixture");
+  assert.match(proof.toolNonce, /^[a-f0-9]{48}$/);
+  const receipt = JSON.parse(fs.readFileSync(path.join(process.env.CONFORMANCE_STATE, ` + string(encodedReceipt) + `), "utf8"));
+  assert.deepEqual(receipt, { fileNonce: "fixture", toolNonce: proof.toolNonce });
+})().catch(error => { console.error(error); process.exitCode = 1; });
+`
+			out, err := runConformanceNode(t, []string{"CONFORMANCE_STATE=" + dir}, "-e", script)
+			require.NoError(t, err, "%s", out)
+		})
+	}
+}
+
+func TestAgyNativeConformanceAllowlistMatchesServerTools(t *testing.T) {
+	var suite conformanceSuite
+	var source struct {
+		MCPServers map[string]struct {
+			Allowed []string `yaml:"allowed"`
+		} `yaml:"mcp-servers"`
+	}
+	file := "../../.github/workflows/shared/agy-conformance.md"
+	readConformanceFrontmatter(t, file, &suite)
+	readConformanceFrontmatter(t, file, &source)
+	allowed := source.MCPServers["agy-native"].Allowed
+	require.Equal(t, []string{"native_challenge"}, allowed)
+	require.Contains(t, suite.MCPScripts, "native-challenge")
+
+	names := make([]string, 0, len(suite.MCPScripts))
+	for name := range suite.MCPScripts {
+		names = append(names, name)
+	}
+	encodedNames, err := json.Marshal(names)
+	require.NoError(t, err)
+	encodedAllowed, err := json.Marshal(allowed)
+	require.NoError(t, err)
+	script := `
+const assert = require("node:assert/strict");
+const { registerTool, handleRequest } = require("../../actions/setup/js/mcp_server_core.cjs");
+const server = { tools: {}, debug() {} };
+for (const name of ` + string(encodedNames) + `) {
+  registerTool(server, { name, description: "Conformance probe", inputSchema: { type: "object" } });
+}
+handleRequest(server, { jsonrpc: "2.0", id: 1, method: "tools/list" })
+  .then(response => {
+    assert.equal(response.error, undefined);
+    const exposed = response.result.tools.map(tool => tool.name);
+    for (const name of ` + string(encodedAllowed) + `) {
+      assert.ok(exposed.includes(name), "Native gateway allowlist must match tools/list: " + name);
+    }
+  })
+  .catch(error => { console.error(error); process.exitCode = 1; });
+`
+	output, err := runConformanceNode(t, nil, "-e", script)
+	require.NoError(t, err, "%s", output)
 }
 
 func TestEngineConformanceCatalogCoverage(t *testing.T) {

@@ -300,6 +300,7 @@ func mcpToolParams() map[string]toolParamEntry {
 		"audit-diff":  jsonFieldNames(auditDiffArgs{}),
 		"checks":      jsonFieldNames(checksArgs{}),
 		"mcp-inspect": jsonFieldNames(mcpInspectArgs{}),
+		"work-queue":  jsonFieldNames(workQueueArgs{}),
 		"add":         jsonFieldNames(addArgs{}),
 		"update":      jsonFieldNames(updateArgs{}),
 		"fix":         jsonFieldNames(fixArgs{}),
