@@ -1360,6 +1360,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Go Function Namer"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-function-namer.md"
           GH_AW_TRACKER_ID: "daily-function-namer"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/claude-sonnet-5"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1406,6 +1408,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Go Function Namer"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-function-namer.md"
           GH_AW_TRACKER_ID: "daily-function-namer"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/claude-sonnet-5"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1424,6 +1428,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Daily Go Function Namer"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-function-namer.md"
           GH_AW_TRACKER_ID: "daily-function-namer"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/claude-sonnet-5"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

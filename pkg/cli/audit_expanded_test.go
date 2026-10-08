@@ -88,6 +88,62 @@ func TestExtractEngineConfig(t *testing.T) {
 	}
 }
 
+func TestExtractEngineConfigUsesEffectiveRoutedModel(t *testing.T) {
+	tests := []struct {
+		name          string
+		awInfo        string
+		routingRecord string
+		model         string
+		effort        string
+		status        string
+		requested     string
+	}{
+		{
+			name:      "new routed aw_info",
+			awInfo:    `{"engine_id":"copilot","model":"gpt-5.6-luna","requested_model":"auto","model_routing":{"status":"selected","wire_model":"gpt-5.6-luna","effort":"xhigh","applied_effort":"xhigh"}}`,
+			model:     "gpt-5.6-luna",
+			effort:    "xhigh",
+			status:    "selected",
+			requested: "auto",
+		},
+		{
+			name:          "legacy routed artifact",
+			awInfo:        `{"engine_id":"copilot","model":"auto"}`,
+			routingRecord: `{"_schema":"model-routing/v0.28.37","stage":"selection","selected_model":"gpt-5.6-luna","wire_model":"gpt-5.6-luna","selected_effort":"high"}`,
+			model:         "gpt-5.6-luna",
+			effort:        "high",
+			status:        "selected",
+			requested:     "auto",
+		},
+		{
+			name:          "failed route does not expose placeholder",
+			awInfo:        `{"engine_id":"copilot","model":"auto","requested_model":"auto","model_routing":{"status":"failed","failure_code":"no_route"}}`,
+			routingRecord: `{"_schema":"model-routing/v0.28.37","stage":"failure","code":"no_route"}`,
+			status:        "failed",
+			requested:     "auto",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(tt.awInfo), 0o644))
+			if tt.routingRecord != "" {
+				routingPath := filepath.Join(dir, "sandbox", "firewall", "logs", "api-proxy-logs", "model-routing.jsonl")
+				require.NoError(t, os.MkdirAll(filepath.Dir(routingPath), 0o755))
+				require.NoError(t, os.WriteFile(routingPath, []byte(tt.routingRecord+"\n"), 0o644))
+			}
+
+			config := extractEngineConfigWithInferredEngine(dir, "")
+			require.NotNil(t, config)
+			assert.Equal(t, tt.model, config.Model)
+			assert.Equal(t, tt.effort, config.ModelEffort)
+			assert.Equal(t, tt.status, config.ModelRoutingStatus)
+			assert.Equal(t, tt.requested, config.RequestedModel)
+		})
+	}
+}
+
 func TestExtractEngineConfigWithDetails(t *testing.T) {
 	t.Parallel()
 	tmpDir := testutil.TempDir(t, "engine-config-details-*")

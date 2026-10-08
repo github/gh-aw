@@ -1369,6 +1369,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Multi-Device Docs Tester"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-multi-device-docs-tester.md"
           GH_AW_TRACKER_ID: "daily-multi-device-docs-tester"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gemini-3.8-flash"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1415,6 +1417,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Multi-Device Docs Tester"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-multi-device-docs-tester.md"
           GH_AW_TRACKER_ID: "daily-multi-device-docs-tester"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gemini-3.8-flash"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1433,6 +1437,8 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Multi-Device Docs Tester"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-multi-device-docs-tester.md"
           GH_AW_TRACKER_ID: "daily-multi-device-docs-tester"
+          GH_AW_ENGINE_ID: "pi"
+          GH_AW_ENGINE_MODEL: "copilot/gemini-3.8-flash"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

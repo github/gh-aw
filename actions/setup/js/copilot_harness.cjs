@@ -93,6 +93,7 @@ const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { isRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
 const { resolveAWFModelRoutingSelection, isModelAvailableInReflectData } = require("./awf_model_routing.cjs");
+const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
@@ -503,6 +504,7 @@ function applyCopilotRoutingSelection(selection, logger = log) {
   } else {
     delete process.env.GH_AW_COPILOT_ROUTING_EFFORT;
   }
+  recordAWFModelRoutingOutcome({ status: "selected", wire_model: selection.wire_model, effort: selection.effort, applied_effort: selection.effort });
   logger(`inference routing: mode=awf-routed model=${selection.wire_model} effort=${selection.effort || "(unset)"} wire_api=${wireApi}`);
 }
 
@@ -1187,6 +1189,7 @@ async function main() {
 
   const routingResult = resolveAWFModelRoutingSelection(awfReflectData, modelRoutingRequired, ["/responses", "/chat/completions"]);
   if (routingResult.error) {
+    recordAWFModelRoutingOutcome({ status: awfReflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: awfReflectData?.routing?.failure_code, detail: routingResult.error });
     log(`unexpected error: AWF model routing failed: ${routingResult.error}; refusing to start Copilot`);
     process.exit(1);
     return;

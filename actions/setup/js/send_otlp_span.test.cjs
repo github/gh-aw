@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import childProcess from "child_process";
 import fs from "fs";
+import os from "os";
+import path from "path";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const nodeFs = require("node:fs");
 
 // ---------------------------------------------------------------------------
 // Module import
@@ -2591,6 +2597,13 @@ describe("sendJobConclusionSpan", () => {
     "GH_AW_DETECTION_CONCLUSION",
     "GH_AW_DETECTION_REASON",
     "GH_AW_TRACKER_ID",
+    "GH_AW_ENGINE_ID",
+    "GH_AW_ENGINE_MODEL",
+    "GH_AW_ENGINE_MODEL_EFFORT",
+    "GH_AW_INFO_MODEL",
+    "GH_AW_MODEL_ROUTING_STATUS",
+    "GH_AW_PHASE",
+    "GH_AW_TMP_DIR",
     "GH_AW_INFO_WORKFLOW_NAME",
     "GITHUB_WORKFLOW",
     "OTEL_RESOURCE_ATTRIBUTES",
@@ -3054,6 +3067,74 @@ describe("sendJobConclusionSpan", () => {
     const conclusionAttrs = Object.fromEntries(conclusionSpan.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
     expect(conclusionAttrs["gen_ai.operation.name"]).toBe("chat");
     expect(conclusionAttrs["gen_ai.workflow.name"]).toBe("otel-advisor");
+  });
+
+  it("reports routed model, effort, and routing metadata from aw_info.json", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = "agent";
+    process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-routed-otel-"));
+
+    const statSpy = vi.spyOn(fs, "statSync").mockReturnValue(/** @type {Partial<fs.Stats>} */ { mtimeMs: 1_700_000_005_000 });
+    const infoPath = path.join(process.env.GH_AW_TMP_DIR, "aw_info.json");
+    nodeFs.writeFileSync(
+      infoPath,
+      JSON.stringify({
+        model: "gpt-5.6-luna",
+        requested_model: "auto",
+        engine_id: "copilot",
+        model_routing: { status: "selected", wire_model: "gpt-5.6-luna", effort: "xhigh", mode: "awf-routed", router_version: "0.28.49" },
+      })
+    );
+
+    try {
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+    } finally {
+      statSpy.mockRestore();
+      nodeFs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+    }
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const span = body.resourceSpans[0].scopeSpans[0].spans[0];
+    const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
+    expect(attrs["gen_ai.request.model"]).toBe("gpt-5.6-luna");
+    expect(attrs["gh-aw.model.requested"]).toBe("auto");
+    expect(attrs["gh-aw.model.effort"]).toBe("xhigh");
+    expect(attrs["gh-aw.model_routing.status"]).toBe("selected");
+    expect(attrs["gh-aw.model_routing.mode"]).toBe("awf-routed");
+    expect(attrs["gh-aw.model_routing.router_version"]).toBe("0.28.49");
+  });
+
+  it("uses routed attribution from downstream job outputs when aw_info.json is absent", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.GH_AW_PHASE = "safe_outputs";
+    process.env.GH_AW_ENGINE_ID = "copilot";
+    process.env.GH_AW_ENGINE_MODEL = "gpt-5.6-luna";
+    process.env.GH_AW_ENGINE_MODEL_EFFORT = "high";
+    process.env.GH_AW_INFO_MODEL = "auto";
+    process.env.GH_AW_MODEL_ROUTING_STATUS = "selected";
+    process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-routed-otel-"));
+
+    const statSpy = vi.spyOn(fs, "statSync").mockReturnValue(/** @type {Partial<fs.Stats>} */ { mtimeMs: 1_700_000_005_000 });
+
+    try {
+      await sendJobConclusionSpan("gh-aw.safe-outputs.conclusion", { startMs: 1_700_000_000_000 });
+    } finally {
+      statSpy.mockRestore();
+      nodeFs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+    }
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const span = body.resourceSpans[0].scopeSpans[0].spans[0];
+    const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
+    expect(attrs["gen_ai.request.model"]).toBe("gpt-5.6-luna");
+    expect(attrs["gh-aw.model.requested"]).toBe("auto");
+    expect(attrs["gh-aw.model.effort"]).toBe("high");
+    expect(attrs["gh-aw.model_routing.status"]).toBe("selected");
   });
 
   it("does not duplicate gen_ai.request.model on the agent span", async () => {

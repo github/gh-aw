@@ -1217,12 +1217,12 @@ jobs:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || github.token }}
-          GITHUB_COPILOT_BASE_URL: http://host.docker.internal:10002
+          GITHUB_COPILOT_BASE_URL: http://api-proxy:10002
           GITHUB_WORKSPACE: ${{ github.workspace }}
           NO_COLOR: 1
           NO_PROXY: localhost,127.0.0.1,host.docker.internal,host.docker.internal:10000,host.docker.internal:10001,host.docker.internal:10002,host.docker.internal:10003,172.30.0.30,172.30.0.30:10000,172.30.0.30:10001,172.30.0.30:10002,172.30.0.30:10003
           OPENAI_API_KEY: ${{ github.token }}
-          OPENAI_BASE_URL: http://host.docker.internal:10002
+          OPENAI_BASE_URL: http://api-proxy:10002
           OPENCODE_AUTH_CONTENT: '{}'
           OPENCODE_DISABLE_AUTOUPDATE: 1
           OPENCODE_DISABLE_DEFAULT_PLUGINS: 1
@@ -1566,6 +1566,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Cache directory setup"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-security-red-team.md"
           GH_AW_TRACKER_ID: "security-red-team"
+          GH_AW_ENGINE_ID: "opencode"
+          GH_AW_ENGINE_VERSION: "1.18.33"
+          GH_AW_ENGINE_MODEL: "copilot/auto"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_REPORT_AS_ISSUE: "false"
@@ -1612,6 +1615,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Cache directory setup"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-security-red-team.md"
           GH_AW_TRACKER_ID: "security-red-team"
+          GH_AW_ENGINE_ID: "opencode"
+          GH_AW_ENGINE_VERSION: "1.18.33"
+          GH_AW_ENGINE_MODEL: "copilot/auto"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1630,6 +1636,9 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Cache directory setup"
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/daily-security-red-team.md"
           GH_AW_TRACKER_ID: "security-red-team"
+          GH_AW_ENGINE_ID: "opencode"
+          GH_AW_ENGINE_VERSION: "1.18.33"
+          GH_AW_ENGINE_MODEL: "copilot/auto"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
