@@ -28,7 +28,6 @@ sandbox:
     id: awf
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
   cli-proxy: true

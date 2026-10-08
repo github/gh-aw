@@ -500,7 +500,7 @@ When policy configuration is omitted for a new queue, trusted initialization MUS
 
 One scheduling **pool** is one durable decision domain with a fixed worker-capability class, worker-routing policy, capacity model, and authoritative policy epoch. All dispatchers in that domain MUST use the same policy. Arbitrary agent-chosen filters MUST NOT redefine the competition set.
 
-The first implementation can support the **Git backend** only. If an equivalent queue-wide serialization mechanism is not implemented for Issues, `storage: issues` MUST be rejected for queue operation altogether. A supported backend MUST enforce the full scheduler contract; advisory display, unscheduled FIFO operation, or weakened consistency is not a permitted fallback.
+The protocol uses the **Git backend** exclusively. `tools.work-queue` MUST NOT expose a `storage` selector. There is no backend selection or legacy-selector handling in the compiler or runtime. The Git backend MUST enforce the full scheduler contract; advisory display, unscheduled FIFO operation, or weakened consistency is not a permitted fallback.
 
 Support exactly these scheduling modes:
 
@@ -1911,7 +1911,7 @@ External vertices are gates, not synthetic Claims: they incur no service charge
 or runner reservation. They are first-class in read/explain/trace views and have
 their own readiness, observation identity, and failure reason.
 
-Issue/PR dependency support is distinct from `storage: issues`. It does not move
+Issue/PR dependency support does not introduce an Issues storage backend or move
 queue authority into resource bodies/comments: scheduling, edges, results, and
 observations still use the same canonical Git transaction log.
 
@@ -2620,7 +2620,7 @@ and explicitly deferred deployment requirements.
 | `work_queue_replay.cjs` | Causal-prefix and validated incremental replay, cycle/reference checks, ready-frontier/result/delivery predicates, one pure selector/explanation engine, exact ticks |
 | `work_queue_store.cjs` | One checked QueueCommit publication path, regenerated atomic batches, stable request recovery |
 | `dispatch_workflow.cjs` or new trusted queue-dispatch handler | Policy-selected Work/target, reserved dispatch, binding/reconciliation |
-| Git-only storage validation | Reject Issues queue storage and remove its unused implementation until an equivalent mandatory serialization contract exists |
+| Git-only storage | Use Git unconditionally; reject the removed `tools.work-queue.storage` field for every value and remove backend-selection plumbing |
 | `work_queue_mcp_server.cjs` and snapshots | Bounded read/explain plus staged submit/dispatch-next intents; explicit snapshot/staged provenance |
 | Queue policy initialization and submission defaults | Mandatory policy with one default class/key, no implicit producer grouping, and oldest-available default grants |
 | Worker finish/reconciliation and compiler integration | Automatic one-Claim / enforced explicit multi-Claim attribution on every safe-output type, bounded trust-compatible arrays, mixed outcomes, independent gates/Result or DeliveryFailure, actual run/attempt binding |

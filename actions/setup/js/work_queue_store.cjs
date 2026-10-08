@@ -29,11 +29,7 @@ const LEGACY_BRANCHES = ["dispatch-coordinator", "gh-aw-work-queue"];
 const LEGACY_LOGS = ["dispatch-work-coordinator.jsonl"];
 const DEFAULT_MAX_RETRIES = 5;
 
-/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, storage?: string, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
-
-function storageSupported(storage = process.env.GH_AW_WORK_QUEUE_STORAGE || "git") {
-  if (storage !== "git") throw queueError("unsupported_backend", "only the mandatory fair Git queue backend is supported");
-}
+/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
 
 function validateBranch(branch) {
   identity(branch, "queue branch");
@@ -107,9 +103,8 @@ async function readRef(githubClient, owner, repo, branch) {
 }
 
 /** @param {QueueReadOptions} options */
-async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, storage = undefined, core: coreApi = undefined }) {
+async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
   log.debug("ledger.read.start");
-  storageSupported(storage);
   validateBranch(branch);
   const repository = await verifyRepository(githubClient, owner, repo);
   const sha = await readRef(githubClient, owner, repo, branch);
@@ -175,8 +170,7 @@ function validateExtendingPrefix(previous, current, message) {
  * @param {QueueReadOptions & {context: Parameters<typeof actorFromContext>[0]}} options
  * @returns {(resource: unknown) => Promise<ReturnType<typeof validateClaimAuthority>>}
  */
-function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, storage = undefined, core: coreApi = undefined }) {
-  storageSupported(storage);
+function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
   validateBranch(branch);
   const actor = actorFromContext(context);
   const trusted = validateTrustedContext(context, actor);
@@ -188,7 +182,7 @@ function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUE
   return async resource => {
     log.debug("effect.authorize.start");
     const target = validateEffectResource(resource);
-    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
     validateExtendingPrefix(observedPrefix, current.transactions, "queue history was rewritten during effect authorization");
     observedPrefix = current.transactions;
     const member = current.state.dispatches.get(actor.dispatch_id)?.claims.find(candidate => candidate.handle === actor.claim_handle);
@@ -232,7 +226,6 @@ async function publishWorkQueueRequest({
   owner,
   repo,
   branch = WORK_QUEUE_BRANCH,
-  storage = undefined,
   request,
   context,
   actor = actorFromContext(context),
@@ -249,7 +242,6 @@ async function publishWorkQueueRequest({
   core: coreApi = undefined,
 }) {
   log.debug("request.publish.start", { max_retries: maxRetries, initialize_only: initializeOnly });
-  storageSupported(storage);
   validateBranch(branch);
   integer(maxRetries, 0, 10, "publication retries");
   validateTrustedContext(context, actor);
@@ -265,7 +257,7 @@ async function publishWorkQueueRequest({
   let lastConflict;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     log.debug("request.publish.attempt", { attempt: attempt + 1 });
-    let current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+    let current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
     validateExtendingPrefix(observedPrefix, current.transactions, "refreshed queue history does not extend the previously validated prefix");
     observedPrefix = current.transactions;
     const recovered = stableRequestResult(current, stable, stableActor);
@@ -285,8 +277,8 @@ async function publishWorkQueueRequest({
         const seed = createHash("sha256").update(stable.id, "utf8").digest("hex");
         const policyOperation = { kind: "Policy", epoch: `epoch_${seed}`, policy: installed };
         const initRequest = newRequest(`init_${seed}`, "policy", genesisActor, { operations: [policyOperation] });
-        await publishWorkQueueRequest({ githubClient, owner, repo, branch, storage, request: initRequest, actor: genesisActor, context: genesisContext, initializeOnly: true, maxRetries, now, commitId, sleepFn, core: coreApi });
-        current = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+        await publishWorkQueueRequest({ githubClient, owner, repo, branch, request: initRequest, actor: genesisActor, context: genesisContext, initializeOnly: true, maxRetries, now, commitId, sleepFn, core: coreApi });
+        current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
         observedPrefix = current.transactions;
       }
     }
@@ -334,7 +326,7 @@ async function publishWorkQueueRequest({
       lastConflict = error;
       // A lost response is not permission to choose another request. Refresh
       // before another candidate, and at exhaustion before reporting uncertainty.
-      const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch, storage, core: coreApi });
+      const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
       validateExtendingPrefix(observedPrefix, refreshed.transactions, "queue history was rewritten during publication");
       const committed = stableRequestResult(refreshed, stable, stableActor);
       if (committed) {
@@ -387,4 +379,4 @@ async function initializeWorkQueue(options) {
   return publishWorkQueueRequest({ ...options, actor, request, initializeOnly: true });
 }
 
-module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, freshAuthorizer, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, storageSupported, verifyRepository };
+module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, freshAuthorizer, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, verifyRepository };

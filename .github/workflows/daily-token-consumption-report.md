@@ -25,7 +25,6 @@ network:
     - node
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
   bash: true

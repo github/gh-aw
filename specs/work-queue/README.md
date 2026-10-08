@@ -122,22 +122,11 @@ permission required for mutations.
 All subcommands support `--json` for machine-readable output. Workflows enable the
 read-only snapshot MCP server with `tools.work-queue: true`.
 
-For the workflow runtime (not the operator CLI), `tools.work-queue: {storage: issues}`
-selects issue storage instead of the default Git branch. Each Work is an issue with
-the `aw:work-queue` label; its Work transaction is in the issue body and later
-transactions are comments. `aw:work-queue:available`, `:claimed`, `:completed`,
-and `:cancelled` labels display the projected state. Comments are replayed in
-publication order; only issues and comments authored by `github-actions[bot]`
-with a valid HMAC signature participate. Configure the repository secret
-`GH_AW_WORK_QUEUE_HMAC_SECRET` with a random value (for example, generate one
-with `openssl rand -hex 32`) so trusted workflow steps can sign and verify each
-record. Keep this secret unchanged while records exist; rotating it invalidates
-their signatures. Labels are not used to authorize a worker. The same
-snapshot and MCP tools are used with either storage choice. Both backends must
-not be used on the same logical queue without an explicit migration. Issue
-storage needs issues read access at activation and conclusion, and issues write
-access at trusted safe-output publication. Each refresh lists the issues and
-comments in full, so the Git backend is preferable for large queues.
+The current workflow runtime and operator CLI use Git exclusively. The workflow
+field `tools.work-queue.storage` has been removed and is rejected for every value,
+including `git`. Remove the field from existing workflows; no legacy selector
+support or automatic migration is provided. Issue and pull request dependencies
+do not change the queue's canonical Git authority.
 
 | Command | Arguments |
 |---|---|

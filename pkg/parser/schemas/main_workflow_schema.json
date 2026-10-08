@@ -5225,6 +5225,7 @@
           "description": "Read the immutable version-3 activation snapshot. Nonworkers without approved dispatch targets are read-only observers; workers and approved dispatchers may stage scoped queue intents. The installed ledger Policy is authoritative. Only Git storage is supported.",
           "oneOf": [
             {
+              "type": "boolean",
               "const": true,
               "description": "Enable read-only queue observation, or queue-control intents when approved worker dispatch targets are configured."
             },
@@ -5236,11 +5237,6 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "storage": {
-                  "type": "string",
-                  "enum": ["git"],
-                  "description": "Version-3 Git queue backend."
-                },
                 "require-assignment": {
                   "type": "boolean",
                   "description": "Fail closed and block safe outputs when no trusted inbound worker assignment is present."
@@ -5270,7 +5266,7 @@
               }
             }
           ],
-          "examples": [true, null, { "storage": "git", "worker": true }]
+          "examples": [true, null, { "worker": true }]
         },
         "cache-memory": {
           "description": "Cache memory MCP configuration for persistent memory storage",
