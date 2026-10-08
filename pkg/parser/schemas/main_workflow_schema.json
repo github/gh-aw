@@ -4101,10 +4101,110 @@
                     },
                     "runtime": {
                       "type": "string",
-                      "description": "Sandbox runtime profile for the agent container. Each value selects one supported security and topology profile: 'docker' (default) runs the agent under Docker with a rootless AWF and network isolation; 'docker-sudo-iptables' runs Docker with a privileged AWF, legacy iptables networking, and host/service access (required for allow-host-ports and GitHub Actions services: connectivity); 'cloud-hypervisor' runs the agent in AWF's preview Cloud Hypervisor microVM runtime on GitHub-hosted Ubuntu x86_64, sized at 2 vCPUs and 4096 MiB. Omitting runtime is equivalent to 'docker'. cloud-hypervisor is incompatible with runner.topology: arc-dind.",
-                      "enum": ["docker", "docker-sudo-iptables", "cloud-hypervisor"],
+                      "description": "Sandbox runtime profile for the agent container. Each value selects one supported security and topology profile: 'docker' (default) runs the agent under Docker with a rootless AWF and network isolation; 'docker-sudo-iptables' runs Docker with a privileged AWF, legacy iptables networking, and host/service access (required for allow-host-ports and GitHub Actions services: connectivity); 'cloud-hypervisor' runs the agent in AWF's preview Cloud Hypervisor microVM runtime; 'nvx' runs the agent in AWF's fail-closed preview NVX microVM with secure defaults. Omitting runtime is equivalent to 'docker'.",
+                      "enum": ["docker", "docker-sudo-iptables", "cloud-hypervisor", "nvx"],
                       "default": "docker",
-                      "examples": ["docker", "docker-sudo-iptables", "cloud-hypervisor"]
+                      "examples": ["docker", "docker-sudo-iptables", "cloud-hypervisor", "nvx"]
+                    },
+                    "nvx": {
+                      "type": "object",
+                      "description": "Optional overrides for AWF's fail-closed NVX preview runtime. Safe defaults apply when omitted. Artifact paths may be GitHub Actions expressions; setup verifies release provenance and stages trusted files before AWF starts.",
+                      "additionalProperties": false,
+                      "properties": {
+                        "preview": {
+                          "type": "boolean",
+                          "const": true,
+                          "description": "NVX preview is always enabled."
+                        },
+                        "network-isolation": {
+                          "type": "boolean",
+                          "const": true,
+                          "description": "Strict AWF network isolation is always enabled."
+                        },
+                        "api-proxy": {
+                          "type": "boolean",
+                          "const": true,
+                          "description": "API proxy credential isolation is always enabled."
+                        },
+                        "mount-policy": {
+                          "type": "string",
+                          "enum": ["workspace-only", "workspace-and-tool-cache"],
+                          "default": "workspace-only"
+                        },
+                        "layer-path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "default": "${{ runner.temp }}/nvx/guest-layer",
+                          "description": "Workload-specific guest distro layer directory; defaults to runner.temp/nvx/guest-layer and supports GitHub Actions expressions."
+                        },
+                        "openvmm-path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "default": "${{ runner.temp }}/nvx/openvmm",
+                          "description": "Path to the trusted, attested OpenVMM binary; defaults to runner.temp/nvx/openvmm and supports GitHub Actions expressions."
+                        },
+                        "kernel-path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "default": "${{ runner.temp }}/nvx/vmlinux",
+                          "description": "Path to the trusted, attested guest kernel; defaults to runner.temp/nvx/vmlinux and supports GitHub Actions expressions."
+                        },
+                        "initramfs-path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "default": "${{ runner.temp }}/nvx/initramfs.cpio.gz",
+                          "description": "Path to the trusted, attested guest initramfs; defaults to runner.temp/nvx/initramfs.cpio.gz and supports GitHub Actions expressions."
+                        },
+                        "artifact-manifest-path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "default": "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.json",
+                          "description": "Path to the AWF release artifact manifest; defaults to runner.temp/nvx/nvx-test-x86_64.manifest.json and supports GitHub Actions expressions."
+                        },
+                        "artifact-manifest-bundle-path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "default": "${{ runner.temp }}/nvx/nvx-test-x86_64.manifest.sigstore.jsonl",
+                          "description": "Path to the offline Sigstore attestation bundle; defaults to runner.temp/nvx/nvx-test-x86_64.manifest.sigstore.jsonl and supports GitHub Actions expressions."
+                        },
+                        "signer-workflow": {
+                          "type": "string",
+                          "enum": [
+                            "github/gh-aw-firewall/.github/workflows/release.yml",
+                            "github/gh-aw-firewall/.github/workflows/nvx-phase-3b-live-kvm.yml",
+                            "github/gh-aw-firewall/.github/workflows/smoke-nvx-copilot.lock.yml",
+                            "github/gh-aw-firewall/.github/workflows/smoke-nvx-build-test.lock.yml"
+                          ],
+                          "default": "github/gh-aw-firewall/.github/workflows/release.yml",
+                          "description": "Expected trusted workflow identity that signed the manifest."
+                        },
+                        "memory-mib": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "default": 512
+                        },
+                        "memory-max-bytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "default": 536870912
+                        },
+                        "pids-max": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "default": 128
+                        },
+                        "scratch-bytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "Optional bounded per-run guest-writable scratch image size in bytes."
+                        },
+                        "container-workdir": {
+                          "type": "string",
+                          "pattern": "^/workspace(?:/[^\\r\\n]*)?$",
+                          "description": "Optional guest working directory, restricted to /workspace or a descendant."
+                        }
+                      },
+                      "required": ["preview", "network-isolation", "api-proxy", "layer-path", "openvmm-path", "kernel-path", "initramfs-path", "artifact-manifest-path", "artifact-manifest-bundle-path"]
                     },
                     "config": {
                       "type": "object",
@@ -4182,6 +4282,26 @@
                       "description": "Additional host TCP ports the agent may connect to. Requires runtime: docker-sudo-iptables. Ports published by `services:` are reached via --allow-host-service-ports instead; use this only for host daemons not declared there."
                     }
                   },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "runtime": {
+                            "const": "nvx"
+                          }
+                        },
+                        "required": ["runtime"]
+                      },
+                      "then": {
+                        "required": ["nvx"]
+                      },
+                      "else": {
+                        "not": {
+                          "required": ["nvx"]
+                        }
+                      }
+                    }
+                  ],
                   "additionalProperties": false
                 }
               ]
