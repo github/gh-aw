@@ -777,7 +777,8 @@ jobs:
                     "type": "array"
                   },
                   "milestone": {
-                    "optionalPositiveInteger": true
+                    "optionalPositiveInteger": true,
+                    "allowNull": true
                   },
                   "operation": {
                     "type": "string",
