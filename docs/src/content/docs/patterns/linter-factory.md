@@ -107,6 +107,14 @@ recording a successful empty-queue `noop`. Install Policy and producer entitleme
 through the [deployment guide](/gh-aw/guides/deploy-work-queue/); do not invent
 worker principal IDs or bypass queue-branch writer protections.
 
+Hosted activation can fail at **Snapshot work queue state**, before the agent
+starts. Diagnose that boundary separately from the agent's queue tools.
+Installation-token repository metadata can report `permissions.pull: false`
+despite usable contents access; actual Git reads establish visibility, not
+collaborator flags. A denied Git read is not an empty queue. Even with readable
+refs, dispatcher activation requires installed Policy and otherwise fails with
+`work_queue_policy_missing`; prompt instructions cannot bootstrap it.
+
 Inspect an existing dispatcher run without launching another:
 
 ```bash

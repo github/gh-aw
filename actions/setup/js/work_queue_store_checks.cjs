@@ -803,6 +803,49 @@ function registerTests({ describe, it }) {
       await assert.rejects(readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" }), /unsupported_protocol/);
       assert.equal(fake.state.updates, 0);
     });
+    it("uses actual Git reads instead of installation-token collaborator flags", async () => {
+      for (const initial of [[], [genesis()]]) {
+        const fake = fakeGitHub(initial);
+        const getRepository = fake.githubClient.rest.repos.get;
+        fake.githubClient.rest.repos.get = async () => {
+          const response = await getRepository();
+          return { data: { ...response.data, permissions: { pull: false } } };
+        };
+        const result = await readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+        assert.equal(result.transactions.length, initial.length);
+        if (!initial.length) {
+          assert.equal(result.sha, null);
+          assert.ok(fake.state.calls.includes("getRef:heads/main"));
+        }
+        assert.equal(fake.state.updates, 0);
+      }
+    });
+    it("does not turn denied contents access into a missing queue", async () => {
+      const fake = fakeGitHub();
+      const getRepository = fake.githubClient.rest.repos.get;
+      fake.githubClient.rest.repos.get = async () => {
+        const response = await getRepository();
+        return { data: { ...response.data, permissions: { pull: false } } };
+      };
+      fake.githubClient.rest.git.getRef = async () => {
+        throw Object.assign(new Error("Resource not accessible by integration"), { status: 403 });
+      };
+      await assert.rejects(readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" }), { status: 403 });
+      assert.equal(fake.state.updates, 0);
+    });
+    it("requires a readable default ref before interpreting an absent queue in a nonempty repository", async () => {
+      for (const defaultBranch of ["main", ""]) {
+        const fake = fakeGitHub();
+        fake.state.defaultRevision = "";
+        const getRepository = fake.githubClient.rest.repos.get;
+        fake.githubClient.rest.repos.get = async () => {
+          const response = await getRepository();
+          return { data: { ...response.data, default_branch: defaultBranch, permissions: { pull: false } } };
+        };
+        await assert.rejects(readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" }), /repository_unavailable: cannot establish contents access/);
+        assert.equal(fake.state.updates, 0);
+      }
+    });
     it("binds every retained Actor to the actual queue repository independently of the ledger's genesis", async () => {
       for (const repository of ["foreign/repository", "Owner/Repo"]) {
         const root = genesis();
