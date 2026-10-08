@@ -15,7 +15,7 @@ The [Work Queue proposal in issue #64852](https://github.com/github/gh-aw/issues
 Implement `tools.work-queue` as a first-class, compiler-aware tool backed by one
 causal log, `work-queue.jsonl`, on a dedicated queue branch. Operators inspect and
 update it with `gh aw work-queue`. The
-[mandatory fair DAG protocol](../../specs/work-queue/priority-and-fairness.md)
+[mandatory fair DAG protocol](../src/content/docs/specs/work-queue-specification.md)
 replaces best-effort local selection and set-of-facts arbitration. Native Go and
 JavaScript engines use one closed contract, the exact scheduling algorithm and
 independent conformance fixtures. Each language reuses its engine across its
@@ -69,7 +69,7 @@ The conclusion job writes a work queue activity step summary for workflows using
 The [formal evidence](../../specs/work-queue/README.md) distinguishes bounded
 models, witnesses, independent service properties and runtime conformance.
 Unfinished searches are not passes. The
-[implementation coverage table](../../specs/work-queue/priority-and-fairness.md#91-implementation-coverage-and-remaining-requirements)
+[implementation coverage table](../src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements)
 tracks deferred writer-restriction enforcement and other unverified obligations.
 
 ### Alternatives Considered
