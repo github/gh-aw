@@ -283,7 +283,7 @@ func TestPromptToolCustomCLITransport(t *testing.T) {
 	}
 	data.ParsedTools = NewTools(data.Tools)
 	require.NoError(t, data.ParsedTools.ParseError())
-	require.Contains(t, getMCPCLIExcludeFromAgentConfig(data, NewCopilotEngine().GetCapabilities()), "inventory")
+	require.Contains(t, getMCPCLIExcludeFromAgentConfig(data), "inventory")
 	compiler := NewCompiler()
 	output := testutil.CaptureStderr(t, func() { compiler.validatePromptTools(data, "test.md") })
 	require.Equal(t, 1, compiler.GetWarningCount())

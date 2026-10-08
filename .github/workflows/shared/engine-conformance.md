@@ -212,10 +212,11 @@ do not claim success or substitute a guessed value.
    `fileNonce` (string), `sum` (number, `left + right`), `shellDigest` (string),
    `engineEnv` (string), and `toolNonce` (string).
 
-After writing the result and completing any additional imported probes, call
-`safeoutputs noop --message "Conformance probes completed"` exactly once.
-This CLI call satisfies the mandatory safe-output completion requirement; do not
-repeat it through a native MCP tool or emit a second noop.
+After writing the result and completing any additional imported probes, emit
+exactly one noop with message `"Conformance probes completed"`. Unless an imported
+suite specifies a native MCP completion call, use
+`safeoutputs noop --message "Conformance probes completed"`.
+Use only the specified transport; do not emit a second noop through another tool.
 Safe outputs are staged; do not create an issue or comment. Your final reply
 should be one short line. The JavaScript post-step, not your reply, decides
 whether the suite passed.

@@ -15581,10 +15581,6 @@
                     },
                     "bash-command-allowlist": {
                       "type": "boolean"
-                    },
-                    "cli-only-mcp-infrastructure": {
-                      "type": "boolean",
-                      "description": "Expose safeoutputs and mcpscripts only through CLI wrappers, preserving other configured native MCP servers."
                     }
                   },
                   "additionalProperties": false

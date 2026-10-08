@@ -37,7 +37,6 @@ func TestAgyBuiltInRegistration(t *testing.T) {
 	assert.Equal(t, "1.3.1", def.Version)
 	assert.False(t, engine.GetCapabilities().BashCommandAllowlist)
 	assert.False(t, engine.GetCapabilities().BashDisable)
-	assert.True(t, engine.GetCapabilities().CLIOnlyMCPInfrastructure)
 	assert.Contains(t, NewEngineCatalog(NewEngineRegistry()).IDs(), "agy")
 	assert.Equal(t, "copilot", def.DetectionEngine)
 	assert.NotNil(t, constants.GetEngineOption("agy"))
@@ -428,14 +427,13 @@ func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {
 			assert.Contains(t, commands, indented, "%s handler must survive compilation", name)
 		}
 	}
-	for _, expected := range []string{"conformance-agy", "mcpscripts conformance_challenge", "safeoutputs noop", "native MCP server `agy-native`"} {
+	for _, expected := range []string{"conformance-agy", "mcpscripts conformance_challenge", "safeoutputs noop", "native MCP server `agy-native`", "native MCP server\n`mcpscripts`", "native MCP server\n`safeoutputs`"} {
 		assert.Contains(t, environment, expected, "compiled environment/prompt must retain %s", expected)
 	}
 	for _, expected := range []string{`"agy-native"`, `"native-challenge"`, "--exclude-env GEMINI_API_KEY"} {
 		assert.Contains(t, commands, expected, "compiled commands must retain %s", expected)
 	}
-	assert.Contains(t, commands, `export GH_AW_MCP_CLI_SERVERS='["mcpscripts","safeoutputs"]'`)
-	assert.NotContains(t, commands, `export GH_AW_MCP_CLI_SERVERS='["agy-native"`)
+	assert.NotContains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
 }
 
 func agyConformanceStepContent(compiled agyConformanceWorkflow) (map[string]map[string]any, string, string) {

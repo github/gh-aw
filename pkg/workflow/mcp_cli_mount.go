@@ -297,30 +297,13 @@ func withMountedCLIShellCommandsInRestrictedBash(workflowData *WorkflowData) map
 // getMCPCLIExcludeFromAgentConfig returns the sorted list of MCP server names that
 // should be excluded from the agent's MCP config (because they are CLI-only).
 //
-// Explicit tools.cli-proxy excludes all CLI-mounted servers for every engine.
-// Engines with CLIOnlyMCPInfrastructure exclude only configured safeoutputs and
-// mcpscripts, preserving native custom and enclave servers. Otherwise,
-// infrastructure servers remain accessible through native MCP and CLI wrappers.
-func getMCPCLIExcludeFromAgentConfig(data *WorkflowData, capabilities EngineCapabilities) []string {
-	if data == nil {
+// Only explicit tools.cli-proxy excludes CLI-mounted servers. Infrastructure
+// wrappers do not otherwise prevent native MCP access.
+func getMCPCLIExcludeFromAgentConfig(data *WorkflowData) []string {
+	if data == nil || data.ParsedTools == nil || !data.ParsedTools.CLIProxy {
 		return nil
 	}
-	if data.ParsedTools != nil && data.ParsedTools.CLIProxy {
-		return getMCPCLIServerNames(data)
-	}
-	if !capabilities.CLIOnlyMCPInfrastructure {
-		return nil
-	}
-
-	var servers []string
-	if IsMCPScriptsEnabled(data.MCPScripts) {
-		servers = append(servers, constants.MCPScriptsMCPServerID.String())
-	}
-	if HasSafeOutputsEnabled(data.SafeOutputs) {
-		servers = append(servers, constants.SafeOutputsMCPServerID.String())
-	}
-	sort.Strings(servers)
-	return servers
+	return getMCPCLIServerNames(data)
 }
 
 // generateMCPCLIMountStep generates the "Mount MCP servers as CLIs" workflow step.

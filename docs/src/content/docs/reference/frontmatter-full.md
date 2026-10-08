@@ -3320,11 +3320,6 @@ engine:
       # (optional)
       bash-command-allowlist: true
 
-      # Expose safeoutputs and mcpscripts only through CLI wrappers, preserving other
-      # configured native MCP servers.
-      # (optional)
-      cli-only-mcp-infrastructure: true
-
     # (optional)
     manifest:
       # (optional)
@@ -21848,11 +21843,6 @@ safe-outputs:
 
           # (optional)
           bash-command-allowlist: true
-
-          # Expose safeoutputs and mcpscripts only through CLI wrappers, preserving other
-          # configured native MCP servers.
-          # (optional)
-          cli-only-mcp-infrastructure: true
 
         # (optional)
         manifest:

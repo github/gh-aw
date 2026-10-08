@@ -13,7 +13,6 @@ import (
 )
 
 func TestGetMCPCLIExcludeFromAgentConfig(t *testing.T) {
-	agyCapabilities := NewAgyEngine().GetCapabilities()
 	safeOutputs := &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
 	mcpScripts := &MCPScriptsConfig{
 		Tools: map[string]*MCPScriptToolConfig{
@@ -27,82 +26,67 @@ func TestGetMCPCLIExcludeFromAgentConfig(t *testing.T) {
 	infra := []string{constants.MCPScriptsMCPServerID.String(), constants.SafeOutputsMCPServerID.String()}
 
 	tests := []struct {
-		name         string
-		data         *WorkflowData
-		capabilities EngineCapabilities
-		expected     []string
+		name     string
+		data     *WorkflowData
+		expected []string
 	}{
 		{name: "nil workflow"},
 		{name: "empty workflow", data: &WorkflowData{}},
 		{
-			name:         "agy no infrastructure",
-			capabilities: agyCapabilities,
-			data:         &WorkflowData{EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false}},
+			name: "agy no infrastructure",
+			data: &WorkflowData{EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false}},
 		},
 		{
-			name:         "agy empty infrastructure",
-			capabilities: agyCapabilities,
+			name: "agy empty infrastructure",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
 				SafeOutputs: &SafeOutputsConfig{}, MCPScripts: &MCPScriptsConfig{},
 			},
 		},
 		{
-			name:         "agy safeoutputs only",
-			capabilities: agyCapabilities,
+			name: "agy safeoutputs only",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
 				SafeOutputs: safeOutputs,
 			},
-			expected: []string{constants.SafeOutputsMCPServerID.String()},
 		},
 		{
-			name:         "agy mcpscripts only",
-			capabilities: agyCapabilities,
+			name: "agy mcpscripts only",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
 				MCPScripts: mcpScripts,
 			},
-			expected: []string{constants.MCPScriptsMCPServerID.String()},
 		},
 		{
-			name:         "agy both infrastructure servers",
-			capabilities: agyCapabilities,
+			name: "agy both infrastructure servers",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: false},
 				SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
 			},
-			expected: infra,
 		},
 		{
-			name:         "agy nil parsed tools still excludes infrastructure",
-			capabilities: agyCapabilities,
+			name: "agy nil parsed tools keeps native infrastructure",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)},
 				SafeOutputs:  safeOutputs, MCPScripts: mcpScripts,
 			},
-			expected: infra,
 		},
 		{
-			name:         "agy preserves enclave and custom without infrastructure",
-			capabilities: agyCapabilities,
+			name: "agy preserves enclave and custom without infrastructure",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: NewTools(customTools),
 				Tools: customTools, Enclaves: enclaves,
 			},
 		},
 		{
-			name:         "agy preserves enclave and custom with infrastructure",
-			capabilities: agyCapabilities,
+			name: "agy preserves enclave and custom with infrastructure",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: NewTools(customTools),
 				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
 			},
-			expected: infra,
 		},
 		{
-			name:         "agy explicit cli proxy excludes all mounted servers",
-			capabilities: agyCapabilities,
+			name: "agy explicit cli proxy excludes all mounted servers",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, ParsedTools: &Tools{CLIProxy: true},
 				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
@@ -133,19 +117,15 @@ func TestGetMCPCLIExcludeFromAgentConfig(t *testing.T) {
 			data: &WorkflowData{EngineConfig: &EngineConfig{ID: string(constants.AgyEngine)}, SafeOutputs: safeOutputs, MCPScripts: mcpScripts},
 		},
 		{
-			name: "arbitrary engine capability excludes only infrastructure",
+			name: "arbitrary engine keeps native infrastructure",
 			data: &WorkflowData{
 				EngineConfig: &EngineConfig{ID: "custom-capability-engine"}, ParsedTools: NewTools(customTools),
 				Tools: customTools, Enclaves: enclaves, SafeOutputs: safeOutputs, MCPScripts: mcpScripts,
 			},
-			capabilities: EngineCapabilities{CLIOnlyMCPInfrastructure: true},
-			expected:     infra,
 		},
 		{
-			name:         "capability works without engine config",
-			data:         &WorkflowData{SafeOutputs: safeOutputs, MCPScripts: mcpScripts},
-			capabilities: EngineCapabilities{CLIOnlyMCPInfrastructure: true},
-			expected:     infra,
+			name: "native infrastructure works without engine config",
+			data: &WorkflowData{SafeOutputs: safeOutputs, MCPScripts: mcpScripts},
 		},
 		{
 			name:     "nil engine explicit cli proxy excludes infrastructure",
@@ -156,7 +136,7 @@ func TestGetMCPCLIExcludeFromAgentConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, getMCPCLIExcludeFromAgentConfig(tt.data, tt.capabilities))
+			assert.Equal(t, tt.expected, getMCPCLIExcludeFromAgentConfig(tt.data))
 		})
 	}
 }

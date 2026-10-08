@@ -25,8 +25,7 @@ func NewAgyEngine() *AgyEngine {
 			description:  "Experimental native Agy CLI with Gemini API-key authentication",
 			experimental: true,
 			capabilities: EngineCapabilities{
-				MCP:                      true,
-				CLIOnlyMCPInfrastructure: true,
+				MCP: true,
 			},
 			dedicatedLLMGatewayPort: constants.GeminiLLMGatewayPort,
 		},

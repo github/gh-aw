@@ -54,14 +54,14 @@ func (c *Compiler) validatePromptTools(data *WorkflowData, markdownPath string) 
 				continue
 			}
 			seen[key] = true
-			message := promptToolWarning(data, requirement, capabilities)
+			message := promptToolWarning(data, requirement)
 			fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
 			c.IncrementWarningCount()
 		}
 	}
 }
 
-func promptToolWarning(data *WorkflowData, requirement promptToolRequirement, capabilities EngineCapabilities) string {
+func promptToolWarning(data *WorkflowData, requirement promptToolRequirement) string {
 	name := requirement.server + "(" + requirement.tool + ")"
 	advice := fmt.Sprintf("allow this specific tool in tools.%s.allowed and enable its server/toolset when needed", requirement.server)
 	if requirement.command != "" {
@@ -79,15 +79,9 @@ func promptToolWarning(data *WorkflowData, requirement promptToolRequirement, ca
 	if (requirement.command != "" || requirement.server == "bash") && promptShellDisabledByProvider(data) {
 		name += " (native shell is disabled for GitHub-backed Codex)"
 		advice = "replace the shell instruction with an available, explicitly configured MCP tool"
-	} else if promptToolTransportUnavailable(data, requirement, capabilities) {
-		advice = fmt.Sprintf("use the %s CLI instead", requirement.server)
-		reason := "the engine's CLI-only MCP infrastructure capability"
-		if !capabilities.CLIOnlyMCPInfrastructure ||
-			(requirement.server != constants.SafeOutputsMCPServerID.String() && requirement.server != constants.MCPScriptsMCPServerID.String()) {
-			advice += ", or disable tools.cli-proxy to retain native MCP access"
-			reason = "tools.cli-proxy"
-		}
-		name = "mcp__" + requirement.server + "__" + requirement.tool + " (native MCP access is excluded by " + reason + ")"
+	} else if promptToolTransportUnavailable(data, requirement) {
+		advice = fmt.Sprintf("use the %s CLI instead, or disable tools.cli-proxy to retain native MCP access", requirement.server)
+		name = "mcp__" + requirement.server + "__" + requirement.tool + " (native MCP access is excluded by tools.cli-proxy)"
 	}
 	return fmt.Sprintf("Prompt explicitly requires %s, but the effective tool configuration does not allow it. Align the prompt with the permitted tools, or, if intended, %s. Permissions have not been expanded.", name, advice)
 }
@@ -355,15 +349,15 @@ func splitPromptShellCommands(script string) ([]string, bool) {
 	return commands, true
 }
 
-func promptToolTransportUnavailable(data *WorkflowData, requirement promptToolRequirement, capabilities EngineCapabilities) bool {
-	return requirement.nativeMCP && slices.Contains(getMCPCLIExcludeFromAgentConfig(data, capabilities), requirement.server)
+func promptToolTransportUnavailable(data *WorkflowData, requirement promptToolRequirement) bool {
+	return requirement.nativeMCP && slices.Contains(getMCPCLIExcludeFromAgentConfig(data), requirement.server)
 }
 
 func promptToolAvailable(data *WorkflowData, requirement promptToolRequirement, capabilities EngineCapabilities) bool {
 	if requirement.command != "" || (requirement.server == "bash" && requirement.tool == "") {
 		return promptShellAvailable(data, requirement.command, requirement.fullCommand, capabilities)
 	}
-	if promptToolTransportUnavailable(data, requirement, capabilities) {
+	if promptToolTransportUnavailable(data, requirement) {
 		return false
 	}
 	// Framework-generated servers are not necessarily present in the tools map.
