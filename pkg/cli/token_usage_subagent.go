@@ -14,9 +14,9 @@ import (
 
 var tokenUsageSubagentLog = logger.New("cli:token_usage_subagent")
 
-var subagentDispatchPattern = regexp.MustCompile(`([A-Za-z0-9][A-Za-z0-9._-]*)\(([A-Za-z0-9][A-Za-z0-9._:-]*)\)`)
+var subagentDispatchPattern = regexp.MustCompile(`^●\s+([A-Za-z0-9][A-Za-z0-9._ -]*?)\s*\((?:model:\s*)?([A-Za-z0-9][A-Za-z0-9._:-]*)\)`)
 
-type subagentDispatchKey struct {
+type subagentModelKey struct {
 	agent    string
 	model    string
 	resolved string
@@ -28,11 +28,27 @@ func augmentSubagentModelAttribution(runDir string, summary *TokenUsageSummary) 
 	}
 	augmentDeclaredSubagentModels(runDir, summary)
 
-	requests := extractSubagentModelRequests(runDir)
+	requests, actuals, found, err := readSessionSubagentModels(runDir)
+	if err != nil {
+		addTokenUsageWarning(summary, "failed to parse unified subagent information: "+err.Error())
+		tokenUsageSubagentLog.Printf("failed to parse unified subagent information: %v", err)
+	}
+	if found {
+		summary.SubagentModelRequests = requests
+		summary.SubagentModelActuals = actuals
+		summary.MismatchCount = 0
+		return
+	}
+
+	requests = extractSubagentModelRequests(runDir)
 	if len(requests) == 0 {
 		tokenUsageSubagentLog.Print("no subagent model dispatch requests found, skipping attribution")
 		return
 	}
+	augmentHeuristicSubagentModelAttribution(requests, summary)
+}
+
+func augmentHeuristicSubagentModelAttribution(requests []SubagentModelRequest, summary *TokenUsageSummary) {
 	addTokenUsageWarning(summary, subagentStdioWarning)
 
 	actuals, observedModels := collectSubagentModelActuals(summary)
@@ -94,7 +110,7 @@ func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
 	}
 	defer file.Close()
 
-	counts := make(map[subagentDispatchKey]int)
+	counts := make(map[subagentModelKey]int)
 
 	reader := bufio.NewReader(file)
 	for {
@@ -108,10 +124,15 @@ func extractSubagentModelRequests(runDir string) []SubagentModelRequest {
 			break
 		}
 		if readErr != nil {
+			tokenUsageSubagentLog.Printf("failed to read agent stdio file %s: %v", agentStdioPath, readErr)
 			return nil
 		}
 	}
 
+	return subagentModelRequestRows(counts)
+}
+
+func subagentModelRequestRows(counts map[subagentModelKey]int) []SubagentModelRequest {
 	rows := make([]SubagentModelRequest, 0, len(counts))
 	for k, n := range counts {
 		rows = append(rows, SubagentModelRequest{
@@ -164,7 +185,7 @@ func collectSubagentModelActuals(summary *TokenUsageSummary) ([]SubagentModelAct
 	return actuals, observedModels
 }
 
-func countSubagentDispatchLine(counts map[subagentDispatchKey]int, line string) {
+func countSubagentDispatchLine(counts map[subagentModelKey]int, line string) {
 	var dispatch struct {
 		Type      string `json:"type"`
 		Agent     string `json:"agent"`
@@ -173,13 +194,20 @@ func countSubagentDispatchLine(counts map[subagentDispatchKey]int, line string) 
 	}
 	if json.Unmarshal([]byte(line), &dispatch) == nil && dispatch.Type == "gh_aw_subagent_dispatch" {
 		if dispatch.Agent != "" && dispatch.Requested != "" {
-			counts[subagentDispatchKey{agent: dispatch.Agent, model: dispatch.Requested, resolved: dispatch.Resolved}]++
+			counts[subagentModelKey{agent: dispatch.Agent, model: dispatch.Requested, resolved: dispatch.Resolved}]++
 		}
 		return
 	}
-	for _, match := range subagentDispatchPattern.FindAllString(line, -1) {
-		agent, model, _ := strings.Cut(match, "(")
-		model = strings.TrimSuffix(model, ")")
-		counts[subagentDispatchKey{agent: agent, model: model}]++
+	var agent, model string
+	for index, match := range subagentDispatchPattern.FindStringSubmatch(line) {
+		switch index {
+		case 1:
+			agent = strings.TrimSpace(match)
+		case 2:
+			model = strings.TrimSpace(match)
+		}
+	}
+	if agent != "" && model != "" {
+		counts[subagentModelKey{agent: agent, model: model}]++
 	}
 }

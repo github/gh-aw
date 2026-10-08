@@ -327,7 +327,8 @@ func (e *PiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string)
 	}
 
 	// Resolve backend and profile early so we can use them when building piArgs.
-	modelConfigured := workflowData.Model != ""
+	modelRouting := isModelRoutingEnabled(workflowData)
+	modelConfigured := workflowData.Model != "" && !modelRouting
 	backend := resolvePiBackend(workflowData)
 	profile := piProviderProfile(workflowData)
 	firewallEnabled := isFirewallEnabled(workflowData)
@@ -345,6 +346,7 @@ func (e *PiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string)
 
 func (e *PiEngine) buildPiArgs(workflowData *WorkflowData) []string {
 	piArgs := []string{"--print", "--mode", "json"}
+	modelRouting := isModelRoutingEnabled(workflowData)
 	session := piSessionSettings(workflowData)
 	if session.Enabled {
 		piArgs = append(piArgs, "--session-dir", PiSessionDirectory)
@@ -371,16 +373,20 @@ func (e *PiEngine) buildPiArgs(workflowData *WorkflowData) []string {
 		piArgs = append(piArgs, "--no-context-files", "--no-skills", "--no-prompt-templates", "--no-extensions", "--no-themes")
 	}
 	if workflowData.EngineConfig != nil {
-		piArgs = append(piArgs, filterPiArgs(workflowData.EngineConfig.Args)...)
+		piArgs = append(piArgs, filterPiArgs(workflowData.EngineConfig.Args, modelRouting)...)
 	}
 	return piArgs
 }
 
 func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile universalLLMBackendProfile, backend UniversalLLMBackend, piArgs []string, firewallEnabled, modelConfigured, driverConfigured bool) (string, []string) {
-	if !modelConfigured {
+	modelRouting := isModelRoutingEnabled(workflowData)
+	if !modelConfigured && !modelRouting {
 		return "", piArgs
 	}
-	modelID := extractPiModelID(workflowData.Model)
+	modelID := ""
+	if modelConfigured {
+		modelID = extractPiModelID(workflowData.Model)
+	}
 	gatewaySecretEnvVar := resolvePiGatewaySecretEnvVar(profile, backend)
 	if firewallEnabled {
 		if gatewaySecretEnvVar == "" {
@@ -396,13 +402,17 @@ func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile un
 		if workflowData.EngineConfig != nil && workflowData.EngineConfig.ContextWindow > 0 {
 			contextWindowAssignment = " GH_AW_PI_CONTEXT_WINDOW=" + shellEscapeArg(strconv.Itoa(workflowData.EngineConfig.ContextWindow))
 		}
+		modelIDAssignment := ""
+		if modelID != "" {
+			modelIDAssignment = "export GH_AW_PI_MODEL_ID=" + shellEscapeArg(modelID) + " && "
+		}
 		setup := fmt.Sprintf(
-			`export GH_AW_PI_MODEL_ID=%s GH_AW_PI_GATEWAY_SECRET_ENV=%s GH_AW_PI_GATEWAY_FALLBACK_PORT=%d GH_AW_LLM_PROVIDER=%s%s && ( %s "%s/pi_models_json.cjs" ) && `,
-			shellEscapeArg(modelID), shellEscapeArg(gatewaySecretEnvVar), profile.gatewayPort, shellEscapeArg(reflectProvider),
+			`%sexport GH_AW_PI_GATEWAY_SECRET_ENV=%s GH_AW_PI_GATEWAY_FALLBACK_PORT=%d GH_AW_LLM_PROVIDER=%s%s && ( %s "%s/pi_models_json.cjs" ) && `,
+			modelIDAssignment, shellEscapeArg(gatewaySecretEnvVar), profile.gatewayPort, shellEscapeArg(reflectProvider),
 			contextWindowAssignment,
 			nodeRuntimeResolutionCommand, SetupActionDestinationShell,
 		)
-		if !driverConfigured {
+		if !driverConfigured && !modelRouting {
 			piArgs = append(piArgs, "--model", "aw-gateway/"+modelID)
 		}
 		piLog.Printf("Pi: using /reflect-resolved models.json gateway routing for model %q via aw-gateway (fallback port %d)", modelID, profile.gatewayPort)
@@ -422,17 +432,28 @@ func (e *PiEngine) buildPiCommand(workflowData *WorkflowData, commandName string
 		piCommand = buildPiDriverCommand(workflowData.EngineConfig.Driver)
 		piLog.Printf("Pi: using driver mode with driver=%s", workflowData.EngineConfig.Driver)
 	} else {
+		routingEnv := ""
+		modelArg := ""
+		if isModelRoutingEnabled(workflowData) {
+			routingEnv = `GH_AW_PI_MODEL="aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)" GH_AW_PI_NATIVE_PROVIDER="aw-gateway" `
+			modelArg = ` --model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`
+		}
 		piCommand = fmt.Sprintf(
-			`cat /tmp/gh-aw/aw-prompts/user.txt | %s %s --append-system-prompt /tmp/gh-aw/aw-prompts/system.txt --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_tool_policy.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_subagent_extension.cjs" --extension builtin:mcp --extension builtin:codemode --extension builtin:tool-search 2>&1 | tee %s`,
-			commandName, shellJoinArgs(piArgs), PiStreamingLogFile)
-	}
-	if piModelsJSONSetup != "" {
-		piCommand = piModelsJSONSetup + piCommand
+			`cat /tmp/gh-aw/aw-prompts/user.txt | %s%s %s%s --append-system-prompt /tmp/gh-aw/aw-prompts/system.txt --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_tool_policy.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_subagent_extension.cjs" --extension builtin:mcp --extension builtin:codemode --extension builtin:tool-search 2>&1 | tee %s`,
+			routingEnv, commandName, shellJoinArgs(piArgs), modelArg, PiStreamingLogFile)
 	}
 	if !driverConfigured && piSessionSettings(workflowData).Export {
 		piCommand += fmt.Sprintf(` && %s "%s/pi_session_export.cjs"`, nodeRuntimeResolutionCommand, SetupActionDestinationShell)
 	}
-	piCommand = fmt.Sprintf(`%s "%s/pi_runtime.cjs" && %s`, nodeRuntimeResolutionCommand, SetupActionDestinationShell, piCommand)
+	piRuntimeCommand := fmt.Sprintf(`%s "%s/pi_runtime.cjs"`, nodeRuntimeResolutionCommand, SetupActionDestinationShell)
+	if isModelRoutingEnabled(workflowData) && piModelsJSONSetup != "" {
+		piCommand = piModelsJSONSetup + piRuntimeCommand + " && " + piCommand
+	} else {
+		if piModelsJSONSetup != "" {
+			piCommand = piModelsJSONSetup + piCommand
+		}
+		piCommand = piRuntimeCommand + " && " + piCommand
+	}
 	return getWorkspaceCommandPrefixFor(workflowData.EngineConfig) + piCommand
 }
 
@@ -542,6 +563,7 @@ func (e *PiEngine) buildPiExecutionEnv(workflowData *WorkflowData, profile unive
 		piLog.Printf("Added %d custom env vars from agent config", len(agentConfig.Env))
 	}
 	applyPiToolPolicyEnv(env, workflowData)
+	applyModelRoutingEnv(env, workflowData)
 	return env
 }
 
@@ -563,15 +585,32 @@ const PiStreamingLogFile = "/tmp/gh-aw/pi-streaming.jsonl"
 
 const PiSessionDirectory = constants.TmpGhAwAgentDir + "pi-sessions"
 
-// filterPiArgs removes redundant Pi CLI flags that gh-aw should not pass through.
-// Pi runs in yolo mode by default, so explicit --yolo flags are ignored while all
-// other engine args are preserved in order.
-func filterPiArgs(args []string) []string {
+// filterPiArgs removes redundant Pi CLI flags and prevents fixed model or thinking
+// options from overriding a routed selection.
+func filterPiArgs(args []string, modelRouting bool) []string {
 	filtered := make([]string, 0, len(args))
+	skipValue := false
 	for _, arg := range args {
+		if skipValue {
+			skipValue = false
+			if !strings.HasPrefix(arg, "-") {
+				continue
+			}
+		}
 		if arg == "--yolo" || strings.HasPrefix(arg, "--yolo=") {
 			piLog.Printf("Pi: dropping redundant arg %q because Pi runs in yolo mode by default", arg)
 			continue
+		}
+		if modelRouting {
+			if arg == "--model" || arg == "--thinking" {
+				piLog.Printf("Pi: dropping routed override %q", arg)
+				skipValue = true
+				continue
+			}
+			if strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "--thinking=") {
+				piLog.Printf("Pi: dropping routed override %q", arg)
+				continue
+			}
 		}
 		filtered = append(filtered, arg)
 	}

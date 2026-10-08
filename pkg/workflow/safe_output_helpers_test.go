@@ -716,7 +716,7 @@ func TestBuildAgentOutputDownloadSteps(t *testing.T) {
 		"- name: Download agent output artifact",
 		"id: download-agent-output",
 		"continue-on-error: true",
-		"uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+		"uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
 		// Both the unified agent artifact and the small fallback copy are matched so the
 		// agent output survives a failed upload of the larger agent artifact.
 		`pattern: "{agent,agent-output-fallback}"`,

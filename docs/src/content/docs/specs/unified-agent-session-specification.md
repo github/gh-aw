@@ -813,6 +813,38 @@ Retry sessions retain independent source provenance and tool-correlation scopes.
 The bootstrap persists each observed session rather than only the last attempt;
 final-attempt telemetry remains separate from the complete conversation evidence.
 
+Copilot subagent lifecycle events retain the instance `agentId`, definition and
+display names, parent agent identity, model, reasoning effort, execution mode,
+model-selection source, and first dispatched model when supplied. The unified
+projection also retains assistant request-correlation metadata (`apiCallId`,
+`interactionId`, `turnId`, and `parentToolCallId`) and the main agent's reasoning
+effort. `session.shutdown.data.agentMetrics` is exposed unchanged in
+`session.result.data.agentMetrics`, including per-agent model request counts,
+token counts, and nano-AIU credits. This is an authoritative snapshot, not an
+additional contribution to session usage.
+
+Audit and logs read subagent models from `usage/aw_session.jsonl` first, then
+`agent-session.jsonl` when structured conclusion evidence is unavailable.
+Structured per-model actuals include only subagent requests, not main-agent or
+router traffic. An observed Copilot session without subagents does not trigger
+stdio inference. Older runs fall back to `agent-stdio.log` with the existing
+heuristic warning; only CLI dispatch-marker lines are considered, supporting
+both `Name(model)` and `Name (model: model)` layouts. Invalid structured evidence
+produces a warning before falling back.
+
+Subagent attribution is scoped to the final retry session; earlier source
+records cannot contribute even when merged timestamps interleave them.
+Malformed preferred artifacts produce diagnostics while the reader continues
+to the next structured source before attempting legacy inference.
+
+Step summaries display subagent instance IDs, definition and display names,
+parent-agent identity, model configuration, per-model requests and token counts,
+and per-agent credits. Credit percentages use only the complete per-agent
+snapshot, not proxy or router totals. Snapshots replace earlier observations;
+native and projected copies are not added together. Missing accounting remains
+unavailable, distinct from observed zero usage. Publication applies the existing
+redaction, escaping, and byte limits.
+
 ### 7.3 Codex
 
 **T-UAS-038 — Codex adapter.** The Codex adapter MUST support recognized `thread.*`, `turn.*`, and `item.*` JSONL records and the existing recognized legacy text layouts. It MUST preserve native item/tool IDs, independent starts/completions, text/reasoning, explicit tool failures, and session errors. Distinct `turn.completed.usage` reports MUST accumulate as specified in Section 6.
@@ -1079,6 +1111,11 @@ both sinks after writing it. `generatePlainTextSummary`,
 unified events. Their unified view shows file version, per-component record
 counts, per-source agent statistics and conversations, and a chronological trace. Existing
 agent-only inputs retain their earlier rendering behavior.
+
+Actions publishes this view once in a plain-titled `Unified session` disclosure,
+using a fenced CLI-style transcript like the Claude conversation summary rather
+than a Markdown table. Gateway diagnostics do not append a second unified event
+timeline, and the disclosure does not repeat its title as a standalone heading.
 
 | Observation | Unified display projection |
 | --- | --- |

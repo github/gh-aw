@@ -24,16 +24,26 @@ function rpcArgs(args) {
 async function main(options = {}) {
   const sdk = options.sdk || (await loadPiSDK());
   const emit = options.emit || (event => process.stdout.write(JSON.stringify(event) + "\n"));
-  const { agentDir, config } = preparePiRuntime();
+  const { agentDir, config, routingSelection } = preparePiRuntime();
   const cwd = process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd();
   const promptPath = process.env.GH_AW_PI_USER_PROMPT || process.env.GH_AW_PROMPT;
   if (!promptPath) throw new Error("GH_AW_PROMPT is required");
+  if (routingSelection) {
+    process.env.GH_AW_PI_MODEL = `aw-gateway/${routingSelection.wire_model}`;
+    process.env.GH_AW_PI_NATIVE_PROVIDER = "aw-gateway";
+  }
   const configuredModel = process.env.GH_AW_PI_MODEL || "";
   const slash = configuredModel.indexOf("/");
   const provider = process.env.GH_AW_PI_NATIVE_PROVIDER || nativePiProvider(slash >= 0 ? configuredModel.slice(0, slash) : "copilot");
   const modelId = slash >= 0 ? configuredModel.slice(slash + 1) : configuredModel;
   const model = fs.existsSync(path.join(agentDir, "models.json")) ? `aw-gateway/${modelId}` : `${provider}/${modelId}`;
   const args = rpcArgs(JSON.parse(process.env.GH_AW_PI_ARGS || '["--no-session","--no-approve"]'));
+  if (routingSelection) {
+    for (let i = args.length - 1; i >= 0; i--) {
+      if (args[i] === "--model") args.splice(i, 2);
+      else if (args[i].startsWith("--model=")) args.splice(i, 1);
+    }
+  }
   const actionsDir = process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, "gh-aw/actions") : __dirname;
   for (const file of ["pi_provider.cjs", "pi_steering_extension.cjs", "pi_tool_policy.cjs", "pi_subagent_extension.cjs"]) args.push("--extension", path.join(actionsDir, file));
   for (const builtin of ["mcp", "codemode", "tool-search"]) args.push("--extension", `builtin:${builtin}`);

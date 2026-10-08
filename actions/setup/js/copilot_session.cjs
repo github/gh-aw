@@ -228,6 +228,7 @@ function normalizeCopilotSession(entries) {
       const end = typeof event.timestamp === "string" ? Date.parse(event.timestamp) : event.timestamp;
       if (typeof end === "number" && isMetric(data.sessionStartTime) && isMetric(end) && end >= data.sessionStartTime) result.durationMs = end - data.sessionStartTime;
       if (data.errorReason !== undefined) result.errors = [data.errorReason];
+      if (data.agentMetrics !== undefined) result.agentMetrics = structuredClone(data.agentMetrics);
       if (Object.keys(result).length) project("session.result", result);
     } else if (event.type === "session.error") {
       project("session.result", { errors: [data.error !== undefined ? structuredClone(data.error) : structuredClone(data)] });

@@ -37,6 +37,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const { renderToolRecommendedExample, renderToolSignature, summarizeHelpText } = require("./mcp_cli_schema_docs.cjs");
+const { isBlankOptionalField, normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 
 /** Directory for JSONL audit logs (writable inside AWF sandbox via /tmp mount) */
 const AUDIT_LOG_DIR = "/tmp/gh-aw/mcp-cli-audit";
@@ -808,7 +809,7 @@ function findInlineJsonPayloadArg(args) {
  * @param {Record<string, {type?: string|string[]}>} [schemaProperties] - Tool input schema properties
  * @param {string | null} [stdinContent] - Pre-read stdin content; used in JSON payload mode
  *   (args empty or `['.']`) and per-field stdin mode (`--key .`).
- * @param {{rejectPositionalArguments?: boolean}} [options]
+ * @param {{rejectPositionalArguments?: boolean, omitBlankOptionalFields?: boolean, requiredFields?: string[]}} [options]
  * @returns {{args: Record<string, unknown>, json: boolean}}
  */
 function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options = {}) {
@@ -817,6 +818,16 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
   let jsonOutput = false;
   const hasSchemaProperties = Object.keys(schemaProperties).length > 0;
   const { normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys } = buildNormalizedSchemaKeyMap(schemaProperties);
+  const normalizeArgs = values => (options.omitBlankOptionalFields ? normalizeBlankOptionalFields(values, schemaProperties, options.requiredFields) : values);
+  const assignFlagValue = (key, rawValue) => {
+    if (options.omitBlankOptionalFields && rawValue.trim() === "") {
+      if (!isBlankOptionalField(rawValue, schemaProperties[key], options.requiredFields?.includes(key), key)) {
+        result[key] = rawValue;
+      }
+      return;
+    }
+    result[key] = coerceToolArgValue(key, rawValue, schemaProperties[key], result[key], !hasSchemaProperties);
+  };
 
   // Inline JSON payload mode: the whole payload is passed as a single quoted
   // argument, e.g. `safeoutputs noop '{"message":"done"}'`.  This keeps the
@@ -838,7 +849,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
       const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
       result[canonicalKey] = value;
     }
-    return { args: result, json: resolveJsonFlag(args) };
+    return { args: normalizeArgs(result), json: resolveJsonFlag(args) };
   }
   // Trimmed stdin content used in both JSON payload mode and per-field stdin mode.
   const trimmedStdin = stdinContent !== null ? stdinContent.trim() : null;
@@ -862,7 +873,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
           const canonicalKey = resolveSchemaPropertyKey(key, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
           result[canonicalKey] = value;
         }
-        return { args: result, json: false };
+        return { args: normalizeArgs(result), json: false };
       }
       throw new Error(`stdin JSON payload must be an object. JSON payload mode was requested ${isExplicitJsonSentinel ? "with '.'" : "from piped stdin with no flags"}. Pass --key value flags instead, or provide a JSON object.`);
     }
@@ -884,7 +895,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
             const extracted = tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
             result[canonicalKey] = extracted !== undefined ? extracted : trimmedStdin;
           } else {
-            result[canonicalKey] = coerceToolArgValue(canonicalKey, rawValue, schemaProperties[canonicalKey], result[canonicalKey], !hasSchemaProperties);
+            assignFlagValue(canonicalKey, rawValue);
           }
         }
       } else if (raw === "json") {
@@ -896,7 +907,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
           const extracted = tryExtractJsonFieldFromStdin(trimmedStdin, canonicalKey, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
           result[canonicalKey] = extracted !== undefined ? extracted : trimmedStdin;
         } else {
-          result[canonicalKey] = coerceToolArgValue(canonicalKey, rawValue, schemaProperties[canonicalKey], result[canonicalKey], !hasSchemaProperties);
+          assignFlagValue(canonicalKey, rawValue);
         }
         i++;
       } else {
@@ -909,7 +920,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
     // Skip non-flag arguments
   }
 
-  return { args: result, json: jsonOutput };
+  return { args: normalizeArgs(result), json: jsonOutput };
 }
 
 /**
@@ -1712,7 +1723,11 @@ async function main() {
   let parsedArgs;
   try {
     // Other MCP bridges retain positional syntax; safeoutputs maps CLI arguments to a strict tool schema.
-    parsedArgs = parseToolArgs(toolUserArgs, schemaProperties, stdinContent, { rejectPositionalArguments: serverName === SAFEOUTPUTS_SERVER_NAME });
+    parsedArgs = parseToolArgs(toolUserArgs, schemaProperties, stdinContent, {
+      rejectPositionalArguments: serverName === SAFEOUTPUTS_SERVER_NAME,
+      omitBlankOptionalFields: serverName === SAFEOUTPUTS_SERVER_NAME,
+      requiredFields: matchedTool?.inputSchema?.required || [],
+    });
   } catch (err) {
     const message = getErrorMessage(err);
     auditLog(serverName, { event: "parse_args_error", tool: toolName, error: message });

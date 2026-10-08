@@ -1,6 +1,7 @@
 // @ts-check
 
 const { normalizeTool } = require("./mcp_server_core.cjs");
+const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 
 /**
  * Unwrap mistakenly nested MCP arguments like { create_discussion: { ... } }.
@@ -15,15 +16,11 @@ function normalizeSafeOutputToolArguments(toolName, args, logger, inputSchema) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     return args;
   }
-  if (typeof args.type === "string" && args.type.trim()) {
-    return args;
-  }
-
   let normalizedArgs = args;
   const normalizedToolName = normalizeTool(toolName);
   const candidateKeys = [...new Set([toolName, normalizedToolName, toolName.replace(/_/g, "-"), normalizedToolName.replace(/_/g, "-")])];
 
-  for (const candidateKey of candidateKeys) {
+  for (const candidateKey of typeof args.type === "string" && args.type.trim() ? [] : candidateKeys) {
     const nestedArgs = normalizedArgs[candidateKey];
     if (nestedArgs && typeof nestedArgs === "object" && !Array.isArray(nestedArgs)) {
       const outerKeys = Object.keys(normalizedArgs);
@@ -71,7 +68,7 @@ function normalizeSafeOutputToolArguments(toolName, args, logger, inputSchema) {
     logger?.debug?.(`Recovered safe-output parameter synonyms for '${normalizedToolName}': ${JSON.stringify(remapped)}`);
   }
 
-  return remappedArgs;
+  return normalizeBlankOptionalFields(remappedArgs, inputSchema.properties, inputSchema.required);
 }
 
 /**

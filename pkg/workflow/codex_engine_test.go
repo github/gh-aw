@@ -737,7 +737,7 @@ func TestCodexEngineExecutionPassesModelEnvVarIntoAWFStep(t *testing.T) {
 			}
 
 			stepContent := strings.Join([]string(steps[0]), "\n")
-			expectedEnvLine := tt.expectedModelEnv + ": ${{ vars." + tt.expectedModelEnv + " || vars.GH_AW_DEFAULT_MODEL_CODEX || '" + constants.CodexDefaultModel + "' }}"
+			expectedEnvLine := tt.expectedModelEnv + ": ${{ vars." + tt.expectedModelEnv + " || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}"
 			if !strings.Contains(stepContent, expectedEnvLine) {
 				t.Errorf("Expected model env var to be included in AWF step env:\n%s", stepContent)
 			}
@@ -1562,4 +1562,26 @@ func TestCodexEngineHttpMCPHeaderSecretsUseEnvVars(t *testing.T) {
 			t.Errorf("Expected MCP config to contain %q, got:\n%s", want, result)
 		}
 	}
+}
+
+func TestCodexEngineModelRoutingExecutionStep(t *testing.T) {
+	workflowData := &WorkflowData{
+		Name:  "routed-workflow",
+		Model: "gpt-5.6-sol",
+		EngineConfig: &EngineConfig{
+			ID:          "codex",
+			LLMProvider: LLMProviderGitHub,
+			ModelRouting: &CopilotModelRoutingConfig{
+				Goal: "cost", Mode: "balanced", AllowedModels: []string{"gpt-5.6-sol"},
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+		ParsedTools:        NewTools(map[string]any{}),
+	}
+
+	step := strings.Join([]string(NewCodexEngine().GetExecutionSteps(workflowData, "test-log")[0]), "\n")
+	require.Contains(t, step, "GH_AW_MODEL_ROUTING")
+	require.Contains(t, step, "candidateModels")
+	require.NotContains(t, step, "GH_AW_MODEL_AGENT_CODEX:")
+	require.NotContains(t, step, "${GH_AW_MODEL_AGENT_CODEX:+ --model")
 }
