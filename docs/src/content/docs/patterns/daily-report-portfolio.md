@@ -261,7 +261,6 @@ imports:
   - shared/daily-report-worker.md
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
 safe-outputs:

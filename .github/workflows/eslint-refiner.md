@@ -51,7 +51,6 @@ steps:
         fs.writeFileSync(path.join(directory, "history.json"), JSON.stringify(history) + "\n", { mode: 0o400 });
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
     memory:

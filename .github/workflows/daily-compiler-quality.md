@@ -70,7 +70,6 @@ strict: true
 timeout-minutes: 30
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
   bash:

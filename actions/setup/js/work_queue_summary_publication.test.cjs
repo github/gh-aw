@@ -105,7 +105,7 @@ describe("queue publication step summaries", () => {
   it("keeps rejected queue updates out of summaries", async () => {
     const core = summaryCore();
     const fake = fakeGitHub([genesis()]);
-    await expect(publishWorkQueueRequest(options(fake, dispatchRequest("unsupported-summary"), dispatcher, { core, storage: "issues" }))).rejects.toThrow(/unsupported_backend/);
+    await expect(publishWorkQueueRequest(options(fake, dispatchRequest("invalid-branch-summary"), dispatcher, { core, branch: "../queue" }))).rejects.toThrow(/branch_invalid/);
     expect(core.summary.addRaw).not.toHaveBeenCalled();
     expect(fake.state.updates).toBe(0);
   });

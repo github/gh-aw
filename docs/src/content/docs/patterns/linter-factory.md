@@ -86,7 +86,6 @@ on:
   workflow_dispatch:
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
 safe-outputs:
@@ -128,7 +127,6 @@ generates the output tool and protected adapter; no persistence script is needed
 ---
 tools:
   work-queue:
-    storage: git
     require-assignment: true
     worker: true
     memory:

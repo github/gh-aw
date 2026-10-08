@@ -6,8 +6,9 @@ description: Git-backed work queue roles, Claim-scoped effects, operator command
 Work queues can be Git-backed or issue-backed. Native `tools.work-queue` uses
 Git storage. Lightweight issue checklists and sub-issue queues use
 [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) with GitHub read tools and safe
-outputs. This reference describes the native version-3 protocol, whose compiler
-and runtime reject `storage: issues`.
+outputs. This reference describes the native version-3 protocol. Git is the only
+backend, and `tools.work-queue` has no `storage` field. The compiler rejects that
+field for every value, including `git`; remove it from existing workflows.
 
 The native queue enforces fair scheduling, immutable task dependency graphs,
 and worker effects authorized by individual Claims. Its only source of

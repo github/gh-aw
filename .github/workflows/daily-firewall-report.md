@@ -30,7 +30,6 @@ safe-outputs:
     expires: 14
 tools:
   work-queue:
-    storage: git
     worker: true
     require-assignment: true
   cli-proxy: true
