@@ -1429,6 +1429,44 @@
                   "requested_model": {
                     "type": "string"
                   },
+                  "resolved_model": {
+                    "type": "string"
+                  },
+                  "invocation_count": {
+                    "type": "integer"
+                  },
+                  "effective_model": {
+                    "type": "string"
+                  },
+                  "reason_code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "agent_name",
+                  "requested_model",
+                  "invocation_count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "declared_subagent_models": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "agent_name": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
+                  "resolved_model": {
+                    "type": "string"
+                  },
                   "invocation_count": {
                     "type": "integer"
                   },

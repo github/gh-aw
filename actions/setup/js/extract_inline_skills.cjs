@@ -34,6 +34,7 @@
 const fs = require("fs");
 const path = require("path");
 const { collectInlineEndMarkers, unknownInlineEndMarkerError } = require("./inline_marker_helpers.cjs");
+const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 
 // Supported frontmatter fields for inline skills.
 // Any other field is stripped with a warning.
@@ -319,6 +320,8 @@ function getEngineSkillTarget(engineId) {
       return { dir: ".codex/skills", ext: "/SKILL.md" };
     case "gemini":
       return { dir: ".gemini/skills", ext: ".md" };
+    case "pi":
+      return { dir: ".pi/skills", ext: "/SKILL.md" };
     default:
       return { dir: ".github/skills", ext: "/SKILL.md" };
   }
@@ -359,7 +362,7 @@ function writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId) {
   }
 
   const baseDir = skillsBaseDir || workspaceDir;
-  const { dir, ext } = getEngineSkillTarget(engineId);
+  const { dir, ext } = inlineArtifactTarget("SKILL", getEngineSkillTarget(engineId));
   const skillsDir = path.join(baseDir, dir);
   core.info(`[extractInlineSkills] Engine: "${engineId || "(default)"}" → dir="${dir}" ext="${ext}"`);
   core.info(`[extractInlineSkills] Writing ${skills.length} skill(s) to: ${skillsDir}`);

@@ -37,6 +37,7 @@ func (c *Compiler) buildInitialWorkflowData(
 	importsResult *parser.ImportsResult,
 ) *WorkflowData {
 	workflowBuilderLog.Print("Building initial workflow data")
+	_, subAgents, _ := parser.ExtractInlineSubAgents(result.Markdown)
 
 	inlinedImports := resolveInlinedImports(result.Frontmatter)
 
@@ -88,6 +89,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		RunInstallScripts:          toolsResult.runInstallScripts,
 		MarkdownContent:            toolsResult.markdownContent,
 		SubAgentModels:             append(toolsResult.subAgentModels, importsResult.SubAgentModels...),
+		SubAgents:                  append(subAgents, importsResult.SubAgents...),
 		AI:                         engineSetup.engineSetting,
 		Model:                      engineSetup.model,
 		EngineConfig:               engineSetup.engineConfig,

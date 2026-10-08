@@ -67,7 +67,7 @@ async function main(options = {}) {
     noExtensions: bare,
     noThemes: true,
     appendSystemPrompt: systemPath ? [fs.readFileSync(systemPath, "utf8")] : undefined,
-    additionalExtensionPaths: ["pi_provider.cjs", "pi_steering_extension.cjs", "pi_tool_policy.cjs"].map(file => path.join(actionsDir, file)),
+    additionalExtensionPaths: ["pi_provider.cjs", "pi_steering_extension.cjs", "pi_tool_policy.cjs", "pi_subagent_extension.cjs"].map(file => path.join(actionsDir, file)),
     extensionFactories: [sdk.createCodemodeExtension({ mode: settings.codemode?.mode || "on" }), sdk.createToolSearchExtension(), sdk.createMcpExtension()],
   });
   await resourceLoader.reload();

@@ -121,6 +121,30 @@ Custom executables without the npm SDK must supply complete model metadata (`rea
 
 The built-in `tools.playwright` integration uses `playwright-cli`; omit its `mode` field. Native `tools.web-search`, `max-continuations`, native `engine.agent` selection, and custom `engine.harness` scripts remain unsupported. Custom drivers must implement their own policies and cannot opt into the built-in aggregate tool budgets.
 
+## Sub-agents
+
+Define [inline sub-agents](/gh-aw/reference/inline-sub-agents/) with a non-empty `description` and instruct the parent to call the `subagent` tool:
+
+```aw wrap
+Use subagent with {"agent":"reader","task":"Summarize README.md"}.
+
+## agent: `reader`
+---
+description: Reads and summarizes files
+model: small
+tools: [read, grep, find, ls]
+---
+Read the requested files and report the facts.
+```
+
+The built-in CLI, SDK, and RPC modes load managed delegation, including with `engine.bare: true`. Each invocation starts an isolated, ephemeral child session with the agent's instructions and the workflow system prompt. The tool accepts one agent and task per call; it does not accept chain or parallel-task parameters, and children cannot recursively delegate.
+
+An omitted model inherits the parent's configured model. Bare model IDs use the parent's provider; aliases such as `small` resolve against that provider's advertised models. A declaration cannot switch to another provider or silently fall back to the parent model when alias resolution fails. The optional `?effort=` parameter supports `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`; other model parameters are rejected. An explicit `name` must match the agent marker.
+
+Children retain the workflow's inference gateway, MCP configuration, steering, bash allowlist, and edit restrictions. Tool-call and denial budgets are shared with the parent. Children use compiler-managed execution arguments rather than inheriting `engine.args` overrides. Optional automatically discovered extensions are disabled in children; only the managed infrastructure extensions are loaded. Custom drivers do not support this delegation path.
+
+Dispatch logs record both the requested alias and resolved model. `gh aw audit` reports `subagent_model_not_observed` when usage evidence exists but no agent inference matches a declared model. This means the agent may not have run or its model was not honored; model presence alone does not prove delegation. Detection requests are not treated as agent-model evidence.
+
 ## Additional providers
 
 `google/` models use the Gemini gateway and `GEMINI_API_KEY`. Other API-compatible providers can use an explicit inference family and endpoint:

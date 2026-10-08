@@ -167,6 +167,11 @@ async function main(core, ctx, githubClient) {
     awInfo.skills = skills;
     core.info(`Configured frontmatter skills (${skills.length}): ${skills.join(", ")}`);
   }
+  if (process.env.GH_AW_INFO_SUB_AGENT_MODELS) {
+    const models = JSON.parse(process.env.GH_AW_INFO_SUB_AGENT_MODELS);
+    if (!Array.isArray(models)) throw new Error("GH_AW_INFO_SUB_AGENT_MODELS must be an array");
+    awInfo.sub_agent_models = models;
+  }
 
   // Include aw_context when the workflow was triggered by a caller that relayed
   // orchestration context via workflow inputs or repository_dispatch client payload.
