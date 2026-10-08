@@ -32,6 +32,48 @@ func TestSessionSubagentModels(t *testing.T) {
 		assert.Equal(t, []SubagentModelActual{{Model: "haiku", Requests: 3}, {Model: "sonnet", Requests: 45}}, actuals)
 	})
 
+	t.Run("uses only the final Copilot attempt", func(t *testing.T) {
+		for _, finalAttemptHasSubagent := range []bool{false, true} {
+			name := "without subagents"
+			if finalAttemptHasSubagent {
+				name = "with different subagent"
+			}
+			t.Run(name, func(t *testing.T) {
+				firstInit := subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"first"}}`)
+				finalInit := subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"final"}}`)
+				firstMetrics := subagentSessionRecord(`{"type":"session.result","data":{"agentMetrics":{"main":{"modelMetrics":{"opus":{"requests":{"count":41}}}},"research":{"agentName":"research","modelMetrics":{"sonnet":{"requests":{"count":45}}}}}}}`)
+				finalMetrics := `{"type":"session.result","data":{"agentMetrics":{"main":{"modelMetrics":{"opus":{"requests":{"count":3}}}}`
+				finalStart := ""
+				if finalAttemptHasSubagent {
+					finalStart = subagentSessionRecord(`{"type":"subagent.started","agentId":"final","data":{"agentName":"final","agentDisplayName":"final-worker","model":"haiku"}}`)
+					finalMetrics += `,"final":{"agentName":"final","modelMetrics":{"haiku":{"requests":{"count":7}}}}`
+				}
+				finalMetrics = subagentSessionRecord(finalMetrics + `}}}`)
+				content := subagentSessionHeader + firstInit + subagentSessionRecord(start) + firstMetrics + finalInit + finalStart + finalMetrics
+
+				requests, actuals, found, err := parseSessionSubagentModels(strings.NewReader(content), true)
+				require.NoError(t, err)
+				require.True(t, found)
+				if finalAttemptHasSubagent {
+					assert.Equal(t, []SubagentModelRequest{{AgentName: "final-worker", RequestedModel: "haiku", EffectiveModel: "haiku", InvocationCount: 1}}, requests)
+					assert.Equal(t, []SubagentModelActual{{Model: "haiku", Requests: 7}}, actuals)
+				} else {
+					assert.Empty(t, requests)
+					assert.Empty(t, actuals)
+				}
+			})
+		}
+	})
+
+	t.Run("aggregates repeated logical subagent requests", func(t *testing.T) {
+		first := subagentSessionRecord(`{"type":"subagent.started","agentId":"research-1","data":{"agentName":"research","agentDisplayName":"routing-research","model":"opus"}}`)
+		second := subagentSessionRecord(`{"type":"subagent.started","agentId":"research-2","data":{"agentName":"research","agentDisplayName":"routing-research","model":"opus"}}`)
+		requests, _, found, err := parseSessionSubagentModels(strings.NewReader(subagentSessionHeader+first+second), true)
+		require.NoError(t, err)
+		require.True(t, found)
+		assert.Equal(t, []SubagentModelRequest{{AgentName: "routing-research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 2}}, requests)
+	})
+
 	t.Run("prefers usage artifact over canonical trace and log", func(t *testing.T) {
 		root := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))
@@ -54,6 +96,19 @@ func TestSessionSubagentModels(t *testing.T) {
 		require.True(t, found)
 		require.Len(t, requests, 1)
 		assert.Equal(t, "sonnet", requests[0].EffectiveModel)
+	})
+
+	t.Run("continues to canonical trace after malformed usage artifact", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "usage", "aw_session.jsonl"), []byte("invalid\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "agent-session.jsonl"), []byte(subagentSessionRecord(start)), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "agent-stdio.log"), []byte("● Fake (model: wrong)"), 0o644))
+		summary := &TokenUsageSummary{}
+		augmentSubagentModelAttribution(root, summary)
+		require.Equal(t, []SubagentModelRequest{{AgentName: "routing-research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1}}, summary.SubagentModelRequests)
+		require.Len(t, summary.Warnings, 1)
+		assert.Contains(t, summary.Warnings[0], "failed to parse unified subagent information")
 	})
 
 	t.Run("does not add native and projected snapshots", func(t *testing.T) {

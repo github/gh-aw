@@ -508,6 +508,18 @@ describe("mcp_scripts_validation.cjs", () => {
   });
 
   describe("validateArgumentsAgainstSchema", () => {
+    it("enforces required fields in root anyOf branches", async () => {
+      const { validateArgumentsAgainstSchema } = await import("./mcp_scripts_validation.cjs");
+      const schema = {
+        type: "object",
+        properties: { issue_number: { type: "number" }, status: { type: "string" }, labels: { type: "array" } },
+        anyOf: [{ required: ["status"] }, { required: ["labels"] }],
+      };
+
+      expect(validateArgumentsAgainstSchema({ issue_number: 42 }, schema)).toMatchObject({ path: "status", message: "is required" });
+      expect(validateArgumentsAgainstSchema({ issue_number: 42, status: "open" }, schema)).toBeNull();
+    });
+
     it("validates nested array item objects and required fields", async () => {
       const { validateArgumentsAgainstSchema } = await import("./mcp_scripts_validation.cjs");
       const schema = {

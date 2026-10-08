@@ -39,6 +39,7 @@ type sessionSubagentData struct {
 // Unified conclusion evidence precedes the canonical bootstrap trace. Neither
 // requires downloading the original engine logs to identify subagents.
 func readSessionSubagentModels(runDir string) ([]SubagentModelRequest, []SubagentModelActual, bool, error) {
+	var parseErrors []error
 	for _, relative := range []string{"usage/aw_session.jsonl", "aw_session.jsonl", "agent-session.jsonl"} {
 		path := filepath.Join(runDir, filepath.FromSlash(relative))
 		for _, source := range []string{filepath.Dir(path), path} {
@@ -58,13 +59,14 @@ func readSessionSubagentModels(runDir string) ([]SubagentModelRequest, []Subagen
 			continue
 		}
 		if parseErr != nil {
-			return nil, nil, false, fmt.Errorf("%s: %w", relative, parseErr)
+			parseErrors = append(parseErrors, fmt.Errorf("%s: %w", relative, parseErr))
+			continue
 		}
 		if found {
-			return requests, actuals, true, nil
+			return requests, actuals, true, errors.Join(parseErrors...)
 		}
 	}
-	return nil, nil, false, nil
+	return nil, nil, false, errors.Join(parseErrors...)
 }
 
 func parseSessionSubagentFile(path string, unified bool) (requests []SubagentModelRequest, actuals []SubagentModelActual, found bool, err error) {
@@ -138,6 +140,8 @@ func (models *subagentSessionModels) observe(event sessionSubagentEvent) error {
 		return err
 	}
 	if event.Type == "session.init" && data.SourceEngine == "copilot" {
+		models.agents = make(map[string]*SubagentModelRequest)
+		models.actualCounts = make(map[string]map[string]int)
 		models.found = true
 	}
 	if err := models.observeMetrics(data); err != nil {
@@ -215,6 +219,23 @@ func (models *subagentSessionModels) rows() ([]SubagentModelRequest, []SubagentM
 		if row.AgentName != "" {
 			requests = append(requests, *row)
 		}
+	}
+	aggregated := make(map[subagentModelKey]SubagentModelRequest, len(requests))
+	for _, row := range requests {
+		key := subagentModelKey{agent: row.AgentName, model: row.RequestedModel}
+		if previous, exists := aggregated[key]; exists {
+			previous.InvocationCount += row.InvocationCount
+			if previous.EffectiveModel != row.EffectiveModel {
+				previous.EffectiveModel = ""
+			}
+			aggregated[key] = previous
+		} else {
+			aggregated[key] = row
+		}
+	}
+	requests = requests[:0]
+	for _, row := range aggregated {
+		requests = append(requests, row)
 	}
 	slices.SortFunc(requests, func(a, b SubagentModelRequest) int {
 		if order := strings.Compare(a.AgentName, b.AgentName); order != 0 {

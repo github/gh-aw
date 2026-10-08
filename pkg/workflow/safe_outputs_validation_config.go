@@ -24,6 +24,7 @@ type FieldValidation struct {
 	OptionalPositiveInteger  bool     `json:"optionalPositiveInteger,omitempty"`
 	AllowAuto                bool     `json:"allowAuto,omitempty"`
 	AllowNull                bool     `json:"allowNull,omitempty"`
+	AllowEmpty               bool     `json:"allowEmpty,omitempty"`
 	IssueOrPRNumber          bool     `json:"issueOrPRNumber,omitempty"`
 	IssueNumberOrTemporaryID bool     `json:"issueNumberOrTemporaryId,omitempty"`
 	Enum                     []string `json:"enum,omitempty"`
@@ -275,7 +276,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 		DefaultMax: 5,
 		Fields: map[string]FieldValidation{
 			"issue_number": {IssueOrPRNumber: true},
-			"issue_type":   {Required: true, Type: "string", Sanitize: true, MaxLength: 128}, // Empty string clears the type
+			"issue_type":   {Required: true, Type: "string", Sanitize: true, MaxLength: 128, AllowEmpty: true}, // Empty string clears the type
 			"rationale":    {Type: "string", Sanitize: true, MaxLength: 280, StripOnError: true},
 			"confidence":   {Type: "string", Enum: []string{"LOW", "MEDIUM", "HIGH"}, StripOnError: true},
 			"suggest":      {Type: "boolean"},
