@@ -29,17 +29,21 @@ export interface UnifiedSessionUsage {
   overflowedTokens?: string[];
 }
 
-export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics"> {
+export interface UnifiedSessionIdentityData {
+  sessionId?: JsonValue;
+  parentSessionId?: JsonValue;
+}
+
+export interface UnifiedSessionResultData extends Pick<SessionResultData, "sourceEngine" | "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics">, UnifiedSessionIdentityData {
   usage?: UnifiedSessionUsage | null;
 }
 
-export interface UnifiedMessageData extends Pick<MessageData, "content"> {
+export interface UnifiedMessageData extends Pick<MessageData, "content">, UnifiedSessionIdentityData {
   delta?: JsonValue;
   partial?: JsonValue;
   messageId?: JsonValue;
   contentIndex?: JsonValue;
   channel?: JsonValue;
-  sessionId?: JsonValue;
   agentId?: JsonValue;
   parentToolUseId?: JsonValue;
   model?: JsonValue;
@@ -265,19 +269,20 @@ export interface CollectionData {
 export interface UnifiedSessionEventDataMap {
   "session.format": SessionFileFormatData;
   "agent.execution": AgentExecutionData;
-  "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
+  "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "parentSessionId" | "cwd" | "reasoningEffort">;
   "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort">;
-  "user.message": Pick<MessageData, "content">;
+  "user.message": Pick<MessageData, "content"> & UnifiedSessionIdentityData;
   "prompt.system": Pick<MessageData, "content">;
   "prompt.user": Pick<MessageData, "content">;
   "assistant.message": UnifiedMessageData;
-  "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial">;
+  "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial"> & UnifiedSessionIdentityData;
   "assistant.reasoning": UnifiedMessageData;
-  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName">;
+  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName"> & UnifiedSessionIdentityData;
   "tool.execution_complete": Pick<
     ToolExecutionCompleteData,
     "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError" | "taskId" | "taskType" | "workflowName" | "workflowRunId"
-  >;
+  > &
+    UnifiedSessionIdentityData;
   "dynamicWorkflows.task_started": DynamicWorkflowObservationData;
   "dynamicWorkflows.task_progress": DynamicWorkflowObservationData;
   "dynamicWorkflows.task_updated": DynamicWorkflowObservationData;

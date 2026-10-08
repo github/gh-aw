@@ -34,11 +34,17 @@ export interface EventMetadata {
   [key: string]: unknown;
 }
 
-export interface SessionInitData {
+export interface SessionIdentityData {
+  sessionId?: string | null;
+  parentSessionId?: string;
+}
+
+export interface SessionInitData extends SessionIdentityData {
   sourceEngine?: string;
   model?: string;
   reasoningEffort?: string;
   sessionId?: string | null;
+  parentSessionId?: string;
   cwd?: string;
   tools?: JsonValue[];
   mcpServers?: JsonValue[];
@@ -47,12 +53,12 @@ export interface SessionInitData {
   [key: string]: unknown;
 }
 
-export interface MessageData {
+export interface MessageData extends SessionIdentityData {
   content?: JsonValue;
   [key: string]: unknown;
 }
 
-export interface AssistantRefusalData {
+export interface AssistantRefusalData extends SessionIdentityData {
   reason: "refusal" | "content_filter";
   content?: JsonValue;
   policyCategory?: string | null;
@@ -62,7 +68,7 @@ export interface AssistantRefusalData {
   [key: string]: unknown;
 }
 
-export interface ToolExecutionStartData {
+export interface ToolExecutionStartData extends SessionIdentityData {
   toolCallId?: string;
   toolName?: string;
   input?: JsonValue;
@@ -72,7 +78,7 @@ export interface ToolExecutionStartData {
   [key: string]: unknown;
 }
 
-export interface ToolExecutionCompleteData {
+export interface ToolExecutionCompleteData extends SessionIdentityData {
   toolCallId?: string;
   toolName?: string;
   taskId?: string;
@@ -110,7 +116,8 @@ export interface SessionUsage {
   [key: string]: unknown;
 }
 
-export interface SessionResultData {
+export interface SessionResultData extends SessionIdentityData {
+  sourceEngine?: string;
   numTurns?: SessionCount;
   durationMs?: SessionMetric;
   totalCostUsd?: SessionMetric;

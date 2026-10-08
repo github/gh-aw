@@ -78,14 +78,20 @@ const SAFE_OUTPUT_FIELDS = {
 };
 
 /** @type {Fields} */
+const SESSION_IDENTITY_FIELDS = {
+  sessionId: ["sessionId", "session_id"],
+  parentSessionId: ["parentSessionId"],
+};
+
+/** @type {Fields} */
 const MESSAGE_FIELDS = {
+  ...SESSION_IDENTITY_FIELDS,
   content: ["content"],
   delta: ["delta"],
   partial: ["partial"],
   messageId: ["messageId", "message_id"],
   contentIndex: ["contentIndex"],
   channel: ["channel"],
-  sessionId: ["sessionId", "session_id"],
   agentId: ["agentId"],
   parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
   model: ["model"],
@@ -111,15 +117,16 @@ const EVENT_FIELDS = {
   ...COPILOT_WORKFLOW_EVENT_FIELDS,
   "session.format": { version: ["version"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
-  "session.init": { sourceEngine: ["sourceEngine"], model: ["model", "selectedModel"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"], reasoningEffort: ["reasoningEffort"] },
-  "user.message": { content: ["content"] },
+  "session.init": { ...SESSION_IDENTITY_FIELDS, sourceEngine: ["sourceEngine"], model: ["model", "selectedModel"], cwd: ["cwd"], reasoningEffort: ["reasoningEffort"] },
+  "user.message": { ...SESSION_IDENTITY_FIELDS, content: ["content"] },
   "prompt.system": { content: ["content"] },
   "prompt.user": { content: ["content"] },
   "assistant.message": MESSAGE_FIELDS,
-  "assistant.refusal": { reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
+  "assistant.refusal": { ...SESSION_IDENTITY_FIELDS, reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
   "assistant.reasoning": MESSAGE_FIELDS,
-  "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
+  "tool.execution_start": { ...SESSION_IDENTITY_FIELDS, ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
   "tool.execution_complete": {
+    ...SESSION_IDENTITY_FIELDS,
     ...TOOL_FIELDS,
     success: ["success"],
     output: ["output", "result"],
@@ -134,6 +141,8 @@ const EVENT_FIELDS = {
     workflowRunId: ["workflowRunId"],
   },
   "session.result": {
+    ...SESSION_IDENTITY_FIELDS,
+    sourceEngine: ["sourceEngine"],
     numTurns: ["numTurns", "num_turns"],
     durationMs: ["durationMs", "duration_ms"],
     totalCostUsd: ["totalCostUsd", "total_cost_usd"],
@@ -273,6 +282,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (event.type.startsWith("subagent.")) Object.assign(data, selectFields(source, SESSION_IDENTITY_FIELDS));
   if (known && event.type.startsWith("dynamicWorkflows.")) {
     if (!Object.hasOwn(data, "status") && source.patch?.status !== undefined) data.status = structuredClone(source.patch.status);
     const usage = selectFields(source.usage, { totalTokens: ["totalTokens", "total_tokens"], toolUses: ["toolUses", "tool_uses"], durationMs: ["durationMs", "duration_ms"] });

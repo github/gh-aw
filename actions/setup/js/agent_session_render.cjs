@@ -9,7 +9,7 @@ const { collectArtifactSecretValues, redactManifestValue } = require("./safe_out
 const publicationSources = new WeakMap();
 
 /** @param {any} source @returns {string} */
-function messageSourceScope(source) {
+function sessionSourceScope(source) {
   return JSON.stringify([
     source.provenance?.component,
     source.provenance?.phase,
@@ -17,8 +17,12 @@ function messageSourceScope(source) {
     source.session_id ?? source.sessionId ?? source.data?.sessionId ?? source.data?.session_id,
     source.agentId ?? source.data?.agentId,
     source.parent_tool_use_id ?? source.data?.parentToolUseId ?? source.data?.parent_tool_use_id,
-    source.channel ?? source.data?.channel,
   ]);
+}
+
+/** @param {any} source @returns {string} */
+function messageSourceScope(source) {
+  return JSON.stringify([sessionSourceScope(source), source.channel ?? source.data?.channel]);
 }
 
 /**
@@ -218,4 +222,4 @@ function redactSessionForPublication(events, redact) {
   }
 }
 
-module.exports = { collapseStreamedMessages, escapeSummaryText, toolInventoryName, displayArgument, renderInitializationLines, toolOutcome, boundSummaryLines, redactSessionForPublication };
+module.exports = { sessionSourceScope, collapseStreamedMessages, escapeSummaryText, toolInventoryName, displayArgument, renderInitializationLines, toolOutcome, boundSummaryLines, redactSessionForPublication };

@@ -7,7 +7,7 @@ const { ERR_PARSE } = require("./error_codes.cjs");
 const createLogParserFormatters = require("./log_parser_format.cjs");
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
 const { isSessionEvent, normalizeAgentSession, normalizeSessionUsage, projectSessionResult, projectSessionInitialization, sessionOutputText, sessionToolSuccess, sessionTokenTotal, isMetric } = require("./agent_session.cjs");
-const { escapeSummaryText, toolInventoryName, displayArgument } = require("./agent_session_render.cjs");
+const { sessionSourceScope, escapeSummaryText, toolInventoryName, displayArgument } = require("./agent_session_render.cjs");
 
 /**
  * Shared utility functions for log parsers
@@ -673,6 +673,8 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   const normalizedEntries = [];
   const pendingByToolCallId = new Map();
   const pendingIdsByToolName = new Map();
+  const scopedDisplayIds = new Map();
+  const claimedNativeIds = new Map();
   let toolCounter = 0;
   const usedToolIds = new Set(logEntries.filter(e => typeof e.data?.toolCallId === "string").map(e => e.data.toolCallId));
   const displayToolId = () => {
@@ -682,6 +684,16 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     } while (usedToolIds.has(id));
     usedToolIds.add(id);
     return id;
+  };
+  const scopedToolId = (scope, id) => {
+    if (id === null) return displayToolId();
+    const key = JSON.stringify([scope, id]);
+    if (!scopedDisplayIds.has(key)) {
+      const claimed = claimedNativeIds.has(id) && claimedNativeIds.get(id) !== scope;
+      scopedDisplayIds.set(key, claimed ? displayToolId() : id);
+      claimedNativeIds.set(id, scope);
+    }
+    return scopedDisplayIds.get(key);
   };
 
   const addPendingId = (toolName, toolId) => {
@@ -765,6 +777,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   for (const entry of logEntries) {
     if (!entry || typeof entry !== "object") continue;
     const data = entry.data && typeof entry.data === "object" ? entry.data : {};
+    const scope = sessionSourceScope(entry);
 
     switch (entry.type) {
       case "session.start":
@@ -810,11 +823,13 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       case "tool.execution_start": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
         const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
-        const resolvedToolId = toolCallId ?? displayToolId();
+        const resolvedToolId = scopedToolId(scope, toolCallId);
+        const callKey = JSON.stringify([scope, toolCallId]);
+        const nameKey = JSON.stringify([scope, toolName]);
         if (toolCallId !== null) {
-          pendingByToolCallId.set(toolCallId, { id: resolvedToolId, name: toolName });
+          pendingByToolCallId.set(callKey, { id: resolvedToolId, name: nameKey });
         }
-        addPendingId(toolName, resolvedToolId);
+        addPendingId(nameKey, resolvedToolId);
         normalizedEntries.push({
           type: "assistant",
           message: {
@@ -827,22 +842,24 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       case "tool.execution_complete": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
         const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
+        const callKey = JSON.stringify([scope, toolCallId]);
+        const nameKey = JSON.stringify([scope, toolName]);
         /** @type {any} */
         let resolvedToolId = null;
 
-        if (toolCallId !== null && pendingByToolCallId.has(toolCallId)) {
-          const pending = pendingByToolCallId.get(toolCallId);
+        if (toolCallId !== null && pendingByToolCallId.has(callKey)) {
+          const pending = pendingByToolCallId.get(callKey);
           resolvedToolId = pending.id;
-          pendingByToolCallId.delete(toolCallId);
+          pendingByToolCallId.delete(callKey);
           if (resolvedToolId !== null) {
             removePendingId(pending.name, resolvedToolId);
           }
         }
-        if (resolvedToolId === null && toolCallId === null && (pendingIdsByToolName.get(toolName)?.length ?? 0) === 1) {
-          resolvedToolId = shiftPendingId(toolName);
+        if (resolvedToolId === null && toolCallId === null && (pendingIdsByToolName.get(nameKey)?.length ?? 0) === 1) {
+          resolvedToolId = shiftPendingId(nameKey);
         }
         if (resolvedToolId === null) {
-          resolvedToolId = toolCallId ?? displayToolId();
+          resolvedToolId = scopedToolId(scope, toolCallId);
           normalizedEntries.push({
             type: "assistant",
             message: {

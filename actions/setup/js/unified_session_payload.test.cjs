@@ -240,6 +240,7 @@ describe("essential unified session payloads", () => {
       {
         type: "session.result",
         data: {
+          sourceEngine: "codex",
           status: "completed",
           sourceType: "turn.completed",
           numTurns: 1,
@@ -259,9 +260,32 @@ describe("essential unified session payloads", () => {
       { type: "turn.failed", error: { message: "Response rejected." } },
     ]);
     expect(events.map(normalizeUnifiedSessionEvent)).toEqual([
-      { type: "session.result", data: { errors: ["Model metadata unavailable."] } },
-      { type: "session.result", data: { status: "failed", sourceType: "turn.failed", errors: [{ message: "Response rejected." }] } },
+      { type: "session.result", data: { sourceEngine: "codex", errors: ["Model metadata unavailable."] } },
+      { type: "session.result", data: { sourceEngine: "codex", status: "failed", sourceType: "turn.failed", errors: [{ message: "Response rejected." }] } },
     ]);
+  });
+
+  it("preserves Codex nested-session identity through essential projection without selecting child accounting", () => {
+    const native = [
+      { type: "thread.started", thread_id: "parent" },
+      { type: "turn.completed", thread_id: "parent", usage: { input_tokens: 10, output_tokens: 2 } },
+      { type: "thread.started", thread_id: "child", parent_thread_id: "parent" },
+      { type: "item.completed", thread_id: "child", item: { id: "message", type: "agent_message", text: " Child answer.\n" } },
+      { type: "item.completed", thread_id: "child", item: { id: "call", type: "command_execution", command: "example", aggregated_output: "", exit_code: 0 } },
+      { type: "item.completed", thread_id: "child", item: { id: "user", type: "user_message", text: "Child follow-up" } },
+      { type: "turn.completed", thread_id: "child", usage: { input_tokens: 100, output_tokens: 20 } },
+      { type: "turn.failed", thread_id: "child", error: { message: "Child-only error." } },
+    ];
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: normalizeCodexSession(native) }]);
+    const validate = createSessionValidator("unified").event;
+    for (const event of events) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    for (const event of events.filter(event => event.agentId === "child")) {
+      expect(event.data).toMatchObject({ sessionId: "child", parentSessionId: "parent" });
+      expect(normalizeUnifiedSessionEvent(event).data).toEqual(event.data);
+    }
+    expect(events.find(event => event.type === "assistant.message").data).toEqual({ content: " Child answer.\n", messageId: "message", sessionId: "child", parentSessionId: "parent", agentId: "child" });
+    expect(selectSessionResult(events)).toMatchObject({ status: "completed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 } });
+    expect(selectSessionResult(events).errors).toBeUndefined();
   });
 
   it("retains grader decisions and safe-output errors without evaluator scripts", () => {

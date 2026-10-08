@@ -855,12 +855,33 @@ redaction, escaping, and byte limits.
 | Supported `item.started` / `item.updated` / `item.completed` with `item.type: "agent_message"` or `"reasoning"` | Message/reasoning observations; distinguish partial text from full snapshots to avoid duplication. |
 | Same item envelope with `item.type: "mcp_tool_call"` | Start/completion according to observed lifecycle; preserve item/call ID, `server`, `tool`, `arguments`, `result`, `error`, `status`. |
 | Same item envelope with `item.type: "command_execution"` | Preserve ID, command, `aggregated_output`, status, and `exit_code`; nonzero exit is failure. |
+| Same item envelope with `item.type: "file_change"`, `"web_search"`, or `"todo_list"` | Tool lifecycle using `apply_patch`, `web_search`, or `update_plan`; retain reported changes, query/action/results, or plan items. Missing outcomes remain unknown. |
+| Same item envelope with `item.type: "collab_tool_call"` | Tool lifecycle using the native `tool` name; normalize sender/receiver thread IDs and prompt into input, and agent states into output. |
 | `turn.completed` with `usage` | Accumulate `input_tokens`, `output_tokens`, `cached_input_tokens` → `cache_read_input_tokens`, and `cache_write_input_tokens` → `cache_creation_input_tokens`; count distinct completed turns. |
 | Supported `turn.failed`, top-level `error`, or completed error item | Session/provider errors in `session.result.errors`, retaining supplied error structure and metadata. |
 | Legacy `thinking`, recognized tool/exec call and outcome lines | Exact payload text and independently observed tool lifecycle; no source ID if none is exposed. |
 | Legacy `ERROR:` / recognized reconnect diagnostics | Session errors, separately from successful tool activity. |
 
 An item carrying a complete invocation and result can expand to a start and completion at that item position. An unfinished item or a legacy call lacking an outcome does not supply a successful completion. Recognized model headers and harness spawn metadata can supply a model, but arbitrary text does not establish a Codex session.
+
+Codex observations retain `sessionId` when a thread identity is available.
+Explicit `thread_id` and collaboration `sender_thread_id` isolate interleaved
+item IDs, message snapshots, errors, and tool correlation. A successful
+`spawn_agent` identifies each receiver's parent; supplied `parent_thread_id`
+also establishes this relationship. Descendant events retain `agentId` and
+`parentSessionId`, including through the essential unified projection.
+Descendant turn accounting remains in the trace but does not replace or add to
+the selected parent result.
+
+Collaboration tool completion describes the operation, not the receiver's
+execution outcome. Reported receiver states expose `subagent.started`,
+`subagent.completed`, or `subagent.failed` observations as applicable. A
+completed receiver's string `message` becomes an attributed `assistant.message`;
+repeated unchanged state snapshots do not duplicate its answer. A revised
+completed-state message retires the earlier answer to `codex.agent_snapshot`
+and exposes the authoritative text. Running waits and shutdown states do not
+fabricate completed work, usage, or model metadata. Unfinished native message
+snapshots retain `partial: true` and their `messageId`.
 
 ### 7.4 Gemini
 

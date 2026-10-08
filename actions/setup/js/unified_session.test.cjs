@@ -12,6 +12,7 @@ const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
 const claudeFixtures = req("./fixtures/claude_ci_sessions.cjs");
 const { dynamicWorkflow } = req("./fixtures/claude_dynamic_workflow.cjs");
 const codexNoTools = fs.readFileSync(new URL("./test_data/codex_ci_no_tools.jsonl", import.meta.url), "utf8");
+const codexCollab = fs.readFileSync(new URL("./test_data/codex_collab.jsonl", import.meta.url), "utf8");
 
 describe("Unified conclusion session", () => {
   let root;
@@ -682,8 +683,10 @@ describe("Unified conclusion session", () => {
     const published = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
     const agent = published.filter(event => event.provenance.component === "agent");
     expect(agent.map(event => event.type)).toEqual(["session.init", "session.result", "turn.started", "assistant.message", "assistant.message", "session.result"]);
-    expect(agent[1].data).toEqual({ errors: ["Model metadata unavailable; using fallback metadata."] });
+    expect(agent[1].data).toEqual({ sessionId: "sanitized-no-tools-thread", sourceEngine: "codex", errors: ["Model metadata unavailable; using fallback metadata."] });
     expect(agent.at(-1).data).toEqual({
+      sessionId: "sanitized-no-tools-thread",
+      sourceEngine: "codex",
       status: "completed",
       sourceType: "turn.completed",
       numTurns: 1,
@@ -692,6 +695,28 @@ describe("Unified conclusion session", () => {
     expect(agent.at(-1)).not.toHaveProperty("usage");
     expect(agent.every(event => event.provenance.path === (canonicalPresent ? "agent-session.jsonl" : "agent-stdio.log"))).toBe(true);
     expect(published.some(event => event.type === "session.collection_warning")).toBe(false);
+  });
+
+  it.each([false, true])("publishes Codex collaboration descendants from %s canonical evidence", canonicalPresent => {
+    write("agent-stdio.log", codexCollab);
+    if (canonicalPresent) write("agent-session.jsonl", parseEngineSession(codexCollab, "codex"));
+    const events = writeUnifiedSession({ rootDir: root, engine: "codex" });
+    const descendants = events.filter(event => event.agentId !== undefined);
+    expect(descendants.filter(event => event.type === "subagent.started").map(event => [event.agentId, event.data.parentId])).toEqual([
+      ["child", "parent"],
+      ["grandchild", "child"],
+    ]);
+    expect(descendants.filter(event => event.type === "assistant.message").map(event => [event.agentId, event.data.parentSessionId, event.data.content])).toEqual([
+      ["grandchild", "child", "  Detail checked.\n"],
+      ["child", "parent", "Inspection complete.\n"],
+    ]);
+    expect(descendants.every(event => event.data.parentSessionId !== undefined)).toBe(true);
+    expect(events.filter(event => event.type === "tool.execution_complete")).toHaveLength(7);
+    expect(events.filter(event => event.type === "session.result").at(-1).data.usage).toEqual({ inputTokens: 10, outputTokens: 2 });
+    expect(events.some(event => event.type === "session.collection_warning")).toBe(false);
+    const published = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(published).not.toContain('"sender_thread_id"');
+    expect(published).not.toContain('"receiver_thread_ids"');
   });
 
   it("retains a structured Codex transport-wedge execution event in the unified session", () => {

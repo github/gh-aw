@@ -38,14 +38,15 @@
     "AssistantRefusalData": {
       "type": "object",
       "properties": {
+        "sessionId": { "type": ["string", "null"] },
+        "parentSessionId": { "type": "string" },
         "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
         "content": { "$ref": "#/definitions/JsonValue" },
         "policyCategory": { "type": ["string", "null"] },
         "explanation": { "type": ["string", "null"] },
         "partial": { "type": "boolean", "description": "True for an observed streaming fragment, not a finalized refusal." }
       },
-      "required": ["reason"],
-      "additionalProperties": {}
+      "required": ["reason"]
     },
     "DetectionResultData": {
       "type": "object",
@@ -70,7 +71,7 @@
         { "type": "object", "additionalProperties": { "$ref": "#/definitions/JsonValue" } }
       ]
     },
-    "MessageData": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": {} },
+    "MessageData": { "type": "object", "properties": { "sessionId": { "type": ["string", "null"] }, "parentSessionId": { "type": "string" }, "content": { "$ref": "#/definitions/JsonValue" } } },
     "SessionCount": { "type": "number", "minimum": 0, "maximum": 9007199254740991, "multipleOf": 1 },
     "SessionDiagnosticName": { "type": "string", "minLength": 1 },
     "SessionErrorNumber": { "type": "number", "minimum": -9007199254740991, "maximum": 9007199254740991, "multipleOf": 1 },
@@ -79,22 +80,25 @@
     "SessionInitData": {
       "type": "object",
       "properties": {
+        "sessionId": { "type": ["string", "null"] },
+        "parentSessionId": { "type": "string" },
         "sourceEngine": { "type": "string" },
         "model": { "type": "string" },
         "reasoningEffort": { "type": "string" },
-        "sessionId": { "type": ["string", "null"] },
         "cwd": { "type": "string" },
         "tools": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "mcpServers": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "slashCommands": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "modelInfo": { "$ref": "#/definitions/JsonValue" }
-      },
-      "additionalProperties": {}
+      }
     },
     "SessionMetric": { "type": "number", "minimum": 0 },
     "SessionResultData": {
       "type": "object",
       "properties": {
+        "sessionId": { "type": ["string", "null"] },
+        "parentSessionId": { "type": "string" },
+        "sourceEngine": { "type": "string" },
         "numTurns": { "$ref": "#/definitions/SessionCount" },
         "durationMs": { "$ref": "#/definitions/SessionMetric" },
         "totalCostUsd": { "$ref": "#/definitions/SessionMetric" },
@@ -104,8 +108,7 @@
         "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "permissionDenials": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "agentMetrics": { "$ref": "#/definitions/JsonValue", "description": "Exact per-agent accounting snapshot supplied by the engine, not additive usage." }
-      },
-      "additionalProperties": {}
+      }
     },
     "SessionUsage": {
       "type": "object",
@@ -129,6 +132,8 @@
     "ToolExecutionCompleteData": {
       "type": "object",
       "properties": {
+        "sessionId": { "type": ["string", "null"] },
+        "parentSessionId": { "type": "string" },
         "toolCallId": { "type": "string" },
         "toolName": { "type": "string" },
         "taskId": { "type": "string" },
@@ -145,20 +150,20 @@
         "is_error": { "type": "boolean" },
         "isError": { "type": "boolean" },
         "mcpServerName": { "type": "string" }
-      },
-      "additionalProperties": {}
+      }
     },
     "ToolExecutionStartData": {
       "type": "object",
       "properties": {
+        "sessionId": { "type": ["string", "null"] },
+        "parentSessionId": { "type": "string" },
         "toolCallId": { "type": "string" },
         "toolName": { "type": "string" },
         "input": { "$ref": "#/definitions/JsonValue" },
         "parameters": { "$ref": "#/definitions/JsonValue" },
         "command": { "type": "string" },
         "mcpServerName": { "type": "string" }
-      },
-      "additionalProperties": {}
+      }
     }
   }
 }

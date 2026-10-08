@@ -368,6 +368,7 @@ function selectSessionResult(events) {
   for (const event of normalized) {
     if (event.type !== "session.result") continue;
     if (event.data.sourceEngine === "claude" && event.parent_tool_use_id) continue;
+    if (event.data.sourceEngine === "codex" && event.data.parentSessionId !== undefined) continue;
     result ??= {};
     const data = event.data;
     for (const [key, value] of Object.entries(data)) {
@@ -404,6 +405,7 @@ function projectSessionInitialization(events) {
   let data;
   for (const event of normalizeAgentSession(events)) {
     if (event.type !== "session.init" && event.type !== "session.start") continue;
+    if (event.data.sourceEngine === "codex" && event.data.parentSessionId !== undefined) continue;
     data ??= {};
     for (const [key, value] of Object.entries(event.data)) {
       if (value !== undefined) data = { ...data, [key]: structuredClone(value) };

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { normalizeCodexSession } from "./codex_session.cjs";
 import { parseCodexLog, isCodexJsonlFormat } from "./parse_codex_log.cjs";
-import { selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
+import { projectSessionInitialization, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
+import { convertCopilotEventsToLegacyLogEntries } from "./log_parser_shared.cjs";
 
 const fixture = name => readFileSync(new URL(`./test_data/${name}.jsonl`, import.meta.url), "utf8");
 const ofType = (events, type) => events.filter(event => event.type === type);
@@ -83,7 +84,7 @@ describe("Codex real CI trace regression", () => {
 });
 
 describe("Codex normalization contract", () => {
-  it.each(["file_change", "web_search", "todo_list", "collab_tool_call", "future_item"])("retains native %s observations without losing payloads", type => {
+  it.each(["future_item"])("retains native %s observations without losing payloads", type => {
     const record = { type: "item.completed", timestamp: 0, item: { id: "item_0", type, status: "failed", extension: { retained: true } } };
     const events = normalizeCodexSession([record]);
     expect(events).toHaveLength(1);
@@ -329,6 +330,170 @@ describe("Codex normalization contract", () => {
     expect(ofType(events, "assistant.message")).toEqual([]);
     expect(selectSessionResult(events).errors).toEqual(["", "", { message: "provider error", details: { retryable: false } }, null]);
     expect(events[2]).toMatchObject({ turn_id: "failed", data: { status: "failed" } });
+  });
+});
+
+describe("Codex native tools and nested sessions", () => {
+  // collab_tool_call is the upstream codex-rs/exec/src/exec_events.rs shape.
+  // The sampled CI runs above did not expose native collaboration items.
+  it("normalizes collaboration calls, descendant identity and completed state messages", () => {
+    const events = parseCodexLog(fixture("codex_collab")).logEntries;
+    expect(ofType(events, "tool.execution_start")).toHaveLength(7);
+    expect(ofType(events, "tool.execution_complete")).toHaveLength(7);
+    expect(ofType(events, "subagent.started").map(event => [event.agentId, event.data.parentId])).toEqual([
+      ["child", "parent"],
+      ["grandchild", "child"],
+    ]);
+    expect(ofType(events, "subagent.completed").map(event => [event.agentId, event.data.toolCallId])).toEqual([
+      ["grandchild", "item_0"],
+      ["child", "item_0"],
+    ]);
+    expect(ofType(events, "assistant.message").map(event => [event.agentId, event.data.sessionId, event.data.parentSessionId, event.data.content])).toEqual([
+      ["grandchild", "grandchild", "child", "  Detail checked.\n"],
+      ["child", "child", "parent", "Inspection complete.\n"],
+    ]);
+    const spawn = ofType(events, "tool.execution_start")[0];
+    expect(spawn.data.input).toEqual({ senderThreadId: "parent", receiverThreadIds: [], prompt: "Inspect the example.\n" });
+    const running = ofType(events, "tool.execution_complete").find(event => event.data.toolName === "wait" && event.data.sessionId === "parent");
+    expect(running.data).toMatchObject({ success: true, output: { agentsStates: { child: { status: "running", message: null } } } });
+    expect(selectSessionResult(events)).toMatchObject({ numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 } });
+    expect(normalizeCodexSession(events)).toEqual(events);
+  });
+
+  it("does not mistake a failed spawn, running wait or shutdown for an agent completion", () => {
+    const events = normalizeCodexSession([
+      { type: "item.completed", item: { id: "spawn", type: "collab_tool_call", tool: "spawn_agent", sender_thread_id: "parent", receiver_thread_ids: [], agents_states: {}, status: "failed" } },
+      {
+        type: "item.completed",
+        item: { id: "wait", type: "collab_tool_call", tool: "wait", sender_thread_id: "parent", receiver_thread_ids: ["unknown"], agents_states: { unknown: { status: "errored", message: "Child failed." } }, status: "completed" },
+      },
+    ]);
+    expect(ofType(events, "subagent.started")).toEqual([]);
+    expect(ofType(events, "subagent.completed")).toEqual([]);
+    expect(ofType(events, "assistant.message")).toEqual([]);
+    expect(ofType(events, "subagent.failed")[0]).toMatchObject({ agentId: "unknown", data: { error: "Child failed." } });
+    expect(ofType(events, "tool.execution_complete").map(event => event.data.success)).toEqual([false, true]);
+    expect(selectSessionResult(events)).toBeUndefined();
+  });
+
+  it("starts observed receivers without requiring an agent-state snapshot and keeps revised final messages", () => {
+    const collab = (id, tool, states) => ({ type: "item.completed", item: { id, type: "collab_tool_call", tool, sender_thread_id: "parent", receiver_thread_ids: ["child"], agents_states: states, status: "completed" } });
+    const events = normalizeCodexSession([collab("spawn", "spawn_agent", {}), collab("wait", "wait", { child: { status: "completed", message: "" } }), collab("wait", "wait", { child: { status: "completed", message: "Revised.\n" } })]);
+    expect(ofType(events, "subagent.started")).toHaveLength(1);
+    expect(ofType(events, "subagent.completed")).toHaveLength(1);
+    expect(ofType(events, "assistant.message").map(event => event.data.content)).toEqual(["Revised.\n"]);
+    expect(ofType(events, "codex.agent_snapshot")[0].data.state.message).toBe("");
+    expect(ofType(events, "tool.execution_complete")).toHaveLength(2);
+    expect(ofType(events, "codex.item_snapshot")).toHaveLength(1);
+  });
+
+  it("isolates interleaved parent, child and grandchild item IDs, invocation metadata and usage", () => {
+    const records = [
+      { type: "thread.started", thread_id: "parent" },
+      { type: "item.updated", thread_id: "parent", item: { id: "item_0", type: "agent_message", text: "parent partial" } },
+      { type: "item.started", thread_id: "parent", item: { id: "item_1", type: "command_execution", command: "parent-command" } },
+      { type: "thread.started", thread_id: "child", parent_thread_id: "parent" },
+      { type: "item.completed", thread_id: "child", item: { id: "item_0", type: "agent_message", text: "child final" } },
+      { type: "item.started", thread_id: "child", item: { id: "item_1", type: "command_execution", command: "child-command" } },
+      { type: "thread.started", thread_id: "grandchild", parent_thread_id: "child" },
+      { type: "item.completed", thread_id: "grandchild", item: { id: "item_0", type: "agent_message", text: "grandchild final" } },
+      { type: "turn.completed", thread_id: "grandchild", id: "turn", usage: { input_tokens: 100, output_tokens: 20 } },
+      { type: "item.completed", thread_id: "child", item: { id: "item_1", type: "command_execution", aggregated_output: "child output", exit_code: 0 } },
+      { type: "turn.completed", thread_id: "child", id: "turn", usage: { input_tokens: 50, output_tokens: 10 } },
+      { type: "item.completed", thread_id: "parent", item: { id: "item_1", type: "command_execution", aggregated_output: "parent output", exit_code: 1 } },
+      { type: "item.completed", thread_id: "parent", item: { id: "item_0", type: "agent_message", text: "parent final" } },
+      { type: "turn.completed", thread_id: "parent", id: "turn", usage: { input_tokens: 10, output_tokens: 2 } },
+      { type: "turn.failed", thread_id: "child", error: { message: "child-only error" } },
+    ];
+    const original = structuredClone(records);
+    const events = normalizeCodexSession(records);
+    expect(ofType(events, "assistant.message").map(event => [event.data.sessionId, event.data.content])).toEqual([
+      ["child", "child final"],
+      ["grandchild", "grandchild final"],
+      ["parent", "parent final"],
+    ]);
+    expect(ofType(events, "tool.execution_complete").map(event => [event.data.sessionId, event.data.command, event.data.output, event.data.success])).toEqual([
+      ["child", "child-command", "child output", true],
+      ["parent", "parent-command", "parent output", false],
+    ]);
+    const display = convertCopilotEventsToLegacyLogEntries(events);
+    const calls = display.flatMap(entry => entry.message?.content ?? []).filter(block => block.type === "tool_use");
+    const results = display.flatMap(entry => entry.message?.content ?? []).filter(block => block.type === "tool_result");
+    expect(calls).toHaveLength(2);
+    expect(calls[0].id).not.toBe(calls[1].id);
+    expect(results.map(result => [calls.find(call => call.id === result.tool_use_id)?.input.command, result.content])).toEqual([
+      ["child-command", "child output"],
+      ["parent-command", "parent output"],
+    ]);
+    expect(
+      ofType(events, "session.result")
+        .filter(event => event.data.usage)
+        .map(event => [event.data.sessionId, event.data.numTurns, event.data.usage.input_tokens])
+    ).toEqual([
+      ["grandchild", 1, 100],
+      ["child", 1, 50],
+      ["parent", 1, 10],
+    ]);
+    expect(selectSessionResult(events)).toMatchObject({ status: "completed", numTurns: 1, usage: { input_tokens: 10, output_tokens: 2 } });
+    expect(selectSessionResult(events).errors).toBeUndefined();
+    expect(events.find(event => event.type === "assistant.message" && event.data.sessionId === "grandchild")).toMatchObject({ agentId: "grandchild", data: { parentSessionId: "child", messageId: "item_0" } });
+    expect(records).toEqual(original);
+    expect(normalizeCodexSession(events)).toEqual(events);
+    expect(JSON.parse(JSON.stringify(events))).toEqual(JSON.parse(JSON.stringify(normalizeCodexSession(events))));
+  });
+
+  it.each([
+    ["file_change", "apply_patch", { changes: [{ path: "example.go", kind: "update" }], status: "failed" }, { changes: [{ path: "example.go", kind: "update" }] }, false],
+    ["web_search", "web_search", { query: "example query", results: [], status: "completed" }, { query: "example query" }, true],
+    ["todo_list", "update_plan", { items: [{ text: "Check", completed: false }] }, { items: [{ text: "Check", completed: false }] }, undefined],
+  ])("normalizes %s without inventing unreported outcomes", (type, toolName, fields, input, success) => {
+    const record = { type: "item.completed", timestamp: 0, item: { id: "item_0", type, ...fields, extension: false } };
+    const events = normalizeCodexSession([record]);
+    expect(events.map(event => event.type)).toEqual(["tool.execution_start", "tool.execution_complete"]);
+    expect(events[0].data).toMatchObject({ toolName, toolCallId: "item_0", input, extension: false });
+    expect(events[1].data.success).toBe(success);
+    expect(events[1].item).toEqual(record.item);
+    expect(normalizeCodexSession(events)).toEqual(events);
+  });
+
+  it("retains incomplete tool invocations and partial message identity", () => {
+    const events = normalizeCodexSession([
+      { type: "item.started", item: { id: "call", type: "mcp_tool_call", tool: "lookup" } },
+      { type: "item.updated", item: { id: "call", type: "mcp_tool_call", arguments: false } },
+      { type: "item.completed", item: { id: "call", type: "mcp_tool_call", result: 0, status: "completed" } },
+      { type: "item.updated", item: { id: "message", type: "agent_message", text: " observed " } },
+      { type: "item.completed", item: { id: "declined", type: "command_execution", command: "example", status: "declined" } },
+    ]);
+    expect(ofType(events, "tool.execution_complete")[0].data).toMatchObject({ toolName: "lookup", input: false, output: 0, success: true });
+    expect(ofType(events, "assistant.message")[0].data).toMatchObject({ messageId: "message", content: " observed ", partial: true });
+    expect(ofType(events, "tool.execution_complete")[1].data.success).toBe(false);
+  });
+
+  it("keeps parent initialization and does not assume child models match the harness model", () => {
+    const events = normalizeCodexSession(
+      [
+        { type: "thread.started", thread_id: "parent", model: "parent-model" },
+        { type: "thread.started", thread_id: "child", parent_thread_id: "parent", model: "child-model" },
+        { type: "thread.started", thread_id: "grandchild", parent_thread_id: "child" },
+      ],
+      "harness-model"
+    );
+    expect(projectSessionInitialization(events)).toMatchObject({ model: "parent-model", session_id: "parent" });
+    expect(events[1].data.model).toBe("child-model");
+    expect(events[2].data.model).toBeUndefined();
+  });
+
+  it("deduplicates descendant state snapshots observed by different ancestors", () => {
+    const spawn = (parent, child) => ({ type: "item.completed", item: { id: "spawn", type: "collab_tool_call", tool: "spawn_agent", sender_thread_id: parent, receiver_thread_ids: [child], agents_states: {}, status: "completed" } });
+    const wait = sender => ({
+      type: "item.completed",
+      item: { id: "wait", type: "collab_tool_call", tool: "wait", sender_thread_id: sender, receiver_thread_ids: ["grandchild"], agents_states: { grandchild: { status: "completed", message: "One answer." } }, status: "completed" },
+    });
+    const events = normalizeCodexSession([spawn("parent", "child"), spawn("child", "grandchild"), wait("child"), wait("parent")]);
+    expect(ofType(events, "assistant.message").map(event => event.data.content)).toEqual(["One answer."]);
+    expect(ofType(events, "subagent.completed")).toHaveLength(1);
+    expect(ofType(events, "subagent.completed")[0].data).toMatchObject({ parentSessionId: "child", toolCallId: "spawn" });
+    expect(ofType(events, "tool.execution_complete")).toHaveLength(4);
   });
 });
 
