@@ -16,11 +16,17 @@
     "prettier": "^3.9.9",
     "ts-json-schema-generator": "2.4.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2",
+    "vite": "8.3.1",
     "vitest": "^5.0.3"
   },
   "overrides": {
-    "undici": "^6.23.0"
+    "undici": "^6.23.0",
+    "vite": {
+      "postcss": {
+        ".": "8.5.28",
+        "nanoid": "3.3.19"
+      }
+    }
   },
   "scripts": {
     "schema:session": "node scripts/generate_session_schemas.cjs",
