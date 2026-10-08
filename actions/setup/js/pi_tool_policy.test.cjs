@@ -102,6 +102,21 @@ describe("Pi tool policy", () => {
     for (const toolName of ["edit", "write"]) expect(handlers.tool_call({ toolName }, {})).toMatchObject({ block: true });
   });
 
+  it("blocks child workflow-completion reporting without blocking task safe outputs", () => {
+    vi.stubEnv("GH_AW_PI_SUBAGENT_CHILD", "1");
+    const child = {};
+    policyExtension({ on: (event, handler) => (child[event] = handler) });
+    for (const toolName of ["noop", "safeoutputs__report_incomplete", "safeoutputs__create_report_incomplete_issue"]) {
+      expect(child.tool_call({ toolName }, {})).toMatchObject({ block: true, reason: expect.stringContaining("parent agent") });
+    }
+    expect(child.tool_call({ toolName: "safeoutputs__create_issue" }, {})).toBeUndefined();
+
+    vi.stubEnv("GH_AW_PI_SUBAGENT_CHILD", "");
+    const parent = {};
+    policyExtension({ on: (event, handler) => (parent[event] = handler) });
+    expect(parent.tool_call({ toolName: "safeoutputs__noop" }, {})).toBeUndefined();
+  });
+
   it("aborts inference at the configured repeated-denial threshold", () => {
     const originalExitCode = process.exitCode;
     vi.stubEnv("GH_AW_PI_TOOL_POLICY", '{"bash":false}');
