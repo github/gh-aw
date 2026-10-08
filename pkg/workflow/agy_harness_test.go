@@ -252,16 +252,31 @@ func TestAgyRuntimeScriptsHaveValidSyntax(t *testing.T) {
 }
 
 func TestAgyMCPConfigurationAdapter(t *testing.T) {
+	nativeServers := `{"mcpServers":{
+		"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":"test-gateway-token"}},
+		"safeoutputs":{"url":"http://gateway:8080/mcp/safeoutputs","headers":{"Authorization":"safeoutputs-token"}},
+		"mcpscripts":{"url":"http://gateway:8080/mcp/mcpscripts","headers":{"Authorization":"mcpscripts-token"}},
+		"awf-enclave":{"url":"http://gateway:8080/mcp/awf-enclave","headers":{"Authorization":"enclave-token"}}
+	}}`
 	for _, tt := range []struct {
-		name, config   string
-		valid, symlink bool
+		name, config, cliServers, expected string
+		valid, symlink                     bool
 	}{
-		{"gateway", `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":"test-gateway-token"}},"safeoutputs":{"command":"ignored"}}}`, true, false},
-		{"invalid root", `{"mcpServers":[]}`, false, false},
-		{"stdio", `{"mcpServers":{"native":{"command":"node"}}}`, false, false},
-		{"nonstring header", `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":123}}}}`, false, false},
-		{"external endpoint", `{"mcpServers":{"native":{"url":"https://outside.example/mcp/native"}}}`, false, false},
-		{"dangling symlink", `{"mcpServers":{}}`, false, true},
+		{name: "gateway", config: `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":"test-gateway-token"}},"safeoutputs":{"command":"ignored"}}}`, cliServers: `["safeoutputs"]`, valid: true,
+			expected: `{"mcpServers":{"native":{"serverUrl":"http://host.docker.internal:80/mcp/native","headers":{"Authorization":"test-gateway-token"}}}}`},
+		{name: "native infrastructure custom and enclave servers", config: nativeServers, valid: true,
+			expected: `{"mcpServers":{
+				"native":{"serverUrl":"http://host.docker.internal:80/mcp/native","headers":{"Authorization":"test-gateway-token"}},
+				"safeoutputs":{"serverUrl":"http://host.docker.internal:80/mcp/safeoutputs","headers":{"Authorization":"safeoutputs-token"}},
+				"mcpscripts":{"serverUrl":"http://host.docker.internal:80/mcp/mcpscripts","headers":{"Authorization":"mcpscripts-token"}},
+				"awf-enclave":{"serverUrl":"http://host.docker.internal:80/mcp/awf-enclave","headers":{"Authorization":"enclave-token"}}
+			}}`},
+		{name: "explicit cli exclusion", config: nativeServers, cliServers: `["native","safeoutputs","mcpscripts","awf-enclave"]`, valid: true, expected: `{"mcpServers":{}}`},
+		{name: "invalid root", config: `{"mcpServers":[]}`},
+		{name: "stdio", config: `{"mcpServers":{"native":{"command":"node"}}}`},
+		{name: "nonstring header", config: `{"mcpServers":{"native":{"url":"http://gateway:8080/mcp/native","headers":{"Authorization":123}}}}`},
+		{name: "external endpoint", config: `{"mcpServers":{"native":{"url":"https://outside.example/mcp/native"}}}`},
+		{name: "dangling symlink", config: `{"mcpServers":{}}`, symlink: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -278,7 +293,10 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 			cmd := exec.Command("node", adapter)
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GITHUB_WORKSPACE=" + dir,
 				"MCP_GATEWAY_OUTPUT=" + gateway, "MCP_GATEWAY_DOMAIN=host.docker.internal",
-				"MCP_GATEWAY_PORT=80", `GH_AW_MCP_CLI_SERVERS=["safeoutputs"]`}
+				"MCP_GATEWAY_PORT=80"}
+			if tt.cliServers != "" {
+				cmd.Env = append(cmd.Env, "GH_AW_MCP_CLI_SERVERS="+tt.cliServers)
+			}
 			out, err := cmd.CombinedOutput()
 			if !tt.valid {
 				require.Error(t, err)
@@ -288,7 +306,7 @@ func TestAgyMCPConfigurationAdapter(t *testing.T) {
 			file := filepath.Join(dir, ".agents", "mcp_config.json")
 			data, err := os.ReadFile(file)
 			require.NoError(t, err)
-			assert.JSONEq(t, `{"mcpServers":{"native":{"serverUrl":"http://host.docker.internal:80/mcp/native","headers":{"Authorization":"test-gateway-token"}}}}`, string(data))
+			assert.JSONEq(t, tt.expected, string(data))
 			stat, err := os.Stat(file)
 			require.NoError(t, err)
 			assert.Equal(t, os.FileMode(0o600), stat.Mode().Perm())
