@@ -599,6 +599,18 @@ func NewEngineRegistry() *EngineRegistry {
 			panic(fmt.Sprintf("BUG: failed to register built-in engine: %v", err))
 		}
 	}
+	for _, definition := range loadBuiltinEngineDefinitions() {
+		if definition.Behaviors == nil {
+			continue
+		}
+		engine, err := NewBehaviorDefinedEngine(definition)
+		if err != nil {
+			panic(fmt.Sprintf("BUG: invalid built-in engine definition %q: %v", definition.ID, err))
+		}
+		if err := registry.Register(engine); err != nil {
+			panic(fmt.Sprintf("BUG: failed to register built-in engine %q: %v", definition.ID, err))
+		}
+	}
 
 	agenticEngineLog.Printf("Registered %d engines", len(registry.engines))
 

@@ -128,6 +128,7 @@ function normalizeRuntimeEvent(component, record) {
  */
 function parseEngineSession(content, engine) {
   const parsers = {
+    agy: ["parse_agy_log.cjs", "parseAgyLog"],
     claude: ["parse_claude_log.cjs", "parseClaudeLog"],
     copilot: ["parse_copilot_log.cjs", "parseCopilotLog"],
     codex: ["parse_codex_log.cjs", "parseCodexLog"],

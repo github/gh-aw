@@ -8,6 +8,7 @@ import "embed"
 //go:embed js/session_cli.cjs js/unified_session.cjs js/unified_session_payload.cjs js/unified_session_render.cjs
 //go:embed js/parse_claude_log.cjs js/parse_codex_log.cjs js/parse_copilot_log.cjs js/parse_gemini_log.cjs
 //go:embed js/parse_custom_log.cjs js/parse_pi_log.cjs js/parse_opencode_log.cjs js/parse_goose_log.cjs
+//go:embed js/parse_agy_log.cjs
 //go:embed js/agent_session.cjs js/agent_session_render.cjs js/claude_session.cjs
 //go:embed js/provider_refusal.cjs
 //go:embed js/codex_session.cjs js/codex_log_framing.cjs js/copilot_session.cjs
@@ -30,6 +31,7 @@ import "embed"
 //go:embed js/work_queue_dispatch_credential.cjs js/work_queue_provisioning.cjs js/work_queue_reconciler.cjs
 //go:embed js/work_queue_git_tree_adapter.cjs js/work_queue_graphql_adapter.cjs js/work_queue_rest_adapter.cjs
 //go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_yaml.cjs
+//go:embed js/work_queue_indexes.cjs
 //go:embed js/mcp_server_core.cjs js/mcp_dependencies_manager.cjs js/mcp_enhanced_errors.cjs js/mcp_logger.cjs
 //go:embed js/mcp_handler_go.cjs js/mcp_handler_javascript.cjs js/mcp_handler_process.cjs
 //go:embed js/mcp_handler_python.cjs js/mcp_handler_shell.cjs js/mcp_scripts_validation.cjs

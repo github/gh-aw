@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const workQueueBranchDescription = "Queue branch (an explicit branch is a separate authority)"
+
 func NewWorkCommand() *cobra.Command {
 	return NewWorkCommandWithNativeDeliveryHost(nil)
 }
@@ -49,7 +51,7 @@ func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *c
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	cmd.PersistentFlags().String("repo", "", "GitHub repository owner/repo")
-	cmd.PersistentFlags().String("branch", workqueue.DefaultBranch, "Queue branch (an explicit branch is a separate authority)")
+	cmd.PersistentFlags().String("branch", workqueue.DefaultBranch, workQueueBranchDescription)
 	cmd.PersistentFlags().String("storage", "git", "Queue storage (git only)")
 	cmd.PersistentFlags().String("request-id", "", "Stable publication handle, or committed request to inspect with explain/trace")
 	cmd.PersistentFlags().Bool("json", false, "Output JSON")

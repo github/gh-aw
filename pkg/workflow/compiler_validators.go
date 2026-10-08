@@ -174,11 +174,14 @@ func (c *Compiler) validateFeatureConfig(workflowData *WorkflowData, markdownPat
 }
 
 // validateToolConfiguration validates safe-outputs settings, on.needs and safe-job
-// declarations, network configuration, labels, concurrency expressions, sandbox
+// declarations, sub-agent models, network configuration, labels, concurrency expressions, sandbox
 // security constraints, GitHub tool-to-toolset alignment, the agentic-workflows
 // permission requirement, and dispatch/call-workflow configurations.
 // workflowPermissions is the *Permissions value returned by validatePermissions.
 func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdownPath string, workflowPermissions *Permissions) error {
+	if err := validateExperimentalSubagentModels(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	workflowLog.Printf("Validating agent file if specified")
 	if err := c.validateAgentFile(workflowData, markdownPath); err != nil {
 		return err

@@ -87,12 +87,31 @@ function normalizeCodexSession(records, model = null) {
         if (!Object.hasOwn(report, "cache_creation_input_tokens") && Object.hasOwn(report, "cache_write_input_tokens")) contribution.cache_creation_input_tokens = report.cache_write_input_tokens;
         accumulateSessionUsage(usage, contribution);
         for (const [field, value] of Object.entries(report)) {
-          if (["cached_input_tokens", "cache_write_input_tokens", "reasoning_output_tokens", "total_tokens"].includes(field)) {
+          if (["cached_input_tokens", "cache_write_input_tokens", "total_tokens"].includes(field)) {
             if (isTokenCount(value)) usage[field] = (usage[field] ?? 0) + value;
-          } else if (!["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"].includes(field))
+          } else if (
+            ![
+              "input_tokens",
+              "output_tokens",
+              "reasoning_output_tokens",
+              "cache_read_input_tokens",
+              "cache_creation_input_tokens",
+              "inputTokens",
+              "outputTokens",
+              "reasoningOutputTokens",
+              "cacheReadInputTokens",
+              "cacheCreationInputTokens",
+            ].includes(field)
+          )
             usage[field] = structuredClone(value);
         }
-        for (const [alias, field] of Object.entries({ inputTokens: "input_tokens", outputTokens: "output_tokens", cacheReadInputTokens: "cache_read_input_tokens", cacheCreationInputTokens: "cache_creation_input_tokens" })) {
+        for (const [alias, field] of Object.entries({
+          inputTokens: "input_tokens",
+          outputTokens: "output_tokens",
+          reasoningOutputTokens: "reasoning_output_tokens",
+          cacheReadInputTokens: "cache_read_input_tokens",
+          cacheCreationInputTokens: "cache_creation_input_tokens",
+        })) {
           if ((Object.hasOwn(report, alias) || Object.hasOwn(usage, alias)) && isTokenCount(usage[field])) usage[alias] = usage[field];
         }
       }

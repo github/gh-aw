@@ -6,10 +6,10 @@ description: TLA+ model, safety proof argument, and bounded verification for the
 # Work Queue protocol model
 
 The current design is the
-[mandatory priority/fairness DAG protocol](priority-and-fairness.md): one causal
+[mandatory priority/fairness DAG protocol](../../docs/src/content/docs/specs/work-queue-specification.md): one causal
 QueueCommit log, exact native Go/JavaScript scheduling conformance, immutable
 Claim arrays, verified Work Results and typed Issue/PR observations.
-Its [implementation coverage table](priority-and-fairness.md#91-implementation-coverage-and-remaining-requirements)
+Its [implementation coverage table](../../docs/src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements)
 tracks unfinished runtime/verification work and user-deferred writer-restriction
 enforcement. Do not infer deployment-security completion from functional tests.
 
@@ -22,104 +22,88 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 
 ## Current operator interface
 
-The current command defaults to branch `work-queue` and supports Git storage
-only. Select the repository with `--repo owner/repo`; an explicit `--branch`
-chooses a separate authority, not a migration. Repository access failures,
-malformed logs and unsupported versions are explicit errors. Commands do not
-silently initialize policy over an existing invalid ledger.
+The current operator commands and keyboard browser are documented in the
+[queue reference](../../docs/src/content/docs/reference/work-queue.md#operator-commands).
+Policy installation is documented in the
+[deployment guide](../../docs/src/content/docs/guides/deploy-work-queue.md).
+This directory retains executable specifications and formal evidence, not a
+second current user guide. The historical material below is model provenance,
+not supported deployment guidance.
 
-| Command | Purpose |
-|---|---|
-| `replay`, `stats` | Inspect the causal projection, typed graph nodes, independent Claims and native reservations |
-| `state [--graph GRAPH] [--pool POOL] [--state STATE] [--search TEXT]` | Metadata-only ASCII graph/Work/Claim forest; `--offset` and `--limit` paginate at most 256 rows/64 KiB |
-| `inspect --work-id ID` or `inspect --claim-id ID` | Full copyable IDs, dependency cross-references, current/historical ownership, original assignment membership and independent delivery/native barriers |
-| `tui` (alias `interactive`) | Keyboard master-detail browser; search, multi-select, live cursor details, checked cancellation and prospective priority changes |
-| `explain --pool POOL [--work-id ID]` | Evaluate the native selector or inspect a dependency path without changing passes |
-| `explain --request-id ID` or `explain --claim-id ID` | Reconstruct an exact historical grant using the authoritative prefix |
-| `trace --request-id ID` or `trace --claim-id ID` | Read bounded causal events without exposing payloads or receipt contents; use `--offset` and `--limit` for pagination |
-| `compact` | Canonicalize and deduplicate complete commits without dropping history, resetting debt or moving FIFO positions |
-| `policy --file policy.json --epoch EPOCH` | Install an authorized prospective policy only when the queue is drained |
-| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed entitlements |
-| `submit-graph` | Atomically admit a bounded normalized graph, including Issue/PR dependency nodes |
-| `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit a deterministic fair prefix and its reservations; does not itself send a workflow-dispatch POST |
-| `control`, `cancel-work` | Apply authorized pause/cutover/cancellation decisions without refunding service or force-releasing a possible native run |
-| `cancel-claim --claim-id ID[,ID...] --reason CODE` | Atomically fence exact current Claims and terminally cancel their Work; not a retry, worker impersonation or native-run stop |
-| `reprioritize --work-id ID[,ID...] --priority 1..5 --reason CODE` | Administrator-only, compare-and-set override for future grants of available Work; preserves admitted definitions, FIFO positions, retry boundaries and accumulated debt |
-| `evidence`, `reconcile --dispatch-id ID` | Inspect authenticated run evidence and reconcile exact termination; uncertainty retains capacity |
+## Local stress simulator
 
-Use `--json` for structured output and `--request-id` to retain a logical
-publication handle across retries. Consult each command's `--help` for its
-validated inputs and the coverage table for unfinished surfaces. Reservation,
-native launch, verified binding, Completion, Result and Release are distinct
-states; a successful `dispatch-next` is not proof that a worker started.
-
-Worker finish remains the scoped `work_queue_claim_finish` MCP intent, not an
-operator impersonation command. Direct `claim --work-id`, scalar assignments
-and arbitrary run-ID adoption are unsupported. Actual worker binding and
-trusted delivery checks are required before resource effects.
-
-### Keyboard browser and checked actions
+Run the simulator from the repository root with Node.js 24 or later and Git.
+It uses temporary local Git repositories, concurrent worker threads and a
+simulated GitHub Git/Actions API; it does not contact GitHub or need credentials.
 
 ```bash
-gh aw work-queue --repo owner/repo tui
-gh aw work-queue --repo owner/repo state --json --limit 80
-gh aw work-queue --repo owner/repo cancel-claim \
-  --claim-id CLAIM_A,CLAIM_B --reason operator_cancelled --request-id incident-cancel
-gh aw work-queue --repo owner/repo reprioritize \
-  --work-id WORK_A,WORK_B --priority 1 --reason operator_reprioritized --request-id incident-priority
+node --test .github/scripts/work-queue-stress.test.cjs
+node .github/scripts/work-queue-stress.cjs --mode history --items 100000 --workers 2
+node .github/scripts/work-queue-stress.cjs --items 1024 --workers 4 --queue-items 64 --seed 7
+node .github/scripts/work-queue-stress.cjs --mode saturation --items 100000 --workers 4
 ```
 
-The TUI requires interactive stdin/stdout and at least 45 columns by 16 rows.
-At 100 columns it shows the forest beside cursor-synchronized details; narrower
-terminals switch panes with `Tab` or `Enter`. Full IDs remain in scrollable
-details, while list labels are abbreviated. Selection and focus also use text
-markers, not color alone.
+The history profile counts retained **Work plus Claim items**, not successful
+worker completions. The lifecycle profile submits, grants, launches simulated
+original native runs, finishes Claims, verifies no-op delivery receipts and
+releases reservations. Its total workload is explicitly divided into bounded
+queue branches; `--items 100000` is a long-running aggregate workload, not a
+promise that one queue admits 100,000 pending Work items. The saturation profile
+instead reports the first real admission refusal, accepted batch count and
+unattempted remainder without fabricating Claims or completions.
 
-| Key | Action |
-|---|---|
-| Arrows or `j`/`k`, `PgUp`/`PgDn`, `g`/`G` | Navigate Work and Claim attempts |
-| Left/right or `h`/`l` | Collapse/expand Claim history |
-| `Tab`/`Enter` | Focus details; arrows/page keys scroll that pane |
-| `/`, then `Enter` | Apply a case-insensitive ID/metadata search |
-| `Space` | Toggle multi-selection, including selections hidden by search |
-| `c`, `p` | Review cancellation or select priority 1..5; `y` publishes, `n`/`Esc` dismisses |
-| `r`, `?`, `q` | Refresh, keyboard help, quit |
-| `Esc` outside a dialog | Clear search and selection |
+Seeded faults force competing real Git reference updates and lose one successful
+publication response. JSON diagnostics report CAS conflicts, recovered requests,
+native POST counts, ledger bytes, cold replay timings, memory and workload scope.
+Workers have bounded deadlines and fixtures are cleaned up on completion or
+failure. Canonicalization must preserve the complete causal history and projection.
 
-Reads refresh every 10 seconds while idle; search and action reviews freeze
-automatic reads. Every action shows its authority and exact targets, and cannot
-publish if the targets exceed the confirmation viewport. Each TUI action
-generates its own stable request ID (`--json` and `--request-id` are rejected);
-uncertain acknowledgments remain visible for `explain --request-id` inspection.
-Read failures retain the previous view with an explicit stale/error status.
+The separate [Work Queue Stress workflow](../../.github/workflows/work-queue-stress.yml)
+runs on pull requests and `main` pushes changing `actions/setup/js` JavaScript,
+the simulator, its workflow or protocol fixtures. It runs the 100,000-item history
+profile, 1,024 live lifecycles and admission saturation independently. Its step
+summary reports profile outcomes, measured workload, elapsed time, throughput and
+peak memory, with phase timings and Git contention in a collapsible section.
+History validation throughput is separate from live Work completion throughput;
+failed or skipped profiles never imply successful completion. The summary and
+JSON diagnostics are uploaded even on failure. It uses read-only checkout
+credentials and does not dispatch actual GitHub workflow runs.
 
-Forest edges group graph membership and Claim attempts, **not** dependency
-parenthood. Shared Work dependencies and typed Issue/PR gates are explicit
-cross-references in details. These views never display payloads or receipt
-bodies; `replay --json` remains the full authoritative projection.
+Render saved JSON diagnostics locally with
+`node .github/scripts/work-queue-stress-summary.cjs stress-results`. The command
+writes `stress-results/summary.md` and appends the same report to
+`GITHUB_STEP_SUMMARY` when that environment variable is set.
 
-Cancellation and reprioritization accept repeated selector flags or
-comma-separated IDs, require an administrator, and publish one all-or-nothing
-checked transaction. A Claim selector includes a durable ownership fence, so
-CAS refresh cannot cancel a replacement owner. Completed ownership cannot be
-cancelled; historical Claims must not be used to cancel a new attempt.
-Cancellation keeps dispatch membership, charges and native reservations;
-`reconcile` remains a separate evidence-based operation.
+## Runtime scaling and compaction
 
-Priority overrides apply only to available Work, including retry-waiting Work.
-They do not edit active assignments, admitted metadata, child admission defaults,
-fairness weights or prior charges. Configured weights determine class shares;
-the defaults favor lower numbers, without strict-preemption semantics. A competing grant or priority change rejects
-the stale action rather than silently redirecting it. These administrator
-extensions are covered by Go/JavaScript protocol tests; the existing fixed-priority
-TLA+ scheduling models do not model arbitrary operator reprioritization.
+The JavaScript replay maintains private indexes for available Work, unfinished
+delivery barriers, open Claims, native reservations, graph membership and original
+run bindings. Scheduling copies only unfinished Work, its direct predecessors and
+held reservations, rather than cloning the entire ledger. Graph admission checks
+new nodes against indexed accepted graphs and traverses new edges iteratively.
+These indexes are derived from validated commits, never stored as authority.
+Detached public projections rebuild indexes when used again, so caller mutation
+cannot leave a stale scheduling cache.
+
+The Git store parses and replays a read once, validates an appended candidate
+once, and serializes that checked history without another replay. Custom candidate
+generators still receive isolated copies. Multi-MiB base64 blobs use linear
+validation rather than a repeated-quartet regular expression that can overflow
+the JavaScript engine's stack.
+
+Compaction remains canonical ordering and identical-commit deduplication only.
+It does not erase terminal Work, historical Claims, request identities, FIFO
+positions or scheduling debt. Native ledger, graph, pending-node and recovery
+bounds still apply; 100,000 submitted Work items are not interchangeable with
+100,000 combined Work/Claim records. A workload that reaches admission limits
+must report that boundary, not raise policy ceilings or silently drop history.
 
 ## Historical queue inspection and operator commands
 
 > [!WARNING]
 > The commands, facts, storage backends and scalar assignments in this historical
 > section are superseded. They are not compatibility modes of the current
-> implementation. Use the [current queue guidance](../../.github/aw/work-queue.md)
+> implementation. Use the [current queue reference](../../docs/src/content/docs/reference/work-queue.md)
 > and the current command's help; old queues are rejected unchanged.
 
 `gh aw work-queue` operates on a dedicated branch without using the current checkout. Supply
@@ -271,7 +255,7 @@ python3 specs/work-queue/verify_official_contract.py \
   --official-dir "$OUT_DIR/@typespec/json-schema"
 ```
 
-The [current wire profile](priority-and-fairness.md#current-wire-encoding)
+The [current wire profile](../../docs/src/content/docs/specs/work-queue-specification.md#current-wire-encoding)
 restricts numbers recursively, including payloads: only plain safe integers are
 accepted. Other exact quantities require explicit strings. All accepted
 payload fields and decoded values are retained without coercion.
@@ -540,7 +524,7 @@ or unvalidated checkpoint never establishes exhaustion or resumability.
 
 ### Successor: mandatory fair scheduling and batched workers
 
-The [priority/fairness specification](priority-and-fairness.md) defines the
+The [priority/fairness specification](../../docs/src/content/docs/specs/work-queue-specification.md) defines the
 replacement protocol. [`FairWorkQueue.tla`](FairWorkQueue.tla) models its causal
 atomic Claim batches, FIFO defaults, two-level integer-pass selection, fresh
 selection after CAS conflicts, request deduplication, and independent Claim
@@ -572,7 +556,7 @@ It does not model dynamic graph admission, multi-profile packing, policy edits,
 idempotency fingerprints/replayed transport responses, actual GitHub credentials,
 resource IDs, observation freshness, artifact delivery, JSON codecs, OTLP delivery,
 or unbounded fairness/liveness. Work positions are causal FIFO positions.
-The [protocol review revision](priority-and-fairness.md#7-proposed-normative-specification)
+The [protocol review revision](../../docs/src/content/docs/specs/work-queue-specification.md#7-proposed-normative-specification)
 additionally specifies selection-before-packing, authenticated activation
 binding recovery, terminal DeliveryFailure/replacement rules, operational
 Control, batch trust domains, and replay/resource budgets. These are acceptance
@@ -580,7 +564,7 @@ obligations, not behavior added to or verified by this model. In particular,
 `DecisionValidity` checks conformance to `NextWork`; it is not an independent
 proportional-service or eventual-grant assertion. The dedicated fairness release
 gate is specified in
-[the validation plan](priority-and-fairness.md#independent-fairness-release-gate).
+[the validation plan](../../docs/src/content/docs/specs/work-queue-specification.md#independent-fairness-release-gate).
 The preceding `WorkQueue.tla` checks
 remain regression evidence for the existing implementation, not an operational
 legacy mode in the replacement.
@@ -669,8 +653,8 @@ use the same jar/model/configuration and worker count with
 ### Claim-scoped safe outputs and mixed DAG outcomes
 
 [`ClaimScopedWorker.tla`](ClaimScopedWorker.tla) separately formalizes
-[enforced output attribution](priority-and-fairness.md#individual-finalization-and-effects)
-and [mixed outcomes](priority-and-fairness.md#mixed-outcomes-are-a-normal-result).
+[enforced output attribution](../../docs/src/content/docs/specs/work-queue-specification.md#individual-finalization-and-effects)
+and [mixed outcomes](../../docs/src/content/docs/specs/work-queue-specification.md#mixed-outcomes-are-a-normal-result).
 Its fixed trusted assignment contains one or three Claims. Omitted selectors
 normalize automatically only for an originally one-Claim assignment; explicit
 foreign handles and missing multi-Claim selectors are rejected. A multi-Claim
@@ -845,7 +829,7 @@ actual restore capability. The collector step uses `continue-on-error`:
 artifact collection/workflow success must be
 distinguished from the `result.json` verification verdict. The five-hour limit
 applies to each matrix job, not the whole workflow including later analysis.
-See the [evidence contract](priority-and-fairness.md#84-daily-verification-evidence-not-accumulated-proof)
+See the [evidence contract](../../docs/src/content/docs/specs/work-queue-specification.md#84-daily-verification-evidence-not-accumulated-proof)
 for follow-up recovery and failure-signaling requirements.
 
 `Safety` includes state types, single open owner per Work, causal history,

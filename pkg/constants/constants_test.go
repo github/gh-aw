@@ -59,7 +59,7 @@ func TestAllowedExpressions(t *testing.T) {
 
 func TestAgenticEngines(t *testing.T) {
 	t.Parallel()
-	expectedEngines := []string{"claude", "codex", "copilot", "gemini", "pi"}
+	expectedEngines := []string{"agy", "claude", "codex", "copilot", "gemini", "pi"}
 	require.NotEmpty(t, AgenticEngines)
 	assert.Equal(t, expectedEngines, AgenticEngines)
 	assert.Equal(t, "claude", string(ClaudeEngine))

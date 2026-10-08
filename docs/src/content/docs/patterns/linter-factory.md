@@ -438,7 +438,7 @@ warnings without changing committed ownership, charging, or launch fencing.
 | Treat prompt quality requirements as ledger guarantees | Rule quality, nonduplicate findings, and the monster's three-total-remediation-assignments instruction are prompt obligations, not a global runtime quota or proof of successful remediation |
 | Assume this example installs deployment security | This example does not provision queue-branch writer restrictions; protected credentials and writer enforcement must be installed independently |
 
-See the [queue specification](https://github.com/github/gh-aw/blob/main/specs/work-queue/priority-and-fairness.md#91-implementation-coverage-and-remaining-requirements)
+See the [queue specification](/gh-aw/specs/work-queue-specification/#91-implementation-coverage-and-remaining-requirements)
 for coverage and remaining deployment/host requirements, and the
 [bounded factory model](https://github.com/github/gh-aw/blob/main/specs/eslint-factory/README.md)
 for independently checked scenarios and explicit abstraction limits.

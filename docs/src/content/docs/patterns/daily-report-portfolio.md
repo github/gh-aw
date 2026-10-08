@@ -508,7 +508,7 @@ gh aw work-queue --repo OWNER/REPO replay --json
 
 The state/forest and master-detail TUI expose admitted Work and original
 Claims; replay exposes their causal history. See the
-[operator reference](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#current-operator-interface)
+[operator reference](/gh-aw/reference/work-queue/#operator-commands)
 for exact cancellation selectors and reconciliation controls.
 
 ## Common pitfalls

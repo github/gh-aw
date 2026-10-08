@@ -279,9 +279,11 @@ func writeSubagentModelDeclarations(yaml *strings.Builder, data *WorkflowData, e
 		}
 	}
 	for _, agent := range data.SubAgentModels {
+		model := RewriteExperimentsReferenceForDownstreamJobs(agent.Model, data.Experiments)
+		model = RewriteActivationOutputsToLocalStepOutputs(model, data.Experiments)
 		declarations = append(declarations, map[string]any{
-			"name": agent.Name, "model": agent.Model,
-			"patterns": expandModelPatterns(agent.Model, data.ModelMappings, provider),
+			"name": agent.Name, "model": model,
+			"patterns": expandSubagentModelPatterns(agent.Model, data, provider),
 		})
 	}
 	encoded, err := json.Marshal(declarations)

@@ -14,10 +14,8 @@ const {
   generateRequestOperations,
   newRequest,
   newState,
-  parseTransactionLog,
   proposedCommitId,
-  replayTransactions,
-  serializeTransactionLog,
+  replayTransactionLog,
   validateClaimAuthority,
   validateRequest,
   validateRequestContext,
@@ -130,7 +128,10 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
   if (blob?.data?.encoding !== "base64" || typeof blob.data.content !== "string") throw queueError("ledger_invalid", "queue blob encoding is unsupported");
   const encoded = blob.data.content.replace(/\s/g, "");
   if (encoded.length > Math.ceil((80 * 1024 * 1024) / 3) * 4) throw queueError("resource_limit", "queue blob exceeds cold parser limit");
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw queueError("ledger_invalid", "malformed queue blob base64");
+  const paddingAt = encoded.indexOf("=");
+  // A repeated quartet regexp over multi-MiB ledgers overflows V8's regexp stack.
+  if (encoded.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(encoded) || (paddingAt !== -1 && (paddingAt < encoded.length - 2 || !["=", "=="].includes(encoded.slice(paddingAt)))))
+    throw queueError("ledger_invalid", "malformed queue blob base64");
   const bytes = Buffer.from(encoded, "base64");
   if (bytes.length > 80 * 1024 * 1024 || (typeof blob.data.size === "number" && blob.data.size !== bytes.length)) throw queueError("ledger_invalid", "queue blob is oversized or truncated");
   let contents;
@@ -139,10 +140,9 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
   } catch {
     throw queueError("ledger_invalid", "queue blob contains malformed UTF-8");
   }
-  const transactions = parseTransactionLog(contents);
-  if (!transactions.length) throw queueError("policy_missing", "existing queue has an empty/policyless log");
+  const state = replayTransactionLog(contents);
+  const transactions = state.transactions;
   if (transactions.some(transaction => transaction.actor.repository.toLowerCase() !== repository.full_name.toLowerCase())) throw queueError("actor_unauthorized", "queue log contains an actor from another repository");
-  const state = replayTransactions(transactions);
   coreApi?.info(`Work queue: validated ${transactions.length} causal commits`);
   return { sha, treeSha, transactions, state, branch, logPath: WORK_QUEUE_LOG_PATH };
 }
@@ -186,7 +186,8 @@ function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUE
 }
 
 async function writeCandidate({ githubClient, owner, repo, current, transactions }) {
-  const content = serializeTransactionLog(transactions);
+  // appendCommit already checked this candidate; never replay its history again.
+  const content = transactions.map(commit => canonical(commit)).join("\n") + "\n";
   const blob = await githubClient.rest.git.createBlob({ owner, repo, content, encoding: "utf-8" });
   const tree = await githubClient.rest.git.createTree({ owner, repo, ...(current.treeSha ? { base_tree: current.treeSha } : {}), tree: [{ path: WORK_QUEUE_LOG_PATH, mode: "100644", type: "blob", sha: blob.data.sha }] });
   const commit = await githubClient.rest.git.createCommit({ owner, repo, message: "Publish checked fair work queue request", tree: tree.data.sha, parents: current.sha ? [current.sha] : [] });
@@ -288,8 +289,8 @@ async function publishWorkQueueRequest({
     const observations = Array.isArray(refresh) ? refresh : refresh && typeof refresh === "object" && "operations" in refresh ? refresh.operations : undefined;
     if (!Array.isArray(observations) || observations.some(operation => operation?.kind !== "Observation")) throw queueError("request_invalid", "observation refresh must return only typed Observation operations");
     const at = integer(now(), 0, Number.MAX_SAFE_INTEGER, "trusted publication time");
-    const id = identity(commitId(structuredClone(current.state), structuredClone(stable)), "candidate commit ID");
-    const generated = await generateOperations(structuredClone(current.state), structuredClone(stable), structuredClone(stableActor), at, id, structuredClone(observations));
+    const id = identity(commitId(commitId === proposedCommitId ? current.state : structuredClone(current.state), structuredClone(stable)), "candidate commit ID");
+    const generated = await generateOperations(generateOperations === generateRequestOperations ? current.state : structuredClone(current.state), structuredClone(stable), structuredClone(stableActor), at, id, structuredClone(observations));
     const decision = Array.isArray(generated) ? { operations: generated } : generated;
     if (!decision || !Array.isArray(decision.operations)) throw queueError("request_invalid", "candidate generator must return operations");
     if (!decision.operations.length)

@@ -99,7 +99,7 @@ func TestCLIDocsReflectStatusAuditExperimentsAndGradersCommands(t *testing.T) {
 	assert.Contains(t, text, "Outside a checkout, run `gh auth login --hostname <host>` to authenticate and set `GH_HOST=<host>` so repository diagnostics target the correct host.", "doctor docs should explain that enterprise hosts outside a checkout require both authentication and host selection")
 	assert.Contains(t, text, "`doctor --repo` currently accepts `owner/repo` only.", "doctor docs should explicitly distinguish their narrower repo format")
 	assert.Contains(t, text, "For repository scope, `--repo` currently accepts `owner/repo` only.", "env docs should explicitly distinguish their narrower repo format")
-	assert.Contains(t, text, "**Options:** `--engine/-e` (copilot, claude, codex, gemini, pi), `--non-interactive`, `--repo/-r`", "secrets bootstrap docs should include the --repo shorthand")
+	assert.Contains(t, text, "**Options:** `--engine/-e` ("+engineFlagHelpList+"), `--non-interactive`, `--repo/-r`", "secrets bootstrap docs should include the --repo shorthand")
 	assert.Contains(t, text, "**Options:** `--concurrency`, `--days`, `--period`, `--sample`, `--eval`, `--timeout`, `--repo/-r`, `--json/-j`", "forecast docs should include --concurrency")
 	assert.Contains(t, text, "| `-h`, `--help` | Show help (`gh aw help [command]` for command-specific help) |\n| `-v`, `--verbose` | Enable verbose output showing detailed information |\n| `--banner` | Display ASCII logo banner with purple GitHub color theme |", "global options table rows should remain contiguous")
 }

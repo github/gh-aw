@@ -22,6 +22,8 @@ const (
 	CodexEngine EngineName = "codex"
 	// GeminiEngine is the Google Gemini engine identifier
 	GeminiEngine EngineName = "gemini"
+	// AgyEngine is the experimental Google Antigravity CLI engine identifier.
+	AgyEngine EngineName = "agy"
 	// PiEngine is the Pi engine identifier
 	PiEngine EngineName = "pi"
 
@@ -34,7 +36,7 @@ const (
 // Deprecated: Use workflow.NewEngineCatalog(workflow.NewEngineRegistry()).IDs() for a
 // catalog-derived list. This slice is maintained for backward compatibility and must
 // stay in sync with the built-in engines registered in NewEngineCatalog.
-var AgenticEngines = []string{string(ClaudeEngine), string(CodexEngine), string(CopilotEngine), string(GeminiEngine), string(PiEngine)}
+var AgenticEngines = []string{string(AgyEngine), string(ClaudeEngine), string(CodexEngine), string(CopilotEngine), string(GeminiEngine), string(PiEngine)}
 
 // EngineOption represents a selectable AI engine with its display metadata and secret configuration
 type EngineOption struct {
@@ -86,6 +88,14 @@ var EngineOptions = []EngineOption{
 		SecretName:  GeminiAPIKey,
 		KeyURL:      "https://aistudio.google.com/app/apikey",
 		WhenNeeded:  "Gemini engine workflows",
+	},
+	{
+		Value:       string(AgyEngine),
+		Label:       "Google Antigravity CLI (Experimental)",
+		Description: "Experimental native Agy CLI with Gemini API-key authentication",
+		SecretName:  GeminiAPIKey,
+		KeyURL:      "https://aistudio.google.com/app/apikey",
+		WhenNeeded:  "Experimental Agy engine workflows (API key only)",
 	},
 	{
 		Value:              string(PiEngine),

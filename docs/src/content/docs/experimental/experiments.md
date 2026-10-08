@@ -185,6 +185,22 @@ Read the given file and return a concise summary.
 See [Inline Sub-Agents](/gh-aw/reference/inline-sub-agents/) for the full
 syntax.
 
+With Copilot, you can also declare `subagent_model: [small, large]` in
+`experiments` and set the sub-agent's `model` to
+`${{ experiments.subagent_model }}`. The selected variant is used in the
+sub-agent definition and recorded in the run's declared-model metadata.
+Audit patterns and model-routing request policy expand every declared variant
+through the workflow's model aliases, while `models.allowed` and `models.blocked`
+still constrain admission. Router candidates remain unchanged. These patterns
+describe possible models; matching observed usage does not prove that the selected
+variant was honored.
+
+Use a direct `${{ experiments.subagent_model }}` reference for sub-agent models.
+Compound expressions such as `${{ experiments.subagent_model || 'small' }}` or
+`format(...)` are rejected because the sub-agent runtime does not evaluate them.
+Put the complete model or alias in each experiment variant instead.
+Pi sub-agents require literal models or aliases, not expressions.
+
 ### Try different subskills
 
 This pattern compares two reusable instruction blocks, sometimes called

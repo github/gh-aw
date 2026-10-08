@@ -1,9 +1,15 @@
 ---
-title: Work queue priority and fairness
+title: Work Queue Specification
 description: A fair work-queue DAG with cross-repository Issue/PR dependencies, batched assignments, and independent Claim finalization.
+sidebar:
+  order: 1380
 ---
 
 # Priority and fairness for the gh-aw work queue
+
+For deployment and operator commands, see [Work queues](/gh-aw/reference/work-queue/).
+Executable contracts, models, fixtures and verification instructions remain in
+[`specs/work-queue/`](https://github.com/github/gh-aw/tree/main/specs/work-queue).
 
 ## 0. Executive walkthrough (no protocol expertise required)
 
@@ -789,7 +795,7 @@ grant explanations use it for future class charges. Active/completed/cancelled
 Work cannot be reprioritized, and child admission still inherits the original
 definition. These operator extensions are conformance-tested but are outside
 the fixed-priority TLA+ models' action sets. See the
-[current operator reference](README.md#current-operator-interface) for bounded
+[current operator reference](/gh-aw/reference/work-queue/#operator-commands) for bounded
 ASCII views, the keyboard master-detail browser and exact cancellation semantics.
 Deploy matching readers/writers: older current-only readers reject these new
 closed operation shapes rather than interpreting them as legacy records.
@@ -2364,8 +2370,8 @@ The causal/late-binding checks use a small disposable model, not a complete impl
 
 ### 8.2 Required automated acceptance cases
 
-The successor model is [`FairWorkQueue.tla`](FairWorkQueue.tla), integrated into
-[`check.sh`](check.sh). Before the DAG extension, commit `f50550e8dc`'s four positive
+The successor model is [`FairWorkQueue.tla`](https://github.com/github/gh-aw/blob/main/specs/work-queue/FairWorkQueue.tla), integrated into
+[`check.sh`](https://github.com/github/gh-aw/blob/main/specs/work-queue/check.sh). Before the DAG extension, commit `f50550e8dc`'s four positive
 configurations exhausted 9,612 distinct states in total on 2026-10-05; five
 deliberate negative controls and two
 guarded witnesses returned exactly their expected results. In particular, one
@@ -2376,7 +2382,7 @@ eight positive configurations exhaust 157,130 distinct states; ten negative
 controls and three guarded reachability witnesses have named expected outcomes.
 The diamond witness uses a successful-action subset rather than exhaustive
 diamond failure interleavings. See the
-[verification scope and reproduction instructions](README.md#successor-mandatory-fair-scheduling-and-batched-workers).
+[verification scope and reproduction instructions](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#successor-mandatory-fair-scheduling-and-batched-workers).
 
 **The complete combined suite is not fully verified.** Earlier
 `FairDAGGitHub` composition and unchanged original `QueueOrdering`
@@ -2385,7 +2391,7 @@ states respectively. Neither interruption was a pass.
 Their original bounds, configurations, logs, and checkpoints remain available.
 The exhausted cases and explicit negative/witness outcomes are the verified
 scope of this change. The fresh
-[2026-10-07 source-bound review](verification-2026-10-07.json) ran all 60
+[2026-10-07 source-bound review](https://github.com/github/gh-aw/blob/main/specs/work-queue/verification-2026-10-07.json) ran all 60
 registered configurations: 15 positive cases exhausted after a separate longer
 fork-model rerun, and all 33 negative controls plus nine guarded witnesses
 returned their exact expected diagnostic. At that capture, local `WorkQueue`, `QueueOrdering` and `FairDAGGitHub`
@@ -2395,7 +2401,7 @@ guarded witness traces across historical/current abstractions. Sampling and
 repeated partial searches do not finish the combined suite or verify native
 runtime refinement.
 
-The subsequent [evaluation-refinement record](verification-2026-10-07-refinement.json)
+The subsequent [evaluation-refinement record](https://github.com/github/gh-aw/blob/main/specs/work-queue/verification-2026-10-07-refinement.json)
 retains all original bounds, constraints and safety checks and adds a replay
 soundness invariant plus its corruption control. The now-61-configuration suite
 has 16 exhausted positive searches, 34 exact negative controls, nine exact
@@ -2494,13 +2500,13 @@ The operational outage/cancellation/fault/campaign walkthroughs in section 7.18
 are likewise runtime acceptance scenarios, not new formal verification results.
 [R14], [R16]
 
-[`ClaimScopedWorker.tla`](ClaimScopedWorker.tla) separately checks the bounded
+[`ClaimScopedWorker.tla`](https://github.com/github/gh-aw/blob/main/specs/work-queue/ClaimScopedWorker.tla) separately checks the bounded
 scope-normalization and mixed-outcome contract. Its focused scenarios distinguish
 automatic single-Claim attribution from required multi-Claim selectors, preserve
 cancelled members' lack of effects/Results, and admit successors only from their
 own predecessor Results. Two positive cases exhaust 120,976 distinct states;
 the five negative controls and two guarded witnesses have exact named expected
-outcomes described in the [reproduction guide](README.md#claim-scoped-safe-outputs-and-mixed-dag-outcomes).
+outcomes described in the [reproduction guide](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#claim-scoped-safe-outputs-and-mixed-dag-outcomes).
 It does not model no-write task contracts or establish runtime handler coverage,
 schema/transport conformance, scheduler fairness, or an unbounded liveness proof.
 
@@ -2509,7 +2515,7 @@ schema/transport conformance, scheduler fairness, or an unbounded liveness proof
 The independent release gate requires recurring unit-service opportunities,
 fixed positive weights, bounded competitor sets and explicit eligibility
 transitions. It must not merely assert that the next selection equals the same
-selector used to generate it. [`QueueService.tla`](QueueService.tla) provides a
+selector used to generate it. [`QueueService.tla`](https://github.com/github/gh-aw/blob/main/specs/work-queue/QueueService.tla) provides a
 first bounded sibling-set instantiation with weights 5:3:2: fixed competition
 exhausts 30 states, arbitrary eligibility changes exhaust 60,360 states, and four
 share/starvation controls return their exact expected violations.
@@ -2536,14 +2542,14 @@ counterexamples without those assumptions, strict-priority starvation, join/
 reactivation, cap/release, and a persistently un-packable next winner. A fixed-set
 ratio fixture is not a dynamic-eligibility liveness theorem.
 
-[`QueueLifecycle.tla`](QueueLifecycle.tla) supplies a separate bounded lifecycle
+[`QueueLifecycle.tla`](https://github.com/github/gh-aw/blob/main/specs/work-queue/QueueLifecycle.tla) supplies a separate bounded lifecycle
 instantiation for multi-profile fair-prefix packing, binding conflicts and
 activation recovery, Control, mutually exclusive delivery outcomes, replacement
 admission and bounded verification attempts. Its independent X/Y/X packing
 oracle distinguishes stopping at an un-packable winner from backfilling.
 Two positive configurations exhaust 208,108 states; eleven negative controls
 and three guarded witnesses require exact named diagnostics.
-The [reproduction guide](README.md#bounded-launch-delivery-and-recovery-evidence)
+The [reproduction guide](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#bounded-launch-delivery-and-recovery-evidence)
 states its evidence abstractions and omissions. It proves neither real host
 authentication nor eventual lifecycle progress.
 
@@ -2643,7 +2649,7 @@ limit, credential-free preparation, and the existing protected `git_tree`
 adapter. Preparation validates the original Claim selector and any body Work ID;
 memory remains output data, never a second ledger or authority. Publication still
 requires Completion and immutable resource scope, and Result still requires
-independent full-tree/blob/ref readback. The [factory example](../../docs/src/content/docs/patterns/linter-factory.md)
+independent full-tree/blob/ref readback. The [factory example](/gh-aw/patterns/linter-factory/)
 documents the schema subset and transport limits.
 
 Trusted JavaScript publication also appends bounded metadata-only Actions
@@ -2670,8 +2676,8 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Independent service-deviation and eventual-service evidence | Bounded sibling model: 30 fixed + 60,360 dynamic states exhausted; four exact negative controls; full hierarchy/runtime refinement still outstanding |
 | Complete lifecycle/runtime refinement and supported-host integration | Bounded lifecycle safety: 208,108 exhausted states, eleven exact negative controls and three witnesses; full runtime/host refinement remains unverified |
 | Retained-history, contention and recovery-headroom operating envelope | An earlier combined-source local capture passed 50 measurements/checks, including actual Go/JS cold replay and serialization at 1/16/64/80 MiB, bounded graph/assignment limits and recovery headroom, with 136 dependency hashes stable during that capture. It has not been regenerated after the safe-output review changes. These are historical shared-host samples and structural closure checks, not current-source release evidence, universal closure proof, live Git/network contention, supported-host/API measurements or deployment SLOs |
-| Current-source queue formal review and traces | All 61 registered configurations exercised; 16 positive searches exhausted and 34 negative controls plus nine guarded witnesses matched exactly. `FairDAGGitHub` exhausted 1,055,182 distinct states at depth 20 with unchanged bounds and original safety checks. Five union-graph comparisons and two exact mutations passed; 18 fresh seeded simulations emitted 309 sampled states and nine guarded witness traces matched. Local checkpoint restoration succeeded for `WorkQueue` and `QueueOrdering`, but both continuations remain unfinished, not passes; portable archives are unvalidated. Source identities still match after the main merge. Earlier captures are preserved. See the [refinement record](verification-2026-10-07-refinement.json); runtime/host refinement remains unproved |
-| ESLint factory formalization and actual-code comparison | Six bounded safety graphs exhaust 31,730 distinct states; nine deliberate controls, seven guarded witnesses and 16 independently replayed/tamper-checked traces cover factory lifecycle, scope, cardinality and exit-zero semantics. Executable observations cover all 66 registered/configured rules, actual ESLint warning/error exits, native Claim checks and collector per-Claim limits. Policy/producers/profile admission and whole-contract native readback remain assumptions. There is no automatic factory DAG; warning-only clean and prompt-only quality/global assignment bars are explicitly distinguished from runtime guarantees. See the [factory model](../eslint-factory/README.md) |
+| Current-source queue formal review and traces | All 61 registered configurations exercised; 16 positive searches exhausted and 34 negative controls plus nine guarded witnesses matched exactly. `FairDAGGitHub` exhausted 1,055,182 distinct states at depth 20 with unchanged bounds and original safety checks. Five union-graph comparisons and two exact mutations passed; 18 fresh seeded simulations emitted 309 sampled states and nine guarded witness traces matched. Local checkpoint restoration succeeded for `WorkQueue` and `QueueOrdering`, but both continuations remain unfinished, not passes; portable archives are unvalidated. Source identities still match after the main merge. Earlier captures are preserved. See the [refinement record](https://github.com/github/gh-aw/blob/main/specs/work-queue/verification-2026-10-07-refinement.json); runtime/host refinement remains unproved |
+| ESLint factory formalization and actual-code comparison | Six bounded safety graphs exhaust 31,730 distinct states; nine deliberate controls, seven guarded witnesses and 16 independently replayed/tamper-checked traces cover factory lifecycle, scope, cardinality and exit-zero semantics. Executable observations cover all 66 registered/configured rules, actual ESLint warning/error exits, native Claim checks and collector per-Claim limits. Policy/producers/profile admission and whole-contract native readback remain assumptions. There is no automatic factory DAG; warning-only clean and prompt-only quality/global assignment bars are explicitly distinguished from runtime guarantees. See the [factory model](https://github.com/github/gh-aw/blob/main/specs/eslint-factory/README.md) |
 | Full JS typecheck/existing dependency-based tests | The earlier `create_project.cjs` SDK layout error is fixed in merge checkpoint `2dcce92c1c`, using validated literals and endpoint-derived request typing without unsafe casts. Genuine TypeScript 7.0.2 typecheck passes; 36 project tests include 12 layout/endpoint/invalid-input regressions. That merge's final component checks passed 2,122 setup-JavaScript tests in 52 files after correcting a stale workflow lock. The later `303b402810` merge ran 2,323 tests in 56 files: 2,322 passed and one real multi-repository fixture exceeded its 10-second deadline. A fixture-local 30-second deadline preserves all assertions and production retry behavior; all 109 repo-memory tests then passed. Impacted Go tests, build, typecheck, standard lint, schema freshness and JavaScript/shell lint passed. After committing the merge, change-scoped custom lint and full 328-workflow drift also passed; the initial custom-lint failures were confined to nine files byte-identical to main that the pre-merge base calculation included. Failed aggregate invocations remain failed records, not retrospectively green; global custom lint is not claimed clean. The approved feed does not supply pinned `@types/node` 26.6.4; existing 26.6.3 remains without changing pins. No dedicated hosted Actions run is claimed |
 | TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 41 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
 | Protected launch credentials, immutable effect targets and native delivery verification | Implemented with exact selected-client/profile proofs, immutable Work/profile/ancestor target intersection and private native readback. Both public and compiler control entry points reject missing/invalid protected launch metadata before client construction or queue publication, while previews and submit-only controls remain credential-independent. Local positive and refusal regressions pass; writer deployment automation is separate |

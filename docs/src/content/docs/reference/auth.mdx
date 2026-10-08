@@ -335,7 +335,10 @@ See also [AI Engines](/gh-aw/reference/engines/#built-in-ai-engines) for additio
 
 ### `GEMINI_API_KEY`
 
-If using the Gemini by Google engine, you need to set a GitHub Actions secret `GEMINI_API_KEY` with an API key from Google AI Studio.
+The Gemini engine and the experimental Agy engine use the GitHub Actions secret
+`GEMINI_API_KEY` with an API key from Google AI Studio. Agy also requires the
+native `modelProvider: gemini` setting; its harness creates that setting in a
+private home for every run. `GOOGLE_API_KEY` is not an Agy alternative.
 
 **Setup**:
 
@@ -348,6 +351,7 @@ If using the Gemini by Google engine, you need to set a GitHub Actions secret `G
    ```
 
 See also [AI Engines](/gh-aw/reference/engines/#built-in-ai-engines) for additional configuration needed when using Gemini with GitHub MCP.
+See [experimental Agy](/gh-aw/engines/agy/) for its authentication and capability limits.
 
 ---
 
@@ -358,6 +362,10 @@ GitHub OIDC tokens exchanged for Google Cloud credentials instead of a long-live
 When WIF is active, the compiler suppresses the static-key requirement, switches the Gemini CLI to the
 Vertex AI backend (`GOOGLE_GENAI_USE_VERTEXAI=true`), and emits `AWF_AUTH_GCP_*` environment variables
 consumed by the AWF firewall api-proxy sidecar.
+
+This supported WIF path remains specific to `engine: gemini`. Agy ADC/WIF and
+Vertex AI support require a separate verified profile; do not migrate a Gemini
+WIF workflow to Agy.
 
 **Prerequisites:**
 - A Google Cloud Workload Identity Pool and Provider configured for GitHub Actions

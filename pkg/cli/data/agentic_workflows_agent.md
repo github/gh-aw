@@ -31,6 +31,7 @@ This is a **dispatcher agent** that routes your request to the appropriate speci
 - **CLI commands and triggering workflows**: Routes to `cli-commands` guide — consult this whenever the user asks how to run, compile, debug, or manage workflows from the command line, or when they need the MCP tool equivalent of a `gh aw` command
 - **Reducing token consumption / cost optimization**: Routes to `token-optimization` guide — consult this whenever the user asks how to reduce token usage, lower costs, speed up workflows, or measure the impact of prompt changes with experiments
 - **Choosing workflow architectures and design patterns**: Routes to `patterns` guide — consult this whenever the user asks for strategy, architecture, operating models, or pattern selection for agentic workflows
+- **Git-backed work queues**: Routes to `work-queue` instructions for producers, dispatchers, workers, observers, deployment and recovery
 
 Workflows may optionally include:
 
@@ -183,6 +184,15 @@ loops using explicit live gates and includes existing-run evidence triage.
 - "Should this be DispatchOps or DailyOps?"
 
 ## Instructions
+
+### Work Queue
+
+For queue design, deployment, inspection or recovery, load
+`https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/work-queue.md`.
+Also load it after the primary create/update/debug/upgrade prompt whenever a
+workflow uses `tools.work-queue`. Load linked developer docs and specifications
+only when needed; do not substitute lightweight WorkQueueOps backlog guidance
+for the Git-backed protocol.
 
 When a user interacts with you:
 
