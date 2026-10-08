@@ -12,19 +12,6 @@ import Octicon from '../Octicon.astro';
   <div class="snippet-content" data-snippet-content></div>
 </dialog>
 
-<script>
-  import { initializeSlideshowSnippets } from '../../scripts/slideshow-snippets';
-
-  let cleanup = () => {};
-  function initialize() {
-    cleanup();
-    cleanup = initializeSlideshowSnippets();
-  }
-  initialize();
-  document.addEventListener('astro:page-load', initialize);
-  document.addEventListener('astro:before-swap', () => cleanup());
-</script>
-
 <style>
   .snippet-dialog {
     position: fixed;

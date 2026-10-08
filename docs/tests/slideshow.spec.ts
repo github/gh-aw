@@ -2,12 +2,113 @@ import { test, expect, type Page } from "@playwright/test";
 
 const presentation = (page: Page) => page.getByRole("dialog", { name: "GitHub Agentic Workflows presentation" });
 
+async function startSlideshow(page: Page) {
+  const trigger = page.getByRole("button", { name: "Start slideshow" });
+  await trigger.click();
+  await expect(presentation(page)).toBeVisible();
+}
+
+const runtimeAsset = /\/slideshow(?:-[^/.]+)?\.[^/]+\.js(?:\?|$)/;
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/gh-aw/");
 });
 
+test("loads the complete slideshow runtime only on first use", async ({ page }) => {
+  const initialAssets = await page.evaluate(pattern => {
+    const matcher = new RegExp(pattern);
+    return performance
+      .getEntriesByType("resource")
+      .filter(entry => matcher.test(entry.name))
+      .map(entry => entry.name);
+  }, runtimeAsset.source);
+  expect(initialAssets).toEqual([]);
+  await expect(page.locator("[data-slideshow-ink]")).not.toHaveAttribute("data-tool");
+  await expect(page.locator("main [data-snippet-trigger]")).toHaveCount(0);
+  const requests: string[] = [];
+  page.on("request", request => {
+    if (runtimeAsset.test(request.url())) requests.push(request.url());
+  });
+  await startSlideshow(page);
+  expect(requests.length).toBeGreaterThan(0);
+  await expect(page.locator("[data-slideshow-ink]")).toHaveAttribute("data-tool", "pointer");
+  await expect(presentation(page).getByRole("button", { name: "Expand daily-issue-summary.md", exact: true })).toBeVisible();
+  const loaded = [...requests];
+  await page.keyboard.press("Escape");
+  await startSlideshow(page);
+  expect(requests).toEqual(loaded);
+});
+
+test("reports lazy-load failures and restores the launcher", async ({ page }) => {
+  await page.route(runtimeAsset, route => route.abort());
+  const trigger = page.getByRole("button", { name: "Start slideshow" });
+  await trigger.click();
+  await expect(page.getByRole("alert")).toHaveText("Unable to load the slideshow. Reload the page and try again.");
+  await expect(trigger).toBeEnabled();
+  await expect(trigger).not.toHaveAttribute("aria-busy");
+  await expect(presentation(page)).not.toBeVisible();
+  await expect(page.locator("main [data-slideshow-slides] > section")).toHaveCount(9);
+  await page.unroute(runtimeAsset);
+  await page.reload();
+  await startSlideshow(page);
+});
+
+test("does not open a stale slideshow when navigation interrupts lazy loading", async ({ page }) => {
+  let resume = () => {};
+  const held = new Promise<void>(resolve => {
+    resume = resolve;
+  });
+  let intercepted = false;
+  await page.route(runtimeAsset, async route => {
+    intercepted = true;
+    await held;
+    await route.continue();
+  });
+  try {
+    await page.getByRole("button", { name: "Start slideshow" }).click();
+    await expect.poll(() => intercepted).toBe(true);
+    await expect(page.getByRole("button", { name: "Start slideshow" })).toHaveAttribute("aria-busy", "true");
+    await page.getByRole("banner").getByRole("link", { name: "Get started", exact: true }).click();
+    await expect(page).toHaveURL(/\/gh-aw\/setup\/quick-start\//);
+    resume();
+    await expect(page.locator("#landing-slideshow")).toHaveCount(0);
+    await page.goBack();
+    await startSlideshow(page);
+  } finally {
+    resume();
+  }
+});
+
+test("ignores a completed lazy import after its launcher was disposed", async ({ page }) => {
+  let resume = () => {};
+  const held = new Promise<void>(resolve => {
+    resume = resolve;
+  });
+  let asset = "";
+  await page.route(runtimeAsset, async route => {
+    asset = route.request().url();
+    await held;
+    await route.continue();
+  });
+  try {
+    await page.getByRole("button", { name: "Start slideshow" }).click();
+    await expect.poll(() => asset).not.toBe("");
+    await page.evaluate(() => document.dispatchEvent(new Event("astro:before-swap")));
+    resume();
+    await page.evaluate(async url => {
+      await import(url);
+    }, asset);
+    await expect(presentation(page)).not.toBeVisible();
+    await expect(page.locator("[data-slideshow-ink]")).not.toHaveAttribute("data-tool");
+    await page.evaluate(() => document.dispatchEvent(new Event("astro:page-load")));
+    await startSlideshow(page);
+  } finally {
+    resume();
+  }
+});
+
 test("presents all landing sections with bounded button and keyboard navigation", async ({ page }) => {
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   const dialog = presentation(page);
   const slides = dialog.locator("[data-slideshow-slides] > section");
   await expect(dialog).toBeVisible();
@@ -39,7 +140,7 @@ test("presents all landing sections with bounded button and keyboard navigation"
 });
 
 test("fits every slide to desktop and short windows in either theme", async ({ page }) => {
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   const dialog = presentation(page);
   for (const theme of ["light", "dark"]) {
     await page.evaluate(value => (document.documentElement.dataset.theme = value), theme);
@@ -77,7 +178,7 @@ test("fits every slide to desktop and short windows in either theme", async ({ p
 test("preserves interactive demos and restores the original page, focus and scroll", async ({ page }) => {
   await page.evaluate(() => window.scrollTo(0, 450));
   const scrollY = await page.evaluate(() => window.scrollY);
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   const dialog = presentation(page);
   await page.keyboard.press("ArrowRight");
   const tabs = dialog.locator('[data-wf-picker] [role="tab"]');
@@ -93,14 +194,14 @@ test("preserves interactive demos and restores the original page, focus and scro
   await expect(page.locator("main [data-slideshow-slides] > section[hidden]")).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
   await expect(page.locator('[data-wf-picker] [role="tab"]').nth(2)).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await expect(dialog.locator("[data-slideshow-status]")).toContainText("1 / 9");
   await dialog.getByRole("button", { name: "Exit slideshow" }).click();
   await expect(dialog).not.toBeVisible();
 });
 
 test("hides the desktop control and exits when resized to mobile", async ({ page }) => {
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(presentation(page)).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Start slideshow" })).not.toBeVisible();
@@ -113,7 +214,7 @@ test("floats a translucent toolbar that becomes opaque on hover and keyboard foc
   const trigger = page.getByRole("button", { name: "Start slideshow" });
   const themeIcon = page.locator("starlight-theme-select svg").first();
   expect(await trigger.locator("svg").evaluate(element => element.outerHTML)).not.toBe(await themeIcon.evaluate(element => element.outerHTML));
-  await trigger.click();
+  await startSlideshow(page);
   const toolbar = presentation(page).getByRole("group", { name: "Slide navigation" });
   await expect(toolbar).toHaveCSS("position", "absolute");
   const viewportBounds = await presentation(page).locator("[data-slideshow-viewport]").boundingBox();
@@ -121,20 +222,31 @@ test("floats a translucent toolbar that becomes opaque on hover and keyboard foc
   if (!viewportBounds || !toolbarBounds) throw new Error("Presentation viewport and toolbar must be visible");
   expect(toolbarBounds.y).toBeLessThan(viewportBounds.y + viewportBounds.height);
   expect(toolbarBounds.y + toolbarBounds.height).toBeLessThanOrEqual(viewportBounds.y + viewportBounds.height + 1);
+  const size = page.viewportSize();
+  if (!size) throw new Error("Presentation viewport size must be available");
+  expect(toolbarBounds.width).toBeLessThan(size.width * 0.7);
+  expect(toolbarBounds.height).toBeLessThanOrEqual(48);
+  expect(Math.abs(toolbarBounds.x + toolbarBounds.width / 2 - size.width / 2)).toBeLessThan(1);
+  expect(size.height - toolbarBounds.y - toolbarBounds.height).toBeGreaterThan(16);
   await page.mouse.move(0, 0);
-  await expect(toolbar).toHaveCSS("opacity", "0.65");
+  await expect(toolbar).toHaveCSS("opacity", "0.12");
   await toolbar.hover();
   await expect(toolbar).toHaveCSS("opacity", "1");
   await page.mouse.move(0, 0);
-  await expect(toolbar).toHaveCSS("opacity", "0.65");
+  await expect(toolbar).toHaveCSS("opacity", "0.12");
   await page.keyboard.press("Shift+Tab");
+  await expect(toolbar).toHaveCSS("opacity", "1");
+  await toolbar.getByRole("button", { name: "Drawing tools", exact: true }).click();
+  await page.locator("[data-slideshow-viewport]").click({ position: { x: 1, y: 1 } });
+  await page.mouse.move(0, 0);
   await expect(toolbar).toHaveCSS("opacity", "1");
 });
 
 test("lets keyboard users leave demo tabs and navigate slides without a trap", async ({ page }) => {
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await page.keyboard.press("PageDown");
   const dialog = presentation(page);
+  await expect(dialog.locator("[data-slideshow-status]")).toContainText("2 / 9");
   const tabs = dialog.locator('[data-wf-picker] [role="tab"]');
   await tabs.first().focus();
   await page.keyboard.press("ArrowRight");
@@ -161,7 +273,7 @@ test("hides annotated secondary content only during the presentation", async ({ 
   await expect(page.locator(".aw-hero .aw-cta-note:visible")).toHaveCount(1);
   await expect(page.locator(".wf-detail:visible")).toHaveCount(1);
   await expect(page.locator(".ma")).toBeVisible();
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   const dialog = presentation(page);
   await expect(dialog.locator("[data-slideshow-hide]:visible")).toHaveCount(0);
   await page.keyboard.press("PageDown");
@@ -180,7 +292,7 @@ test("skips annotated slide sections and restores them on exit", async ({ page }
     document.querySelector("#watch")?.setAttribute("data-slideshow-hide", "");
     document.dispatchEvent(new Event("astro:page-load"));
   });
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   const dialog = presentation(page);
   await expect(dialog.locator("[data-slideshow-status]")).toContainText("1 / 8");
   await page.keyboard.press("PageDown");
@@ -196,7 +308,7 @@ test("skips annotated slide sections and restores them on exit", async ({ page }
 });
 
 test("uses directional CSS View Transitions and handles rapid navigation", async ({ page }) => {
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await page.evaluate(() => {
     const start = document.startViewTransition.bind(document);
     document.startViewTransition = (...args) => {
@@ -231,7 +343,7 @@ test("uses directional CSS View Transitions and handles rapid navigation", async
 
 test("navigates without animations for reduced motion or unsupported browsers", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await page.keyboard.press("ArrowRight");
   await expect(presentation(page).locator("[data-slideshow-status]")).toContainText("2 / 9");
   await expect(page.locator("html")).not.toHaveAttribute("data-slideshow-direction");
@@ -247,18 +359,18 @@ test("navigates without animations for reduced motion or unsupported browsers", 
 test("cleans up on page swaps and works after navigating away and back", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await page.evaluate(() => document.dispatchEvent(new Event("astro:before-swap")));
   await expect(presentation(page)).not.toBeVisible();
   await expect(page.locator("main [data-slideshow-slides] > section")).toHaveCount(9);
   await page.evaluate(() => document.dispatchEvent(new Event("astro:page-load")));
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await presentation(page).getByRole("link", { name: "Create a workflow" }).first().click();
   await expect(page).toHaveURL(/\/gh-aw\/setup\/creating-workflows\//);
   await expect(page.locator("[data-slideshow-trigger]")).toHaveCount(0);
   await page.goBack();
   await expect(page).toHaveURL(/\/gh-aw\/$/);
-  await page.getByRole("button", { name: "Start slideshow" }).click();
+  await startSlideshow(page);
   await expect(presentation(page).locator("[data-slideshow-status]")).toContainText("1 / 9");
   await page.keyboard.press("Escape");
   expect(errors).toEqual([]);

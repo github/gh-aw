@@ -27,8 +27,8 @@ const colors = [
       <button type="button" data-drawing-tool="rect" aria-label="Draw rectangle (Shift for square)" aria-pressed="false" title="Draw rectangle (Shift for square)">
         <Octicon name="square" size={20} />
       </button>
-      <button type="button" data-drawing-tool="line" aria-label="Draw line" aria-pressed="false" title="Draw line">
-        <Octicon name="dash" size={20} />
+      <button type="button" data-drawing-tool="arrow" aria-label="Draw arrow" aria-pressed="false" title="Drag from the arrow's tail to its tip">
+        <Octicon name="arrow-right" size={20} />
       </button>
       {emojis.map(emoji => (
         <button type="button" data-drawing-tool="emoji" data-emoji={emoji.symbol} aria-label={`${emoji.label} emoji`} aria-pressed="false" title={`${emoji.label} emoji`}>
@@ -44,6 +44,14 @@ const colors = [
           </button>
         ))}
       </div>
+      <span class="drawing-help">
+        <button type="button" aria-label="Drawing help" aria-describedby="slideshow-drawing-help">
+          <Octicon name="question" size={20} />
+        </button>
+        <span id="slideshow-drawing-help" class="drawing-help-tooltip" role="tooltip">
+          Drag to draw. Hold Shift for squares. Choose an emoji, then click the slide to stamp; drag to resize and rotate.
+        </span>
+      </span>
       <button type="button" data-drawing-undo aria-label="Undo drawing" title="Undo drawing (Ctrl/Cmd+Z)" disabled>
         <Octicon name="reply" size={20} />
       </button>
@@ -51,23 +59,9 @@ const colors = [
         <Octicon name="trash" size={20} />
       </button>
     </div>
-    <p>Drag to draw. Hold Shift for squares. Click an emoji to stamp; drag to resize and rotate.</p>
     <span class="sr-only" data-drawing-status role="status" aria-live="polite"></span>
   </div>
 </div>
-
-<script>
-  import { initializeSlideshowDrawing } from '../../scripts/slideshow-drawing';
-
-  let cleanup = () => {};
-  function initialize() {
-    cleanup();
-    cleanup = initializeSlideshowDrawing();
-  }
-  initialize();
-  document.addEventListener('astro:page-load', initialize);
-  document.addEventListener('astro:before-swap', () => cleanup());
-</script>
 
 <style>
   .drawing-tools { position: relative; }
@@ -93,11 +87,24 @@ const colors = [
   }
   .drawing-tools [data-emoji] { font-size: 1.5rem; }
   .drawing-swatch { width: 1.125rem; height: 1.125rem; border-radius: 50%; }
-  .drawing-panel p {
-    max-width: 35ch;
-    margin: 0.75rem 0 0;
-    color: var(--aw-color-text-muted);
+  .drawing-help { position: relative; display: inline-flex; }
+  .drawing-help-tooltip {
+    display: none;
+    position: absolute;
+    inset-inline-end: 0;
+    bottom: calc(100% + 0.5rem);
+    z-index: 1;
+    width: 20rem;
+    max-width: calc(100vw - 4rem);
+    padding: 0.75rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-sm);
+    background: var(--aw-color-surface);
+    color: var(--aw-color-text);
+    box-shadow: var(--aw-shadow-raised);
     font-size: var(--aw-step--1);
     line-height: 1.5;
   }
+  .drawing-help:hover .drawing-help-tooltip,
+  .drawing-help:focus-within .drawing-help-tooltip { display: block; }
 </style>

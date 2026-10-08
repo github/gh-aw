@@ -3,6 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 async function openPresentation(page: Page) {
   await page.goto("/gh-aw/");
   await page.getByRole("button", { name: "Start slideshow" }).click();
+  await expect(page.locator("#landing-slideshow")).toBeVisible();
 }
 
 async function draw(page: Page, dx: number, dy: number, shift = false) {
@@ -18,7 +19,7 @@ async function draw(page: Page, dx: number, dy: number, shift = false) {
   if (shift) await page.keyboard.up("Shift");
 }
 
-test("draws colored rectangles, squares, lines and resizable emoji stamps", async ({ page }) => {
+test("draws colored rectangles, squares, arrows and resizable emoji stamps", async ({ page }) => {
   await openPresentation(page);
   await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
   await page.getByRole("button", { name: "Draw rectangle (Shift for square)", exact: true }).click();
@@ -31,9 +32,12 @@ test("draws colored rectangles, squares, lines and resizable emoji stamps", asyn
   const square = ink.locator('[data-drawing-kind="rect"]').last().locator("rect").last();
   expect(Number(await square.getAttribute("width"))).toBeCloseTo(Number(await square.getAttribute("height")), 1);
 
-  await page.getByRole("button", { name: "Draw line", exact: true }).click();
+  await page.getByRole("button", { name: "Draw arrow", exact: true }).click();
   await draw(page, 140, -80);
-  await expect(ink.locator('[data-drawing-kind="line"]')).toHaveCount(1);
+  await expect(ink.locator('[data-drawing-kind="arrow"]')).toHaveCount(1);
+  const arrow = ink.locator('[data-drawing-kind="arrow"] path');
+  await expect(arrow).toHaveCount(2);
+  expect((await arrow.last().getAttribute("d"))?.match(/L /g)).toHaveLength(3);
   await page.getByRole("button", { name: "Thinking emoji", exact: true }).click();
   await draw(page, 0, 0);
   await expect(ink.locator("text")).toHaveText("🤔");
@@ -48,19 +52,19 @@ test("draws colored rectangles, squares, lines and resizable emoji stamps", asyn
 test("keeps ink with its slide, preserves it on resize, and supports undo and clear", async ({ page }) => {
   await openPresentation(page);
   await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
-  await page.getByRole("button", { name: "Draw line", exact: true }).click();
+  await page.getByRole("button", { name: "Draw arrow", exact: true }).click();
   await draw(page, 100, 80);
   const ink = page.locator("[data-slideshow-ink]");
-  const original = await ink.locator('[data-drawing-kind="line"]').evaluate(element => element.outerHTML);
+  const original = await ink.locator('[data-drawing-kind="arrow"]').evaluate(element => element.outerHTML);
   await page.setViewportSize({ width: 1024, height: 700 });
-  expect(await ink.locator('[data-drawing-kind="line"]').evaluate(element => element.outerHTML)).toBe(original);
+  expect(await ink.locator('[data-drawing-kind="arrow"]').evaluate(element => element.outerHTML)).toBe(original);
   await page.getByRole("button", { name: "Next slide", exact: true }).click();
   await expect(ink.locator("[data-drawing-kind]")).toHaveCount(0);
   await draw(page, 100, 80);
   await page.getByRole("button", { name: "Previous slide", exact: true }).click();
   await expect(page.locator("[data-slideshow-status]")).toContainText("1 / 9");
-  await expect(ink.locator('[data-drawing-kind="line"]')).toHaveCount(1);
-  expect(await ink.locator('[data-drawing-kind="line"]').evaluate(element => element.outerHTML)).toBe(original);
+  await expect(ink.locator('[data-drawing-kind="arrow"]')).toHaveCount(1);
+  expect(await ink.locator('[data-drawing-kind="arrow"]').evaluate(element => element.outerHTML)).toBe(original);
   await page.getByRole("button", { name: "Undo drawing", exact: true }).click();
   await expect(ink.locator("[data-drawing-kind]")).toHaveCount(0);
   await page.getByRole("button", { name: "Next slide", exact: true }).click();
@@ -78,7 +82,7 @@ test("cancels unfinished strokes and restores demo interaction in pointer mode",
   await openPresentation(page);
   await page.keyboard.press("PageDown");
   await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
-  await page.getByRole("button", { name: "Draw line", exact: true }).click();
+  await page.getByRole("button", { name: "Draw arrow", exact: true }).click();
   const bounds = await page.locator("[data-slideshow-ink]").boundingBox();
   if (!bounds) throw new Error("Drawing layer is not visible");
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
@@ -98,6 +102,52 @@ test("cancels unfinished strokes and restores demo interaction in pointer mode",
   await expect(page.locator("#landing-slideshow")).not.toBeVisible();
   await page.getByRole("button", { name: "Start slideshow" }).click();
   await expect(page.locator("[data-slideshow-ink] [data-drawing-kind]")).toHaveCount(0);
+  await expect(page.locator("#landing-slideshow")).toBeVisible();
+});
+
+test("Escape exits drawing mode and clears every slide without exiting the presentation", async ({ page }) => {
+  await openPresentation(page);
+  await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
+  await page.getByRole("button", { name: "Draw arrow", exact: true }).click();
+  await draw(page, 100, 80);
+  await page.getByRole("button", { name: "Next slide", exact: true }).click();
+  await draw(page, 100, 80);
+  await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
+  await expect(page.locator("#slideshow-drawing-panel")).not.toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#landing-slideshow")).toBeVisible();
+  await expect(page.locator("[data-slideshow-ink]")).toHaveAttribute("data-tool", "pointer");
+  await expect(page.locator("[data-slideshow-ink] [data-drawing-kind]")).toHaveCount(0);
+  await page.getByRole("button", { name: "Previous slide", exact: true }).click();
+  await expect(page.locator("[data-slideshow-status]")).toContainText("1 / 9");
+  await expect(page.locator("[data-slideshow-ink] [data-drawing-kind]")).toHaveCount(0);
+  await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
+  await page.getByRole("button", { name: "Smile emoji", exact: true }).click();
+  await draw(page, 0, 0);
+  await expect(page.locator("[data-slideshow-ink] text")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#landing-slideshow")).toBeVisible();
+  await expect(page.locator("#slideshow-drawing-panel")).not.toBeVisible();
+  await expect(page.locator("[data-slideshow-ink] [data-drawing-kind]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#landing-slideshow")).not.toBeVisible();
+});
+
+test("shows drawing instructions only in a hover or keyboard-focus tooltip", async ({ page }) => {
+  await openPresentation(page);
+  await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
+  const panel = page.getByRole("group", { name: "Draw on slides", exact: true });
+  await expect(panel.locator("p")).toHaveCount(0);
+  const tooltip = panel.getByRole("tooltip", { includeHidden: true });
+  const help = panel.getByRole("button", { name: "Drawing help", exact: true });
+  await expect(tooltip).not.toBeVisible();
+  await help.hover();
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("Drag to draw.");
+  await page.mouse.move(0, 0);
+  await expect(tooltip).not.toBeVisible();
+  await help.focus();
+  await expect(tooltip).toBeVisible();
 });
 
 test("expands snippets with larger type and smooth transitions without changing slides", async ({ page }) => {

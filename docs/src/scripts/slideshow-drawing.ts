@@ -1,4 +1,4 @@
-type Tool = "pointer" | "rect" | "line" | "emoji";
+type Tool = "pointer" | "rect" | "arrow" | "emoji";
 interface Point {
   x: number;
   y: number;
@@ -57,16 +57,23 @@ export function initializeSlideshowDrawing(): () => void {
       stamp.textContent = drawing.emoji;
       group.append(stamp);
     } else {
-      const attributes: Record<string, string> =
-        drawing.tool === "line"
-          ? { x1: String(start.x), y1: String(start.y), x2: String(end.x), y2: String(end.y) }
-          : { x: String(Math.min(start.x, end.x)), y: String(Math.min(start.y, end.y)), width: String(Math.abs(end.x - start.x)), height: String(Math.abs(end.y - start.y)) };
+      let attributes: Record<string, string>;
+      if (drawing.tool === "arrow") {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const angle = Math.atan2(dy, dx);
+        const size = Math.min(28, Math.hypot(dx, dy) * 0.35);
+        const head = (offset: number) => `${end.x - size * Math.cos(angle + offset)} ${end.y - size * Math.sin(angle + offset)}`;
+        attributes = { d: `M ${start.x} ${start.y} L ${end.x} ${end.y} M ${head(-Math.PI / 6)} L ${end.x} ${end.y} L ${head(Math.PI / 6)}` };
+      } else {
+        attributes = { x: String(Math.min(start.x, end.x)), y: String(Math.min(start.y, end.y)), width: String(Math.abs(end.x - start.x)), height: String(Math.abs(end.y - start.y)) };
+      }
       for (const [stroke, width] of [
         ["#ffffff", "8"],
         [drawing.color, "5"],
       ]) {
         group.append(
-          element(drawing.tool === "line" ? "line" : "rect", {
+          element(drawing.tool === "arrow" ? "path" : "rect", {
             ...attributes,
             fill: "none",
             stroke,
@@ -146,6 +153,7 @@ export function initializeSlideshowDrawing(): () => void {
     toggle.setAttribute("aria-expanded", "false");
     setTool("pointer");
     render();
+    announce();
   };
 
   toggle.addEventListener(
@@ -161,7 +169,7 @@ export function initializeSlideshowDrawing(): () => void {
       "click",
       () => {
         const value = button.dataset.drawingTool;
-        if (value !== "pointer" && value !== "rect" && value !== "line" && value !== "emoji") return;
+        if (value !== "pointer" && value !== "rect" && value !== "arrow" && value !== "emoji") return;
         if (button.dataset.emoji) emoji = button.dataset.emoji;
         setTool(value);
       },
@@ -243,12 +251,10 @@ export function initializeSlideshowDrawing(): () => void {
       if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
         event.preventDefault();
         undoDrawing();
-      } else if (event.key === "Escape" && !panel.hidden) {
+      } else if (event.key === "Escape" && (tool !== "pointer" || !panel.hidden || Array.from(history.values()).some(drawings => drawings.length > 0))) {
         event.preventDefault();
         event.stopPropagation();
-        panel.hidden = true;
-        toggle.setAttribute("aria-expanded", "false");
-        setTool("pointer");
+        reset();
         toggle.focus();
       }
     },

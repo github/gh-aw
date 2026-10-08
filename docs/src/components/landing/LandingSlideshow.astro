@@ -19,6 +19,7 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     <path d="m10 7 5 3-5 3Z" />
   </svg>
 </button>
+<span class="slideshow-error" data-slideshow-error role="alert" hidden></span>
 
 <dialog id="landing-slideshow" aria-label="GitHub Agentic Workflows presentation">
   <div class="slideshow-viewport" data-slideshow-viewport>
@@ -49,163 +50,45 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
   function initialize() {
     cleanup();
     const trigger = document.querySelector<HTMLButtonElement>('[data-slideshow-trigger]');
-    const dialog = document.querySelector<HTMLDialogElement>('#landing-slideshow');
+    const errorMessage = document.querySelector<HTMLElement>('[data-slideshow-error]');
     const deck = document.querySelector<HTMLElement>('[data-slideshow-slides]');
-    const viewport = dialog?.querySelector<HTMLElement>('[data-slideshow-viewport]');
-    const stage = dialog?.querySelector<HTMLElement>('[data-slideshow-stage]');
-    const ink = dialog?.querySelector<SVGSVGElement>('[data-slideshow-ink]');
-    const previous = dialog?.querySelector<HTMLButtonElement>('[data-slideshow-previous]');
-    const next = dialog?.querySelector<HTMLButtonElement>('[data-slideshow-next]');
-    const close = dialog?.querySelector<HTMLButtonElement>('[data-slideshow-close]');
-    const status = dialog?.querySelector<HTMLElement>('[data-slideshow-status]');
-    if (!trigger || !dialog || !deck || !viewport || !stage || !ink || !previous || !next || !close || !status) return;
-    const slides = Array.from(deck.querySelectorAll<HTMLElement>(':scope > section:not([data-slideshow-hide])'));
-    if (!slides.length) return;
-
+    if (!trigger || !errorMessage || !deck?.querySelector(':scope > section:not([data-slideshow-hide])')) return;
     const controller = new AbortController();
     const { signal } = controller;
     const desktop = window.matchMedia('(min-width: 50rem)');
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const placeholder = document.createComment('Landing slideshow');
-    let index = 0;
-    let requestedIndex = 0;
-    let scrollY = 0;
-    let transition: ViewTransition | undefined;
-
-    const fit = () => {
-      if (!dialog.open) return;
-      const width = deck.offsetWidth;
-      const height = deck.offsetHeight;
-      if (!width || !height) return;
-      const scale = Math.min(1, viewport.clientWidth / width, viewport.clientHeight / height);
-      stage.style.width = `${width * scale}px`;
-      stage.style.height = `${height * scale}px`;
-      deck.style.transform = `scale(${scale})`;
-      ink.setAttribute('viewBox', `0 0 ${width} ${height}`);
-    };
-
-    const observer = new ResizeObserver(fit);
-    observer.observe(viewport);
-    observer.observe(deck);
-
-    function pauseVideos(slide: HTMLElement) {
-      slide.querySelectorAll('video').forEach(video => video.pause());
-    }
-
-    const showSlide = (target: number) => {
-      const newIndex = Math.max(0, Math.min(slides.length - 1, target));
-      if (newIndex !== index) pauseVideos(slides[index]);
-      index = newIndex;
-      slides.forEach((slide, i) => { slide.hidden = i !== index; });
-      previous.disabled = index === 0;
-      next.disabled = index === slides.length - 1;
-      const heading = Array.from(slides[index].querySelectorAll<HTMLElement>('h1, h2'))
-        .find(element => element.checkVisibility());
-      status.textContent = `${index + 1} / ${slides.length} — ${heading?.textContent?.trim() ?? 'Slide'}`;
-      // Keep focus out of hidden slides and disabled navigation buttons.
-      if (document.activeElement instanceof HTMLElement &&
-          (document.activeElement.closest('section[hidden]') ||
-           document.activeElement === previous && previous.disabled ||
-           document.activeElement === next && next.disabled)) {
-        close.focus({ preventScroll: true });
-      }
-      fit();
-      dialog.dataset.slideIndex = String(index);
-      dialog.dispatchEvent(new Event('slideshow:slide-change'));
-    };
-
-    const navigate = (target: number) => {
-      const newIndex = Math.max(0, Math.min(slides.length - 1, target));
-      if (newIndex === requestedIndex) return;
-      const direction = newIndex > requestedIndex ? 'forward' : 'backward';
-      requestedIndex = newIndex;
-      transition?.skipTransition();
-      if (!document.startViewTransition || reducedMotion.matches) {
-        showSlide(newIndex);
-        return;
-      }
-      document.documentElement.dataset.slideshowDirection = direction;
-      const current = document.startViewTransition(() => {
-        if (dialog.open && requestedIndex === newIndex) showSlide(newIndex);
-      });
-      transition = current;
-      current.finished.then(() => {
-        if (transition !== current) return;
-        transition = undefined;
-        delete document.documentElement.dataset.slideshowDirection;
-      });
-    };
-
-    const restore = () => {
-      transition?.skipTransition();
-      transition = undefined;
-      delete document.documentElement.dataset.slideshowDirection;
-      if (!placeholder.parentNode) return;
-      slides.forEach(slide => {
-        pauseVideos(slide);
-        slide.hidden = false;
-      });
-      deck.style.removeProperty('transform');
-      placeholder.replaceWith(deck);
-      dialog.dispatchEvent(new Event('slideshow:reset'));
-      window.scrollTo({ top: scrollY, behavior: 'instant' });
-      trigger.focus({ preventScroll: true });
-    };
-
+    let runtime: import('../../scripts/slideshow').SlideshowController | undefined;
     trigger.hidden = false;
-    trigger.addEventListener('click', () => {
-      if (!desktop.matches || dialog.open) return;
-      scrollY = window.scrollY;
-      deck.replaceWith(placeholder);
-      stage.prepend(deck);
-      dialog.showModal();
-      requestedIndex = 0;
-      showSlide(0);
-      close.focus({ preventScroll: true });
-    }, { signal });
-    previous.addEventListener('click', () => navigate(requestedIndex - 1), { signal });
-    next.addEventListener('click', () => navigate(requestedIndex + 1), { signal });
-    close.addEventListener('click', () => {
-      dialog.close();
-      restore();
-    }, { signal });
-    dialog.addEventListener('cancel', event => {
-      event.preventDefault();
-      dialog.close();
-      restore();
-    }, { signal });
-    dialog.addEventListener('close', () => {
-      if (!dialog.open) restore();
-    }, { signal });
-    desktop.addEventListener('change', () => {
-      if (!desktop.matches && dialog.open) {
-        dialog.close();
-        restore();
+    trigger.addEventListener('click', async () => {
+      if (!desktop.matches || trigger.disabled) return;
+      trigger.disabled = true;
+      trigger.setAttribute('aria-busy', 'true');
+      errorMessage.hidden = true;
+      try {
+        if (!runtime) {
+          const { createSlideshow } = await import('../../scripts/slideshow');
+          if (signal.aborted) return;
+          runtime = createSlideshow(trigger);
+        }
+        runtime.open();
+      } catch (error) {
+        if (signal.aborted) return;
+        console.error('Unable to load the slideshow:', error);
+        errorMessage.textContent = 'Unable to load the slideshow. Reload the page and try again.';
+        errorMessage.hidden = false;
+      } finally {
+        if (!signal.aborted) {
+          trigger.disabled = false;
+          trigger.removeAttribute('aria-busy');
+        }
       }
     }, { signal });
-    dialog.addEventListener('keydown', event => {
-      if (dialog.querySelector('dialog[open]')) return;
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
-          event.target instanceof HTMLElement &&
-          event.target.closest('input, textarea, select, video, summary, [contenteditable]')) return;
-      if (event.target instanceof HTMLElement && event.target.closest('[role="tab"]') &&
-          ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-      const destinations: Record<string, number> = {
-        ArrowRight: requestedIndex + 1, ArrowDown: requestedIndex + 1, PageDown: requestedIndex + 1,
-        ArrowLeft: requestedIndex - 1, ArrowUp: requestedIndex - 1, PageUp: requestedIndex - 1,
-        Home: 0, End: slides.length - 1,
-      };
-      if (!(event.key in destinations)) return;
-      event.preventDefault();
-      navigate(destinations[event.key]);
-    }, { signal });
-
     cleanup = () => {
       controller.abort();
-      observer.disconnect();
-      if (dialog.open) dialog.close();
-      restore();
+      runtime?.destroy();
       trigger.hidden = true;
+      trigger.disabled = false;
+      trigger.removeAttribute('aria-busy');
+      errorMessage.hidden = true;
     };
   }
 
@@ -229,6 +112,16 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
   }
   .slideshow-trigger:hover { color: var(--aw-color-text-strong); }
   .slideshow-trigger[hidden] { display: none; }
+  .slideshow-error {
+    position: fixed;
+    inset: calc(var(--sl-nav-height) + 1rem) 1rem auto;
+    z-index: 10;
+    padding: 1rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-sm);
+    background: var(--aw-color-bg);
+    color: var(--aw-color-text);
+  }
   @media (max-width: 49.99rem) {
     .slideshow-trigger { display: none; }
   }
@@ -288,30 +181,34 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
   :global(#landing-slideshow[open] [data-slideshow-hide]) { display: none !important; }
   .slideshow-controls {
     position: absolute;
-    inset-inline: 1rem;
-    bottom: 1rem;
+    inset-inline-start: 50%;
+    bottom: 1.25rem;
+    width: max-content;
+    max-width: calc(100% - 2rem);
+    transform: translateX(-50%);
     z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
+    gap: 0.375rem;
     flex: none;
-    padding: 0.5rem 1rem;
+    padding: 0.375rem 0.5rem;
     border: 1px solid var(--aw-color-divider);
-    border-radius: var(--aw-radius-md);
-    background: color-mix(in srgb, var(--aw-color-bg) 85%, transparent);
+    border-radius: var(--aw-radius-pill);
+    background: color-mix(in srgb, var(--aw-color-bg) 55%, transparent);
     backdrop-filter: blur(12px);
     box-shadow: var(--aw-shadow-raised);
-    font-size: var(--aw-step--1);
-    opacity: 0.65;
+    font-size: 0.75rem;
+    opacity: 0.12;
     transition: opacity 180ms ease, background-color 180ms ease;
   }
   .slideshow-controls:hover,
-  .slideshow-controls:has(:focus-visible) {
+  .slideshow-controls:has(:focus-visible),
+  .slideshow-controls:has([data-drawing-toggle][aria-expanded='true']) {
     opacity: 1;
     background: var(--aw-color-bg);
   }
-  .slideshow-hint { margin-inline-end: auto; color: var(--aw-color-text-muted); }
+  .slideshow-hint { display: none; }
   .slideshow-controls :global(button) {
     display: inline-flex;
     align-items: center;
@@ -328,17 +225,19 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
   }
   .slideshow-controls :global(button:hover) { background: var(--aw-color-bg-subtle); }
   .slideshow-controls :global(button:disabled) { opacity: 0.4; cursor: default; }
+  .slideshow-controls > button,
+  .slideshow-controls :global([data-drawing-toggle]) {
+    width: 32px;
+    height: 32px;
+  }
   [data-slideshow-status] {
-    max-width: min(40vw, 32rem);
+    max-width: min(40vw, 24rem);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
   }
   [data-slideshow-close] { margin-inline-start: auto; }
-  @media (max-width: 63.99rem) {
-    .slideshow-hint { display: none; }
-  }
   @media (prefers-reduced-motion: reduce) {
     .slideshow-controls { transition: none; }
   }
