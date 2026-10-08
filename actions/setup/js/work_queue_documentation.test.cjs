@@ -18,7 +18,7 @@ describe("work-queue deployment documentation", () => {
   it("omits removed storage selectors from the generated frontmatter reference", () => {
     const source = readRepositoryFile("docs/src/content/docs/reference/frontmatter-full.md");
     const queue = source.slice(source.indexOf("  # Read the immutable version-3 activation snapshot."), source.indexOf("  # Cache memory MCP configuration"));
-    expect(queue).toContain("work-queue: true");
+    expect(queue).toContain("work-queue: null");
     expect(queue).toContain("worker: true");
     expect(queue).not.toMatch(/\bstorage:/);
   });
