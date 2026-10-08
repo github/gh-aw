@@ -1,6 +1,6 @@
 {
-  "run_date": "2026-10-08T12:39:16Z",
-  "run_id": 37778097015,
+  "run_date": "2026-10-08T18:35:48Z",
+  "run_id": "37824688183",
   "source": "pr-triage-agent",
   "eligible_total": 1,
   "cooldown_skipped": 0,
@@ -21,7 +21,9 @@
     "fast_track": 0
   },
   "batches": [],
-  "selected_candidates": [56568],
+  "selected_candidates": [
+    56568
+  ],
   "prs": [
     {
       "number": 56568,
@@ -38,7 +40,14 @@
       "action": "batch_review",
       "batch": null,
       "ci_status": "unknown",
-      "review_status": "changes_requested"
+      "review_status": "changes_requested",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
     }
   ]
 }
