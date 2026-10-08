@@ -11,6 +11,46 @@ code execution. Follow [debugger restrictions](debug-agentic-workflow.md).
 PASS grants no dispatch permission; retain scanners, isolation, credential
 restrictions and human live-validation gates.
 
+## Agent Ownership
+
+The agent performs the review: capture intent, inspect source and reachable
+runtime dependencies, prepare the evidence packet, run independent judges,
+resolve findings and missing coverage, execute permitted compilation/scanners,
+and record the result. Do not hand these steps to the user as a checklist.
+An incomplete judge response is missing review evidence, not a confirmed
+vulnerability or a reason to ask the user to inspect code. Gather the missing
+evidence within the judge limits below; never turn UNKNOWN into PASS.
+
+The agent also prepares exact revisions, hashes, credential-source/destination
+metadata, permissions, protections and run bounds for any required human
+validation. Ask only for decisions or authorization the agent cannot supply,
+such as protected-environment approval or authentication repair. Human
+validation remains required for live execution; it is not a request for the
+user to perform the technical review. Never retrieve secret values or claim
+to have verified credential validity/expiry when metadata cannot establish it.
+
+## Compile-Only Validation
+
+The agent may run the installed, trusted `gh aw compile WORKFLOW --dry-run`
+to obtain emitted locks and compiler/scanner evidence before the final
+source/lock review. This permission covers compilation, not execution of
+workflow scripts, changed compiler code, build hooks, harnesses or MCP servers.
+Review those separately before running them. The judges remain read-only.
+
+Emission is required: do not combine `--dry-run` with `--no-emit`. Compilation
+may run in the current checkout; a disposable checkout is optional, not a
+prerequisite or work to delegate to the user. Snapshot the pre-command contents
+and existence of every file the compiler can modify, including pre-existing
+user edits and untracked files. Preserve the diagnostic locks and results in
+session artifacts, then restore only compiler-generated changes to that
+snapshot. Remove only known files created by this invocation; never reset the
+worktree or overwrite concurrent edits. If ownership is unclear, stop cleanup
+and report the conflict.
+
+Record hashes of both the diagnostic output and the restored files. Reverting
+diagnostic output does not erase findings, satisfy a failed gate, or transfer
+the diagnostic lock's review verdict to a different live lock.
+
 ## Capture Session Intent First
 
 - At session start, before edits/testing, capture the user's current-session

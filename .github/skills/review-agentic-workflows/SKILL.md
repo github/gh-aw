@@ -15,6 +15,17 @@ Reference workflow authoring skill guidance at: https://raw.githubusercontent.co
 3. Flag suspicious changes that weaken protections.
 4. Use run history (`logs`/`audit`) when available to find optimization opportunities.
 
+## Agent ownership
+
+The agent performs setup, source and runtime-dependency inspection, independent
+review coordination when required, compilation/scanners, evidence collection,
+finding resolution and cleanup. Do not give the user a technical preflight
+checklist to execute. Report concrete blockers and request only authorization
+or decisions the agent cannot supply. For debugging and live-test gates, follow
+the [shared security-review guidance](../../aw/debug-security-review.md);
+the agent prepares the evidence for human validation rather than asking the
+user to conduct the review.
+
 ## Self-contained setup (do not assume environment is ready)
 
 ### Step 0) Verify CLI availability
@@ -26,9 +37,9 @@ if gh aw --help >/dev/null 2>&1; then
   echo "gh aw is installed"
 else
   if [ -f ./install-gh-aw.sh ]; then
-    echo "gh aw is missing. Run the install step before continuing:"
+    echo "gh aw is missing. The agent must run the install step before continuing:"
     echo "  bash ./install-gh-aw.sh"
-    echo "Then verify:"
+    echo "The agent must then verify:"
     echo "  gh aw --help"
   else
     echo "gh aw is missing and ./install-gh-aw.sh is not present in this checkout."
@@ -67,6 +78,15 @@ If `gh aw` extension is unavailable but local binary exists:
 ```bash
 ./gh-aw compile --strict --actionlint --zizmor --poutine --runner-guard --yamllint --shellcheck
 ```
+
+For debug/dry-run reviews, the agent runs `gh aw compile WORKFLOW --dry-run`,
+adding available scanners as required by the shared guidance. Do not combine
+`--dry-run` with `--no-emit`: emitted locks are part of the evidence. A
+disposable checkout is optional. Running in the current checkout and reverting
+only compiler-generated changes is permitted after snapshotting all affected
+files, preserving diagnostic outputs, and checking for concurrent edits.
+Restore pre-existing user changes exactly; never use a broad worktree reset.
+See the [snapshot/restore rules](../../aw/debug-security-review.md#compile-only-validation).
 
 Fail review on compilation errors or High/Critical security findings unless explicitly justified.
 
