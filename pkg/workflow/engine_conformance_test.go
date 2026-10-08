@@ -194,7 +194,7 @@ func TestAgyNativeConformanceRequiresStagedNoop(t *testing.T) {
 				"native-receipt.json": `{"fileNonce":"fixture","toolNonce":"` + strings.Repeat("a", 48) + `"}`,
 				"outputs.jsonl":       item.output,
 				"native.jsonl": `{"event":"init","init":{"model":"gemini-3.8-flash-medium"}}
-	{"event":"step_update","step_update":{"step_type":"tool","tool_info":{"name":"agy_native_native_challenge"}}}
+	{"event":"step_update","step_update":{"step_type":"tool","state":"DONE","tool_info":{"name":"call_mcp_tool","parameters":{"ServerName":"agy-native","ToolName":"native_challenge","Arguments":{"file_nonce":"fixture"}},"output":"{\"toolNonce\":\"` + strings.Repeat("a", 48) + `\"}"}}}
 	{"event":"result","result":{"status":"SUCCESS","num_turns":1,"usage":{"input_tokens":10,"output_tokens":2}}}`,
 			} {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
@@ -213,6 +213,70 @@ func TestAgyNativeConformanceRequiresStagedNoop(t *testing.T) {
 				require.Error(t, err, "%s", out)
 				_, statErr := os.Stat(reportPath)
 				require.True(t, os.IsNotExist(statErr), "invalid noop evidence must not produce a passing native report")
+			}
+		})
+	}
+}
+
+func TestAgyNativeConformanceRequiresCompletedNativeCall(t *testing.T) {
+	var suite conformanceSuite
+	readConformanceFrontmatter(t, "../../.github/workflows/shared/agy-conformance.md", &suite)
+	verify := conformanceNodeScript(t, suite.PostSteps[0].Run)
+	for _, item := range []struct {
+		name, mutate string
+		passed       bool
+	}{
+		{name: "actual native event", passed: true},
+		{name: "active call", mutate: `step.state = "ACTIVE";`},
+		{name: "missing state", mutate: `delete step.state;`},
+		{name: "CLI wrapper", mutate: `info.name = "run_command";`},
+		{name: "wrong server", mutate: `info.parameters.ServerName = "mcpscripts";`},
+		{name: "wrong tool", mutate: `info.parameters.ToolName = "conformance_challenge";`},
+		{name: "wrong nonce", mutate: `info.parameters.Arguments.file_nonce = "guessed";`},
+		{name: "missing parameters", mutate: `delete info.parameters;`},
+		{name: "failed tool", mutate: `info.error = { type: "ERROR", message: "failed" };`},
+		{name: "wrong receipt", mutate: `info.output = JSON.stringify({ toolNonce: "guessed" });`},
+		{name: "invalid response", mutate: `info.output = "not JSON";`},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			dir := t.TempDir()
+			logPath := filepath.Join(dir, "native.jsonl")
+			outputPath := filepath.Join(dir, "outputs.jsonl")
+			prepare := `
+const fs = require("node:fs");
+const path = require("node:path");
+const host = process.env.CONFORMANCE_STATE;
+const toolNonce = "a".repeat(48);
+const info = {
+  name: "call_mcp_tool",
+  parameters: { ServerName: "agy-native", ToolName: "native_challenge", Arguments: { file_nonce: "fixture" } },
+  output: JSON.stringify({ toolNonce }),
+};
+const step = { step_type: "tool", state: "DONE", tool_info: info };
+` + item.mutate + `
+const entries = [
+  { event: "init", init: { model: "gemini-3.8-flash-medium" } },
+  { event: "step_update", step_update: step },
+  { event: "result", result: { status: "SUCCESS", num_turns: 1, usage: { input_tokens: 10, output_tokens: 2 } } },
+];
+fs.writeFileSync(path.join(host, "native.jsonl"), entries.map(entry => JSON.stringify(entry)).join("\n"));
+fs.writeFileSync(path.join(host, "expected.json"), JSON.stringify({ fileNonce: "fixture" }));
+fs.writeFileSync(path.join(host, "native-receipt.json"), JSON.stringify({ fileNonce: "fixture", toolNonce }));
+fs.writeFileSync(process.env.CONFORMANCE_SAFE_OUTPUTS, JSON.stringify({ type: "noop", message: "Conformance probes completed" }) + "\n");
+`
+			env := []string{"CONFORMANCE_STATE=" + dir, "CONFORMANCE_SAFE_OUTPUTS=" + outputPath}
+			out, err := runConformanceNode(t, env, "-e", prepare)
+			require.NoError(t, err, "%s", out)
+			encodedPath, err := json.Marshal(logPath)
+			require.NoError(t, err)
+			script := strings.ReplaceAll(verify, `"/tmp/gh-aw/agent-stdio.log"`, string(encodedPath))
+			out, err = runConformanceNode(t, env, "-e", script)
+			if item.passed {
+				require.NoError(t, err, "%s", out)
+			} else {
+				require.Error(t, err, "%s", out)
+				_, statErr := os.Stat(filepath.Join(dir, "native-report.json"))
+				require.True(t, os.IsNotExist(statErr), "invalid native calls must not produce a passing report")
 			}
 		})
 	}

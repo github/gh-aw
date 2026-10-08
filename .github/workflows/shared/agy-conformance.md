@@ -50,8 +50,18 @@ post-steps:
         try { return [JSON.parse(line)]; } catch { return []; }
       });
       const tools = entries.filter(entry => entry.event === "step_update" && entry.step_update?.step_type === "tool");
-      assert.ok(tools.some(entry => /agy[-_]native.*native[-_]challenge/.test(entry.step_update.tool_info?.name || "")),
+      const native = tools.find(entry => {
+        const step = entry.step_update;
+        const info = step.tool_info;
+        return step.state === "DONE" && info?.name === "call_mcp_tool" &&
+          info.parameters?.ServerName === "agy-native" &&
+          info.parameters?.ToolName === "native_challenge" &&
+          info.parameters?.Arguments?.file_nonce === expected.fileNonce;
+      })?.step_update.tool_info;
+      assert.ok(native,
         "The challenge must be called through the native MCP client, not its CLI wrapper");
+      assert.equal(native.error, undefined, "The native MCP challenge must complete without an error");
+      assert.deepEqual(JSON.parse(native.output), { toolNonce: receipt.toolNonce });
       const terminal = entries.filter(entry => entry.event === "result").at(-1)?.result;
       assert.equal(terminal?.status, "SUCCESS");
       assert.ok(Number.isSafeInteger(terminal?.num_turns) && terminal.num_turns > 0);
@@ -96,3 +106,6 @@ Execute the imported engine configuration conformance suite once.
 Also call the `native_challenge` tool through the native MCP server `agy-native`,
 using the actual fixture `fileNonce`. Do not call `mcpscripts native-challenge`
 or substitute a shell/HTTP request; the checker requires a native MCP tool event.
+Complete this native challenge before the shared suite's final safe-output call.
+Emit that noop exactly once through the `safeoutputs` CLI; do not repeat it through
+a native MCP tool or emit another completion message.

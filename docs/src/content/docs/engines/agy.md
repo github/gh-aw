@@ -134,7 +134,12 @@ inference accounting, native and CLI-mounted MCP round trips, and staged safe
 outputs. Runs are bounded to ten minutes and fifty AI credits; results are recorded
 in the step summary and conformance artifacts, not published as issues or comments.
 
-Both checkers require the exact staged noop receipt, not an empty output file.
+Both checkers require exactly one staged noop receipt, not an empty output file
+or duplicate completion messages. Complete all probes before emitting that noop
+through the `safeoutputs` CLI. Agy's native MCP configuration excludes CLI-mounted
+infrastructure even when `tools.cli-proxy` is not enabled.
+The native checker requires a completed `call_mcp_tool` event for the expected
+server, tool and fixture nonce, with a response matching the recorded receipt.
 The native MCP allowlist uses `native_challenge`, matching the underscore-normalized
 name exposed by the MCP scripts server; the script's authored name remains
 `native-challenge`.
