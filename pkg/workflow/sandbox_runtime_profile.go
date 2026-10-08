@@ -63,6 +63,11 @@ var sandboxRuntimeProfiles = map[AgentRuntime]sandboxRuntimeProfile{
 		// legacy-security or host-access flags are implied by the sudo prefix.
 		AWFCommand: constants.AWFCloudHypervisorCommand,
 	},
+	AgentRuntimeNVX: {
+		Runtime:          AgentRuntimeNVX,
+		NetworkIsolation: true,
+		AWFCommand:       constants.AWFNVXCommand,
+	},
 }
 
 // supportedAgentRuntimes lists the runtime values accepted in frontmatter, in
@@ -71,6 +76,7 @@ var supportedAgentRuntimes = []AgentRuntime{
 	AgentRuntimeDocker,
 	AgentRuntimeDockerSudoIptables,
 	AgentRuntimeCloudHypervisor,
+	AgentRuntimeNVX,
 }
 
 // supportedAgentRuntimeNames returns the supported runtime values as strings.

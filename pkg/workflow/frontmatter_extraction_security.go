@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -330,6 +331,16 @@ func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
 		if runtimeStr, ok := runtimeVal.(string); ok {
 			agentConfig.Runtime = AgentRuntime(runtimeStr)
 			frontmatterExtractionSecurityLog.Printf("Extracted sandbox.agent.runtime: %s", runtimeStr)
+		}
+	}
+
+	if nvxVal, hasNVX := agentObj["nvx"]; hasNVX {
+		if encoded, err := json.Marshal(nvxVal); err == nil {
+			var nvxConfig AgentNVXConfig
+			if err := json.Unmarshal(encoded, &nvxConfig); err == nil {
+				agentConfig.NVX = &nvxConfig
+				frontmatterExtractionSecurityLog.Print("Extracted sandbox.agent.nvx configuration")
+			}
 		}
 	}
 

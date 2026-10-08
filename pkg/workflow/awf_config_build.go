@@ -332,14 +332,19 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfImageTag = ""
 	}
 	agentTimeout := 0
-	if isCloudHypervisorRuntime(config.WorkflowData) {
+	if isCloudHypervisorRuntime(config.WorkflowData) || isNVXRuntime(config.WorkflowData) {
 		agentTimeout = resolveAWFContainerAgentTimeoutMinutes(config.WorkflowData)
 	}
-	if awfImageTag != "" || isArcDindTopology(config.WorkflowData) || agentTimeout > 0 || len(containerImages) > 0 {
+	if awfImageTag != "" || isArcDindTopology(config.WorkflowData) || agentTimeout > 0 || len(containerImages) > 0 || isNVXRuntime(config.WorkflowData) {
 		container := &AWFContainerConfig{
 			ImageTag:     awfImageTag,
 			AgentTimeout: agentTimeout,
 			Images:       containerImages,
+		}
+		if isNVXRuntime(config.WorkflowData) {
+			nvx := effectiveNVXConfig(getAgentConfig(config.WorkflowData).NVX)
+			container.ContainerRuntime = string(AgentRuntimeNVX)
+			container.ContainerWorkDir = nvx.ContainerWorkDir
 		}
 		// NOTE: dockerHostPathPrefix is intentionally NOT set for arc-dind topology.
 		// With sysroot-stage active, the Docker daemon can access all needed paths:
@@ -363,6 +368,9 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 
 	if isCloudHypervisorRuntime(config.WorkflowData) {
 		awfConfig.CloudHypervisor = buildAWFCloudHypervisorConfig()
+	} else if isNVXRuntime(config.WorkflowData) {
+		agentConfig := getAgentConfig(config.WorkflowData)
+		awfConfig.NVX = buildAWFNVXConfig(agentConfig.NVX)
 	} else if hasCloudHypervisorEnclaves(config.WorkflowData) {
 		if awfConfig.Container == nil {
 			awfConfig.Container = &AWFContainerConfig{}
