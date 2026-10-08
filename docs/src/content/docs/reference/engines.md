@@ -55,6 +55,24 @@ The tool probe checks the production MCP gateway/CLI path, not native MCP client
 support. It does not test SDK/driver profiles, plugins, permission-denial
 enforcement, or prove that a provider honored the requested model.
 
+### Experimental Agy authentication gate
+
+The manual `credentials-check.yml` workflow has an opt-in `agy-only` input and
+an `agy-model` native model slug. Its default behavior still runs the existing
+credential checks. The Agy job verifies the native Linux x64 v1.3.1 archive's
+SHA-256 checksum and runs with a fresh settings home and empty workspace.
+It requires `GEMINI_API_KEY` with `modelProvider: gemini`, verifies a fresh
+inference challenge and reported usage, checks missing/invalid credentials
+and unknown-model failures, and tests `GOOGLE_GEMINI_BASE_URL` against a
+controlled Gemini endpoint.
+
+The two-day `agy-native-authentication` artifact contains allowlisted event
+metadata, not API keys, prompts, tool payloads, or raw diagnostics. This is a
+native authentication feasibility gate, not an AWF, MCP, permissions, or
+production-engine conformance test. It does not register `engine: agy` or
+deprecate Gemini. Agy integration remains experimental and gated on live
+authentication and production sandbox evidence.
+
 ## Unsupported engine samples
 
 The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Goose, Kiro, and Pydantic AI integrations in this repository are **samples only**. They are not officially supported by gh-aw and have no compatibility or maintenance commitment.
