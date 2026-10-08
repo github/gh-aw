@@ -95,11 +95,7 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("AWF model routing", () => {
-    it.each([
-      ["/v1/messages", "anthropic-messages"],
-      ["/responses", "openai-responses"],
-      ["/chat/completions", "openai-completions"],
-    ])("maps routed endpoint %s to Pi API %s", (endpoint, api) => {
+    it.each(["/v1/messages", "/responses", "/chat/completions"])("preserves AWF's selected endpoint %s for catalog API resolution", endpoint => {
       const result = piModelsJson.resolvePiModelRouting({
         endpoints: [{ provider: "github", configured: true, models: ["routed-model"] }],
         routing: {
@@ -108,8 +104,7 @@ describe("pi_models_json.cjs", () => {
         },
       });
       expect(result.error).toBeNull();
-      expect(result.api).toBe(api);
-      expect(result.selection).toMatchObject({ wire_model: "routed-model", mapped_effort: "off" });
+      expect(result.selection).toMatchObject({ wire_model: "routed-model", endpoint, selected_endpoint: endpoint, mapped_effort: "off" });
     });
 
     it.each([
@@ -139,7 +134,17 @@ describe("pi_models_json.cjs", () => {
       process.env.GH_AW_PI_MODEL_ROUTING_MODEL_FILE = routingModelPath;
       const messages = [];
       const reflect = {
-        endpoints: [{ provider: "github", configured: true, port: 10002, base_url: "http://api-proxy:10002", models: ["gpt-5.6-sol"] }],
+        models_fetch_complete: true,
+        endpoints: [
+          {
+            provider: "copilot",
+            configured: true,
+            port: 10002,
+            base_url: "http://api-proxy:10002",
+            models: ["gpt-5.6-sol"],
+            routing_models: [{ model_id: "gpt-5.6-sol", candidate_metadata_complete: true, supported_endpoints: ["/responses"] }],
+          },
+        ],
         routing: {
           status: "selected",
           selection: { provider: "github", model: "github-copilot/gpt-5.6-sol", wire_model: "gpt-5.6-sol", effort: "none", endpoint: "/responses" },
@@ -148,7 +153,7 @@ describe("pi_models_json.cjs", () => {
       await piModelsJson.main({
         fetchReflect: async () => ({ ok: true, reflectData: reflect }),
         loadModelsJson: () => ({ data: [] }),
-        loadSDK: async () => ({ ModelRuntime: { create: async () => ({ getModel: () => undefined }) } }),
+        loadSDK: async () => ({ ModelRuntime: { create: async () => ({ getModel: () => ({ api: "openai-responses" }) }) } }),
         logger: message => messages.push(message),
       });
       const models = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
@@ -159,7 +164,113 @@ describe("pi_models_json.cjs", () => {
         wire_model: "gpt-5.6-sol",
         mapped_effort: "off",
       });
-      expect(messages.join("\n")).toContain("inference routing: mode=awf-routed model=gpt-5.6-sol effort=none");
+      expect(messages.join("\n")).toContain("inference routing: mode=awf-routed model=gpt-5.6-sol effort=none endpoint=/responses");
+    });
+
+    it("uses the Pi catalog API rather than AWF's selected endpoint for Claude models", async () => {
+      const agentDir = path.join(tmpDir, "routed-claude-pi");
+      const modelsPath = path.join(agentDir, "models.json");
+      process.env.GH_AW_MODEL_ROUTING = "1";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.PI_CODING_AGENT_DIR = agentDir;
+      process.env.GH_AW_PI_MODELS_JSON_PATH = modelsPath;
+      const messages = [];
+      const reflect = {
+        models_fetch_complete: true,
+        endpoints: [
+          {
+            provider: "copilot",
+            configured: true,
+            port: 10002,
+            base_url: "http://api-proxy:10002",
+            models: ["claude-opus-5"],
+            routing_models: [
+              {
+                model_id: "claude-opus-5",
+                source: "provider",
+                supported_endpoints: ["/v1/messages", "/chat/completions"],
+                supported_reasoning_efforts: ["low", "medium", "high", "xhigh", "max"],
+                context_window_tokens: 1000000,
+                candidate_metadata_complete: true,
+              },
+              { model_id: "claude-haiku-4.5", source: "provider", supported_endpoints: ["/chat/completions", "/v1/messages"], supported_reasoning_efforts: [], context_window_tokens: 200000, candidate_metadata_complete: true },
+            ],
+          },
+        ],
+        routing: {
+          status: "selected",
+          selection: { provider: "github", model: "github-copilot/claude-opus-5", wire_model: "claude-opus-5", effort: "max", endpoint: "/chat/completions" },
+        },
+      };
+      await piModelsJson.main({
+        fetchReflect: async () => ({ ok: true, reflectData: reflect }),
+        loadModelsJson: () => ({ data: [] }),
+        loadSDK: async () => ({ ModelRuntime: { create: async () => ({ getModel: () => ({ api: "anthropic-messages" }) }) } }),
+        logger: message => messages.push(message),
+      });
+      const models = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
+      expect(models.providers["aw-gateway"].api).toBe("anthropic-messages");
+      expect(messages.join("\n")).toContain("endpoint=/v1/messages selected_endpoint=/chat/completions");
+    });
+
+    it.each([false, undefined])("rejects incomplete metadata on the selected model (%s)", candidate_metadata_complete => {
+      const reflectData = {
+        models_fetch_complete: true,
+        endpoints: [
+          {
+            provider: "copilot",
+            configured: true,
+            routing_models: [
+              { model_id: "claude-haiku-4.5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] },
+              { model_id: "claude-opus-5", candidate_metadata_complete, supported_endpoints: ["/v1/messages"] },
+            ],
+          },
+        ],
+      };
+      expect(piModelsJson.resolvePiRoutingEndpoint({ reflectData, modelId: "claude-opus-5", api: "anthropic-messages" }).error).toContain("candidate metadata is incomplete");
+    });
+
+    it("fails closed when multiple configured GitHub endpoints list the Pi model", () => {
+      const reflectData = {
+        endpoints: [
+          { provider: "copilot", configured: true, routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] }] },
+          { provider: "github", configured: true, routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] }] },
+        ],
+      };
+      const result = piModelsJson.resolvePiRoutingEndpoint({ reflectData, modelId: "claude-opus-5", api: "anthropic-messages" });
+      expect(result.endpoint).toBe("/v1/messages");
+      expect(result.error).toContain("model claude-opus-5");
+      expect(result.error).toContain("[copilot, github]");
+    });
+
+    it("fails when the catalog API endpoint is not advertised for the selected model", async () => {
+      process.env.GH_AW_MODEL_ROUTING = "1";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.PI_CODING_AGENT_DIR = path.join(tmpDir, "routed-claude-pi-mismatch");
+      const reflect = {
+        endpoints: [
+          {
+            provider: "github",
+            configured: true,
+            models: ["claude-opus-5"],
+            routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/chat/completions"] }],
+          },
+        ],
+        routing: {
+          status: "selected",
+          selection: { provider: "github", model: "github-copilot/claude-opus-5", wire_model: "claude-opus-5", effort: "max", endpoint: "/chat/completions" },
+        },
+      };
+      await expect(
+        piModelsJson.main({
+          fetchReflect: async () => ({ ok: true, reflectData: reflect }),
+          loadModelsJson: () => ({ data: [] }),
+          loadSDK: async () => ({ ModelRuntime: { create: async () => ({ getModel: () => ({ api: "anthropic-messages" }) }) } }),
+          logger: () => {},
+        })
+      ).rejects.toThrow("which is not advertised in supported_endpoints");
     });
   });
 
@@ -323,6 +434,16 @@ describe("pi_models_json.cjs", () => {
           modelsJson: { providers: { "github-copilot": { models: { "gpt-5.5": { wire_api: "responses" } } } } },
         })
       ).toBe("openai-responses");
+    });
+
+    it("uses AWF wire API metadata when the Pi catalog has no model entry", () => {
+      expect(
+        piModelsJson.resolvePiApiForModel({
+          provider: "github",
+          modelId: "claude-opus-5",
+          wireApi: "messages",
+        })
+      ).toBe("anthropic-messages");
     });
 
     it("rejects a chat-completions override for a Responses-only model", () => {
@@ -564,7 +685,15 @@ describe("pi_models_json.cjs", () => {
           ok: true,
           reflectData: {
             models_fetch_complete: true,
-            endpoints: [{ provider: "copilot", configured: true, port: 10002, models: catalog.map(model => model.id) }],
+            endpoints: [
+              {
+                provider: "copilot",
+                configured: true,
+                port: 10002,
+                models: catalog.map(model => model.id),
+                ...(routing ? { routing_models: [{ model_id: "gpt-5.6-luna", candidate_metadata_complete: true, supported_endpoints: ["/responses"] }] } : {}),
+              },
+            ],
             routing: { status: "selected", selection: { provider: "github", wire_model: "gpt-5.6-luna", effort: "none", endpoint: "/responses" } },
           },
         }),

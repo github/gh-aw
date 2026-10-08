@@ -23,8 +23,12 @@ func TestNewModelPricingEntries(t *testing.T) {
 	}{
 		{"anthropic", "claude-opus-5-5", 4e-6, 20e-6, 0.2e-6, 5e-6},
 		{"anthropic", "claude-sonnet-5-5", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
+		{"github-copilot", "claude-haiku-5.5", 0.1e-6, 0.5e-6, 0.01e-6, 0.125e-6},
 		{"github-copilot", "claude-opus-5.5", 4e-6, 20e-6, 0.2e-6, 5e-6},
-		{"github-copilot", "claude-sonnet-5.5", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
+		{"github-copilot", "claude-sonnet-5.5", 2e-6, 10e-6, 0.1e-6, 2.5e-6},
+		{"github-copilot", "gpt-5-mini", 0.25e-6, 2e-6, 0.025e-6, 0},
+		{"github-copilot", "gpt-5.3-codex", 1.75e-6, 14e-6, 0.175e-6, 0},
+		{"github-copilot", "gpt-5.4-mini", 0.75e-6, 4.5e-6, 0.075e-6, 0},
 		{"github-copilot", "gpt-6-sol", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
 		{"github-copilot", "gpt-6-luna", 0.1e-6, 0.5e-6, 0.01e-6, 0.125e-6},
 		{"github-copilot", "gpt-6.1-sol", 2e-6, 10e-6, 0.1e-6, 2.5e-6},

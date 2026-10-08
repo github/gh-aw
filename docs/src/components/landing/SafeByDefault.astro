@@ -53,10 +53,9 @@ const layers = [
 <LandingSection id="safety" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
   <SafeByDefaultTrifecta slot="intro" part="text" />
   <SafeByDefaultTrifecta slot="aside" part="figure" />
+</LandingSection>
+<LandingSection id="safety-layers" title="Six layers of defence" lede="Step through the layers.">
   <div class="aw-safe">
-
-    <p class="aw-defence-intro">Step through the layers.</p>
-
     <div class="aw-layout" data-safe-root>
       <div class="aw-stack">
         <div class="aw-end"><Octicon name="copilot" class="aw-end-ico" />The agent</div>
@@ -98,7 +97,6 @@ const layers = [
 </LandingSection>
 
 <style>
-  /* Tight to the heading + lede so the trifecta paragraph reads as part of that group. */
   .aw-safe {
     --aw-safe-stack: 23rem;
     --aw-safe-gap: 3rem;
@@ -111,14 +109,6 @@ const layers = [
     text-underline-offset: 0.2em;
   }
 
-  .aw-defence-intro {
-    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
-    max-width: 52ch;
-    font-size: var(--aw-step-0);
-    line-height: 1.6;
-    color: var(--aw-color-text-secondary);
-    text-wrap: pretty;
-  }
   /* Stack */
   .aw-layout {
     position: relative;
@@ -324,7 +314,6 @@ const layers = [
 
   /* Desktop: stack + detail panel as one centred unit */
   @media (min-width: 52rem) {
-    .aw-defence-intro,
     .aw-layout[data-enhanced],
     .aw-safe:has(.aw-layout[data-enhanced]) .aw-foot {
       width: calc(var(--aw-safe-stack) + var(--aw-safe-gap) + var(--aw-safe-panel));
