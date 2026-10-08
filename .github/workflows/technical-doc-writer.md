@@ -52,7 +52,7 @@ safe-outputs:
 
 steps:
   - name: Setup Node.js
-    uses: actions/setup-node@v7
+    uses: actions/setup-node@v7.0.0
     with:
       node-version: '24'
       cache: 'npm'

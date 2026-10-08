@@ -22,7 +22,7 @@ on:
   steps:
     - name: Search for candidate issues
       id: search
-      uses: actions/github-script@v9
+      uses: actions/github-script@v9.0.0
       with:
         script: |
           const { owner, repo } = context.repo;

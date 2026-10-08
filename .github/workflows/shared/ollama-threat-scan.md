@@ -27,7 +27,7 @@ safe-outputs:
     steps:
       - name: Ollama Llama Guard 3 Threat Scan
         id: ollama-scan
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             const fs = require('fs');
@@ -329,7 +329,7 @@ safe-outputs:
       
       - name: Upload scan results
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: ollama-scan-results
           path: |
