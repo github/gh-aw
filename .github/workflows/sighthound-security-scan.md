@@ -128,7 +128,7 @@ jobs:
           echo "value=sighthound-results-${{ github.run_id }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Sighthound results artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ steps.artifact_name.outputs.value }}
           path: /tmp/gh-aw/agent/sighthound
@@ -137,7 +137,7 @@ jobs:
 
 steps:
   - name: Download Sighthound artifact
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       name: ${{ needs.sighthound_scan.outputs.artifact_name }}
       path: /tmp/gh-aw/agent/sighthound

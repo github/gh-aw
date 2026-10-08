@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"5f29f5d4ea5a4fda66d7e041421fa4a574a207dadb93779927aec0e0c7d84a10","body_hash":"a167995aa1bffcf91a3768c902c752e77e2aeaf59aa5d782507fdcf07c707534","strict":true,"agent_id":"pi","agent_model":"copilot/gpt-5.4","engine_versions":{"pi":"1.0.0"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44","digest":"sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44@sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44","digest":"sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44@sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44","digest":"sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44@sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.29","digest":"sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.29@sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"}],"mcp_servers":[{"name":"mcpscripts","tools":["conformance-challenge"]},{"name":"safeoutputs","tools":["create_issue","missing_data","missing_tool","noop","report_incomplete"]}],"threat_detection":{"mode":"disabled"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"6dd4a0be759280ab98dfdefa2c7f41c79a192a2783b85037086d91d0e467fe16","body_hash":"a167995aa1bffcf91a3768c902c752e77e2aeaf59aa5d782507fdcf07c707534","strict":true,"agent_id":"pi","agent_model":"copilot/gpt-5.4","engine_versions":{"pi":"1.0.0"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44","digest":"sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.44@sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44","digest":"sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.44@sha256:630c0895fe51727ad3f6d5bfb0b7d153d88697f870f8e5917ad53f50df26014e"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44","digest":"sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.44@sha256:02262c36c9d9f2f91b1b7d129aaf7abf02cd4e4bfb684f75316dc50df6ca8983"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.29","digest":"sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.29@sha256:ec08867ac8a4823e01efb2de2ba85a313199bb7ae666ef70ae58effc162a9bf3"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"}],"mcp_servers":[{"name":"mcpscripts","tools":["conformance-challenge"]},{"name":"safeoutputs","tools":["create_issue","missing_data","missing_tool","noop","report_incomplete"]}],"threat_detection":{"mode":"disabled"}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -40,10 +40,10 @@
 #
 # Custom actions used:
 #   - actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-#   - actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+#   - actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
 #   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-#   - actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-#   - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+#   - actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+#   - actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
 #
 # Container images used:
 #   - ghcr.io/github/gh-aw-firewall/agent:0.28.44@sha256:f36912e24d360625351fc8f2981cca7dca4e234719ac99648de93129c5f4fda4
@@ -205,7 +205,7 @@ jobs:
       - name: Publish daily AIC scan observations
         if: always() && env.GH_AW_MAX_DAILY_AI_CREDITS != ''
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aic-usage-scan-v2
           path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
@@ -307,7 +307,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
       - name: Upload info artifact
         if: success() || failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: info
           path: /tmp/gh-aw/aw_info.json
@@ -319,7 +319,7 @@ jobs:
           cp -a "${RUNNER_TEMP}/gh-aw/aw-prompts/." /tmp/gh-aw/aw-prompts/
       - name: Upload activation artifact
         if: success() || failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: activation
           include-hidden-files: true
@@ -429,7 +429,7 @@ jobs:
           printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
           mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           package-manager-cache: false
@@ -440,7 +440,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Download activation artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: activation
           path: /tmp/gh-aw
@@ -467,7 +467,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'checkout_pr_branch.cjs'));
             await main();
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           package-manager-cache: false
@@ -1116,7 +1116,7 @@ jobs:
         run: "set -euo pipefail\nnode <<'JS'\nconst assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst root = process.env.CONFORMANCE_ROOT;\nconst host = process.env.CONFORMANCE_STATE;\nif (!root || !host) throw new Error(\"Conformance paths are missing\");\nconst checks = [];\nconst check = (name, run) => {\n  try {\n    run();\n    checks.push({ name, status: \"passed\" });\n  } catch (error) {\n    checks.push({ name, status: \"failed\", error: error.message });\n  }\n};\nconst read = (directory, name) => {\n  const directoryStat = fs.lstatSync(directory);\n  assert.ok(directoryStat.isDirectory() && !directoryStat.isSymbolicLink(), \"Evidence directory must not be a symlink\");\n  const file = path.join(directory, name);\n  const stat = fs.lstatSync(file);\n  assert.ok(stat.isFile() && !stat.isSymbolicLink(), `${name} must be a regular file`);\n  assert.ok(stat.size <= 16384, `${name} exceeds 16 KiB`);\n  return JSON.parse(fs.readFileSync(file, \"utf8\"));\n};\nlet expected, result, receipt, shell;\ncheck(\"agent-execution\", () => assert.equal(process.env.CONFORMANCE_EXECUTION, \"success\"));\ncheck(\"fixtures\", () => {\n  expected = read(host, \"expected.json\");\n  assert.equal(expected.engine, process.env.CONFORMANCE_ENGINE);\n  assert.deepEqual(read(root, \"input.json\"), {\n    fileNonce: expected.fileNonce, left: expected.left, right: expected.right,\n  });\n});\ncheck(\"result-schema\", () => {\n  result = read(root, \"result.json\");\n  assert.deepEqual(Object.keys(result).sort(), [\n    \"engineEnv\", \"fileNonce\", \"shellDigest\", \"sum\", \"toolNonce\",\n  ]);\n  assert.equal(typeof result.sum, \"number\");\n  for (const key of [\"engineEnv\", \"fileNonce\", \"shellDigest\", \"toolNonce\"]) {\n    assert.equal(typeof result[key], \"string\", `${key} must be a string`);\n  }\n});\ncheck(\"file-read\", () => assert.equal(result.fileNonce, expected.fileNonce));\ncheck(\"inference\", () => assert.equal(result.sum, expected.left + expected.right));\ncheck(\"shell-and-environment\", () => {\n  shell = read(root, \"shell.json\");\n  assert.deepEqual(shell, { shellDigest: expected.shellDigest, engineEnv: expected.engineEnv });\n  assert.equal(result.shellDigest, shell.shellDigest);\n  assert.equal(result.engineEnv, shell.engineEnv);\n});\ncheck(\"tool-round-trip\", () => {\n  receipt = read(host, \"receipt.json\");\n  assert.equal(receipt.fileNonce, expected.fileNonce);\n  assert.match(receipt.toolNonce, /^[a-f0-9]{48}$/);\n  assert.equal(result.toolNonce, receipt.toolNonce);\n});\nconst passed = checks.every(item => item.status === \"passed\");\nconst report = { engine: process.env.CONFORMANCE_ENGINE, status: passed ? \"passed\" : \"failed\", checks };\nfs.mkdirSync(host, { recursive: true, mode: 0o700 });\nfs.writeFileSync(path.join(host, \"report.json\"), JSON.stringify(report, null, 2), { mode: 0o600, flag: \"wx\" });\nconst summary = [\n  `## Engine conformance: ${report.engine}`,\n  \"\",\n  \"| Probe | Result |\",\n  \"|---|---|\",\n  ...checks.map(item => `| ${item.name} | ${item.status} |`),\n  \"\",\n  `Overall: **${report.status.toUpperCase()}**`,\n  \"\",\n].join(\"\\n\");\nif (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);\nconsole.log(summary);\nfor (const item of checks.filter(item => item.status === \"failed\")) {\n  const message = `${item.name}: ${item.error}`.replace(/%/g, \"%25\").replace(/\\r/g, \"%0D\").replace(/\\n/g, \"%0A\");\n  console.error(`::error::${message}`);\n}\nif (!passed) process.exitCode = 1;\nJS\n"
       - if: always()
         name: Upload engine conformance evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           if-no-files-found: error
           name: engine-conformance-pi
@@ -1126,7 +1126,7 @@ jobs:
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: agent
           path: |
@@ -1214,7 +1214,7 @@ jobs:
       - name: Download agent output artifact
         id: download-agent-output
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: "{agent,agent-output-fallback}"
           merge-multiple: true
@@ -1232,7 +1232,7 @@ jobs:
         id: download-safe-outputs-manifest
         if: always()
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: safe-outputs-items
           merge-multiple: true
@@ -1384,7 +1384,7 @@ jobs:
         id: upload-usage-artifact
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: usage
           path: |
@@ -1419,7 +1419,7 @@ jobs:
         id: upload-usage-artifact-retry
         if: always() && steps.upload-usage-artifact.outcome == 'failure'
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: usage
           path: |
@@ -1518,7 +1518,7 @@ jobs:
       - name: Download agent output artifact
         id: download-agent-output
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: "{agent,agent-output-fallback}"
           merge-multiple: true

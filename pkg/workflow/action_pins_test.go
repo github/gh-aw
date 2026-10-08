@@ -967,12 +967,12 @@ func TestGetActionPinWithData_V7Fallback(t *testing.T) {
 
 	t.Logf("Result: %s", result)
 
-	if !strings.HasSuffix(result, "# v7.0.1") {
+	if !strings.HasSuffix(result, "# v7.0.2") {
 		t.Errorf("Expected single resolved version comment in result, got: %s", result)
 	}
 
-	// Check the SHA matches v7 (resolves to v7.0.1 pin)
-	expectedSHA := "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+	// Check the SHA matches v7 (resolves to v7.0.2 pin)
+	expectedSHA := "cf430e030ddbb5b0abf93d22962f4752f3646cd9"
 	if !strings.Contains(result, expectedSHA) {
 		t.Errorf("Expected SHA %s in result, got: %s", expectedSHA, result)
 	}

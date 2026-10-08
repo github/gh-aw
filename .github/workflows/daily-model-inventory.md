@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload OpenAI artifacts
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: openai-models
           path: |
@@ -152,7 +152,7 @@ jobs:
 
       - name: Upload Anthropic artifacts
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: anthropic-models
           path: |
@@ -213,7 +213,7 @@ jobs:
 
       - name: Upload Gemini artifacts
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: gemini-models
           path: |
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload GitHub Copilot billing models artifact
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: copilot-billing-models
           path: /tmp/gh-aw/agent/model-inventory/copilot-billing/models.json
@@ -306,7 +306,7 @@ jobs:
 
       - name: Upload GitHub Copilot SDK models artifact
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: copilot-sdk-models
           path: /tmp/gh-aw/agent/model-inventory/copilot-sdk/models.json
@@ -315,7 +315,7 @@ jobs:
 
 steps:
   - name: Download all model artifacts
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       path: /tmp/gh-aw/agent/model-inventory/artifacts
 
