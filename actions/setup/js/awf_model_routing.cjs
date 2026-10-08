@@ -63,6 +63,8 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   if (!isModelAvailableInReflectData(wireModel, reflectData, REFLECT_PROVIDER_ALIASES.github)) {
     return { selection: null, error: `AWF /reflect selected unavailable Copilot wire model ${wireModel}` };
   }
+  const routingModelAmbiguity = getAWFRoutingModelAmbiguityError(reflectData, wireModel);
+  if (routingModelAmbiguity) return { selection: null, error: routingModelAmbiguity };
   let effectiveEndpoint = endpoint;
   if (allowedEndpoints && !allowedEndpoints.includes(endpoint)) {
     if (!allowEndpointOverride) {
@@ -97,14 +99,37 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
  * @returns {any|null}
  */
 function getAWFRoutingModel(reflectData, wireModel) {
+  const matches = getAWFRoutingModelMatches(reflectData, wireModel);
+  return matches.length === 1 ? matches[0].model : null;
+}
+
+/**
+ * @param {any} reflectData
+ * @param {string} wireModel
+ * @returns {string|null}
+ */
+function getAWFRoutingModelAmbiguityError(reflectData, wireModel) {
+  const matches = getAWFRoutingModelMatches(reflectData, wireModel);
+  if (matches.length <= 1) return null;
+  const endpoints = matches.map(match => match.endpoint).join(", ");
+  return `AWF /reflect has ambiguous routing metadata for model ${wireModel}; configured GitHub endpoints [${endpoints}] all list this model`;
+}
+
+/**
+ * @param {any} reflectData
+ * @param {string} wireModel
+ * @returns {{endpoint: string, model: any}[]}
+ */
+function getAWFRoutingModelMatches(reflectData, wireModel) {
   const endpoints = Array.isArray(reflectData?.endpoints) ? reflectData.endpoints : [];
   const normalizedModel = wireModel.toLowerCase();
+  const matches = [];
   for (const endpoint of endpoints) {
     if (endpoint?.configured !== true || !REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(endpoint.provider))) continue;
     const model = endpoint.routing_models?.find(candidate => typeof candidate?.model_id === "string" && candidate.model_id.toLowerCase() === normalizedModel);
-    if (model) return model;
+    if (model) matches.push({ endpoint: typeof endpoint.provider === "string" ? endpoint.provider.trim().toLowerCase() : "unknown", model });
   }
-  return null;
+  return matches;
 }
 
 /**
@@ -129,5 +154,6 @@ module.exports = {
   mapAWFRoutingEffort,
   resolveAWFModelRoutingSelection,
   getAWFRoutingModel,
+  getAWFRoutingModelAmbiguityError,
   isModelAvailableInReflectData,
 };

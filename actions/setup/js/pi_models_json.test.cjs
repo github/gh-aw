@@ -231,6 +231,19 @@ describe("pi_models_json.cjs", () => {
       expect(piModelsJson.resolvePiRoutingEndpoint({ reflectData, modelId: "claude-opus-5", api: "anthropic-messages" }).error).toContain("candidate metadata is incomplete");
     });
 
+    it("fails closed when multiple configured GitHub endpoints list the Pi model", () => {
+      const reflectData = {
+        endpoints: [
+          { provider: "copilot", configured: true, routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] }] },
+          { provider: "github", configured: true, routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: ["/v1/messages"] }] },
+        ],
+      };
+      const result = piModelsJson.resolvePiRoutingEndpoint({ reflectData, modelId: "claude-opus-5", api: "anthropic-messages" });
+      expect(result.endpoint).toBe("/v1/messages");
+      expect(result.error).toContain("model claude-opus-5");
+      expect(result.error).toContain("[copilot, github]");
+    });
+
     it("fails when the catalog API endpoint is not advertised for the selected model", async () => {
       process.env.GH_AW_MODEL_ROUTING = "1";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";

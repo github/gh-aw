@@ -38,7 +38,7 @@ const { loadModelsJson } = require("./model_costs.cjs");
 const { loadPiSDK, nativePiProvider, parsePiConfig, stagePiArtifacts } = require("./pi_runtime.cjs");
 const { preparePiSubagents } = require("./pi_subagent_config.cjs");
 const { buildCatalogFromReflect } = require("./resolve_model_alias.cjs");
-const { resolveAWFModelRoutingSelection, getAWFRoutingModel, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, getAWFRoutingModel, getAWFRoutingModelAmbiguityError, mapAWFRoutingEffort } = require("./awf_model_routing.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const PI_ROUTING_ENDPOINT_APIS = Object.freeze({
@@ -301,6 +301,8 @@ function resolvePiModelRouting(reflectData) {
  */
 function resolvePiRoutingEndpoint({ reflectData, modelId, api }) {
   const endpoint = PI_API_ROUTING_ENDPOINTS[api] || null;
+  const routingModelAmbiguity = getAWFRoutingModelAmbiguityError(reflectData, modelId);
+  if (routingModelAmbiguity) return { endpoint, error: routingModelAmbiguity };
   const routingModel = getAWFRoutingModel(reflectData, modelId);
   const supportedEndpoints = routingModel?.supported_endpoints;
   if (routingModel?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
