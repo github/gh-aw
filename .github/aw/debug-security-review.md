@@ -29,6 +29,32 @@ validation remains required for live execution; it is not a request for the
 user to perform the technical review. Never retrieve secret values or claim
 to have verified credential validity/expiry when metadata cannot establish it.
 
+## Session Authorization
+
+The user may explicitly grant live-debug authorization for the current session.
+Record the originating message, session ID, workflow/ref scope, allowed effects
+and destinations, run/time/spend caps, and monitoring bounds in session artifacts.
+Use the agreed bounds; extending authorization's lifetime does not increase them.
+No response or request to change guidance grants execution permission.
+
+While the grant remains valid, do not ask for repeated approval of in-scope
+iterations. Source/lock changes still require fresh agent review, compilation,
+and exact revision/hash tracking before each upload/dispatch. Session approval
+covers that agent-led revalidation, not unreviewed revisions, new destinations,
+broader effects, or bypassing host restrictions or protected-environment gates.
+
+Any compiler security warning immediately invalidates the session grant. Record
+the warning and stop affected uploads/dispatches; fixing it or obtaining a clean
+compile does not restore approval. Resolve the warning, re-review the revision,
+and obtain fresh explicit user authorization before resuming. Other failed checks
+still block execution under their existing gates.
+
+The grant also ends on revocation, exhausted bounds, or session end, and is not
+inherited by other sessions. Request new authorization for out-of-scope effects.
+For example: "Allow smoke-agy debugging for this session, up to three runs with
+the reviewed destinations and existing per-run limits." Report its remaining
+bounds and any invalidation separately from technical review results.
+
 ## Runtime Readiness Is Not a Review Gate
 
 Do not require proof that a workflow is registered or active, or that its secrets

@@ -255,7 +255,7 @@ func (c *Compiler) generateObservabilitySummary(yaml *strings.Builder, data *Wor
 // OTEL_EXPORTER_OTLP_ENDPOINT env var into workflowData.Env, which is the authoritative
 // result of OTLP detection after all frontmatter (main + imports) has been processed.
 func isOTLPEnabled(data *WorkflowData) bool {
-	if data == nil {
+	if data == nil || data.DryRun {
 		return false
 	}
 	return strings.Contains(data.Env, "OTEL_EXPORTER_OTLP_ENDPOINT")

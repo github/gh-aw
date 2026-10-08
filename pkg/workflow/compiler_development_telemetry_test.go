@@ -20,6 +20,8 @@ env: &shared
     Authorization=private
     X-Tenant=private
   GH_AW_OTLP_ENDPOINTS: '[{"url":"https://traces.example.com"}]'
+  START_DATE: 2026-01-01
+  ANTHROPIC_CUSTOM_HEADERS: "x-aw-gw-github-repo: ${{ github.repository }}"
   KEEP: |
     first
     OTEL_LITERAL: keep this value
@@ -71,7 +73,11 @@ jobs:
 		}
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(content), &compiled))
-	assert.Equal(t, map[string]string{"KEEP": "first\nOTEL_LITERAL: keep this value\n"}, compiled.Env)
+	assert.Equal(t, map[string]string{
+		"KEEP":                     "first\nOTEL_LITERAL: keep this value\n",
+		"START_DATE":               "2026-01-01",
+		"ANTHROPIC_CUSTOM_HEADERS": "x-aw-gw-github-repo: ${{ github.repository }}",
+	}, compiled.Env)
 	job := compiled.Jobs["test"]
 	assert.Equal(t, compiled.Env, job.Env)
 	assert.Equal(t, map[string]string{"KEEP": "container"}, job.Container.Env)
@@ -86,6 +92,7 @@ jobs:
 	assert.NotContains(t, content, "Authorization=private")
 	assert.Contains(t, content, `echo "OTEL_SERVICE_NAME: this is script content"`)
 	assert.Contains(t, content, "env: &shared")
+	assert.Contains(t, content, `ANTHROPIC_CUSTOM_HEADERS: "x-aw-gw-github-repo: ${{ github.repository }}"`)
 	assert.Equal(t, source[:strings.Index(source, "env:")], content[:strings.Index(content, "env:")])
 }
 
@@ -98,6 +105,18 @@ func TestRemoveDryRunTelemetryEnvPreservesUnrelatedYAML(t *testing.T) {
 	require.ErrorContains(t, err, "cannot remove dry-run telemetry")
 	_, err = removeDryRunTelemetryEnv("env: not-a-mapping\n")
 	require.ErrorContains(t, err, "requires an env mapping")
+}
+
+func TestRemoveDryRunTelemetryEnvPreservesScalarText(t *testing.T) {
+	for _, value := range []string{"2026-01-01", "2026-01-01T00:00:00Z", "1e3", "0012", "false"} {
+		t.Run(value, func(t *testing.T) {
+			content, err := removeDryRunTelemetryEnv("env:\n  OTEL_SERVICE_NAME: removed\n  KEEP: " + value + "\n")
+			require.NoError(t, err)
+			var compiled struct{ Env map[string]string }
+			require.NoError(t, yaml.Unmarshal([]byte(content), &compiled))
+			assert.Equal(t, map[string]string{"KEEP": value}, compiled.Env)
+		})
+	}
 }
 
 func TestDryRunTelemetryConfiguration(t *testing.T) {
@@ -133,6 +152,7 @@ func TestDryRunTelemetryConfiguration(t *testing.T) {
 	assert.Nil(t, result.ParsedFrontmatter.Observability)
 	assert.False(t, isOTLPHeadersPresent(result))
 	assert.False(t, isOTLPAttributesPresent(result))
+	assert.False(t, isOTLPEnabled(result))
 	assert.Equal(t, map[string]string{"KEEP": "(main workflow)"}, result.EnvSources)
 	assert.Contains(t, result.Env, "KEEP: preserved")
 	assert.Contains(t, data.RawFrontmatter, "observability")
@@ -185,13 +205,15 @@ engine:
   env:
     OTEL_SERVICE_NAME: engine
     ENGINE_KEEP: preserved
+    START_DATE: "2026-01-01"
+    ANTHROPIC_CUSTOM_HEADERS: "x-aw-gw-github-repo: ${{ github.repository }}"
 env:
   OTEL_CUSTOM: workflow
   OTEL_USER_SECRET: ${{ secrets.USER_TELEMETRY_ONLY }}
   GH_AW_OTLP_ENDPOINTS: '[{"url":"https://manual.example.com"}]'
   GH_AW_OTLP_ATTRIBUTES: '{"test": "value"}'
   KEEP: preserved
-  KEEP_LITERAL: OTEL_EXPORTER_OTLP_HEADERS GH_AW_OTLP_ATTRIBUTES
+  KEEP_LITERAL: OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS GH_AW_OTLP_ATTRIBUTES
 tools:
   github: false
 pre-steps:
@@ -233,12 +255,15 @@ jobs:
 					assert.NotContains(t, compiled, "Check OTLP telemetry configuration")
 					assert.NotContains(t, compiled, "Mask OTLP")
 					assert.NotContains(t, compiled, "Mint OTLP")
+					assert.NotContains(t, compiled, "Generate observability summary")
 					assert.NotContains(t, compiled, `"opentelemetry":`)
 					assert.NotContains(t, compiled, "#   - OTEL_")
 					assert.NotContains(t, compiled, "#   - GH_AW_OTLP_")
 					assert.Contains(t, compiled, "ENGINE_KEEP: preserved")
 					assert.Contains(t, compiled, "KEEP: preserved")
-					assert.Contains(t, compiled, "KEEP_LITERAL: OTEL_EXPORTER_OTLP_HEADERS GH_AW_OTLP_ATTRIBUTES")
+					assert.Contains(t, compiled, "KEEP_LITERAL: OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS GH_AW_OTLP_ATTRIBUTES")
+					assert.Contains(t, compiled, `ANTHROPIC_CUSTOM_HEADERS: "x-aw-gw-github-repo: ${{ github.repository }}"`)
+					assertDryRunEngineDate(t, content)
 				} else {
 					assert.Contains(t, compiled, "OTEL_EXPORTER_OTLP_ENDPOINT:")
 					assert.Contains(t, compiled, "OTEL_SERVICE_NAME: engine")
@@ -254,6 +279,24 @@ jobs:
 			}
 		})
 	}
+}
+
+func assertDryRunEngineDate(t *testing.T, content []byte) {
+	t.Helper()
+	var compiled struct {
+		Jobs map[string]struct {
+			Steps []struct{ Env map[string]string }
+		}
+	}
+	require.NoError(t, yaml.Unmarshal(content, &compiled))
+	foundDate := false
+	for _, step := range compiled.Jobs["agent"].Steps {
+		if value, ok := step.Env["START_DATE"]; ok {
+			assert.Equal(t, "2026-01-01", value)
+			foundDate = true
+		}
+	}
+	assert.True(t, foundDate, "engine environment must retain the original date text")
 }
 
 func assertNoDryRunTelemetryEnv(t *testing.T, value any) {
