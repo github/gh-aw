@@ -126,6 +126,9 @@ const AWFArcDindMinVersion Version = "v0.27.20"
 // cloud-hypervisor preview runtime and its release assets.
 const AWFCloudHypervisorMinVersion Version = "v0.28.11"
 
+// AWFNVXMinVersion is the minimum AWF release with the fail-closed NVX runtime.
+const AWFNVXMinVersion Version = "v0.28.49"
+
 // AWFEnclaveCloudHypervisorMinVersion is the minimum AWF version supporting
 // the release-attested Cloud Hypervisor enclave executor preview.
 const AWFEnclaveCloudHypervisorMinVersion Version = "v0.28.47"
