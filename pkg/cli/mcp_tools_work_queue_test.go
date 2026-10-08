@@ -24,20 +24,12 @@ func TestWorkQueueToolOperations(t *testing.T) {
 		flags     []string
 		output    string
 	}{
-		{"replay", nil, nil, `{"works":{},"claims":{}}`},
-		{"stats", nil, nil, `{"work":0,"available":0}`},
 		{"state", map[string]any{"graph": "graph", "pool": "default", "state": "available", "search": "--request-id=evil", "offset": 0, "limit": 2},
 			[]string{"--graph=graph", "--pool=default", "--state=available", "--search=--request-id=evil", "--offset=0", "--limit=2"},
 			`{"status":"committed_snapshot","rows":[],"next_offset":2}`},
 		{"inspect", map[string]any{"work_id": "work"}, []string{"--work-id=work"}, `{"details":"metadata"}`},
 		{"inspect", map[string]any{"claim_id": "claim"}, []string{"--claim-id=claim"}, `{"details":"claim metadata"}`},
-		{"explain", map[string]any{"work_id": "work"}, []string{"--work-id=work"}, `{"status":"operator_live_read"}`},
-		{"explain", map[string]any{"pool": "default"}, []string{"--pool=default"}, `{"status":"snapshot_prediction"}`},
-		{"explain", map[string]any{"before_claim": "claim"}, []string{"--before-claim=claim"}, `{"claim_id":"claim"}`},
-		{"explain", map[string]any{"request_id": "request"}, []string{"--request-id=request"}, `{"request_id":"request"}`},
-		{"trace", map[string]any{"claim_id": "claim", "offset": 0, "limit": 256}, []string{"--claim-id=claim", "--offset=0", "--limit=256"}, `{"events":[]}`},
-		{"trace", map[string]any{"request_id": "request"}, []string{"--request-id=request"}, `{"events":[]}`},
-		{"evidence", map[string]any{"dispatch_id": "dispatch"}, []string{"--dispatch-id=dispatch"}, `{"reason":"delivery_unknown"}`},
+		{"state", map[string]any{"limit": 256}, []string{"--limit=256"}, `{"rows":[]}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.operation, func(t *testing.T) {
@@ -68,6 +60,11 @@ func TestWorkQueueToolRejectsInvalidArguments(t *testing.T) {
 	t.Parallel()
 	tests := []map[string]any{
 		{},
+		{"operation": "replay"},
+		{"operation": "stats"},
+		{"operation": "explain"},
+		{"operation": "trace"},
+		{"operation": "evidence"},
 		{"operation": "submit"},
 		{"operation": "submit-graph"},
 		{"operation": "dispatch-next"},
@@ -81,16 +78,18 @@ func TestWorkQueueToolRejectsInvalidArguments(t *testing.T) {
 		{"operation": "compact"},
 		{"operation": "tui"},
 		{"operation": "--help"},
-		{"operation": "stats", "pool": ""},
-		{"operation": "stats", "work_id": "work"},
+		{"operation": "inspect", "pool": ""},
+		{"operation": "state", "work_id": "work"},
 		{"operation": "inspect", "request_id": "request"},
+		{"operation": "inspect", "before_claim": "claim"},
+		{"operation": "inspect", "dispatch_id": "dispatch"},
 		{"operation": "state", "offset": -1},
-		{"operation": "trace", "limit": 0},
-		{"operation": "trace", "limit": 257},
+		{"operation": "state", "limit": 0},
+		{"operation": "state", "limit": 257},
 		{"operation": "state", "offset": nil},
 		{"operation": "state", "search": nil},
-		{"operation": "stats", "storage": "issues"},
-		{"operation": "stats", "file": "payload.json"},
+		{"operation": "state", "storage": "issues"},
+		{"operation": "state", "file": "payload.json"},
 	}
 	for _, options := range tests {
 		name, err := json.Marshal(options)
@@ -118,16 +117,19 @@ func TestWorkQueueToolRejectsInvalidArguments(t *testing.T) {
 
 func TestWorkQueueToolDefaultsAndExplicitEmptyFlags(t *testing.T) {
 	t.Parallel()
-	for _, raw := range []string{`{"operation":"state"}`, `{"operation":"explain","pool":""}`} {
+	for _, tt := range []struct {
+		raw   string
+		flags []string
+	}{
+		{`{"operation":"state"}`, nil},
+		{`{"operation":"state","pool":""}`, []string{"--pool="}},
+	} {
 		var args workQueueArgs
-		require.NoError(t, json.Unmarshal([]byte(raw), &args))
-		command, err := workQueueMCPCommand(args, json.RawMessage(raw))
+		require.NoError(t, json.Unmarshal([]byte(tt.raw), &args))
+		command, err := workQueueMCPCommand(args, json.RawMessage(tt.raw))
 		require.NoError(t, err)
-		if args.Operation == "state" {
-			assert.Equal(t, []string{"work-queue", "state", "--json", "--storage=git"}, command)
-		} else {
-			assert.Contains(t, command, "--pool=")
-		}
+		expected := append([]string{"work-queue", "state", "--json", "--storage=git"}, tt.flags...)
+		assert.Equal(t, expected, command)
 	}
 }
 
@@ -150,7 +152,7 @@ func TestWorkQueueToolErrors(t *testing.T) {
 			server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
 			require.NoError(t, registerWorkQueueTool(server, tt.exec))
 			session := connectInMemory(t, server)
-			result, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "work-queue", Arguments: map[string]any{"operation": "stats", "repo": "owner/repo"}})
+			result, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "work-queue", Arguments: map[string]any{"operation": "state", "repo": "owner/repo"}})
 			if err != nil {
 				assert.Contains(t, err.Error(), tt.expect)
 			} else {
@@ -190,9 +192,12 @@ func TestWorkQueueToolSchema(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(encoded, &schema))
 	assert.ElementsMatch(t, []string{"operation", "repo"}, schema.Required)
-	assert.ElementsMatch(t, []string{"state", "inspect", "replay", "stats", "explain", "trace", "evidence"}, schema.Properties["operation"].Enum)
+	assert.ElementsMatch(t, []string{"state", "inspect"}, schema.Properties["operation"].Enum)
+	for _, removed := range []string{"request_id", "before_claim", "dispatch_id"} {
+		assert.NotContains(t, schema.Properties, removed)
+	}
 	for _, options := range []map[string]any{
-		{"operation": "stats"},
+		{"operation": "state"},
 		{"operation": "inspect", "repo": "owner/repo", "work-id": "work"},
 	} {
 		result, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "work-queue", Arguments: options})
@@ -211,12 +216,7 @@ func TestWorkQueueToolCLIValidation(t *testing.T) {
 	for _, raw := range []string{
 		`{"operation":"inspect","work_id":"work","claim_id":"claim"}`,
 		`{"operation":"inspect"}`,
-		`{"operation":"trace","request_id":"request","claim_id":"claim"}`,
-		`{"operation":"trace"}`,
-		`{"operation":"explain","work_id":"work","before_claim":"claim"}`,
-		`{"operation":"explain","request_id":"request","pool":""}`,
 		`{"operation":"state","state":"invalid"}`,
-		`{"operation":"evidence"}`,
 	} {
 		t.Run(raw, func(t *testing.T) {
 			t.Parallel()
