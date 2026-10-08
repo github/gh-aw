@@ -1,16 +1,17 @@
 ---
 title: WorkQueueOps
-description: Process work with the native work-queue feature or simple checklist, cache-memory, and repo-memory alternatives
+description: Process work with the native work-queue feature or simple issue-backed and memory-backed alternatives
 sidebar:
   badge: { text: 'Queue-based', variant: 'note' }
 ---
 
-WorkQueueOps is a pattern for processing a backlog incrementally across workflow runs. The native `tools.work-queue` feature provides a Git-backed queue with fair scheduling, task dependencies, and Claim-scoped effects. Issue checklists, cache-memory, and repo-memory are lightweight alternatives when simple progress tracking is enough.
+WorkQueueOps is a pattern for processing a backlog incrementally across workflow runs. The native `tools.work-queue` feature provides a Git-backed queue with fair scheduling, task dependencies, and Claim-scoped effects. Issue checklists, sub-issues, cache-memory, and repo-memory are lightweight alternatives when simple progress tracking is enough.
 
 | Approach | Choose it when |
 | --- | --- |
 | Native work queue | Multiple workers need fair scheduling, verified dependencies, and authorization for each task attempt. |
 | Issue checklist | A small backlog needs visible progress without deploying a native queue. |
+| Sub-issues | Each work item needs its own discussion, assignee, and completion status under a parent tracking issue. |
 | Cache-memory | A short-lived, branch-local backlog can be reconstructed if the cache is evicted. |
 | Repo-memory | A file-based backlog needs Git history and persistence shared across workflow branches. |
 
@@ -106,6 +107,32 @@ flowchart LR
 ```
 
 Checklist progress markers do not provide native fair scheduling, Claim authority, or verified dependency graphs. The concurrency group serializes runs in that group, but does not protect against other workflows or humans editing the issue.
+
+## Alternative: Sub-Issues
+
+Create one sub-issue per work item under a parent tracking issue. Open sub-issues are pending work; closing a sub-issue marks that item complete. This keeps individual discussions, assignees, and results separate while the parent provides a backlog overview.
+
+Use the GitHub `issues` toolset to read the parent's sub-issues and safe outputs to report and close completed items:
+
+```yaml title="Sub-issue queue frontmatter"
+tools:
+  github:
+    toolsets: [issues]
+
+safe-outputs:
+  add-comment:
+    max: 6
+  close-issue:
+    max: 5
+
+concurrency:
+  group: sub-issue-queue
+  cancel-in-progress: false
+```
+
+Each run lists all pages of the parent's open sub-issues, processes at most five, and adds a result comment before closing each successfully completed item. Leave failed items open with an explanation, then add one progress comment on the parent. Use a shared concurrency group for workflows processing the same parent and check for existing results before retrying work.
+
+Sub-issue relationships organize the backlog; they do not enforce processing order, verified dependencies, or Claim-scoped authorization. Other workflows and human edits remain outside the concurrency group's protection.
 
 ## Alternative: Cache-Memory
 

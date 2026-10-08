@@ -4,7 +4,7 @@ description: Git-backed work queue roles, Claim-scoped effects, operator command
 ---
 
 Work queues can be Git-backed or issue-backed. Native `tools.work-queue` uses
-Git storage. Lightweight issue checklists use
+Git storage. Lightweight issue checklists and sub-issue queues use
 [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) with GitHub read tools and safe
 outputs. This reference describes the native version-3 protocol, whose compiler
 and runtime reject `storage: issues`.
@@ -19,7 +19,7 @@ durable Claims, not CPU time or successful completions.
 
 In the native protocol, issues and pull requests can be dependency nodes, but
 cannot store the queue. [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) describes
-issue checklists, cache-memory, and repo-memory as alternatives, but those
+issue checklists, sub-issues, cache-memory, and repo-memory as alternatives, but those
 progress markers do not provide native fair scheduling, Claim authority, or
 verified dependency graphs.
 
