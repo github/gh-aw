@@ -17,7 +17,9 @@ func (c *Compiler) validateRuntimeSetupCaches(data *WorkflowData) error {
 	}
 
 	var offendingSteps []string
-	for _, section := range []string{data.PreSteps, customSteps, data.PreAgentSteps, data.PostSteps} {
+	sections := []string{data.PreSteps, customSteps, data.PreAgentSteps, data.PostSteps}
+	sections = append(sections, agentJobSetupStepSections(data)...)
+	for _, section := range sections {
 		if !strings.Contains(strings.ToLower(section), "astral-sh/setup-uv") {
 			continue
 		}
@@ -53,6 +55,7 @@ func uvSetupCacheEnabled(step map[string]any) bool {
 	if !ok {
 		return false
 	}
+
 	uses, _, _ = strings.Cut(uses, " #")
 	repo, _, _ := strings.Cut(strings.TrimSpace(uses), "@")
 	if !strings.EqualFold(repo, "astral-sh/setup-uv") {
@@ -67,4 +70,27 @@ func uvSetupCacheEnabled(step map[string]any) bool {
 		}
 	}
 	return true
+}
+
+func agentJobSetupStepSections(data *WorkflowData) []string {
+	if data == nil || data.Jobs == nil {
+		return nil
+	}
+	agentConfig, ok := data.Jobs["agent"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	var sections []string
+	for _, field := range []string{"setup-steps", "pre-steps"} {
+		steps, exists := agentConfig[field]
+		if !exists {
+			continue
+		}
+		section, err := yaml.Marshal(map[string]any{field: steps})
+		if err == nil {
+			sections = append(sections, string(section))
+		}
+	}
+	return sections
 }

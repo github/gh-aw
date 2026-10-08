@@ -76,6 +76,20 @@ func TestComputeAWFExcludeEnvVarNamesUVHostPaths(t *testing.T) {
 			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
 		},
 		{
+			name: "agent job setup-steps",
+			data: WorkflowData{Jobs: map[string]any{"agent": map[string]any{
+				"setup-steps": []any{map[string]any{"uses": "astral-sh/setup-uv@v5"}},
+			}}},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "agent job pre-steps",
+			data: WorkflowData{Jobs: map[string]any{"agent": map[string]any{
+				"pre-steps": []any{map[string]any{"uses": "astral-sh/setup-uv@v5"}},
+			}}},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
 			name:    "post-step setup does not affect agent",
 			data:    WorkflowData{PostSteps: "post-steps:\n  - uses: astral-sh/setup-uv@v5\n"},
 			notWant: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
@@ -138,6 +152,22 @@ func TestComputeAWFExcludeEnvVarNamesUVHostPaths(t *testing.T) {
 			data: WorkflowData{
 				CustomSteps: "steps:\n  - run: uv sync\n",
 				Env:         "env:\n  UV_CACHE_DIR: ${{ secrets.CACHE }}\n",
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "secret expression without whitespace remains excluded",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - uses: astral-sh/setup-uv@v7\n",
+				Env:         "env:\n  UV_CACHE_DIR: ${{secrets.CACHE}}\n",
+			},
+			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
+		},
+		{
+			name: "compound secret expression remains excluded",
+			data: WorkflowData{
+				CustomSteps: "steps:\n  - uses: astral-sh/setup-uv@v7\n",
+				Env:         "env:\n  UV_CACHE_DIR: ${{ vars.UV_CACHE_DIR || secrets.CACHE }}\n",
 			},
 			want: []string{"UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR"},
 		},

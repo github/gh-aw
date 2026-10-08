@@ -153,7 +153,7 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	agentConfig := getAgentConfig(workflowData)
 	if agentConfig != nil {
 		for varName, varValue := range agentConfig.Env {
-			if strings.Contains(varValue, "${{ secrets.") || ContainsJobOutputExpr(varValue) {
+			if len(ExtractSecretsFromValue(varValue)) > 0 || ContainsJobOutputExpr(varValue) {
 				addUnique(varName)
 			}
 		}
@@ -198,7 +198,7 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	frontmatterEnv := parseEnvYAMLSection(workflowData.Env)
 	for _, name := range runtimeHostOnlyEnvVarNames(workflowData) {
 		if value, overridden := frontmatterEnv[name]; overridden {
-			if value, ok := value.(string); ok && (strings.Contains(value, "${{ secrets.") || ContainsJobOutputExpr(value)) {
+			if value, ok := value.(string); ok && (len(ExtractSecretsFromValue(value)) > 0 || ContainsJobOutputExpr(value)) {
 				addUnique(name)
 			}
 			continue
@@ -234,7 +234,9 @@ func runtimeHostOnlyEnvVarNames(workflowData *WorkflowData) []string {
 	type setupStep struct {
 		Uses string `yaml:"uses"`
 	}
-	for _, section := range []string{workflowData.PreSteps, workflowData.CustomSteps, workflowData.PreAgentSteps} {
+	sections := []string{workflowData.PreSteps, workflowData.CustomSteps, workflowData.PreAgentSteps}
+	sections = append(sections, agentJobSetupStepSections(workflowData)...)
+	for _, section := range sections {
 		var blocks map[string][]setupStep
 		if err := yaml.Unmarshal([]byte(section), &blocks); err != nil {
 			continue

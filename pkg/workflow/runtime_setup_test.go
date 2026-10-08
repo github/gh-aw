@@ -594,6 +594,14 @@ func TestDeduplicateUVDisablesCache(t *testing.T) {
 	}
 }
 
+func TestDeduplicatePreservesUnrelatedActionContainingRuntimeRepo(t *testing.T) {
+	customSteps := "steps:\n  - uses: other/astral-sh/setup-uv@v10\n  - run: uv sync\n"
+	steps, requirements, err := DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps, []RuntimeRequirement{{Runtime: findRuntimeByID("uv")}})
+	require.NoError(t, err)
+	assert.Contains(t, steps, "other/astral-sh/setup-uv@v10")
+	require.Len(t, requirements, 1)
+}
+
 func TestGenerateRuntimeSetupSteps_UVWithoutVersionRendersRuntimeExtraWithFields(t *testing.T) {
 	uvRuntime := *findRuntimeByID("uv")
 	uvRuntime.ExtraWithFields = map[string]string{

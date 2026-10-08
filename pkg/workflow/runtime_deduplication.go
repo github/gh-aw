@@ -102,7 +102,8 @@ func DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps string, runtimeRequ
 		shouldRemove := false
 		shouldPreserve := false
 		for actionRepo, req := range actionRepoToReq {
-			if strings.Contains(usesStr, actionRepo) {
+			usesRepo, _, hasRef := strings.Cut(strings.TrimSpace(usesStr), "@")
+			if hasRef && strings.EqualFold(usesRepo, actionRepo) {
 				// Check if the step has custom "with" fields that differ from defaults
 				withVal, hasWith := step["with"]
 				if hasWith {

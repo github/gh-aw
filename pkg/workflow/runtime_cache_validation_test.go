@@ -76,10 +76,27 @@ func TestValidateRuntimeSetupCachesAgentStepSections(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeSetupCachesAgentJobSections(t *testing.T) {
+	for _, section := range []string{"setup-steps", "pre-steps"} {
+		t.Run(section, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.SetStrictMode(true)
+			data := &WorkflowData{
+				Jobs: map[string]any{
+					"agent": map[string]any{
+						section: []any{map[string]any{"uses": "astral-sh/setup-uv@v10"}},
+					},
+				},
+			}
+			require.ErrorContains(t, compiler.validateRuntimeSetupCaches(data), "enable-cache: false")
+		})
+	}
+}
+
 func TestValidateRuntimeSetupCachesIgnoresOtherActions(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
-	data := &WorkflowData{CustomSteps: "steps:\n  - uses: other/astral-sh/setup-uv@v10\n"}
+	data := &WorkflowData{CustomSteps: "steps:\n  - uses: other/astral-sh/setup-uv@v10\n  - run: uv sync\n"}
 	require.NoError(t, compiler.validateRuntimeSetupCaches(data))
 }
 
