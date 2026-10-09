@@ -13,7 +13,7 @@ This directory models the factory's queue-worker lifecycle and compares its assu
 | `trace.mjs`        | Strict finite-value trace parser, independent abstraction replay and readable trace rendering                                          |
 | `compare.test.mjs` | Comparison sensitivity, mutated executable fixture and generated trace validation tests                                                |
 
-The universe contains two externally admitted root Works. Each has a provisioned worker profile; equal priority, dependency readiness, capacity, run binding and resource authorization are simplified assumptions. `Dispatch` projects the first compatible worker assignment from one protected prefix request, not the complete native dispatch set. Homogeneous batching is permitted only when `Batch` is true; otherwise the assignment is a singleton. Different profiles cannot share an assignment. Actual mixed-profile probes produce two separate dispatches; leaving the other modeled Work queued is projection, not a claim about scheduler selection. This two-Work projection does not exercise all three dispatch slots, profile trust-domain/share-key restrictions, assignment byte bounds or queue fairness/recovery algorithms.
+The universe contains two externally admitted root Works. `queueBranch` starts absent; the first authorized producer submit atomically creates it with the compiler-approved Policy and Work. `Installed` models availability of that compiled Policy proposal, not an administrator-seeded ledger. Dispatch requires the created branch and Policy. Each Work has a provisioned worker profile; equal priority, dependency readiness, capacity, run binding and resource authorization are simplified assumptions. `Dispatch` projects the first compatible worker assignment from one protected prefix request, not the complete native dispatch set. Homogeneous batching is permitted only when `Batch` is true; otherwise the assignment is a singleton. Different profiles cannot share an assignment. Actual mixed-profile probes produce two separate dispatches; leaving the other modeled Work queued is projection, not a claim about scheduler selection. This two-Work projection does not exercise all three dispatch slots, profile trust-domain/share-key restrictions, assignment byte bounds or queue fairness/recovery algorithms.
 
 `birth` records original membership and `original` must remain equal to it. Implicit Claim selection is allowed only for an original singleton, regardless of how many members later finish or cancel. `Stage` projects one output family per Claim: miner PR, refiner issue or monster remediation assignment. Its count is **not** the aggregate of every output type. Modeled `OutputMin`/`OutputMax` are scenario assumptions, not the complete worker-specific contracts prepared by `eslint_factory_portfolio.cjs`. A separate no-write scenario models explicit no-write Work.
 
@@ -31,7 +31,7 @@ daily producer's cancellation or live reservation release.
 
 ## Checked properties
 
-The safety configurations check types, immutable original membership, homogeneous batches, installed policy, unambiguous original Claim selection, Completion before writes, independent readback before Result, per-Claim result cardinality, warning-only exit-zero behavior, explicit admission and assignment size. With only two Works, `BoundedAssignment <= 3` is a finite-universe bound, not validation of the full three-slot dispatcher budget. `Spec` permits stuttering; deadlock checking is disabled for terminal or stalled workers. No fairness assumption or temporal progress property is checked.
+The safety configurations check types, immutable original membership, homogeneous batches, compiled Policy availability, branch creation with first admission, unambiguous original Claim selection, Completion before writes, independent readback before Result, per-Claim result cardinality, warning-only exit-zero behavior, explicit admission and assignment size. With only two Works, `BoundedAssignment <= 3` is a finite-universe bound, not validation of the full three-slot dispatcher budget. `Spec` permits stuttering; deadlock checking is disabled for terminal or stalled workers. No fairness assumption or temporal progress property is checked.
 
 Each negative configuration changes exactly one abstraction rule and requires the **named** invariant violation, not merely a nonzero TLC exit:
 
@@ -40,7 +40,7 @@ Each negative configuration changes exactly one abstraction rule and requires th
 | Permit an implicit selector for an original multi-Claim assignment | `ScopedIntents`            |
 | Shrink original membership after cancellation                      | `ImmutableMembership`      |
 | Mix worker profiles in a batch                                     | `HomogeneousBatch`         |
-| Admit/dispatch without installed policy                            | `PolicyRequired`           |
+| Admit/dispatch without compiled Policy proposal                    | `PolicyRequired`           |
 | Write before Completion                                            | `EffectRequiresCompletion` |
 | Settle without independent readback                                | `ResultRequiresReadback`   |
 | Verify an under-minimum output count                               | `ResultCardinality`        |
@@ -59,7 +59,7 @@ Build and scan fixtures reuse existing source/dependencies via symlinks as build
 | --- | --- |
 | Assignment protocol is version 3, original payload is deeply frozen | Native `normalizeAssignment` probes; this normalization alone is not authentication |
 | Singleton selection differs from original multi-Claim selection | Native scope, foreign-selector, authority-override and nested AsyncLocalStorage escape probes |
-| Policy/profile installation and producer entitlement are required | Native replay/policy rejection probes; default profile has `max_claims: 1`, permitted batch has two members, mixed profiles produce separate dispatches |
+| First-submit Policy bootstrap, profile installation and producer entitlement are required | Native replay/store tests; default profile has `max_claims: 1`, permitted batch has two members, mixed profiles produce separate dispatches |
 | Winning Claim/native attempt/principal gate authority | `claimAuthority` probes reject unfinished, cancelled, wrong-principal and later-attempt Claims; positive completed state is a detached fixture mutation, not fabricated durable evidence |
 | Count contracts are per Claim | Actual collector entrypoint accepts three issues for each of two Claims, rejects one Claim's overflow without charging its sibling, and checks a missing sibling's minimum independently. Native diagnostic delivery checks also reject invalid counts; six accepted intents do not establish six native writes |
 | Completion/success cannot replace readback | Missing exact receipts/verifier remain unknown; the protected two-argument delivery facade rejects untrusted nominal success |

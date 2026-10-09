@@ -25,14 +25,17 @@ ledgers.
 
 | Workflow | Assigned work | Intended outputs |
 | --- | --- | --- |
-| [Dispatcher](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-factory-dispatcher.md) | Admit the daily cohort, then request a fair prefix within the installed pool policy | Three independent tasks and a bounded dispatch request; report an absent Policy explicitly |
+| [Dispatcher](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-factory-dispatcher.md) | Admit the daily cohort, then request a fair prefix within the compiled pool policy | Three independent tasks and a bounded dispatch request; treat an absent queue as empty and bootstrap on first submit |
 | [Miner](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-miner.md) | Find and implement a useful new ESLint rule | At most one draft rule PR per Claim; cancel write-capable Work when no rule is needed |
 | [Refiner](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-refiner.md) | Identify false positives, missing edge cases, or weak diagnostics | Up to three issues, a discussion, and one immutable memory snapshot per Claim |
 | [Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-monster.md) | Group actionable diagnostics and arrange remediation | Issue updates, Copilot assignments, and a discussion; cancel write-capable Work after a clean scan |
 
-An authenticated operator must first install Policy, producer entitlements,
-worker profiles, immutable workflow revisions, and resource scopes. An
-authorized producer explicitly admits Work with its output contract. The
+Configure producer entitlements, worker profiles, immutable workflow revisions,
+resource scopes, and a matching protected-branch ruleset before enabling the
+factory. The compiler embeds the validated Policy proposal. The first trusted
+producer submit installs that Policy with its Work and creates the queue branch;
+no administrator needs to seed the queue. An authorized producer explicitly
+admits Work with its output contract. The
 supplied workflows do **not** automatically create a miner-to-refiner-to-monster
 DAG, and creating a refinement issue does not submit another Work.
 
@@ -50,7 +53,15 @@ does not itself admit any Work. Workers still require authenticated assignments;
 they do not seed tasks. The separate `daily-report-dispatcher` uses the
 `daily-reports` pool and is not this factory's producer.
 
-### Provision the factory policy
+### Bootstrap the factory policy
+
+Activation reports a missing queue branch as `queue_state: "uninitialized"`
+without writing to it. The dispatcher can continue as a producer: its first
+`work_queue_submit` safe output atomically creates the branch with the compiled
+Policy and admitted Work. A dispatch-only request cannot bootstrap the queue.
+Protect the `work-queue` branch name with a ruleset pattern before enabling the
+dispatcher; do not substitute an ordinary workflow dispatch for a queue
+assignment.
 
 The checked-in policy generator provides three immutable worker profiles,
 singleton assignments, three native slots, and a 30-pending-task limit:
@@ -63,13 +74,15 @@ node actions/setup/js/eslint_factory_portfolio.cjs policy \
   --file eslint-factory-policy.json --epoch eslint-factory-v1
 ```
 
-Generation does not authenticate principals, install Policy, protect the queue
-branch, or launch workers. Use verified positive decimal principal IDs from the
-trusted producer and dispatch credential flows, not display names or assumed
-`github.actor` values. Follow the [deployment guide](/gh-aw/guides/deploy-work-queue/)
-before the administrator-only installation command. If the queue already serves
-other pools, retain their configuration when preparing a quiescent Policy update;
-do not replace it with this single-pool template.
+Generation does not authenticate principals, protect the queue branch, or launch
+workers. The generated policy must be represented by the dispatcher's
+compiler-validated work-queue configuration for safe-output bootstrap. Use
+verified positive decimal principal IDs from trusted producer and dispatch
+credential flows, not display names or assumed `github.actor` values. Follow the
+[deployment guide](/gh-aw/guides/deploy-work-queue/) to configure branch rules.
+An administrator may still install Policy explicitly; later policy changes
+require a drained queue. If the queue already serves other pools, retain their
+configuration rather than replacing it with this single-pool template.
 
 Prepared payloads freeze the repository's verified numeric identity and
 worker-specific output contracts. The miner permits one draft PR; the refiner
@@ -99,21 +112,24 @@ go build -o ./gh-aw ./cmd/gh-aw
 ./gh-aw work-queue --repo github/gh-aw explain --pool default --json
 ```
 
-`queue_missing: queue branch work-queue does not exist` means deployment has not
-initialized the queue. It is not an initialized empty backlog. The agent's
-`work_queue_read` snapshot reports this distinction as
-`queue_state: "uninitialized"`. Report the missing Policy explicitly rather than
-recording a successful empty-queue `noop`. Install Policy and producer entitlements
-through the [deployment guide](/gh-aw/guides/deploy-work-queue/); do not invent
-worker principal IDs or bypass queue-branch writer protections.
+`queue_missing: queue branch work-queue does not exist` means the queue has not
+yet been provisioned; the producer safe-output path treats it as empty and
+creates the branch only when it atomically commits its first Policy and Work.
+The agent's `work_queue_read` snapshot reports
+`queue_state: "uninitialized"`. Continue with the trusted producer plan and
+`work_queue_submit`; do not claim a successful empty-queue `noop`. Missing
+compiler Policy, invalid producer entitlements, or a denied Git read still block
+publication. Do not invent worker principal IDs or bypass queue-branch writer
+protections.
 
 Hosted activation can fail at **Snapshot work queue state**, before the agent
 starts. Diagnose that boundary separately from the agent's queue tools.
 Installation-token repository metadata can report `permissions.pull: false`
 despite usable contents access; actual Git reads establish visibility, not
 collaborator flags. A denied Git read is not an empty queue. Even with readable
-refs, dispatcher activation requires installed Policy and otherwise fails with
-`work_queue_policy_missing`; prompt instructions cannot bootstrap it.
+refs, first-submit bootstrap requires the compiler's validated Policy proposal.
+The snapshot alone does not bootstrap the branch; trusted safe-output processing
+does so only when it accepts a producer submission.
 
 Inspect an existing dispatcher run without launching another:
 
@@ -178,8 +194,9 @@ safe-outputs:
 ---
 
 Do not select Work IDs, workers, revisions, or targets from a queue snapshot.
-Read work_queue_read first and check queue_state. Report an uninitialized queue
-with missing_data; it is not an empty backlog and must not produce noop.
+Read work_queue_read first and check queue_state. An uninitialized queue is
+empty; submit the trusted daily plan to provision it rather than reporting
+missing_data or producing noop.
 Read the trusted daily plan and stage its exact nodes with work_queue_submit.
 Repeated admissions of the same UTC date are idempotent.
 Request the trusted scheduler's fair prefix with work_queue_dispatch_next:
