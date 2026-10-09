@@ -1790,8 +1790,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-        - FairDAGGitHub
-        - QueueOrdering
+          - FairDAGGitHub
+          - QueueOrdering
     # Permissions for the formal_checks job (workflow permissions default to none).
     permissions:
       contents: read
