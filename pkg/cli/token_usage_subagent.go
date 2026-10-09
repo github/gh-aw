@@ -294,10 +294,7 @@ func reconcileAgentUsageCredits(summary *TokenUsageSummary, entries []TokenUsage
 	slices.Sort(endpoints)
 	endpoint := strings.Join(endpoints, ", ")
 	if endpoint == "" {
-		endpoint = summary.endpoint
-		if endpoint == "" {
-			endpoint = "unknown endpoint"
-		}
+		endpoint = "unknown endpoint"
 	}
 	addTokenUsageWarning(summary, fmt.Sprintf("per-agent AI credits (%.3f) differ from non-classifier proxy total (%.3f) for endpoint %s", attributed, expected, endpoint))
 }
