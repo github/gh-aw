@@ -14,25 +14,9 @@ For downstream result tracking, see [Outcomes](/gh-aw/reference/outcomes/).
 
 ## Timing of Cost and Outcomes
 
-Cost estimates are usually available early, while accurate cost
-measurement often arrives later from GitHub Actions minutes,
-runner duration, inference usage, and storage or artifact retention.
+Cost estimates are available early, while accurate cost arrives later from Actions minutes, runner duration, inference usage, and artifact retention. Outcomes arrive later still: a comment may wait days for a response, and a proposed change or created issue matters only once it is merged or resolved.
 
-Outcomes arrive later. A comment may not get a response for days,
-a proposed change may matter only after it is accepted or merged,
-and a created issue may create value only after it is resolved. If
-you collect outcomes in a separate workflow or reporting pass,
-that delay is expected.
-
-Avoid custom impact formulas. Start with the small set of metrics
-gh-aw already exposes, and read each one on the timeline where it
-becomes trustworthy.
-
-Use metric layers instead of a synthetic score: operational metrics
-show whether the workflow runs reliably, cost-efficiency metrics
-show what useful execution costs, outcome metrics show whether the
-workflow produced something that mattered, and long-term impact
-metrics show whether the workflow improved the broader system.
+Avoid custom impact formulas. Use the metrics gh-aw already exposes, each read on the timeline where it becomes trustworthy, in layers rather than a synthetic score:
 
 | Layer | Start with | Data source |
 | --- | --- | --- |
@@ -41,21 +25,9 @@ metrics show whether the workflow improved the broader system.
 | Outcomes | Accepted, rejected, pending, acceptance rate, time to outcome | [`gh aw outcomes`](/gh-aw/setup/cli/#outcomes) |
 | Long-term impact | Backlog, review time, defects, or another repository-specific goal | Repository analytics or organization reporting |
 
-Long-term impact matters, but it is usually the hardest to measure
-and attribute directly.
-
-For most teams, start with run volume, execution success, Actions
-minutes, inference cost, useful output rate, and acceptance over
-time. These metrics are easy to observe and improve. Once they are
-stable, connect them to downstream questions such as whether
-outputs were used, accepted, merged, or helped reduce later work.
+Long-term impact matters but is the hardest to attribute directly. Most teams should start with run volume, execution success, cost, useful output rate, and acceptance over time. Once those are stable, connect them to downstream questions such as whether outputs were accepted, merged, or reduced later work.
 
 ## A Practical Measurement Model
-
-Start simple. For most teams, the right first dashboard is run
-volume, execution success, cost, useful output rate, and
-acceptance over time. That is enough to tell you whether a
-workflow is doing useful work at a reasonable price.
 
 For workflows that produce [safe outputs](/gh-aw/reference/safe-outputs/),
 use this measurement loop:
@@ -79,28 +51,11 @@ state of the affected issues, pull requests, comments, and other
 supported objects. See [Outcomes](/gh-aw/reference/outcomes/#evaluating-outcomes-in-practice)
 for evaluation timing, result interpretation, and telemetry export.
 
-Use the built-in telemetry before designing anything more complex.
-`gh aw logs` covers runs and cost, while [Outcomes](/gh-aw/reference/outcomes/)
-covers downstream acceptance. If you need repository-wide or
-organization-wide trends, send the same data to
-[OpenTelemetry](/gh-aw/reference/open-telemetry/).
+Use built-in telemetry first: `gh aw logs` covers runs and cost, and [Outcomes](/gh-aw/reference/outcomes/) covers downstream acceptance. For repository-wide or organization-wide trends, send the same data to [OpenTelemetry](/gh-aw/reference/open-telemetry/).
 
-This is enough to show where impact is breaking down: a workflow
-that runs reliably but produces little value, one that creates
-useful output that rarely gets adopted, or one that is effective
-but too expensive. Detailed downstream outcome evaluation belongs
-in [Outcomes](/gh-aw/reference/outcomes/).
+This shows where impact breaks down: a workflow that runs reliably but produces little value, produces output that is rarely adopted, or is effective but too expensive.
 
-A workflow can look efficient on its own while still reducing total
-system value. That usually happens when two workflows act on the
-same issue or pull request, overlapping triggers create duplicate
-outputs, or competing suggestions increase review burden.
-
-Measure both local efficiency and system-level overlap. Ask whether
-multiple workflows are acting on the same event type, how often
-they produce duplicate outputs, what the cost per unique accepted
-outcome looks like across the system, and which workflows add
-unique value rather than repeating other automation.
+A workflow can look efficient alone while reducing total system value, for example when two workflows act on the same issue or pull request, overlapping triggers create duplicates, or competing suggestions increase review burden. Measure system-level overlap too: which workflows act on the same event type, how often they duplicate output, and what the cost per unique accepted outcome is.
 
 ## System Overlap and Waste
 
@@ -123,9 +78,3 @@ Do not overreact to single numbers. Trend data is usually more
 useful. Look for cost per successful run moving down, useful
 output rate and acceptance moving up, retries dropping, and
 system overlap decreasing.
-
-## Learn More
-
-See [Cost management](/gh-aw/reference/cost-management/) for spend
-controls and [Outcomes](/gh-aw/reference/outcomes/) for downstream
-result tracking.
