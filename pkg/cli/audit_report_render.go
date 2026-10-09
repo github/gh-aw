@@ -131,6 +131,12 @@ func formatAuditComparisonRoute(route *AuditComparisonRoute) string {
 	if route.RouterVersion != "" {
 		value += " router=" + safeModelRoutingText(route.RouterVersion)
 	}
+	if route.EffectiveEndpoint != "" {
+		value += " effective_endpoint=" + safeModelRoutingText(route.EffectiveEndpoint)
+	}
+	if route.SelectedEndpoint != "" {
+		value += " selected_endpoint=" + safeModelRoutingText(route.SelectedEndpoint)
+	}
 	return value
 }
 

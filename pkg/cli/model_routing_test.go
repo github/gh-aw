@@ -265,13 +265,34 @@ func TestAwInfoModelRoutingPreservesSelectedEndpoint(t *testing.T) {
 }
 
 func TestModelRoutingComparisonDetectsRouteChanges(t *testing.T) {
-	before := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2"}
-	after := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "high", Mode: "economy", RouterVersion: "0.1.3"}
+	before := &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/chat/completions",
+	}
+	after := &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "high", Mode: "economy", RouterVersion: "0.1.3",
+		EffectiveEndpoint: "/responses", SelectedEndpoint: "/chat/completions",
+	}
 	if sameModelRoutingRoute(before, after) {
 		t.Fatal("route changes should be detected even when the model is unchanged")
 	}
-	if !sameModelRoutingRoute(before, &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2"}) {
+	if !sameModelRoutingRoute(before, &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/chat/completions",
+	}) {
 		t.Fatal("identical routes should compare as equal")
+	}
+	if sameModelRoutingRoute(before, &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/responses", SelectedEndpoint: "/chat/completions",
+	}) {
+		t.Fatal("effective endpoint changes should be detected")
+	}
+	if sameModelRoutingRoute(before, &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/responses",
+	}) {
+		t.Fatal("selected endpoint changes should be detected")
 	}
 	comparison := buildAuditComparison("success",
 		auditComparisonSnapshot{ModelRouting: after},
@@ -280,6 +301,10 @@ func TestModelRoutingComparisonDetectsRouteChanges(t *testing.T) {
 	)
 	if comparison.Classification.Label != "changed" || !comparison.Delta.ModelRouting.Changed {
 		t.Fatalf("route-only change should be visible in comparison: %+v", comparison)
+	}
+	if comparison.Delta.ModelRouting.Before.EffectiveEndpoint != "/v1/messages" ||
+		comparison.Delta.ModelRouting.After.EffectiveEndpoint != "/responses" {
+		t.Fatalf("route comparison omitted effective endpoints: %+v", comparison.Delta.ModelRouting)
 	}
 }
 
@@ -317,6 +342,27 @@ func TestBuildModelRoutingLogsSummary(t *testing.T) {
 		len(summary.SubagentCosts) != 1 || summary.SubagentCosts[0].Requests != 6 ||
 		math.Abs(summary.SubagentCosts[0].AIC-0.68) > 0.000001 || summary.SubagentCosts[0].CompletedCount != 2 {
 		t.Fatalf("unexpected per-agent routing costs: main=%+v subagents=%+v", summary.MainAgentCost, summary.SubagentCosts)
+	}
+}
+
+func TestBuildModelRoutingLogsSummaryOrdersEndpointDistinctRoutes(t *testing.T) {
+	route := func(effectiveEndpoint string) ProcessedRun {
+		return ProcessedRun{ModelRouting: &ModelRoutingSummary{
+			Status: "selected", SelectedModel: "gpt-5.6-luna", SelectedEffort: "medium",
+			Endpoint: "/chat/completions", EffectiveEndpoint: effectiveEndpoint, SelectedEndpoint: "/chat/completions",
+		}}
+	}
+	routes := []ProcessedRun{route("/v1/messages"), route("/responses")}
+	forward := buildModelRoutingLogsSummary(routes)
+	reverse := buildModelRoutingLogsSummary([]ProcessedRun{routes[1], routes[0]})
+	if forward == nil || reverse == nil || len(forward.Routes) != 2 || len(reverse.Routes) != 2 {
+		t.Fatalf("expected endpoint-distinct routes in both summaries: forward=%+v reverse=%+v", forward, reverse)
+	}
+	for index := range forward.Routes {
+		if forward.Routes[index].EffectiveEndpoint != reverse.Routes[index].EffectiveEndpoint ||
+			forward.Routes[index].SelectedEndpoint != reverse.Routes[index].SelectedEndpoint {
+			t.Fatalf("route order changed with input order: forward=%+v reverse=%+v", forward.Routes, reverse.Routes)
+		}
 	}
 }
 
