@@ -1,18 +1,26 @@
 # ADR-67023: Acknowledge Experimental-Feature Notices via an Explicit Compile Flag
 
 **Date**: 2026-10-08
-**Status**: Draft
+**Status**: Proposed
 **Deciders**: pelikhan (PR author), gh-aw maintainers
 
 ---
 
 ### Context
 
-`gh aw compile --dry-run` is the validation gate used by agentic debugging workflows: it fails whenever the compiler reports any warning, so that security findings, model diagnostics, and scanner failures cannot be silently ignored. Several built-in features are still marked experimental and emit a compiler notice on every compilation, which means any workflow that legitimately uses them can never produce a clean dry-run. Workflows such as the ESLint factory dispatcher, miner, refiner, and monster depend on those features, so operators had no way to validate them end to end without either disabling the gate wholesale or suppressing warnings globally. The project requires that any relaxation stay narrow, auditable, and visible in both human and JSON output.
+`gh aw compile --dry-run` is the compile-only validation gate used by agentic debugging workflows. It rejects compiler warnings, structured validation warnings, model diagnostics, and scanner failures. The ESLint factory workers use experimental built-ins such as LSP and steering, whose notices also fail this gate even when every other check passes. The operator explicitly requested a way to acknowledge those notices while validating the factory with the locally built CLI.
+
+Acknowledgment must remain narrow, auditable, and visible in human and JSON output. Successful compilation must not authorize live execution, install work-queue Policy, or bypass runtime controls. This decision covers notice acknowledgment; daily factory admission and paginated workflow discovery are separate changes needed for the original factory debugging task.
 
 ### Decision
 
-We will add an explicit, opt-in `compile --allow-experimental` flag that acknowledges *only* built-in experimental-feature notices during dry-run validation. The flag does not suppress the notices: it records `GetExperimentalWarningCount()` as `AcceptedExperimentalWarnings`, keeps the notices in the printed diagnostics and warning counts, reports the accepted count in the JSON report, and relaxes the dry-run validity predicate to `stats.Warnings <= report.AcceptedExperimentalWarnings`. All other warnings, security validation, model diagnostics, and scanner failures remain fatal, and the flag grants no execution or policy-installation authority.
+Add an explicit `compile --allow-experimental` flag, defaulting to false, that acknowledges only built-in experimental-feature notices during dry-run validation.
+
+The fixed built-in feature table records each notice in a dedicated experimental counter and the ordinary warning counter. Neither warning-text prefixes nor the batch-only feature-usage map classify accepted notices. The flag preserves printed notices and warning counts, and reports the accepted count as `accepted_experimental_warnings` in dry-run JSON.
+
+Both aggregate and compiler warning counts must not exceed the acknowledged experimental count. Structured workflow warnings, safe-update and schedule warnings, model-inventory diagnostics, and scanner failures are checked independently and remain fatal. The final report also requires successful workflow results without errors or structured warnings. No required validation flag or runtime protection is disabled.
+
+Regression coverage includes single and batch notice accounting, counter resets, CLI/config propagation, and rejection of forged notice text, ordinary warnings, structured warnings, model diagnostics, and scanner failures. A local dry-run of the four factory workflows accepted three genuine notices while retaining shellcheck and model validation.
 
 ### Alternatives Considered
 
@@ -22,7 +30,7 @@ Workflows that need experimental features would have to wait until those feature
 
 #### Alternative 2: Generic warning-suppression flag (e.g. `--ignore-warnings` or a per-code allowlist)
 
-A general mechanism would cover experimental notices and any future noisy diagnostic with one flag. It was a close call for flexibility, but a broad suppression switch would also mask security findings, model diagnostics, and scanner errors — exactly the signals the dry-run gate exists to enforce — and a per-code allowlist adds a configuration surface that must be reviewed on every use. Rejected in favor of a single, narrowly scoped, self-documenting flag.
+A general mechanism would cover experimental notices and other diagnostics with one flag, but accepting arbitrary warnings would weaken the gate's fail-closed contract. A per-code allowlist would also add configuration and review obligations beyond this request. Rejected in favor of a narrowly scoped flag whose accepted category is classified by the compiler.
 
 #### Alternative 3: Frontmatter opt-in per workflow
 
@@ -37,14 +45,14 @@ Each workflow could declare that it accepts experimental features. This moves th
 
 #### Negative
 - Adds a user-visible CLI flag and a new field to the dry-run report, both of which are now part of the compatibility surface.
-- The validity predicate compares warning *counts* rather than identities, so a future change that emits an unrelated warning while an experimental notice disappears could, in principle, fall under the same threshold.
+- Correctness depends on keeping ordinary and experimental counters synchronized and resetting both together. New diagnostic paths must preserve that invariant; regression tests cover it.
 - Operators may habitually pass `--allow-experimental`, reducing pressure to promote or remove experimental features.
 
 #### Neutral
-- Documentation in `.github/aw/debug-agentic-workflow.md` and `docs/src/content/docs/reference/compilation-process.md` must state that the flag conveys no live-execution or policy-installation authorization.
+- Documentation in `.github/aw/debug-agentic-workflow.md` and `docs/src/content/docs/reference/compilation-process.md` states that the flag conveys no live-execution or policy-installation authorization.
 - The flag threads through `CompileConfig.AllowExperimental` and `enforceDevelopmentDiagnostics`, so any future dry-run diagnostic category must decide explicitly whether it is in scope.
-- Shipped as a `minor` changeset alongside unrelated ESLint-factory admission and paginated remote-workflow-discovery fixes in the same PR.
+- Shipped as a `minor` changeset alongside the factory admission and workflow-discovery fixes required by the same debugging task.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+The decision remains proposed until maintainer acceptance.

@@ -65,6 +65,8 @@ const (
 	// AgentRuntimeCloudHypervisor runs the agent inside a Cloud Hypervisor microVM
 	// using AWF's preview cloud-hypervisor runtime mode.
 	AgentRuntimeCloudHypervisor AgentRuntime = "cloud-hypervisor"
+	// AgentRuntimeNVX runs the agent inside AWF's preview one-shot NVX microVM.
+	AgentRuntimeNVX AgentRuntime = "nvx"
 )
 
 // AgentSandboxConfig represents the agent sandbox configuration
@@ -74,6 +76,7 @@ type AgentSandboxConfig struct {
 	Version        string                                `yaml:"version,omitempty"`        // AWF version override used to install and run the matching firewall version
 	Platform       string                                `yaml:"platform,omitempty"`       // AWF platform.type override (github.com, ghes, ghec, ghec-self-hosted)
 	Runtime        AgentRuntime                          `yaml:"runtime,omitempty"`        // Sandbox runtime profile for the agent container (see sandbox_runtime_profile.go)
+	NVX            *AgentNVXConfig                       `yaml:"nvx,omitempty"`            // Optional NVX settings; safe defaults apply when omitted
 	AllowHostPorts []int                                 `yaml:"-"`                        // Additional host TCP ports the agent may connect to (docker-sudo-iptables only).
 	Disabled       bool                                  `yaml:"-"`                        // True when agent is explicitly set to false (disables firewall). This is a runtime flag, not serialized to YAML.
 	Config         *SandboxRuntimeConfig                 `yaml:"config,omitempty"`         // Custom SRT config (optional)
@@ -87,6 +90,26 @@ type AgentSandboxConfig struct {
 	Targets        map[string]*AgentAPIProxyTargetConfig `yaml:"targets,omitempty"`        // Per-provider API proxy target overrides keyed by provider name (e.g. "openai", "anthropic")
 	Images         map[string]string                     `yaml:"images,omitempty"`         // Digest-pinned AWF infrastructure images keyed by AWF image role (see sandbox_agent_images.go)
 	CACert         string                                `yaml:"ca-cert,omitempty"`        // Host path to an additional CA certificate for API proxy upstream TLS verification (maps to apiProxy.caCert, AWF v0.28.10+)
+}
+
+// AgentNVXConfig contains optional overrides for AWF's NVX preview runtime defaults.
+type AgentNVXConfig struct {
+	PreviewEnabled             bool   `yaml:"preview,omitempty" json:"preview,omitempty"`
+	NetworkIsolation           bool   `yaml:"network-isolation,omitempty" json:"network-isolation,omitempty"`
+	APIProxy                   bool   `yaml:"api-proxy,omitempty" json:"api-proxy,omitempty"`
+	MountPolicy                string `yaml:"mount-policy,omitempty" json:"mount-policy,omitempty"`
+	LayerPath                  string `yaml:"layer-path,omitempty" json:"layer-path,omitempty"`
+	OpenVMMPath                string `yaml:"openvmm-path,omitempty" json:"openvmm-path,omitempty"`
+	KernelPath                 string `yaml:"kernel-path,omitempty" json:"kernel-path,omitempty"`
+	InitramfsPath              string `yaml:"initramfs-path,omitempty" json:"initramfs-path,omitempty"`
+	ArtifactManifestPath       string `yaml:"artifact-manifest-path,omitempty" json:"artifact-manifest-path,omitempty"`
+	ArtifactManifestBundlePath string `yaml:"artifact-manifest-bundle-path,omitempty" json:"artifact-manifest-bundle-path,omitempty"`
+	SignerWorkflow             string `yaml:"signer-workflow,omitempty" json:"signer-workflow,omitempty"`
+	MemoryMiB                  int    `yaml:"memory-mib,omitempty" json:"memory-mib,omitempty"`
+	MemoryMaxBytes             int64  `yaml:"memory-max-bytes,omitempty" json:"memory-max-bytes,omitempty"`
+	PidsMax                    int    `yaml:"pids-max,omitempty" json:"pids-max,omitempty"`
+	ScratchBytes               int64  `yaml:"scratch-bytes,omitempty" json:"scratch-bytes,omitempty"`
+	ContainerWorkDir           string `yaml:"container-workdir,omitempty" json:"container-workdir,omitempty"`
 }
 
 // AiCreditsPricingConfig holds per-token pricing rates ($/1M tokens) used as a fallback
