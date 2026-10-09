@@ -52,6 +52,13 @@ they do not seed tasks. The separate `daily-report-dispatcher` uses the
 
 ### Provision the factory policy
 
+The scheduled dispatcher cannot initialize its own queue: without the
+`work-queue` branch and an installed Policy, activation cannot launch any
+workers. A successful run that only reports `queue_state: "uninitialized"`
+also does not mean the factory is operating. Check the authoritative queue
+state before expecting any of the three worker workflows to run. Do not
+substitute an ordinary workflow dispatch for a queue assignment.
+
 The checked-in policy generator provides three immutable worker profiles,
 singleton assignments, three native slots, and a 30-pending-task limit:
 
