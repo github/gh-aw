@@ -3,6 +3,7 @@ export const invariants = [
   "ImmutableMembership",
   "HomogeneousBatch",
   "PolicyRequired",
+  "BranchProvisioning",
   "ScopedIntents",
   "EffectRequiresCompletion",
   "ResultRequiresReadback",

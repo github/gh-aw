@@ -48,20 +48,25 @@ func Replay(commits []QueueCommit) (Projection, error) {
 	generations := identitySet{state.CredentialGeneration: {}}
 	offset := 0
 	checkpointCount := 0
-	if kind, kindErr := operationKind(ordered[0].Operations[0]); kindErr == nil && kind == "Checkpoint" {
-		state, err = restoreCheckpoint(ordered[0])
-		if err != nil {
-			return state, err
+	if len(ordered) > 0 {
+		firstCommit := ordered[0]
+		if len(firstCommit.Operations) > 0 {
+			if kind, kindErr := operationKind(firstCommit.Operations[0]); kindErr == nil && kind == "Checkpoint" {
+				state, err = restoreCheckpoint(firstCommit)
+				if err != nil {
+					return state, err
+				}
+				offset = state.Stats.Transactions
+				checkpointCount = 1
+				for epoch := range state.SeenEpochs {
+					epochs.add(epoch)
+				}
+				for generation := range state.SeenGenerations {
+					generations.add(generation)
+				}
+				ordered = ordered[1:]
+			}
 		}
-		offset = state.Stats.Transactions
-		checkpointCount = 1
-		for epoch := range state.SeenEpochs {
-			epochs.add(epoch)
-		}
-		for generation := range state.SeenGenerations {
-			generations.add(generation)
-		}
-		ordered = ordered[1:]
 	}
 	for ordinal, commit := range ordered {
 		if err := state.replayCommit(commit, offset+checkpointCount+ordinal, epochs, generations); err != nil {
@@ -107,8 +112,16 @@ func (state *Projection) validateReplayCommit(commit QueueCommit, ordinal int) (
 		}
 		isPolicy = kind == "Policy"
 	}
+	bootstrap := isBootstrapSubmit(commit, ordinal)
+	if bootstrap {
+		isPolicy = true
+	}
 	if ordinal == 0 && !isPolicy {
 		return false, queueError("policy_missing", "genesis must install exactly one policy")
+	}
+	if isPolicy && !bootstrap &&
+		(len(commit.Operations) != 1 || commit.Request.Kind != "policy" || commit.Actor.Role != "administrator") {
+		return false, queueError("policy_not_quiescent", "only an administrator may install Policy outside first-submit bootstrap")
 	}
 	if !isPolicy && commit.PolicyEpoch != state.PolicyEpoch {
 		return false, queueError("policy_epoch_invalid", "commit names a non-current epoch")
@@ -117,6 +130,52 @@ func (state *Projection) validateReplayCommit(commit QueueCommit, ordinal int) (
 		return false, queueError("operation_limit", "commit exceeds installed operation limit")
 	}
 	return isPolicy, nil
+}
+
+func isBootstrapSubmit(commit QueueCommit, ordinal int) bool {
+	if ordinal != 0 || commit.Request.Kind != "submit" ||
+		(commit.Actor.Role != "producer" && commit.Actor.Role != "dispatcher") ||
+		len(commit.Operations) < 2 {
+		return false
+	}
+	if !isPolicyOperation(commit.Operations) {
+		return false
+	}
+	return operationsAreWork(commit.Operations[1:]) && submissionMatchesOperations(commit.Request, commit.Operations[1:])
+}
+
+func isPolicyOperation(operations []Operation) bool {
+	if len(operations) > 0 {
+		kind, err := operationKind(operations[0])
+		return err == nil && kind == "Policy"
+	}
+	return false
+}
+
+func operationsAreWork(operations []Operation) bool {
+	for _, operation := range operations {
+		kind, err := operationKind(operation)
+		if err != nil || kind != "Work" {
+			return false
+		}
+	}
+	return len(operations) > 0
+}
+
+func submissionMatchesOperations(request Request, operations []Operation) bool {
+	var parameters SubmitParameters
+	if request.Kind != "submit" || json.Unmarshal(request.Parameters, &parameters) != nil || len(parameters.Nodes) != len(operations) {
+		return false
+	}
+	for index, node := range parameters.Nodes {
+		if index < 0 || index >= len(operations) {
+			return false
+		}
+		if !sameJSON(node, operations[index]) {
+			return false
+		}
+	}
+	return true
 }
 
 func (state *Projection) replayCommit(commit QueueCommit, ordinal int, epochs, generations identitySet) error {
@@ -195,22 +254,8 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 		return state.recordObservation(observation, commit)
 	case "Completion":
 		return state.applyCompletion(operation, commit)
-	case "ClaimCancellation":
-		if err := state.cancelClaim(operation, commit); err != nil {
-			return err
-		}
-		var value ClaimOperation
-		_ = json.Unmarshal(operation, &value)
-		state.Cancellations[value.ClaimID] = operation
-		return nil
-	case "WorkCancellation":
-		if err := state.cancelWork(operation, commit); err != nil {
-			return err
-		}
-		var value WorkDefinition
-		_ = json.Unmarshal(operation, &value)
-		state.Cancellations[value.WorkID] = operation
-		return nil
+	case "ClaimCancellation", "WorkCancellation":
+		return state.replayCancellation(operation, kind, commit)
 	case "WorkPriority":
 		return state.reprioritizeWork(operation)
 	case "IssueLink", "IssueComment":
@@ -220,16 +265,46 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	case "Release":
 		return state.release(operation, commit)
 	case "Result", "DeliveryFailure":
-		if err := state.settleResult(operation, commit, kind == "DeliveryFailure"); err != nil {
-			return err
-		}
-		var value WorkDefinition
-		_ = json.Unmarshal(operation, &value)
-		state.TerminalBarriers[value.WorkID] = operation
-		return nil
+		return state.replayTerminalResult(operation, kind, commit)
 	default:
 		return queueError("unsupported_protocol", "unknown operation")
 	}
+}
+
+func (state *Projection) replayCancellation(operation Operation, kind string, commit QueueCommit) error {
+	if kind == "ClaimCancellation" {
+		var value ClaimOperation
+		if err := json.Unmarshal(operation, &value); err != nil {
+			return err
+		}
+		if err := state.cancelClaim(operation, commit); err != nil {
+			return err
+		}
+		state.Cancellations[value.ClaimID] = operation
+		return nil
+	}
+
+	var value WorkDefinition
+	if err := json.Unmarshal(operation, &value); err != nil {
+		return err
+	}
+	if err := state.cancelWork(operation, commit); err != nil {
+		return err
+	}
+	state.Cancellations[value.WorkID] = operation
+	return nil
+}
+
+func (state *Projection) replayTerminalResult(operation Operation, kind string, commit QueueCommit) error {
+	var value WorkDefinition
+	if err := json.Unmarshal(operation, &value); err != nil {
+		return err
+	}
+	if err := state.settleResult(operation, commit, kind == "DeliveryFailure"); err != nil {
+		return err
+	}
+	state.TerminalBarriers[value.WorkID] = operation
+	return nil
 }
 
 func (state *Projection) installReplayPolicy(op Operation, commit QueueCommit, isPolicy bool, epochs identitySet) error {

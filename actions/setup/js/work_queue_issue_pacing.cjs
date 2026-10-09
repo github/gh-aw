@@ -31,7 +31,7 @@ function wrapGithubClient(githubClient, { sleep = delay => new Promise(resolve =
       if (key === "graphql")
         return async (query, variables) => {
           const mutation = /^\s*mutation/.test(query);
-          const cost = Math.max(1, [...query.matchAll(/:\s*(?:createIssue|addComment|updateIssueComment|setIssueFieldValue|addLabelsToLabelable|closeIssue|createRef|deleteRef)\(/g)].length);
+          const cost = Math.max(1, [...query.matchAll(/:\s*(?:createIssue|addComment|updateIssueComment|setIssueFieldValue|addLabelsToLabelable|removeLabelsFromLabelable|closeIssue|createRef|deleteRef)\(/g)].length);
           return invoke(mutation, cost, () => target.graphql(query, { ...variables, request: { ...variables?.request, retries: 0 } }));
         };
       if (key === "rest")

@@ -67,7 +67,7 @@ import Octicon from '../Octicon.astro';
     --aw-step--1: clamp(1.25rem, 2.4vw, 2rem);
     --aw-step-0: clamp(1.5rem, 2.8vw, 2.25rem);
     --aw-text-ui: clamp(1.25rem, 2.4vw, 2rem);
-    width: min(100%, 76rem);
+    width: 100%;
     margin: auto;
     padding-block: 2rem;
     font-size: var(--aw-step-0);
@@ -85,6 +85,7 @@ import Octicon from '../Octicon.astro';
     animation: none;
     transform: none;
   }
+  .snippet-content > :global([data-slideshow-snippet]) { width: 100%; }
   .snippet-content :global(pre) { font-size: var(--aw-step-0); white-space: pre-wrap; overflow-wrap: anywhere; }
   .snippet-content :global(.gh) { position: relative; inset: auto; width: 100%; min-height: 0; padding: 2rem; }
   .snippet-content :global([data-snippet-trigger]) { cursor: auto; }
