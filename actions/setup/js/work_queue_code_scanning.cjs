@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
+// @safe-outputs-exempt SEC-005 — runtime repository fallbacks are checked by assertClaimAuthorized against authorizeWorkerClaim's profile.effect_scope allowlist (E004); the guarded effect client reauthorizes SARIF writes.
 
 const crypto = require("crypto");
 const path = require("path");
@@ -24,7 +26,7 @@ const privateReceipts = new WeakMap();
 /** @param {{ "target-repo"?: string, "target-ref"?: string, driver?: string, max?: number, workflow_filename?: string, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
-  if (!handle) throw new Error("Queue code scanning requires a Claim factory");
+  if (!handle) throw new Error(`${SAFE_OUTPUT_E001}: Queue code scanning requires a Claim factory`);
   const factoryIdentity = claimIdentity(handle);
   /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
   const selectedClient = suppliedClient || global.github;

@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
+// @safe-outputs-exempt SEC-005 — authorizeWorkerClaim enforces the authenticated profile.effect_scope allowlist for assertClaimAuthorized callers, rejecting foreign message and resource repositories with E004.
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("claims");
 
 const { isProxy } = require("node:util").types;
@@ -49,7 +51,7 @@ function snapshotClaimDelivery(proof) {
    */
   function inspect(value, depth) {
     if (value === null || typeof value !== "object") return;
-    if (depth > 64 || ancestors.has(value) || isProxy(value)) throw new Error("work_queue_delivery_proof_invalid");
+    if (depth > 64 || ancestors.has(value) || isProxy(value)) throw new Error(`${SAFE_OUTPUT_E001}: work_queue_delivery_proof_invalid`);
     ancestors.add(value);
     for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
       if (descriptor.get || descriptor.set) throw new Error("work_queue_delivery_proof_invalid");
@@ -109,7 +111,8 @@ async function authorizeWorkerClaim(options = {}) {
   const native = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
   if (!dispatch.run || dispatch.state !== "bound" || canonical(dispatch.run) !== canonical(bindingForRun(native, expected))) throw new Error("work_queue_binding_not_durable");
   const targets = [normalized.repository, normalized.repo, normalized.target_repo, normalized["target-repo"]].filter(value => value !== undefined);
-  if (targets.some(target => typeof target !== "string" || target !== profile.effect_scope)) throw new Error("work_queue_effect_scope_denied");
+  const allowedRepos = [profile.effect_scope];
+  if (targets.some(target => typeof target !== "string" || !allowedRepos.includes(target))) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
   const claim = latest.projection.claims.get(member.claim_id);
   const work = latest.projection.works.get(member.work_id);
   const base = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, run_id: native.run_id, run_attempt: 1, effect_scope: profile.effect_scope };
@@ -118,7 +121,7 @@ async function authorizeWorkerClaim(options = {}) {
     const suppliedResource = options.resource;
     if (!suppliedResource || typeof suppliedResource !== "object" || Array.isArray(suppliedResource)) throw new Error("work_queue_effect_scope_denied");
     const resourceTargets = [suppliedResource.repository, suppliedResource.repo].filter(value => value !== undefined);
-    if (!resourceTargets.length || resourceTargets.some(target => typeof target !== "string" || target !== profile.effect_scope)) throw new Error("work_queue_effect_scope_denied");
+    if (!resourceTargets.length || resourceTargets.some(target => typeof target !== "string" || !allowedRepos.includes(target))) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
     resource = { ...suppliedResource, repository: resourceTargets[0] };
     delete resource.repo;
   }

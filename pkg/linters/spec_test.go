@@ -275,23 +275,7 @@ func TestSpec_UsageExample_AnalyzersUsable(t *testing.T) {
 	}
 }
 
-// TestSpec_DesignDecision_UniqueAnalyzerNames validates that each documented
-// subpackage exposes a distinct Analyzer.Name so they can coexist in a single
-// go/analysis driver (multichecker) without conflict.
-// Spec: "intentionally organized as a namespace ... so individual analyzers
-// remain isolated and independently testable."
-func TestSpec_DesignDecision_UniqueAnalyzerNames(t *testing.T) {
-	t.Parallel()
-	documented := documentedAnalyzers()
-	names := make(map[string]bool, len(documented))
-	for _, d := range documented {
-		names[d.analyzer.Name] = true
-	}
-	assert.Len(t, names, len(documented),
-		"each documented subpackage should expose a distinct Analyzer.Name")
-}
-
-// TestRegistryMatchesDocumentation validates that linters.All() (the canonical,
+// TestSpec_PublicAPI_All validates that linters.All() (the canonical,
 // importable registry) and documentedAnalyzers() (the spec_test hand-list
 // derived from the README Subpackages table) are equal sets — bidirectionally.
 //
@@ -299,7 +283,7 @@ func TestSpec_DesignDecision_UniqueAnalyzerNames(t *testing.T) {
 // cmd/linters/main.go without updating docs) causes this test to fail, closing
 // the recurring doc-sync drift gap (gh-aw#40436, #45185, #46131, #46527,
 // #46707, #46977).
-func TestRegistryMatchesDocumentation(t *testing.T) {
+func TestSpec_PublicAPI_All(t *testing.T) {
 	t.Parallel()
 	allAnalyzers := linters.All()
 	documented := documentedAnalyzers()

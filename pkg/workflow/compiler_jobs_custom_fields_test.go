@@ -15,6 +15,32 @@ import (
 // Custom Job Field Configuration Tests (runs-on, strategy, container)
 // ========================================
 
+func TestFormatIndentedYAMLFieldPreservesDefaultsAndSequenceIndent(t *testing.T) {
+	value := map[string]any{
+		"matrix": map[string]any{
+			"config": []any{"a", "b"},
+		},
+	}
+
+	got, err := formatIndentedYAMLField("strategy", value, false)
+	if err != nil {
+		t.Fatalf("formatIndentedYAMLField() returned error: %v", err)
+	}
+
+	want := "strategy:\n      matrix:\n        config:\n          - a\n          - b\n"
+	if got != want {
+		t.Errorf("formatIndentedYAMLField() = %q, want %q", got, want)
+	}
+
+	multiline, err := formatIndentedYAMLField("env", map[string]any{"SCRIPT": "line one\nline two"}, false)
+	if err != nil {
+		t.Fatalf("formatIndentedYAMLField() returned error for multiline value: %v", err)
+	}
+	if !strings.Contains(multiline, "      SCRIPT: |-\n        line one\n        line two") {
+		t.Errorf("formatIndentedYAMLField() did not preserve literal multiline style: %q", multiline)
+	}
+}
+
 // TestBuildCustomJobsRunsOnForms tests that runs-on string, array, and object forms
 // are all correctly handled in buildCustomJobs.
 func TestBuildCustomJobsRunsOnForms(t *testing.T) {
