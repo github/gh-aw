@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const fs = require("fs");
 const path = require("path");
 const { serializeTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
@@ -28,7 +28,7 @@ async function main(options = {}) {
   };
   const outputPath = options.snapshotPath || process.env.GH_AW_WORK_QUEUE_SNAPSHOT || SNAPSHOT_PATH;
   const runtime = resolveWorkQueueRuntime(configuration.context.payload, { role: options.role, requireAssignment: options.requireAssignment });
-  if (runtime.role === "observer" && options.initializationContext !== undefined) throw new Error("E001: work_queue_observer_read_only");
+  if (runtime.role === "observer" && options.initializationContext !== undefined) throw new Error(`${SAFE_OUTPUT_E001}: work_queue_observer_read_only`);
   const readConfiguration = runtime.role === "observer" ? { ...configuration, policyProposal: undefined } : configuration;
   let latest = await loadQueue(readConfiguration);
   if (!latest.projection.policy && !(runtime.role !== "worker" && latest.sha === null && latest.transactions.length === 0)) throw new Error("work_queue_policy_missing");

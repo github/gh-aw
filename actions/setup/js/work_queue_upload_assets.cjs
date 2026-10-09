@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -26,7 +26,7 @@ const receipts = new WeakMap();
 /** @param {{ "target-repo"?: string, "assets-dir"?: string, "allowed-exts"?: string[], "max-size"?: number, max?: number, branch?: string, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const factoryClaim = currentClaimHandle();
-  if (!factoryClaim) throw new Error("E001: Queue asset adapter requires an immutable Claim factory");
+  if (!factoryClaim) throw new Error(`${SAFE_OUTPUT_E001}: Queue asset adapter requires an immutable Claim factory`);
   const factoryIdentity = claimIdentity(factoryClaim);
   /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
   const selectedClient = suppliedClient || global.github;

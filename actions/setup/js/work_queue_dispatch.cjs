@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("dispatch");
 
 const { canonical, closed, digest, integer } = require("./work_queue_codec.cjs");
@@ -22,7 +23,7 @@ const { normalizeDispatchCredential, createDispatchCredentialValidator, isDispat
 
 function assertQueueControlRole(options) {
   const runtime = resolveWorkQueueRuntime(options.context?.payload, { role: options.role, requireAssignment: options.requireAssignment });
-  if (runtime.role === "observer") throw new Error("E001: work_queue_observer_read_only");
+  if (runtime.role === "observer") throw new Error(`${SAFE_OUTPUT_E001}: work_queue_observer_read_only`);
   return runtime;
 }
 

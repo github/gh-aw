@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-
+const { SAFE_OUTPUT_E002 } = require("./error_codes.cjs");
 const queue = require("./work_queue_replay.cjs");
 const store = require("./work_queue_store.cjs");
 const { canonical, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
@@ -13,7 +13,7 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 function policyProposalFor(options) {
   const raw = Object.hasOwn(options, "policyProposal") ? options.policyProposal : process.env.GH_AW_WORK_QUEUE_POLICY;
   if (raw === undefined) return;
-  if (typeof raw === "string" && Buffer.byteLength(raw, "utf8") > 4 * 1024 * 1024) throw new Error("E002: work_queue_policy_proposal_limit");
+  if (typeof raw === "string" && Buffer.byteLength(raw, "utf8") > 4 * 1024 * 1024) throw new Error(`${SAFE_OUTPUT_E002}: work_queue_policy_proposal_limit`);
   const proposal = typeof raw === "string" ? parseStrictJSON(raw) : raw;
   validatePolicy(proposal);
   return proposal;
