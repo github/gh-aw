@@ -2619,6 +2619,8 @@ describe("safe_outputs_handlers", () => {
         fs.writeFileSync(path.join(repoDir, "agent.js"), "console.log('agent');\n");
         execSync("git add agent.js", { cwd: repoDir, stdio: "pipe" });
         execSync("git commit -m 'agent script'", { cwd: repoDir, stdio: "pipe" });
+        execSync("git rm agent.js", { cwd: repoDir, stdio: "pipe" });
+        execSync("git commit -m 'revert agent script'", { cwd: repoDir, stdio: "pipe" });
 
         process.env.GITHUB_BASE_REF = "main";
         process.env.GITHUB_WORKSPACE = repoDir;
@@ -2631,6 +2633,33 @@ describe("safe_outputs_handlers", () => {
           const data = JSON.parse(result.content[0].text);
           expect(data.disallowed_files).toEqual(["agent.js"]);
           expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+        } finally {
+          delete process.env.GITHUB_BASE_REF;
+          process.env.GITHUB_WORKSPACE = testWorkspaceDir;
+        }
+      });
+
+      it("does not reject disallowed files merged from the updated base branch", async () => {
+        const { repoDir } = createRepoWithDisallowedHistoryFile();
+        execSync("git checkout main", { cwd: repoDir, stdio: "pipe" });
+        fs.writeFileSync(path.join(repoDir, "upstream.js"), "console.log('upstream');\n");
+        execSync("git add upstream.js", { cwd: repoDir, stdio: "pipe" });
+        execSync("git commit -m 'update base branch'", { cwd: repoDir, stdio: "pipe" });
+        execSync("git checkout feature/work", { cwd: repoDir, stdio: "pipe" });
+        execSync("git merge --no-ff main -m 'merge updated base'", { cwd: repoDir, stdio: "pipe" });
+
+        process.env.GITHUB_BASE_REF = "main";
+        process.env.GITHUB_WORKSPACE = repoDir;
+        const localHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
+          push_to_pull_request_branch: { allowed_files: ["*.md"] },
+        });
+        try {
+          const result = await localHandlers.pushToPullRequestBranchHandler({ branch: "feature/work" });
+          if (result.isError) {
+            const data = JSON.parse(result.content[0].text);
+            expect(data.error).not.toContain("allowed-files configuration");
+            expect(data.disallowed_files).toBeUndefined();
+          }
         } finally {
           delete process.env.GITHUB_BASE_REF;
           process.env.GITHUB_WORKSPACE = testWorkspaceDir;

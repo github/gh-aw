@@ -1484,6 +1484,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
 
     const prHeadBaseline = resolvePRHeadBaselineForPush(entry.branch, itemRepo, effectivePushPRNumber, server);
+    const incrementalBaseRef = prHeadBaseline?.sha || prHeadBaseline?.ref || `refs/remotes/origin/${entry.branch}`;
     if (prHeadBaseline?.headRepo && prHeadBaseline.headRepo.toLowerCase() !== itemRepo.toLowerCase() && prHeadBaseline.headRepo.toLowerCase() !== configuredHeadRepo.toLowerCase()) {
       return {
         content: [
@@ -1556,10 +1557,9 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     // only local refs (no extra fetch); a detection miss simply preserves the
     // existing behavior.
     if (!useBundle && !patchFormatExplicit && entry.branch) {
-      const rangeBaseRef = prHeadBaseline?.sha || prHeadBaseline?.ref || `refs/remotes/origin/${entry.branch}`;
-      const hasMerges = hasMergeCommitsInRange(rangeBaseRef, entry.branch, { cwd: repoCwd || undefined });
+      const hasMerges = hasMergeCommitsInRange(incrementalBaseRef, entry.branch, { cwd: repoCwd || undefined });
       if (hasMerges) {
-        server.debug(`push_to_pull_request_branch: detected merge commit(s) in incremental range ${rangeBaseRef}..${entry.branch}; auto-switching to bundle transport (set patch-format: am to override).`);
+        server.debug(`push_to_pull_request_branch: detected merge commit(s) in incremental range ${incrementalBaseRef}..${entry.branch}; auto-switching to bundle transport (set patch-format: am to override).`);
         useBundle = true;
       }
     }
@@ -1604,8 +1604,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         if (!pushPinnedSha) {
           server.debug("Incremental allowed-files check skipped: branch SHA not pinned (non-bundle path)");
         } else {
-          const incrementalBase = prHeadBaseline?.sha || prHeadBaseline?.ref || `refs/remotes/origin/${entry.branch}`;
-          const agentFiles = execGitSync(["log", "--name-only", "--pretty=format:", `${incrementalBase}..${pushPinnedSha}`, "--"], { cwd: pushGitCwd })
+          const agentFiles = execGitSync(["log", "--ancestry-path", "--name-only", "--pretty=format:", `${incrementalBaseRef}..${pushPinnedSha}`, "--"], { cwd: pushGitCwd })
             .toString()
             .split("\n")
             .map(s => s.trim())
