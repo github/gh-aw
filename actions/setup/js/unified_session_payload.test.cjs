@@ -220,9 +220,33 @@ describe("essential unified session payloads", () => {
   });
 
   it("uses one accounting shape without losing zero values or adding overlapping totals", () => {
-    const data = { provider: "copilot", inputTokens: 0, output_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0, ai_credits_this_response: 0, ai_credits_total: 0, duration_ms: 0, opaque: "omit" };
+    const data = {
+      provider: "copilot",
+      model: "gpt-5.4-mini",
+      purpose: "subagent",
+      path: "/v1/messages",
+      request_id: "request-1",
+      inputTokens: 0,
+      output_tokens: 2,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      ai_credits_this_response: 0,
+      ai_credits_total: 0,
+      duration_ms: 0,
+      opaque: "omit",
+    };
     const runtime = normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data });
-    expect(runtime.data).toEqual({ provider: "copilot", aic: 0, totalAic: 0, durationMs: 0, usage: { inputTokens: 0, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } });
+    expect(runtime.data).toEqual({
+      provider: "copilot",
+      model: "gpt-5.4-mini",
+      purpose: "subagent",
+      path: "/v1/messages",
+      requestId: "request-1",
+      aic: 0,
+      totalAic: 0,
+      durationMs: 0,
+      usage: { inputTokens: 0, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+    });
     const agent = normalizeUnifiedSessionEvent({ type: "session.result", data: { num_turns: 0, usage: { inputTokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"], unused: 10 } } });
     expect(agent.data).toEqual({ numTurns: 0, usage: { inputTokens: 0, outputTokens: 2, overflowedTokens: ["cacheReadInputTokens"] } });
     const reconciled = reconcileSessionUsage({ cache_read_input_tokens: 4 }, agent.data.usage);
@@ -230,6 +254,36 @@ describe("essential unified session payloads", () => {
     expect(reconciled.cacheReadInputTokens).toBeUndefined();
     expect(reconciled.overflowed_tokens).toEqual(["cache_read_input_tokens"]);
     expect(normalizeUnifiedSessionEvent(runtime)).toEqual(runtime);
+  });
+
+  it("retains normalized subagent invocation and per-request usage fields", () => {
+    const source = {
+      type: "subagent.request",
+      agentId: "invocation-1",
+      data: {
+        invocationId: "invocation-1",
+        agentName: "reader",
+        model: "gpt-5.4-mini",
+        inputTokens: 10,
+        outputTokens: 2,
+        cacheReadTokens: 3,
+        cacheWriteTokens: 4,
+        discarded: "omit",
+      },
+    };
+    expect(normalizeUnifiedSessionEvent(source)).toEqual({
+      type: "subagent.request",
+      agentId: "invocation-1",
+      data: {
+        invocationId: "invocation-1",
+        agentName: "reader",
+        model: "gpt-5.4-mini",
+        inputTokens: 10,
+        outputTokens: 2,
+        cacheReadTokens: 3,
+        cacheWriteTokens: 4,
+      },
+    });
   });
 
   it.each([0, 3])("keeps Codex terminal metadata and %i reasoning tokens without duplicate accounting", reasoning => {
