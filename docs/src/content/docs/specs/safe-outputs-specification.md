@@ -3728,6 +3728,14 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - `required-labels`: Labels that must ALL be present on the pull request for the resolution to be processed
 - `required-title-prefix`: Title prefix that the pull request MUST have for the resolution to be processed
 
+**Operational Semantics**:
+
+1. **Node Lookup**: Before resolving, the processor MUST look up `thread_id` through GraphQL and verify that it identifies a `PullRequestReviewThread` or a `PullRequestReviewComment`. A review-comment ID is mapped to its containing review thread; an ID of another node type MUST be rejected.
+2. **Target and Filter Checks**: The processor MUST derive the thread's pull request and repository from GitHub's response, then enforce repository allowlists, the configured target, and required label/title filters before mutation. Agent-supplied repository or pull request metadata MUST NOT override the resolved node's parent.
+3. **Resolution**: The processor MUST use GitHub's `resolveReviewThread` GraphQL mutation only for a verified, unresolved thread. Already-resolved threads and stale or missing thread IDs are successful no-ops; staged mode MUST preview without calling the mutation.
+4. **Comment-ID Lookup**: When `thread_id` contains a review-comment ID, the processor MUST search the parent pull request's review threads and comments, following GraphQL cursors until the comment is found or all pages are exhausted. If no containing thread is found, the operation MUST fail without mutation.
+5. **Permission Failure**: If GitHub rejects the mutation because the integration token cannot access the thread, the processor MUST report a skipped operation with guidance to configure a suitable `github-token`; unrelated API errors MUST remain failures.
+
 **Target Authorization**:
 
 **RPT-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
@@ -3756,6 +3764,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Higher default max (10) enables resolving multiple threads per review cycle
 - GitHub can reject `resolveReviewThread` with `Resource not accessible by integration` for some `GITHUB_TOKEN` contexts even with `pull-requests: write`; gh-aw treats this specific response as a soft-skip warning for this handler
 - For reliable resolution, configure `safe-outputs.resolve-pull-request-review-thread.github-token` with a token that can resolve review threads in the target repository
+- The safe-output message field is `thread_id`; it accepts a review-thread GraphQL node ID or a review-comment node ID that can be mapped to its containing thread.
+- A thread ID normally needs one GraphQL lookup and, if unresolved and not staged, one GraphQL mutation. A comment ID can require paginated GraphQL reads across the pull request's review threads and comments. Configured label/title filters also read pull request metadata before the mutation.
 
 ---
 

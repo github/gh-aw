@@ -76,7 +76,7 @@ async function verifyRepository(githubClient, owner, repo) {
     throw queueError("repository_unavailable", `cannot establish queue repository visibility (${httpStatus(error) ?? "transport"})`);
   }
   if (!response?.data || typeof response.data.full_name !== "string" || response.data.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("repository_unavailable", "repository identity does not match the queue");
-  if (response.data.permissions?.pull === false) throw queueError("repository_unavailable", "caller lacks queue repository read visibility");
+  // Installation-token collaborator flags are not token scopes; Git reads establish contents access.
   log.debug("repository.verify.complete");
   return response.data;
 }
