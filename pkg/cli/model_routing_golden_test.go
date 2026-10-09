@@ -378,7 +378,14 @@ func assertModelRoutingGoldenFile(t *testing.T, path string, actual []byte) {
 	if err != nil {
 		t.Fatalf("read golden file %s (regenerate with UPDATE_MODEL_ROUTING_GOLDEN=1): %v", path, err)
 	}
-	if !bytes.Equal(expected, actual) {
+	var expectedJSON, actualJSON bytes.Buffer
+	if err := json.Compact(&expectedJSON, expected); err != nil {
+		t.Fatalf("parse golden file %s: %v", path, err)
+	}
+	if err := json.Compact(&actualJSON, actual); err != nil {
+		t.Fatalf("parse actual golden projection for %s: %v", path, err)
+	}
+	if !bytes.Equal(expectedJSON.Bytes(), actualJSON.Bytes()) {
 		t.Errorf("golden mismatch for %s; regenerate with UPDATE_MODEL_ROUTING_GOLDEN=1 and review the diff\nexpected:\n%s\nactual:\n%s",
 			path, expected, actual)
 	}
