@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 
 const require = createRequire(import.meta.url);
 const fixture = require("../../../specs/work-queue/fixtures/checkpoint.json");
@@ -39,13 +40,16 @@ describe("shared version-3 checkpoint conformance", () => {
     for (const original of fixture.history) {
       const restored = after.requests.get(original.request.id);
       assert.equal(restored.request.fingerprint, original.request.fingerprint);
-      assert.deepEqual(restored.request.parameters, ["submit", "dispatch_next"].includes(original.request.kind) ? original.request.parameters : null);
+      assert.equal(canonical(restored.request.parameters), canonical(["submit", "dispatch_next"].includes(original.request.kind) ? original.request.parameters : null));
     }
     const originalSubmission = fixture.history[1];
     const intent = {
       nodes: originalSubmission.request.parameters.nodes.map(({ kind, batch_trust_domain, enqueued, ...node }) => node),
     };
-    assert.deepEqual(acceptedSubmissionParameters(after, context(originalSubmission.actor, { created_at: originalSubmission.at }), intent, after.requests.get(originalSubmission.request.id)), originalSubmission.request.parameters);
+    assert.equal(
+      canonical(acceptedSubmissionParameters(after, context(originalSubmission.actor, { created_at: originalSubmission.at }), intent, after.requests.get(originalSubmission.request.id))),
+      canonical(originalSubmission.request.parameters)
+    );
     assert.equal(after.transactions.length, 1);
     assert.equal(serializeTransactionLog(after.transactions), serializeTransactionLog(fixture.checkpoint));
     assert.deepEqual(compactTransactions(fixture.history, fixture.prior_git_sha, administrator, 100), fixture.checkpoint);
@@ -92,7 +96,12 @@ describe("shared version-3 checkpoint conformance", () => {
     forged.request = newRequest(base.request.id, "checkpoint", administrator, { ...base.request.parameters, state_sha256: forged.operations[0].state_sha256 });
     assert.throws(() => replayTransactions([forged]), /checkpoint_invalid/);
     const receiptForgery = structuredClone(base);
-    receiptForgery.operations[0].state.requests[1].parameters_digest = "0".repeat(64);
+    const state = receiptForgery.operations[0].state;
+    const requests = JSON.parse(inflateRawSync(Buffer.from(state.requests_compressed, "base64")).toString("utf8"));
+    const receipt = requests.find(request => request.kind === "dispatch_next");
+    assert.ok(receipt);
+    receipt.parameters_digest = "0".repeat(64);
+    state.requests_compressed = deflateRawSync(Buffer.from(canonical(requests), "utf8")).toString("base64");
     receiptForgery.operations[0].state_sha256 = digest(receiptForgery.operations[0].state);
     receiptForgery.request = newRequest(base.request.id, "checkpoint", administrator, { ...base.request.parameters, state_sha256: receiptForgery.operations[0].state_sha256 });
     assert.throws(() => replayTransactions([receiptForgery]), /checkpoint_invalid/);

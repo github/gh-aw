@@ -294,7 +294,7 @@ func TestBranchVerifiesCheckpointChainsBeyondFormerDepthLimit(t *testing.T) {
 	mock.commits[head] = gitQueueCommit{Tree: tree}
 	commits := fixture.History
 	actor := fixture.Checkpoint[0].Actor
-	for index := 0; index < 66; index++ {
+	for index := range 66 {
 		ordered, err := causalOrder(commits)
 		if err != nil {
 			t.Fatal(err)

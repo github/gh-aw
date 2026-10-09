@@ -3,6 +3,7 @@ package workqueue
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"strings"
 	"unicode/utf8"
 )
@@ -173,9 +174,7 @@ func assertWorkTarget(work *WorkState, target EffectResource) error {
 // WorkCreators retains the first actor for each immutable Work across checkpoints.
 func immutableWorkCreators(state Projection) (map[string]Actor, error) {
 	creators := make(map[string]Actor, len(state.WorkCreators))
-	for id, actor := range state.WorkCreators {
-		creators[id] = actor
-	}
+	maps.Copy(creators, state.WorkCreators)
 	derived := map[string]Actor{}
 	checkpointPriorTips := map[string]string{}
 	commitsByID := make(map[string]QueueCommit, len(state.Requests))

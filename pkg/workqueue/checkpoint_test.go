@@ -26,7 +26,15 @@ func TestSharedCheckpointConformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	after, err := Replay(fixture.Checkpoint)
+	checkpointData, err := Serialize(fixture.Checkpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint, err := Parse(checkpointData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := Replay(checkpoint)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,14 +59,14 @@ func TestSharedCheckpointConformance(t *testing.T) {
 			t.Fatal("compacted request must not claim empty parameters")
 		}
 	}
-	again, err := CompactCheckpoint(fixture.History, fixture.PriorGitSHA, fixture.Checkpoint[0].Actor, fixture.Checkpoint[0].At)
+	again, err := CompactCheckpoint(fixture.History, fixture.PriorGitSHA, checkpoint[0].Actor, checkpoint[0].At)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sameJSON(again[0].Request, fixture.Checkpoint[0].Request) || again[0].ID != fixture.Checkpoint[0].ID {
+	if !sameJSON(again[0].Request, checkpoint[0].Request) || again[0].ID != checkpoint[0].ID {
 		t.Fatal("Go and JS derived different stable checkpoint identities")
 	}
-	genesis, err := CompactCheckpoint(fixture.History[:1], fixture.PriorGitSHA, fixture.Checkpoint[0].Actor, 0)
+	genesis, err := CompactCheckpoint(fixture.History[:1], fixture.PriorGitSHA, checkpoint[0].Actor, 0)
 	if err != nil || len(fixture.GenesisCheckpoint) != 1 ||
 		!sameJSON(genesis[0].Request, fixture.GenesisCheckpoint[0].Request) {
 		t.Fatal("Go and JS differ for an untouched scheduling clock")
@@ -67,11 +75,11 @@ func TestSharedCheckpointConformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err := NewRequest("post-checkpoint-pause", "control", fixture.Checkpoint[0].Actor, OperationsParameters{Operations: []Operation{control}})
+	request, err := NewRequest("post-checkpoint-pause", "control", checkpoint[0].Actor, OperationsParameters{Operations: []Operation{control}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	next, published, _, err := BuildCandidate(fixture.Checkpoint, fixture.Checkpoint[0].Actor, request, 101)
+	next, published, _, err := BuildCandidate(checkpoint, checkpoint[0].Actor, request, 101)
 	if err != nil || published == nil {
 		t.Fatalf("cannot extend checkpoint with fresh request: %v", err)
 	}
@@ -89,7 +97,7 @@ func TestSharedCheckpointConformance(t *testing.T) {
 		!nestedState.GrantsPaused || len(nestedState.Requests) != len(extended.Requests)+1 {
 		t.Fatal("nested checkpoint lost earlier causal history or later request")
 	}
-	malformed := fixture.Checkpoint[0]
+	malformed := checkpoint[0]
 	malformed.Operations = append([]Operation(nil), malformed.Operations...)
 	var op CheckpointOperation
 	if err := json.Unmarshal(malformed.Operations[0], &op); err != nil {
@@ -107,7 +115,7 @@ func TestSharedCheckpointConformance(t *testing.T) {
 	if _, err := Replay([]QueueCommit{malformed}); err == nil {
 		t.Fatal("checkpoint accepted altered state digest")
 	}
-	forged := fixture.Checkpoint[0]
+	forged := checkpoint[0]
 	forged.Operations = append([]Operation(nil), forged.Operations...)
 	if err := json.Unmarshal(forged.Operations[0], &op); err != nil {
 		t.Fatal(err)
