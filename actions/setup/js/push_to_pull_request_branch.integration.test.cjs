@@ -7,6 +7,7 @@ import { spawnSync } from "child_process";
 
 const require = createRequire(import.meta.url);
 const { getBundlePreApplyFiles } = require("./push_to_pull_request_branch.cjs");
+const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 
 global.core = {
   debug: vi.fn(),
@@ -102,6 +103,36 @@ describe("push_to_pull_request_branch bundle integration", () => {
     const actualFiles = await getBundlePreApplyFiles(createExecApi(targetRepo), {}, baseSha, bundleRef);
 
     expect(actualFiles.sort()).toEqual([".changeset/fix.md", "docs/guide.md"]);
+  });
+
+  it("checks only bundle commits added after an existing PR head", async () => {
+    const branchName = "feature/existing-pr";
+    const sourceRepo = createRepo("push-pr-existing-source-");
+    const targetRepo = createRepo("push-pr-existing-target-");
+    tempDirs.push(sourceRepo, targetRepo);
+
+    writeRepoFile(sourceRepo, "README.md", "base\n");
+    execGit(["add", "README.md"], { cwd: sourceRepo });
+    execGit(["commit", "-m", "base"], { cwd: sourceRepo });
+    execGit(["checkout", "-b", branchName], { cwd: sourceRepo });
+    writeRepoFile(sourceRepo, "tools/__pycache__/author.pyc", "author file\n");
+    execGit(["add", "tools/__pycache__/author.pyc"], { cwd: sourceRepo });
+    execGit(["commit", "-m", "author change"], { cwd: sourceRepo });
+    const existingHead = execGit(["rev-parse", "HEAD"], { cwd: sourceRepo }).stdout.trim();
+
+    writeRepoFile(sourceRepo, "config/agent.json", "{}\n");
+    execGit(["add", "config/agent.json"], { cwd: sourceRepo });
+    execGit(["commit", "-m", "agent change"], { cwd: sourceRepo });
+    const bundlePath = path.join(sourceRepo, "incremental.bundle");
+    execGit(["bundle", "create", bundlePath, `refs/heads/${branchName}`], { cwd: sourceRepo });
+
+    fetchBaseCommit(targetRepo, sourceRepo, existingHead, branchName);
+    const bundleRef = "refs/bundles/test-existing-pr";
+    execGit(["fetch", bundlePath, `refs/heads/${branchName}:${bundleRef}`], { cwd: targetRepo });
+    const files = await getBundlePreApplyFiles(createExecApi(targetRepo), {}, existingHead, bundleRef);
+
+    expect(files).toEqual(["config/agent.json"]);
+    expect(checkFileProtectionPostApply(files, { allowed_files: ["**/*.json"] }).action).toBe("allow");
   });
 
   it("fetches a HEAD-only bundle after its named branch ref is absent", () => {

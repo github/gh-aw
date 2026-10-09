@@ -264,6 +264,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 	tests := []struct {
 		name            string
 		engine          string
+		provider        LLMProvider
 		runtime         string
 		inline          bool
 		policy          *HostedWebPolicy
@@ -275,6 +276,24 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			name:   "allows a lowercase allowlist",
 			engine: "claude",
 			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
+		},
+		{
+			name:    "rejects Codex OpenAI standalone max-uses",
+			engine:  "codex",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
+			wantErr: "network.hosted-web.max-uses is not supported by standalone web search",
+		},
+		{
+			name:     "rejects Codex Copilot hosted web",
+			engine:   "codex",
+			provider: LLMProviderGitHub,
+			policy:   &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			wantErr:  "not functional with Codex using Copilot inference",
+		},
+		{
+			name:     "allows Codex Copilot inference without hosted web",
+			engine:   "codex",
+			provider: LLMProviderGitHub,
 		},
 		{
 			name:    "requires a policy list",
@@ -355,6 +374,12 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			wantErr:         "requires AWF",
 		},
 		{
+			name:            "ignores absent hosted-web policy for unsupported engines",
+			engine:          "copilot",
+			explicitNetwork: true,
+			firewallVersion: "v0.28.24",
+		},
+		{
 			name:    "rejects unsupported engine",
 			engine:  "copilot",
 			policy:  &HostedWebPolicy{Enabled: false},
@@ -376,7 +401,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 				compiler.engineCatalog.Register(&EngineDefinition{ID: tt.engine, RuntimeID: tt.runtime})
 			}
 			err := compiler.validateHostedWebPolicy(&WorkflowData{
-				EngineConfig:       &EngineConfig{ID: tt.engine, IsInlineDefinition: tt.inline},
+				EngineConfig:       &EngineConfig{ID: tt.engine, IsInlineDefinition: tt.inline, LLMProvider: tt.provider},
 				NetworkPermissions: network,
 			})
 			if tt.wantErr == "" {

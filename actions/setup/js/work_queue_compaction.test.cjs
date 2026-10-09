@@ -1,5 +1,7 @@
-"use strict";
+import { it as test } from "vitest";
+import { createRequire } from "node:module";
 
+const require = createRequire(import.meta.url);
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
 const fs = require("node:fs");
