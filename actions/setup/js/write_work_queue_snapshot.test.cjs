@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import os from "node:os";
 import { main, resolveWorkerAssignment } from "./write_work_queue_snapshot.cjs";
-import { loadWorkQueueSnapshot } from "./work_queue_mcp_server.cjs";
+import { loadWorkQueueSnapshot, readWorkQueueState } from "./work_queue_mcp_server.cjs";
 import { normalizeRuntimeMessage, readClaimScopeContext } from "./work_queue_claim_scope.cjs";
 import { queueFixture, REF, REPOSITORY, WORKFLOW, DISPATCHER } from "./work_queue_lifecycle.test_helpers.cjs";
 import { newRequest, newState, replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
@@ -175,6 +175,21 @@ describe("authenticated immutable activation snapshots", () => {
     expect(options.core.setOutput.mock.calls[0][0]).toBe("work_queue_origin");
     expect(fs.statSync(options.snapshotPath).mode & 0o777).toBe(0o444);
     expect(loadWorkQueueSnapshot(options.snapshotPath).projection.policy_epoch).toBe("e1");
+  });
+
+  it("reports an absent queue as uninitialized without claiming worker readiness or installing Policy", async () => {
+    const { options } = setup({ granted: false });
+    const initialize = vi.fn();
+    const snapshot = await main({
+      ...options,
+      branch: "custom-queue",
+      readWorkQueueLog: async () => ({ sha: null, transactions: [], state: newState() }),
+      initializeWorkQueue: initialize,
+    });
+    expect(snapshot).toMatchObject({ sha: null, worker: null, role: "dispatcher" });
+    expect(initialize).not.toHaveBeenCalled();
+    expect(readWorkQueueState(loadWorkQueueSnapshot(options.snapshotPath)).queue_state).toBe("uninitialized");
+    expect(options.core.info).toHaveBeenCalledWith(expect.stringContaining("protected queue branch 'custom-queue'"));
   });
 
   it("rejects actual oversized encoded framing before creating a snapshot or publishing origin output", async () => {
