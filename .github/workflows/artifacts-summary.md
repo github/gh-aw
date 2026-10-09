@@ -4,7 +4,6 @@ emoji: "📦"
 description: Generates a comprehensive summary of GitHub Actions artifacts usage across all workflows in the repository
 on:
   workflow_dispatch:
-  schedule: weekly on sunday around 06:00
 max-daily-ai-credits: 10000
 permissions:
   contents: read
@@ -22,6 +21,9 @@ sandbox:
   agent:
     id: awf
 tools:
+  work-queue:
+    worker: true
+    require-assignment: true
   cli-proxy: true
   edit:
   bash: true
@@ -33,10 +35,12 @@ safe-outputs:
     expires: 1d
     category: "artifacts"
     max: 1
+    fallback-to-issue: false
     close-older-discussions: true
 timeout-minutes: 15
 strict: true
 imports:
+  - shared/daily-report-worker.md
   - shared/reporting.md
   - shared/safe-output-app.md
   - shared/otlp.md
@@ -63,7 +67,7 @@ Generate a comprehensive summary table of GitHub Actions artifacts usage in the 
 #### Task Requirements
 
 1. **Analyze all workflows** in the repository to identify which ones generate artifacts
-2. **Collect artifact data** for recent workflow runs (last 30 days recommended)
+2. **Collect artifact data** for the 30-day window ending at midnight UTC after the assigned `report_date`; exclude runs outside that window
 3. **Generate a summary table** with the following columns:
    - Workflow Name
    - Total Artifacts Count
@@ -92,7 +96,7 @@ Please:
 
 #### Output Format
 
-Create an issue with a markdown table like this:
+Create a discussion titled "Artifacts Usage Report - [report_date]" with a markdown table like this:
 
 ```markdown
 # Artifacts Usage Report

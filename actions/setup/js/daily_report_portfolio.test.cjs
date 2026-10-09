@@ -1,7 +1,7 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { DAILY_REPORTS, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan, buildDailyReportPolicy } from "./daily_report_portfolio.cjs";
+import { DAILY_REPORTS, FIXED_DAILY_REPORTS, WEEKLY_REPORTS, REPORT_PROFILES, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan, buildDailyReportPolicy } from "./daily_report_portfolio.cjs";
 import { normalizeDispatchParameters, normalizeSubmitParameters } from "./work_queue_intents.cjs";
 import { newState, newRequest, generateRequestOperations, replayTransactions } from "./work_queue_replay.cjs";
 import { validatePolicy } from "./work_queue_policy.cjs";
@@ -32,21 +32,33 @@ function ledger() {
   return { append, policy, state: () => state, transactions };
 }
 
-describe("three-of-ten daily discussion-report portfolio", () => {
-  it("selects three distinct profiles per day and exactly three slots per profile over any ten-day rotation", () => {
+describe("bounded daily and weekly discussion-report portfolio", () => {
+  it("reserves daily intelligence and weekly slots while rotating other reports fairly over any thirty-five-day cycle", () => {
     expect(DAILY_REPORTS).toHaveLength(10);
-    expect(new Set(DAILY_REPORTS).size).toBe(10);
-    for (const start of ["2026-01-01", "2026-02-25", "2026-12-27"]) {
-      const counts = Object.fromEntries(DAILY_REPORTS.map(profile => [profile, 0]));
-      for (let index = 0; index < 10; index++) {
+    expect(REPORT_PROFILES).toHaveLength(13);
+    expect(new Set(REPORT_PROFILES).size).toBe(13);
+    for (const start of ["1970-01-01", "2024-02-25", "2026-01-01", "2026-02-25", "2026-12-27"]) {
+      const counts = Object.fromEntries(REPORT_PROFILES.map(profile => [profile, 0]));
+      const dailySequence = [];
+      for (let index = 0; index < 35; index++) {
         const date = new Date(Date.parse(start) + index * 86400000).toISOString().slice(0, 10);
         const selected = reportsForDay(date);
         expect(selected).toHaveLength(REPORTS_PER_DAY);
         expect(new Set(selected).size).toBe(REPORTS_PER_DAY);
+        expect(selected).toContain("deep-report");
         for (const profile of selected) counts[profile]++;
+        for (const report of WEEKLY_REPORTS) {
+          expect(selected.includes(report.profile)).toBe(new Date(`${date}T00:00:00Z`).getUTCDay() === report.reportWeekday);
+        }
+        dailySequence.push(...selected.filter(profile => DAILY_REPORTS.includes(profile)));
         expect(reportsForDay(date)).toEqual(selected);
       }
-      expect(Object.values(counts)).toEqual(Array(10).fill(3));
+      expect(DAILY_REPORTS.map(profile => counts[profile])).toEqual(Array(10).fill(6));
+      expect(WEEKLY_REPORTS.map(report => counts[report.profile])).toEqual([5, 5]);
+      expect(FIXED_DAILY_REPORTS.map(profile => counts[profile])).toEqual([35]);
+      for (let index = 1; index < dailySequence.length; index++) {
+        expect(DAILY_REPORTS.indexOf(dailySequence[index])).toBe((DAILY_REPORTS.indexOf(dailySequence[index - 1]) + 1) % DAILY_REPORTS.length);
+      }
     }
     expect(reportsForDay("2024-02-29")).toHaveLength(3);
   });
@@ -66,20 +78,20 @@ describe("three-of-ten daily discussion-report portfolio", () => {
       expect(node.payload).toMatchObject({ report_date: plan.date, report_profile: node.worker_profile });
       expect(frozenResourceScope(node.payload)).toEqual({ version: 1, resources: [{ host: "github.com", repository, repository_id: "7" }] });
       expect(validateDeliveryContract(node.payload.effect_contract).outputs).toContainEqual({ type: "create_discussion", min: 1, max: 1 });
-      expect(node.payload.effect_contract.outputs.some(output => output.type === "create_issue")).toBe(false);
+      expect(node.payload.effect_contract.outputs.some(output => output.type === "create_issue")).toBe(node.worker_profile === "deep-report");
     }
     expect(() => buildDailyReportPlan({ ...planOptions, repository: "not-a-repository" })).toThrow();
     expect(() => buildDailyReportPlan({ ...planOptions, repositoryId: "0" })).toThrow();
     expect(() => buildDailyReportPlan({ ...planOptions, repositoryId: "007" })).toThrow();
   });
 
-  it("generates a validated singleton, one-attempt, equal-weight policy with only the ten immutable routes", () => {
+  it("generates a validated singleton, one-attempt, equal-weight policy with all thirteen immutable routes", () => {
     const policy = buildDailyReportPolicy(policyOptions);
     expect(validatePolicy(policy)).toEqual(policy);
     const pool = policy.pools[REPORT_POOL];
     expect(pool).toMatchObject({ logical_limit: 3, native_limit: 3, per_account_limit: 1, retry: { max_attempts: 1 } });
-    expect(Object.keys(pool.profiles)).toEqual(DAILY_REPORTS);
-    for (const profile of DAILY_REPORTS) {
+    expect(Object.keys(pool.profiles)).toEqual(REPORT_PROFILES);
+    for (const profile of REPORT_PROFILES) {
       expect(policy.accounting_weights[profile]).toBe(1);
       expect(pool.profiles[profile]).toEqual({
         workflow: `.github/workflows/${profile}.lock.yml`,
@@ -125,10 +137,33 @@ describe("three-of-ten daily discussion-report portfolio", () => {
     expect(replayTransactions(queue.transactions).claims.size).toBe(3);
   });
 
-  it("keeps the dispatcher allowlist and ten dispatch-only Claim workers wired to actual compiled queue protocols", () => {
+  it.each(["2026-10-10", "2026-10-11"])("admits weekly reports idempotently with exactly one required discussion on %s", date => {
+    const queue = ledger();
+    const plan = buildDailyReportPlan({ ...planOptions, date });
+    const producer = { role: "producer", repository, principal: "11" };
+    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 2000, queue.state()), producer);
+    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 3000, queue.state()), producer);
+    expect(queue.state().works.size).toBe(3);
+    const weekly = plan.nodes.find(node => WEEKLY_REPORTS.some(report => report.profile === node.worker_profile));
+    expect(weekly).toBeDefined();
+    expect(weekly.payload.report_date).toBe(date);
+    expect(weekly.payload.effect_contract.outputs).toContainEqual({ type: "create_discussion", min: 1, max: 1 });
+    queue.append("dispatch_next", normalizeDispatchParameters(plan.dispatch, queue.policy, 3), {
+      role: "dispatcher",
+      repository,
+      principal: "11",
+      workflow: ".github/workflows/daily-report-dispatcher.lock.yml",
+      run_id: "15",
+      run_attempt: 1,
+    });
+    expect(queue.state().dispatches.size).toBe(3);
+    expect([...queue.state().dispatches.values()].some(dispatch => dispatch.profile.workflow === `.github/workflows/${weekly.worker_profile}.lock.yml`)).toBe(true);
+  });
+
+  it("keeps the dispatcher allowlist and thirteen dispatch-only Claim workers wired to actual compiled queue protocols", () => {
     const dispatcher = source("daily-report-dispatcher");
-    const routes = [...dispatcher.matchAll(/^      - (daily-[a-z-]+)$/gm)].map(match => match[1]);
-    expect(routes).toEqual(DAILY_REPORTS);
+    const routes = [...dispatcher.matchAll(/^      - ([a-z-]+)$/gm)].map(match => match[1]);
+    expect(routes).toEqual(REPORT_PROFILES);
     expect(dispatcher).toContain("if: github.run_attempt == 1");
     expect(dispatcher).toContain("Date.parse(run.created_at) - 86400000");
     expect(dispatcher).not.toMatch(/^\s+workflow_dispatch:/m);
@@ -136,7 +171,7 @@ describe("three-of-ten daily discussion-report portfolio", () => {
     const lock = fs.readFileSync(new URL("../../../.github/workflows/daily-report-dispatcher.lock.yml", import.meta.url), "utf8");
     expect(lock).toContain("if: github.run_attempt == 1");
     expect(lock).toContain("daily_report_portfolio.cjs");
-    for (const profile of DAILY_REPORTS) {
+    for (const profile of REPORT_PROFILES) {
       const worker = source(profile);
       const frontmatter = worker.split("\n---")[0];
       expect(frontmatter).toMatch(/^  workflow_dispatch:/m);
@@ -151,8 +186,54 @@ describe("three-of-ten daily discussion-report portfolio", () => {
       expect(compiled).toContain("name: Reconcile work queue claim");
       expect(compiled).toContain("work_queue_claim_finish");
       expect(compiled).toContain("create_discussion");
+      if (["deep-report", "artifacts-summary", "repo-tree-map"].includes(profile)) expect(frontmatter).toContain("fallback-to-issue: false");
     }
     expect(source("daily-evals-report")).not.toContain("create_issue");
     expect(source("daily-token-consumption-report")).not.toContain("create_issue");
+  });
+
+  it("leaves timing-sensitive, stateful, remediation and other weekly workflows on their own schedules", () => {
+    for (const profile of [
+      "daily-news",
+      "daily-arxiv-researcher",
+      "daily-cache-strategy-analyzer",
+      "daily-hippo-learn",
+      "org-health-report",
+      "portfolio-analyst",
+      "archivx-agentic-workflows-analyzer",
+      "workflow-skill-extractor",
+      "dataflow-pr-discussion-dataset",
+      "firewall-escape",
+      "lint-monster",
+      "issue-arborist",
+      "smoke-copilot",
+      "constraint-solving-potd",
+    ]) {
+      expect(REPORT_PROFILES).not.toContain(profile);
+      expect(source(profile).split("\n---")[0]).toMatch(/^\s+schedule:/m);
+    }
+    expect(REPORT_PROFILES).not.toContain("agent-performance-analyzer");
+    expect(source("agent-performance-analyzer")).toContain("on: daily");
+  });
+
+  it("preserves DeepReport's bounded follow-ups without authorizing unscoped repository-memory writes", () => {
+    const plan = buildDailyReportPlan(planOptions);
+    const deepReport = plan.nodes.find(node => node.worker_profile === "deep-report");
+    expect(deepReport.depends_on).toEqual([]);
+    expect(deepReport.payload.effect_contract.outputs).toEqual([
+      { type: "create_discussion", min: 1, max: 1 },
+      ...["noop", "report_incomplete", "missing_tool", "missing_data"].map(type => ({ type, min: 0, max: 1 })),
+      { type: "create_issue", min: 0, max: 7 },
+      { type: "add_comment", min: 0, max: 3 },
+      { type: "upload_artifact", min: 0, max: 3 },
+    ]);
+    const worker = source("deep-report");
+    expect(worker.split("\n---")[0]).not.toContain("repo-memory:");
+    expect(worker).toContain("  cache-memory: true");
+    expect(worker).toContain("/tmp/gh-aw/cache-memory/deep-report/");
+    expect(worker).toContain("Do not wait for this activation's sibling workers");
+    expect(worker).toContain("[report_date]");
+    expect(worker).toContain("Do not invent tasks to reach a count");
+    expect(worker).toContain("work_queue_claim_finish");
   });
 });
