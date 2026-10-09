@@ -60,9 +60,8 @@ const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
-
-const CODEX_ROUTING_ENDPOINTS = ["/responses"];
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy } = require("./awf_model_routing.cjs");
+const CODEX_ROUTING_POLICY = getAWFModelRoutingPolicy("codex");
 
 // Pattern to detect OpenAI rate-limit errors.
 // Matches the JSON error type field ("rate_limit_exceeded"), the HTTP status code
@@ -514,7 +513,7 @@ function applyCodexRoutingEffort(args, effort) {
  * @returns {{selection: any, model: string, args: string[], error: string|null}}
  */
 function resolveCodexModelRouting(reflectData, args) {
-  const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_ENDPOINTS, true);
+  const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride);
   if (result.error || !result.selection) {
     recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
     return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
@@ -527,7 +526,14 @@ function resolveCodexModelRouting(reflectData, args) {
   let routedArgs = removeCodexRoutingOverrides(args);
   routedArgs = injectModelFlagAfterExec(routedArgs, result.selection.wire_model);
   if (mappedEffort.effort) routedArgs = applyCodexRoutingEffort(routedArgs, mappedEffort.effort);
-  recordAWFModelRoutingOutcome({ status: "selected", wire_model: result.selection.wire_model, effort: result.selection.effort, applied_effort: mappedEffort.effort });
+  recordAWFModelRoutingOutcome({
+    status: "selected",
+    wire_model: result.selection.wire_model,
+    endpoint: result.selection.endpoint,
+    selected_endpoint: result.selection.selected_endpoint,
+    effort: result.selection.effort,
+    applied_effort: mappedEffort.effort,
+  });
   return { selection: result.selection, model: result.selection.wire_model, args: routedArgs, error: null };
 }
 

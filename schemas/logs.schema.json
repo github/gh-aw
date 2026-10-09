@@ -4469,6 +4469,9 @@
                   "router_version": {
                     "type": "string"
                   },
+                  "endpoint": {
+                    "type": "string"
+                  },
                   "effective_endpoint": {
                     "type": "string"
                   },
@@ -5282,6 +5285,9 @@
                     "type": "string"
                   },
                   "router_version": {
+                    "type": "string"
+                  },
+                  "endpoint": {
                     "type": "string"
                   },
                   "effective_endpoint": {

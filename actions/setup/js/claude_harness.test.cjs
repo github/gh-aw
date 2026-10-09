@@ -208,9 +208,18 @@ describe("claude_harness.cjs", () => {
         routing: { ...routedReflect.routing, selection: { ...routedReflect.routing.selection, effort: "max", endpoint: "/chat/completions" } },
       };
       const messages = [];
-      const child = await buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github" }, message => messages.push(message));
-      expect(child).toMatchObject({ ANTHROPIC_MODEL: "claude-opus-5", CLAUDE_CODE_EFFORT_LEVEL: "max" });
-      expect(messages[0]).toContain("endpoint=/v1/messages selected_endpoint=/chat/completions");
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-routing-outcome-"));
+      try {
+        const child = await buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github", GH_AW_TMP_DIR: tmpDir }, message => messages.push(message));
+        expect(child).toMatchObject({ ANTHROPIC_MODEL: "claude-opus-5", CLAUDE_CODE_EFFORT_LEVEL: "max" });
+        expect(messages[0]).toContain("endpoint=/v1/messages selected_endpoint=/chat/completions");
+        expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "agent", "awf-routing-outcome.json"), "utf8"))).toMatchObject({
+          endpoint: "/v1/messages",
+          selected_endpoint: "/chat/completions",
+        });
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
 
     it("starts the harness with the routed model and refuses an endpoint mismatch", () => {

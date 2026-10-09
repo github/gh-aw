@@ -66,6 +66,7 @@ type ModelRoutingRouteSummary struct {
 	Model             string  `json:"model,omitempty" console:"header:Model"`
 	Effort            string  `json:"effort,omitempty" console:"header:Effort"`
 	RouterVersion     string  `json:"router_version,omitempty" console:"header:Router"`
+	Endpoint          string  `json:"endpoint,omitempty" console:"header:Endpoint"`
 	EffectiveEndpoint string  `json:"effective_endpoint,omitempty" console:"header:Effective Endpoint"`
 	SelectedEndpoint  string  `json:"selected_endpoint,omitempty" console:"header:Selected Endpoint"`
 	RunCount          int     `json:"run_count" console:"header:Runs"`
@@ -454,6 +455,7 @@ func extractRunEngineInfo(pr ProcessedRun) runEngineInfo {
 
 // applyAwInfoToRunData copies repository/ref metadata from aw_info.json onto the run data.
 func applyAwInfoToRunData(runData *RunData, awInfo *AwInfo) {
+	runData.ModelRouting = applyAwInfoModelRoutingInfo(runData.ModelRouting, awInfo)
 	if awInfo.Repository != "" {
 		runData.Repository = awInfo.Repository
 		if organization, _, found := strings.Cut(awInfo.Repository, "/"); found {

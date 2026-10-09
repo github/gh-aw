@@ -31,7 +31,7 @@ async function main(options = {}) {
   if (runtime.role === "observer" && options.initializationContext !== undefined) throw new Error("work_queue_observer_read_only");
   const readConfiguration = runtime.role === "observer" ? { ...configuration, policyProposal: undefined } : configuration;
   let latest = await loadQueue(readConfiguration);
-  if (!latest.projection.policy && !(runtime.role === "observer" && latest.sha === null && latest.transactions.length === 0)) throw new Error("work_queue_policy_missing");
+  if (!latest.projection.policy && !(runtime.role !== "worker" && latest.sha === null && latest.transactions.length === 0)) throw new Error("work_queue_policy_missing");
   let worker = runtime.assignment ? validateStoredAssignment(latest.projection, runtime.assignment).assignment : null;
   let trustedContext;
   const staged = process.env.GH_AW_WORK_QUEUE_ISSUES !== undefined && isStagedMode(configuration);
@@ -49,6 +49,7 @@ async function main(options = {}) {
     await require("./work_queue_issues.cjs").main({ ...configuration, trustedContext });
     latest = await loadQueue(readConfiguration);
   }
+  if (!latest.projection.policy && !(runtime.role !== "worker" && latest.sha === null && latest.transactions.length === 0)) throw new Error("work_queue_policy_missing");
   const snapshot = {
     version: 3,
     sha: latest.sha,

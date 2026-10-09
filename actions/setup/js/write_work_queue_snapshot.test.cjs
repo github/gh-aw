@@ -296,10 +296,36 @@ describe("authenticated immutable activation snapshots", () => {
       initializeWorkQueue: initialize,
       readWorkQueueLog: async () => ({ sha: null, transactions: [], state: newState() }),
     });
+
     expect(snapshot).toMatchObject({ role: "observer", sha: null, worker: null, transactionLog: "", origin: { role: "producer" } });
     expect(loadWorkQueueSnapshot(options.snapshotPath).projection.policy).toBeNull();
     expect(initialize).not.toHaveBeenCalled();
     await expect(main({ ...options, role: "observer", readWorkQueueLog: async () => ({ sha: "existing", transactions: [], state: newState() }) })).rejects.toThrow(/policy_missing/);
+  });
+
+  it("captures a genuinely absent queue for a dispatcher without creating policy or granting worker authority", async () => {
+    const { options } = setup({ granted: false });
+    const readWorkQueueLog = vi.fn(async () => ({ sha: null, transactions: [], state: newState() }));
+    const snapshot = await main({ ...options, readWorkQueueLog });
+    expect(snapshot).toMatchObject({ role: "dispatcher", sha: null, worker: null, transactionLog: "" });
+    expect(loadWorkQueueSnapshot(options.snapshotPath).projection.policy).toBeNull();
+    expect(readWorkQueueLog).toHaveBeenCalledTimes(2);
+    const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT"];
+    const previous = keys.map(key => process.env[key]);
+    try {
+      process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+      process.env.GH_AW_WORK_QUEUE_ROLE = "dispatcher";
+      process.env.GH_AW_WORK_QUEUE_SNAPSHOT = options.snapshotPath;
+      expect(readClaimScopeContext()).toMatchObject({ assignment: null, snapshot: { sha: null } });
+    } finally {
+      keys.forEach((key, index) => {
+        if (previous[index] === undefined) delete process.env[key];
+        else process.env[key] = previous[index];
+      });
+    }
+    const existing = setup({ granted: false });
+    await expect(main({ ...existing.options, readWorkQueueLog: async () => ({ sha: "existing", transactions: [], state: newState() }) })).rejects.toThrow(/policy_missing/);
+    expect(fs.existsSync(existing.options.snapshotPath)).toBe(false);
   });
 
   it("cannot downgrade declared workers or supplied assignments into read-only observers", async () => {

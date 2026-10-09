@@ -92,12 +92,11 @@ Upgrade all closed-schema readers first. See the
 - Treat finish as an intent: trusted processing publishes Completion before
   scoped effects and Result only after independently verified delivery.
 
-When `<mcp-clis>` advertises the wrapper, use
-`work-queue work_queue_read '{}'` or
-`work-queue work_queue_claim_finish '{"claim_handle":"h1","outcome":"completed"}'`.
-These are MCP subcommands, not operator commands. Pass one JSON argument, not
-structured-tool `command`/`description`. Check `queue_state`: `uninitialized`
-means deployment failure, not empty; `status: "staged"` is not a grant or launch.
+Use `<mcp-clis>` advertised MCP subcommands with one JSON argument (not
+structured-tool `command`/`description`). Dispatcher: `uninitialized` plus
+null `snapshot_sha` means absent; stop with `noop`, not submit/dispatch.
+Existing policyless ledgers are deployment failures; workers require Policy.
+`status: "staged"` is no grant or launch.
 
 ## Dependencies and recovery
 
