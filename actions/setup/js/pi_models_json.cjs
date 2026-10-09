@@ -38,7 +38,15 @@ const { loadModelsJson } = require("./model_costs.cjs");
 const { loadPiSDK, nativePiProvider, parsePiConfig, stagePiArtifacts } = require("./pi_runtime.cjs");
 const { preparePiSubagents } = require("./pi_subagent_config.cjs");
 const { buildCatalogFromReflect } = require("./resolve_model_alias.cjs");
-const { resolveAWFModelRoutingSelection, getAWFRoutingModel, getAWFRoutingModelAmbiguityError, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy } = require("./awf_model_routing.cjs");
+const {
+  resolveAWFModelRoutingSelection,
+  getAWFRoutingModel,
+  getAWFRoutingModelAmbiguityError,
+  mapAWFRoutingEffort,
+  recordAWFModelRoutingOutcome,
+  getAWFModelRoutingPolicy,
+  getAWFModelRoutingFailureCode,
+} = require("./awf_model_routing.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const PI_ROUTING_ENDPOINT_APIS = Object.freeze({
@@ -288,7 +296,11 @@ function resolvePiReasoningForModel({ provider, modelId, reflectData }) {
 function resolvePiModelRouting(reflectData) {
   const result = resolveAWFModelRoutingSelection(reflectData, true, PI_ROUTING_ENDPOINTS, PI_ROUTING_POLICY.allowEndpointOverride);
   if (result.error || !result.selection) {
-    recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
+    recordAWFModelRoutingOutcome({
+      status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",
+      failure_code: reflectData?.routing?.failure_code || getAWFModelRoutingFailureCode(result.error),
+      detail: result.error,
+    });
     return { selection: null, error: result.error || "AWF model routing selection is missing" };
   }
   const mappedEffort = mapAWFRoutingEffort("pi", result.selection.effort);
@@ -322,6 +334,28 @@ function resolvePiRoutingEndpoint({ reflectData, modelId, api }) {
     };
   }
   return { endpoint, error: null };
+}
+
+/**
+ * Resolve the endpoint for a Pi routing selection and record the final outcome.
+ * @param {{ reflectData: any, modelId: string, api: string, selection: any }} options
+ * @returns {{ endpoint: string|null, error: string|null }}
+ */
+function resolveAndRecordPiModelRoutingEndpoint({ reflectData, modelId, api, selection }) {
+  const result = resolvePiRoutingEndpoint({ reflectData, modelId, api });
+  if (result.error) {
+    recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_endpoint", detail: result.error });
+    return result;
+  }
+  recordAWFModelRoutingOutcome({
+    status: "selected",
+    wire_model: selection.wire_model,
+    endpoint: result.endpoint,
+    selected_endpoint: selection.selected_endpoint,
+    effort: selection.effort,
+    applied_effort: selection.mapped_effort,
+  });
+  return result;
 }
 
 /** @param {{ loadSDK?: typeof loadPiSDK, loadModelsJson?: typeof loadModelsJson, fetchReflect?: typeof fetchAWFReflect, logger?: (message: string) => void }} [options] */
@@ -389,17 +423,9 @@ async function main(options = {}) {
     logger,
   });
   if (routingRequired) {
-    const result = resolvePiRoutingEndpoint({ reflectData, modelId, api });
+    const result = resolveAndRecordPiModelRoutingEndpoint({ reflectData, modelId, api, selection: routingSelection });
     if (result.error) throw new Error(`${result.error}; refusing to start Pi`);
     const endpointOverride = routingSelection.selected_endpoint && routingSelection.selected_endpoint !== result.endpoint ? ` selected_endpoint=${routingSelection.selected_endpoint}` : "";
-    recordAWFModelRoutingOutcome({
-      status: "selected",
-      wire_model: routingSelection.wire_model,
-      endpoint: result.endpoint,
-      selected_endpoint: routingSelection.selected_endpoint,
-      effort: routingSelection.effort,
-      applied_effort: routingSelection.mapped_effort,
-    });
     logger(`inference routing: mode=awf-routed model=${modelId} effort=${routingSelection.effort || "(unset)"} endpoint=${result.endpoint}${endpointOverride}`);
   }
   logger(`resolved gateway api=${api} (provider=${provider}, model=${modelId})`);
@@ -483,6 +509,7 @@ module.exports = {
   resolvePiApiForModel,
   resolvePiModelRouting,
   resolvePiRoutingEndpoint,
+  resolveAndRecordPiModelRoutingEndpoint,
   resolvePiReasoningForModel,
   validatePiModelAvailability,
   DEFAULT_PI_CODING_AGENT_DIR,
