@@ -230,6 +230,7 @@ async function verifyClaimAdapterOutput(options) {
   return verifyBuiltinDeliveryOutput({ ...options, message: receipt.message });
 }
 
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates a literal configured repository; projection fixes that destination and assertClaimAuthorized enforces the per-Claim profile allowlist before effects.
 module.exports = {
   wrapDeclaredBuiltinHandler,
   ADAPTER_EFFECT_TYPES,

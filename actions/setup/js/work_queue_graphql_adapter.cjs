@@ -1,6 +1,8 @@
 // @ts-check
 "use strict";
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client authorize resolved GraphQL targets before mutations.
+
 const { canonical, canonicalBytes, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
 const { assertClaimAuthorized, currentClaimHandle, claimIdentity, assertClaimIdentity, receiptMatchesClaim, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
 const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");

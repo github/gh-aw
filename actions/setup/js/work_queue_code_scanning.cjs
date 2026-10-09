@@ -1,6 +1,8 @@
 // @ts-check
 "use strict";
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
+// @safe-outputs-exempt SEC-005 — runtime repository fallbacks are checked by assertClaimAuthorized against authorizeWorkerClaim's profile.effect_scope allowlist (E004); the guarded effect client reauthorizes SARIF writes.
+
 const crypto = require("crypto");
 const path = require("path");
 const zlib = require("zlib");

@@ -1,6 +1,8 @@
 // @ts-check
 "use strict";
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client enforce per-Claim resource authority before Git writes.
+
 const crypto = require("crypto");
 const path = require("path");
 const { canonical, closed, digest, utf8Compare } = require("./work_queue_codec.cjs");
