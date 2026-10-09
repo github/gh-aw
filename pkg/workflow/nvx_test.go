@@ -139,6 +139,8 @@ func TestNVXRuntimeDefaultsWithoutConfiguration(t *testing.T) {
 
 	cleanupStep := strings.Join(generateNVXRuntimeCleanupStep(data), "\n")
 	assert.Contains(t, cleanupStep, "if: always()")
+	assert.Contains(t, cleanupStep, `sudo -n "$sudo_bin" "$setfacl_bin" -m "u:${acl_uid}:${acl_permissions}" /dev/kvm`)
+	assert.Contains(t, cleanupStep, `sudo -n "$sudo_bin" "$setfacl_bin" -x "u:${acl_uid}" /dev/kvm`)
 	assert.Contains(t, cleanupStep, `sudo -n "$resolved_rm" -rf -- "$stage_dir"`)
 	assert.Contains(t, cleanupStep, `^/tmp/gh-aw-nvx\.[[:alnum:]]{10}$`)
 
