@@ -182,6 +182,7 @@ async function assertClaimAuthorized(message, options = {}) {
   const execution = claimExecution.getStore();
   const scope = execution || readClaimScopeContext();
   if (!scope) return normalized;
+  if (scope.assignment === null && normalized.type === "noop") return normalized;
   if (options.effect === true) {
     if (execution?.closedEffectChannel) throw scopeError("Claim write channel is closed for independent delivery verification");
     if (resourceExecution.getStore()?.verification) throw scopeError("Claim resource verification is read-only");

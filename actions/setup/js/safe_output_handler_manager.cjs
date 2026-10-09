@@ -1001,7 +1001,16 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
  */
 async function processMessages(messageHandlers, messages, onItemCreated = null) {
-  if (readClaimScopeContext() && !currentClaimHandle()) {
+  const claimScope = readClaimScopeContext();
+  const absentBranchDispatcherNoop =
+    claimScope?.assignment === null &&
+    claimScope.snapshot?.sha === null &&
+    claimScope.snapshot.transactionLog === "" &&
+    claimScope.snapshot.worker === null &&
+    process.env.GH_AW_WORK_QUEUE_ROLE === "dispatcher" &&
+    messages.length > 0 &&
+    messages.every(message => message?.type === "noop");
+  if (claimScope && !currentClaimHandle() && !absentBranchDispatcherNoop) {
     throw new Error("Queue safe outputs must execute in a trusted per-Claim handler context; use the scoped manager");
   }
   messages = messages.map(message => {
