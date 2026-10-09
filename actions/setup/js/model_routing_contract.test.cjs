@@ -112,6 +112,20 @@ describe("cross-module model routing contract", () => {
     ["Pi Claude pick", fixtures.piClaudePick, "claude-opus-4-6", "/v1/messages"],
   ];
 
+  it("resolves Pi's routing selection directly in-process", () => {
+    const result = pi.resolvePiModelRouting(fixtures.piClaudePick.reflectData);
+    expect(result).toMatchObject({
+      error: null,
+      selection: {
+        wire_model: "claude-opus-4-6",
+        endpoint: "/v1/messages",
+        selected_endpoint: "/v1/messages",
+        effort: "high",
+        mapped_effort: "high",
+      },
+    });
+  });
+
   it.each(endpointCases)("%s agrees across harness, attribution, session, and OTEL", async (_name, fixture, model, endpoint) => {
     const result = await runContract(fixture);
     const selectedEndpoint = fixture.reflectData.routing.selection.endpoint;
