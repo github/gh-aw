@@ -306,5 +306,41 @@
    "Minimal documentation"
   ],
   "blogged": false
+ },
+ "Software-SE-Pod/storyplan": {
+  "kind": "tool",
+  "reviewed": "2026-10-09",
+  "score": 6,
+  "summary": "Typed pre-PR plan per user story: MCP server + gh-aw workflow files plan as sub-issue, CI verifies PR against it.",
+  "highlights": [
+   "README.md: story issue -> pre-PR issue -> storyplan-verify flow",
+   "F# plan model exposed via MCP server",
+   "Pins Copilot model; org-billed copilot-requests"
+  ],
+  "blogged": false
+ },
+ "victorperr/agentic-workflow-observatory": {
+  "kind": "tool",
+  "reviewed": "2026-10-09",
+  "score": 6,
+  "summary": "Maps gh-aw runs to Datadog Agent Observability traces, flagging runs that pass CI but fail as agents; experimental.",
+  "highlights": [
+   "README.md: loop detection and firewall-blocked egress flagged",
+   "Parses firewall logs",
+   "Marked experimental, 0 stars"
+  ],
+  "blogged": false
+ },
+ "cnotv/agentic-extension": {
+  "kind": "extension",
+  "reviewed": "2026-10-09",
+  "score": 5,
+  "summary": "Rancher UI extension/controller cataloguing gh-aw workflows, dispatching runs and showing cost stats as k8s resources.",
+  "highlights": [
+   "AgentRepository/Agent/AgentRun CRDs",
+   "Dispatch via AgentRun origin: rancher",
+   "Created 2026-10-07, very new"
+  ],
+  "blogged": false
  }
 }
