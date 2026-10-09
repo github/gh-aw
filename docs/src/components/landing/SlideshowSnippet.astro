@@ -85,6 +85,7 @@ import Octicon from '../Octicon.astro';
     animation: none;
     transform: none;
   }
+  .snippet-content > :global([data-slideshow-snippet]) { width: 100%; }
   .snippet-content :global(pre) { font-size: var(--aw-step-0); white-space: pre-wrap; overflow-wrap: anywhere; }
   .snippet-content :global(.gh) { position: relative; inset: auto; width: 100%; min-height: 0; padding: 2rem; }
   .snippet-content :global([data-snippet-trigger]) { cursor: auto; }

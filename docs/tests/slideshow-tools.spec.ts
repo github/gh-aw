@@ -177,6 +177,33 @@ test("expands snippets with larger type and smooth transitions without changing 
   await expect(page.locator("main .va")).toHaveAttribute("aria-hidden", "true");
 });
 
+test("expands constrained cards across the zoom content without changing the landing layout", async ({ page }) => {
+  await page.goto("/gh-aw/");
+  const landingCard = page.locator("main .va-chat");
+  const landingWidth = (await landingCard.boundingBox())?.width;
+  await openPresentation(page);
+  const source = page.locator("[data-slideshow-slides] .va-chat");
+  const originalWidth = (await source.boundingBox())?.width;
+  expect(originalWidth).toBeGreaterThan(0);
+  await source.click();
+  const zoom = page.getByRole("dialog", { name: "Coding agent prompt", exact: true });
+  const content = zoom.locator("[data-snippet-content]");
+  const card = content.locator("[data-slideshow-snippet]");
+  await expect(zoom).toBeVisible();
+  await expect
+    .poll(async () => {
+      const contentWidth = (await content.boundingBox())?.width;
+      const cardWidth = (await card.boundingBox())?.width;
+      return contentWidth && cardWidth ? Math.abs(contentWidth - cardWidth) : Infinity;
+    })
+    .toBeLessThan(2);
+  expect((await card.boundingBox())?.width).toBeGreaterThan(originalWidth! * 1.5);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await source.boundingBox())?.width).toBeCloseTo(originalWidth!, 0);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await landingCard.boundingBox())?.width).toBeCloseTo(landingWidth!, 0);
+});
+
 test("edits enlarged code as plain text without changing the original slide", async ({ page }) => {
   await openPresentation(page);
   const source = page.getByRole("button", { name: "Expand daily-issue-summary.md", exact: true });
