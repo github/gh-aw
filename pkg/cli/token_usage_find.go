@@ -241,29 +241,3 @@ func discoverAPIProxyEventsLog(runDir string) (*apiProxySteeringLog, error) {
 	}
 	return nil, firstErr
 }
-
-func findAgentStdioFile(runDir string) string {
-	primary := filepath.Join(runDir, "agent-stdio.log")
-	if fileutil.FileExists(primary) {
-		return primary
-	}
-
-	var found string
-	if walkErr := filepath.Walk(runDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if info == nil || info.IsDir() {
-			return nil
-		}
-		if info.Name() == "agent-stdio.log" {
-			found = path
-			return filepath.SkipAll
-		}
-		return nil
-	}); walkErr != nil && !errors.Is(walkErr, filepath.SkipAll) {
-		tokenUsageLog.Printf("findAgentStdioFile walk error: %v", walkErr)
-	}
-
-	return found
-}

@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -13,6 +14,84 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSetupEngineAndImports_GeminiDeprecation(t *testing.T) {
+	tests := []struct {
+		name         string
+		engine       string
+		imported     bool
+		override     string
+		batchMode    bool
+		quiet        bool
+		wantEngine   string
+		wantNotices  int
+		wantBatchUse int
+		wantWarnings int
+	}{
+		{name: "string form", engine: "engine: gemini\n", wantEngine: "gemini", wantNotices: 1},
+		{name: "object form with pin", engine: "engine:\n  id: gemini\n  version: \"0.39.1\"\n", wantEngine: "gemini", wantNotices: 1},
+		{name: "imported engine", imported: true, wantEngine: "gemini", wantNotices: 1},
+		{name: "override to Gemini", engine: "engine: copilot\n", override: "gemini", wantEngine: "gemini", wantNotices: 1, wantWarnings: 1},
+		{name: "override away from Gemini", engine: "engine: gemini\n", override: "copilot", wantEngine: "copilot", wantWarnings: 1},
+		{name: "batch mode aggregates notice", engine: "engine: gemini\n", batchMode: true, wantEngine: "gemini", wantBatchUse: 1},
+		{name: "quiet mode suppresses notice", engine: "engine: gemini\n", quiet: true, wantEngine: "gemini"},
+		{name: "default engine", wantEngine: "copilot"},
+		{name: "experimental replacement", engine: "engine: agy\n", wantEngine: "agy"},
+		{
+			name: "Google WIF",
+			engine: `engine:
+  id: gemini
+  auth:
+    type: github-oidc
+    provider: gcp
+    workload-identity-provider: projects/123/locations/global/workloadIdentityPools/test/providers/test
+    service-account: test@example.iam.gserviceaccount.com
+    project: test-project
+`,
+			wantEngine: "gemini", wantNotices: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "gemini-deprecation")
+			engine := tt.engine
+			if tt.imported {
+				require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "shared.md"), []byte("---\nengine: gemini\n---\n"), 0644))
+				engine = "imports:\n  - shared.md\n"
+			}
+			content := "---\non: push\n" + engine + "---\n\n# Test Workflow\n"
+			frontmatter, err := parser.ExtractFrontmatterFromContent(content)
+			require.NoError(t, err)
+			compiler := NewCompiler(WithEngineOverride(tt.override))
+			compiler.SetStrictMode(true)
+			compiler.SetBatchMode(tt.batchMode)
+			compiler.SetQuiet(tt.quiet)
+			output := testutil.CaptureStderr(t, func() {
+				result, err := compiler.setupEngineAndImports(frontmatter, filepath.Join(tmpDir, "test.md"), []byte(content), tmpDir)
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				assert.Equal(t, tt.wantEngine, result.agenticEngine.GetID())
+				assert.Equal(t, tt.wantEngine, result.engineConfig.ID)
+				if tt.name == "object form with pin" {
+					assert.Equal(t, "0.39.1", result.engineConfig.Version)
+				}
+				if tt.name == "Google WIF" {
+					require.NotNil(t, result.engineConfig.Auth)
+					assert.Equal(t, "github-oidc", result.engineConfig.Auth.Type)
+					assert.Equal(t, "gcp", result.engineConfig.Auth.Provider)
+				}
+			})
+			assert.Equal(t, tt.wantNotices, strings.Count(output, "The gemini engine is deprecated"))
+			assert.Equal(t, tt.wantBatchUse, compiler.GetExperimentalFeatureUsage()["gemini deprecation"])
+			assert.Equal(t, tt.wantWarnings, compiler.GetWarningCount())
+			if tt.wantNotices > 0 {
+				assert.Contains(t, output, "Use engine: agy where supported")
+				assert.Contains(t, output, "retain engine: gemini for Google WIF")
+			}
+		})
+	}
+}
 
 func TestFrontmatterDeclaresImports(t *testing.T) {
 	tests := []struct {

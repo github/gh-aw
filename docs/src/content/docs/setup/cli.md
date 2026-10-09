@@ -229,7 +229,7 @@ gh aw secrets set MY_SECRET --value-from-env MY_TOKEN          # From env var
 
 **Options:** `--repo/-r`, `--value`, `--value-from-env`, `--api-url`
 
-For Claude workflows, set `ANTHROPIC_API_KEY` or configure [Anthropic WIF](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif). `CLAUDE_CODE_OAUTH_TOKEN`, including a token from `claude login`, is not supported; it is silently ignored, so the run instead fails with an authentication error from the Claude CLI that never mentions the token, which is the signal to switch credentials.
+For Claude workflows, set `ANTHROPIC_API_KEY` or configure [Anthropic WIF](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif). `CLAUDE_CODE_OAUTH_TOKEN`, including a token from `claude login`, is not supported; the CLI rejects it with an error naming `CLAUDE_CODE_OAUTH_TOKEN` and pointing to these alternatives.
 
 ##### `secrets bootstrap`
 

@@ -1,0 +1,11 @@
+{"type":"session.init","data":{"sourceEngine":"pi","sessionId":"parent"}}
+{"type":"tool.execution_start","data":{"toolCallId":"quick-call","toolName":"subagent","input":{"agent":"quick-checker"}}}
+{"type":"pi.subagent_dispatch","data":{"agent":"quick-checker","requestedModel":"small","resolvedModel":"claude-haiku-4.5"}}
+{"type":"tool.execution_start","data":{"toolCallId":"summary-call","toolName":"subagent","input":{"agent":"file-summarizer"}}}
+{"type":"pi.subagent_dispatch","data":{"agent":"file-summarizer","requestedModel":"claude-haiku-4.5","resolvedModel":"claude-haiku-4.5"}}
+{"type":"pi.subagent_event","data":{"agent":"quick-checker","event":{"message":{"model":"claude-haiku-4-5-20251001","responseModel":"claude-haiku-4-5-20251001","timestamp":"2026-10-08T10:01:00Z","usage":{"input":10,"output":2}}}}}
+{"type":"pi.subagent_event","data":{"agent":"file-summarizer","event":{"message":{"model":"claude-haiku-4-5-20251001","responseModel":"claude-haiku-4-5-20251001","timestamp":"2026-10-08T10:02:00Z","usage":{"input":20,"output":3}}}}}
+{"type":"pi.subagent_event","data":{"agent":"quick-checker","event":{"message":{"model":"claude-haiku-4-5-20251001","responseModel":"claude-haiku-4-5-20251001","timestamp":"2026-10-08T10:03:00Z","usage":{"input":30,"output":4}}}}}
+{"type":"pi.subagent_event","data":{"agent":"file-summarizer","event":{"message":{"model":"claude-haiku-4-5-20251001","responseModel":"claude-haiku-4-5-20251001","timestamp":"2026-10-08T10:04:00Z","usage":{"input":40,"output":5}}}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"quick-call","success":true}}
+{"type":"tool.execution_complete","data":{"toolCallId":"summary-call","success":true}}
