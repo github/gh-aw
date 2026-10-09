@@ -53,6 +53,18 @@ describe("bounded credential-free work queue MCP", () => {
     expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/policy_missing/);
   });
 
+  it("reads an absent dispatcher queue as empty but rejects existing policyless and worker snapshots", () => {
+    const test = setup();
+    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: null, transactionLog: "", worker: null, role: "dispatcher" }));
+    const snapshot = loadWorkQueueSnapshot(test.snapshotPath);
+    expect(readWorkQueueState(snapshot)).toMatchObject({ queue_state: "uninitialized", total: 0, snapshot_sha: null });
+    expect(snapshot.projection.policy).toBeNull();
+    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: "existing", transactionLog: "", worker: null, role: "dispatcher" }));
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/policy_missing/);
+    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: null, transactionLog: "", role: "worker" }));
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/assignment_required|policy_missing/);
+  });
+
   it("reports independent Work/Claim states, pending delivery, native accounting and absent Work without payloads", () => {
     const test = setup({ granted: true, bound: true });
     test.fixture.append("finish", { dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h1", outcome: "completed" }, { ...test.fixture.workerActor, dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h1" });
