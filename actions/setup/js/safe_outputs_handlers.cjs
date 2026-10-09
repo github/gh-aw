@@ -1595,49 +1595,43 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       pushPinnedSha = null;
     }
 
-    // Full-branch allowed_files check: validate that ALL commits on the PR branch
-    // (relative to origin/baseBranch) only touch files permitted by allowed_files.
-    // The incremental patch check at apply-time only inspects the net diff between
-    // origin/<branch> and the local branch tip; this catches disallowed files that
-    // appear in earlier commits on the branch (e.g. a Copilot branch that also
-    // modified .github/workflows/**) and returns an actionable error to the agent
-    // before any transport artifacts are generated.
+    // Validate the commits added after the existing PR head, not author-owned
+    // commits already on the branch. Inspect each commit rather than only the net
+    // diff so a disallowed file changed and reverted by the agent is still caught.
     if (Array.isArray(pushConfig.allowed_files) && pushConfig.allowed_files.length > 0) {
       try {
-        // Use the pinned SHA as the range head to avoid any TOCTOU window between
-        // the time the SHA was recorded and the time of the git log query.  If no
-        // pinned SHA is available (e.g. non-bundle path), skip the check so we do
-        // not race against a mutable ref; the apply-time check still enforces policy.
+        // Use the pinned SHA to avoid racing a mutable local branch ref.
         if (!pushPinnedSha) {
-          server.debug("Full-branch allowed-files check skipped: branch SHA not pinned (non-bundle path)");
+          server.debug("Incremental allowed-files check skipped: branch SHA not pinned (non-bundle path)");
         } else {
-          const branchHistoryFiles = execGitSync(["log", "--name-only", "--pretty=format:", `origin/${baseBranch}..${pushPinnedSha}`, "--"], { cwd: pushGitCwd })
+          const incrementalBase = prHeadBaseline?.sha || prHeadBaseline?.ref || `refs/remotes/origin/${entry.branch}`;
+          const agentFiles = execGitSync(["log", "--name-only", "--pretty=format:", `${incrementalBase}..${pushPinnedSha}`, "--"], { cwd: pushGitCwd })
             .toString()
             .split("\n")
             .map(s => s.trim())
             .filter(Boolean);
 
-          if (branchHistoryFiles.length > 0) {
+          if (agentFiles.length > 0) {
             const allowedPatterns = pushConfig.allowed_files.map(p => globPatternToRegex(p));
             // Files matching excluded_files are intentionally exempt: they will be stripped
             // from the patch at generation time via :(exclude) pathspecs, so they won't be
             // present in the final changeset applied to the branch.
             const excludedPatterns = Array.isArray(pushConfig.excluded_files) ? pushConfig.excluded_files.map(p => globPatternToRegex(p)) : [];
-            const uniqueFiles = [...new Set(branchHistoryFiles)];
+            const uniqueFiles = [...new Set(agentFiles)];
             const disallowedFiles = uniqueFiles.filter(f => !allowedPatterns.some(re => re.test(f)) && !excludedPatterns.some(re => re.test(f)));
 
             if (disallowedFiles.length > 0) {
               const sample = disallowedFiles.slice(0, 5);
               const remaining = disallowedFiles.length - sample.length;
               const filesStr = remaining > 0 ? `${sample.join(", ")} (+${remaining} more)` : sample.join(", ");
-              server.debug(`Full-branch allowed-files check failed: ${filesStr}`);
+              server.debug(`Incremental allowed-files check failed: ${filesStr}`);
               return {
                 content: [
                   {
                     type: "text",
                     text: JSON.stringify({
                       result: "error",
-                      error: `Cannot push to pull request branch: the branch '${entry.branch}' history contains commits that modify files outside the allowed-files configuration: ${filesStr}. Remove the disallowed file changes from your commits and retry, or update the allowed-files configuration to include these files.`,
+                      error: `Cannot push to pull request branch: the agent commits on '${entry.branch}' modify files outside the allowed-files configuration: ${filesStr}. Remove the disallowed file changes from your commits and retry, or update the allowed-files configuration to include these files.`,
                       disallowed_files: disallowedFiles,
                     }),
                   },
@@ -1647,12 +1641,12 @@ function createHandlers(server, appendSafeOutput, config = {}) {
             }
           }
         }
-      } catch (fullBranchCheckError) {
-        // Non-fatal: if origin/baseBranch is not available locally or git fails,
-        // skip the full-branch check and continue.  The apply-time policy check in
+      } catch (incrementalCheckError) {
+        // Non-fatal: if the PR head is not available locally or git fails,
+        // skip this check and continue. The apply-time policy check in
         // push_to_pull_request_branch.cjs will still enforce allowed_files against
         // the incremental patch content.
-        server.debug(`Full-branch allowed-files check skipped (non-fatal): ${getErrorMessage(fullBranchCheckError)}`);
+        server.debug(`Incremental allowed-files check skipped (non-fatal): ${getErrorMessage(incrementalCheckError)}`);
       }
     }
 
