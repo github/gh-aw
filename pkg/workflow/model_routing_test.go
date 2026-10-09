@@ -179,7 +179,7 @@ safe-outputs:
 				require.Contains(t, string(compiled), "Prepare model-routing conversation")
 				detection := extractJobSection(string(compiled), "detection")
 				require.NotEmpty(t, detection)
-				require.Contains(t, detection, "COPILOT_MODEL: detection")
+				require.Contains(t, detection, "COPILOT_MODEL: gpt-5.4-mini")
 				for _, forbidden := range []string{"modelRouting", `"routing"`, "GH_AW_MODEL_ROUTING", "gh-aw-router"} {
 					require.NotContains(t, detection, forbidden)
 				}
