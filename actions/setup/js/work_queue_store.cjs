@@ -114,7 +114,7 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
   const repository = await verifyRepository(githubClient, owner, repo);
   const sha = await readRef(githubClient, owner, repo, branch);
   if (!sha) {
-    if (repository.default_branch && repository.size !== 0 && !(await readRef(githubClient, owner, repo, repository.default_branch)))
+    if (repository.size !== 0 && (typeof repository.default_branch !== "string" || !repository.default_branch || !(await readRef(githubClient, owner, repo, repository.default_branch))))
       throw queueError("repository_unavailable", "cannot establish contents access before treating a queue ref as absent");
     // Detect but never adopt/copy/upgrade known unsupported storage.
     if (branch === WORK_QUEUE_BRANCH) {

@@ -100,6 +100,8 @@ do not discard user edits or treat restoration as a way to bypass findings.
 
 ```bash
 gh aw compile WORKFLOW --dry-run
+# Only when the user explicitly accepts experimental-feature notices:
+gh aw compile WORKFLOW --dry-run --allow-experimental
 # Optional reviewed test environment:
 gh aw compile WORKFLOW --dry-run --environment gh-aw-debug
 # Additional source validation; does not run scanners:
@@ -113,6 +115,12 @@ requirements. Run zizmor, actionlint and poutine when possible; report unavailab
 checks as unverified, not passed. Without Docker, use a native `shellcheck` binary
 for the required run-step linting. Findings or failures from requested checks still
 fail the dry-run gate.
+
+With explicit user acceptance of experimental-feature notices, add
+`--allow-experimental`. Only built-in feature notices are acknowledged;
+their warning counts remain visible in the dry-run summary. Other warnings,
+security findings, and scanner failures remain fatal. This opt-in grants no
+live execution or policy-installation authorization.
 
 `validate` uses `--no-emit`, which skips zizmor, actionlint and poutine. Only the
 scanner-enabled compile command above runs them; a passing `validate` command

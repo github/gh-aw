@@ -19,6 +19,7 @@ describe("work-queue deployment documentation", () => {
     const source = readRepositoryFile("docs/src/content/docs/reference/frontmatter-full.md");
     const queue = source.slice(source.indexOf("  # Read the immutable version-3 activation snapshot."), source.indexOf("  # Cache memory MCP configuration"));
     expect(queue).toContain("work-queue: true");
+    expect(queue).toContain("work-queue: null");
     expect(queue).toContain("worker: true");
     expect(queue).not.toMatch(/\bstorage:/);
   });
@@ -83,6 +84,30 @@ describe("work-queue deployment documentation", () => {
     const automation = readRepositoryFile(".github/aw/safe-outputs-automation.md");
     expect(automation).toContain("use `work_queue_dispatch_next`");
     expect(automation).not.toContain('pass `work_queue: {work_id: "<id>"}`');
+  });
+
+  it("distinguishes an uninitialized factory from an empty backlog and documents real CLI boundaries", () => {
+    const dispatcher = readRepositoryFile(".github/workflows/eslint-factory-dispatcher.md");
+    expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"default","limit":32}\'');
+    expect(dispatcher).toContain("Check `queue_state`, not just `total`");
+    expect(dispatcher).toContain("then stop without");
+    expect(dispatcher).toContain("dispatching or calling `noop`");
+    expect(dispatcher).toContain("safeoutputs missing_data");
+    expect(dispatcher).toContain("not that an initialized queue");
+    expect(dispatcher).toContain('work-queue work_queue_dispatch_next \'{"pool":"default","max_claims":3,"max_dispatches":3}\'');
+    expect(dispatcher).toContain('`status: "staged"`');
+    expect(dispatcher).toContain("an empty snapshot or a prediction of no eligible Work can be stale");
+    expect(dispatcher).toContain("Do not call ordinary `dispatch_workflow`");
+
+    const factory = readRepositoryFile("docs/src/content/docs/patterns/linter-factory.md");
+    expect(factory).toContain("go build -o ./gh-aw ./cmd/gh-aw");
+    expect(factory).toContain("./gh-aw work-queue --repo github/gh-aw stats --json");
+    expect(factory).toContain("--no-baseline --json");
+    expect(factory).toContain("--ref REVIEWED_REF --json");
+    expect(factory).toContain("does not send a workflow-dispatch request");
+    expect(factory).toContain("A missing queue cannot exercise that lifecycle");
+    expect(factory).toContain("The dispatcher is also the producer");
+    expect(factory).toContain("does not itself admit any Work");
   });
 
   it("resolves queue documentation links after relocation", () => {

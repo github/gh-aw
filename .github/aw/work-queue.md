@@ -99,6 +99,10 @@ When `<mcp-clis>` advertises the wrapper, use
 `work-queue work_queue_read '{}'` or
 `work-queue work_queue_claim_finish '{"claim_handle":"h1","outcome":"completed"}'`.
 These are MCP subcommands, not `gh aw work-queue` operator commands.
+Pass one JSON argument to each wrapper subcommand; do not invoke a wrapper as
+a structured tool with `command`/`description`. Check `queue_state` before
+interpreting counts: `uninitialized` is a deployment failure, not an empty
+backlog. A dispatch response with `status: "staged"` is not a grant or launch.
 
 ## Dependencies and recovery
 
@@ -118,6 +122,9 @@ automatic upgrades; preserve old evidence before explicit redeployment.
 - Operator commands, TUI and diagnostic artifacts:
   [queue reference](../../docs/src/content/docs/reference/work-queue.md).
   Cancellation is terminal for Work, not a native-worker stop; reconcile separately.
+  In this checkout, build with `go build -o ./gh-aw ./cmd/gh-aw` and use
+  `./gh-aw work-queue --repo OWNER/REPO stats --json`. `dispatch-next` grants
+  reservations but never launches workers; use the authorized dispatcher workflow.
 - Daily report rotation, dedicated Policy and Claim examples:
   [portfolio walkthrough](../../docs/src/content/docs/patterns/daily-report-portfolio.md)
   and [shared worker instructions](../workflows/shared/daily-report-worker.md).
