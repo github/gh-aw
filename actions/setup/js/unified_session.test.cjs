@@ -311,7 +311,7 @@ describe("Unified conclusion session", () => {
     const times = events.slice(1).map(event => event.provenance.timestampMs ?? Infinity);
     expect(times).toEqual([...times].sort((a, b) => (a === b ? 0 : a < b ? -1 : 1)));
     expect(events.at(-1).type).toBe("session.collection");
-    expect(events.at(-1).data).toMatchObject({ warnings: 0, absentComponents: [] });
+    expect(events.at(-1).data).toMatchObject({ warnings: 0, absentComponents: ["workflow"] });
     const original = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
     writeUnifiedSession({ rootDir: root });
     expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toBe(original);
@@ -342,6 +342,77 @@ describe("Unified conclusion session", () => {
       provenance: { path: "aw_info.json", component: "workflow" },
     });
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
+  });
+
+  it("collects final agent routing metadata and harness outcome when activation metadata is absent", () => {
+    write("agent/aw_info.json", {
+      engine_id: "claude",
+      model: "claude-sonnet-5",
+      requested_model: "agent",
+      model_routing: {
+        status: "selected",
+        source: "awf-routing",
+        provider: "anthropic",
+        wire_model: "claude-sonnet-5",
+        model: "claude-sonnet-5",
+        effort: "medium",
+        applied_effort: "low",
+        endpoint: "/v1/messages",
+        mode: "awf-routed",
+        selected_id: "sonnet",
+        router_version: "0.28.49",
+        failure_code: "",
+        detail: "omit this detail",
+      },
+    });
+    write("agent/awf-routing-outcome.json", {
+      status: "selected",
+      wire_model: "claude-sonnet-5",
+      endpoint: "/v1/messages",
+      selected_endpoint: "/chat/completions",
+      effort: "medium",
+      applied_effort: "medium",
+      detail: "omit this detail",
+    });
+
+    const { events } = collectUnifiedSession({ rootDir: root, warn: vi.fn() });
+    const workflow = events.find(event => event.type === "workflow.info");
+    expect(workflow).toMatchObject({
+      data: {
+        model: "claude-sonnet-5",
+        requestedModel: "agent",
+        modelRouting: {
+          status: "selected",
+          source: "awf-routing",
+          provider: "anthropic",
+          wireModel: "claude-sonnet-5",
+          model: "claude-sonnet-5",
+          effort: "medium",
+          appliedEffort: "medium",
+          effectiveEndpoint: "/v1/messages",
+          selectedEndpoint: "/chat/completions",
+          mode: "awf-routed",
+          selectedId: "sonnet",
+          routerVersion: "0.28.49",
+        },
+      },
+      provenance: { component: "workflow", phase: "agent", path: "agent/aw_info.json" },
+    });
+    expect(workflow.data.modelRouting).not.toHaveProperty("detail");
+    const outcome = events.find(event => event.type === "model_routing.outcome");
+    expect(outcome).toMatchObject({
+      data: {
+        status: "selected",
+        wireModel: "claude-sonnet-5",
+        effectiveEndpoint: "/v1/messages",
+        selectedEndpoint: "/chat/completions",
+        effort: "medium",
+        appliedEffort: "medium",
+      },
+      provenance: { component: "agent", phase: "agent", path: "agent/awf-routing-outcome.json" },
+    });
+    expect(outcome.data).not.toHaveProperty("detail");
+    expect(events.at(-1).data.absentComponents).not.toContain("workflow");
   });
 
   it.each([true, false])("persists dry_run=%s in workflow.info", dryRun => {
@@ -713,7 +784,13 @@ describe("Unified conclusion session", () => {
     };
     write("sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", [record]);
     const event = collectUnifiedSession({ rootDir: root }).events.find(item => item.type === "firewall.model_routing");
-    expect(event.data).toEqual(record);
+    expect(event.data).toMatchObject({
+      schema: "model-routing/v0.28.37",
+      stage: "selection",
+      selectedModel: "gpt-5.6-luna",
+      selectedEffort: "high",
+      router: { name: "gh-aw-router", version: "0.1.3" },
+    });
     expect(event.provenance).toMatchObject({
       component: "firewall",
       path: "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl",
@@ -839,7 +916,7 @@ describe("Unified conclusion session", () => {
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({ type: "session.format", data: { version: 1 } });
     expect(events[0].provenance).not.toHaveProperty("timestampMs");
-    expect(events[1]).toMatchObject({ type: "session.collection", data: { absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval"], warnings: 0, untimedEvents: 0 } });
+    expect(events[1]).toMatchObject({ type: "session.collection", data: { absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval", "workflow"], warnings: 0, untimedEvents: 0 } });
   });
 
   it("pins only the collector file-format header, preserving a native session.format extension", () => {

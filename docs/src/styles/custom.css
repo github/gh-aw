@@ -12,9 +12,14 @@
   text-size-adjust: 100%;
 }
 
-/* Reading measure: ~70-75 characters per line at 16px. */
+/* Reading measure: 620px holds ~80 characters per line, the most that reads
+   comfortably. Only tables, diagrams and images may run wider (chrome.css).
+   Do not widen. Rationale: .github/skills/docs-design/SKILL.md. Enforced by
+   scripts/check-reading-measure.mjs, which fails the docs build. */
 :root {
-  --sl-content-width: 38rem;
+  --aw-prose-width: 38.75rem; /* 620px */
+  --aw-content-gutter: 3.75rem; /* 60px */
+  --sl-content-width: var(--aw-prose-width);
 }
 
 /* Page background */

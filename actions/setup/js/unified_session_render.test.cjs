@@ -47,6 +47,7 @@ const trace = [
   event("agent.execution", { categories: ["agentic_engine_timeout"], errorCodes: [502], errorTypes: ["server_error"], exitCode: 0 }, "execution", 1),
   event("detection.result", { job_result: "success", conclusion: "warning", reason: "threat_detected", prompt_injection: true, secret_leak: false, malicious_patch: false, reasons: "PRIVATE_DETECTION_REASON" }, "detection", 0),
   event("workflow.info", { engine_id: "copilot", model: "fixture", run_id: 1 }, "workflow", 0),
+  event("model_routing.outcome", { status: "selected", wireModel: "claude-sonnet-5", effectiveEndpoint: "/v1/messages", selectedEndpoint: "/chat/completions", appliedEffort: "medium" }, "agent", 6),
   event("vendor.progress", { private: "PRIVATE_EXTENSION" }, "agent", 5, undefined, "session-a.jsonl"),
   event("session.collection_warning", { path: "gateway.jsonl", line: 2, code: "malformed_jsonl" }, "collector", 1),
   event("session.collection", { sources: [], warnings: 1, untimedEvents: 10, absentComponents: [] }, "collector", 2),
@@ -80,6 +81,8 @@ describe("unified session publication views", () => {
       expect(output).toContain("rpcId=0");
       expect(output).toContain("TCP_DENIED");
       expect(output).toContain("budget warning");
+      expect(output).toContain("effectiveEndpoint=/v1/messages");
+      expect(output).toContain("selectedEndpoint=/chat/completions");
       expect(output).toContain("[requested, not executed]");
       expect(output).toContain("[execution recorded]");
       expect(output).toContain("value=0 unit=ratio passed=false");

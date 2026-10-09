@@ -628,6 +628,8 @@ When evaluating cross-repository operations, implementations MUST apply these ru
 - Pattern matching is NOT supported
 - Each repository MUST be explicitly listed
 
+Internal work-queue Claim adapters use the authenticated worker profile's `effect_scope` as a singleton repository allowlist. Declared adapters MUST specify a fixed literal `target-repo`, validated by `work_queue_claim_adapters.cjs`. Every selected repository, including native adapter runtime fallbacks and independently resolved mutation targets, MUST match the profile allowlist through `assertClaimAuthorized` before effects execute. Repository allowlist rejection carries error code E004 while preserving the queue protocol message `work_queue_effect_scope_denied`. This queue-specific authorization does not replace type-specific or global allowlists for user-facing safe-output handlers.
+
 **Security Properties**
 
 **Property SP6: Cross-Repository Containment**

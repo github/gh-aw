@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -25,7 +25,7 @@ const privateReceipts = new WeakMap();
 /** @param {{ "target-ref"?: string, "coverage-dir"?: string, max?: number, "wait-for-processing-timeout"?: number, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
-  if (!handle) throw new Error("Queue coverage requires a Claim factory");
+  if (!handle) throw new Error(`${SAFE_OUTPUT_E001}: Queue coverage requires a Claim factory`);
   const factoryIdentity = claimIdentity(handle);
   /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
   const selectedClient = suppliedClient || global.github;

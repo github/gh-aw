@@ -99,18 +99,65 @@ export interface RuntimeObservationData {
 }
 
 export interface ModelRoutingData {
+  schema?: JsonValue;
   stage?: JsonValue;
+  purpose?: JsonValue;
   attempt?: JsonValue;
   classifier_model?: JsonValue;
   classifier_attempts?: JsonValue;
+  classifierModel?: JsonValue;
+  classifierEffort?: JsonValue;
+  objective?: JsonValue;
+  provider?: JsonValue;
+  labels?: JsonValue;
+  mode?: JsonValue;
+  degradedClassification?: JsonValue;
+  degradedReason?: JsonValue;
+  selectedId?: JsonValue;
+  selectedProvider?: JsonValue;
   routed?: JsonValue;
   outcome?: JsonValue;
   selected_model?: JsonValue;
   selected_effort?: JsonValue;
+  selectedModel?: JsonValue;
+  selectedEffort?: JsonValue;
+  wireModel?: JsonValue;
   endpoint?: JsonValue;
   router?: JsonValue;
+  latencyMs?: JsonValue;
+  code?: JsonValue;
+  requestId?: JsonValue;
   request_id?: JsonValue;
+  classifierAttempts?: JsonValue;
   deviations?: JsonValue;
+  requestedModel?: JsonValue;
+  requestedEffort?: JsonValue;
+}
+
+export interface UnifiedModelRoutingData {
+  status?: JsonValue;
+  source?: JsonValue;
+  provider?: JsonValue;
+  wireModel?: JsonValue;
+  model?: JsonValue;
+  effort?: JsonValue;
+  appliedEffort?: JsonValue;
+  effectiveEndpoint?: JsonValue;
+  selectedEndpoint?: JsonValue;
+  mode?: JsonValue;
+  selectedId?: JsonValue;
+  routerVersion?: JsonValue;
+  failureCode?: JsonValue;
+}
+
+export interface ModelRoutingOutcomeData {
+  status?: JsonValue;
+  wireModel?: JsonValue;
+  effectiveEndpoint?: JsonValue;
+  selectedEndpoint?: JsonValue;
+  effort?: JsonValue;
+  appliedEffort?: JsonValue;
+  failureCode?: JsonValue;
 }
 
 export interface McpObservationData {
@@ -231,7 +278,9 @@ export interface WorkflowInfoData {
   cliVersion?: JsonValue;
   awfVersion?: JsonValue;
   mcpgVersion?: JsonValue;
+  model?: JsonValue;
   requestedModel?: JsonValue;
+  modelRouting?: UnifiedModelRoutingData;
   triggerType?: JsonValue;
   dryRun?: JsonValue;
   workflow?: JsonValue;
@@ -307,6 +356,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.http_access": FirewallAccessData;
   "firewall.token_usage": UsageReportData;
   "firewall.model_routing": ModelRoutingData;
+  "model_routing.outcome": ModelRoutingOutcomeData;
   "firewall.steering": RuntimeObservationData;
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;

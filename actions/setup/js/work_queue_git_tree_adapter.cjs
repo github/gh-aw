@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client enforce per-Claim resource authority before Git writes.
 
 const crypto = require("crypto");
 const path = require("path");
@@ -26,7 +28,7 @@ function validateGitTreeAdapter(adapter) {
   closed(adapter["git-tree"], ["base-revision", "branch-prefix"], ["pull-request", "base-branch"], "trusted code adapter");
   const config = adapter["git-tree"];
   if (!REVISION.test(config["base-revision"]) || typeof config["branch-prefix"] !== "string" || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(config["branch-prefix"]) || config["branch-prefix"].length > 128)
-    throw new Error("Trusted code adapter requires an immutable base revision and fixed branch namespace");
+    throw new Error(`${SAFE_OUTPUT_E001}: Trusted code adapter requires an immutable base revision and fixed branch namespace`);
   if (config["pull-request"] !== undefined && typeof config["pull-request"] !== "boolean") throw new Error("Trusted code adapter pull-request must be boolean");
   if (config["pull-request"] === true && (typeof config["base-branch"] !== "string" || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(config["base-branch"]) || config["base-branch"].length > 128))
     throw new Error("Trusted code adapter pull request requires a fixed base branch");

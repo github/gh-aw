@@ -364,6 +364,21 @@ func TestFrozenWorkAncestorOriginsCannotBeReplacedOrLost(t *testing.T) {
 	if err := AuthorizeEffect(state, actor, test.Target); err == nil {
 		t.Fatal("duplicate producer submission erased ancestor restriction")
 	}
+	checkpoint, err := CompactCheckpoint(commits, strings.Repeat("c", 40), testActor("administrator"), commits[len(commits)-1].At)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compacted, err := Replay(checkpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creators, err = immutableWorkCreators(compacted)
+	if err != nil || creators[child.WorkID].Role != "worker" {
+		t.Fatalf("checkpoint lost immutable worker creator: %v", err)
+	}
+	if err := AuthorizeEffect(compacted, actor, test.Target); err == nil {
+		t.Fatal("checkpoint erased ancestor resource restrictions")
+	}
 	for _, candidate := range resourceScopeFixture(t) {
 		if candidate.Name == "child-preserves-parent-native-target" {
 			test = candidate

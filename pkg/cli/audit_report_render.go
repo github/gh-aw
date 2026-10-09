@@ -131,6 +131,12 @@ func formatAuditComparisonRoute(route *AuditComparisonRoute) string {
 	if route.RouterVersion != "" {
 		value += " router=" + safeModelRoutingText(route.RouterVersion)
 	}
+	if route.EffectiveEndpoint != "" {
+		value += " effective_endpoint=" + safeModelRoutingText(route.EffectiveEndpoint)
+	}
+	if route.SelectedEndpoint != "" {
+		value += " selected_endpoint=" + safeModelRoutingText(route.SelectedEndpoint)
+	}
 	return value
 }
 
@@ -265,10 +271,10 @@ func renderConsoleModelRoutingSelection(routing *ModelRoutingSummary) {
 		line += " endpoint=" + routing.Endpoint
 	}
 	if routing.EffectiveEndpoint != "" {
-		line += " effective_endpoint=" + routing.EffectiveEndpoint
+		line += " effective_endpoint=" + safeModelRoutingText(routing.EffectiveEndpoint)
 	}
 	if routing.SelectedEndpoint != "" {
-		line += " selected_endpoint=" + routing.SelectedEndpoint
+		line += " selected_endpoint=" + safeModelRoutingText(routing.SelectedEndpoint)
 	}
 	if routing.RouterName != "" {
 		line += " router=" + routing.RouterName

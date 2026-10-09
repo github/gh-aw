@@ -20,6 +20,10 @@ engine:
   id: agy
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-agy
+tools:
+  work-queue:
+    worker: true
+    require-assignment: true
 safe-outputs:
   staged: true
   threat-detection: false
@@ -33,6 +37,7 @@ safe-outputs:
     create-issue: false
 imports:
   - shared/agy-conformance.md
+  - shared/engine-conformance-worker.md
 ---
 
 Execute the imported Agy conformance gate once.

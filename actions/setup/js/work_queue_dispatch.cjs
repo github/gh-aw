@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("dispatch");
 
 const { canonical, closed, digest, integer } = require("./work_queue_codec.cjs");
@@ -22,7 +23,7 @@ const { normalizeDispatchCredential, createDispatchCredentialValidator, isDispat
 
 function assertQueueControlRole(options) {
   const runtime = resolveWorkQueueRuntime(options.context?.payload, { role: options.role, requireAssignment: options.requireAssignment });
-  if (runtime.role === "observer") throw new Error("work_queue_observer_read_only");
+  if (runtime.role === "observer") throw new Error(`${SAFE_OUTPUT_E001}: work_queue_observer_read_only`);
   return runtime;
 }
 
@@ -282,7 +283,9 @@ function inheritWorkerSubmission(state, trustedContext, parameters) {
 
 function acceptedSubmissionParameters(state, trustedContext, parameters, prior) {
   if (prior.request.kind !== "submit" || canonical(prior.actor) !== canonical(actorFromContext(trustedContext))) throw new Error("work_queue_request_reused");
-  const policy = state.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Policy" && operation.epoch === prior.policy_epoch)?.policy;
+  const policy =
+    state.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Policy" && operation.epoch === prior.policy_epoch)?.policy ??
+    (prior.compacted_parameters_digest && prior.policy_epoch === state.policy_epoch ? state.policy : undefined);
   if (!policy) throw new Error("work_queue_policy_missing");
   let inherited = parameters;
   if (trustedContext.role === "worker") {

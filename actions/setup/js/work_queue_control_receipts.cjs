@@ -37,7 +37,7 @@ function controlReceiptForRequest(state, requestId) {
     completion_id: work.completion_id,
     request_id: requestId,
     commit_id: commit.id,
-    parameters_digest: digest(commit.request.parameters),
+    parameters_digest: commit.compacted_parameters_digest ?? digest(commit.request.parameters),
     writes: {
       works: commit.operations.filter(operation => operation.kind === "Work").length,
       claims: commit.operations.filter(operation => operation.kind === "Claim").length,
@@ -141,11 +141,17 @@ async function verifyClaimQueueControl(options) {
   const prior = facts.state.requests.get(id);
   const receipt = inventory.controls.find(control => control.request_id === id);
   if (!prior || !receipt || prior.request.kind !== kind) return { verified: false, effects: "unknown", reason: "queue_control_not_committed" };
-  const policy = facts.state.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Policy" && operation.epoch === prior.policy_epoch)?.policy;
+  const policy =
+    facts.state.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Policy" && operation.epoch === prior.policy_epoch)?.policy ??
+    (facts.state.policy_epoch === prior.policy_epoch ? facts.state.policy : undefined);
   if (!policy) throw new Error("work_queue_policy_missing");
   const parameters = kind === "submit" ? require("./work_queue_dispatch.cjs").acceptedSubmissionParameters(facts.state, facts.context, message.parameters, prior) : normalizeDispatchParameters(message.parameters, policy, 4096);
   const request = requestForIntent(facts.context, message.intent_id, kind, parameters);
-  if (prior.request.fingerprint !== request.fingerprint || canonical(prior.request.parameters) !== canonical(request.parameters) || canonical(prior.actor) !== canonical(actorFromContext(facts.context))) {
+  if (
+    prior.request.fingerprint !== request.fingerprint ||
+    (prior.request.parameters !== null && canonical(prior.request.parameters) !== canonical(request.parameters)) ||
+    canonical(prior.actor) !== canonical(actorFromContext(facts.context))
+  ) {
     return { verified: false, effects: "unknown", reason: "queue_control_request_mismatch" };
   }
   return { verified: true, claim_handle: message.claim_handle, resource: { kind: "queue_commit", repository: facts.context.repository, id: prior.id }, evidence: receipt };

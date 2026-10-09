@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.6.0"
+version: "1.7.0"
 status: Draft
-publication_date: "2026-10-05"
+publication_date: "2026-10-09"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.6.0<br>
+**Version**: 1.7.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-05<br>
+**Publication Date**: 2026-10-09<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.6.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.7.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -246,6 +246,7 @@ opaque because its essential fields are not defined by this specification.
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. Detection and eval usage reports resolve per-observation AIC from known model pricing only when explicit AIC is unavailable; unknown pricing leaves AIC absent, while explicit zero and checkpoints remain authoritative. |
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine ID, requested model, trigger type, workflow/repository/run ID, and available gh-aw, AWF, MCPG, and agent versions. No detector transcript or free-form reasons. |
+| Model routing | `firewall.model_routing` retains its stage, purpose, provider, labels, selection, endpoint, router, request, outcome, and deviation fields. `workflow.info` includes the observed `model`, `requestedModel`, and a compact `modelRouting` object. `model_routing.outcome` records the harness's status, wire model, effective and selected endpoints, effort, applied effort, and failure code. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
 present canonical value even when it is `false`, `0`, `null`, or empty.
@@ -580,12 +581,13 @@ source for opaque fields.
 | `mcp.difc.filtered`, `mcp.guard.blocked` | DIFC and guard-policy diagnostics; no inferred successful tool outcome. |
 | `mcp.tool_call`, `mcp.event` | Structured gateway calls or other gateway log messages. |
 | `firewall.http_access` | AWF network audit observations, including operational entries without a host. |
-| `firewall.token_usage`, `firewall.steering`, `firewall.event` | API proxy accounting, token/time steering, tracker and other firewall messages. |
+| `firewall.token_usage`, `firewall.model_routing`, `firewall.steering`, `firewall.event` | API proxy accounting, essential AWF model-routing selection/request records, token/time steering, tracker and other firewall messages. |
 | `safe_output.request`, `safe_output.result`, `safe_output.error` | Requested operation identities, executed item identities, and available errors. Requests are not execution results. |
 | `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
 | `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
-| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, `agentVersion`, `requestedModel`, and `triggerType` from `aw_info.json` (`cli_version`, `awf_version`, `awmg_version`, `engine_id`, `agent_version`, `model`, and `event_name`, respectively). Unavailable values are not inferred. |
+| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, `agentVersion`, observed `model`, `requestedModel`, compact `modelRouting`, and `triggerType` from `aw_info.json`. `requestedModel` prefers `requested_model` and falls back to `model` for earlier metadata. Unavailable values are not inferred. |
+| `model_routing.outcome` | The harness's observed routing status, wire model, effective endpoint, selected endpoint, effort, applied effort, and failure code from `agent/awf-routing-outcome.json`; free-form detail is excluded. |
 | `guardrail.daily_aic` | Activation's daily AI Credits decision (`status`, `exceeded`, and available numeric `total`, `estimated`, `threshold`). Omitted when the guardrail has no decision; an existing event is not duplicated. |
 | `github_api.rate_limit` | Available GitHub API rate-limit JSONL observations retain the recorded source (`response_headers`, `rate_limit_api`, or `retry`), operation, resource, limit, remaining, used, reset, and retry state. `credentialSource` identifies a known GitHub Actions token, PAT, or app token where classified by the client; absent or unknown credential types are not inferred from quota values. Raw credentials and unrecognized fields are excluded. The collector prefers `github_rate_limits.jsonl` over its `usage/` copy to avoid duplicate observations. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
@@ -619,6 +621,26 @@ remain distinguishable. Warnings MUST identify the source and cause without
 printing malformed payloads or unredacted source text.
 Source-event counts and the untimed source-event count exclude the generated
 file-format header and collection diagnostics.
+
+**T-UAS-070 — Model routing attribution.** When available, the merger MUST select
+the agent job's final `agent/aw_info.json` ahead of activation and usage copies
+and emit its workflow metadata as `workflow.info` with agent-phase provenance.
+The event MUST retain observed `model`, prefer `requested_model` for
+`requestedModel`, and project only status, source, provider, wire model, model,
+effort, applied effort, effective endpoint, selected endpoint, mode, selected
+ID, router version, and failure code into `modelRouting`. The collector MUST
+also emit `agent/awf-routing-outcome.json` as `model_routing.outcome` in the
+agent phase, retaining status, wire model, effective endpoint, selected
+endpoint, effort, applied effort, and failure code. Free-form detail MUST NOT
+be included in either compact routing payload. Absence of workflow metadata
+MUST be reported in `session.collection.absentComponents` or by a collection
+warning.
+
+`firewall.model_routing` retains the essential selected routing record fields:
+schema, stage, purpose, attempt, classifier model and effort, objective,
+provider, labels, mode, classifier attempts, degraded-classification state,
+selected ID/provider/model/effort, wire model, endpoint, router, latency, code,
+request ID, routed outcome, deviations, requested model, and requested effort.
 
 ### 4.8 `agent.execution`
 
@@ -1691,6 +1713,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.7.0 — Draft (2026-10-09)
+
+- Added final agent workflow metadata and compact model-routing attribution to `workflow.info`.
+- Added the `model_routing.outcome` harness observation and documented essential `firewall.model_routing` fields.
+- Recorded absent workflow metadata in collection coverage and retained serialization-format version 1.
 
 ### Version 1.6.0 — Draft (2026-10-05)
 
