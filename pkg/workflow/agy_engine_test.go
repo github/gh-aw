@@ -345,7 +345,7 @@ func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 			assert.Contains(t, string(lock), `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
 			assert.Contains(t, string(lock), `"threat_detection":{"mode":"disabled"}`)
 			assert.NotContains(t, callee.Jobs, "detection")
-			assertAgyConformanceProbes(t, callee, entry.id == "engine-conformance-agy")
+			assertAgyConformanceProbes(t, callee, false)
 		})
 	}
 }
@@ -356,6 +356,7 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 	assert.Equal(t, map[string]any{"workflow_dispatch": nil}, canonical["on"])
 	assert.Equal(t, []any{"shared/agy-conformance.md", "shared/engine-conformance-worker.md"}, canonical["imports"])
 	assert.Equal(t, map[string]any{
+		"cli-proxy":  false,
 		"work-queue": map[string]any{"worker": true, "require-assignment": true},
 	}, canonical["tools"])
 	canonical["imports"] = []any{"shared/agy-conformance.md"}
@@ -425,7 +426,7 @@ func TestAgySmokeLabelCommandIsCentrallyRouted(t *testing.T) {
 	assert.NotContains(t, string(lock), "remove_trigger_label")
 }
 
-func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, workQueueWorker bool) {
+func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, workQueueCLIServer bool) {
 	t.Helper()
 	steps, environment, commands := agyConformanceStepContent(compiled)
 	execution := steps["Execute experimental Agy CLI"]
@@ -455,7 +456,7 @@ func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, w
 	for _, expected := range []string{`"agy-native"`, `"native-challenge"`, "--exclude-env GEMINI_API_KEY"} {
 		assert.Contains(t, commands, expected, "compiled commands must retain %s", expected)
 	}
-	if workQueueWorker {
+	if workQueueCLIServer {
 		assert.Contains(t, commands, `export GH_AW_MCP_CLI_SERVERS='["agy-native","mcpscripts","safeoutputs","work-queue"]'`)
 	} else {
 		assert.NotContains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
