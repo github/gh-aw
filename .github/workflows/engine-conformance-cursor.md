@@ -16,11 +16,16 @@ engine:
   id: cursor
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-cursor
+tools:
+  work-queue:
+    worker: true
+    require-assignment: true
 imports:
   - shared/cursor.md
   - uses: shared/engine-conformance.md
     with:
       engine-id: cursor
+  - shared/engine-conformance-worker.md
 ---
 
 Execute the imported engine configuration conformance suite once.

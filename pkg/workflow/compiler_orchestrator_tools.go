@@ -396,10 +396,23 @@ func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, 
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Using experimental %s support (engine: %s)", agenticEngine.GetDisplayName(), agenticEngine.GetID())))
 	c.IncrementWarningCount()
 	if _, hasTools := frontmatter["tools"]; hasTools {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("'tools' section ignored when using engine: %s (%s doesn't support MCP tool allow-listing)", agenticEngine.GetID(), agenticEngine.GetDisplayName())))
+		message := fmt.Sprintf("'tools' section ignored when using engine: %s (%s doesn't support MCP tool allow-listing)", agenticEngine.GetID(), agenticEngine.GetDisplayName())
+		if _, hasQueue := tools["work-queue"]; hasQueue {
+			message = fmt.Sprintf("Native tool allow-list ignored for engine: %s; work-queue controls and CLI transport remain enabled", agenticEngine.GetID())
+		}
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(message))
 		c.IncrementWarningCount()
 	}
-	return map[string]any{"github": map[string]any{}}
+	// Queue assignment and CLI transport are framework controls, not native
+	// engine tool allow-list entries. Preserve them for dispatch-only workers.
+	fallback := map[string]any{"github": map[string]any{}}
+	if queue, ok := tools["work-queue"]; ok {
+		fallback["work-queue"] = queue
+	}
+	if proxy, ok := tools["cli-proxy"]; ok {
+		fallback["cli-proxy"] = proxy
+	}
+	return fallback
 }
 
 func (c *Compiler) validateEngineToolRequirements(frontmatter map[string]any, agenticEngine CodingAgentEngine, tools map[string]any) error {

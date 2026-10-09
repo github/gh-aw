@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -398,6 +399,9 @@ func TestEngineConformanceCatalogCoverage(t *testing.T) {
 	}
 	files, err := filepath.Glob("../../.github/workflows/engine-conformance-*.md")
 	require.NoError(t, err)
+	files = slices.DeleteFunc(files, func(file string) bool {
+		return strings.HasSuffix(file, "engine-conformance-dispatcher.md")
+	})
 	require.Len(t, files, len(ids), "each runnable engine must have exactly one conformance workflow")
 	for _, id := range ids {
 		t.Run(id, func(t *testing.T) {
@@ -414,10 +418,12 @@ func TestEngineConformanceCatalogCoverage(t *testing.T) {
 			on, ok := source["on"].(map[string]any)
 			require.True(t, ok)
 			require.Contains(t, on, "workflow_dispatch")
-			require.Len(t, on, 1, "live inference should be manual-only")
+			require.Len(t, on, 1, "conformance workers must be dispatch-only")
 			lock, err := os.ReadFile(strings.TrimSuffix(file, ".md") + ".lock.yml")
 			require.NoError(t, err)
 			compiled := string(lock)
+			require.Contains(t, compiled, "work_queue_assignment:")
+			require.Contains(t, compiled, `GH_AW_WORK_QUEUE_ROLE: "worker"`)
 			for _, expected := range []string{
 				"Prepare engine conformance fixtures", "Assert engine conformance",
 				"Upload engine conformance evidence", "conformance-challenge",
