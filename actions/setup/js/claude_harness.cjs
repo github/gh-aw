@@ -73,7 +73,7 @@ const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { applyModelFallback, normalizeClaudeModel, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode } = require("./awf_model_routing.cjs");
 const CLAUDE_ROUTING_POLICY = getAWFModelRoutingPolicy("claude");
 
 // Pattern to detect Anthropic API overload errors (HTTP 529).
@@ -366,41 +366,61 @@ function stripContinueArgs(args) {
 }
 
 /**
+ * Resolve, validate, and record the routing decision for Claude.
+ * @param {any} reflectData
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{selection: any, effort: string|null, error: string|null}}
+ */
+function resolveClaudeModelRouting(reflectData, env = process.env) {
+  const result = resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_POLICY.endpoints, CLAUDE_ROUTING_POLICY.allowEndpointOverride);
+  if (result.error || !result.selection) {
+    const error = result.error || "AWF model routing selection is missing";
+    recordAWFModelRoutingOutcome(
+      {
+        status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",
+        failure_code: reflectData?.routing?.failure_code || getAWFModelRoutingFailureCode(error),
+        detail: error,
+      },
+      env
+    );
+    return { selection: null, effort: null, error };
+  }
+  const mappedEffort = mapAWFRoutingEffort("claude", result.selection.effort);
+  if (mappedEffort.error) {
+    recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort", detail: mappedEffort.error }, env);
+    return { selection: null, effort: null, error: mappedEffort.error };
+  }
+  recordAWFModelRoutingOutcome(
+    {
+      status: "selected",
+      wire_model: result.selection.wire_model,
+      endpoint: result.selection.endpoint,
+      selected_endpoint: result.selection.selected_endpoint,
+      effort: result.selection.effort,
+      applied_effort: mappedEffort.effort,
+    },
+    env
+  );
+  return { selection: result.selection, effort: mappedEffort.effort, error: null };
+}
+
+/**
  * Build Claude child process env with provider endpoint overrides resolved from /reflect.
  * @param {import("./awf_reflect.cjs").ReflectData | null | undefined} reflectData
  * @param {NodeJS.ProcessEnv} [env]
  * @param {(message: string) => void} [logger]
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-async function buildClaudeChildEnv(reflectData, env = process.env, logger = log, modelRoutingSelection = null) {
+async function buildClaudeChildEnv(reflectData, env = process.env, logger = log) {
   const childEnv = { ...env };
   applyClaudeRuntimeTimeouts(childEnv);
   if (env.GH_AW_MODEL_ROUTING === "1") {
-    const result = modelRoutingSelection ? { selection: modelRoutingSelection, error: null } : resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_POLICY.endpoints, CLAUDE_ROUTING_POLICY.allowEndpointOverride);
-    if (result.error || !result.selection) {
-      recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
-      throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Claude`);
-    }
-    const mappedEffort = mapAWFRoutingEffort("claude", result.selection.effort);
-    if (mappedEffort.error) {
-      recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort", detail: mappedEffort.error });
-      throw new Error(`${mappedEffort.error}; refusing to start Claude`);
-    }
+    const result = resolveClaudeModelRouting(reflectData, env);
+    if (result.error || !result.selection) throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Claude`);
     childEnv.ANTHROPIC_MODEL = result.selection.wire_model;
     delete childEnv.GH_AW_MODEL_FALLBACK;
-    if (mappedEffort.effort) childEnv.CLAUDE_CODE_EFFORT_LEVEL = mappedEffort.effort;
+    if (result.effort) childEnv.CLAUDE_CODE_EFFORT_LEVEL = result.effort;
     else delete childEnv.CLAUDE_CODE_EFFORT_LEVEL;
-    recordAWFModelRoutingOutcome(
-      {
-        status: "selected",
-        wire_model: result.selection.wire_model,
-        endpoint: result.selection.endpoint,
-        selected_endpoint: result.selection.selected_endpoint,
-        effort: result.selection.effort,
-        applied_effort: mappedEffort.effort,
-      },
-      env
-    );
     const endpointOverride = result.selection.selected_endpoint && result.selection.selected_endpoint !== result.selection.endpoint ? ` selected_endpoint=${result.selection.selected_endpoint}` : "";
     logger(`inference routing: mode=awf-routed model=${result.selection.wire_model} effort=${result.selection.effort || "(unset)"} endpoint=${result.selection.endpoint}${endpointOverride}`);
   } else {
@@ -476,20 +496,12 @@ async function main() {
   const reflection = await fetchAWFReflect({ logger: log });
   let childEnv;
   try {
-    /** @type {any} */
-    let modelRoutingSelection = null;
     if (process.env.GH_AW_MODEL_ROUTING === "1") {
-      const result = resolveAWFModelRoutingSelection(reflection.reflectData, true, CLAUDE_ROUTING_POLICY.endpoints, CLAUDE_ROUTING_POLICY.allowEndpointOverride);
-      if (result.error || !result.selection) {
-        recordAWFModelRoutingOutcome({ status: reflection.reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflection.reflectData?.routing?.failure_code, detail: result.error });
-        throw new Error(`${result.error || "AWF model routing selection is missing"}; refusing to start Claude`);
-      }
-      modelRoutingSelection = result.selection;
       initialArgs = removeClaudeRoutingOverrides(initialArgs);
     } else {
       initialArgs = normalizeClaudeModelArgs(initialArgs, normalizeReflectProviderName(process.env.GH_AW_LLM_PROVIDER, "anthropic"), process.env, { reflectData: reflection.reflectData, logger: log });
     }
-    childEnv = await buildClaudeChildEnv(reflection.reflectData, process.env, log, modelRoutingSelection);
+    childEnv = await buildClaudeChildEnv(reflection.reflectData, process.env, log);
   } catch (error) {
     removeClaudePlugin(pluginDir);
     throw error;
@@ -829,6 +841,7 @@ if (typeof module !== "undefined" && module.exports) {
     resolveRetryConfig,
     resolveStartupRetryLimit,
     applyModelFallback,
+    resolveClaudeModelRouting,
     buildClaudeChildEnv,
     removeClaudeRoutingOverrides,
   };

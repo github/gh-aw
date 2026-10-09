@@ -3107,6 +3107,31 @@ describe("sendJobConclusionSpan", () => {
     expect(attrs["gh-aw.model_routing.router_version"]).toBe("0.28.49");
   });
 
+  it("omits routing-only attributes for a non-routed run", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = "agent";
+    process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-non-routed-otel-"));
+    const statSpy = vi.spyOn(fs, "statSync").mockReturnValue(/** @type {Partial<fs.Stats>} */ { mtimeMs: 1_700_000_005_000 });
+    nodeFs.writeFileSync(path.join(process.env.GH_AW_TMP_DIR, "aw_info.json"), JSON.stringify({ model: "gpt-5.6-luna", requested_model: "auto", engine_id: "copilot" }));
+
+    try {
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+    } finally {
+      statSpy.mockRestore();
+      nodeFs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+    }
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const span = body.resourceSpans[0].scopeSpans[0].spans[0];
+    const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
+    expect(Object.keys(attrs).filter(key => key.startsWith("gh-aw.model_routing."))).toEqual([]);
+    expect(attrs).not.toHaveProperty("gh-aw.model.requested");
+    expect(attrs).not.toHaveProperty("gh-aw.model.effort");
+  });
+
   it("uses routed attribution from downstream job outputs when aw_info.json is absent", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
     vi.stubGlobal("fetch", mockFetch);
