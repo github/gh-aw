@@ -40,6 +40,11 @@ func TestSpec_PublicAPI_MarshalCompactNoHTMLEscape(t *testing.T) {
 			expected: `["one","two"]`,
 		},
 		{
+			name:     "documented html-sensitive characters remain literal",
+			input:    map[string]string{"value": "a&b<c>d"},
+			expected: `{"value":"a&b<c>d"}`,
+		},
+		{
 			name:    "marshal error is returned",
 			input:   map[string]any{"bad": math.Inf(1)},
 			wantErr: true,
