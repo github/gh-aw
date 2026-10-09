@@ -178,6 +178,7 @@ test("expands snippets with larger type and smooth transitions without changing 
 });
 
 test("expands constrained cards across the zoom content without changing the landing layout", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/gh-aw/");
   const landingCard = page.locator("main .va-chat");
   const landingWidth = (await landingCard.boundingBox())?.width;
@@ -190,6 +191,7 @@ test("expands constrained cards across the zoom content without changing the lan
   const content = zoom.locator("[data-snippet-content]");
   const card = content.locator("[data-slideshow-snippet]");
   await expect(zoom).toBeVisible();
+  expect((await content.boundingBox())?.width).toBeGreaterThan(1300);
   await expect
     .poll(async () => {
       const contentWidth = (await content.boundingBox())?.width;
