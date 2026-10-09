@@ -160,7 +160,7 @@ func TestCloudHypervisorAWFCommandEmitsAwfHomeMkdirBeforeInvocation(t *testing.T
 	// /workspace already exists (checked out by actions/checkout) and must not be mkdir'd.
 	assert.NotContains(t, command, `mkdir -p "${GITHUB_WORKSPACE}"`+"\n")
 	assert.Contains(t, command, `mkdir -p "${GITHUB_WORKSPACE}/.awf-home" "/tmp/gh-aw/agent"`)
-	assert.Contains(t, command, `git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude`)
+	assert.Contains(t, command, `if GH_AW_GIT_EXCLUDE="$(git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude 2>/dev/null)"; then`)
 	assert.Contains(t, command, `if ! grep -qxF -- '/.awf-home/' "$GH_AW_GIT_EXCLUDE"`)
 
 	mkdirIdx := strings.Index(command, "mkdir -p")
@@ -223,6 +223,20 @@ func TestCloudHypervisorHomeGitExclude(t *testing.T) {
 	}
 	script := buildCloudHypervisorFilesystemMkdirScript(workflowData)
 	require.NotEmpty(t, script)
+
+	t.Run("not a git repository", func(t *testing.T) {
+		workspace := t.TempDir()
+		cmd := exec.Command("bash", "-e", "-c", script+"\nprintf 'setup complete\\n'")
+		cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		assert.Equal(t, "setup complete\n", string(output))
+		info, err := os.Stat(filepath.Join(workspace, ".awf-home"))
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
+		assert.NoDirExists(t, filepath.Join(workspace, ".git"))
+		assert.NoFileExists(t, filepath.Join(workspace, "info", "exclude"))
+	})
 
 	for _, worktree := range []bool{false, true} {
 		for _, tc := range []struct {

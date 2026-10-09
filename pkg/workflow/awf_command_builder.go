@@ -283,10 +283,11 @@ func buildCloudHypervisorFilesystemMkdirScript(workflowData *WorkflowData) strin
 	homeTarget, _ := cloudHypervisorAllowWriteHostMkdirTarget(cloudHypervisorAwfHomeWritePath)
 	if _, createsHome := seen[homeTarget]; createsHome {
 		script += `
-GH_AW_GIT_EXCLUDE="$(git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude)"
-mkdir -p "$(dirname "$GH_AW_GIT_EXCLUDE")"
-if ! grep -qxF -- '/.awf-home/' "$GH_AW_GIT_EXCLUDE" 2>/dev/null; then
-  printf '\n%s\n' '/.awf-home/' >> "$GH_AW_GIT_EXCLUDE"
+if GH_AW_GIT_EXCLUDE="$(git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude 2>/dev/null)"; then
+  mkdir -p "$(dirname "$GH_AW_GIT_EXCLUDE")"
+  if ! grep -qxF -- '/.awf-home/' "$GH_AW_GIT_EXCLUDE" 2>/dev/null; then
+    printf '\n%s\n' '/.awf-home/' >> "$GH_AW_GIT_EXCLUDE"
+  fi
 fi`
 	}
 	return script
