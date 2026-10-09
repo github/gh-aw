@@ -8,11 +8,14 @@ import (
 	"testing"
 )
 
+const validationAlpineImage = "mirror.gcr.io/library/alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+
 func TestValidateContainerImages(t *testing.T) {
 	tests := []struct {
 		name           string
 		workflowData   *WorkflowData
 		expectError    bool
+		errorContains  string
 		skipIfNoDocker bool
 	}{
 		{
@@ -39,8 +42,7 @@ func TestValidateContainerImages(t *testing.T) {
 			workflowData: &WorkflowData{
 				Tools: map[string]any{
 					"test-tool": map[string]any{
-						"container": "alpine",
-						"version":   "latest",
+						"container": validationAlpineImage,
 					},
 				},
 			},
@@ -52,12 +54,13 @@ func TestValidateContainerImages(t *testing.T) {
 			workflowData: &WorkflowData{
 				Tools: map[string]any{
 					"test-tool": map[string]any{
-						"container": "nonexistent-image-that-should-not-exist-12345",
-						"version":   "nonexistent",
+						"container": "mirror.gcr.io/library/alpine",
+						"version":   "nonexistent-image-that-should-not-exist-12345",
 					},
 				},
 			},
 			expectError:    true,
+			errorContains:  "manifest unknown",
 			skipIfNoDocker: true,
 		},
 	}
@@ -84,6 +87,9 @@ func TestValidateContainerImages(t *testing.T) {
 			if !tt.expectError && err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			if err != nil && tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+				t.Errorf("expected error containing %q, got: %v", tt.errorContains, err)
+			}
 		})
 	}
 }
@@ -99,19 +105,21 @@ func TestValidateDockerImage(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		image       string
-		expectError bool
+		name          string
+		image         string
+		expectError   bool
+		errorContains string
 	}{
 		{
 			name:        "valid image - alpine",
-			image:       "alpine:latest",
+			image:       validationAlpineImage,
 			expectError: false,
 		},
 		{
-			name:        "invalid image",
-			image:       "nonexistent-image-12345:nonexistent",
-			expectError: true,
+			name:          "invalid image",
+			image:         "mirror.gcr.io/library/alpine:nonexistent-image-that-should-not-exist-12345",
+			expectError:   true,
+			errorContains: "manifest unknown",
 		},
 	}
 
@@ -124,6 +132,9 @@ func TestValidateDockerImage(t *testing.T) {
 			}
 			if !tt.expectError && err != nil {
 				t.Errorf("unexpected error: %v", err)
+			}
+			if err != nil && tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+				t.Errorf("expected error containing %q, got: %v", tt.errorContains, err)
 			}
 		})
 	}
