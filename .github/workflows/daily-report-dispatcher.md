@@ -1,6 +1,6 @@
 ---
 name: Daily Discussion Report Dispatcher
-description: Admits a rotating three-of-ten discussion-report cohort and requests its bounded native queue grants
+description: Admits a bounded discussion-report cohort with daily rotation and weekly report slots, then requests native queue grants
 on:
   schedule: daily around 10:00
 if: github.run_attempt == 1
@@ -27,6 +27,9 @@ safe-outputs:
       - daily-secrets-analysis
       - daily-team-evolution-insights
       - daily-token-consumption-report
+      - deep-report
+      - artifacts-summary
+      - repo-tree-map
     target-ref: ${{ github.event.repository.default_branch }}
     max: 3
   noop:
@@ -55,8 +58,13 @@ strict: true
 # Daily Discussion Report Dispatcher
 
 Read `/tmp/gh-aw/agent/daily-report-plan.json`. The trusted preparation step picks
-three distinct members of the ten-workflow portfolio using a deterministic UTC
-rotation. Use the exact stored date, node definitions and budgets; never invent
+three distinct members of the thirteen-workflow portfolio using a deterministic
+UTC rotation. DeepReport reserves one slot every day to synthesize previously
+published reports. Artifact and tree reports reserve one slot on Sunday and Monday
+activations respectively; the remaining slots rotate across the ten daily
+profiles without skipping a member. DeepReport is independent Work, not a
+same-cohort fan-in: it analyzes prior published evidence and never waits inside
+its run for other workers. Use the exact stored date, node definitions and budgets; never invent
 additional candidates or admission identities.
 
 1. Call `work_queue_read` with `{"pool":"daily-reports","limit":32}`. An absent
