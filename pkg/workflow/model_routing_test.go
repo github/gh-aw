@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -191,6 +192,183 @@ safe-outputs:
 			})
 		}
 	}
+}
+
+func TestCompiledRoutedWorkflowsKeepThreatDetectionJob(t *testing.T) {
+	tests := []struct {
+		name                string
+		engine              string
+		provider            string
+		allowedModel        string
+		detectionEngine     string
+		detectionModel      string
+		detectionModelEnv   string
+		detectionModelValue string
+		override            bool
+	}{
+		{
+			name: "copilot", engine: "copilot", allowedModel: "gpt-5.4-mini",
+			detectionEngine: "copilot", detectionModel: "gpt-4.1",
+			detectionModelEnv: "COPILOT_MODEL", detectionModelValue: "gpt-4.1",
+		},
+		{
+			name: "claude", engine: "claude", provider: "github", allowedModel: "claude-sonnet-4-6",
+			detectionEngine: "copilot", detectionModel: "claude-haiku-4.5",
+			detectionModelEnv: "COPILOT_MODEL", detectionModelValue: "claude-haiku-4.5",
+		},
+		{
+			name: "pi", engine: "pi", provider: "github", allowedModel: "claude-sonnet-4-6",
+			detectionEngine: "copilot", detectionModel: "pi/claude-haiku-4.5",
+			detectionModelEnv: "COPILOT_MODEL", detectionModelValue: "claude-haiku-4.5",
+		},
+		{
+			name: "claude with copilot override", engine: "claude", provider: "github",
+			allowedModel: "claude-sonnet-4-6", detectionEngine: "copilot",
+			detectionModel: "gpt-4.1", detectionModelEnv: "COPILOT_MODEL", detectionModelValue: "gpt-4.1",
+			override: true,
+		},
+	}
+
+	for _, tt := range tests {
+		for _, external := range []bool{false, true} {
+			path := "inline"
+			if external {
+				path = "external"
+			}
+			t.Run(tt.name+"/"+path, func(t *testing.T) {
+				routed := compileRoutedDetectionTestWorkflow(t, tt, external, true)
+				unrouted := compileRoutedDetectionTestWorkflow(t, tt, external, false)
+
+				detection := routed.Jobs["detection"]
+				require.NotNil(t, detection, "routed workflow must retain the detection job")
+				require.Equal(t, "always() && needs.agent.result != 'skipped'", detection["if"])
+				detectionYAML, err := yamlv3.Marshal(detection)
+				require.NoError(t, err)
+				for _, forbidden := range []string{
+					"model_routing", "GH_AW_MODEL_ROUTING", "modelRouting", "model-routing",
+					"gh-aw-router", "needs.agent.outputs.model", "needs.agent.outputs.routing",
+				} {
+					require.NotContains(t, string(detectionYAML), forbidden)
+				}
+
+				steps, ok := detection["steps"].([]any)
+				require.True(t, ok, "detection job steps should be parsed from YAML")
+				var executionStep map[string]any
+				for _, rawStep := range steps {
+					step, ok := rawStep.(map[string]any)
+					if !ok {
+						continue
+					}
+					if findCompiledEnvValue(t, step, tt.detectionModelEnv) != nil {
+						executionStep = step
+						break
+					}
+				}
+				require.NotNil(t, executionStep, "expected %s execution step using fixed model %q", tt.detectionEngine, tt.detectionModel)
+				require.Equal(t, tt.detectionModelValue, findCompiledEnvValue(t, executionStep, tt.detectionModelEnv), "engine execution step: %v", executionStep)
+				if external {
+					require.Contains(t, fmt.Sprint(executionStep["run"]), "--engine "+tt.detectionEngine)
+				} else {
+					require.Contains(t, fmt.Sprint(executionStep["name"]), "Copilot CLI")
+				}
+				if stepCondition, ok := executionStep["if"]; ok {
+					for _, forbidden := range []string{"model_routing", "GH_AW_MODEL_ROUTING", "modelRouting", "needs.agent.outputs"} {
+						require.NotContains(t, fmt.Sprint(stepCondition), forbidden)
+					}
+				}
+
+				safeOutputs := routed.Jobs["safe_outputs"]
+				require.NotNil(t, safeOutputs)
+				require.Contains(t, safeOutputs["needs"], "detection")
+				require.Contains(t, fmt.Sprint(safeOutputs["if"]), "needs.detection.result == 'success'")
+				require.Equal(t, "${{ needs.detection.outputs.detection_conclusion }}", findCompiledEnvValue(t, safeOutputs, "GH_AW_DETECTION_CONCLUSION"))
+
+				unroutedDetection := unrouted.Jobs["detection"]
+				unroutedSafeOutputs := unrouted.Jobs["safe_outputs"]
+				require.NotNil(t, unroutedDetection)
+				require.NotNil(t, unroutedSafeOutputs)
+				require.Equal(t, detection["if"], unroutedDetection["if"], "routing must not change detection gating")
+				require.Equal(t, detection["needs"], unroutedDetection["needs"], "routing must not change detection dependencies")
+				require.Equal(t, safeOutputs["if"], unroutedSafeOutputs["if"], "routing must not change safe_outputs gating")
+				require.Equal(t, safeOutputs["needs"], unroutedSafeOutputs["needs"], "routing must not change safe_outputs dependencies")
+			})
+		}
+	}
+}
+
+func compileRoutedDetectionTestWorkflow(t *testing.T, tt struct {
+	name                string
+	engine              string
+	provider            string
+	allowedModel        string
+	detectionEngine     string
+	detectionModel      string
+	detectionModelEnv   string
+	detectionModelValue string
+	override            bool
+}, external, routing bool) struct {
+	Jobs map[string]map[string]any `yaml:"jobs"`
+} {
+	t.Helper()
+
+	var source strings.Builder
+	source.WriteString("---\non: workflow_dispatch\nstrict: false\nengine:\n  id: " + tt.engine + "\n")
+	if tt.provider != "" {
+		source.WriteString("  model-provider: " + tt.provider + "\n")
+	}
+	if routing {
+		source.WriteString("  model-routing:\n    goal: cost\n    mode: balanced\n    allowed-models: [" + tt.allowedModel + "]\n")
+	}
+	source.WriteString("safe-outputs:\n  create-issue:\n  threat-detection:\n    model: " + tt.detectionModel + "\n")
+	if tt.override {
+		source.WriteString("    engine:\n      id: " + tt.detectionEngine + "\n")
+		if routing {
+			source.WriteString("      model-routing:\n        goal: cost\n        mode: balanced\n        allowed-models: [gpt-5.4-mini]\n")
+		}
+	}
+	source.WriteString("features:\n  gh-aw-detection: ")
+	if external {
+		source.WriteString("true\n")
+	} else {
+		source.WriteString("false\n")
+	}
+	source.WriteString("---\nReport a finding.\n")
+
+	dir := t.TempDir()
+	workflowPath := filepath.Join(dir, "routed.md")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(source.String()), 0o600))
+	require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+	compiled, err := os.ReadFile(filepath.Join(dir, "routed.lock.yml"))
+	require.NoError(t, err)
+	var workflow struct {
+		Jobs map[string]map[string]any `yaml:"jobs"`
+	}
+	require.NoError(t, yamlv3.Unmarshal(compiled, &workflow))
+	return workflow
+}
+
+func findCompiledEnvValue(t *testing.T, value any, key string) any {
+	t.Helper()
+	switch value := value.(type) {
+	case map[string]any:
+		if env, ok := value["env"].(map[string]any); ok {
+			if envValue, found := env[key]; found {
+				return envValue
+			}
+		}
+		for _, nested := range value {
+			if envValue := findCompiledEnvValue(t, nested, key); envValue != nil {
+				return envValue
+			}
+		}
+	case []any:
+		for _, nested := range value {
+			if envValue := findCompiledEnvValue(t, nested, key); envValue != nil {
+				return envValue
+			}
+		}
+	}
+	return nil
 }
 
 func TestBuildAWFConfigJSON_ModelRoutingUsesEffectiveAWFVersion(t *testing.T) {
