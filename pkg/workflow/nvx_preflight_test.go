@@ -94,8 +94,23 @@ func setupNVXPreflightFixture(t *testing.T, manifest string) (string, []string) 
 		path := filepath.Join(binDir, name)
 		body := "#!/bin/bash\nexec /usr/bin/" + name + ` "$@"` + "\n"
 		switch name {
-		case "bwrap", "flock", "getfacl", "getent", "groupdel", "ip", "iptables", "mkfs.erofs", "mke2fs", "nft", "setfacl", "setpriv", "sysctl", "useradd", "userdel":
+		case "bwrap", "flock", "getent", "groupdel", "ip", "iptables", "mkfs.erofs", "mke2fs", "nft", "setpriv", "sysctl", "useradd", "userdel":
 			body = "#!/bin/bash\nexit 0\n"
+		case "setfacl":
+			body = `#!/bin/bash
+[[ "${NVX_TEST_ACL_FAIL:-}" != 1 ]] || exit 1
+printf 'user:0:rw-\n' > "$NVX_TEST_ACL_STATE"
+`
+		case "getfacl":
+			body = `#!/bin/bash
+if [[ -f "$NVX_TEST_ACL_STATE" ]]; then
+  cat "$NVX_TEST_ACL_STATE"
+elif [[ "${NVX_TEST_ACL_EXISTING:-1}" == 1 ]]; then
+  echo user:0:rw-
+else
+  printf 'user::rw-\ngroup::r--\nother::---\n'
+fi
+`
 		case "gh":
 			body = `#!/bin/bash
 set -e
@@ -146,6 +161,7 @@ exec /usr/bin/mktemp "$@"
 		case "sudo":
 			body = `#!/bin/bash
 [[ "$1" == -n ]] && shift
+[[ "${NVX_TEST_SUDO_FAIL:-}" != 1 ]] || exit 1
 if [[ "${1##*/}" == rm ]]; then
   stage_dir="${@: -1}"
   /usr/bin/chmod 755 "$stage_dir"
@@ -189,8 +205,11 @@ esac
 	fixtureScript = strings.ReplaceAll(fixtureScript, "/usr/bin/realpath", filepath.Join(binDir, "realpath"))
 	fixtureScript = strings.ReplaceAll(fixtureScript, "/usr/bin/stat", filepath.Join(binDir, "stat"))
 	fixtureKVM := filepath.Join(root, "dev", "kvm")
-	fixtureScript = strings.ReplaceAll(fixtureScript, "/dev/kvm", fixtureKVM)
-	fixtureScript = strings.Replace(fixtureScript, "[[ ! -c "+fixtureKVM, "[[ ! -e "+fixtureKVM, 1)
+	kvmScript, err := os.ReadFile(filepath.Join(filepath.Dir(scriptPath), "kvm_access.sh"))
+	require.NoError(t, err)
+	fixtureKVMScript := strings.ReplaceAll(string(kvmScript), "/dev/kvm", fixtureKVM)
+	fixtureKVMScript = strings.Replace(fixtureKVMScript, "[[ ! -c "+fixtureKVM, "[[ ! -f "+fixtureKVM, 1)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "kvm_access.sh"), []byte(fixtureKVMScript), 0o600))
 	fixtureScript = strings.ReplaceAll(fixtureScript, "/sys/fs/cgroup/cgroup.controllers", filepath.Join(root, "sys", "fs", "cgroup", "cgroup.controllers"))
 	fixtureScript = strings.ReplaceAll(fixtureScript, "/proc/sys/kernel/seccomp/actions_avail", filepath.Join(root, "proc", "sys", "kernel", "seccomp", "actions_avail"))
 	fixtureScriptPath := filepath.Join(root, "nvx_host_preflight.sh")
@@ -210,6 +229,7 @@ esac
 		"NVX_TEST_BIN=" + binDir,
 		"NVX_TEST_TMP=" + filepath.Join(root, "tmp"),
 		"NVX_TEST_LOG=" + filepath.Join(root, "events"),
+		"NVX_TEST_ACL_STATE=" + filepath.Join(root, "acl_state"),
 		"PATH=" + binDir + ":" + os.Getenv("PATH"),
 	}
 	return fixtureScriptPath, env
@@ -248,18 +268,68 @@ func TestNVXHostPreflightExecutesAgainstFixtures(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(githubEnv), "GH_AW_NVX_STAGE_DIR=")
 		assert.Contains(t, string(githubEnv), "GH_AW_NVX_RM=")
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_EXISTS=true")
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_PERMISSIONS=rw-")
 	})
 
 	t.Run("missing host controller fails before staging", func(t *testing.T) {
 		scriptPath, env := setupNVXPreflightFixture(t, manifest)
+		env = append(env, "NVX_TEST_ACL_EXISTING=0")
 		hostControllerFile := filepath.Join(filepath.Dir(scriptPath), "sys", "fs", "cgroup", "cgroup.controllers")
 		require.NoError(t, os.WriteFile(hostControllerFile, []byte("cpu memory\n"), 0o644))
 		output, err := runNVXPreflightFixture(t, scriptPath, env)
 		require.Error(t, err)
 		assert.Contains(t, output, "requires the cgroup v2 pids controller")
 		_, statErr := os.Stat(filepath.Join(filepath.Dir(scriptPath), "events"))
-		assert.ErrorIs(t, statErr, os.ErrNotExist)
+		require.ErrorIs(t, statErr, os.ErrNotExist)
+		githubEnv, readErr := os.ReadFile(filepath.Join(filepath.Dir(scriptPath), "github_env"))
+		require.NoError(t, readErr)
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_EXISTS=false")
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_PERMISSIONS=---")
 	})
+
+	for _, tc := range []struct {
+		name      string
+		directory bool
+		message   string
+	}{
+		{"missing KVM device", false, "is missing"},
+		{"wrong KVM device type", true, "must be a character device"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scriptPath, env := setupNVXPreflightFixture(t, manifest)
+			device := filepath.Join(filepath.Dir(scriptPath), "dev", "kvm")
+			require.NoError(t, os.Remove(device))
+			if tc.directory {
+				require.NoError(t, os.Mkdir(device, 0o755))
+			}
+			output, err := runNVXPreflightFixture(t, scriptPath, env)
+			require.Error(t, err)
+			assert.Contains(t, output, tc.message)
+			matches, globErr := filepath.Glob(filepath.Join(filepath.Dir(scriptPath), "tmp", "gh-aw-nvx.*"))
+			require.NoError(t, globErr)
+			assert.Empty(t, matches)
+		})
+	}
+
+	for _, tc := range []struct {
+		name    string
+		env     string
+		message string
+	}{
+		{"ACL setup failure", "NVX_TEST_ACL_FAIL=1", "failed to configure scoped access"},
+		{"non-interactive sudo failure", "NVX_TEST_SUDO_FAIL=1", "requires non-interactive sudo"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scriptPath, env := setupNVXPreflightFixture(t, manifest)
+			output, err := runNVXPreflightFixture(t, scriptPath, append(env, tc.env))
+			require.Error(t, err)
+			assert.Contains(t, output, tc.message)
+			matches, globErr := filepath.Glob(filepath.Join(filepath.Dir(scriptPath), "tmp", "gh-aw-nvx.*"))
+			require.NoError(t, globErr)
+			assert.Empty(t, matches)
+		})
+	}
 
 	t.Run("attestation failure removes incomplete staging", func(t *testing.T) {
 		scriptPath, env := setupNVXPreflightFixture(t, manifest)
