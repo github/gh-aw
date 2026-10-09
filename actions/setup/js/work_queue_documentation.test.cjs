@@ -58,6 +58,8 @@ describe("work-queue deployment documentation", () => {
     expect(instructions.trim().split(/\s+/).length).toBeLessThanOrEqual(800);
     expect(instructions).not.toContain("```json");
     expect(instructions).toContain("issue-backed WorkQueueOps");
+    expect(instructions).toContain("null `snapshot_sha` means absent; stop with `noop`");
+    expect(instructions).toContain("Existing policyless ledgers are deployment failures");
     expect(readRepositoryFile(referencePath)).toContain("Work queues can be Git-backed or issue-backed");
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       expect(instructions).toContain(file.replace(/^docs\//, "../../docs/"));

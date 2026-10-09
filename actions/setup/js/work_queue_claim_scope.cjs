@@ -162,7 +162,11 @@ function normalizeRuntimeMessage(message) {
       throw scopeError("protected observers cannot emit queue-control operations");
     return message;
   }
-  if (!scope.assignment) throw scopeError("unassigned dispatcher cannot emit worker safe outputs");
+  if (!scope.assignment) {
+    const absentDispatcher = scope.snapshot?.sha === null && scope.snapshot.transactionLog === "" && scope.snapshot.worker === null;
+    if (absentDispatcher && message?.type === "noop") return message;
+    throw scopeError("unassigned dispatcher cannot emit worker safe outputs");
+  }
   const normalized = normalizeClaimScope(message, scope.assignment);
   if (execution?.claim_handle && normalized.claim_handle !== execution.claim_handle) throw scopeError("message cannot escape its trusted per-Claim execution context");
   return normalized;
