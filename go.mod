@@ -1,6 +1,6 @@
 module github.com/github/gh-aw
 
-go 1.26.8
+go 1.26.9
 
 require (
 	charm.land/bubbles/v2 v2.2.1
@@ -40,7 +40,7 @@ require (
 require (
 	github.com/rhysd/actionlint v1.7.12
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 )
 
 require (
