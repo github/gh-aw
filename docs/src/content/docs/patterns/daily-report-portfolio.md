@@ -17,9 +17,10 @@ Completion and verified delivery share that transaction log.
 
 > [!IMPORTANT]
 > The sources are an orchestration example, not an already provisioned live
-> deployment. An authenticated administrator must install the complete queue
-> Policy and verified immutable worker bindings. Compiling a workflow does not
-> install policy, protect the queue branch, or launch workers.
+> deployment. Configure the complete compiler-approved Policy proposal,
+> verified immutable worker bindings, and queue-branch protections before
+> enabling a producer. Its first submission atomically bootstraps Policy and
+> Work; compiling a workflow alone does not protect the branch or launch workers.
 
 ## Ten reports, one dispatcher
 
@@ -114,8 +115,8 @@ dispatcher requires a new calendar-budget design.
 ## Dispatcher source and consuming prompt
 
 The following source excerpt omits engine settings and the preparation step.
-The dispatch allowlist approves routes; the installed Policy supplies actual
-immutable revisions, launch principals and resource scope.
+The dispatch allowlist approves routes; the compiler-approved Policy proposal
+supplies actual immutable revisions, launch principals and resource scope.
 
 ```aw wrap title=".github/workflows/daily-report-dispatcher.md (excerpt)"
 ---

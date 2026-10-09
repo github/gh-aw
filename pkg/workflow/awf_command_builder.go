@@ -252,8 +252,9 @@ func buildAWFConfigFileSetup(config AWFCommandConfig, awfConfigJSON string) stri
 // host, every directory backing a filesystem.allowWrite entry emitted for the Cloud
 // Hypervisor runtime. The AWF planner requires every allowWrite path to already exist on
 // the host before AWF starts and fails closed otherwise (e.g. ".awf-home" is not
-// auto-created by the Cloud Hypervisor backend the way it is for other runtimes). Returns
-// an empty string when the Cloud Hypervisor filesystem.allowWrite section is not being
+// auto-created by the Cloud Hypervisor backend the way it is for other runtimes).
+// When creating HOME, it also installs a checkout-local Git exclusion for tool state.
+// Returns an empty string when the Cloud Hypervisor filesystem.allowWrite section is not being
 // emitted, or when there is nothing to create.
 func buildCloudHypervisorFilesystemMkdirScript(workflowData *WorkflowData) string {
 	if !awfEmitsFilesystemAllowWrite(workflowData, getFirewallConfig(workflowData)) {
@@ -285,7 +286,18 @@ func buildCloudHypervisorFilesystemMkdirScript(workflowData *WorkflowData) strin
 	for _, target := range targets {
 		quoted = append(quoted, shellEscapeArgWithVarsPreserved(target, "GITHUB_WORKSPACE"))
 	}
-	return "mkdir -p " + strings.Join(quoted, " ")
+	script := "mkdir -p " + strings.Join(quoted, " ")
+	homeTarget, _ := cloudHypervisorAllowWriteHostMkdirTarget(cloudHypervisorAwfHomeWritePath)
+	if _, createsHome := seen[homeTarget]; createsHome {
+		script += `
+if GH_AW_GIT_EXCLUDE="$(git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude 2>/dev/null)"; then
+  mkdir -p "$(dirname "$GH_AW_GIT_EXCLUDE")"
+  if ! grep -qxF -- '/.awf-home/' "$GH_AW_GIT_EXCLUDE" 2>/dev/null; then
+    printf '\n%s\n' '/.awf-home/' >> "$GH_AW_GIT_EXCLUDE"
+  fi
+fi`
+	}
+	return script
 }
 
 // cloudHypervisorAllowWriteHostMkdirTarget maps a filesystem.allowWrite guest path to the

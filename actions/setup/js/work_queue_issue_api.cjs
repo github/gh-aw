@@ -9,80 +9,73 @@ const MAX_PROJECTION_TARGETS = 25;
 const MAX_PROJECTION_MUTATIONS = 50;
 const LABELS_PAGE_SIZE = 100;
 const STATUSES = ["Queued", "Blocked", "Assigned", "Running", "Verifying", "Needs review", "Done", "Needs attention", "Cancelled"];
-const FIELD_SELECTION = `__typename ... on IssueFieldText { id name } ... on IssueFieldNumber { id name }
-  ... on IssueFieldDate { id name } ... on IssueFieldMultiSelect { id name }
-  ... on IssueFieldSingleSelect { id name options { id name } }`;
-const VALUE_SELECTION = `... on IssueFieldSingleSelectValue { optionId name field { ... on IssueFieldSingleSelect { id } } }`;
-const ISSUE_SELECTION = `id databaseId number state viewerCanSetFields repository { id databaseId nameWithOwner } author { login }
-  labels(first:${LABELS_PAGE_SIZE}) { nodes { id name } pageInfo { hasNextPage endCursor } }
-  issueFieldValues(first:${MAX_PROJECTION_TARGETS}) { nodes { ${VALUE_SELECTION} } pageInfo { hasNextPage endCursor } }`;
+const ISSUE_SELECTION = `id databaseId number state repository { id databaseId nameWithOwner } author { login }
+  labels(first:${LABELS_PAGE_SIZE}) { nodes { id name } pageInfo { hasNextPage endCursor } }`;
+const QUEUE_LABEL_COLOR = "7057FF";
 
-async function ensureTrackingLabel(github, repositoryId, label, name) {
+async function ensureLabel(github, repositoryId, label, name) {
   if (label) {
     if (label.name !== name || typeof label.id !== "string") throw queueError("projection_label_pending", "tracking label identity is invalid");
+    if (label.color?.toUpperCase() !== QUEUE_LABEL_COLOR) {
+      const response = await github.graphql("mutation WorkQueueLabelColor($input:UpdateLabelInput!) { updateLabel(input:$input) { label { id name color } } }", {
+        input: { id: label.id, color: QUEUE_LABEL_COLOR },
+        request: { retries: 0, timeout: 15000 },
+      });
+      if (response?.updateLabel?.label?.id !== label.id || response.updateLabel.label.name !== name || response.updateLabel.label.color?.toUpperCase() !== QUEUE_LABEL_COLOR)
+        throw queueError("projection_label_pending", "work queue label color update is uncertain");
+    }
     return label.id;
   }
-  const response = await github.graphql("mutation WorkQueueTrackingLabel($input:CreateLabelInput!) { createLabel(input:$input) { label { id name } } }", {
-    input: { repositoryId, name, color: "808080", description: "Git-backed Work queue tracking" },
+  const response = await github.graphql("mutation WorkQueueTrackingLabel($input:CreateLabelInput!) { createLabel(input:$input) { label { id name color } } }", {
+    input: { repositoryId, name, color: QUEUE_LABEL_COLOR, description: "Git-backed Work queue" },
     request: { retries: 0, timeout: 15000 },
   });
-  if (!response?.createLabel?.label?.id || response.createLabel.label.name !== name) throw queueError("projection_label_pending", "tracking label creation is uncertain");
+  if (!response?.createLabel?.label?.id || response.createLabel.label.name !== name || response.createLabel.label.color?.toUpperCase() !== QUEUE_LABEL_COLOR)
+    throw queueError("projection_label_pending", "work queue label creation is uncertain");
   return response.createLabel.label.id;
+}
+
+function statusLabelName(config, status) {
+  const prefix = config.label.replace(/\s+/g, "-");
+  const suffix = status.toLowerCase().replace(/\s+/g, "-");
+  return `${prefix}:${suffix}`;
+}
+
+async function ensureStatusLabel(github, repositoryId, config, status) {
+  const name = statusLabelName(config, status);
+  const response = await findStatusLabel(github, repositoryId, name);
+  if (response?.node?.id !== repositoryId) throw queueError("projection_label_pending", "status label target is inaccessible");
+  try {
+    return await ensureLabel(github, repositoryId, response.node.label, name);
+  } catch (error) {
+    if (response.node.label || !labelAlreadyExists(error)) throw error;
+    const concurrent = await findStatusLabel(github, repositoryId, name);
+    if (concurrent?.node?.id !== repositoryId || !concurrent.node.label) throw error;
+    return ensureLabel(github, repositoryId, concurrent.node.label, name);
+  }
+}
+
+async function findStatusLabel(github, repositoryId, name) {
+  return github.graphql("query WorkQueueStatusLabel($repositoryId:ID!,$name:String!) { node(id:$repositoryId) { ... on Repository { id label(name:$name) { id name color } } } }", { repositoryId, name });
+}
+
+function labelAlreadyExists(error) {
+  const failure = error?.originalError || error;
+  const messages = [failure?.message, ...(Array.isArray(failure?.errors) ? failure.errors.map(item => item?.message) : [])];
+  return messages.some(message => typeof message === "string" && /already (?:exists|been taken)/i.test(message));
 }
 
 async function discoverTarget(github, repository, config, firstPage = undefined) {
   const [owner, name] = repository.split("/");
-  /** @type {string | null} */
-  let cursor = null;
-  let field;
-  let repositoryId;
-  let label;
-  try {
-    for (let page = 0; page < 16; page++) {
-      const fieldQuery = config["status-field"] ? `issueFields(first:${MAX_PROJECTION_TARGETS},after:$cursor) { nodes { ${FIELD_SELECTION} } pageInfo { hasNextPage endCursor } }` : "";
-      const result =
-        page === 0 && firstPage
-          ? { repository: firstPage }
-          : await github.graphql(
-              `query WorkQueueIssueTarget($owner:String!,$name:String!,$label:String!${config["status-field"] ? ",$cursor:String" : ""}) {
-        repository(owner:$owner,name:$name) { id nameWithOwner label(name:$label) { id name } ${fieldQuery} }
-      }`,
-              { owner, name, label: config.label, ...(config["status-field"] ? { cursor } : {}) }
-            );
-      const target = result?.repository;
-      if (!target || target.nameWithOwner !== repository) throw queueError("projection_target_unavailable", "Issue target is inaccessible or transferred");
-      repositoryId = target.id;
-      label = target.label;
-      if (!config["status-field"]) return { repositoryId, labelId: await ensureTrackingLabel(github, repositoryId, label, config.label) };
-      const fields = target.issueFields;
-      if (!Array.isArray(fields?.nodes)) throw queueError("projection_field_pending", "native organization Issue fields are inaccessible");
-      for (const node of fields.nodes) {
-        if (node.name !== config["status-field"]) continue;
-        if (field || node.__typename !== "IssueFieldSingleSelect" || !Array.isArray(node.options)) throw queueError("projection_field_pending", "status field is ambiguous or not single-select");
-        const options = new Map();
-        for (const option of node.options) {
-          if (options.has(option.name) || typeof option.id !== "string") throw queueError("projection_field_pending", "status options are ambiguous");
-          options.set(option.name, option.id);
-        }
-        if (STATUSES.some(status => !options.has(status))) throw queueError("projection_field_pending", "status field is missing required options");
-        field = { id: node.id, options };
-      }
-      if (fields.pageInfo?.hasNextPage === false) {
-        if (!field) throw queueError("projection_field_pending", "configured native status field is missing or inaccessible");
-        return { repositoryId, labelId: await ensureTrackingLabel(github, repositoryId, label, config.label), field };
-      }
-      const next = fields.pageInfo?.endCursor;
-      if (typeof next !== "string" || !next || next === cursor) throw queueError("projection_field_pending", "status field discovery is incomplete");
-      cursor = next;
-    }
-    throw queueError("projection_field_pending", "status field discovery pagination exhausted");
-  } catch (error) {
-    if (error.code !== "projection_field_pending") throw error;
-    return { repositoryId, labelId: await ensureTrackingLabel(github, repositoryId, label, config.label), fieldPending: error.message };
-  }
+  const result = firstPage
+    ? { repository: firstPage }
+    : await github.graphql("query WorkQueueIssueTarget($owner:String!,$name:String!,$label:String!) { repository(owner:$owner,name:$name) { id nameWithOwner label(name:$label) { id name color } } }", { owner, name, label: config.label });
+  const target = result?.repository;
+  if (!target || target.nameWithOwner !== repository) throw queueError("projection_target_unavailable", "Issue target is inaccessible or transferred");
+  return { repositoryId: target.id, labelId: await ensureLabel(github, target.id, target.label, config.label) };
 }
 
-function issuePreflightQuery(targets, fields) {
+function issuePreflightQuery(targets) {
   if (targets.length > MAX_PROJECTION_TARGETS) throw queueError("projection_limit", `at most ${MAX_PROJECTION_TARGETS} projection targets`);
   const variables = {};
   const declarations = [];
@@ -94,7 +87,7 @@ function issuePreflightQuery(targets, fields) {
       if (!Number.isSafeInteger(number) || number < 1 || number > 2147483647) throw queueError("projection_target_unavailable", "Issue number cannot be represented by GraphQL");
       declarations.push(`$o${index}:String!,$r${index}:String!,$n${index}:Int!`);
       Object.assign(variables, { [`o${index}`]: owner, [`r${index}`]: name, [`n${index}`]: number });
-      selections.push(`i${index}: repository(owner:$o${index},name:$r${index}) { issue(number:$n${index}) { ${fields ? ISSUE_SELECTION : ISSUE_SELECTION.replace(/issueFieldValues[\s\S]*$/, "")} } }`);
+      selections.push(`i${index}: repository(owner:$o${index},name:$r${index}) { issue(number:$n${index}) { ${ISSUE_SELECTION} } }`);
     }
     for (const [handle, id] of Object.entries(target.comments || {})) {
       const alias = `c${index}_${selections.length}`;
@@ -109,7 +102,7 @@ function issuePreflightQuery(targets, fields) {
 }
 
 function issueReadQuery(targets, config, repository) {
-  const read = issuePreflightQuery(targets, !!config["status-field"]);
+  const read = issuePreflightQuery(targets);
   const repositories = [...new Set(targets.map(target => target.resource?.repository || repository))];
   const repositoryAliases = new Map();
   read.declarations.push("$trackingLabel:String!");
@@ -120,16 +113,15 @@ function issueReadQuery(targets, config, repository) {
     repositoryAliases.set(repository, alias);
     read.declarations.push(`$${alias}Owner:String!,$${alias}Name:String!`);
     Object.assign(read.variables, { [`${alias}Owner`]: owner, [`${alias}Name`]: name });
-    read.selections.push(`${alias}: repository(owner:$${alias}Owner,name:$${alias}Name) { id nameWithOwner label(name:$trackingLabel) { id name }
-      ${config["status-field"] ? `issueFields(first:${MAX_PROJECTION_TARGETS}) { nodes { ${FIELD_SELECTION} } pageInfo { hasNextPage endCursor } }` : ""} }`);
+    read.selections.push(`${alias}: repository(owner:$${alias}Owner,name:$${alias}Name) { id nameWithOwner label(name:$trackingLabel) { id name color } }`);
   }
   return { ...read, repositoryAliases };
 }
 
-/** @param {{fields?: boolean, response?: Record<string, any>}} [options] */
+/** @param {{response?: Record<string, any>}} [options] */
 async function preflightIssues(github, targets, options = {}) {
-  const { fields = true, response } = options;
-  const read = issuePreflightQuery(targets, fields);
+  const { response } = options;
+  const read = issuePreflightQuery(targets);
   if (!read.selections.length) return new Map();
   const result = response || (await github.graphql(`query WorkQueueIssuePreflight(${read.declarations.join(",")}) { ${read.selections.join("\n")} }`, read.variables));
   const issues = new Map();
@@ -146,7 +138,6 @@ async function preflightIssues(github, targets, options = {}) {
     )
       throw queueError("projection_target_unavailable", "backing Issue was deleted, transferred, or changed identity");
     if (!Array.isArray(issue.labels?.nodes)) throw queueError("projection_target_unavailable", "Issue labels are inaccessible");
-    if (fields && !Array.isArray(issue.issueFieldValues?.nodes)) throw queueError("projection_field_pending", "Issue field values are inaccessible");
     issue.comments = new Map();
     for (const [handle, alias] of Object.entries(target.commentAliases || {})) {
       const comment = result?.[alias];
@@ -156,46 +147,35 @@ async function preflightIssues(github, targets, options = {}) {
     }
     issues.set(target.work_id, issue);
   }
-  await completeIssueConnections(github, [...issues.values()], fields);
-  return issues;
-}
-
-async function completeIssueConnections(github, issues, fields) {
+  const issueList = [...issues.values()];
   const seen = new Map();
   for (let page = 0; page < 16; page++) {
     const declarations = [];
     const selections = [];
     const variables = {};
     const pending = [];
-    for (const [index, issue] of issues.entries()) {
-      for (const connection of fields ? ["labels", "issueFieldValues"] : ["labels"]) {
-        const values = issue[connection];
-        if (values?.pageInfo?.hasNextPage === false) continue;
-        const cursor = values?.pageInfo?.endCursor;
-        const key = `${index}:${connection}`;
-        const cursors = seen.get(key) || new Set();
-        if (typeof cursor !== "string" || !cursor || cursors.has(cursor)) throw queueError("projection_pagination_pending", "Issue connection pagination is incomplete");
-        cursors.add(cursor);
-        seen.set(key, cursors);
-        const alias = `p${pending.length}`;
-        declarations.push(`$${alias}:ID!,$${alias}Cursor:String!`);
-        Object.assign(variables, { [alias]: issue.id, [`${alias}Cursor`]: cursor });
-        selections.push(
-          `${alias}: node(id:$${alias}) { ... on Issue { id repository { id } ${connection}(first:${connection === "labels" ? LABELS_PAGE_SIZE : MAX_PROJECTION_TARGETS},after:$${alias}Cursor) { nodes { ${connection === "labels" ? "id name" : VALUE_SELECTION} } pageInfo { hasNextPage endCursor } } } }`
-        );
-        pending.push({ issue, connection, alias });
-      }
+    for (const [index, issue] of issueList.entries()) {
+      if (issue.labels?.pageInfo?.hasNextPage === false) continue;
+      const cursor = issue.labels?.pageInfo?.endCursor;
+      const cursors = seen.get(index) || new Set();
+      if (typeof cursor !== "string" || !cursor || cursors.has(cursor)) throw queueError("projection_pagination_pending", "Issue label pagination is incomplete");
+      cursors.add(cursor);
+      seen.set(index, cursors);
+      const alias = `p${pending.length}`;
+      declarations.push(`$${alias}:ID!,$${alias}Cursor:String!`);
+      Object.assign(variables, { [alias]: issue.id, [`${alias}Cursor`]: cursor });
+      selections.push(`${alias}: node(id:$${alias}) { ... on Issue { id repository { id } labels(first:${LABELS_PAGE_SIZE},after:$${alias}Cursor) { nodes { id name } pageInfo { hasNextPage endCursor } } } }`);
+      pending.push({ issue, alias });
     }
-    if (!pending.length) return;
+    if (!pending.length) return issues;
     const response = await github.graphql(`query WorkQueueIssuePages(${declarations.join(",")}) { ${selections.join("\n")} }`, variables);
-    for (const { issue, connection, alias } of pending) {
+    for (const { issue, alias } of pending) {
       const node = response?.[alias];
-      if (node?.id !== issue.id || node.repository?.id !== issue.repository.id || !Array.isArray(node[connection]?.nodes))
-        throw queueError("projection_target_unavailable", "Issue was deleted, transferred, or its pagination is inaccessible");
-      issue[connection] = { nodes: [...issue[connection].nodes, ...node[connection].nodes], pageInfo: node[connection].pageInfo };
+      if (node?.id !== issue.id || node.repository?.id !== issue.repository.id || !Array.isArray(node.labels?.nodes)) throw queueError("projection_target_unavailable", "Issue was deleted, transferred, or its pagination is inaccessible");
+      issue.labels = { nodes: [...issue.labels.nodes, ...node.labels.nodes], pageInfo: node.labels.pageInfo };
     }
   }
-  throw queueError("projection_pagination_pending", "Issue connection pagination exhausted");
+  throw queueError("projection_pagination_pending", "Issue label pagination exhausted");
 }
 
 async function mutateIssues(github, operations, { sleep = delay => new Promise(resolve => setTimeout(resolve, delay)) } = {}) {
@@ -269,6 +249,8 @@ module.exports = {
   LABELS_PAGE_SIZE,
   STATUSES,
   ISSUE_SELECTION,
+  statusLabelName,
+  ensureStatusLabel,
   discoverTarget,
   preflightIssues,
   mutateIssues,
