@@ -56,6 +56,14 @@ function mapAWFRoutingEffort(engine, effort) {
 }
 
 /**
+ * @param {string|null|undefined} error
+ * @returns {string}
+ */
+function getAWFModelRoutingFailureCode(error) {
+  return /none compatible|not supported by this engine|does not advertise endpoint/.test(error || "") ? "unsupported_endpoint" : "invalid_selection";
+}
+
+/**
  * Resolve the task-level AWF model selection when routing is enabled.
  * @param {any} reflectData
  * @param {boolean} routingRequired
@@ -220,6 +228,7 @@ module.exports = {
   getAWFModelRoutingPolicy,
   isRoutingReasoningEffort,
   mapAWFRoutingEffort,
+  getAWFModelRoutingFailureCode,
   resolveAWFModelRoutingSelection,
   getAWFRoutingModel,
   getAWFRoutingModelAmbiguityError,

@@ -92,7 +92,7 @@ const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness
 const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { isRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
-const { resolveAWFModelRoutingSelection, isModelAvailableInReflectData, getAWFModelRoutingPolicy } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, isModelAvailableInReflectData, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode } = require("./awf_model_routing.cjs");
 const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
@@ -514,6 +514,27 @@ function applyCopilotRoutingSelection(selection, logger = log) {
     applied_effort: selection.effort,
   });
   logger(`inference routing: mode=awf-routed model=${selection.wire_model} effort=${selection.effort || "(unset)"} wire_api=${wireApi}`);
+}
+
+/**
+ * Resolve and record the Copilot routing decision used by the harness.
+ * @param {any} reflectData
+ * @param {boolean} routingRequired
+ * @param {(msg: string) => void} [logger]
+ * @returns {{selection: any, error: string|null}}
+ */
+function resolveCopilotModelRouting(reflectData, routingRequired, logger = log) {
+  const result = resolveAWFModelRoutingSelection(reflectData, routingRequired, COPILOT_ROUTING_POLICY.endpoints, COPILOT_ROUTING_POLICY.allowEndpointOverride);
+  if (result.error) {
+    recordAWFModelRoutingOutcome({
+      status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",
+      failure_code: reflectData?.routing?.failure_code || getAWFModelRoutingFailureCode(result.error),
+      detail: result.error,
+    });
+    return result;
+  }
+  if (result.selection) applyCopilotRoutingSelection(result.selection, logger);
+  return result;
 }
 
 /**
@@ -1195,16 +1216,14 @@ async function main() {
     }
   }
 
-  const routingResult = resolveAWFModelRoutingSelection(awfReflectData, modelRoutingRequired, COPILOT_ROUTING_POLICY.endpoints, COPILOT_ROUTING_POLICY.allowEndpointOverride);
+  const routingResult = resolveCopilotModelRouting(awfReflectData, modelRoutingRequired, log);
   if (routingResult.error) {
-    recordAWFModelRoutingOutcome({ status: awfReflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: awfReflectData?.routing?.failure_code, detail: routingResult.error });
     log(`unexpected error: AWF model routing failed: ${routingResult.error}; refusing to start Copilot`);
     process.exit(1);
     return;
   }
   modelRoutingSelection = routingResult.selection;
   if (modelRoutingSelection) {
-    applyCopilotRoutingSelection(modelRoutingSelection, log);
     if (!copilotSDKMode) {
       resolvedArgs = applyCopilotRoutingArgs(resolvedArgs, modelRoutingSelection);
     }
@@ -1876,6 +1895,7 @@ if (typeof module !== "undefined" && module.exports) {
     applyCopilotModelAliasResolution,
     applyCopilotWireAPI,
     resolveAWFModelRoutingSelection,
+    resolveCopilotModelRouting,
     applyCopilotRoutingSelection,
     applyCopilotRoutingArgs,
     formatInferenceEndpointForLog,
