@@ -86,6 +86,9 @@ func ValidatePolicy(policy Policy) error {
 }
 
 func validatePolicy(policy Policy) error {
+	if err := validateProjectors(policy); err != nil {
+		return err
+	}
 	if policy.Mode != "weighted-priority" && policy.Mode != "strict-priority" {
 		return queueError("policy_invalid", "unsupported scheduling mode")
 	}
@@ -239,6 +242,8 @@ func permitted(role, kind string) bool {
 		return role == "producer" || role == "administrator" || role == "reconciler" || role == "worker"
 	case "WorkPriority":
 		return role == "administrator"
+	case "IssueLink", "IssueComment":
+		return role == "projector"
 	}
 	return false
 }
@@ -258,6 +263,7 @@ func validateRequest(commit QueueCommit) error {
 		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"},
 		"cancel_work": {"WorkCancellation"}, "cancel_claim": {"ClaimCancellation", "WorkCancellation"},
 		"checkpoint": {"Checkpoint"},
+		"issue_link": {"IssueLink", "IssueComment"},
 	}
 	for _, operation := range commit.Operations {
 		kind, err := operationKind(operation)

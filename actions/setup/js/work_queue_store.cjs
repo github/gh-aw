@@ -56,7 +56,11 @@ function httpStatus(error) {
 
 function refConflict(error) {
   const status = httpStatus(error);
-  return status === 409 || (status === 422 && /already exists|not a fast.forward|reference update failed/i.test(error.message || ""));
+  return (
+    status === 409 ||
+    (status === 422 && /already exists|not a fast.forward|reference update failed/i.test(error.message || "")) ||
+    (error?.errors?.some(item => /expectedHeadOid|head.*(?:changed|match)|expected.*head/i.test(item.message || "")) ?? false)
+  );
 }
 
 function ambiguousWrite(error) {
@@ -108,6 +112,7 @@ async function readRef(githubClient, owner, repo, branch) {
 async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
   log.debug("ledger.read.start");
   validateBranch(branch);
+  if (process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT === "graphql") return require("./work_queue_checked_transport.cjs").readCheckedQueue({ githubClient, owner, repo, branch });
   const repository = await verifyRepository(githubClient, owner, repo);
   const sha = await readRef(githubClient, owner, repo, branch);
   if (!sha) {
@@ -332,6 +337,7 @@ function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUE
 }
 
 async function writeCandidate({ githubClient, owner, repo, current, transactions }) {
+  if (current.sha && process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT === "graphql") return require("./work_queue_checked_transport.cjs").writeCheckedCandidate({ githubClient, owner, repo, current, transactions });
   // appendCommit already checked this candidate; never replay its history again.
   const content = transactions.map(commit => canonical(commit)).join("\n") + "\n";
   log.debug("candidate.write.start", { transactions: transactions.length, bytes: Buffer.byteLength(content, "utf8"), initialized: !!current.sha });
@@ -518,3 +524,16 @@ async function initializeWorkQueue(options) {
 }
 
 module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, compactWorkQueue, freshAuthorizer, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, verifyRepository };
+module.exports = {
+  WORK_QUEUE_BRANCH,
+  WORK_QUEUE_LOG_PATH,
+  applyAndPublishWorkQueueTransactions,
+  compactWorkQueue,
+  freshAuthorizer,
+  initializeWorkQueue,
+  publishWorkQueueRequest,
+  readWorkQueueLog,
+  stableRequestResult,
+  verifyRepository,
+  validateBranch,
+};

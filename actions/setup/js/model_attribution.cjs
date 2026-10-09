@@ -76,6 +76,7 @@ function recordModelRouting(routing, env = process.env, infoPath = `${env.GH_AW_
     ...(effort ? { effort } : {}),
     ...(appliedEffort ? { applied_effort: appliedEffort } : {}),
     ...(routing.endpoint ? { endpoint: validateModelIdentifier(routing.endpoint) } : {}),
+    ...(routing.selected_endpoint ? { selected_endpoint: validateModelIdentifier(routing.selected_endpoint) } : {}),
     ...(routing.mode ? { mode: validateModelIdentifier(routing.mode) } : {}),
     ...(routing.selected_id ? { selected_id: validateModelIdentifier(routing.selected_id) } : {}),
     ...(routing.router_version ? { router_version: validateModelIdentifier(routing.router_version) } : {}),

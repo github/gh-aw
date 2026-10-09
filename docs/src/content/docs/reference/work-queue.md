@@ -18,7 +18,8 @@ for fairness accounting. Configured weights share opportunities to receive
 durable Claims, not CPU time or successful completions.
 
 In the native protocol, issues and pull requests can be dependency nodes, but
-cannot store the queue. [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) describes
+cannot store the queue. Optional backing Issues mirror admitted Work; they do
+not grant Claim authority or establish Result. [WorkQueueOps](/gh-aw/patterns/workqueue-ops/) describes
 issue checklists, sub-issues, cache-memory, and repo-memory as alternatives, but those
 progress markers do not provide native fair scheduling, Claim authority, or
 verified dependency graphs.
@@ -36,6 +37,8 @@ The native protocol distinguishes the following records and lifecycle events:
 | Completion | A durable record of task completion, published before the Claim's effects. It is not proof of delivery. |
 | Result | A record published only after independently verified delivery of the Claim's effects. |
 | Release | The operation that frees a native reservation after trusted evidence of exact termination or definitive nonlaunch. |
+| IssueLink | An immutable, checked link from one admitted Work item to one backing Issue. |
+| IssueComment | An immutable canonical summary or historical Claim-comment handle. |
 
 See [deployment](/gh-aw/guides/deploy-work-queue/) for Policy installation, the
 [specification](/gh-aw/specs/work-queue-specification/) for normative behavior and
@@ -47,6 +50,137 @@ For workflow examples, see the [Linter Factory](/gh-aw/patterns/linter-factory/)
 for fair dispatch and Claim-scoped worker outputs, and the
 [Daily Report Portfolio](/gh-aw/patterns/daily-report-portfolio/) for a daily
 dispatcher coordinating reporting workers.
+
+## Backing Issues
+
+```aw
+tools:
+  work-queue:
+    worker: true
+    issues:
+      label: cookie
+      status-field: WorkStatus
+```
+
+`issues: true` enables comment-only projection with the `work` label. An object
+may override `label` and select `status-field`; an empty object uses defaults.
+Absent or false disables the integration. Both names must be nonblank literal
+strings of at most 256 bytes; unknown keys are rejected.
+
+`status-field` names a pre-provisioned native organization single-select Issue
+field, not Project-local Status. Its required options are **Queued**, **Blocked**,
+**Assigned**, **Running**, **Verifying**, **Needs review**, **Done**,
+**Needs attention**, and **Cancelled**. `WorkStatus` is a naming convention,
+not a reserved name. No Project is required. Missing, inaccessible, incompatible,
+or unwritable fields report **queue committed; field sync pending**. They are
+never provisioned automatically or silently replaced with comment-only mode.
+
+The existing activation and conclusion jobs project only Work admitted by
+their authenticated run/attempt and Work in their original authenticated Claims.
+Installed `Policy.projectors` rules must authorize the exact principal, workflow
+revision, pool, and backing repository. Pre-existing Issues also require
+explicit lossless identities in that rule's `backing_issues` array. A shared queue, workflow name, label,
+API token, or caller-supplied Work ID does not grant scope. Agent execution
+stages intents and receives no projector or queue-writer credential.
+Conclusion refreshes checked Git state after queue settlement, including when
+earlier jobs fail. Staged/trial projection performs no live queue or Issue writes.
+
+An immutable submission node may specify `backing_issue`, using the same
+lossless resource identity shape as an external dependency:
+
+```json
+{
+  "kind": "issue",
+  "host": "github.com",
+  "repository": "owner/repo",
+  "repository_id": "123",
+  "resource_id": "456",
+  "number": "7"
+}
+```
+
+This property is separate from `subject`, effect scope, and dependencies.
+Admission rejects pre-existing Issues without an installed exact-target grant;
+each projecting workflow must independently hold that grant. Repository
+allowlisting, marker text, and a generated summary do not establish ownership.
+Without it, the hook creates an Issue and publishes its checked `IssueLink`.
+Admission and link publication enforce one Work per Issue under concurrency;
+links and comment handles cannot be rebound. The configured tracking label is
+created if missing and repaired when removed. Human titles, bodies, types,
+unrelated labels/fields, and discussion are preserved.
+
+Each backing Issue has a canonical summary and one historical comment per
+owned Claim, with run, ledger, and verified outcome links. Comment-only summaries
+include changing status; native-field summaries avoid status-only duplicate
+edits. Completion projects **Verifying**, verified PR delivery **Needs review**,
+and verified non-PR delivery **Done**. Native job failure/cancellation is
+diagnostic, not Work cancellation or Result. Human closure/status changes
+cannot establish either.
+
+Generated Issue bodies, summaries, and Claim comments use the packaged
+`actions/setup/md/work_queue_issue_*.md` templates and always include a
+generated-by footer linking the producing run. Existing human Issue bodies
+are not replaced.
+
+Both protected hooks request `contents: write`, `issues: write`, and
+`actions: read`, including separately minted projector App tokens. Agent
+execution does not receive those write credentials. Issue creation uses the
+shared `withRetry` helper only for a proven pre-execution rate-limit rejection;
+timeouts and partial or ambiguous mutation responses are not blindly retried.
+
+Issues stay open by default. An administrator may set a projector rule's
+`"completion_policy": "close-on-result"` before Work admission; closure still
+requires a verified non-PR Result and current target authority. Later policy
+expansion cannot retroactively authorize closure. Agent payload fields,
+including `issue_completion_policy`, never control closure. PR delivery alone
+never authorizes closure.
+
+### Synchronization and recovery
+
+Short per-Work/per-Issue coordination spans fresh checked reads and native
+writes without holding agents. Projection journals persist native creation
+intent and verified receipts; bindings are batched through
+`createCommitOnBranch` with `expectedHeadOid`. Publication conflicts refresh
+and replay the ledger; uncertain acknowledgements recover stable requests.
+Maintenance does not change Claims, fairness, reservations, or recovery reserve.
+
+Only a later authorized hook for the same Work/Claims can retry pending
+synchronization. There are no Issue intake scans, global dirty-Work sweeps,
+schedules, or independent repair workflows. Transferred/deleted Issues,
+deleted immutable comments, exhausted pagination, and uncertain creation remain
+explicitly pending. Marker text or bot identity is not proof of creation.
+Ambiguous native writes retain coordination: locks never expire or get stolen,
+and absent verified receipts never authorize blind recreation.
+
+Creation intent is durable before sending either an Issue or comment mutation.
+An interruption before sending and a crash after GitHub accepted the write but
+before saving its receipt are indistinguishable to the next hook. Both remain
+pending, potentially indefinitely; a later hook alone cannot unblock a retained
+lock or prove that an unreceipted creation never happened. Recording a
+`sent` flag after the call would permit duplicates in that second crash window.
+GitHub does not provide documented creation deduplication, and marker text or an
+empty discovery result is not proof of noncreation. Automatic crash recovery
+that can safely clear these fences is not implemented.
+
+Hooks batch up to 25 owned targets. Checked GraphQL reads combine immutable-head
+ledger/journal reads, field discovery, and scoped Issue preflight; an explicitly
+truncated blob uses an OID-checked REST fallback. Writes are paced and exhausted
+rate limits stop subsequent live requests. Hook metrics count authentication,
+coordination, native writes, journals, and retries within the projection phase;
+shared activation work and GitHub App token minting are additional requests.
+Local full-hook mocks also count ordinary queue publication and both hooks.
+For 25 unchanged existing Issues, the authenticated projection currently uses
+six requests: four reads and two batched coordination mutations, with no Issue
+writes. An ordinary checked queue read/publication takes two requests instead
+of the previous five/nine-call REST paths.
+Mutation primary cost remains unmeasured; baseline Issue-operation estimates
+must not be mistaken for this end-to-end total.
+
+Upgrade every Go/JavaScript reader, compiler, runtime setup action, and operator
+deployment before installing `projectors` or enabling new backing-Issue records.
+The protocol remains version 3, but older closed-schema readers reject these
+extensions. Existing logs need no migration; no automatic reader upgrade or
+fallback to an older deployment is supported.
 
 ## Runtime debug logging
 

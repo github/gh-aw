@@ -25,6 +25,7 @@ const {
   COPILOT_SESSION_STATE_DIR,
   DEFAULT_SUMMARY_TITLE,
 } = require("./parse_token_usage.cjs");
+const { getEffectiveModelLabel } = require("./model_attribution.cjs");
 
 describe("parse_token_usage", () => {
   const singleEntry = JSON.stringify({
@@ -166,6 +167,141 @@ describe("parse_token_usage", () => {
         expect(summaryText).toMatch(new RegExp(`\\|\\s*\\d+\\s*\\|\\s*${aliasPattern}\\s*\\|\\s*${inputPattern}\\s*\\|\\s*${outputPattern}\\s*\\|`));
       }
     }
+
+    function setupClaudeRoutingFixture({ supportedEndpoints = ["/chat/completions", "/v1/messages"], withOutcome = true, requests = undefined, engine = "claude", selectedEndpoint = "/chat/completions" } = {}) {
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_MODEL_ROUTING_ENABLED = "true";
+      process.env.GH_AW_ENGINE_ID = engine;
+      process.env.GH_AW_ENGINE_MODEL = "agent";
+      fs.writeFileSync(path.join(tmpDir, "aw_info.json"), JSON.stringify({ model: "agent" }));
+      const reflectDir = path.join(tmpDir, "agent");
+      fs.mkdirSync(reflectDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(reflectDir, "awf-reflect.json"),
+        JSON.stringify({
+          endpoints: [
+            {
+              provider: "github",
+              configured: true,
+              models: ["claude-opus-5"],
+              routing_models: [{ model_id: "claude-opus-5", candidate_metadata_complete: true, supported_endpoints: supportedEndpoints }],
+            },
+          ],
+        })
+      );
+      if (withOutcome) {
+        fs.writeFileSync(
+          path.join(reflectDir, "awf-routing-outcome.json"),
+          JSON.stringify({
+            status: "selected",
+            wire_model: "claude-opus-5",
+            endpoint: "/v1/messages",
+            selected_endpoint: selectedEndpoint,
+          })
+        );
+      }
+      const routingPath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl");
+      fs.mkdirSync(path.dirname(routingPath), { recursive: true });
+      const records = [
+        {
+          _schema: "model-routing/v0.28.49",
+          stage: "selection",
+          selected_provider: "github",
+          selected_model: "claude-opus-5",
+          wire_model: "claude-opus-5",
+          selected_effort: "max",
+          endpoint: selectedEndpoint,
+        },
+        ...(requests === undefined
+          ? [
+              {
+                _schema: "model-routing/v0.28.49",
+                stage: "request",
+                requested_model: "claude-opus-5",
+                routed: "as_selected",
+                upstream_endpoint: "/v1/messages",
+                deviations: ["endpoint"],
+              },
+            ]
+          : requests),
+      ];
+      fs.writeFileSync(routingPath, records.map(record => JSON.stringify(record)).join("\n") + "\n");
+    }
+
+    test("attributes a corroborated Claude harness endpoint override", async () => {
+      setupClaudeRoutingFixture();
+
+      await main();
+
+      const info = JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"));
+      expect(info).toMatchObject({
+        model: "claude-opus-5",
+        model_routing: { status: "selected", endpoint: "/v1/messages", selected_endpoint: "/chat/completions" },
+      });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model", "claude-opus-5");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_effort", "max");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "selected");
+      expect(getEffectiveModelLabel(path.join(tmpDir, "aw_info.json"), "agent", process.env)).toBe("routed: opus50 max");
+    });
+
+    test("records a corroborated pi effective endpoint even when AWF's endpoint is supported", async () => {
+      setupClaudeRoutingFixture({ engine: "pi" });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8")).model_routing).toMatchObject({
+        status: "selected",
+        endpoint: "/v1/messages",
+        selected_endpoint: "/chat/completions",
+      });
+    });
+
+    test("attributes a corroborated Claude endpoint override from reflect when no harness outcome exists", async () => {
+      setupClaudeRoutingFixture({ withOutcome: false });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8")).model_routing).toMatchObject({
+        status: "selected",
+        endpoint: "/v1/messages",
+        selected_endpoint: "/chat/completions",
+      });
+    });
+
+    test("rejects endpoint overrides the selected model does not advertise", async () => {
+      setupClaudeRoutingFixture({ supportedEndpoints: ["/chat/completions"] });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"))).toMatchObject({
+        model: "agent",
+        model_routing: { status: "rejected", failure_code: "unsupported_endpoint" },
+      });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model", "");
+    });
+
+    test("rejects an uncorroborated harness endpoint claim", async () => {
+      setupClaudeRoutingFixture({ requests: [] });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8")).model_routing).toMatchObject({
+        status: "rejected",
+        failure_code: "uncorroborated_endpoint",
+      });
+    });
+
+    test("keeps Copilot endpoint routing strict", async () => {
+      setupClaudeRoutingFixture({ engine: "copilot", requests: [], selectedEndpoint: "/v1/messages" });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"))).toMatchObject({
+        model: "agent",
+        model_routing: { status: "rejected", failure_code: "unsupported_endpoint" },
+      });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model", "");
+    });
 
     test("records selected AWF model and mapped effort in aw_info and step outputs", async () => {
       process.env.GH_AW_TMP_DIR = tmpDir;

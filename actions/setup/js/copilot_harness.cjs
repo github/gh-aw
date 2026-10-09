@@ -92,8 +92,9 @@ const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness
 const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { isRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
-const { resolveAWFModelRoutingSelection, isModelAvailableInReflectData } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, isModelAvailableInReflectData, getAWFModelRoutingPolicy } = require("./awf_model_routing.cjs");
 const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
+const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
@@ -1187,7 +1188,7 @@ async function main() {
     }
   }
 
-  const routingResult = resolveAWFModelRoutingSelection(awfReflectData, modelRoutingRequired, ["/responses", "/chat/completions"]);
+  const routingResult = resolveAWFModelRoutingSelection(awfReflectData, modelRoutingRequired, COPILOT_ROUTING_POLICY.endpoints, COPILOT_ROUTING_POLICY.allowEndpointOverride);
   if (routingResult.error) {
     recordAWFModelRoutingOutcome({ status: awfReflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: awfReflectData?.routing?.failure_code, detail: routingResult.error });
     log(`unexpected error: AWF model routing failed: ${routingResult.error}; refusing to start Copilot`);

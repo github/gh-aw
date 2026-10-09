@@ -18,7 +18,7 @@ describe("work-queue deployment documentation", () => {
   it("omits removed storage selectors from the generated frontmatter reference", () => {
     const source = readRepositoryFile("docs/src/content/docs/reference/frontmatter-full.md");
     const queue = source.slice(source.indexOf("  # Read the immutable version-3 activation snapshot."), source.indexOf("  # Cache memory MCP configuration"));
-    expect(queue).toContain("work-queue: true");
+    expect(queue).toMatch(/^  work-queue:\s*$/m);
     expect(queue).toContain("work-queue: null");
     expect(queue).toContain("worker: true");
     expect(queue).not.toMatch(/\bstorage:/);
@@ -27,13 +27,24 @@ describe("work-queue deployment documentation", () => {
   it("installs the documented policy after replacing identity placeholders", () => {
     const source = readRepositoryFile(deploymentPath);
     const examples = [...source.matchAll(/```json(?: [^\n]*)?\n([\s\S]*?)\n```/g)];
-    expect(examples).toHaveLength(1);
+    expect(examples).toHaveLength(2);
     const policy = JSON.parse(examples[0][1].replaceAll("REPLACE_WITH_PRODUCER_ACTOR_ID", "11").replaceAll("REPLACE_WITH_WORKER_CREDENTIAL_ACTOR_ID", "12").replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40)));
 
     expect(validatePolicy(policy)).toBe(policy);
     expect(policy.accounting_weights).toEqual({ "": 1 });
     expect(policy.producers["11"].fairness_keys).toEqual([""]);
     expect(policy.limits).toEqual(DEFAULT_LIMITS);
+    const projection = JSON.parse(
+      examples[1][1]
+        .replaceAll("REPLACE_WITH_NATIVE_PRINCIPAL_ID", "12")
+        .replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40))
+        .replaceAll("REPLACE_WITH_NUMERIC_REPOSITORY_ID", "9876")
+        .replaceAll("REPLACE_WITH_NUMERIC_ISSUE_ID", "9007199254740993")
+        .replaceAll("REPLACE_WITH_ISSUE_NUMBER", "42")
+    );
+    expect(validatePolicy({ ...policy, ...projection }).projectors).toEqual(projection.projectors);
+    expect(projection.projectors[0].completion_policy).toBe("keep-open");
+    expect(projection.projectors[0].backing_issues[0]).toEqual({ kind: "issue", host: "github.com", repository: "github/gh-aw", repository_id: "9876", resource_id: "9007199254740993", number: "42" });
   });
 
   it("separates published docs and specifications from bounded agent instructions", () => {
@@ -47,6 +58,8 @@ describe("work-queue deployment documentation", () => {
     expect(instructions.trim().split(/\s+/).length).toBeLessThanOrEqual(800);
     expect(instructions).not.toContain("```json");
     expect(instructions).toContain("issue-backed WorkQueueOps");
+    expect(instructions).toContain("null `snapshot_sha` means absent; stop with `noop`");
+    expect(instructions).toContain("Existing policyless ledgers are deployment failures");
     expect(readRepositoryFile(referencePath)).toContain("Work queues can be Git-backed or issue-backed");
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       expect(instructions).toContain(file.replace(/^docs\//, "../../docs/"));
@@ -75,14 +88,13 @@ describe("work-queue deployment documentation", () => {
     expect(automation).not.toContain('pass `work_queue: {work_id: "<id>"}`');
   });
 
-  it("distinguishes an uninitialized factory from an empty backlog and documents real CLI boundaries", () => {
+  it("treats genuine factory queue absence as empty without bypassing Policy", () => {
     const dispatcher = readRepositoryFile(".github/workflows/eslint-factory-dispatcher.md");
     expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"default","limit":32}\'');
     expect(dispatcher).toContain("Check `queue_state`, not just `total`");
-    expect(dispatcher).toContain("then stop without");
-    expect(dispatcher).toContain("dispatching or calling `noop`");
-    expect(dispatcher).toContain("safeoutputs missing_data");
-    expect(dispatcher).toContain("not that an initialized queue");
+    expect(dispatcher).toContain("Treat it as an empty backlog and stop with `noop`");
+    expect(dispatcher).toMatch(/no\s+installed Policy to authorize submission or dispatch/);
+    expect(dispatcher).toContain("existing policyless ledger");
     expect(dispatcher).toContain('work-queue work_queue_dispatch_next \'{"pool":"default","max_claims":3,"max_dispatches":3}\'');
     expect(dispatcher).toContain('`status: "staged"`');
     expect(dispatcher).toContain("an empty snapshot or a prediction of no eligible Work can be stale");

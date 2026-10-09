@@ -31,6 +31,9 @@
             },
             {
               "const": "reconciler"
+            },
+            {
+              "const": "projector"
             }
           ]
         },
@@ -459,6 +462,31 @@
       "x-forbid-ascii-controls": true,
       "x-utf8-max-bytes": 256
     },
+    "IssueCommentOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "authority_claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "comment_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "IssueComment"
+        },
+        "projector_ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "work_id", "comment_id", "projector_ref"],
+      "type": "object"
+    },
     "IssueEdge": {
       "additionalProperties": false,
       "properties": {
@@ -480,6 +508,28 @@
         }
       },
       "required": ["kind", "resource", "condition"],
+      "type": "object"
+    },
+    "IssueLinkOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "IssueLink"
+        },
+        "projector_ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "work_id", "resource", "projector_ref"],
       "type": "object"
     },
     "Limits": {
@@ -712,6 +762,56 @@
       "required": ["pools", "priorities", "fairness_keys"],
       "type": "object"
     },
+    "ProjectorRule": {
+      "additionalProperties": false,
+      "properties": {
+        "backing_issues": {
+          "items": {
+            "$ref": "#/$defs/Resource"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "completion_policy": {
+          "anyOf": [
+            {
+              "const": "keep-open"
+            },
+            {
+              "const": "close-on-result"
+            }
+          ]
+        },
+        "pools": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "principal": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repositories": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["principal", "workflow", "ref", "pools", "repositories"],
+      "type": "object"
+    },
     "PullRequestEdge": {
       "additionalProperties": false,
       "properties": {
@@ -771,6 +871,12 @@
         },
         {
           "$ref": "#/$defs/CheckpointOperation"
+        },
+        {
+          "$ref": "#/$defs/IssueLinkOperation"
+        },
+        {
+          "$ref": "#/$defs/IssueCommentOperation"
         }
       ]
     },
@@ -821,6 +927,14 @@
           "x-forbid-key-ascii-controls": true,
           "x-key-min-utf8-bytes": 1,
           "x-key-utf8-max-bytes": 256
+        },
+        "projectors": {
+          "items": {
+            "$ref": "#/$defs/ProjectorRule"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
         }
       },
       "required": ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"],
@@ -875,6 +989,9 @@
             },
             {
               "const": "checkpoint"
+            },
+            {
+              "const": "issue_link"
             }
           ]
         },
@@ -1128,6 +1245,9 @@
     "WorkOperation": {
       "additionalProperties": false,
       "properties": {
+        "backing_issue": {
+          "$ref": "#/$defs/Resource"
+        },
         "batch_trust_domain": {
           "$ref": "#/$defs/Identity"
         },

@@ -80,6 +80,8 @@ type ModelRoutingSummary struct {
 	SelectedEffort                  string                  `json:"selected_effort,omitempty"`
 	WireModel                       string                  `json:"wire_model,omitempty"`
 	Endpoint                        string                  `json:"endpoint,omitempty"`
+	EffectiveEndpoint               string                  `json:"effective_endpoint,omitempty"`
+	SelectedEndpoint                string                  `json:"selected_endpoint,omitempty"`
 	TopChoices                      []ModelRoutingChoice    `json:"top_choices,omitempty"`
 	RouterName                      string                  `json:"router_name,omitempty"`
 	RouterVersion                   string                  `json:"router_version,omitempty"`
@@ -233,13 +235,13 @@ func modelRoutingFileExists(path string) bool {
 
 func analyzeModelRouting(runDir string) *ModelRoutingSummary {
 	path := findModelRoutingFile(runDir)
-	if path == "" {
-		return nil
-	}
 	proxyEntries := tokenUsageEntriesForRun(runDir)
-	summary := parseModelRoutingFile(path, proxyEntries)
+	var summary *ModelRoutingSummary
+	if path != "" {
+		summary = parseModelRoutingFile(path, proxyEntries)
+	}
 	_, _, agents, found, err := readSessionSubagentModelsDetailed(runDir)
-	if err == nil && found {
+	if summary != nil && err == nil && found {
 		models := make([]string, 0, len(proxyEntries))
 		for _, entry := range proxyEntries {
 			models = appendUnique(models, entry.Model)
@@ -248,7 +250,34 @@ func analyzeModelRouting(runDir string) *ModelRoutingSummary {
 		matchPiAgentUsageCredits(agentSummary, proxyEntries, newModelIdentityResolver(runDir))
 		applyAgentUsageToModelRouting(summary, agentSummary.AgentUsage)
 	}
-	return summary
+	return applyAwInfoModelRouting(summary, runDir)
+}
+
+func applyAwInfoModelRouting(routing *ModelRoutingSummary, runDir string) *ModelRoutingSummary {
+	if runDir == "" {
+		return routing
+	}
+	awInfoPath := findAwInfoPath(runDir)
+	awInfo, err := parseAwInfo(awInfoPath, false)
+	if err != nil {
+		return routing
+	}
+	return applyAwInfoModelRoutingInfo(routing, awInfo)
+}
+
+func applyAwInfoModelRoutingInfo(routing *ModelRoutingSummary, awInfo *AwInfo) *ModelRoutingSummary {
+	if awInfo == nil || awInfo.ModelRouting == nil {
+		return routing
+	}
+	if routing == nil {
+		routing = &ModelRoutingSummary{Status: awInfo.ModelRouting.Status}
+	} else {
+		copy := *routing
+		routing = &copy
+	}
+	routing.EffectiveEndpoint = awInfo.ModelRouting.Endpoint
+	routing.SelectedEndpoint = awInfo.ModelRouting.SelectedEndpoint
+	return routing
 }
 
 func applyAgentUsageToModelRouting(summary *ModelRoutingSummary, agents []AgentUsageBreakdown) {
@@ -482,6 +511,7 @@ func normalizeLegacyEndpointDeviation(summary *ModelRoutingSummary, request *mod
 
 type modelRoutingRouteKey struct {
 	taskType, scope, complexity, mode, model, effort, routerVersion string
+	endpoint, effectiveEndpoint, selectedEndpoint                   string
 }
 
 type modelRoutingRouteTotals struct {
@@ -494,7 +524,7 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 	subagentTotals := make(map[string]ModelRoutingAgentCost)
 	result := &ModelRoutingLogsSummary{}
 	for _, run := range runs {
-		routing := run.ModelRouting
+		routing := applyAwInfoModelRouting(run.ModelRouting, run.Run.LogsPath)
 		if routing == nil {
 			continue
 		}
@@ -514,6 +544,7 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 		key := modelRoutingRouteKey{
 			routing.Labels.TaskType, routing.Labels.Scope, routing.Labels.TaskComplexity,
 			routing.Mode, routing.SelectedModel, routing.SelectedEffort, routing.RouterVersion,
+			routing.Endpoint, routing.EffectiveEndpoint, routing.SelectedEndpoint,
 		}
 		route := totals[key]
 		route.count++
@@ -568,12 +599,13 @@ func appendModelRoutingRouteSummaries(summary *ModelRoutingLogsSummary, totals m
 		summary.Routes = append(summary.Routes, ModelRoutingRouteSummary{
 			TaskType: key.taskType, Scope: key.scope, Complexity: key.complexity, Mode: key.mode,
 			Model: key.model, Effort: key.effort, RouterVersion: key.routerVersion,
+			Endpoint: key.endpoint, EffectiveEndpoint: key.effectiveEndpoint, SelectedEndpoint: key.selectedEndpoint,
 			RunCount: route.count, TotalAIC: route.aic, AverageAIC: route.aic / float64(route.count),
 		})
 	}
 	slices.SortFunc(summary.Routes, func(left, right ModelRoutingRouteSummary) int {
-		leftKey := strings.Join([]string{left.TaskType, left.Scope, left.Complexity, left.Mode, left.Model, left.Effort, left.RouterVersion}, "\x00")
-		rightKey := strings.Join([]string{right.TaskType, right.Scope, right.Complexity, right.Mode, right.Model, right.Effort, right.RouterVersion}, "\x00")
+		leftKey := strings.Join([]string{left.TaskType, left.Scope, left.Complexity, left.Mode, left.Model, left.Effort, left.RouterVersion, left.Endpoint, left.EffectiveEndpoint, left.SelectedEndpoint}, "\x00")
+		rightKey := strings.Join([]string{right.TaskType, right.Scope, right.Complexity, right.Mode, right.Model, right.Effort, right.RouterVersion, right.Endpoint, right.EffectiveEndpoint, right.SelectedEndpoint}, "\x00")
 		return strings.Compare(leftKey, rightKey)
 	})
 }
