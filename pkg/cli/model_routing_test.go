@@ -195,15 +195,62 @@ func TestResolveEffectiveModelAttributionSuppressesUnselectedRouteModels(t *test
 		},
 	}
 
-	attribution := resolveEffectiveModelAttribution(info, nil, usage)
+	attribution := resolveEffectiveModelAttribution("", info, nil, usage)
 	if attribution.Model != "" {
 		t.Fatalf("failed routing must not attribute classifier usage as the agent model: %+v", attribution)
 	}
 
 	legacyInfo := &AwInfo{Model: "configured-alias"}
-	attribution = resolveEffectiveModelAttribution(legacyInfo, nil, usage)
+	attribution = resolveEffectiveModelAttribution("", legacyInfo, nil, usage)
 	if attribution.Model != "configured-alias" {
 		t.Fatalf("non-routed workflows must retain configured model attribution: %+v", attribution)
+	}
+}
+
+func TestUnifiedSessionModelRoutingAttribution(t *testing.T) {
+	runDir := t.TempDir()
+	sessionDir := filepath.Join(runDir, "usage")
+	routingDir := filepath.Join(runDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(routingDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	session := strings.Join([]string{
+		`{"type":"session.format","data":{"version":1},"provenance":{"component":"collector","phase":"conclusion","path":"usage/aw_session.jsonl","index":0}}`,
+		`{"type":"workflow.info","data":{"engineId":"claude","model":"claude-sonnet-5","requestedModel":"agent","modelRouting":{"status":"selected","source":"awf-routing","provider":"anthropic","wireModel":"claude-sonnet-5","model":"claude-sonnet-5","effort":"medium","appliedEffort":"max","effectiveEndpoint":"/v1/messages","selectedEndpoint":"/chat/completions","mode":"awf-routed","selectedId":"sonnet","routerVersion":"0.28.49"}},"provenance":{"component":"workflow","phase":"agent","path":"agent/aw_info.json","index":0}}`,
+		`{"type":"model_routing.outcome","data":{"status":"selected","wireModel":"claude-sonnet-5","effectiveEndpoint":"/v1/messages","selectedEndpoint":"/chat/completions","effort":"medium","appliedEffort":"max"},"provenance":{"component":"agent","phase":"agent","path":"agent/awf-routing-outcome.json","index":0}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(routingDir, "model-routing.jsonl"), []byte(
+		`{"_schema":"model-routing/v0.28.49","stage":"selection","selected_model":"claude-sonnet-5","selected_effort":"medium","endpoint":"/chat/completions"}`+"\n",
+	), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	summary := analyzeModelRouting(runDir)
+	if summary == nil || summary.Endpoint != "/chat/completions" ||
+		summary.EffectiveEndpoint != "/v1/messages" || summary.SelectedEndpoint != "/chat/completions" {
+		t.Fatalf("unified session endpoints were not applied: %+v", summary)
+	}
+	attribution := resolveEffectiveModelAttribution(runDir, nil, summary, nil)
+	if attribution.Model != "claude-sonnet-5" || attribution.RequestedModel != "agent" ||
+		attribution.Effort != "max" || attribution.RoutingStatus != "selected" {
+		t.Fatalf("unified session attribution was not preferred: %+v", attribution)
+	}
+	config := extractEngineConfigWithInferredEngine(runDir, "")
+	if config == nil || config.EngineID != "claude" || config.Model != "claude-sonnet-5" ||
+		config.RequestedModel != "agent" || config.ModelEffort != "max" {
+		t.Fatalf("engine config did not use workflow.info: %+v", config)
+	}
+	logsSummary := buildModelRoutingLogsSummary([]ProcessedRun{{ModelRouting: summary}})
+	if logsSummary == nil || len(logsSummary.Routes) != 1 ||
+		logsSummary.Routes[0].EffectiveEndpoint != "/v1/messages" ||
+		logsSummary.Routes[0].SelectedEndpoint != "/chat/completions" {
+		t.Fatalf("logs routing summary omitted session endpoints: %+v", logsSummary)
 	}
 }
 
@@ -218,13 +265,34 @@ func TestAwInfoModelRoutingPreservesSelectedEndpoint(t *testing.T) {
 }
 
 func TestModelRoutingComparisonDetectsRouteChanges(t *testing.T) {
-	before := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2"}
-	after := &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "high", Mode: "economy", RouterVersion: "0.1.3"}
+	before := &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/chat/completions",
+	}
+	after := &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "high", Mode: "economy", RouterVersion: "0.1.3",
+		EffectiveEndpoint: "/responses", SelectedEndpoint: "/chat/completions",
+	}
 	if sameModelRoutingRoute(before, after) {
 		t.Fatal("route changes should be detected even when the model is unchanged")
 	}
-	if !sameModelRoutingRoute(before, &AuditComparisonRoute{Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2"}) {
+	if !sameModelRoutingRoute(before, &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/chat/completions",
+	}) {
 		t.Fatal("identical routes should compare as equal")
+	}
+	if sameModelRoutingRoute(before, &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/responses", SelectedEndpoint: "/chat/completions",
+	}) {
+		t.Fatal("effective endpoint changes should be detected")
+	}
+	if sameModelRoutingRoute(before, &AuditComparisonRoute{
+		Model: "gpt-5.6-luna", Effort: "medium", Mode: "economy", RouterVersion: "0.1.2",
+		EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/responses",
+	}) {
+		t.Fatal("selected endpoint changes should be detected")
 	}
 	comparison := buildAuditComparison("success",
 		auditComparisonSnapshot{ModelRouting: after},
@@ -233,6 +301,10 @@ func TestModelRoutingComparisonDetectsRouteChanges(t *testing.T) {
 	)
 	if comparison.Classification.Label != "changed" || !comparison.Delta.ModelRouting.Changed {
 		t.Fatalf("route-only change should be visible in comparison: %+v", comparison)
+	}
+	if comparison.Delta.ModelRouting.Before.EffectiveEndpoint != "/v1/messages" ||
+		comparison.Delta.ModelRouting.After.EffectiveEndpoint != "/responses" {
+		t.Fatalf("route comparison omitted effective endpoints: %+v", comparison.Delta.ModelRouting)
 	}
 }
 
@@ -270,6 +342,27 @@ func TestBuildModelRoutingLogsSummary(t *testing.T) {
 		len(summary.SubagentCosts) != 1 || summary.SubagentCosts[0].Requests != 6 ||
 		math.Abs(summary.SubagentCosts[0].AIC-0.68) > 0.000001 || summary.SubagentCosts[0].CompletedCount != 2 {
 		t.Fatalf("unexpected per-agent routing costs: main=%+v subagents=%+v", summary.MainAgentCost, summary.SubagentCosts)
+	}
+}
+
+func TestBuildModelRoutingLogsSummaryOrdersEndpointDistinctRoutes(t *testing.T) {
+	route := func(effectiveEndpoint string) ProcessedRun {
+		return ProcessedRun{ModelRouting: &ModelRoutingSummary{
+			Status: "selected", SelectedModel: "gpt-5.6-luna", SelectedEffort: "medium",
+			Endpoint: "/chat/completions", EffectiveEndpoint: effectiveEndpoint, SelectedEndpoint: "/chat/completions",
+		}}
+	}
+	routes := []ProcessedRun{route("/v1/messages"), route("/responses")}
+	forward := buildModelRoutingLogsSummary(routes)
+	reverse := buildModelRoutingLogsSummary([]ProcessedRun{routes[1], routes[0]})
+	if forward == nil || reverse == nil || len(forward.Routes) != 2 || len(reverse.Routes) != 2 {
+		t.Fatalf("expected endpoint-distinct routes in both summaries: forward=%+v reverse=%+v", forward, reverse)
+	}
+	for index := range forward.Routes {
+		if forward.Routes[index].EffectiveEndpoint != reverse.Routes[index].EffectiveEndpoint ||
+			forward.Routes[index].SelectedEndpoint != reverse.Routes[index].SelectedEndpoint {
+			t.Fatalf("route order changed with input order: forward=%+v reverse=%+v", forward.Routes, reverse.Routes)
+		}
 	}
 }
 

@@ -60,6 +60,7 @@
       { "if": { "properties": { "type": { "const": "mcp.rpc.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.tool_call" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "model_routing.outcome" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelRoutingOutcomeData" } } } },
       { "if": { "properties": { "type": { "const": "prompt.system" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "prompt.user" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputErrorData" } } } },
@@ -410,14 +411,47 @@
     "ModelRoutingData": {
       "type": "object",
       "properties": {
+        "schema": { "$ref": "#/definitions/JsonValue" },
         "stage": { "$ref": "#/definitions/JsonValue" },
+        "purpose": { "$ref": "#/definitions/JsonValue" },
+        "attempt": { "$ref": "#/definitions/JsonValue" },
+        "classifierModel": { "$ref": "#/definitions/JsonValue" },
+        "classifierEffort": { "$ref": "#/definitions/JsonValue" },
+        "objective": { "$ref": "#/definitions/JsonValue" },
+        "provider": { "$ref": "#/definitions/JsonValue" },
+        "labels": { "$ref": "#/definitions/JsonValue" },
+        "mode": { "$ref": "#/definitions/JsonValue" },
+        "classifierAttempts": { "$ref": "#/definitions/JsonValue" },
+        "degradedClassification": { "$ref": "#/definitions/JsonValue" },
+        "degradedReason": { "$ref": "#/definitions/JsonValue" },
+        "selectedId": { "$ref": "#/definitions/JsonValue" },
+        "selectedProvider": { "$ref": "#/definitions/JsonValue" },
+        "selectedModel": { "$ref": "#/definitions/JsonValue" },
+        "selectedEffort": { "$ref": "#/definitions/JsonValue" },
+        "wireModel": { "$ref": "#/definitions/JsonValue" },
+        "endpoint": { "$ref": "#/definitions/JsonValue" },
+        "router": { "$ref": "#/definitions/JsonValue" },
+        "latencyMs": { "$ref": "#/definitions/JsonValue" },
+        "code": { "$ref": "#/definitions/JsonValue" },
+        "requestId": { "$ref": "#/definitions/JsonValue" },
         "routed": { "$ref": "#/definitions/JsonValue" },
         "outcome": { "$ref": "#/definitions/JsonValue" },
-        "selected_model": { "$ref": "#/definitions/JsonValue" },
-        "selected_effort": { "$ref": "#/definitions/JsonValue" },
-        "router": { "$ref": "#/definitions/JsonValue" },
-        "request_id": { "$ref": "#/definitions/JsonValue" },
-        "deviations": { "$ref": "#/definitions/JsonValue" }
+        "deviations": { "$ref": "#/definitions/JsonValue" },
+        "requestedModel": { "$ref": "#/definitions/JsonValue" },
+        "requestedEffort": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "ModelRoutingOutcomeData": {
+      "type": "object",
+      "properties": {
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "wireModel": { "$ref": "#/definitions/JsonValue" },
+        "effectiveEndpoint": { "$ref": "#/definitions/JsonValue" },
+        "selectedEndpoint": { "$ref": "#/definitions/JsonValue" },
+        "effort": { "$ref": "#/definitions/JsonValue" },
+        "appliedEffort": { "$ref": "#/definitions/JsonValue" },
+        "failureCode": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": false
     },
@@ -511,6 +545,25 @@
       },
       "additionalProperties": false
     },
+    "UnifiedModelRoutingData": {
+      "type": "object",
+      "properties": {
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "source": { "$ref": "#/definitions/JsonValue" },
+        "provider": { "$ref": "#/definitions/JsonValue" },
+        "wireModel": { "$ref": "#/definitions/JsonValue" },
+        "model": { "$ref": "#/definitions/JsonValue" },
+        "effort": { "$ref": "#/definitions/JsonValue" },
+        "appliedEffort": { "$ref": "#/definitions/JsonValue" },
+        "effectiveEndpoint": { "$ref": "#/definitions/JsonValue" },
+        "selectedEndpoint": { "$ref": "#/definitions/JsonValue" },
+        "mode": { "$ref": "#/definitions/JsonValue" },
+        "selectedId": { "$ref": "#/definitions/JsonValue" },
+        "routerVersion": { "$ref": "#/definitions/JsonValue" },
+        "failureCode": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
     "UnifiedSessionResultData": {
       "type": "object",
       "properties": {
@@ -568,7 +621,9 @@
         "cliVersion": { "$ref": "#/definitions/JsonValue" },
         "awfVersion": { "$ref": "#/definitions/JsonValue" },
         "mcpgVersion": { "$ref": "#/definitions/JsonValue" },
+        "model": { "$ref": "#/definitions/JsonValue" },
         "requestedModel": { "$ref": "#/definitions/JsonValue" },
+        "modelRouting": { "$ref": "#/definitions/UnifiedModelRoutingData" },
         "triggerType": { "$ref": "#/definitions/JsonValue" },
         "dryRun": { "$ref": "#/definitions/JsonValue" },
         "workflow": { "$ref": "#/definitions/JsonValue" },
