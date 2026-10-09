@@ -10,6 +10,7 @@ const { canonical, digest } = require("./work_queue_codec.cjs");
 const { diagnostics } = require("./work_queue_scheduler.cjs");
 const { appendCommit, compactTransactions, generateRequestOperations, newRequest, prepareCheckpoint, proposedCommitId, replayTransactions, serializeTransactionLog } = require("./work_queue_replay.cjs");
 const { readWorkQueueLog } = require("./work_queue_store.cjs");
+const { readCheckedQueue } = require("./work_queue_checked_transport.cjs");
 const { acceptedSubmissionParameters } = require("./work_queue_dispatch.cjs");
 
 describe("shared version-3 checkpoint conformance", () => {
@@ -142,6 +143,50 @@ describe("shared version-3 checkpoint conformance", () => {
       if (checkedTransport === undefined) delete process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT;
       else process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT = checkedTransport;
     }
+  });
+
+  it("authenticates checkpoints read through the checked GraphQL transport", async () => {
+    const head = "f".repeat(40);
+    const prior = fixture.prior_git_sha;
+    let parent = prior;
+    const logs = {
+      root: serializeTransactionLog(fixture.checkpoint),
+      history: serializeTransactionLog(fixture.history),
+    };
+    const githubClient = {
+      graphql: async () => ({
+        repository: {
+          id: "repository",
+          nameWithOwner: "owner/repo",
+          isEmpty: false,
+          defaultBranchRef: { target: { oid: "d".repeat(40) } },
+          legacy0: null,
+          legacy1: null,
+          ref: { target: { oid: head, tree: { oid: "root-tree", entries: [{ name: "work-queue.jsonl", type: "blob", mode: 33188, oid: "root" }] } } },
+          log: { oid: "root", text: logs.root, byteSize: Buffer.byteLength(logs.root), isTruncated: false },
+        },
+      }),
+      rest: {
+        git: {
+          getCommit: async ({ commit_sha }) => ({
+            data: {
+              tree: { sha: commit_sha === head ? "root-tree" : "history-tree" },
+              parents: commit_sha === head ? [{ sha: parent }] : [],
+            },
+          }),
+          getTree: async ({ tree_sha }) => ({
+            data: { tree: [{ path: "work-queue.jsonl", mode: "100644", type: "blob", sha: tree_sha === "root-tree" ? "root" : "history" }] },
+          }),
+          getBlob: async ({ file_sha }) => ({
+            data: { encoding: "base64", content: Buffer.from(logs[file_sha]).toString("base64"), size: Buffer.byteLength(logs[file_sha]) },
+          }),
+        },
+      },
+    };
+    const read = () => readCheckedQueue({ githubClient, owner: "owner", repo: "repo" });
+    assert.equal((await read()).state.tip, fixture.checkpoint[0].id);
+    parent = "e".repeat(40);
+    await assert.rejects(read(), /checkpoint_invalid/);
   });
 
   it("verifies checkpoint ancestry without a finite compaction lifetime", async () => {

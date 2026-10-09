@@ -538,5 +538,6 @@ module.exports = {
   readWorkQueueLog,
   stableRequestResult,
   verifyRepository,
+  verifyCheckpointGitHistory,
   validateBranch,
 };
