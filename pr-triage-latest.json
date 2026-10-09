@@ -1,6 +1,6 @@
 {
-  "run_date": "2026-10-09T06:42:39Z",
-  "run_id": "37894774364",
+  "run_date": "2026-10-09T12:36:12Z",
+  "run_id": "37930851725",
   "source": "pr-triage-agent",
   "eligible_total": 7,
   "cooldown_skipped": 3,
@@ -30,23 +30,10 @@
   "batches": [
     {
       "id": "bugfix-cluster",
-      "prs": [
-        67114,
-        67092,
-        67020,
-        56568
-      ]
+      "prs": [67114, 67092, 67020, 56568]
     }
   ],
-  "selected_candidates": [
-    67114,
-    67092,
-    67020,
-    56568,
-    67105,
-    67091,
-    66942
-  ],
+  "selected_candidates": [67114, 67092, 67020, 56568, 67105, 67091, 66942],
   "prs": [
     {
       "number": 67114,
@@ -55,11 +42,7 @@
       "risk": "high",
       "priority": "high",
       "score": 82,
-      "score_breakdown": {
-        "impact": 38,
-        "urgency": 26,
-        "quality": 18
-      },
+      "score_breakdown": {"impact": 38, "urgency": 26, "quality": 18},
       "action": "fast_track",
       "batch": "bugfix-cluster",
       "ci_status": "unknown",
@@ -80,11 +63,7 @@
       "risk": "high",
       "priority": "high",
       "score": 79,
-      "score_breakdown": {
-        "impact": 36,
-        "urgency": 25,
-        "quality": 18
-      },
+      "score_breakdown": {"impact": 36, "urgency": 25, "quality": 18},
       "action": "fast_track",
       "batch": "bugfix-cluster",
       "ci_status": "unknown",
@@ -105,11 +84,7 @@
       "risk": "high",
       "priority": "high",
       "score": 84,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 26,
-        "quality": 18
-      },
+      "score_breakdown": {"impact": 40, "urgency": 26, "quality": 18},
       "action": "fast_track",
       "batch": "bugfix-cluster",
       "ci_status": "unknown",
@@ -130,11 +105,7 @@
       "risk": "high",
       "priority": "medium",
       "score": 68,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 22,
-        "quality": 11
-      },
+      "score_breakdown": {"impact": 35, "urgency": 22, "quality": 11},
       "action": "batch_review",
       "batch": "bugfix-cluster",
       "ci_status": "unknown",
@@ -155,11 +126,7 @@
       "risk": "medium",
       "priority": "medium",
       "score": 71,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 21,
-        "quality": 20
-      },
+      "score_breakdown": {"impact": 30, "urgency": 21, "quality": 20},
       "action": "batch_review",
       "batch": null,
       "ci_status": "unknown",
@@ -179,11 +146,7 @@
       "risk": "low",
       "priority": "medium",
       "score": 40,
-      "score_breakdown": {
-        "impact": 14,
-        "urgency": 9,
-        "quality": 17
-      },
+      "score_breakdown": {"impact": 14, "urgency": 9, "quality": 17},
       "action": "batch_review",
       "batch": null,
       "ci_status": "unknown",
@@ -203,11 +166,7 @@
       "risk": "low",
       "priority": "low",
       "score": 27,
-      "score_breakdown": {
-        "impact": 10,
-        "urgency": 6,
-        "quality": 11
-      },
+      "score_breakdown": {"impact": 10, "urgency": 6, "quality": 11},
       "action": "defer",
       "batch": null,
       "ci_status": "unknown",
