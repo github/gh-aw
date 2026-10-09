@@ -81,3 +81,19 @@ func TestAdjustToolsForNativeMCPEngineWithoutAllowlistRetainsFallback(t *testing
 	assert.Equal(t, map[string]any{"github": map[string]any{}}, actual)
 	assert.Equal(t, 2, compiler.warningCount)
 }
+
+func TestAdjustToolsForNativeMCPEngineWithoutAllowlistPreservesQueueControls(t *testing.T) {
+	engine, err := NewBehaviorDefinedEngine(newHarnessEngineDefinition())
+	require.NoError(t, err)
+	tools := map[string]any{
+		"bash":       []string{"*"},
+		"work-queue": map[string]any{"worker": true, "require-assignment": true},
+		"cli-proxy":  true,
+	}
+	actual := NewCompiler().adjustToolsForEngineCapabilities(map[string]any{"tools": tools}, engine, tools)
+	assert.Equal(t, map[string]any{
+		"github":     map[string]any{},
+		"work-queue": tools["work-queue"],
+		"cli-proxy":  true,
+	}, actual)
+}
