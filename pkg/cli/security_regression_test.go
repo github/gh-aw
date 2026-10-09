@@ -361,9 +361,7 @@ func TestSecurityCLIEnvironmentVariableSanitization(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set the environment variable temporarily
-			oldValue := os.Getenv(tt.envVarName)
-			os.Setenv(tt.envVarName, tt.envVarValue)
-			defer os.Setenv(tt.envVarName, oldValue)
+			t.Setenv(tt.envVarName, tt.envVarValue)
 
 			// Get the value back
 			value := os.Getenv(tt.envVarName)
