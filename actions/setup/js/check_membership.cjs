@@ -1,10 +1,19 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { parseRequiredPermissions, parseAllowedBots, checkRepositoryPermission, checkBotStatus, isAllowedBot, isConfusedDeputyAttack } = require("./check_permissions_utils.cjs");
+const { parseRequiredPermissions, parseAllowedBots, canonicalizeBotIdentifier, checkRepositoryPermission, checkBotStatus, isAllowedBot, isConfusedDeputyAttack } = require("./check_permissions_utils.cjs");
 const { writeDenialSummary } = require("./pre_activation_summary.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
+
+function isCopilotPullRequestActor(eventName, actor) {
+  if (eventName !== "pull_request" && eventName !== "pull_request_target") {
+    return false;
+  }
+  const canonicalActor = canonicalizeBotIdentifier(actor);
+  const copilotBotNames = process.env.GH_AW_COPILOT_BOT_NAMES?.split(",").filter(Boolean) ?? [];
+  return copilotBotNames.some(name => canonicalizeBotIdentifier(name) === canonicalActor);
+}
 
 /**
  * Attempt to authorize the actor via the bots allowlist.
@@ -32,13 +41,10 @@ async function checkBotAllowlistAuthorization(actorToValidate, allowedBots, owne
 
   core.info(`Actor '${actorToValidate}' matched the allowed bots list: ${allowedBots.join(", ")}`);
 
-  // Built-in Copilot agents are not repository collaborators; the explicit allowlist
-  // is sufficient for their GitHub-provided actor identities.
-  const isBuiltInCopilot = actorToValidate === "Copilot" || actorToValidate === "copilot-swe-agent" || actorToValidate === "copilot-swe-agent[bot]";
-  const botStatus = isBuiltInCopilot ? { isBot: true, isActive: true } : await checkBotStatus(actorToValidate, owner, repo);
+  const botStatus = await checkBotStatus(actorToValidate, owner, repo);
 
   if (botStatus.isBot && botStatus.isActive) {
-    core.info(isBuiltInCopilot ? `✅ Built-in bot '${actorToValidate}' is allowlisted and authorized` : `✅ Bot '${actorToValidate}' is active on the repository and authorized`);
+    core.info(`✅ Bot '${actorToValidate}' is active on the repository and authorized`);
     core.setOutput("is_team_member", "true");
     core.setOutput("result", "authorized_bot");
     core.setOutput("user_permission", "bot");
@@ -240,7 +246,9 @@ async function main() {
     const authorPermission = await checkRepositoryPermission(pullRequestAuthor, owner, repo, requiredPermissions);
     if (authorPermission.authorized) {
       core.info(`PR author '${pullRequestAuthor}' is trusted; checking whether bot '${actorToValidate}' is active`);
-      const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo);
+      const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo, {
+        installationCheckOptional: isCopilotPullRequestActor(eventName, actorToValidate),
+      });
       if (botResult.handled) {
         return;
       }
@@ -270,7 +278,7 @@ async function main() {
   // `contents: write` on this repository to post the event, so an explicitly allowlisted App is
   // authorized even when that lookup finds nothing.
   const botResult = await checkBotAllowlistAuthorization(actorToValidate, allowedBots, owner, repo, {
-    installationCheckOptional: eventName === "repository_dispatch",
+    installationCheckOptional: eventName === "repository_dispatch" || isCopilotPullRequestActor(eventName, actorToValidate),
   });
   if (botResult.handled) {
     return;
