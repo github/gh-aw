@@ -4,6 +4,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 const ROUTING_STATUSES = new Set(["selected", "pending", "failed", "rejected", "unavailable"]);
 const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "off"]);
+const MODEL_ROUTING_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
 
 /** @param {unknown} value @returns {string} */
 function validateModelIdentifier(value) {
@@ -118,6 +119,135 @@ function getModelRouting(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"
   };
 }
 
+function readModelRoutingSession(sessionPath) {
+  const fs = require("fs");
+  let content;
+  try {
+    content = fs.readFileSync(sessionPath, "utf8");
+  } catch {
+    return [];
+  }
+  const events = [];
+  for (const line of content.split("\n")) {
+    try {
+      const event = JSON.parse(line);
+      const provenance = event?.provenance;
+      const agentEvent =
+        (event?.type === "workflow.info" && provenance?.component === "workflow" && provenance?.phase === "agent") ||
+        (event?.type === "model_routing.outcome" && provenance?.component === "agent" && provenance?.phase === "agent") ||
+        (event?.type === "firewall.model_routing" && provenance?.component === "firewall" && provenance?.phase === "agent");
+      if (agentEvent) events.push(event);
+    } catch {
+      // Ignore partial session records.
+    }
+  }
+  return events;
+}
+
+function readModelRoutingProxyRecords(ghAwDir) {
+  const fs = require("fs");
+  const records = [];
+  for (const relativePath of MODEL_ROUTING_LOG_PATHS) {
+    let content;
+    try {
+      content = fs.readFileSync(require("path").join(ghAwDir, relativePath), "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of content.split("\n")) {
+      try {
+        const record = JSON.parse(line);
+        if (typeof record?._schema === "string" && record._schema.startsWith("model-routing/")) records.push(record);
+      } catch {
+        // Ignore incomplete proxy records.
+      }
+    }
+  }
+  return records;
+}
+
+function isLegacyEndpointOnlyDeviation(schema) {
+  const match = /^model-routing\/v?(\d+)\.(\d+)\.(\d+)/.exec(schema || "");
+  if (!match) return false;
+  const [, major, minor, patch] = match.map(Number);
+  return major === 0 && (minor < 28 || (minor === 28 && patch < 39));
+}
+
+function countDeviatedModelRoutingRequests(records, schema) {
+  const legacyEndpointOnly = isLegacyEndpointOnlyDeviation(schema);
+  return records.filter(record => {
+    if (record?.routed !== "deviated") return false;
+    const deviations = record.deviations;
+    return !(legacyEndpointOnly && Array.isArray(deviations) && deviations.length === 1 && deviations[0] === "endpoint");
+  }).length;
+}
+
+function firstValidated(...values) {
+  for (const value of values) {
+    const validated = validateModelIdentifier(value);
+    if (validated) return validated;
+  }
+  return "";
+}
+
+function resolveModelRoutingSummary({
+  infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`,
+  sessionPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/usage/aw_session.jsonl`,
+  ghAwDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw",
+} = {}) {
+  const sessionEvents = readModelRoutingSession(sessionPath);
+  const workflowInfo = sessionEvents.find(event => event.type === "workflow.info")?.data;
+  const outcome = sessionEvents.find(event => event.type === "model_routing.outcome")?.data;
+  const sessionRouting = workflowInfo?.modelRouting ?? workflowInfo?.model_routing ?? {};
+  const sessionRecords = sessionEvents.filter(event => event.type === "firewall.model_routing").map(event => event.data);
+  const sessionSelection = sessionRecords.find(record => record?.stage === "selection");
+  const sessionFailure = sessionRecords.find(record => record?.stage === "failure");
+  const infoRouting = getModelRouting(infoPath);
+
+  // The agent post-step runs before the usage-artifact step writes aw_session.jsonl.
+  // Use the session when available, then aw_info.json and proxy logs as fallbacks.
+  const proxyRecords = readModelRoutingProxyRecords(ghAwDir);
+  const proxySelection = proxyRecords.filter(record => record.stage === "selection").at(-1);
+  const proxyFailure = proxyRecords.filter(record => record.stage === "failure").at(-1);
+  const proxyRequests = proxyRecords.filter(record => record.stage === "request");
+  const proxySchema = proxyRecords.find(record => record?._schema)?.["_schema"] || "";
+  const sessionRequests = sessionRecords.filter(record => record?.stage === "request");
+  const requestRecords = sessionRequests.length ? sessionRequests : proxyRequests;
+  const requestSchema = sessionRecords.find(record => typeof (record?._schema || record?.schema) === "string")?._schema || sessionRecords.find(record => typeof record?.schema === "string")?.schema || proxySchema;
+
+  const status = [outcome?.status, sessionRouting.status, sessionSelection ? "selected" : "", sessionFailure ? "failed" : "", infoRouting?.status, proxySelection ? "selected" : "", proxyFailure ? "failed" : ""].find(
+    value => typeof value === "string" && ROUTING_STATUSES.has(value)
+  );
+  if (!status) return null;
+
+  const selection = sessionSelection || proxySelection || {};
+  const objective = selection.objective?.goal ?? selection.objective?.Goal;
+  const labels = selection.labels ?? {};
+  const result = {
+    status,
+    mode: firstValidated(sessionRouting.mode, sessionRouting.Mode, selection.mode, infoRouting?.mode, proxySelection?.mode),
+    router_version: firstValidated(sessionRouting.routerVersion, sessionRouting.router_version, sessionRouting.router?.version, selection.router?.version, infoRouting?.router_version, proxySelection?.router?.version),
+    ...(status !== "selected"
+      ? {
+          failure_code: firstValidated(outcome?.failureCode, outcome?.failure_code, sessionRouting.failureCode, sessionRouting.failure_code, sessionFailure?.code, infoRouting?.failure_code, proxyFailure?.code),
+        }
+      : {}),
+    objective: firstValidated(objective),
+    task_type: firstValidated(labels.task_type, labels.taskType),
+    scope: firstValidated(labels.scope),
+    complexity: firstValidated(labels.task_complexity, labels.taskComplexity),
+  };
+  if (typeof selection.degraded_classification === "boolean") {
+    result.degraded = selection.degraded_classification;
+  } else if (typeof selection.degradedClassification === "boolean") {
+    result.degraded = selection.degradedClassification;
+  }
+  if (requestRecords.length > 0) {
+    result.deviated_requests = countDeviatedModelRoutingRequests(requestRecords, requestSchema);
+  }
+  return result;
+}
+
 function resolveEffectiveModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
   let routing = getModelRouting(infoPath, phase);
   if (!routing && typeof env.GH_AW_MODEL_ROUTING_STATUS === "string" && ROUTING_STATUSES.has(env.GH_AW_MODEL_ROUTING_STATUS)) {
@@ -182,6 +312,7 @@ module.exports = {
   recordFallbackModelFromUsage,
   recordModelRouting,
   getModelRouting,
+  resolveModelRoutingSummary,
   resolveEffectiveModel,
   getEffectiveModelLabel,
   validateRoutingEffort,

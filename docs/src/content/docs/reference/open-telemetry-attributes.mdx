@@ -144,6 +144,8 @@ These attributes carry model, token, and stop-reason data on built-in agent span
     <tr><td><code>gen_ai.system</code></td><td>Compatibility GenAI system/provider name used by existing gh-aw dashboards and backends.</td></tr>
     <tr><td><code>gh-aw.engine.id</code></td><td>Raw gh-aw engine identifier.</td></tr>
     <tr><td><code>gen_ai.request.model</code></td><td>Requested model name.</td></tr>
+    <tr><td><code>gh-aw.model.requested</code></td><td>Configured model request, including a routing placeholder when applicable.</td></tr>
+    <tr><td><code>gh-aw.model.effort</code></td><td>Effective reasoning effort for the selected routed model.</td></tr>
     <tr><td><code>gen_ai.operation.name</code></td><td>Always <code>chat</code> for built-in agent spans.</td></tr>
     <tr><td><code>gen_ai.workflow.name</code></td><td>Workflow name repeated in GenAI namespace.</td></tr>
     <tr><td><code>gen_ai.response.model</code></td><td>Resolved runtime model when available.</td></tr>
@@ -155,6 +157,35 @@ These attributes carry model, token, and stop-reason data on built-in agent span
     <tr><td><code>gen_ai.usage.total_tokens</code></td><td>Total input plus output tokens.</td></tr>
   </tbody>
 </table>
+
+## Model-routing attributes
+
+These attributes are emitted at most once per run, on the agent job's conclusion span, when model routing is active. Values are selected from agent-provenance routing records, with routing metadata and proxy-log fallbacks when the unified session file is unavailable.
+
+<table>
+  <thead>
+    <tr>
+      <th>Attribute</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><code>gh-aw.model_routing.status</code></td><td>string</td><td>Routing status, such as <code>selected</code>, <code>failed</code>, or <code>rejected</code>.</td></tr>
+    <tr><td><code>gh-aw.model_routing.mode</code></td><td>string</td><td>Routing mode when available.</td></tr>
+    <tr><td><code>gh-aw.model_routing.router_version</code></td><td>string</td><td>Router version when available.</td></tr>
+    <tr><td><code>gh-aw.model_routing.failure_code</code></td><td>string</td><td>Low-cardinality routing failure code; emitted only when status is not <code>selected</code>.</td></tr>
+    <tr><td><code>gh-aw.model_routing.objective</code></td><td>string</td><td>Selection objective, for example <code>cost</code>, when present.</td></tr>
+    <tr><td><code>gh-aw.model_routing.task_type</code></td><td>string</td><td>Validated task-type classification label when present.</td></tr>
+    <tr><td><code>gh-aw.model_routing.scope</code></td><td>string</td><td>Validated scope classification label when present.</td></tr>
+    <tr><td><code>gh-aw.model_routing.complexity</code></td><td>string</td><td>Validated task-complexity classification label when present.</td></tr>
+    <tr><td><code>gh-aw.model_routing.degraded</code></td><td>boolean</td><td>Whether classification was degraded, when a selection record provides the flag.</td></tr>
+    <tr><td><code>gh-aw.model_routing.classifier_aic</code></td><td>double</td><td>Classifier AI credits when classifier-cost attribution is available. This value is separate from, and is not added to, <code>gh-aw.aic</code>.</td></tr>
+    <tr><td><code>gh-aw.model_routing.deviated_requests</code></td><td>integer</td><td>Count of requests not served as selected, using the same endpoint-only deviation normalization as routing audit.</td></tr>
+  </tbody>
+</table>
+
+Routing spans do not include ranked choices, selected IDs, conversation hashes, classifier rationale or degraded-reason text, or per-request details. Non-routed runs and non-agent conclusion spans do not include <code>gh-aw.model_routing.*</code> attributes. <code>classifier_aic</code> remains un-emitted until classifier-cost attribution is available.
 
 ## Workflow-call and episode attributes
 

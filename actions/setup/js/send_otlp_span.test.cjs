@@ -7,6 +7,7 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const nodeFs = require("node:fs");
+const originalMkdirSync = nodeFs.mkdirSync.bind(nodeFs);
 
 // ---------------------------------------------------------------------------
 // Module import
@@ -3088,6 +3089,21 @@ describe("sendJobConclusionSpan", () => {
         model_routing: { status: "selected", wire_model: "gpt-5.6-luna", effort: "xhigh", mode: "awf-routed", router_version: "0.28.49" },
       })
     );
+    const proxyRoutingPath = path.join(process.env.GH_AW_TMP_DIR, "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl");
+    originalMkdirSync(path.dirname(proxyRoutingPath), { recursive: true });
+    nodeFs.writeFileSync(
+      proxyRoutingPath,
+      [
+        JSON.stringify({
+          _schema: "model-routing/v0.28.49",
+          stage: "selection",
+          objective: { goal: "cost" },
+          labels: { task_type: "code", scope: "repository", task_complexity: "moderate" },
+          degraded_classification: true,
+        }),
+        JSON.stringify({ _schema: "model-routing/v0.28.49", stage: "request", routed: "deviated", deviations: ["effort"] }),
+      ].join("\n")
+    );
 
     try {
       await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
@@ -3098,13 +3114,134 @@ describe("sendJobConclusionSpan", () => {
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     const span = body.resourceSpans[0].scopeSpans[0].spans[0];
-    const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
+    const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue ?? a.value.boolValue]));
     expect(attrs["gen_ai.request.model"]).toBe("gpt-5.6-luna");
     expect(attrs["gh-aw.model.requested"]).toBe("auto");
     expect(attrs["gh-aw.model.effort"]).toBe("xhigh");
     expect(attrs["gh-aw.model_routing.status"]).toBe("selected");
     expect(attrs["gh-aw.model_routing.mode"]).toBe("awf-routed");
     expect(attrs["gh-aw.model_routing.router_version"]).toBe("0.28.49");
+    expect(attrs["gh-aw.model_routing.objective"]).toBe("cost");
+    expect(attrs["gh-aw.model_routing.task_type"]).toBe("code");
+    expect(attrs["gh-aw.model_routing.scope"]).toBe("repository");
+    expect(attrs["gh-aw.model_routing.complexity"]).toBe("moderate");
+    expect(attrs["gh-aw.model_routing.degraded"]).toBe(true);
+    expect(attrs["gh-aw.model_routing.deviated_requests"]).toBe(1);
+  });
+
+  it("emits sparse session routing data only on the agent conclusion span", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = "agent";
+    process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-routed-session-"));
+    const infoPath = path.join(process.env.GH_AW_TMP_DIR, "aw_info.json");
+    const sessionPath = path.join(process.env.GH_AW_TMP_DIR, "usage/aw_session.jsonl");
+    nodeFs.writeFileSync(infoPath, JSON.stringify({ model: "gpt-5.6-luna", requested_model: "auto", model_routing: { status: "selected", mode: "awinfo-mode", router_version: "0.28.49" } }));
+    originalMkdirSync(path.dirname(sessionPath), { recursive: true });
+    nodeFs.writeFileSync(
+      sessionPath,
+      [
+        {
+          type: "workflow.info",
+          data: { modelRouting: { status: "selected", mode: "session-mode", routerVersion: "1.2.3" } },
+          provenance: { component: "workflow", phase: "agent" },
+        },
+        { type: "model_routing.outcome", data: { status: "selected" }, provenance: { component: "agent", phase: "agent" } },
+        {
+          type: "firewall.model_routing",
+          data: {
+            schema: "model-routing/v0.28.49",
+            stage: "selection",
+            objective: { goal: "cost" },
+            labels: { task_type: "code", scope: "repository", task_complexity: "moderate" },
+            degraded_classification: false,
+            degraded_reason: "not for telemetry",
+            selected_id: "not-for-telemetry",
+            ranked_choices: [{ model: "not-for-telemetry" }],
+            conversation_hash: "not-for-telemetry",
+          },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: { schema: "model-routing/v0.28.49", stage: "request", routed: "deviated", deviations: ["effort"] },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+      ]
+        .map(JSON.stringify)
+        .join("\n")
+    );
+
+    try {
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+    } finally {
+      nodeFs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+    }
+
+    const span = JSON.parse(mockFetch.mock.calls[0][1].body).resourceSpans[0].scopeSpans[0].spans[0];
+    const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue ?? attr.value.intValue ?? attr.value.boolValue]));
+    expect(attrs).toMatchObject({
+      "gh-aw.model_routing.status": "selected",
+      "gh-aw.model_routing.mode": "session-mode",
+      "gh-aw.model_routing.router_version": "1.2.3",
+      "gh-aw.model_routing.objective": "cost",
+      "gh-aw.model_routing.task_type": "code",
+      "gh-aw.model_routing.scope": "repository",
+      "gh-aw.model_routing.complexity": "moderate",
+      "gh-aw.model_routing.degraded": false,
+      "gh-aw.model_routing.deviated_requests": 1,
+    });
+    expect(attrs["gh-aw.model_routing.failure_code"]).toBeUndefined();
+    expect(attrs["gh-aw.model_routing.classifier_aic"]).toBeUndefined();
+    expect(Object.keys(attrs).some(key => /selected_id|ranked_choices|conversation_hash|degraded_reason/i.test(key))).toBe(false);
+  });
+
+  it("emits a failure code for non-selected routing outcomes", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = "agent";
+    process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-routing-failure-"));
+    const sessionPath = path.join(process.env.GH_AW_TMP_DIR, "usage/aw_session.jsonl");
+    originalMkdirSync(path.dirname(sessionPath), { recursive: true });
+    nodeFs.writeFileSync(
+      sessionPath,
+      JSON.stringify({
+        type: "model_routing.outcome",
+        data: { status: "rejected", failureCode: "unsupported_endpoint" },
+        provenance: { component: "agent", phase: "agent" },
+      })
+    );
+
+    try {
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+    } finally {
+      nodeFs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+    }
+
+    const span = JSON.parse(mockFetch.mock.calls[0][1].body).resourceSpans[0].scopeSpans[0].spans[0];
+    const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue]));
+    expect(attrs["gh-aw.model_routing.status"]).toBe("rejected");
+    expect(attrs["gh-aw.model_routing.failure_code"]).toBe("unsupported_endpoint");
+  });
+
+  it("does not emit routing attributes for a non-routed agent run", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = "agent";
+    process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-non-routed-"));
+    nodeFs.writeFileSync(path.join(process.env.GH_AW_TMP_DIR, "aw_info.json"), JSON.stringify({ model: "gpt-5.6-luna" }));
+
+    try {
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+    } finally {
+      nodeFs.rmSync(process.env.GH_AW_TMP_DIR, { recursive: true, force: true });
+    }
+
+    const span = JSON.parse(mockFetch.mock.calls[0][1].body).resourceSpans[0].scopeSpans[0].spans[0];
+    expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.model_routing."))).toBe(false);
   });
 
   it("uses routed attribution from downstream job outputs when aw_info.json is absent", async () => {
@@ -3134,7 +3271,8 @@ describe("sendJobConclusionSpan", () => {
     expect(attrs["gen_ai.request.model"]).toBe("gpt-5.6-luna");
     expect(attrs["gh-aw.model.requested"]).toBe("auto");
     expect(attrs["gh-aw.model.effort"]).toBe("high");
-    expect(attrs["gh-aw.model_routing.status"]).toBe("selected");
+    expect(attrs["gh-aw.model_routing.status"]).toBeUndefined();
+    expect(Object.keys(attrs).some(key => key.startsWith("gh-aw.model_routing."))).toBe(false);
   });
 
   it("does not duplicate gen_ai.request.model on the agent span", async () => {
