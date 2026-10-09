@@ -58,7 +58,10 @@ describe("local work queue stress CI", () => {
     expect(commands.some(command => command.includes('--mode history --items "$HISTORY_ITEMS" --workers 2') && command.includes("--timeout-seconds 300"))).toBe(true);
     expect(commands.some(command => command.includes('--items "$LIFECYCLE_ITEMS" --workers 4 --queue-items 64') && command.includes("--timeout-seconds 600"))).toBe(true);
     expect(commands.some(command => command.includes("--mode saturation --items 100000 --workers 4") && command.includes("--timeout-seconds 60"))).toBe(true);
-    expect(commands.some(command => command.includes("node --test .github/scripts/work-queue-stress.test.cjs"))).toBe(true);
+    const invariants = workflow.jobs.stress.steps.find(step => step.id === "invariants");
+    const checkpoint = workflow.jobs.stress.steps.find(step => step.id === "checkpoint");
+    expect(invariants.run).toMatch(/node --test --test-skip-pattern='checkpoint loses real-Git'\s*\\?\s*\.github\/scripts\/work-queue-stress\.test\.cjs/);
+    expect(checkpoint.run).toContain("node --test --test-name-pattern='checkpoint loses real-Git' .github/scripts/work-queue-stress.test.cjs");
   });
 
   it("publishes a human-readable performance summary even when a profile fails", () => {
