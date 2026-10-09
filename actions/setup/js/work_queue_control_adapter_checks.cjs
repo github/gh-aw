@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
-const { createCompilerDependencyResolver, credentialBindings, main } = require("./work_queue_control_adapter.cjs");
+const { createCompilerDependencyResolver, credentialBindings, dependencyStateForIntents, main } = require("./work_queue_control_adapter.cjs");
 const { queueFixture, WORKFLOW, DISPATCHER, REF, REPOSITORY } = require("./work_queue_lifecycle.test_helpers.cjs");
 const { main: captureIntentOrigin } = require("./capture_work_queue_intent_origin.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
@@ -55,6 +55,16 @@ function registerTests({ describe, it }) {
         else assert.equal(calls[0].username, entry.login);
         await assert.rejects(validate({ profile: { principal: "11" } }), /credential_principal_mismatch/);
       }
+    });
+
+    it("uses the compiled Policy proposal only to resolve dependencies for a first submit on an absent branch", () => {
+      const fixture = queueFixture({ granted: false });
+      const latest = { sha: null, projection: { policy: null, credential_generation: "initial" } };
+      const state = dependencyStateForIntents(latest, [{ kind: "submit" }], { policyProposal: fixture.policy });
+      assert.equal(canonical(state.policy), canonical(fixture.policy));
+      assert.equal(latest.projection.policy, null);
+      assert.equal(dependencyStateForIntents(latest, [{ kind: "dispatch_next" }], { policyProposal: fixture.policy }), latest.projection);
+      assert.equal(dependencyStateForIntents({ ...latest, sha: "existing" }, [{ kind: "submit" }], { policyProposal: fixture.policy }), latest.projection);
     });
 
     it("rejects spoofed credential kinds, App metadata, human bot lookups, lossy IDs and unavailable identity APIs without a fallback", async () => {

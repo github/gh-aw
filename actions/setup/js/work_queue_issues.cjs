@@ -11,7 +11,7 @@ const { dependencyStatus } = require("./work_queue_graph.cjs");
 const { appendCommit, newRequest, proposedCommitId, replayTransactions } = require("./work_queue_replay.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
 const { withProjectionLocks, projectionNonce } = require("./work_queue_issue_coordination.cjs");
-const { MAX_PROJECTION_TARGETS, LABELS_PAGE_SIZE, discoverTarget, preflightIssues, mutateIssues, issueResource, ISSUE_SELECTION, issueReadQuery } = require("./work_queue_issue_api.cjs");
+const { MAX_PROJECTION_TARGETS, LABELS_PAGE_SIZE, STATUSES, statusLabelName, ensureStatusLabel, discoverTarget, preflightIssues, mutateIssues, issueResource, ISSUE_SELECTION, issueReadQuery } = require("./work_queue_issue_api.cjs");
 const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { validateJournal } = require("./work_queue_issue_journal.cjs");
@@ -20,9 +20,9 @@ const { issueBody, renderSummary, renderClaim, runLink } = require("./work_queue
 function issuesConfiguration(value) {
   if (value === undefined || value === false) return null;
   if (value === true) return { label: "work" };
-  closed(value, [], ["label", "status-field"], "work-queue issues");
+  closed(value, [], ["label"], "work-queue issues");
   for (const [key, field] of Object.entries(value)) {
-    if (typeof field !== "string" || !field.trim() || field.includes("${{") || Buffer.byteLength(field) > 256 || /[\x00-\x1f\x7f]/.test(field))
+    if (typeof field !== "string" || !field.trim() || field.includes("${{") || Buffer.byteLength(field) > 33 || /[\x00-\x1f\x7f]/.test(field))
       throw queueError("projection_invalid", `${SAFE_OUTPUT_E001}: ${key} must be a nonblank bounded literal`);
   }
   return { label: "work", ...value };
@@ -77,7 +77,7 @@ function jobDiagnostics(value) {
     .map(([name, job]) => `Native job \`${name}\`: **${job.result}**. This does not establish Work cancellation or Result.`);
 }
 
-function summaryBody(state, work, field, at, diagnostics = [], branch = "work-queue", run = undefined) {
+function summaryBody(state, work, at, diagnostics = [], branch = "work-queue", run = undefined) {
   const lines = [...diagnostics];
   const claimHistory = [];
   const outcomes = [];
@@ -112,8 +112,7 @@ function summaryBody(state, work, field, at, diagnostics = [], branch = "work-qu
       diagnostics: lines.join("\n"),
     },
     origin,
-    workIssueStatus(state, work, at),
-    !!field
+    workIssueStatus(state, work, at)
   );
 }
 
@@ -207,20 +206,23 @@ async function projectBatch(options, initial, origin, assignment, config, target
   const journals = new Map();
   const pending = [];
   const discovery = new Map();
+  const statusLabels = new Map();
   for (const target of targets) {
     const path = journalPath(target.work_id);
     const journal = current.journal.get(path) || { version: 1, work_id: target.work_id, comments: {} };
     const repository = target.resource?.repository || origin.repository;
     validateJournal(journal, current.state, target.work_id, repository);
     journals.set(path, structuredClone(journal));
+    const work = current.state.works.get(target.work_id);
     if (!discovery.has(repository)) discovery.set(repository, await discoverTarget(options.githubClient, repository, config, current.nativeResponse?.[issueRead.repositoryAliases.get(repository)]));
-    if (discovery.get(repository).fieldPending) pending.push({ work_id: target.work_id, reason: `queue committed; field sync pending: ${discovery.get(repository).fieldPending}` });
+    const status = workIssueStatus(current.state, work, options.now ?? Date.now());
+    const statusKey = `${repository}:${status}`;
+    if (!statusLabels.has(statusKey)) statusLabels.set(statusKey, await ensureStatusLabel(options.githubClient, discovery.get(repository).repositoryId, config, status));
     if (!target.resource && journal.create?.resource) {
       assertProjectionAuthority(current.state, journal.create.origin, target.work_id, journal.create.ref, journal.create.resource.repository, journal.create.authority_claim_id);
       target.resource = journal.create.resource;
     }
     target.comments = {};
-    const work = current.state.works.get(target.work_id);
     if (work.issue_summary) target.comments.summary = work.issue_summary;
     for (const claimId of target.claim_ids) {
       const claim = current.state.claims.get(claimId);
@@ -231,7 +233,7 @@ async function projectBatch(options, initial, origin, assignment, config, target
     }
   }
   const samePreflight = targets.every((target, index) => canonical(target.resource || null) === canonical(preflight[index].resource || null) && canonical(target.comments) === canonical(preflight[index].comments));
-  const issues = await preflightIssues(options.githubClient, targets, { fields: !!config["status-field"], response: samePreflight ? current.nativeResponse : undefined });
+  const issues = await preflightIssues(options.githubClient, targets, { response: samePreflight ? current.nativeResponse : undefined });
   for (const target of targets) {
     const receipt = journals.get(journalPath(target.work_id)).create;
     if (receipt?.node_id && receipt.node_id !== issues.get(target.work_id)?.id) throw queueError("projection_journal_invalid", "native Issue receipt node identity disagrees with preflight");
@@ -265,10 +267,9 @@ async function projectBatch(options, initial, origin, assignment, config, target
         repositoryId: discovered.repositoryId,
         title: `Work ${work.work_id}`,
         body: issueBody(current.state, work, origin, config, current.branch),
-        labelIds: [discovered.labelId],
-        ...(discovered.field ? { issueFields: [{ fieldId: discovered.field.id, singleSelectOptionId: discovered.field.options.get(status) }] } : {}),
+        labelIds: [discovered.labelId, statusLabels.get(`${origin.repository}:${status}`)],
       },
-      selection: `issue { ${config["status-field"] ? ISSUE_SELECTION : ISSUE_SELECTION.replace(/issueFieldValues[\s\S]*$/, "")} }`,
+      selection: `issue { ${ISSUE_SELECTION} }`,
     });
   }
   if (creates.length) {
@@ -300,16 +301,9 @@ async function projectBatch(options, initial, origin, assignment, config, target
       journal.create.resource = resource;
       journal.create.node_id = issue.id;
       issues.set(target.work_id, { ...issue, comments: new Map() });
-      const discovered = discovery.get(resource.repository);
-      if (
-        discovered.field &&
-        (!issue.viewerCanSetFields ||
-          issue.issueFieldValues?.pageInfo?.hasNextPage !== false ||
-          !issue.issueFieldValues.nodes?.some(
-            value => value.field?.id === discovered.field.id && value.optionId === discovered.field.options.get(workIssueStatus(current.state, current.state.works.get(target.work_id), options.now ?? Date.now()))
-          ))
-      )
-        pending.push({ work_id: target.work_id, reason: "queue committed; field sync pending: initial field application was not verified" });
+      const status = workIssueStatus(current.state, current.state.works.get(target.work_id), options.now ?? Date.now());
+      if (issue.labels?.pageInfo?.hasNextPage !== false || !issue.labels.nodes?.some(label => label.id === statusLabels.get(`${resource.repository}:${status}`)))
+        pending.push({ work_id: target.work_id, reason: "queue committed; initial status label application was not verified" });
       operations.push(bindingOperation(target, origin.ref, resource));
     }
     current = await publishProjection(options, current, actor, journals, operations);
@@ -326,12 +320,12 @@ async function projectBatch(options, initial, origin, assignment, config, target
         if (canonical(work.backing_issue || work.issue_link || null) !== canonical(target.resource)) throw queueError("projection_scope_changed", "new native receipt has no checked backing binding");
       }
     }
-    return projectLinkedIssues(options, current, actor, origin, config, targets, journals, issues, discovery, pending, creates.length > 0);
+    return projectLinkedIssues(options, current, actor, origin, config, targets, journals, issues, discovery, statusLabels, pending, creates.length > 0);
   };
   return resources.length ? (options.withProjectionLocks || withProjectionLocks)({ ...options, repositoryId: current.repositoryId, head: current.sha, keys: resources }, project) : project();
 }
 
-async function projectLinkedIssues(options, current, actor, origin, config, targets, journals, issues, discovery, pending, created) {
+async function projectLinkedIssues(options, current, actor, origin, config, targets, journals, issues, discovery, statusLabels, pending, created) {
   const edits = [];
   const newComments = [];
   const bindings = [];
@@ -342,33 +336,30 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
     const journal = journals.get(journalPath(target.work_id));
     assertProjectionAuthority(current.state, actor, work.work_id, origin.ref, target.resource.repository, target.authority_claim_id);
     const discovered = discovery.get(target.resource.repository);
-    if (!issue.labels.nodes.some(label => label.id === discovered.labelId))
+    const status = workIssueStatus(current.state, work, options.now ?? Date.now());
+    const desiredStatusId = statusLabels.get(`${target.resource.repository}:${status}`);
+    const missing = [discovered.labelId, desiredStatusId].filter(id => !issue.labels.nodes.some(label => label.id === id));
+    if (missing.length)
       edits.push({
         key: target.work_id,
         name: "addLabelsToLabelable",
         type: "AddLabelsToLabelableInput",
-        input: { labelableId: issue.id, labelIds: [discovered.labelId] },
+        input: { labelableId: issue.id, labelIds: missing },
         selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
+        expectedLabels: missing,
       });
-    const status = workIssueStatus(current.state, work, options.now ?? Date.now());
-    if (discovered.field) {
-      if (!issue.viewerCanSetFields) {
-        pending.push({ work_id: target.work_id, reason: "queue committed; field sync pending: projector token cannot set fields" });
-      } else if (!issue.issueFieldValues.nodes.some(value => value.field?.id === discovered.field.id && value.optionId === discovered.field.options.get(status))) {
-        edits.push({
-          key: target.work_id,
-          name: "setIssueFieldValue",
-          type: "SetIssueFieldValueInput",
-          input: { issueId: issue.id, issueFields: [{ fieldId: discovered.field.id, singleSelectOptionId: discovered.field.options.get(status) }] },
-          selection: `issue { id issueFieldValues(first:${MAX_PROJECTION_TARGETS}) { nodes { ... on IssueFieldSingleSelectValue { optionId field { ... on IssueFieldSingleSelect { id } } } } pageInfo { hasNextPage } } }`,
-          expected: { field: discovered.field.id, option: discovered.field.options.get(status) },
-        });
-      }
-    }
+    const obsolete = issue.labels.nodes.filter(label => STATUSES.some(candidate => candidate !== status && label.name === statusLabelName(config, candidate))).map(label => label.id);
+    if (obsolete.length)
+      edits.push({
+        key: target.work_id,
+        name: "removeLabelsFromLabelable",
+        type: "RemoveLabelsFromLabelableInput",
+        input: { labelableId: issue.id, labelIds: obsolete },
+        selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
+        removedLabels: obsolete,
+      });
     const diagnostics = jobDiagnostics(options.jobResults ?? process.env.GH_AW_WORK_QUEUE_JOB_RESULTS);
-    if (discovered.fieldPending) diagnostics.push(`Native status field sync pending: ${discovered.fieldPending}.`);
-    else if (discovered.field && !issue.viewerCanSetFields) diagnostics.push("Native status field sync pending: projector token cannot set fields.");
-    const bodies = new Map([["summary", summaryBody(current.state, work, !!config["status-field"], options.now ?? Date.now(), diagnostics, current.branch, origin)]]);
+    const bodies = new Map([["summary", summaryBody(current.state, work, options.now ?? Date.now(), diagnostics, current.branch, origin)]]);
     for (const claimId of target.claim_ids) bodies.set(claimId, claimBody(current.state, current.state.claims.get(claimId), options.now ?? Date.now(), diagnostics));
     for (const [key, body] of bodies) {
       const comment = issue.comments.get(key);
@@ -416,17 +407,14 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
       recordUncertainReceipt(result, batch, pending, "Issue closure returned no exact native receipt");
       continue;
     }
-    if (result.operation.name === "addLabelsToLabelable" && (result.value.labelable?.id !== result.operation.input.labelableId || !result.value.labelable?.labels?.nodes?.some(label => label.id === result.operation.input.labelIds[0])))
-      pending.push({ work_id: result.operation.key, reason: "queue committed; tracking label application was not verified" });
-    if (result.operation.expected) {
-      const values = result.value.issue?.issueFieldValues;
-      if (
-        result.value.issue?.id !== result.operation.input.issueId ||
-        values?.pageInfo?.hasNextPage !== false ||
-        !values.nodes?.some(value => value.field?.id === result.operation.expected.field && value.optionId === result.operation.expected.option)
-      )
-        pending.push({ work_id: result.operation.key, reason: "queue committed; field sync pending: mutation did not apply the selected option" });
-    }
+    if (
+      (result.operation.expectedLabels || result.operation.removedLabels) &&
+      (result.value.labelable?.id !== result.operation.input.labelableId ||
+        result.value.labelable?.labels?.pageInfo?.hasNextPage !== false ||
+        result.operation.expectedLabels?.some(id => !result.value.labelable.labels.nodes.some(label => label.id === id)) ||
+        result.operation.removedLabels?.some(id => result.value.labelable.labels.nodes.some(label => label.id === id)))
+    )
+      pending.push({ work_id: result.operation.key, reason: "queue committed; status label synchronization was not verified" });
     if (result.operation.handle) {
       const node = result.value.commentEdge?.node;
       const target = targets.find(target => target.work_id === result.operation.key);
