@@ -264,6 +264,12 @@ func renderConsoleModelRoutingSelection(routing *ModelRoutingSummary) {
 	if routing.Endpoint != "" {
 		line += " endpoint=" + routing.Endpoint
 	}
+	if routing.EffectiveEndpoint != "" {
+		line += " effective_endpoint=" + safeModelRoutingText(routing.EffectiveEndpoint)
+	}
+	if routing.SelectedEndpoint != "" {
+		line += " selected_endpoint=" + safeModelRoutingText(routing.SelectedEndpoint)
+	}
 	if routing.RouterName != "" {
 		line += " router=" + routing.RouterName
 		if routing.RouterVersion != "" {

@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {
@@ -2423,6 +2423,12 @@
                   "type": "string"
                 },
                 "endpoint": {
+                  "type": "string"
+                },
+                "effective_endpoint": {
+                  "type": "string"
+                },
+                "selected_endpoint": {
                   "type": "string"
                 },
                 "top_choices": {
@@ -5350,6 +5356,12 @@
                     "endpoint": {
                       "type": "string"
                     },
+                    "effective_endpoint": {
+                      "type": "string"
+                    },
+                    "selected_endpoint": {
+                      "type": "string"
+                    },
                     "top_choices": {
                       "type": [
                         "null",
@@ -7718,6 +7730,9 @@
                     "endpoint": {
                       "type": "string"
                     },
+                    "selected_endpoint": {
+                      "type": "string"
+                    },
                     "mode": {
                       "type": "string"
                     },
@@ -7937,7 +7952,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {
@@ -8054,7 +8069,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {
@@ -8143,7 +8158,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {

@@ -469,19 +469,20 @@ type AwInfo struct {
 }
 
 type AwInfoModelRouting struct {
-	Status        string `json:"status"`
-	Source        string `json:"source,omitempty"`
-	Provider      string `json:"provider,omitempty"`
-	Model         string `json:"model,omitempty"`
-	WireModel     string `json:"wire_model,omitempty"`
-	Effort        string `json:"effort,omitempty"`
-	AppliedEffort string `json:"applied_effort,omitempty"`
-	Endpoint      string `json:"endpoint,omitempty"`
-	Mode          string `json:"mode,omitempty"`
-	SelectedID    string `json:"selected_id,omitempty"`
-	RouterVersion string `json:"router_version,omitempty"`
-	FailureCode   string `json:"failure_code,omitempty"`
-	Detail        string `json:"detail,omitempty"`
+	Status           string `json:"status"`
+	Source           string `json:"source,omitempty"`
+	Provider         string `json:"provider,omitempty"`
+	Model            string `json:"model,omitempty"`
+	WireModel        string `json:"wire_model,omitempty"`
+	Effort           string `json:"effort,omitempty"`
+	AppliedEffort    string `json:"applied_effort,omitempty"`
+	Endpoint         string `json:"endpoint,omitempty"`
+	SelectedEndpoint string `json:"selected_endpoint,omitempty"`
+	Mode             string `json:"mode,omitempty"`
+	SelectedID       string `json:"selected_id,omitempty"`
+	RouterVersion    string `json:"router_version,omitempty"`
+	FailureCode      string `json:"failure_code,omitempty"`
+	Detail           string `json:"detail,omitempty"`
 }
 
 // GetFirewallVersion returns the AWF firewall version, preferring the new field name

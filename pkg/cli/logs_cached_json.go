@@ -21,7 +21,7 @@ import (
 
 type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
-const cachedLogsJSONLSchemaVersion = 4
+const cachedLogsJSONLSchemaVersion = 5
 
 const (
 	cachedLogsJSONLKindRun          = "run"
@@ -544,7 +544,7 @@ func buildCachedLogsJSONLRunData(run ProcessedRun, runData RunData) *cachedLogsJ
 		MCPToolUsage: projectCachedLogsJSONLMCPToolUsage(run.MCPToolUsage),
 	}
 	if info := runData.awInfo; info != nil {
-		attribution := resolveEffectiveModelAttribution(info, run.ModelRouting, run.TokenUsage)
+		attribution := resolveEffectiveModelAttribution(run.Run.LogsPath, info, run.ModelRouting, run.TokenUsage)
 		data.EngineVersion = info.Version
 		data.Model = attribution.Model
 		data.GhAwVersion = info.CLIVersion

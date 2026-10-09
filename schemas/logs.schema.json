@@ -2547,6 +2547,12 @@
                   "endpoint": {
                     "type": "string"
                   },
+                  "effective_endpoint": {
+                    "type": "string"
+                  },
+                  "selected_endpoint": {
+                    "type": "string"
+                  },
                   "top_choices": {
                     "type": [
                       "null",
@@ -4463,6 +4469,12 @@
                   "router_version": {
                     "type": "string"
                   },
+                  "effective_endpoint": {
+                    "type": "string"
+                  },
+                  "selected_endpoint": {
+                    "type": "string"
+                  },
                   "run_count": {
                     "type": "integer"
                   },
@@ -5270,6 +5282,12 @@
                     "type": "string"
                   },
                   "router_version": {
+                    "type": "string"
+                  },
+                  "effective_endpoint": {
+                    "type": "string"
+                  },
+                  "selected_endpoint": {
                     "type": "string"
                   },
                   "run_count": {

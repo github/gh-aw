@@ -80,6 +80,8 @@ type ModelRoutingSummary struct {
 	SelectedEffort                  string                  `json:"selected_effort,omitempty"`
 	WireModel                       string                  `json:"wire_model,omitempty"`
 	Endpoint                        string                  `json:"endpoint,omitempty"`
+	EffectiveEndpoint               string                  `json:"effective_endpoint,omitempty"`
+	SelectedEndpoint                string                  `json:"selected_endpoint,omitempty"`
 	TopChoices                      []ModelRoutingChoice    `json:"top_choices,omitempty"`
 	RouterName                      string                  `json:"router_name,omitempty"`
 	RouterVersion                   string                  `json:"router_version,omitempty"`
@@ -103,8 +105,9 @@ type effectiveModelAttribution struct {
 	RoutingStatus  string
 }
 
-func resolveEffectiveModelAttribution(info *AwInfo, routing *ModelRoutingSummary, usage *TokenUsageSummary) effectiveModelAttribution {
+func resolveEffectiveModelAttribution(runDir string, info *AwInfo, routing *ModelRoutingSummary, usage *TokenUsageSummary) effectiveModelAttribution {
 	var result effectiveModelAttribution
+	info = mergeSessionModelRoutingAwInfo(runDir, info)
 	if info == nil {
 		return result
 	}
@@ -141,6 +144,35 @@ func resolveEffectiveModelAttribution(info *AwInfo, routing *ModelRoutingSummary
 		result.Model = info.Model
 	}
 	return result
+}
+
+func mergeSessionModelRoutingAwInfo(runDir string, info *AwInfo) *AwInfo {
+	sessionRouting, found, err := readSessionModelRouting(runDir)
+	if err != nil {
+		tokenUsageSubagentLog.Printf("failed to read unified session model routing: %v", err)
+	}
+	if !found || sessionRouting == nil {
+		return info
+	}
+	var sessionInfo AwInfo
+	if info != nil {
+		sessionInfo = *info
+	}
+	if workflowInfo := sessionRouting.WorkflowInfo; workflowInfo != nil {
+		if workflowInfo.EngineID != "" {
+			sessionInfo.EngineID = workflowInfo.EngineID
+		}
+		if workflowInfo.Model != "" {
+			sessionInfo.Model = workflowInfo.Model
+		}
+		if workflowInfo.RequestedModel != "" {
+			sessionInfo.RequestedModel = workflowInfo.RequestedModel
+		}
+	}
+	if modelRouting := sessionRouting.modelRouting(); modelRouting != nil {
+		sessionInfo.ModelRouting = modelRouting
+	}
+	return &sessionInfo
 }
 
 func primaryTokenUsageModel(usage *TokenUsageSummary) string {
@@ -232,23 +264,74 @@ func modelRoutingFileExists(path string) bool {
 }
 
 func analyzeModelRouting(runDir string) *ModelRoutingSummary {
-	path := findModelRoutingFile(runDir)
-	if path == "" {
+	sessionRouting, sessionFound, sessionErr := readSessionModelRouting(runDir)
+	if sessionErr != nil {
+		tokenUsageSubagentLog.Printf("failed to read unified session model routing: %v", sessionErr)
+	}
+	routingPath := findModelRoutingFile(runDir)
+	if routingPath == "" && (!sessionFound || sessionRouting.modelRouting() == nil) {
 		return nil
 	}
 	proxyEntries := tokenUsageEntriesForRun(runDir)
-	summary := parseModelRoutingFile(path, proxyEntries)
+	var summary *ModelRoutingSummary
+	if routingPath != "" {
+		summary = parseModelRoutingFile(routingPath, proxyEntries)
+	} else {
+		summary = &ModelRoutingSummary{Status: "not_routed"}
+	}
+	applySessionModelRouting(summary, sessionRouting)
 	_, _, agents, found, err := readSessionSubagentModelsDetailed(runDir)
 	if err == nil && found {
 		models := make([]string, 0, len(proxyEntries))
 		for _, entry := range proxyEntries {
 			models = appendUnique(models, entry.Model)
 		}
+
 		agentSummary := &TokenUsageSummary{AgentUsage: resolveAgentUsageModels(agents, newModelIdentityResolver(runDir), models...)}
 		matchPiAgentUsageCredits(agentSummary, proxyEntries, newModelIdentityResolver(runDir))
 		applyAgentUsageToModelRouting(summary, agentSummary.AgentUsage)
 	}
 	return summary
+}
+
+func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionModelRoutingAttribution) {
+	if summary == nil || session == nil {
+		return
+	}
+	routing := session.modelRouting()
+	if routing == nil {
+		return
+	}
+	if routing.Status != "" {
+		summary.Status = routing.Status
+	}
+	if routing.WireModel != "" {
+		summary.WireModel = routing.WireModel
+	}
+	if summary.SelectedModel == "" {
+		summary.SelectedModel = firstNonEmpty(routing.Model, routing.WireModel)
+	}
+	if routing.Effort != "" && summary.SelectedEffort == "" {
+		summary.SelectedEffort = routing.Effort
+	}
+	if routing.Endpoint != "" {
+		summary.EffectiveEndpoint = routing.Endpoint
+	}
+	if routing.SelectedEndpoint != "" {
+		summary.SelectedEndpoint = routing.SelectedEndpoint
+	}
+	if routing.Mode != "" && summary.Mode == "" {
+		summary.Mode = routing.Mode
+	}
+	if routing.SelectedID != "" && summary.SelectedID == "" {
+		summary.SelectedID = routing.SelectedID
+	}
+	if routing.RouterVersion != "" && summary.RouterVersion == "" {
+		summary.RouterVersion = routing.RouterVersion
+	}
+	if routing.FailureCode != "" && summary.Failure == nil {
+		summary.Failure = &ModelRoutingFailure{Code: routing.FailureCode}
+	}
 }
 
 func applyAgentUsageToModelRouting(summary *ModelRoutingSummary, agents []AgentUsageBreakdown) {
@@ -481,7 +564,7 @@ func normalizeLegacyEndpointDeviation(summary *ModelRoutingSummary, request *mod
 }
 
 type modelRoutingRouteKey struct {
-	taskType, scope, complexity, mode, model, effort, routerVersion string
+	taskType, scope, complexity, mode, model, effort, routerVersion, effectiveEndpoint, selectedEndpoint string
 }
 
 type modelRoutingRouteTotals struct {
@@ -495,6 +578,17 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 	result := &ModelRoutingLogsSummary{}
 	for _, run := range runs {
 		routing := run.ModelRouting
+		if sessionRouting, found, err := readSessionModelRouting(run.Run.LogsPath); err != nil {
+			tokenUsageSubagentLog.Printf("failed to read unified session model routing: %v", err)
+		} else if found && sessionRouting.modelRouting() != nil {
+			if routing == nil {
+				routing = &ModelRoutingSummary{}
+			} else {
+				routingCopy := *routing
+				routing = &routingCopy
+			}
+			applySessionModelRouting(routing, sessionRouting)
+		}
 		if routing == nil {
 			continue
 		}
@@ -514,6 +608,7 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 		key := modelRoutingRouteKey{
 			routing.Labels.TaskType, routing.Labels.Scope, routing.Labels.TaskComplexity,
 			routing.Mode, routing.SelectedModel, routing.SelectedEffort, routing.RouterVersion,
+			routing.EffectiveEndpoint, routing.SelectedEndpoint,
 		}
 		route := totals[key]
 		route.count++
@@ -568,6 +663,7 @@ func appendModelRoutingRouteSummaries(summary *ModelRoutingLogsSummary, totals m
 		summary.Routes = append(summary.Routes, ModelRoutingRouteSummary{
 			TaskType: key.taskType, Scope: key.scope, Complexity: key.complexity, Mode: key.mode,
 			Model: key.model, Effort: key.effort, RouterVersion: key.routerVersion,
+			EffectiveEndpoint: key.effectiveEndpoint, SelectedEndpoint: key.selectedEndpoint,
 			RunCount: route.count, TotalAIC: route.aic, AverageAIC: route.aic / float64(route.count),
 		})
 	}
