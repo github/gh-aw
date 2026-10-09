@@ -52,9 +52,10 @@ Do not invent additional tasks or broaden resource scopes.
 Read the activation snapshot first with `work_queue_read`, using
 `{"pool":"default","limit":32}`. Check `queue_state`, not just `total`:
 `"uninitialized"` with a null snapshot SHA means the queue branch does not
-exist yet. Treat it as an empty backlog and stop with `noop`; there is no
-installed Policy to authorize submission or dispatch. Surface read/tool errors
-explicitly; never turn an error or an existing policyless ledger into an
+exist yet. Treat it as an empty backlog; the first trusted producer submission
+will atomically bootstrap the branch with its compiler-approved Policy and Work.
+Do not dispatch until that submission has been admitted. Surface read/tool
+errors explicitly; never turn an error or an existing policyless ledger into an
 empty-backlog report.
 
 When `<mcp-clis>` advertises the wrappers, invoke their subcommands with one JSON
@@ -66,7 +67,7 @@ work-queue work_queue_read '{"pool":"default","limit":32}'
 
 Use the advertised MCP tools directly when wrappers are not available.
 
-For an initialized queue, submit the prepared cohort:
+Submit the prepared cohort whether the queue is initialized or absent:
 Call `work_queue_submit` once with
 `{"nodes": <the plan.nodes array>}` before requesting any grants. Date-keyed
 graph/node identities make repeated submissions on the same UTC day idempotent,
@@ -99,8 +100,7 @@ worker-name allowlist; it does not replace the installed policy's profile,
 revision, or principal binding. Do not call ordinary `dispatch_workflow` or typed
 per-worker dispatch tools.
 
-The authenticated operator provisions the queue Policy and grants this
-dispatcher's authenticated principal producer entitlement before it can submit
-or dispatch. Do not bootstrap Policy. If producer entitlement is missing from
-an existing queue, report the admission failure explicitly; do not call `noop`
-or ordinary worker dispatch.
+Safe-output processing uses only the compiler-approved Policy proposal; never
+choose or modify Policy. The proposal must grant this dispatcher's principal
+producer entitlement. If bootstrap or admission fails, report the failure; do
+not bypass it with `noop` or ordinary worker dispatch.

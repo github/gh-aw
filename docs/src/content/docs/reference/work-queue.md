@@ -30,7 +30,7 @@ The native protocol distinguishes the following records and lifecycle events:
 | --- | --- |
 | Work | An immutable task definition. Tasks can form a directed acyclic graph (DAG), a dependency graph with no cycles. |
 | Claim | Authorization for one attempt at a Work item. Its original `claim_handle` identifies that attempt. |
-| Policy | Administrator-installed rules for scheduling, producer permissions, worker routing, and limits. |
+| Policy | Compiler-approved rules for scheduling, producer permissions, worker routing, and limits. The first trusted producer submission installs the proposal with Work when the branch is absent; later changes are administrator-only. |
 | Pool | A group of tasks with shared worker routes and capacity limits. |
 | Reservation | Native worker capacity held for an assignment, including while launch or termination is uncertain. |
 | Native launch | The request to start a GitHub Actions worker run. A committed assignment is not proof of launch. |
@@ -305,7 +305,7 @@ initialize Policy over an invalid log.
 | `trace --request-id ID` or `trace --claim-id ID` | Read causal events within size limits, without exposing payloads or receipt contents. `--offset` and `--limit` control pagination. |
 | `compact` | Replace the current log prefix with a version-3 checkpoint of deterministic replay state. The checkpoint names the prior Git commit and preserves fairness accounting, ownership, delivery barriers, and request identities. |
 | `policy --file policy.json --epoch EPOCH` | Install an authorized Policy for future work only when the queue is quiescent. |
-| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed producer permissions. |
+| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed producer permissions. The CLI requires an existing Policy; a workflow producer's first safe-output submit can bootstrap an absent branch. |
 | `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. |
 | `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit the next assignments selected by deterministic fair scheduling and their reservations. Does not send a workflow-dispatch POST. |
 | `control`, `cancel-work` | Apply authorized pause, cutover, or cancellation decisions without refunding accounted service or force-releasing a reservation for a possible native run. |
@@ -323,8 +323,9 @@ A Policy update requires a quiescent queue: no nonterminal (unfinished) Work,
 outstanding reservations, or unresolved delivery barriers for completed Work.
 Installing Policy does not configure or verify queue-branch writer restrictions.
 Those restrictions must be established independently; automated enforcement
-remains deferred. The agent cannot install Policy or receive queue-write
-credentials.
+remains deferred. A trusted workflow producer can publish only the exact
+compiler-approved proposal with its first Work on an absent branch; the agent
+cannot choose or update Policy or receive queue-write credentials.
 
 Worker finish is a Claim-scoped MCP intent, not an operator command that can
 impersonate a worker. Direct `claim --work-id`, legacy scalar assignments
