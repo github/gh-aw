@@ -16,15 +16,12 @@ import (
 )
 
 func TestRunListWorkflows_JSONOutput(t *testing.T) {
-	// Save current directory
 	originalDir, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current directory")
 
 	// Change to repository root
 	repoRoot := filepath.Join(originalDir, "..", "..")
-	err = os.Chdir(repoRoot)
-	require.NoError(t, err, "Failed to change to repository root")
-	defer os.Chdir(originalDir)
+	t.Chdir(repoRoot)
 
 	// Test JSON output without pattern
 	t.Run("JSON output without pattern", func(t *testing.T) {
@@ -85,15 +82,12 @@ func TestWorkflowListItem_JSONMarshaling(t *testing.T) {
 }
 
 func TestRunListWorkflows_TextOutput(t *testing.T) {
-	// Save current directory
 	originalDir, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current directory")
 
 	// Change to repository root
 	repoRoot := filepath.Join(originalDir, "..", "..")
-	err = os.Chdir(repoRoot)
-	require.NoError(t, err, "Failed to change to repository root")
-	defer os.Chdir(originalDir)
+	t.Chdir(repoRoot)
 
 	// Test text output
 	t.Run("Text output without pattern", func(t *testing.T) {
