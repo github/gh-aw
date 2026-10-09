@@ -284,7 +284,7 @@ type agyConformanceWorkflow struct {
 	Jobs        map[string]agyConformanceJob `yaml:"jobs"`
 }
 
-func TestAgyProductionConformanceIsBoundedAndScoped(t *testing.T) {
+func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 	var caller agyConformanceWorkflow
 	parent, err := os.ReadFile("../../.github/workflows/credentials-check.yml")
 	require.NoError(t, err)
@@ -333,7 +333,9 @@ func TestAgyProductionConformanceIsBoundedAndScoped(t *testing.T) {
 					}
 				}
 				for permission, level := range config.Permissions {
-					assert.Equal(t, allowedPermissions[permission], level, "%s must allow only scoped %s permission", name, permission)
+					expectedLevel, allowed := allowedPermissions[permission]
+					assert.True(t, allowed, "%s must not grant unscoped %s permission", name, permission)
+					assert.Equal(t, expectedLevel, level, "%s must use the scoped %s permission", name, permission)
 				}
 			}
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
@@ -363,6 +365,8 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 	delete(canonical, "description")
 	delete(canonical, "on")
 	delete(canonical, "max-ai-credits")
+	delete(canonical, "imports")
+	delete(canonical, "tools")
 	for _, entry := range []struct {
 		id, trigger string
 		credits     int
@@ -395,6 +399,8 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			delete(source, "description")
 			delete(source, "on")
 			delete(source, "max-ai-credits")
+			delete(source, "imports")
+			delete(source, "tools")
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})
 	}
@@ -419,7 +425,7 @@ func TestAgySmokeLabelCommandIsCentrallyRouted(t *testing.T) {
 	assert.NotContains(t, string(lock), "remove_trigger_label")
 }
 
-func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, cliProxyEnabled bool) {
+func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, workQueueWorker bool) {
 	t.Helper()
 	steps, environment, commands := agyConformanceStepContent(compiled)
 	execution := steps["Execute experimental Agy CLI"]
@@ -449,8 +455,8 @@ func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, c
 	for _, expected := range []string{`"agy-native"`, `"native-challenge"`, "--exclude-env GEMINI_API_KEY"} {
 		assert.Contains(t, commands, expected, "compiled commands must retain %s", expected)
 	}
-	if cliProxyEnabled {
-		assert.Contains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
+	if workQueueWorker {
+		assert.Contains(t, commands, `export GH_AW_MCP_CLI_SERVERS='["agy-native","mcpscripts","safeoutputs","work-queue"]'`)
 	} else {
 		assert.NotContains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
 	}
