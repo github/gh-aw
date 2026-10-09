@@ -4564,11 +4564,6 @@ tools:
       # (optional)
       label: "example-value"
 
-      # Pre-provisioned native organization single-select field. Omit for comment-only
-      # status.
-      # (optional)
-      status-field: "example-value"
-
     # Declare one schema-validated JSON memory snapshot per Claim. The compiler
     # supplies credential-free preparation and protected immutable git-tree delivery.
     # (optional)

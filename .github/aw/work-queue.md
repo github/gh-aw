@@ -53,9 +53,9 @@ for installation; writer-restriction automation remains deferred.
 
 ## Mirror admitted Work with Issues
 
-`tools.work-queue.issues: true` mirrors admitted Work with the `work` label.
-An object may set `label` and a pre-provisioned native organization
-`status-field`. Require installed projector authority: only protected hooks
+`tools.work-queue.issues: true` mirrors admitted Work with purple `work` and
+`work: <status>` labels. An object may customize the tracking label and status
+label prefix with `label`. Require installed projector authority: only protected hooks
 project their own admissions/original Claims. Immutable `backing_issue` binds
 one Work per Issue. Agents never write mirrors; human edits never establish
 Result. Pre-existing Issues need exact installed `backing_issues` grants.
