@@ -702,6 +702,14 @@ jobs:
                     "type": "string",
                     "maxLength": 256
                   },
+                  "state_reason": {
+                    "type": "string",
+                    "enum": [
+                      "completed",
+                      "not_planned",
+                      "duplicate"
+                    ]
+                  },
                   "suggest": {
                     "type": "boolean"
                   }
