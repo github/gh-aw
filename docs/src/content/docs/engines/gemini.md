@@ -1,9 +1,16 @@
 ---
 title: Using Gemini CLI with GitHub Agentic Workflows
-description: Select and authenticate Google Gemini CLI as the AI engine for GitHub Agentic Workflows, understand its capabilities and limitations, and start from an example.
+description: Maintain workflows using the deprecated Google Gemini CLI engine and evaluate migration to the experimental Agy engine.
 ---
 
 [Google Gemini CLI](https://geminicli.com/) is a coding agent from Google. GitHub Agentic Workflows runs Gemini CLI in GitHub Actions, adding GitHub event triggers, sandbox controls, and safe outputs for constrained, reviewable automation.
+
+> [!WARNING]
+> The `gemini` engine is deprecated in favor of the experimental [`agy` engine](/gh-aw/engines/agy/).
+> Existing Gemini workflows remain supported, with no automatic migration or removal date.
+> For API-key workflows, review [Agy's migration guidance](/gh-aw/engines/agy/#evaluating-a-gemini-api-key-workflow)
+> before changing engines. Keep `engine: gemini` for Google WIF or features Agy does not support,
+> including native bash restrictions.
 
 ## Selecting Gemini CLI as the AI engine
 
