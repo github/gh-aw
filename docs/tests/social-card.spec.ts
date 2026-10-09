@@ -48,3 +48,11 @@ test("falls back to the site image for pages outside the docs collection", async
 
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://github.github.com/gh-aw/og-home-1200x630.png");
 });
+
+test("keeps the fallback page description consistent with social metadata", async ({ page }) => {
+  await page.goto("/gh-aw/blog/");
+
+  const description = "Intelligent automation for GitHub with Copilot, Claude, Codex or Antigravity. Agents triage, investigate and open pull requests with guardrails and cost controls.";
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", description);
+  await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", description);
+});

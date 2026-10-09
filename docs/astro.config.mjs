@@ -13,6 +13,7 @@ import remarkTableDataLabels from "./src/lib/remark/tableDataLabels.js";
 import remarkInlineMarkdownInHtml from "./src/lib/remark/inlineMarkdownInHtml.js";
 import remarkAgenticsWorkflow from "./src/lib/remark/agenticsWorkflow.js";
 import rehypeTableWrapper from "./src/lib/rehype/tableWrapper.js";
+import { siteDescription } from "./src/lib/site-description.js";
 
 const agenticsWorkflowsDirectory = process.env.AGENTICS_WORKFLOWS_DIR ?? fileURLToPath(new URL("../../agentics/workflows/", import.meta.url));
 
@@ -268,7 +269,7 @@ export default defineConfig({
     mermaid(),
     starlight({
       title: "GitHub Agentic Workflows",
-      description: "Intelligent automation for GitHub with Copilot, Claude, Codex or Gemini. Agents triage, investigate and open pull requests with guardrails and cost controls.",
+      description: siteDescription,
       favicon: "/favicon.svg",
       logo: {
         src: "./src/assets/agentic-workflow.svg",

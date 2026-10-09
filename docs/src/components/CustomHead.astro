@@ -1,6 +1,7 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
 import { getCollection } from 'astro:content';
+import { siteDescription } from '../lib/site-description.js';
 
 type BlogAuthor = {
   name?: string;
@@ -25,8 +26,7 @@ const isHomePage = isDocsHomePage || rawPageTitle === siteTitle;
 const ogTitle = isHomePage ? siteTitle : `${rawPageTitle} | ${siteTitle}`;
 
 // Default description (110-160 chars optimal for OG)
-const defaultDescription = 'Intelligent automation for GitHub with Copilot, Claude, Codex or Antigravity. Agents triage, investigate and open pull requests with guardrails and cost controls.';
-const pageDescription = entry?.data?.description || defaultDescription;
+const pageDescription = entry?.data?.description || siteDescription;
 
 // Social image: the site card (src/og/OgHome.astro, `npm run og`) for the home
 // page and pages outside the docs collection; otherwise the page's own card
@@ -98,7 +98,7 @@ const homeJsonLd = {
       '@id': websiteId,
       name: schemaWebsiteName,
       url: siteUrl,
-      description: defaultDescription,
+      description: siteDescription,
       publisher: {
         '@id': organizationId,
       },
@@ -139,7 +139,7 @@ const homeJsonLd = {
       '@id': `${siteUrl}#software`,
       name: siteTitle,
       url: siteUrl,
-      description: defaultDescription,
+      description: siteDescription,
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'Any',
       dateModified: '2026-05-09',
