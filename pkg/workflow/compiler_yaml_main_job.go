@@ -24,7 +24,10 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	}
 
 	// Phase 2: Runtime detection, custom steps, and workspace setup
-	customStepsContainCheckout := c.generateRuntimeAndWorkspaceSetupSteps(yaml, data, needsCheckout)
+	customStepsContainCheckout, err := c.generateRuntimeAndWorkspaceSetupSteps(yaml, data, needsCheckout)
+	if err != nil {
+		return err
+	}
 	needsGitConfig := needsCheckout || customStepsContainCheckout
 
 	// Phase 3: Engine installation, MCP setup, and pre-agent preparation

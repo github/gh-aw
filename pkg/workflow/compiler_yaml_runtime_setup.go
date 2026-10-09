@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -19,10 +20,13 @@ import (
 // turn.
 // It mutates data.CustomSteps (via deduplication) and returns whether the custom steps
 // themselves contain a checkout action (used by the caller to compute needsGitConfig).
-func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, data *WorkflowData, needsCheckout bool) bool {
-	runtimeSetupSteps, customStepsContainCheckout := c.prepareRuntimeSetupAndCheckoutInfo(data)
-	compilerYamlLog.Printf("Custom steps contain checkout: %t (len(customSteps)=%d)", customStepsContainCheckout, len(data.CustomSteps))
+func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, data *WorkflowData, needsCheckout bool) (bool, error) {
+	runtimeSetupSteps, customStepsContainCheckout, err := c.prepareRuntimeSetupAndCheckoutInfo(data)
+	if err != nil {
+		return false, err
+	}
 
+	compilerYamlLog.Printf("Custom steps contain checkout: %t (len(customSteps)=%d)", customStepsContainCheckout, len(data.CustomSteps))
 	c.emitRuntimeSetupPrelude(yaml, data, needsCheckout, customStepsContainCheckout, runtimeSetupSteps)
 
 	// Create /tmp/gh-aw/ base directory for all temporary files
@@ -37,8 +41,7 @@ func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, 
 	//   3. For GHE/GHES: authenticates gh CLI with the enterprise host and sets
 	//      GH_HOST=<host> in GITHUB_ENV so every subsequent step in this job
 	//      picks up the correct host without manual per-step configuration.
-	// Must run after the setup action (so the script is available at ${RUNNER_TEMP}/gh-aw/actions/)
-	// and before any custom steps that invoke gh CLI commands.
+	// Run after setup so its script is available, before custom steps that invoke gh CLI commands.
 	yaml.WriteString("      - name: Configure gh CLI for GitHub Enterprise\n")
 	yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/configure_gh_for_ghe.sh\"\n")
 	yaml.WriteString("        env:\n")
@@ -77,7 +80,7 @@ func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, 
 	compilerYamlLog.Printf("Generating cache steps for workflow")
 	generateCacheSteps(yaml, data, c.verbose)
 
-	return customStepsContainCheckout
+	return customStepsContainCheckout, nil
 }
 
 func (c *Compiler) generateWorkQueueIntentOriginStep(yaml *strings.Builder, data *WorkflowData) {
@@ -92,7 +95,7 @@ func (c *Compiler) generateWorkQueueIntentOriginStep(yaml *strings.Builder, data
 	yaml.WriteString(generateGitHubScriptWithRequire("capture_work_queue_intent_origin.cjs"))
 }
 
-func (c *Compiler) prepareRuntimeSetupAndCheckoutInfo(data *WorkflowData) ([]GitHubActionStep, bool) {
+func (c *Compiler) prepareRuntimeSetupAndCheckoutInfo(data *WorkflowData) ([]GitHubActionStep, bool, error) {
 	// Add automatic runtime setup steps if needed
 	// This detects runtimes from custom steps and MCP configs
 	runtimeRequirements := detectRuntimeRequirementsCached(data)
@@ -111,6 +114,10 @@ func (c *Compiler) prepareRuntimeSetupAndCheckoutInfo(data *WorkflowData) ([]Git
 		}
 	}
 
+	if err := c.validateCustomSetupUVCache(data.CustomSteps); err != nil {
+		return nil, false, err
+	}
+
 	// Generate runtime setup steps (after filtering out user-customized ones)
 	runtimeSetupSteps := GenerateRuntimeSetupSteps(runtimeRequirements, data)
 	compilerYamlLog.Printf("Detected runtime requirements: %d runtimes, %d setup steps", len(runtimeRequirements), len(runtimeSetupSteps))
@@ -123,7 +130,24 @@ func (c *Compiler) prepareRuntimeSetupAndCheckoutInfo(data *WorkflowData) ([]Git
 	// sanitization.
 	customStepsContainCheckout := data.CustomSteps != "" && ContainsCheckout(data.CustomSteps)
 
-	return runtimeSetupSteps, customStepsContainCheckout
+	return runtimeSetupSteps, customStepsContainCheckout, nil
+}
+
+func (c *Compiler) validateCustomSetupUVCache(customSteps string) error {
+	warnings := customSetupUVCacheWarnings(customSteps)
+	if len(warnings) == 0 {
+		return nil
+	}
+
+	if c.strictMode {
+		return errors.New("strict mode: " + strings.Join(warnings, "; "))
+	}
+
+	for _, warning := range warnings {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
+		c.IncrementWarningCount()
+	}
+	return nil
 }
 
 func (c *Compiler) emitRuntimeSetupPrelude(yaml *strings.Builder, data *WorkflowData, needsCheckout bool, customStepsContainCheckout bool, runtimeSetupSteps []GitHubActionStep) {

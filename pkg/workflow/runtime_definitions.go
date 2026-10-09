@@ -161,13 +161,16 @@ var knownRuntimes = []*Runtime{
 		ManifestFiles:  []string{"Gemfile", "Gemfile.lock"},
 	},
 	{
-		ID:                "uv",
-		Name:              "uv",
-		ActionRepo:        "astral-sh/setup-uv",
-		ActionVersion:     "v5",
-		VersionField:      "version",
-		DefaultVersion:    "", // Uses latest
-		Commands:          []string{"uv", "uvx"},
+		ID:             "uv",
+		Name:           "uv",
+		ActionRepo:     "astral-sh/setup-uv",
+		ActionVersion:  "v5",
+		VersionField:   "version",
+		DefaultVersion: "", // Uses latest
+		Commands:       []string{"uv", "uvx"},
+		ExtraWithFields: map[string]string{
+			"enable-cache": "false",
+		},
 		ManifestFiles:     []string{"pyproject.toml", "uv.lock"},
 		UnverifiedCreator: true, // astral-sh org is not GitHub-verified on the Marketplace
 	},
