@@ -58,8 +58,8 @@ describe("work-queue deployment documentation", () => {
     expect(instructions.trim().split(/\s+/).length).toBeLessThanOrEqual(800);
     expect(instructions).not.toContain("```json");
     expect(instructions).toContain("issue-backed WorkQueueOps");
-    expect(instructions).toContain("null `snapshot_sha` means absent; stop with `noop`");
-    expect(instructions).toContain("Existing policyless ledgers are deployment failures");
+    expect(instructions).toContain("`uninitialized` plus null SHA is empty");
+    expect(instructions).toContain("Existing policyless ledgers are failures");
     expect(readRepositoryFile(referencePath)).toContain("Work queues can be Git-backed or issue-backed");
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       expect(instructions).toContain(file.replace(/^docs\//, "../../docs/"));
@@ -92,8 +92,8 @@ describe("work-queue deployment documentation", () => {
     const dispatcher = readRepositoryFile(".github/workflows/eslint-factory-dispatcher.md");
     expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"default","limit":32}\'');
     expect(dispatcher).toContain("Check `queue_state`, not just `total`");
-    expect(dispatcher).toContain("Treat it as an empty backlog and stop with `noop`");
-    expect(dispatcher).toMatch(/no\s+installed Policy to authorize submission or dispatch/);
+    expect(dispatcher).toContain("Treat it as an empty backlog; the first trusted producer submission");
+    expect(dispatcher).toContain("Do not dispatch until that submission has been admitted");
     expect(dispatcher).toContain("existing policyless ledger");
     expect(dispatcher).toContain('work-queue work_queue_dispatch_next \'{"pool":"default","max_claims":3,"max_dispatches":3}\'');
     expect(dispatcher).toContain('`status: "staged"`');

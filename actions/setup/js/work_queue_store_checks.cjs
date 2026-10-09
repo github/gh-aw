@@ -890,6 +890,26 @@ function registerTests({ describe, it }) {
       }
       assert.equal(fake.state.updates, 0);
     });
+    it("provisions an absent queue branch from the compiled Policy on the first producer submission", async () => {
+      const fake = fakeGitHub();
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
+      const nodes = [newWork({ task: "first safe-output submission" }, "bootstrap-graph", "root", "default", policy, 100)];
+      const request = newRequest("producer-bootstrap", "submit", producer, { nodes });
+      const result = await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
+      assert.equal(result.publishedNow, true);
+      assert.equal(fake.refs.has("work-queue"), true);
+      assert.equal(result.transactions.length, 1);
+      assert.equal(result.commit.actor.role, "producer");
+      assert.deepEqual(
+        result.commit.operations.map(operation => operation.kind),
+        ["Policy", "Work"]
+      );
+      assert.deepEqual(result.state.policy, policy);
+      assert.ok(fake.state.calls.includes(`getContent:.github/workflows/worker.lock.yml@${fake.state.defaultRevision}`));
+      assert.ok(fake.state.calls.includes("getWorkflow:worker.lock.yml"));
+      await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
+      assert.equal(fake.log().length, 1);
+    });
     it("installs mandatory defaults only on genuine genesis and does not overlay authoritative installed Policy", async () => {
       const fake = fakeGitHub();
       const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });

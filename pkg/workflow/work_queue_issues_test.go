@@ -45,17 +45,18 @@ func TestWorkQueueIssuesConfiguration(t *testing.T) {
 		value any
 		valid bool
 		label string
-		field string
 	}{
-		{"true", true, true, "work", ""},
-		{"false", false, true, "", ""},
-		{"object", map[string]any{"label": "cookie", "status-field": "CustomStatus"}, true, "cookie", "CustomStatus"},
-		{"empty-object", map[string]any{}, true, "work", ""},
-		{"blank-label", map[string]any{"label": " "}, false, "", ""},
-		{"blank-field", map[string]any{"status-field": "\t"}, false, "", ""},
-		{"unknown", map[string]any{"storage": "issues"}, false, "", ""},
-		{"null", nil, false, "", ""},
-		{"expression", map[string]any{"label": "${{ inputs.label }}"}, false, "", ""},
+		{"true", true, true, "work"},
+		{"false", false, true, ""},
+		{"object", map[string]any{"label": "cookie"}, true, "cookie"},
+		{"maximum-label-prefix", map[string]any{"label": strings.Repeat("x", 33)}, true, strings.Repeat("x", 33)},
+		{"empty-object", map[string]any{}, true, "work"},
+		{"blank-label", map[string]any{"label": " "}, false, ""},
+		{"label-prefix-too-long", map[string]any{"label": strings.Repeat("x", 34)}, false, ""},
+		{"status-field", map[string]any{"status-field": "CustomStatus"}, false, ""},
+		{"unknown", map[string]any{"storage": "issues"}, false, ""},
+		{"null", nil, false, ""},
+		{"expression", map[string]any{"label": "${{ inputs.label }}"}, false, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			data := &WorkflowData{Tools: map[string]any{"work-queue": map[string]any{"worker": true, "issues": test.value}}}
@@ -69,7 +70,6 @@ func TestWorkQueueIssuesConfiguration(t *testing.T) {
 				require.Nil(t, config)
 			} else {
 				require.Equal(t, test.label, config.Label)
-				require.Equal(t, test.field, config.StatusField)
 			}
 		})
 	}
@@ -92,7 +92,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 		return compiled
 	}
 	baseline := compile("", false)
-	enabled := compile("    issues:\n      label: cookie\n      status-field: WorkStatus\n", false)
+	enabled := compile("    issues:\n      label: cookie\n", false)
 	baseJobs := baseline["jobs"].(map[string]any)
 	jobs := enabled["jobs"].(map[string]any)
 	require.Len(t, jobs, len(baseJobs))
@@ -119,7 +119,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 		if step["id"] == "work_queue_issues" {
 			require.Equal(t, "always()", step["if"])
 			env := step["env"].(map[string]any)
-			require.JSONEq(t, `{"label":"cookie","status-field":"WorkStatus"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
+			require.JSONEq(t, `{"label":"cookie"}`, env["GH_AW_WORK_QUEUE_ISSUES"].(string))
 			seen = true
 		}
 	}

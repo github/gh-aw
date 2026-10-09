@@ -411,9 +411,19 @@ async function publishWorkQueueRequest({
     const recovered = stableRequestResult(current, stable, stableActor);
     if (recovered) return recovered;
     if (initializeOnly && current.sha) return { ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: false, rejected: [] };
+    let bootstrapOperation;
     if (!current.sha) {
       if (stableActor.role === "worker") throw queueError("claim_scope_invalid", "a worker cannot have effective Claim authority in an uninitialized queue");
-      if (stable.kind !== "policy") {
+      if (stable.kind === "submit" && ["producer", "dispatcher"].includes(stableActor.role) && initializationContext === undefined) {
+        if (policyProposal === undefined) throw queueError("policy_missing", "first producer submission requires a compiler-approved Policy proposal");
+        const policy = validatePolicy(structuredClone(policyProposal));
+        const seed = createHash("sha256").update(stable.id, "utf8").digest("hex");
+        bootstrapOperation = { kind: "Policy", epoch: `epoch_${seed}`, policy };
+        current = {
+          ...current,
+          state: { ...current.state, repository: stableActor.repository, policy, policy_epoch: bootstrapOperation.epoch },
+        };
+      } else if (stable.kind !== "policy") {
         log.debug("request.genesis.required");
         // Genuine genesis only: separate explicit Policy request, never overlay an
         // installed epoch with a compiled proposal after a publication conflict.
@@ -453,6 +463,7 @@ async function publishWorkQueueRequest({
     const generated = await generateOperations(generateOperations === generateRequestOperations ? current.state : structuredClone(current.state), structuredClone(stable), structuredClone(stableActor), at, id, structuredClone(observations));
     const decision = Array.isArray(generated) ? { operations: generated } : generated;
     if (!decision || !Array.isArray(decision.operations)) throw queueError("request_invalid", "candidate generator must return operations");
+    if (bootstrapOperation) decision.operations.unshift(bootstrapOperation);
     log.debug("request.candidate.generated", { operations: decision.operations.length, observations: observations.length });
     if (!decision.operations.length) {
       log.debug("request.publish.no_operations");
