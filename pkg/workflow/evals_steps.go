@@ -573,7 +573,7 @@ func marshalEvalsQuestions(questions []EvalDefinition) string {
 		// Use json.Marshal for robust string quoting (handles all JSON escape sequences)
 		idJSON, _ := json.Marshal(q.ID)             //nolint:jsonmarshalignoredeerror // marshaling a string cannot fail
 		questionJSON, _ := json.Marshal(q.Question) //nolint:jsonmarshalignoredeerror // marshaling a string cannot fail
-		fmt.Fprintf(&sb, `{"id":%s,"question":%s}`, idJSON, questionJSON)
+		sb.WriteString(`{"id":` + string(idJSON) + `,"question":` + string(questionJSON) + `}`)
 	}
 	sb.WriteString("]")
 	return sb.String()
