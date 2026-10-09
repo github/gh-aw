@@ -419,6 +419,7 @@ func (e *ExpressionExtractor) generateEnvVarName(content string) string {
 
 	// Fall back to hash-based name for complex expressions
 	// Use SHA256 hash to generate a unique identifier
+	// content is unevaluated workflow expression source, not its runtime value; the digest is only an environment variable name.
 	hash := sha256.Sum256([]byte(content))
 	hashStr := hex.EncodeToString(hash[:])
 
