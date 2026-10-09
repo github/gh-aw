@@ -74,7 +74,7 @@ async function main(options = {}) {
   fs.writeFileSync(outputPath, encoded, { mode: 0o444 });
   fs.chmodSync(outputPath, 0o444);
   configuration.core.setOutput?.("work_queue_origin", canonical(snapshot.origin));
-  configuration.core.info(`Work queue activation: ${activationMessage({ worker, staged, latest, runtime, branch: configuration.branch ?? WORK_QUEUE_BRANCH })}; snapshot captured`);
+  configuration.core.info(`Work queue activation: ${activationMessage({ worker, staged, latest, runtime, branch: options.branch ?? WORK_QUEUE_BRANCH })}; snapshot captured`);
   return snapshot;
 }
 
