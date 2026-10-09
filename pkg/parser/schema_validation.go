@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -78,11 +79,12 @@ func validateSharedWorkflowFields(frontmatter map[string]any) error {
 	}
 
 	if len(forbiddenFound) > 0 {
+		sort.Strings(forbiddenFound)
 		schemaValidationLog.Printf("Found %d forbidden field(s) in shared workflow: %v", len(forbiddenFound), forbiddenFound)
 		if len(forbiddenFound) == 1 {
-			return fmt.Errorf("field '%s' cannot be used in shared workflows (only allowed in main workflows with 'on' trigger)", forbiddenFound[0])
+			return fmt.Errorf("field '%s' cannot be used in shared workflows (only allowed in main workflows with 'on' trigger); shared workflows may use import-safe 'on' fields: %s", forbiddenFound[0], strings.Join(sharedWorkflowAllowedOnFieldList, ", "))
 		}
-		return fmt.Errorf("fields %v cannot be used in shared workflows (only allowed in main workflows with 'on' trigger)", forbiddenFound)
+		return fmt.Errorf("fields %v cannot be used in shared workflows (only allowed in main workflows with 'on' trigger); shared workflows may use import-safe 'on' fields: %s", forbiddenFound, strings.Join(sharedWorkflowAllowedOnFieldList, ", "))
 	}
 
 	return nil
