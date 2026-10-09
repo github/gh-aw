@@ -42,10 +42,13 @@ foreign-repository responses and failed confirmation are rejected.
 Candidate validation precedes default-branch preparation. Reads, dispatches,
 invalid requests and workers cannot prepare a repository. The empty repository's
 default branch must differ from the queue branch. A lost preparation response is
-accepted only after the default branch is readable. Preparation does not publish
+accepted only after the default branch is readable; an absent branch or failed
+recheck rejects the attempt. Preparation does not publish
 queue facts: the first queue commit contains Policy and Work together, and requires
-independent verification of the approved worker route. An unavailable route stops
-publication; deploying the worker permits retry of the same immutable submission.
+independent verification of the approved worker route. An unavailable route fails
+the invocation with `policy_missing`; after deploying the worker, an external new
+invocation can resubmit the same immutable request. The model's `deferred` phase
+records this failed attempt, not automatic polling or a runtime retry loop.
 Repeating an already-published request recovers its receipt without another commit.
 
 Run the focused checks using the official jar documented below:
@@ -66,6 +69,7 @@ TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=QueueBootstrap \
 | `BootstrapDeferredWitness.cfg` | Reach a prepared default branch with no queue publication and an unavailable worker. |
 | `BootstrapRetryWitness.cfg` | Reach atomic publication after preparation, route failure, worker deployment and retry. |
 | `BootstrapLostResponseWitness.cfg` | Reach publication after recovering a lost default-branch initialization response. |
+| `BootstrapLostResponseFailureWitness.cfg` | Reach rejection without publication when a lost initialization response is followed by an absent default branch. |
 
 Witness configurations check `Safety` before their deliberately false
 reachability invariant. They do not establish eventual deployment or submission

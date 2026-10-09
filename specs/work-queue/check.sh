@@ -137,6 +137,7 @@ run_model BrokenBootstrapAtomic AtomicGenesis Invariant 12 QueueBootstrap
 run_model BootstrapDeferredWitness NoDeferredPreparation Invariant 12 QueueBootstrap
 run_model BootstrapRetryWitness NoDeploymentRetry Invariant 12 QueueBootstrap
 run_model BootstrapLostResponseWitness NoLostResponseRecovery Invariant 12 QueueBootstrap
+run_model BootstrapLostResponseFailureWitness NoLostResponseFailure Invariant 12 QueueBootstrap
 if [ "$RUN_COUNT" -eq 0 ]; then
     echo "No configuration matches the requested TLC filters." >&2
     exit 1

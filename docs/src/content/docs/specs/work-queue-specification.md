@@ -514,9 +514,10 @@ confirms the requested repository identity and `isEmpty = true`. In a branchless
 repository, the runtime MAY prepare the default branch only after validating the
 first producer submission's Policy and Work. The default branch MUST differ from
 the queue branch. A lost preparation response MUST be resolved by reading that
-default branch. Preparation MUST NOT publish Policy or Work: if the immutable
-worker route is unavailable, queue publication stops. After worker deployment,
-the same submission MAY be retried; Policy and Work still enter the separate queue
+default branch; an absent branch or failed recheck MUST fail closed. Preparation
+MUST NOT publish Policy or Work: if the immutable worker route is unavailable, the
+invocation fails without queue publication. After worker deployment, a new
+invocation MAY resubmit the same request; Policy and Work still enter the separate queue
 branch atomically only after route verification.
 
 One scheduling **pool** is one durable decision domain with a fixed worker-capability class, worker-routing policy, capacity model, and authoritative policy epoch. All dispatchers in that domain MUST use the same policy. Arbitrary agent-chosen filters MUST NOT redefine the competition set.
@@ -2595,7 +2596,7 @@ separately checks bounded first-submit preparation and atomic genesis for empty
 and initialized repositories. Its negative controls cover unconfirmed absence,
 invalid preparation, coincident branches, unverified routes and split publication.
 Guarded witnesses demonstrate preparation without publication, retry after worker
-deployment and lost-response recovery. These are reachability checks, not eventual
+deployment and lost-response confirmation or rejection. These are reachability checks, not eventual
 deployment or GitHub API guarantees; the
 [bootstrap model guide](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#first-submit-bootstrap-model)
 states the abstraction limits.

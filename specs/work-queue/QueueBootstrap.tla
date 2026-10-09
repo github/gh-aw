@@ -74,16 +74,22 @@ PrepareDefault(outcome) ==
        ELSE IF outcome = "failed"
        THEN /\ phase' = "rejected"
             /\ UNCHANGED <<defaultExists, prepared, lostResponse>>
+       ELSE IF outcome = "lost"
+       THEN /\ defaultExists' \in BOOLEAN
+            /\ prepared' = defaultExists' /\ lostResponse' = TRUE
+            /\ phase' = "confirm"
        ELSE /\ defaultExists' = TRUE /\ prepared' = TRUE
-            /\ lostResponse' = (outcome = "lost")
-            /\ phase' = IF outcome = "lost" THEN "confirm" ELSE "route"
+            /\ lostResponse' = FALSE /\ phase' = "route"
     /\ UNCHANGED <<request, workerAvailable, checked, verified, deferred,
                    retried, ledger, publications, violation>>
 
-ConfirmDefault ==
+ConfirmDefault(observation) ==
     \* A lost write response is recovered only by a readable default branch.
-    /\ phase = "confirm" /\ defaultExists
-    /\ phase' = "route"
+    /\ phase = "confirm"
+    /\ observation \in {"found", "not-found", "unavailable"}
+    /\ (observation = "found" => defaultExists)
+    /\ (observation = "not-found" => ~defaultExists)
+    /\ phase' = IF observation = "found" THEN "route" ELSE "rejected"
     /\ UNCHANGED <<request, defaultExists, workerAvailable, checked, verified,
                    prepared, lostResponse, deferred, retried, ledger,
                    publications, violation>>
@@ -97,6 +103,7 @@ DeployWorker ==
 VerifyRoute ==
     /\ phase = "route" /\ defaultExists /\ checked
     /\ verified' = workerAvailable
+    \* "deferred" is a failed invocation (policy_missing), not a waiting runtime.
     /\ phase' = IF workerAvailable \/ Broken = "unverified-route"
                 THEN "publish" ELSE "deferred"
     /\ deferred' = (deferred \/ ~workerAvailable)
@@ -105,7 +112,8 @@ VerifyRoute ==
 
 RetrySubmission ==
     /\ phase = "deferred" /\ workerAvailable /\ ~retried
-    \* The same immutable request is re-read and revalidated, not rewritten.
+    \* An external new invocation resubmits the same immutable request.
+    \* There is no automatic worker-deployment polling or retry loop.
     /\ phase' = "read" /\ checked' = FALSE /\ verified' = FALSE
     /\ retried' = TRUE
     /\ UNCHANGED <<request, defaultExists, workerAvailable, prepared,
@@ -129,10 +137,12 @@ RecoverPublished ==
                    verified, prepared, lostResponse, deferred, ledger,
                    publications, violation>>
 
-Next == ValidateCandidate \/ InvalidPreparation \/ ConfirmDefault
+Next == ValidateCandidate \/ InvalidPreparation
         \/ DeployWorker \/ VerifyRoute \/ RetrySubmission \/ Publish
         \/ RecoverPublished
         \/ (\E observation \in Observations : ReadRef(observation))
+        \/ (\E observation \in {"found", "not-found", "unavailable"} :
+                ConfirmDefault(observation))
         \/ (\E outcome \in {"acknowledged", "lost", "failed"} : PrepareDefault(outcome))
 Spec == Init /\ [][Next]_vars
 
@@ -159,4 +169,6 @@ Safety == TypeOK /\ AbsenceAuthority /\ PreparationAuthority /\ SeparateQueueBra
 NoDeferredPreparation == ~(prepared /\ phase = "deferred" /\ ledger = <<>>)
 NoDeploymentRetry == ~(prepared /\ deferred /\ retried /\ ledger = <<"Policy", "Work">>)
 NoLostResponseRecovery == ~(prepared /\ lostResponse /\ ledger = <<"Policy", "Work">>)
+NoLostResponseFailure == ~(lostResponse /\ ~defaultExists /\ phase = "rejected"
+                          /\ ledger = <<>>)
 =============================================================================
