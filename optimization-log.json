@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-22",
-    "workflow_name": "PR Code Quality Reviewer",
-    "workflow_file": "pr-code-quality-reviewer",
-    "total_aic_analyzed": 280.94,
-    "runs_audited": 21,
-    "recommendations_count": 5,
-    "estimated_aic_savings_per_run": 26
-  },
-  {
     "date": "2026-06-23",
     "workflow_name": "Smoke Copilot",
     "workflow_file": "smoke-copilot",
@@ -19,7 +10,7 @@
   },
   {
     "date": "2026-06-24",
-    "workflow_name": "Design Decision Gate \ud83c\udfd7\ufe0f",
+    "workflow_name": "Design Decision Gate 🏗️",
     "workflow_file": "design-decision-gate",
     "total_aic_analyzed": 432.592,
     "runs_audited": 7,
@@ -282,12 +273,22 @@
   },
   {
     "date": "2026-10-08",
-    "workflow_name": "Design Decision Gate \ud83c\udfd7\ufe0f",
+    "workflow_name": "Design Decision Gate 🏗️",
     "workflow_file": "design-decision-gate",
     "total_aic_analyzed": 102.14,
     "runs_audited": 6,
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 12
+  },
+  {
+    "date": "2026-10-09",
+    "workflow_name": "Claude Code User Documentation Review",
+    "workflow_file": "claude-code-user-docs-review",
+    "total_aic_analyzed": 340.1,
+    "runs_audited": 1,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 85
   }
 ]
