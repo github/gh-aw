@@ -291,6 +291,44 @@ func TestComputeAWFExcludeEnvVarNames(t *testing.T) {
 	}
 }
 
+func TestComputeAWFExcludeEnvVarNamesDetectsSecretExpressionsAcrossSources(t *testing.T) {
+	expressions := []struct {
+		name  string
+		value string
+	}{
+		{name: "compact expression", value: "${{secrets.TOKEN}}"},
+		{name: "mixed-case context and name", value: "${{ Secrets.Token }}"},
+		{name: "variable-first fallback", value: "${{ vars.A || secrets.B }}"},
+		{name: "github-token-first fallback", value: "${{ github.token || secrets.X }}"},
+	}
+	sources := []string{"engine", "agent", "mcp-scripts"}
+
+	for _, source := range sources {
+		for _, expression := range expressions {
+			t.Run(source+"/"+expression.name, func(t *testing.T) {
+				const envName = "CONFIGURED_ENV"
+				workflowData := &WorkflowData{}
+				switch source {
+				case "engine":
+					workflowData.EngineConfig = &EngineConfig{Env: map[string]string{envName: expression.value}}
+				case "agent":
+					workflowData.SandboxConfig = &SandboxConfig{
+						Agent: &AgentSandboxConfig{Env: map[string]string{envName: expression.value}},
+					}
+				case "mcp-scripts":
+					workflowData.MCPScripts = &MCPScriptsConfig{
+						Tools: map[string]*MCPScriptToolConfig{
+							"example": {Env: map[string]string{envName: expression.value}},
+						},
+					}
+				}
+
+				assert.Contains(t, ComputeAWFExcludeEnvVarNames(workflowData, nil), envName)
+			})
+		}
+	}
+}
+
 // TestMainAgentRunUsesStandardCreditsExpressionNotDetectionExpression verifies that
 // a standard (non-detection) main-agent run emits the main-agent credits expression
 // (vars.GH_AW_DEFAULT_MAX_AI_CREDITS) and not the detection-specific one, so a future
