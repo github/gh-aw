@@ -144,6 +144,10 @@ workflow embeds its complete compiler-approved Policy proposal. On an absent
 branch, the first accepted `work_queue_submit` safe output atomically creates
 the branch with one Policy-and-Work genesis commit. No administrator seed is
 required. Dispatch-only requests, reads, and snapshots do not provision it.
+Activation treats a genuinely absent branch as an uninitialized, empty queue,
+even when a compiled Policy proposal is present. It validates the proposal
+without installing it; the checked commit publication creates the branch.
+An existing ledger with missing or mismatched Policy still fails validation.
 
 For an explicit operator-managed genesis or a later Policy update, an
 authenticated administrator may still run:
