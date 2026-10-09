@@ -22,7 +22,11 @@ imports:
   - uses: shared/engine-conformance.md
     with:
       engine-id: deepseek-harness
+  - shared/engine-conformance-worker.md
 tools:
+  work-queue:
+    worker: true
+    require-assignment: true
   github:
     mode: gh-proxy
     toolsets: [repos]
