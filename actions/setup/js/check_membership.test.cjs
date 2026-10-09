@@ -487,6 +487,47 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "confused_deputy");
     });
 
+    it("should authorize allowlisted Copilot synchronizing a trusted author's same-repository PR without a bot lookup", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "Copilot";
+      mockContext.actor = "Copilot";
+      mockContext.eventName = "pull_request";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "human-author" },
+          head: { repo: { id: 123, full_name: "testorg/testrepo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "write" } });
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
+      expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledTimes(1);
+      expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith({ owner: "testorg", repo: "testrepo", username: "human-author" });
+    });
+
+    it("should deny allowlisted Copilot synchronizing a fork PR before bot authorization", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "Copilot";
+      mockContext.actor = "Copilot";
+      mockContext.eventName = "pull_request";
+      mockContext.payload = {
+        action: "synchronize",
+        pull_request: {
+          user: { login: "fork-author" },
+          head: { repo: { id: 456, full_name: "fork/repo" } },
+          base: { repo: { id: 123, full_name: "testorg/testrepo" } },
+        },
+      };
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("result", "confused_deputy");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("result", "authorized_bot");
+      expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+    });
+
     it.each(["pull_request", "pull_request_target"])("should deny an active allowlisted bot when synchronizing a cross-repository PR (%s event)", async eventName => {
       process.env.GH_AW_ALLOWED_BOTS = "my-fixup-bot[bot]";
       mockContext.actor = "my-fixup-bot";
@@ -890,22 +931,23 @@ describe("check_membership.cjs", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "insufficient_permissions");
     });
 
-    it("should authorize a bot in the allowlist when permission check returns an API error (e.g. GitHub App not a user)", async () => {
-      process.env.GH_AW_ALLOWED_BOTS = "Copilot";
-      mockContext.actor = "Copilot";
-
-      mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValueOnce({ data: { permission: "none" } }); // bot status check (Copilot[bot] form) → active
+    it.each(["Copilot", "copilot-swe-agent", "copilot-swe-agent[bot]"])("should authorize explicitly allowlisted built-in agent %s without a collaborator lookup on a PR", async actor => {
+      process.env.GH_AW_ALLOWED_BOTS = actor;
+      mockContext.actor = actor;
+      mockContext.eventName = "pull_request";
+      mockContext.payload = { action: "opened", pull_request: { user: { login: actor } } };
 
       await runScript();
 
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "true");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "authorized_bot");
       expect(mockCore.setOutput).toHaveBeenCalledWith("user_permission", "bot");
+      expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
     });
 
-    it("should return bot_not_active when permission check returns API error and bot is not installed", async () => {
-      process.env.GH_AW_ALLOWED_BOTS = "Copilot";
-      mockContext.actor = "Copilot";
+    it("should still require a collaborator lookup for other Copilot-like actors", async () => {
+      process.env.GH_AW_ALLOWED_BOTS = "copilot[bot]";
+      mockContext.actor = "copilot[bot]";
 
       const notFoundError = { status: 404, message: "Not Found" };
       mockGithub.rest.repos.getCollaboratorPermissionLevel.mockRejectedValue(notFoundError); // all bot status checks → 404
@@ -914,6 +956,7 @@ describe("check_membership.cjs", () => {
 
       expect(mockCore.setOutput).toHaveBeenCalledWith("is_team_member", "false");
       expect(mockCore.setOutput).toHaveBeenCalledWith("result", "bot_not_active");
+      expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledTimes(2);
     });
 
     it("should return api_error when permission check fails and actor is not in allowed bots list", async () => {

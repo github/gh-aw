@@ -32,11 +32,13 @@ async function checkBotAllowlistAuthorization(actorToValidate, allowedBots, owne
 
   core.info(`Actor '${actorToValidate}' matched the allowed bots list: ${allowedBots.join(", ")}`);
 
-  // Verify the bot is active/installed on the repository
-  const botStatus = await checkBotStatus(actorToValidate, owner, repo);
+  // Built-in Copilot agents are not repository collaborators; the explicit allowlist
+  // is sufficient for their GitHub-provided actor identities.
+  const isBuiltInCopilot = actorToValidate === "Copilot" || actorToValidate === "copilot-swe-agent" || actorToValidate === "copilot-swe-agent[bot]";
+  const botStatus = isBuiltInCopilot ? { isBot: true, isActive: true } : await checkBotStatus(actorToValidate, owner, repo);
 
   if (botStatus.isBot && botStatus.isActive) {
-    core.info(`✅ Bot '${actorToValidate}' is active on the repository and authorized`);
+    core.info(isBuiltInCopilot ? `✅ Built-in bot '${actorToValidate}' is allowlisted and authorized` : `✅ Bot '${actorToValidate}' is active on the repository and authorized`);
     core.setOutput("is_team_member", "true");
     core.setOutput("result", "authorized_bot");
     core.setOutput("user_permission", "bot");
