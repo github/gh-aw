@@ -70,6 +70,7 @@ When the relevant skill is not obvious, first discover candidates locally and th
 - Query helpers for issues/PRs/workflows/discussions/labels → matching `.github/skills/github-*-query/SKILL.md`
 - Security-focused reviews of agentic workflow changes (compile/scans/audit/optimization) → `.github/skills/review-agentic-workflows/SKILL.md`
 - Doc-writing conventions → `.github/skills/documentation/SKILL.md`
+- Visual changes to the docs site or landing page (layout, widths, spacing, colour, header nav) → `.github/skills/docs-design/SKILL.md`
 - Reviewing or writing `git`/`gh`/remote operations against checkouts (per-checkout credentials, sparse/shallow monorepos, safe-outputs MCP runs without credentials) → `.github/skills/checkout-credential-review/SKILL.md`
 - Authoring, validating, or debugging canvas extensions (loopback servers, actions, iframe rendering, state model, theme tokens) → `.github/skills/create-canvas/SKILL.md`
 

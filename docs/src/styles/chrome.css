@@ -42,15 +42,41 @@ body:has(.aw-hero) .sl-container {
 
 /* Docs pages: Starlight puts the title in its own .content-panel with a hairline
    under it, and centres the content column in the space left by the sidebars.
-   Here the title and body read as one unit, and the column sits left-aligned a
-   fixed gutter from the sidebar, with a narrower "On this page" column on the right. */
-body:not(:has(.aw-hero)) {
-  --sl-content-width: 100%;
-}
-
+   Here the title and body read as one unit, and the column is centred between
+   the sidebar and a narrower "On this page" column on the right. */
 :root {
   --aw-toc-width: 15rem;
-  --aw-content-gutter: 3.5rem;
+}
+
+/* Reading measure, docs pages only (the landing page sets its own widths).
+   Tokens and rationale in custom.css. The body column fills the space so wide
+   media can use it, but every readable element in it is capped at
+   --aw-prose-width and centred. Only tables, diagrams and images run wider,
+   spreading evenly either side of the reading column. */
+main > .content-panel:has(h1#_top) + .content-panel .sl-container {
+  max-width: none;
+}
+
+body:not(:has(.aw-hero)) :is(.sl-markdown-content > *, .content-panel footer.sl-flex) {
+  max-width: var(--aw-prose-width);
+  margin-inline: auto;
+}
+
+body:not(:has(.aw-hero)) .sl-markdown-content > :is(figure, picture, img, video, p:has(> img:only-child)) {
+  max-width: 100%;
+}
+
+/* Tables and diagrams fill the reading column, and grow past it only when
+   their content needs to */
+body:not(:has(.aw-hero)) .sl-markdown-content > :is(.table-scroll-wrapper, pre.mermaid) {
+  width: max-content;
+  min-width: min(100%, var(--aw-prose-width));
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+body:not(:has(.aw-hero)) .sl-markdown-content > .table-scroll-wrapper > table {
+  min-width: 100%;
 }
 
 .content-panel + .content-panel {
@@ -75,17 +101,11 @@ main > .content-panel:has(h1#_top) + .content-panel {
 
 @media (min-width: 50rem) {
   [data-has-sidebar] .content-panel {
-    padding-inline-start: var(--aw-content-gutter);
+    padding-inline: var(--aw-content-gutter);
   }
 
   [data-has-sidebar] .main-pane {
-    --sl-content-margin-inline: 0 auto;
-  }
-}
-
-@media (min-width: 50rem) and (max-width: 71.99rem) {
-  :root {
-    --aw-content-gutter: 2.5rem;
+    --sl-content-margin-inline: auto;
   }
 }
 
@@ -107,7 +127,7 @@ main > .content-panel:has(h1#_top) + .content-panel {
   }
 
   [data-has-sidebar][data-has-toc] .main-pane {
-    --sl-content-margin-inline: 0 auto;
+    --sl-content-margin-inline: auto;
     width: calc(100% - var(--aw-toc-width));
   }
 }
