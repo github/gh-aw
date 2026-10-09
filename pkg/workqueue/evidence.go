@@ -190,6 +190,9 @@ func (b Branch) verifySubmittedNode(ctx context.Context, state Projection, node 
 		}
 		resources = append(resources, Dependency{Kind: node.Subject.Kind, Resource: node.Subject, Condition: condition})
 	}
+	if node.BackingIssue != nil {
+		resources = append(resources, Dependency{Kind: "issue", Resource: node.BackingIssue, Condition: "completed"})
+	}
 	for _, edge := range resources {
 		if edge.Resource == nil {
 			return queueError("resource_invalid", "external resource must have resolved immutable identity")

@@ -249,7 +249,7 @@ function createWorkQueueSubmitTool(snapshot, options = {}) {
       closed(args, ["nodes"], ["claim_handle"], "work_queue_submit");
       if (!Array.isArray(args.nodes) || args.nodes.length < 1 || args.nodes.length > 256) throw new TypeError("submission must contain 1 to 256 nodes");
       for (const node of args.nodes) {
-        closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "depends_on", "subject", "replacement_of"], "submitted Work");
+        closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "depends_on", "subject", "backing_issue", "replacement_of"], "submitted Work");
         if (Object.hasOwn(node, "graph_id")) identity(node.graph_id, "graph ID");
         if (Object.hasOwn(node, "node_key")) identity(node.node_key, "node key");
       }

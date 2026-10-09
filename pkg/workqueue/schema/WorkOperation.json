@@ -148,6 +148,9 @@
     "WorkOperation": {
       "additionalProperties": false,
       "properties": {
+        "backing_issue": {
+          "$ref": "#/$defs/Resource"
+        },
         "batch_trust_domain": {
           "$ref": "#/$defs/Identity"
         },
