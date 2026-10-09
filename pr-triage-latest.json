@@ -1,132 +1,112 @@
 {
-  "run_date": "2026-10-09T12:36:12Z",
-  "run_id": "37930851725",
+  "run_date": "2026-10-09T18:29:57Z",
+  "run_id": "37973462551",
   "source": "pr-triage-agent",
   "eligible_total": 7,
-  "cooldown_skipped": 3,
+  "cooldown_skipped": 10,
   "category_counts": {
-    "bug": 4,
+    "bug": 5,
     "feature": 1,
-    "chore": 1,
-    "docs": 1
+    "chore": 1
   },
   "risk_counts": {
-    "high": 4,
-    "medium": 1,
-    "low": 2
+    "high": 3,
+    "medium": 4
   },
   "priority_counts": {
-    "high": 3,
-    "medium": 3,
-    "low": 1
+    "high": 2,
+    "medium": 5
   },
   "action_counts": {
     "auto_merge": 0,
-    "fast_track": 3,
-    "batch_review": 3,
-    "defer": 1,
+    "fast_track": 2,
+    "batch_review": 5,
+    "defer": 0,
     "close": 0
   },
   "batches": [
     {
-      "id": "bugfix-cluster",
-      "prs": [67114, 67092, 67020, 56568]
+      "id": "agent-guardrails",
+      "prs": [
+        67230,
+        67238,
+        67241,
+        67244,
+        56568
+      ]
     }
   ],
-  "selected_candidates": [67114, 67092, 67020, 56568, 67105, 67091, 66942],
+  "selected_candidates": [
+    56568,
+    67217,
+    67223,
+    67230,
+    67238,
+    67241,
+    67244
+  ],
   "prs": [
-    {
-      "number": 67114,
-      "title": "Preserve model routing attribution in audit and logs",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "score": 82,
-      "score_breakdown": {"impact": 38, "urgency": 26, "quality": 18},
-      "action": "fast_track",
-      "batch": "bugfix-cluster",
-      "ci_status": "unknown",
-      "review_status": "unknown",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:bugfix-cluster"
-      ]
-    },
-    {
-      "number": 67092,
-      "title": "Restore classifier cost attribution in routed-run audits",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "score": 79,
-      "score_breakdown": {"impact": 36, "urgency": 25, "quality": 18},
-      "action": "fast_track",
-      "batch": "bugfix-cluster",
-      "ci_status": "unknown",
-      "review_status": "unknown",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:bugfix-cluster"
-      ]
-    },
-    {
-      "number": 67020,
-      "title": "Exclude Cloud Hypervisor HOME state from Git staging and agent patches",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "score": 84,
-      "score_breakdown": {"impact": 40, "urgency": 26, "quality": 18},
-      "action": "fast_track",
-      "batch": "bugfix-cluster",
-      "ci_status": "unknown",
-      "review_status": "unknown",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:bugfix-cluster"
-      ]
-    },
     {
       "number": 56568,
       "title": "Fall back to unsigned push instead of failing when a rebase hits a genuine merge conflict in `pushSignedCommits`",
       "category": "bug",
       "risk": "high",
       "priority": "medium",
-      "score": 68,
-      "score_breakdown": {"impact": 35, "urgency": 22, "quality": 11},
+      "score": 70,
+      "score_breakdown": {
+        "impact": 35,
+        "urgency": 22,
+        "quality": 13
+      },
       "action": "batch_review",
-      "batch": "bugfix-cluster",
+      "batch": "agent-guardrails",
       "ci_status": "unknown",
-      "review_status": "changes_requested",
+      "review_status": "unknown",
       "labels": [
         "pr-type:bug",
         "pr-risk:high",
         "pr-priority:medium",
         "pr-action:batch_review",
         "pr-agent:copilot",
-        "pr-batch:bugfix-cluster"
+        "pr-batch:agent-guardrails"
       ]
     },
     {
-      "number": 67105,
-      "title": "Extending work queue protocol to support checkpoints and maintenance jobs",
+      "number": 67217,
+      "title": "Clarify why the ESLint factory cannot dispatch workers",
+      "category": "chore",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 48,
+      "score_breakdown": {
+        "impact": 22,
+        "urgency": 14,
+        "quality": 12
+      },
+      "action": "batch_review",
+      "batch": null,
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:chore",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 67223,
+      "title": "Use repository labels for work-queue Issue status",
       "category": "feature",
       "risk": "medium",
       "priority": "medium",
-      "score": 71,
-      "score_breakdown": {"impact": 30, "urgency": 21, "quality": 20},
+      "score": 62,
+      "score_breakdown": {
+        "impact": 28,
+        "urgency": 18,
+        "quality": 16
+      },
       "action": "batch_review",
       "batch": null,
       "ci_status": "unknown",
@@ -140,43 +120,103 @@
       ]
     },
     {
-      "number": 67091,
-      "title": "[yamllint-fixer] fix: indent sequence items under custom-job strategy/runs-on/services fields",
-      "category": "chore",
-      "risk": "low",
-      "priority": "medium",
-      "score": 40,
-      "score_breakdown": {"impact": 14, "urgency": 9, "quality": 17},
-      "action": "batch_review",
-      "batch": null,
+      "number": 67230,
+      "title": "[WIP] Restore classifier cost attribution in routed-run audits",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "score": 81,
+      "score_breakdown": {
+        "impact": 38,
+        "urgency": 26,
+        "quality": 17
+      },
+      "action": "fast_track",
+      "batch": "agent-guardrails",
       "ci_status": "unknown",
       "review_status": "unknown",
       "labels": [
-        "pr-type:chore",
-        "pr-risk:low",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot"
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:agent-guardrails"
       ]
     },
     {
-      "number": 66942,
-      "title": "docs: replace Gemini with Antigravity in the homepage hero",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "score": 27,
-      "score_breakdown": {"impact": 10, "urgency": 6, "quality": 11},
-      "action": "defer",
-      "batch": null,
+      "number": 67238,
+      "title": "Allow Copilot coding agents through the bot allowlist without collaborator lookup",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "score": 76,
+      "score_breakdown": {
+        "impact": 36,
+        "urgency": 25,
+        "quality": 15
+      },
+      "action": "fast_track",
+      "batch": "agent-guardrails",
       "ci_status": "unknown",
       "review_status": "unknown",
       "labels": [
-        "pr-type:docs",
-        "pr-risk:low",
-        "pr-priority:low",
-        "pr-action:defer",
-        "pr-agent:copilot"
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:agent-guardrails"
+      ]
+    },
+    {
+      "number": 67241,
+      "title": "Scope PR push file policy to agent commits",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 62,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 18,
+        "quality": 14
+      },
+      "action": "batch_review",
+      "batch": "agent-guardrails",
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agent-guardrails"
+      ]
+    },
+    {
+      "number": 67244,
+      "title": "Add fallbacks for downstream activation repository outputs",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 65,
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 18,
+        "quality": 15
+      },
+      "action": "batch_review",
+      "batch": "agent-guardrails",
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agent-guardrails"
       ]
     }
   ]
