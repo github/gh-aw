@@ -685,16 +685,10 @@ func (c *Compiler) generatePickExperimentStep(data *WorkflowData, experimentName
 }
 
 func experimentHarnessVersion(data *WorkflowData) string {
-	switch {
-	case data.FrontmatterHash == "" && data.BodyHash == "":
+	if data.FrontmatterHash == "" {
 		return "unknown"
-	case data.FrontmatterHash == "":
-		return data.BodyHash
-	case data.BodyHash == "":
-		return data.FrontmatterHash
-	default:
-		return data.FrontmatterHash + ":" + data.BodyHash
 	}
+	return data.FrontmatterHash
 }
 
 // generateExperimentArtifactUploadStep generates the artifact upload step shared by both storage modes.

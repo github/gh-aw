@@ -1194,6 +1194,14 @@ bounded operation are specified in section 7.17.
 | Implementation conformance | Runtime/operator codecs, selector, publisher, binder, and recovery enforce the same contract on real APIs | Native implementations and source-hashed exact conformance results exist; compiler/effects integration and supported-host evidence remain incomplete as tracked in section 9.1 |
 | Operational evidence | Reproducible source/tool identities and explicit passed/violation/incomplete verdicts | Exhausted finite cases are documented separately from two unfinished searches; artifact collection is not a proof |
 
+For workflow evaluation identity, use the compiled frontmatter SHA alone.
+Prompt-body changes are routine minor revisions: a changed body hash does not
+create a new evaluation identity or require repeating the entire protocol
+verification suite. Retain the body hash as provenance when available. This
+does not replace the immutable Git revision required to dispatch and
+authenticate an approved worker route, nor does it waive focused validation
+of changed behavior or the protocol-safety acceptance cases below.
+
 The scheduler admits the largest **fair prefix** allowed by the request and
 capacity limits. It does not promise to fill every physically idle slot.
 Ownership and terminal safety remain requirements, not a claim that the
