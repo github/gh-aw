@@ -171,7 +171,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"prompt_compression":{"variants":["verbose","caveman"],"description":"Test whether extreme prompt compression preserves output quality for meta-orchestrator workflows","hypothesis":"H0: no change in aic. H1: caveman reduces tokens by ≥20% while maintaining quality ≥90%","metric":"aic","secondary_metrics":["run_duration_seconds","issues_created","discussion_engagement_score","assessment_completeness_score"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.90"},{"name":"output_quality_score","threshold":"\u003e=0.70"}],"min_samples":14,"weight":[50,50],"issue":33280,"start_date":"2026-05-20","analysis_type":"mann_whitney","tags":["cost_optimization","prompt_engineering","meta_orchestrator"],"notify":{"issue":33280}}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: bbcd6fead817404802d120c61e8779dcef3a4b093c1c304e050f84b2779a0ca8:5b599210644f4359be99d592dea4f9fbb25fce5285fa34197681be23ef47475b
+          GH_AW_HARNESS_VERSION: bbcd6fead817404802d120c61e8779dcef3a4b093c1c304e050f84b2779a0ca8
         with:
           script: |
             const path = require('path');

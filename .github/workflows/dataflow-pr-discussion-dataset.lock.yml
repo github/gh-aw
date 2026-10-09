@@ -171,7 +171,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"caveman_mode":{"variants":["no","yes"],"description":"Test whether extreme prompt compression (removing ASCII diagrams, embedded Python scripts, and step-by-step narration) preserves DataFlow dataset quality and run reliability","hypothesis":"H0: no change in input_token_count, retention_rate, or run_success_rate. H1: caveman prompt cuts input tokens ≥30% with retention_rate ≥0.80 and run_success_rate ≥0.90","metric":"input_token_count","secondary_metrics":["run_duration_ms","dataset_record_count","retention_rate"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.9"},{"name":"empty_output_rate","threshold":"==0.0"}],"min_samples":10,"weight":[50,50],"issue":37102,"start_date":"2026-06-05"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 36a03cafdc42a282eac01007c8e3f3243c69667f84d0c2d3940605728399db82:4a3e68c532d7636479819c5884490617f7f751c6d482e64c1639d24505223f14
+          GH_AW_HARNESS_VERSION: 36a03cafdc42a282eac01007c8e3f3243c69667f84d0c2d3940605728399db82
         with:
           script: |
             const path = require('path');

@@ -180,7 +180,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"log_fetch_strategy":{"variants":["eager","lazy"],"description":"Tests whether using a pre-fetched 24h log bundle (eager) vs. forcing on-demand gh-aw MCP log downloads (lazy) affects run duration and AI credit consumption","hypothesis":"H0: no change in run_duration_ms. H1: eager reduces run duration by \u003e=15% by avoiding MCP log-fetch turns","metric":"run_duration_ms","secondary_metrics":["ai_credits_consumed","mcp_tool_call_count"],"guardrail_metrics":[{"name":"issue_creation_success_rate","direction":"min","threshold":"0.8"}],"min_samples":20,"issue":38094,"start_date":"2026-06-09","analysis_type":"mann_whitney","tags":["daily","log-fetching","efficiency","claude"],"continual":{"seed":"daily-safe-output-log-fetch-v1","ramp":[10,25,50]}}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 3855eac71c02e178c1046427cf337d8a2a76977e3fb2ddd5403f1835182d8b08:85e630101dca304a0a6190480c4d4b2d977bf0daa7a3eb3837acd2b801edb771
+          GH_AW_HARNESS_VERSION: 3855eac71c02e178c1046427cf337d8a2a76977e3fb2ddd5403f1835182d8b08
         with:
           script: |
             const path = require('path');

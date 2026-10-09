@@ -189,7 +189,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"prompt_style_test":{"variants":["detailed","concise","step_by_step"],"description":"Test whether reducing prompt verbosity preserves project-operation success rate","hypothesis":"H0: no change in run_success_rate. H1: concise/step_by_step achieve ≥90% success rate with ≥30% fewer prompt tokens","metric":"run_success_rate","secondary_metrics":["run_duration_ms","prompt_token_count","ops_completed_count"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"\u003c=0.05"},{"name":"missing_ops_rate","threshold":"\u003c=0.10"}],"min_samples":20,"weight":[34,33,33],"start_date":"2026-06-06","analysis_type":"proportion_test","tags":["smoke-test","prompt-engineering","verbosity"],"notify":{"issue":37302}}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 5344b752ad17b5469b6eb93d04be792e1153f8d949b8ae8fbd653db6fa5c8a64:602c6db055d7f3513ca9c2eb4d1c467eb5c1ceba1660162fb22f92581fde34d2
+          GH_AW_HARNESS_VERSION: 5344b752ad17b5469b6eb93d04be792e1153f8d949b8ae8fbd653db6fa5c8a64
         with:
           script: |
             const path = require('path');

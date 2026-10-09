@@ -173,7 +173,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"detail_level":{"variants":["brief","comprehensive"],"description":"Tests whether a leaner output format (diagram + brief change log only) delivers equivalent reader value vs. the full report with Package Reference table and verbose summaries.","hypothesis":"H0: no change in run success rate or issue engagement. H1: brief variant reduces token usage ≥20% and run duration ≥15% with no drop in success rate.","metric":"run_duration_ms","secondary_metrics":["output_issue_body_length","run_success_rate"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.85"}],"min_samples":10,"weight":[50,50],"issue":31926,"start_date":"2026-05-19","analysis_type":"mann_whitney","tags":["output-format","cost","latency"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 00ab8760721a5c8a25f6ce2f617eb8a5a60bc9231b2b2cf6e791f0631843e8b5:222077f693270e01883e9e2b8a83ab3f160a0b2f88ddbe2897667a2e29cab546
+          GH_AW_HARNESS_VERSION: 00ab8760721a5c8a25f6ce2f617eb8a5a60bc9231b2b2cf6e791f0631843e8b5
         with:
           script: |
             const path = require('path');

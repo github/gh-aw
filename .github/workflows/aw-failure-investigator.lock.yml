@@ -182,7 +182,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"tone_variant":{"variants":["clinical","assertive","narrative"],"description":"Tests whether report tone (clinical/assertive/narrative) affects output efficiency and engineer engagement on failure investigation issues","hypothesis":"H0: no change in output_length_chars across tone variants. H1: assertive tone produces shorter, more actionable outputs than clinical or narrative, with equivalent or better sub-issue quality.","metric":"output_length_chars","secondary_metrics":["issue_creation_rate","sub_issue_link_count","run_duration_seconds"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.85"}],"min_samples":50,"weight":[34,33,33],"issue":36105,"start_date":"2026-05-31","analysis_type":"mann_whitney","tags":["tone","output-quality","triage"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 76edc703944df67939eb44746ea10b56f61275ded8060f1969b3ae16813ae173:fe34211c44fe13558ede7de5418e448ac448eaf5a6b8a5ff475e1610e20ff975
+          GH_AW_HARNESS_VERSION: 76edc703944df67939eb44746ea10b56f61275ded8060f1969b3ae16813ae173
         with:
           script: |
             const path = require('path');

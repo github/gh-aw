@@ -183,7 +183,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"sub_agent_strategy":{"variants":["single_agent","sub_agents"],"description":"Test whether decomposing issue creation into sub-agents reduces cost","hypothesis":"H0: no change in AI credit count. H1: sub-agents reduce AI credit count by 15-25% and improve success rate.","metric":"aic","secondary_metrics":["run_duration_seconds","issue_creation_success_rate"],"guardrail_metrics":[{"name":"all_issues_created","threshold":"==3"},{"name":"temporary_id_resolution_rate","threshold":"\u003e=0.95"}],"min_samples":20,"weight":[50,50],"start_date":"2026-05-23","analysis_type":"t_test","tags":["cost-efficiency","sub-agents","smoke-tests"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: b62d633b700adc36015b06be5bc845700387c9b8e84c31b79784a252a05f8d61:d664c3836440fc30b80a4f840e3a0950bcfa1d92177fbd7e9659f9b533dce9a1
+          GH_AW_HARNESS_VERSION: b62d633b700adc36015b06be5bc845700387c9b8e84c31b79784a252a05f8d61
         with:
           script: |
             const path = require('path');

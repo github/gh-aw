@@ -174,7 +174,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"prompt_style":{"variants":["detailed","concise"],"description":"Tests whether a high-level goal-oriented prompt produces the same audit quality as the current step-by-step detailed instructions","hypothesis":"H0: no change in audit correctness or discussion quality. H1: concise variant reduces token cost ≥20% with no degradation in validation accuracy","metric":"aic","secondary_metrics":["run_duration_ms","discussion_created","validation_pass_rate"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"==0"},{"name":"missed_validation_failures","threshold":"==0"}],"min_samples":20,"weight":[50,50],"start_date":"2026-05-16","analysis_type":"mann_whitney","tags":["prompt-engineering","cost-optimization","blog-auditor"],"notify":{"issue":32603}}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: c6e2e8b37c8163bec1fd05b32bdba48f9bcc98adbdb54f9cacc829d2fc40da06:70582cd523107b97ed4e4644782c3ede6d43542f6c5ba58b67ffd101e540bf60
+          GH_AW_HARNESS_VERSION: c6e2e8b37c8163bec1fd05b32bdba48f9bcc98adbdb54f9cacc829d2fc40da06
         with:
           script: |
             const path = require('path');

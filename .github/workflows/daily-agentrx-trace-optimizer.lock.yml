@@ -175,7 +175,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"sub_agent_strategy":{"variants":["sub_agents","single_agent"],"description":"Test whether delegating trajectory-builder, artifacts-summarizer, and failure-pattern-classifier to small-model sub-agents improves recommendation quality vs. inline analysis by the main agent","hypothesis":"H0: no change in issue quality or run success rate. H1: sub_agents variant yields higher evidence completeness score with equal or lower token cost","metric":"issue_evidence_completeness","secondary_metrics":["run_success_rate","ai_credits_total","run_duration_ms"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"\u003c=0.10"},{"name":"noop_rate","threshold":"\u003c=0.30"}],"min_samples":20,"weight":[50,50],"start_date":"2026-06-02"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: cbbd04f6e82d495c480ccf30c05b1cfd26cea20448d89243fc21ff72862352f4:6472636ed8d1fad3a52082bc826ba9a74da1e4fae5422c0d44c114139f9bf8d0
+          GH_AW_HARNESS_VERSION: cbbd04f6e82d495c480ccf30c05b1cfd26cea20448d89243fc21ff72862352f4
         with:
           script: |
             const path = require('path');

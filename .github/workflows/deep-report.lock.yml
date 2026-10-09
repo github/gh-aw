@@ -182,7 +182,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"output_format":{"variants":["full_briefing","executive_brief","annotated_brief","ste"],"description":"Tests whether report verbosity, structure, or Simplified Technical English (STE) phrasing affect token cost and discussion engagement","hypothesis":"H0: no change in discussion engagement or token cost. H1: executive_brief reduces token usage by ≥20% without reducing engagement; annotated_brief improves actionability; ste improves clarity while reducing token usage.","metric":"token_count","secondary_metrics":["discussion_reactions","discussion_replies","output_char_length","run_duration_ms","eval:output_format_goal_met"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"==0"},{"name":"issue_creation_success_rate","threshold":"\u003e=0.8"}],"min_samples":15,"weight":[25,25,25,25],"start_date":"2026-05-06","analysis_type":"mann_whitney","tags":["output-format","token-cost","engagement","daily"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 5207b4165009cc88e43e627350a69e491800ec8a389de34ba53483281de4484e:00cb52fd84b020c699ef6ffd70ec28f490b1cd6dd29917d7c86ed471aba75164
+          GH_AW_HARNESS_VERSION: 5207b4165009cc88e43e627350a69e491800ec8a389de34ba53483281de4484e
         with:
           script: |
             const path = require('path');

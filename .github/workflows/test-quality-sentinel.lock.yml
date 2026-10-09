@@ -181,7 +181,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"model_size":{"variants":["claude-haiku-4.5","claude-sonnet-5"],"description":"Tests whether a smaller model can preserve test-review decision quality at lower cost versus a larger reasoning-capable model.","hypothesis":"H0: model-size variant does not improve review usefulness acceptance rate. H1: a larger reasoning-capable model improves review usefulness acceptance rate by \u003e=15 percentage points without materially increasing false-positive change requests.","metric":"review_usefulness_acceptance_rate","secondary_metrics":["ai_credits_total","false_positive_change_request_rate"],"guardrail_metrics":[{"name":"false_positive_change_request_rate","threshold":"\u003c=0.20"},{"name":"run_success_rate","threshold":"\u003e=0.90"}],"min_samples":70,"weight":[50,50],"issue":43530,"start_date":"2026-07-05"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: d26551a33a50d76e5da0313df31ba6d2bcf17b582cb01b12c46bf272f5867b75:31ab401e5b7ee4f5eb709116a6c78289f7e52bcd112a17e03ebaff87d069883a
+          GH_AW_HARNESS_VERSION: d26551a33a50d76e5da0313df31ba6d2bcf17b582cb01b12c46bf272f5867b75
         with:
           script: |
             const path = require('path');

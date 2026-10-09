@@ -173,7 +173,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"nlp_prompt_style":{"variants":["concise","structured"],"description":"Tests whether concise vs structured prompt wording improves NLP report usefulness and reliability","hypothesis":"H0: no change in eval pass rate. H1: structured improves eval pass rate by \u003e=10pp","metric":"eval:insights_report_produced","secondary_metrics":["eval:pr_conversations_analyzed","run_duration_ms","output_word_count"],"guardrail_metrics":[{"name":"run_failure_rate","direction":"min","threshold":"0.05"},{"name":"empty_output_rate","direction":"min","threshold":"0.02"}],"min_samples":30,"weight":[50,50],"issue":63156,"start_date":"2026-09-24"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 7141c1e96bfa5eaa2aeca24686c8f5abcb147b5b6b6979a1048cd002eae88d70:faf9f5d4f3771d524b5163b15a330bf1a31430d94913fea4149149e03c682fd1
+          GH_AW_HARNESS_VERSION: 7141c1e96bfa5eaa2aeca24686c8f5abcb147b5b6b6979a1048cd002eae88d70
         with:
           script: |
             const path = require('path');

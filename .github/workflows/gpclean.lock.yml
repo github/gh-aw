@@ -168,7 +168,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"tool_verbosity":{"variants":["full_bash","minimal_toolset"],"description":"Test whether restricting bash tools reduces cost without compromising GPL detection quality","hypothesis":"H0: no change in token consumption. H1: minimal toolset reduces tokens by 10-15% while maintaining issue quality (detection accuracy + alternative research depth)","metric":"aic","secondary_metrics":["run_duration_seconds","tools_invoked_count","issue_completeness_score"],"guardrail_metrics":[{"name":"gpl_detection_rate","threshold":"==100"},{"name":"issue_created_rate","threshold":"\u003e=90"}],"min_samples":30,"weight":[50,50],"start_date":"2026-05-24"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 6cea0ed33021321cd0c2354f059af2e84dcb011a9595a0373275553fcd46c0db:e5aa3122d825621b000df4bb1aec75a404855734aeb8b2210423e507608c80cc
+          GH_AW_HARNESS_VERSION: 6cea0ed33021321cd0c2354f059af2e84dcb011a9595a0373275553fcd46c0db
         with:
           script: |
             const path = require('path');

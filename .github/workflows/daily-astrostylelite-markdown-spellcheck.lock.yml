@@ -169,7 +169,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"prompt_style":{"variants":["concise","detailed"],"description":"Test whether a concise agent prompt achieves the same fix quality as the current detailed prompt while reducing token usage","hypothesis":"Concise prompt reduces token consumption ≥20% without degrading fix precision. H0: no difference in fix rate.","metric":"aic","secondary_metrics":["pr_acceptance_rate","output_length_chars"],"guardrail_metrics":[{"name":"empty_output_rate","threshold":"\u003c0.10"},{"name":"run_success_rate","threshold":"\u003e=0.90"}],"min_samples":30,"weight":[50,50]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: ebe3c7d3195dd730e6ee0cb7463c2026214e03156f9da29da945c68fde94b91c:d0f15b1d54e236c4e9495b898113f2f1a90d574c572b200714683d63e8b47cb4
+          GH_AW_HARNESS_VERSION: ebe3c7d3195dd730e6ee0cb7463c2026214e03156f9da29da945c68fde94b91c
         with:
           script: |
             const path = require('path');

@@ -159,7 +159,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"sub_agent_strategy":{"variants":["inline_strict","delegated_sequential","single_agent_control"],"description":"Measure whether inline sub-agent orchestration is the best reliability/cost tradeoff for a model-identity smoke test.","hypothesis":"H0: no change in pass_rate between inline_strict and delegated_sequential. H1: delegated_sequential improves pass_rate by \u003e= 0.15 absolute versus inline_strict. Note: single_agent_control is a synthetic negative baseline (always FAIL by design) excluded from H1 comparisons.","metric":"pass_rate","secondary_metrics":["run_duration_seconds","output_validity_rate"],"guardrail_metrics":[{"name":"empty_output_rate","direction":"min","threshold":"0.01"},{"name":"false_pass_rate","direction":"min","threshold":"0.05"}],"min_samples":30,"weight":[34,33,33],"issue":47551,"start_date":"2026-07-23","end_date":"2026-10-23"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 904043e6f7d1d1121005edda7e346e977d286e134537e7bd802a9966571ef72d:0daed06ad9ab37f712e54a71683b2f3c690ab0cce61735ab8ecf312216a2f4ec
+          GH_AW_HARNESS_VERSION: 904043e6f7d1d1121005edda7e346e977d286e134537e7bd802a9966571ef72d
         with:
           script: |
             const path = require('path');

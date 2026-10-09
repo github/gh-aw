@@ -170,7 +170,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"model_size":{"variants":["claude-sonnet-5","claude-haiku-4.5"],"description":"Tests whether Claude Haiku produces equivalent instruction conciseness improvements at lower token cost versus Claude Sonnet.","hypothesis":"H0: no change in PR creation rate or run success rate. H1: Claude Haiku reduces AI credit usage \u003e=30% with equivalent run success rate (\u003e=0.90).","metric":"ai_credits_total","secondary_metrics":["run_success_rate","run_duration_ms"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.90"},{"name":"empty_output_rate","threshold":"\u003c=0.10"}],"min_samples":20,"start_date":"2026-06-04","continual":{"seed":"daily-caveman-model-size-v1","ramp":[10,25,50]}}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: e44d67919b10745a044fef58ad3ec2dc1f1e2d2721cc03939db363e4780e9eb0:2f4f2a9930e6f45419283d19f41977177e9456adbb5dac28209575be0a34e510
+          GH_AW_HARNESS_VERSION: e44d67919b10745a044fef58ad3ec2dc1f1e2d2721cc03939db363e4780e9eb0
         with:
           script: |
             const path = require('path');

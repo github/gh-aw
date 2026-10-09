@@ -201,7 +201,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"caveman":{"variants":["yes","no"]},"subagent_model":{"variants":["small","large"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 6da9adc6af6044e219007642a910d5b229fb1b9c50076c204c84bd6306a43632:6adb39fcbc38e0783317d23f7f755343c9f5627864542acb520aa628f7c7df74
+          GH_AW_HARNESS_VERSION: 6da9adc6af6044e219007642a910d5b229fb1b9c50076c204c84bd6306a43632
         with:
           script: |
             const path = require('path');

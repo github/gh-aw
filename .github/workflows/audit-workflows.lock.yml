@@ -181,7 +181,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"audit_decomposition":{"variants":["single_agent","phased_sub_agents"],"description":"Tests whether decomposing audit-workflows into explicit analysis phases improves reliability and reduces long failing runs.","hypothesis":"H0: no change in run_success_rate. H1: phased_sub_agents improves run_success_rate by at least 15% relative while keeping runtime within +10%.","metric":"run_success_rate","secondary_metrics":["run_duration_minutes","empty_findings_rate"],"guardrail_metrics":[{"name":"timeout_rate","direction":"min","threshold":"0.05"}],"min_samples":264,"weight":[50,50],"issue":43177,"start_date":"2026-07-03"}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 96e25c209576d81d45f3f5ad4428d60246f91e1e54308e073f45c108375e34a4:3d61f3c788253d800fc7476638a5fea48e630f5e0440205bb074f50703edc97e
+          GH_AW_HARNESS_VERSION: 96e25c209576d81d45f3f5ad4428d60246f91e1e54308e073f45c108375e34a4
         with:
           script: |
             const path = require('path');

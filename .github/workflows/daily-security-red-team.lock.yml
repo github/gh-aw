@@ -168,7 +168,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"reasoning_depth":{"variants":["single_pass","iterative"],"description":"Compare single-pass vs. iterative (re-evaluation) security analysis to measure false-positive rate, true-positive rate, and cost","hypothesis":"H0: no change in finding quality. H1: iterative reduces false-positive rate by \u003e=20% at \u003c=30% token overhead","metric":"false_positive_rate","secondary_metrics":["run_duration_ms","issues_created","token_count"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.9"},{"name":"empty_output_rate","threshold":"\u003c=0.05"}],"min_samples":30,"weight":[50,50],"issue":31673,"start_date":"2026-05-12","analysis_type":"proportion_test","tags":["security","cost-efficiency","quality"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: 44994c8c347a6d98ea0b9c2c8f346a66a249c4eeeb3d4f362344d8d576afa6c7:fe0013b377c6a6294aa8baec2b7d5dc1e8219694f09e469354d9db452bb469ba
+          GH_AW_HARNESS_VERSION: 44994c8c347a6d98ea0b9c2c8f346a66a249c4eeeb3d4f362344d8d576afa6c7
         with:
           script: |
             const path = require('path');

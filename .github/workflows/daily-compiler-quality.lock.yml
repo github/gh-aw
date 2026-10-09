@@ -176,7 +176,7 @@ jobs:
           GH_AW_EXPERIMENT_SPEC: '{"output_format":{"variants":["detailed","concise","ste"],"description":"Tests whether a concise executive-summary report or a Simplified Technical English (STE) report outperforms the current exhaustive per-file report on discussion engagement and token efficiency","hypothesis":"H0: no change in discussion engagement. H1: concise variant achieves equal engagement with ≥30% fewer output tokens; ste variant achieves equal or better engagement via simplified language.","metric":"discussion_engagement_score","secondary_metrics":["output_token_count","run_duration_ms","run_success_rate","eval:output_format_adherence"],"guardrail_metrics":[{"name":"run_success_rate","threshold":"\u003e=0.85"},{"name":"empty_output_rate","threshold":"\u003c=0.05"}],"min_samples":20,"weight":[34,33,33],"issue":32390,"start_date":"2026-05-16","analysis_type":"mann_whitney","tags":["output-quality","token-efficiency","daily-workflows"]}}'
           GH_AW_EXPERIMENT_STATE_FILE: /tmp/gh-aw/experiments/state.jsonl
           GH_AW_EXPERIMENT_STATE_DIR: /tmp/gh-aw/experiments
-          GH_AW_HARNESS_VERSION: e2d57798b0b11585f95df2f6f07bab8a67dc0bb928d9ec0dd7f2aa2f417c8207:15b08bd29294c93512c36d73e999b0d689aa0cae95f805f6e89ed2e8bae9eda2
+          GH_AW_HARNESS_VERSION: e2d57798b0b11585f95df2f6f07bab8a67dc0bb928d9ec0dd7f2aa2f417c8207
         with:
           script: |
             const path = require('path');
