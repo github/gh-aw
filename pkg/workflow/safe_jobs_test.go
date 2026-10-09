@@ -444,7 +444,7 @@ func TestParseAndBuildSafeJobsRunsOnList(t *testing.T) {
 		},
 	})
 
-	require.Equal(t, "runs-on:\n      - self-hosted\n      - linux", safeJobs["deploy"].RunsOn)
+	require.Equal(t, "runs-on:\n      - self-hosted\n        - linux", safeJobs["deploy"].RunsOn)
 
 	workflowData := &WorkflowData{
 		Name:        "test-workflow",
@@ -464,7 +464,7 @@ func TestParseAndBuildSafeJobsRunsOnList(t *testing.T) {
 	}
 
 	// Multiple labels parsed as a list are rendered as a YAML list.
-	require.Equal(t, "runs-on:\n      - self-hosted\n      - linux", job.RunsOn)
+	require.Equal(t, "runs-on:\n      - self-hosted\n        - linux", job.RunsOn)
 }
 
 func TestParseAndBuildSafeJobsRunsOnObject(t *testing.T) {
@@ -484,7 +484,7 @@ func TestParseAndBuildSafeJobsRunsOnObject(t *testing.T) {
 				"group":  "safe-job-runners",
 				"labels": []any{"linux", "x64"},
 			},
-			expected: "runs-on:\n      group: safe-job-runners\n      labels:\n      - linux\n      - x64",
+			expected: "runs-on:\n      group: safe-job-runners\n      labels:\n        - linux\n        - x64",
 		},
 	}
 
@@ -560,7 +560,7 @@ safe-outputs:
 	compiled, err := os.ReadFile(filepath.Join(tmpDir, "safe-job-runs-on-object.lock.yml"))
 	require.NoError(t, err)
 	notifyJob := extractJobSection(string(compiled), "notify")
-	require.Contains(t, notifyJob, "    runs-on:\n      group: safe-job-runners\n      labels:\n      - linux")
+	require.Contains(t, notifyJob, "    runs-on:\n      group: safe-job-runners\n      labels:\n        - linux")
 }
 
 func TestParseAndBuildSafeJobsSingleRunsOnList(t *testing.T) {

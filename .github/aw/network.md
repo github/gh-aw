@@ -89,7 +89,8 @@ Keywords expanding to curated domain lists:
 | `copilot` | Copilot engine transport | `api.githubcopilot.com`, GitHub API/web, `host.docker.internal`, `raw.githubusercontent.com` |
 | `claude` | Claude engine transport | Anthropic APIs, GitHub transport, certificate/OCSP services, Ubuntu package metadata, Playwright downloads |
 | `codex` | Codex engine transport | `api.openai.com`, `chatgpt.com`, GitHub API/web, `host.docker.internal` |
-| `gemini` | Gemini engine transport | `generativelanguage.googleapis.com`, `*.googleapis.com`, GitHub web, `host.docker.internal` |
+| `gemini` | Gemini engine transport (deprecated, prefer `agy`) | `generativelanguage.googleapis.com`, `*.googleapis.com`, GitHub web, `host.docker.internal` |
+| `agy` | Agy (Antigravity CLI) engine transport (experimental) | `github.com`, `api.github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `host.docker.internal` |
 | `pi` | Pi engine transport | `api.githubcopilot.com`, GitHub web, `host.docker.internal`, `raw.githubusercontent.com` |
 | `pi-base` | Pi provider-independent baseline | `github.com`, `host.docker.internal`, `raw.githubusercontent.com` |
 | `threat-detection` | Compatibility alias for Copilot threat detection | Copilot API/telemetry hosts, GitHub API/web, `host.docker.internal`, `registry.npmjs.org` |

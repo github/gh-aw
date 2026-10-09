@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 // @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client authorize resolved targets before writes.
 
 const { resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
@@ -34,7 +35,8 @@ const RESERVED = new Set([
 const privateReceipts = new WeakMap();
 
 function routeFields(route) {
-  if (typeof route !== "string" || !/^\/repos\/\{owner\}\/\{repo\}\/[A-Za-z0-9_{}./-]+$/.test(route) || route.includes("..") || route.includes("//")) throw new Error("Trusted REST adapter requires a fixed repository-relative route");
+  if (typeof route !== "string" || !/^\/repos\/\{owner\}\/\{repo\}\/[A-Za-z0-9_{}./-]+$/.test(route) || route.includes("..") || route.includes("//"))
+    throw new Error(`${SAFE_OUTPUT_E001}: Trusted REST adapter requires a fixed repository-relative route`);
   const fields = [...route.matchAll(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g)].map(match => match[1]);
   if (route.replace(/\{[A-Za-z_][A-Za-z_0-9]*\}/g, "").match(/[{}]/)) throw new Error("Malformed trusted REST adapter route");
   return fields;
