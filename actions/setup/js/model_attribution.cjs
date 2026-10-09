@@ -1,6 +1,7 @@
 "use strict";
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { computeInferenceAIC } = require("./model_costs.cjs");
 
 const ROUTING_STATUSES = new Set(["selected", "pending", "failed", "rejected", "unavailable"]);
 const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "off"]);
@@ -9,7 +10,7 @@ const ROUTING_SCOPES = new Set(["local", "multi_file", "subsystem", "cross_syste
 const ROUTING_COMPLEXITIES = new Set(["trivial", "easy", "medium", "hard", "expert", "unknown"]);
 const MODEL_ROUTING_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
 
-/** @typedef {{ status: string, mode: string, router_version: string, failure_code?: string, objective: string, task_type: string, scope: string, complexity: string, degraded?: boolean, deviated_requests?: number }} ModelRoutingSummary */
+/** @typedef {{ status: string, mode: string, router_version: string, failure_code?: string, objective: string, task_type: string, scope: string, complexity: string, degraded?: boolean, classifier_aic?: number, deviated_requests?: number }} ModelRoutingSummary */
 
 /** @param {unknown} value @returns {string} */
 function validateModelIdentifier(value) {
@@ -140,7 +141,7 @@ function readModelRoutingSession(sessionPath) {
       const agentEvent =
         (event?.type === "workflow.info" && provenance?.component === "workflow" && provenance?.phase === "agent") ||
         (event?.type === "model_routing.outcome" && provenance?.component === "agent" && provenance?.phase === "agent") ||
-        (event?.type === "firewall.model_routing" && provenance?.component === "firewall" && provenance?.phase === "agent");
+        ((event?.type === "firewall.model_routing" || event?.type === "firewall.token_usage") && provenance?.component === "firewall" && provenance?.phase === "agent");
       if (agentEvent) events.push(event);
     } catch {
       // Ignore partial session records.
@@ -188,6 +189,31 @@ function countDeviatedModelRoutingRequests(records, schema) {
   }).length;
 }
 
+function classifierAIC(sessionEvents) {
+  const classifierUsage = sessionEvents.filter(event => event.type === "firewall.token_usage" && event.data?.purpose === "routing_classification");
+  if (classifierUsage.length === 0) return undefined;
+
+  return classifierUsage.reduce((total, event) => {
+    const data = event.data;
+    const reportedAIC = data.aic;
+    if (typeof reportedAIC === "number" && Number.isFinite(reportedAIC) && reportedAIC >= 0) return total + reportedAIC;
+
+    const usage = data.usage ?? {};
+    const tokenCount = value => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0);
+    const estimatedAIC = computeInferenceAIC({
+      provider: typeof data.provider === "string" ? data.provider : "",
+      model: typeof data.model === "string" ? data.model : "",
+      inputTokens: tokenCount(usage.inputTokens),
+      outputTokens: tokenCount(usage.outputTokens),
+      cacheReadTokens: tokenCount(usage.cacheReadInputTokens),
+      cacheWriteTokens: tokenCount(usage.cacheCreationInputTokens),
+      reasoningTokens: tokenCount(usage.reasoningOutputTokens),
+      ...(typeof usage.inputTokensIncludeCache === "boolean" ? { inputTokensIncludeCache: usage.inputTokensIncludeCache } : {}),
+    });
+    return total + (Number.isFinite(estimatedAIC) && estimatedAIC >= 0 ? estimatedAIC : 0);
+  }, 0);
+}
+
 function firstValidated(...values) {
   for (const value of values) {
     const validated = validateModelIdentifier(value);
@@ -233,6 +259,7 @@ function resolveModelRoutingSummary({
   const selection = sessionSelection || proxySelection || {};
   const objective = selection.objective?.goal ?? selection.objective?.Goal;
   const labels = selection.labels ?? {};
+  const classifierAic = classifierAIC(sessionEvents);
   /** @type {ModelRoutingSummary} */
   const result = {
     status,
@@ -247,6 +274,7 @@ function resolveModelRoutingSummary({
     task_type: firstAllowed(ROUTING_TASK_TYPES, labels.task_type, labels.taskType),
     scope: firstAllowed(ROUTING_SCOPES, labels.scope),
     complexity: firstAllowed(ROUTING_COMPLEXITIES, labels.task_complexity, labels.taskComplexity),
+    ...(typeof classifierAic === "number" ? { classifier_aic: classifierAic } : {}),
   };
   if (typeof selection.degraded_classification === "boolean") {
     result.degraded = selection.degraded_classification;

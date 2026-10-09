@@ -3134,6 +3134,7 @@ describe("sendJobConclusionSpan", () => {
     vi.stubGlobal("fetch", mockFetch);
     process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
     process.env.INPUT_JOB_NAME = "agent";
+    process.env.GH_AW_AIC = "0.125";
     process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-routed-session-"));
     const infoPath = path.join(process.env.GH_AW_TMP_DIR, "aw_info.json");
     const sessionPath = path.join(process.env.GH_AW_TMP_DIR, "usage/aw_session.jsonl");
@@ -3168,6 +3169,11 @@ describe("sendJobConclusionSpan", () => {
           data: { schema: "model-routing/v0.28.49", stage: "request", routed: "deviated", deviations: ["effort"] },
           provenance: { component: "firewall", phase: "agent" },
         },
+        {
+          type: "firewall.token_usage",
+          data: { purpose: "routing_classification", path: "/responses", xInitiator: "router", aic: 0.04 },
+          provenance: { component: "firewall", phase: "agent" },
+        },
       ]
         .map(JSON.stringify)
         .join("\n")
@@ -3180,7 +3186,7 @@ describe("sendJobConclusionSpan", () => {
     }
 
     const span = JSON.parse(mockFetch.mock.calls[0][1].body).resourceSpans[0].scopeSpans[0].spans[0];
-    const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue ?? attr.value.intValue ?? attr.value.boolValue]));
+    const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue ?? attr.value.intValue ?? attr.value.doubleValue ?? attr.value.boolValue]));
     expect(attrs).toMatchObject({
       "gh-aw.model_routing.status": "selected",
       "gh-aw.model_routing.mode": "session-mode",
@@ -3190,10 +3196,12 @@ describe("sendJobConclusionSpan", () => {
       "gh-aw.model_routing.scope": "local",
       "gh-aw.model_routing.complexity": "medium",
       "gh-aw.model_routing.degraded": false,
+      "gh-aw.model_routing.classifier_aic": 0.04,
       "gh-aw.model_routing.deviated_requests": 1,
     });
+    expect(span.attributes.find(attr => attr.key === "gh-aw.model_routing.classifier_aic").value).toEqual({ doubleValue: 0.04 });
     expect(attrs["gh-aw.model_routing.failure_code"]).toBeUndefined();
-    expect(attrs["gh-aw.model_routing.classifier_aic"]).toBeUndefined();
+    expect(attrs["gh-aw.aic"]).toBe(0.125);
     expect(Object.keys(attrs).some(key => /selected_id|ranked_choices|conversation_hash|degraded_reason/i.test(key))).toBe(false);
   });
 

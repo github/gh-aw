@@ -2374,6 +2374,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     if (modelRoutingSummary.scope) attributes.push(buildAttr("gh-aw.model_routing.scope", modelRoutingSummary.scope));
     if (modelRoutingSummary.complexity) attributes.push(buildAttr("gh-aw.model_routing.complexity", modelRoutingSummary.complexity));
     if (typeof modelRoutingSummary.degraded === "boolean") attributes.push(buildAttr("gh-aw.model_routing.degraded", modelRoutingSummary.degraded));
+    if (typeof modelRoutingSummary.classifier_aic === "number") attributes.push(buildDoubleAttr("gh-aw.model_routing.classifier_aic", modelRoutingSummary.classifier_aic));
     if (typeof modelRoutingSummary.deviated_requests === "number") attributes.push(buildAttr("gh-aw.model_routing.deviated_requests", modelRoutingSummary.deviated_requests));
   }
   if (trackerId) attributes.push(buildAttr("gh-aw.tracker.id", trackerId));

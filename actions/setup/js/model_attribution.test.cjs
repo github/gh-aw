@@ -58,6 +58,21 @@ describe("resolveModelRoutingSummary", () => {
           provenance: { component: "firewall", phase: "agent" },
         },
         {
+          type: "firewall.token_usage",
+          data: { purpose: "routing_classification", path: "/responses", xInitiator: "router", aic: 0.04, totalAic: 99 },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.token_usage",
+          data: { purpose: "agent", aic: 1 },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.token_usage",
+          data: { purpose: "routing_classification", aic: 9 },
+          provenance: { component: "firewall", phase: "subagent" },
+        },
+        {
           type: "firewall.model_routing",
           data: { schema: "model-routing/v0.28.49", stage: "request", routed: "deviated" },
           provenance: { component: "firewall", phase: "subagent" },
@@ -73,6 +88,7 @@ describe("resolveModelRoutingSummary", () => {
         scope: "local",
         complexity: "medium",
         degraded: false,
+        classifier_aic: 0.04,
         deviated_requests: 1,
       });
     } finally {
@@ -152,6 +168,39 @@ describe("resolveModelRoutingSummary", () => {
         complexity: "",
         deviated_requests: 0,
       });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("estimates classifier AIC from attributed token usage when response AIC is absent", () => {
+    const root = createRoot();
+    const sessionPath = path.join(root, "usage/aw_session.jsonl");
+    try {
+      writeJSONL(sessionPath, [
+        {
+          type: "model_routing.outcome",
+          data: { status: "selected" },
+          provenance: { component: "agent", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: { stage: "selection" },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.token_usage",
+          data: {
+            provider: "anthropic",
+            model: "claude-sonnet-4.6",
+            purpose: "routing_classification",
+            usage: { inputTokens: 100, outputTokens: 10 },
+          },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+      ]);
+
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath: path.join(root, "missing.json"), ghAwDir: root }).classifier_aic).toBeGreaterThan(0);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
