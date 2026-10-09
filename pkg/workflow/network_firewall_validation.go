@@ -141,15 +141,12 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 	}
 
 	policy := workflowData.NetworkPermissions.HostedWeb
-	runtimeID, err := c.resolveHostedWebRuntimeID(workflowData)
+	capabilityProvider, err := c.resolveHostedWebCapabilityProvider(workflowData, policy)
 	if err != nil {
-		return fmt.Errorf("network.hosted-web: failed to resolve engine runtime: %w", err)
+		return err
 	}
-	if runtimeID != "claude" && runtimeID != "codex" {
-		if policy == nil {
-			return nil
-		}
-		return errors.New("network.hosted-web is only supported by the claude and codex engines")
+	if capabilityProvider == nil && policy == nil {
+		return nil
 	}
 	firewallConfig := getFirewallConfig(workflowData)
 	if !awfSupportsHostedWeb(firewallConfig) {
@@ -171,8 +168,9 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 		}
 		return nil
 	}
-	if runtimeID == "codex" && NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderGitHub {
-		return errors.New("network.hosted-web is not functional with Codex using Copilot inference; use OpenAI inference to enable standalone web search")
+	hostedWebCapabilities, err := validateHostedWebCapabilities(workflowData, capabilityProvider)
+	if err != nil {
+		return err
 	}
 	if len(policy.Allowed) == 0 && len(policy.Blocked) == 0 {
 		return errors.New("network.hosted-web requires exactly one non-empty allowed or blocked list")
@@ -183,8 +181,8 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 	if policy.MaxUses < 0 {
 		return errors.New("network.hosted-web.max-uses must be a positive integer")
 	}
-	if runtimeID == "codex" && policy.MaxUses > 0 && NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderOpenAI {
-		return errors.New("network.hosted-web.max-uses is not supported by Codex standalone web search; remove max-uses to enable hosted web")
+	if policy.MaxUses > 0 && !hostedWebCapabilities.SupportsMaxUses {
+		return errors.New("network.hosted-web.max-uses is not supported by standalone web search; remove max-uses to enable hosted web")
 	}
 	if err := validateHostedWebDomains("allowed", policy.Allowed); err != nil {
 		return err
@@ -195,24 +193,62 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 	return nil
 }
 
-func (c *Compiler) resolveHostedWebRuntimeID(workflowData *WorkflowData) (string, error) {
+func validateHostedWebCapabilities(workflowData *WorkflowData, provider HostedWebCapabilityProvider) (HostedWebCapabilities, error) {
+	capabilities := provider.GetHostedWebCapabilities(workflowData)
+	if capabilities.UnsupportedReason != "" {
+		return HostedWebCapabilities{}, errors.New(capabilities.UnsupportedReason)
+	}
+	if !capabilities.Supported {
+		return HostedWebCapabilities{}, errors.New("network.hosted-web is not supported by the selected engine and inference provider")
+	}
+	return capabilities, nil
+}
+
+func (c *Compiler) resolveHostedWebCapabilityProvider(workflowData *WorkflowData, policy *HostedWebPolicy) (HostedWebCapabilityProvider, error) {
+	engine, err := c.resolveHostedWebEngine(workflowData)
+	if err != nil {
+		return nil, fmt.Errorf("network.hosted-web: failed to resolve engine runtime: %w", err)
+	}
+	capabilityProvider, ok := engine.(HostedWebCapabilityProvider)
+	if !ok && policy != nil {
+		return nil, errors.New("network.hosted-web is only supported by engines with hosted web search capabilities")
+	}
+	return capabilityProvider, nil
+}
+
+func (c *Compiler) resolveHostedWebEngine(workflowData *WorkflowData) (CodingAgentEngine, error) {
 	if workflowData == nil || workflowData.EngineConfig == nil {
-		return "", nil
+		return nil, nil
 	}
 	engineID := workflowData.EngineConfig.ID
 	if workflowData.EngineConfig.IsInlineDefinition {
-		return hostedWebRuntimeID(engineID, ""), nil
-	}
-	if c != nil && c.engineCatalog != nil {
-		resolved, err := c.engineCatalog.Resolve(engineID, workflowData.EngineConfig)
+		if c == nil || c.engineRegistry == nil {
+			return nil, nil
+		}
+		engine, err := c.engineRegistry.GetEngine(hostedWebRuntimeID(engineID, ""))
 		if err != nil {
-			return "", err
+			return nil, nil
 		}
-		if resolved != nil && resolved.Runtime != nil {
-			return guardResolvedHostedWebRuntimeID(engineID, resolved.Runtime.GetID(), c.engineCatalog.Get(engineID) != nil), nil
-		}
+		return engine, nil
 	}
-	return hostedWebRuntimeID(engineID, ""), nil
+	if c == nil || c.engineCatalog == nil {
+		return nil, nil
+	}
+	resolved, err := c.engineCatalog.Resolve(engineID, workflowData.EngineConfig)
+	if err != nil {
+		if c.engineCatalog.Get(engineID) != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	if resolved == nil || resolved.Runtime == nil {
+		return nil, nil
+	}
+	runtimeID := guardResolvedHostedWebRuntimeID(engineID, resolved.Runtime.GetID(), c.engineCatalog.Get(engineID) != nil)
+	if runtimeID != strings.ToLower(resolved.Runtime.GetID()) {
+		return nil, nil
+	}
+	return resolved.Runtime, nil
 }
 
 func guardResolvedHostedWebRuntimeID(engineID, resolvedRuntimeID string, registeredEngine bool) string {

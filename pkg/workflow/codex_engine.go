@@ -81,6 +81,15 @@ func (e *CodexEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvider
 	return resolveEngineLLMProviderFromModel(workflowData, LLMProviderOpenAI)
 }
 
+func (e *CodexEngine) GetHostedWebCapabilities(workflowData *WorkflowData) HostedWebCapabilities {
+	if e.ResolveLLMProvider(workflowData) != LLMProviderOpenAI {
+		return HostedWebCapabilities{
+			UnsupportedReason: "network.hosted-web is not functional with Codex using Copilot inference; use OpenAI inference to enable standalone web search",
+		}
+	}
+	return HostedWebCapabilities{Supported: true}
+}
+
 // codexModelID strips the provider prefix from a model identifier because the Codex
 // CLI expects a bare model name (for example "gpt-5.3-codex"). Both the "copilot/"
 // prefix (GitHub-hosted inference through Codex's BYOK provider) and the "openai/"

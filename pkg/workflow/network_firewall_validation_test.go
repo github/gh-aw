@@ -281,7 +281,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			name:    "rejects Codex OpenAI standalone max-uses",
 			engine:  "codex",
 			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
-			wantErr: "network.hosted-web.max-uses is not supported by Codex standalone web search",
+			wantErr: "network.hosted-web.max-uses is not supported by standalone web search",
 		},
 		{
 			name:     "rejects Codex Copilot hosted web",
@@ -372,6 +372,12 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			explicitNetwork: true,
 			firewallVersion: "v0.28.24",
 			wantErr:         "requires AWF",
+		},
+		{
+			name:            "ignores absent hosted-web policy for unsupported engines",
+			engine:          "copilot",
+			explicitNetwork: true,
+			firewallVersion: "v0.28.24",
 		},
 		{
 			name:    "rejects unsupported engine",
