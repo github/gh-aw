@@ -573,6 +573,8 @@ source for opaque fields.
 | Event type | Source observation |
 | --- | --- |
 | `agent.execution` | One aggregate execution/error observation for the main agent, as defined in Section 4.8. |
+| `subagent.started`, `subagent.configured`, `subagent.completed`, `subagent.failed` | Cross-engine sub-agent lifecycle observations. `agentId` identifies the invocation; `data.invocationId` preserves an available engine invocation ID. Failures may include `errorCode`, including `SUBAGENT_MODEL_UNAVAILABLE`. |
+| `subagent.request` | A sub-agent inference observation with `agentId`, `invocationId`, model, and the available input, output, cache-read, and cache-write token counts. It provides the per-request evidence used to correlate proxy accounting. |
 | `prompt.system`, `prompt.user` | Split activation prompt file contents with source provenance, when available; omitted from default summaries. |
 | `mcp.rpc.request`, `mcp.rpc.response` | MCPG `REQUEST`/`RESPONSE` or `rpc_request`/`rpc_response`, with flat RPC metadata and error code/message. |
 | `mcp.difc.filtered`, `mcp.guard.blocked` | DIFC and guard-policy diagnostics; no inferred successful tool outcome. |
@@ -863,14 +865,18 @@ effort. `session.shutdown.data.agentMetrics` is exposed unchanged in
 token counts, and nano-AIU credits. This is an authoritative snapshot, not an
 additional contribution to session usage.
 
-Audit and logs read subagent models from `usage/aw_session.jsonl` first, then
-`agent-session.jsonl` when structured conclusion evidence is unavailable.
-Structured per-model actuals include only subagent requests, not main-agent or
-router traffic. An observed Copilot session without subagents does not trigger
-stdio inference. Older runs fall back to `agent-stdio.log` with the existing
-heuristic warning; only CLI dispatch-marker lines are considered, supporting
-both `Name(model)` and `Name (model: model)` layouts. Invalid structured evidence
-produces a warning before falling back.
+Pi dispatches, resolved models, per-request token usage, terminal outcomes, and
+invocation IDs are projected into the shared `subagent.*` lifecycle vocabulary.
+`subagent.request` retains the observed model and token quartet; failure events
+retain sanitized error text and any supplied failure code.
+
+Audit and logs read sub-agent lifecycle and model evidence from
+`usage/aw_session.jsonl`. Per-agent proxy credits are correlated from that
+file's `firewall.token_usage` observations with sub-agent requests using model,
+token counts, and observation order. Structured per-model actuals include only
+sub-agent requests, not main-agent or router traffic. `agent-session.jsonl` is
+used only for older runs without a unified-session artifact. `agent-stdio.log`
+is not a source of sub-agent rows.
 
 Subagent attribution is scoped to the final retry session; earlier source
 records cannot contribute even when merged timestamps interleave them.

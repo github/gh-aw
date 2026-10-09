@@ -219,11 +219,14 @@ func TestSessionParserCopilotSubagentAttribution(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, summary)
 			require.Equal(t, []SubagentModelRequest{
-				{AgentName: "awf-routing", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
-				{AgentName: "ghaw-issues", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
-				{AgentName: "subagent-research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
+				{AgentName: "awf-routing", RequestedModel: "opus", ResolvedModel: "opus", EffectiveModel: "opus", InvocationCount: 1, CompletedCount: 1, Effort: "low"},
+				{AgentName: "ghaw-issues", RequestedModel: "opus", ResolvedModel: "opus", EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "low"},
+				{AgentName: "subagent-research", RequestedModel: "opus", ResolvedModel: "opus", EffectiveModel: "opus", InvocationCount: 1, IncompleteCount: 1, Effort: "xhigh"},
 			}, summary.SubagentModelRequests)
-			require.Equal(t, []SubagentModelActual{{Model: "opus", Requests: 60}}, summary.SubagentModelActuals)
+			require.Equal(t, []SubagentModelActual{{
+				Model: "opus", ResolvedModel: "opus", Requests: 60,
+				TokenCoreMetrics: TokenCoreMetrics{InputTokens: 6000, OutputTokens: 600, CacheReadTokens: 60, CacheWriteTokens: 120},
+			}}, summary.SubagentModelActuals)
 			require.Zero(t, summary.MismatchCount)
 			require.Empty(t, summary.Warnings)
 			require.Contains(t, summary.ByModel, "proxy-only-model")
@@ -308,7 +311,7 @@ func TestSessionParserCopilotWithoutSubagents(t *testing.T) {
 	require.Zero(t, summary.MismatchCount)
 }
 
-func TestSessionParserCopilotLegacySubagentFallback(t *testing.T) {
+func TestSessionParserDoesNotInferSubagentsFromStdio(t *testing.T) {
 	t.Parallel()
 	requireSessionTestNode(t)
 	for _, dispatch := range []string{"Research(opus)", "Research (model: opus)"} {
@@ -325,21 +328,12 @@ func TestSessionParserCopilotLegacySubagentFallback(t *testing.T) {
 			summary, err := analyzeTokenUsage(root, false)
 			require.NoError(t, err)
 			require.NotNil(t, summary)
-			require.Equal(t, []SubagentModelRequest{
-				{AgentName: "Research", RequestedModel: "opus", EffectiveModel: "opus", InvocationCount: 1},
-			}, summary.SubagentModelRequests)
-			require.Contains(t, summary.Warnings, subagentStdioWarning)
+			require.Empty(t, summary.SubagentModelRequests)
+			require.Empty(t, summary.Warnings)
 			require.Zero(t, summary.MismatchCount)
 		})
 	}
 }
-
-const copilotSubagentIntegrationMetrics = `{
-	"main":{"totalNanoAiu":389122000000,"modelMetrics":{"opus":{"requests":{"count":41},"usage":{"inputTokens":4100,"outputTokens":410,"cacheReadTokens":41,"cacheWriteTokens":82}}}},
-	"research":{"agentName":"research","agentDisplayName":"subagent-research","totalNanoAiu":494207000000,"modelMetrics":{"opus":{"requests":{"count":45},"usage":{"inputTokens":4500,"outputTokens":450,"cacheReadTokens":45,"cacheWriteTokens":90}}}},
-	"ghaw":{"agentName":"explore","agentDisplayName":"ghaw-issues","totalNanoAiu":9141000000,"modelMetrics":{"opus":{"requests":{"count":3},"usage":{"inputTokens":300,"outputTokens":30,"cacheReadTokens":3,"cacheWriteTokens":6}}}},
-	"awf":{"agentName":"explore","agentDisplayName":"awf-routing","totalNanoAiu":40977000000,"modelMetrics":{"opus":{"requests":{"count":12},"usage":{"inputTokens":1200,"outputTokens":120,"cacheReadTokens":12,"cacheWriteTokens":24}}}}
-}`
 
 func copilotSubagentIntegrationEvents(t *testing.T) string {
 	t.Helper()

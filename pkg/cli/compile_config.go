@@ -15,6 +15,7 @@ type CompileConfig struct {
 	UseSamples                bool     // Hidden: replace agentic step with a deterministic samples replay driver
 	Strict                    bool     // Enable strict mode validation
 	DryRun                    bool     // Enable fail-closed development testing checks and staged safe outputs
+	AllowExperimental         bool     // Accept experimental-feature notices without waiving other dry-run diagnostics
 	EnvironmentOverride       string   // Override the environment on every generated job
 	RequireSelfHostedRunners  bool     // Require every generated job to select a self-hosted runner
 	Dependabot                bool     // Generate Dependabot manifests for npm dependencies

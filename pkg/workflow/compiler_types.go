@@ -47,6 +47,7 @@ type Compiler struct {
 	engineCatalog           *EngineCatalog           // Catalog of engine definitions backed by the registry
 	fileTracker             FileCreationTracker      // Optional file tracker for tracking created files
 	warningCount            int                      // Number of warnings encountered during compilation
+	experimentalWarnings    int                      // Experimental-feature notices, also included in warningCount
 	stepOrderTracker        *StepOrderTracker        // Tracks step ordering for validation
 	actionCache             *ActionCache             // Shared cache for action pin resolutions across all workflows
 	actionResolver          *ActionResolver          // Shared resolver for action pins across all workflows

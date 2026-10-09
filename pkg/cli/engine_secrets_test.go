@@ -540,34 +540,6 @@ func TestEngineSecretConfigStructure(t *testing.T) {
 func TestGetEngineSecretNameAndValue(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
 
-	// Save current env and restore after test
-	oldCopilotToken := os.Getenv("COPILOT_GITHUB_TOKEN")
-	oldAnthropicKey := os.Getenv("ANTHROPIC_API_KEY")
-	oldOpenAIKey := os.Getenv("OPENAI_API_KEY")
-	oldCodexKey := os.Getenv("CODEX_API_KEY")
-	defer func() {
-		if oldCopilotToken != "" {
-			os.Setenv("COPILOT_GITHUB_TOKEN", oldCopilotToken)
-		} else {
-			os.Unsetenv("COPILOT_GITHUB_TOKEN")
-		}
-		if oldAnthropicKey != "" {
-			os.Setenv("ANTHROPIC_API_KEY", oldAnthropicKey)
-		} else {
-			os.Unsetenv("ANTHROPIC_API_KEY")
-		}
-		if oldOpenAIKey != "" {
-			os.Setenv("OPENAI_API_KEY", oldOpenAIKey)
-		} else {
-			os.Unsetenv("OPENAI_API_KEY")
-		}
-		if oldCodexKey != "" {
-			os.Setenv("CODEX_API_KEY", oldCodexKey)
-		} else {
-			os.Unsetenv("CODEX_API_KEY")
-		}
-	}()
-
 	t.Run("secret exists in repository", func(t *testing.T) {
 		existingSecrets := map[string]struct {
 		}{
@@ -583,8 +555,7 @@ func TestGetEngineSecretNameAndValue(t *testing.T) {
 	})
 
 	t.Run("secret found in environment", func(t *testing.T) {
-		os.Setenv("ANTHROPIC_API_KEY", "test-api-key-12345")
-		defer os.Unsetenv("ANTHROPIC_API_KEY")
+		t.Setenv("ANTHROPIC_API_KEY", "test-api-key-12345")
 
 		existingSecrets := map[string]struct {
 		}{}
@@ -598,8 +569,8 @@ func TestGetEngineSecretNameAndValue(t *testing.T) {
 	})
 
 	t.Run("secret not in repo or environment", func(t *testing.T) {
-		os.Unsetenv("OPENAI_API_KEY")
-		os.Unsetenv("CODEX_API_KEY")
+		t.Setenv("OPENAI_API_KEY", "")
+		t.Setenv("CODEX_API_KEY", "")
 
 		existingSecrets := map[string]struct {
 		}{}
@@ -623,6 +594,8 @@ func TestGetEngineSecretNameAndValue(t *testing.T) {
 	})
 
 	t.Run("no alternative secret in repo", func(t *testing.T) {
+		t.Setenv("ANTHROPIC_API_KEY", "")
+
 		existingSecrets := map[string]struct {
 		}{}
 
@@ -635,8 +608,7 @@ func TestGetEngineSecretNameAndValue(t *testing.T) {
 	})
 
 	t.Run("prefers primary secret over environment", func(t *testing.T) {
-		os.Setenv("COPILOT_GITHUB_TOKEN", "test-token-from-env")
-		defer os.Unsetenv("COPILOT_GITHUB_TOKEN")
+		t.Setenv("COPILOT_GITHUB_TOKEN", "test-token-from-env")
 
 		existingSecrets := map[string]struct {
 		}{

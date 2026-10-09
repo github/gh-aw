@@ -4519,6 +4519,7 @@ tools:
 
   # Format 1: Enable read-only queue observation, or queue-control intents when
   # approved worker dispatch targets are configured.
+  work-queue: true
 
   # Format 2: Enable the work-queue MCP server.
   work-queue: null

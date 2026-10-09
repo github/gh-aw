@@ -543,13 +543,8 @@ func TestRenderForecastTable_ZeroMonteCarloRangeRendersDash(t *testing.T) {
 }
 
 func TestLoadCachedRunAIC_UsageArtifactFirst(t *testing.T) {
-	originalDir, err := os.Getwd()
-	require.NoError(t, err)
 	tmpDir := t.TempDir()
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() {
-		_ = os.Chdir(originalDir)
-	})
+	t.Chdir(tmpDir)
 
 	originalDownload := forecastDownloadRunArtifacts
 	originalAnalyze := forecastAnalyzeTokenUsage
@@ -576,13 +571,8 @@ func TestLoadCachedRunAIC_UsageArtifactFirst(t *testing.T) {
 }
 
 func TestLoadCachedRunAIC_MissingUsageReturnsZero(t *testing.T) {
-	originalDir, err := os.Getwd()
-	require.NoError(t, err)
 	tmpDir := t.TempDir()
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() {
-		_ = os.Chdir(originalDir)
-	})
+	t.Chdir(tmpDir)
 
 	originalDownload := forecastDownloadRunArtifacts
 	originalAnalyze := forecastAnalyzeTokenUsage

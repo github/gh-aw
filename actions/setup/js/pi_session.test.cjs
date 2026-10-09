@@ -12,15 +12,62 @@ describe("Pi CI stream regressions", () => {
     const parent = { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Parent answer" }], usage: { input: 10, output: 3 } } };
     const child = {
       type: "gh_aw_subagent_event",
+      invocation_id: "invocation-1",
       agent: "reader",
       event: { type: "message_end", message: { role: "assistant", model: "claude-haiku-4.5", content: [{ type: "text", text: "Child answer" }], usage: { input: 5, output: 2 } } },
     };
-    const records = [{ type: "gh_aw_subagent_dispatch", agent: "reader", requested_model: "small", resolved_model: "claude-haiku-4.5" }, child, parent];
+    const records = [
+      { type: "gh_aw_subagent_dispatch", invocation_id: "invocation-1", agent: "reader", requested_model: "small", resolved_model: "claude-haiku-4.5" },
+      child,
+      { type: "gh_aw_subagent_result", invocation_id: "invocation-1", agent: "reader", outcome: "completed" },
+      parent,
+    ];
     const events = transformPiV3Entries(records);
-    expect(byType(events, "pi.subagent_dispatch")[0].data).toMatchObject({ requestedModel: "small", resolvedModel: "claude-haiku-4.5" });
-    expect(byType(events, "pi.subagent_event")[0].data.event).toEqual(child.event);
+    expect(byType(events, "subagent.started")[0]).toMatchObject({
+      agentId: "invocation-1",
+      data: { invocationId: "invocation-1", agentName: "reader", model: "small", resolvedModel: "claude-haiku-4.5" },
+    });
+    expect(byType(events, "subagent.configured")[0]).toMatchObject({
+      agentId: "invocation-1",
+      data: { invocationId: "invocation-1", model: "claude-haiku-4.5" },
+    });
+    expect(byType(events, "subagent.request")[0]).toMatchObject({
+      agentId: "invocation-1",
+      data: { invocationId: "invocation-1", agentName: "reader", model: "claude-haiku-4.5", inputTokens: 5, outputTokens: 2 },
+    });
+    expect(byType(events, "subagent.completed")[0].data).toMatchObject({ invocationId: "invocation-1", outcome: "completed" });
+    expect(byType(events, "pi.subagent_dispatch")).toEqual([]);
+    expect(byType(events, "pi.subagent_event")).toEqual([]);
+    expect(byType(events, "pi.subagent_result")).toEqual([]);
     expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["Parent answer"]);
     expect(computePiV3Stats(records).usage.input_tokens).toBe(10);
+  });
+
+  it("normalizes a failed child with its invocation and failure code", () => {
+    const events = transformPiV3Entries([
+      { type: "gh_aw_subagent_dispatch", invocation_id: "unavailable-1", agent: "reader", requested_model: "small", resolved_model: "gpt-5.6-luna" },
+      { type: "gh_aw_subagent_result", invocation_id: "unavailable-1", agent: "reader", outcome: "failed", error_code: "SUBAGENT_MODEL_UNAVAILABLE", error: "No model endpoint is available" },
+    ]);
+    expect(byType(events, "subagent.failed")[0]).toMatchObject({
+      agentId: "unavailable-1",
+      data: {
+        invocationId: "unavailable-1",
+        outcome: "failed",
+        errorCode: "SUBAGENT_MODEL_UNAVAILABLE",
+        error: "No model endpoint is available",
+      },
+    });
+  });
+
+  it("derives legacy invocation identities by agent and dispatch order", () => {
+    const events = transformPiV3Entries([
+      { type: "gh_aw_subagent_dispatch", agent: "reader", requested_model: "small" },
+      { type: "gh_aw_subagent_event", agent: "reader", event: { message: { role: "assistant", model: "gpt-5.4-mini", usage: { input: 5, output: 2, cacheRead: 0, cacheWrite: 0 } } } },
+      { type: "gh_aw_subagent_result", agent: "reader", outcome: "completed" },
+    ]);
+    expect(byType(events, "subagent.started")[0].agentId).toBe("legacy:pi:reader:1");
+    expect(byType(events, "subagent.request")[0].agentId).toBe("legacy:pi:reader:1");
+    expect(byType(events, "subagent.completed")[0].agentId).toBe("legacy:pi:reader:1");
   });
   // https://github.com/github/gh-aw/actions/runs/36884805242 (success)
   // https://github.com/github/gh-aw/actions/runs/36447274044 (provider failure)

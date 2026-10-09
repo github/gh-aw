@@ -101,7 +101,7 @@ Out of scope:
    - `cd eslint-factory && npm install`
    - `cd eslint-factory && npm run build`
    - `cd eslint-factory && npm run lint:setup-js`
-8. Open one draft PR with evidence and rationale. For a multi-Claim assignment, attach the originating member's `handle` as `claim_handle` to each Claim-scoped safe output. Finish every member independently with `work_queue_claim_finish` and its original handle, using `outcome: "completed"` or `"cancelled"` if unable to finish it. A single-member assignment may omit the selector. If no suitable rule exists, finish the Claim and call `noop`.
+8. Open one draft PR with evidence and rationale. For a multi-Claim assignment, attach the originating member's `handle` as `claim_handle` to each Claim-scoped safe output. Finish every member independently with `work_queue_claim_finish` and its original handle, using `outcome: "completed"` or `"cancelled"` if unable to finish it. A single-member assignment may omit the selector. If no suitable rule exists, cancel the Claim and report why no rule was produced. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits a completed `noop`-only outcome; a write-capable contract cannot settle Result from `noop` alone.
 
 ## Rule quality bar
 

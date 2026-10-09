@@ -124,8 +124,9 @@ authentication/model cases. `engine-conformance-agy.md` separately exercises the
 production installer, AWF, native MCP, CLI-mounted MCP tools and staged safe
 outputs. It remains dispatch-only; Credentials Check calls the feature-branch
 `agy-conformance-reusable.lock.yml`, compiled from the same shared probes and
-prompt. Release and Gemini deprecation are gated on that production path, not
-on mocked tests or native authentication alone.
+prompt. Stable promotion is gated on that production path, not on mocked tests
+or native authentication alone. Gemini is deprecated in favor of experimental
+Agy, but remains supported for workflows outside Agy's capabilities.
 
 `smoke-agy.md` provides an on-demand smoke test using the same shared conformance
 suite. Run it with `workflow_dispatch`, `/smoke-agy` in an issue or pull request

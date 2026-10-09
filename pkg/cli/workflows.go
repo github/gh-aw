@@ -19,6 +19,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/repoutil"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -79,10 +80,16 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 	}
 
 	endpoint := "repos/{owner}/{repo}/actions/workflows?per_page=100"
+	var hostname string
 	if repoOverride != "" {
-		endpoint = fmt.Sprintf("repos/%s/actions/workflows?per_page=100", repoOverride)
+		var ownerRepo string
+		ownerRepo, hostname = repoutil.NormalizeRepoForAPI(repoOverride)
+		endpoint = fmt.Sprintf("repos/%s/actions/workflows?per_page=100", ownerRepo)
 	}
 	args := []string{"api", "--paginate", "--slurp", endpoint}
+	if hostname != "" {
+		args = append(args, "--hostname", hostname)
+	}
 	cmd := workflow.ExecGHContext(ctx, args...)
 	output, err := cmd.Output()
 

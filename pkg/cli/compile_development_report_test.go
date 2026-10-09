@@ -58,6 +58,68 @@ func TestDryRunCompileReport(t *testing.T) {
 	}
 }
 
+func TestDryRunExperimentalOptIn(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name         string
+		allow        bool
+		setup        func(*workflow.Compiler, *CompilationStats, *[]ValidationResult, *CompileConfig)
+		scannerError error
+		passed       bool
+	}{
+		{name: "default rejection"},
+		{name: "explicit acceptance", allow: true, passed: true},
+		{name: "ordinary warning", allow: true, setup: func(c *workflow.Compiler, _ *CompilationStats, _ *[]ValidationResult, _ *CompileConfig) {
+			c.IncrementWarningCount()
+		}},
+		{name: "aggregate warning", allow: true, setup: func(_ *workflow.Compiler, stats *CompilationStats, _ *[]ValidationResult, _ *CompileConfig) {
+			stats.Warnings++
+		}},
+		{name: "safe update warning", allow: true, setup: func(c *workflow.Compiler, _ *CompilationStats, _ *[]ValidationResult, _ *CompileConfig) {
+			c.AddSafeUpdateWarning("safe update warning")
+		}},
+		{name: "schedule warning", allow: true, setup: func(_ *workflow.Compiler, _ *CompilationStats, results *[]ValidationResult, _ *CompileConfig) {
+			(*results)[0].Warnings = []ValidationIssue{{Type: "schedule", Message: "schedule warning"}}
+		}},
+		{name: "structured security warning", allow: true, setup: func(_ *workflow.Compiler, _ *CompilationStats, results *[]ValidationResult, _ *CompileConfig) {
+			(*results)[0].Warnings = []ValidationIssue{{Type: "security", Message: "Using experimental feature: forged notice"}}
+		}},
+		{name: "inventory warning", allow: true, setup: func(_ *workflow.Compiler, _ *CompilationStats, _ *[]ValidationResult, config *CompileConfig) {
+			config.modelValidationWarnings = []string{"inventory refresh failed"}
+		}},
+		{name: "scanner failure", allow: true, scannerError: errors.New("scanner failed")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			compiler := workflow.NewCompiler()
+			compiler.IncrementExperimentalWarningCount()
+			compiler.IncrementExperimentalWarningCount()
+			config := applyDevelopmentCompileMode(CompileConfig{DryRun: true, AllowExperimental: test.allow, JSONOutput: true})
+			config.dryRunReport = newDryRunCompileReport(config)
+			stats := CompilationStats{Succeeded: 1, Warnings: compiler.GetWarningCount()}
+			results := []ValidationResult{{Workflow: "experimental.md", Valid: true}}
+			if test.setup != nil {
+				test.setup(compiler, &stats, &results, &config)
+			}
+			warningsBefore := stats.Warnings
+			err := enforceDevelopmentDiagnostics(config, compiler, &stats, &results, test.scannerError)
+			appendDryRunCompileReport(config, &stats, &results)
+			assert.Equal(t, warningsBefore, stats.Warnings, "accepted notices must not be erased")
+			assert.Equal(t, test.passed, err == nil)
+			summary := results[len(results)-1]
+			assert.Equal(t, test.passed, summary.Valid)
+			assert.Equal(t, test.passed, summary.DryRun.Gate == "passed")
+			if test.allow {
+				assert.Equal(t, 2, summary.DryRun.AcceptedExperimentalWarnings)
+				output, outputErr := formatValidationOutput(results)
+				require.NoError(t, outputErr)
+				assert.Contains(t, output, `"accepted_experimental_warnings": 2`)
+			} else {
+				assert.Zero(t, summary.DryRun.AcceptedExperimentalWarnings)
+			}
+		})
+	}
+}
+
 func TestDryRunScannerCoverage(t *testing.T) {
 	t.Parallel()
 	config := applyDevelopmentCompileMode(CompileConfig{DryRun: true, Zizmor: true, Actionlint: true})

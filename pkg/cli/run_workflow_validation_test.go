@@ -5,12 +5,88 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestValidateRemoteWorkflowPaginated(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fake gh is not supported on Windows")
+	}
+
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "args.log")
+	responsePath := filepath.Join(dir, "response.json")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"" + argsPath + "\"\ncat \"" + responsePath + "\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+
+	tests := []struct {
+		name      string
+		repo      string
+		response  string
+		wantError string
+		wantHost  string
+	}{
+		{
+			name:     "workflow on later page",
+			repo:     "owner/repo",
+			response: `[{"workflows":[{"id":1,"path":".github/workflows/first.lock.yml","state":"active"}]},{"workflows":[{"id":2,"name":"ESLint Factory Dispatcher","path":".github/workflows/eslint-factory-dispatcher.lock.yml","state":"active"}]}]`,
+		},
+		{
+			name:     "disabled workflow is discoverable",
+			repo:     "owner/repo",
+			response: `[{"workflows":[{"id":2,"path":".github/workflows/eslint-factory-dispatcher.lock.yml","state":"disabled_manually"}]}]`,
+		},
+		{
+			name:     "enterprise host",
+			repo:     "github.example.com/owner/repo",
+			response: `[{"workflows":[{"id":2,"path":".github/workflows/eslint-factory-dispatcher.lock.yml","state":"active"}]}]`,
+			wantHost: "github.example.com",
+		},
+		{
+			name:      "similarly suffixed workflow is not a match",
+			repo:      "owner/repo",
+			response:  `[{"workflows":[{"id":2,"path":".github/workflows/not-eslint-factory-dispatcher.lock.yml","state":"active"}]}]`,
+			wantError: "not found in repository",
+		},
+		{
+			name:      "empty inventory",
+			repo:      "owner/repo",
+			response:  `[{"workflows":[]}]`,
+			wantError: "not found in repository",
+		},
+		{
+			name:      "malformed response",
+			repo:      "owner/repo",
+			response:  `invalid-json`,
+			wantError: "invalid JSON",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, os.WriteFile(responsePath, []byte(tt.response), 0o600))
+			err := validateRemoteWorkflow(".github/workflows/eslint-factory-dispatcher.md", tt.repo, true)
+			if tt.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantError)
+			}
+			args, err := os.ReadFile(argsPath)
+			require.NoError(t, err)
+			assert.Contains(t, string(args), "api --paginate --slurp repos/owner/repo/actions/workflows?per_page=100")
+			if tt.wantHost != "" {
+				assert.Contains(t, string(args), "--hostname "+tt.wantHost)
+			}
+		})
+	}
+}
 
 func TestGetLockFilePath(t *testing.T) {
 	t.Parallel()

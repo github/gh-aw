@@ -13,23 +13,9 @@ import (
 
 // TestAddCommandRequiresArguments verifies that the add command requires at least one argument
 func TestAddCommandRequiresArguments(t *testing.T) {
-	// Save current directory
-	originalDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current directory: %v", err)
-	}
-	defer func() {
-		// Restore original directory
-		if err := os.Chdir(originalDir); err != nil {
-			t.Logf("Warning: Failed to restore directory: %v", err)
-		}
-	}()
-
 	// Create a temporary directory for testing
 	tmpDir := testutil.TempDir(t, "test-*")
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("Failed to change to temp dir: %v", err)
-	}
+	t.Chdir(tmpDir)
 
 	// Initialize git repo
 	if err := os.MkdirAll(".git", 0755); err != nil {
@@ -48,7 +34,7 @@ func TestAddCommandRequiresArguments(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	// Execute and expect an error
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Error("Expected error when calling add without arguments, got nil")
 	}

@@ -204,6 +204,17 @@ func renderConsoleTokenUsage(tokenUsage *TokenUsageSummary) {
 		tokenUsage.TotalRequests,
 		console.FormatNumber(tokenUsage.TotalSteeringEvents),
 	)
+	if len(tokenUsage.AgentUsage) > 0 {
+		fmt.Fprintln(os.Stderr, "  agent_usage:")
+		fmt.Fprintln(os.Stderr, "    agent | instances | outcome (completed/failed/incomplete) | requests | tokens (in/out) | credits | effort")
+		for _, agent := range tokenUsage.AgentUsage {
+			fmt.Fprintf(os.Stderr, "    %s %s | %d | %d/%d/%d | %d | %s/%s | %.3f | %s\n",
+				agent.AgentType, safeModelRoutingText(agent.AgentName), agent.InstanceCount,
+				agent.CompletedCount, agent.FailedCount, agent.IncompleteCount, agent.Requests,
+				console.FormatNumber(agent.InputTokens), console.FormatNumber(agent.OutputTokens),
+				agent.AIC, safeModelRoutingText(agent.Effort))
+		}
+	}
 	if len(tokenUsage.Warnings) > 0 {
 		fmt.Fprintln(os.Stderr, "  token_usage_warnings:")
 		for _, warning := range tokenUsage.Warnings {
@@ -224,6 +235,16 @@ func renderConsoleModelRouting(routing *ModelRoutingSummary) {
 	}
 	fmt.Fprintf(os.Stderr, "    cost_aic: classifier=%.3f selected_model=%.3f deviated=%.3f\n",
 		routing.ClassifierCost.AIC, routing.SelectedModelCost.AIC, routing.DeviatedTrafficCost.AIC)
+	if routing.MainAgentCost.Requests > 0 || routing.MainAgentCost.AIC > 0 {
+		fmt.Fprintf(os.Stderr, "    main_agent_cost: requests=%d input=%d output=%d aic=%.3f\n",
+			routing.MainAgentCost.Requests, routing.MainAgentCost.InputTokens,
+			routing.MainAgentCost.OutputTokens, routing.MainAgentCost.AIC)
+	}
+	for _, agent := range routing.SubagentCosts {
+		fmt.Fprintf(os.Stderr, "    subagent_cost: %s effort=%s requests=%d failed=%d aic=%.3f\n",
+			safeModelRoutingText(agent.AgentName), safeModelRoutingText(agent.Effort),
+			agent.Requests, agent.FailedCount, agent.AIC)
+	}
 }
 
 func renderConsoleModelRoutingSelection(routing *ModelRoutingSummary) {
