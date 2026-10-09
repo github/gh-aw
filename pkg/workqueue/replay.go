@@ -44,28 +44,29 @@ func Replay(commits []QueueCommit) (Projection, error) {
 	if err != nil {
 		return state, err
 	}
-	firstCommit, firstOperation, foundFirstOperation := firstReplayOperation(ordered)
-	if !foundFirstOperation {
-		return state, queueError("policy_missing", "existing queue has no policy genesis")
-	}
 	epochs := identitySet{}
 	generations := identitySet{state.CredentialGeneration: {}}
 	offset := 0
 	checkpointCount := 0
-	if kind, kindErr := operationKind(firstOperation); kindErr == nil && kind == "Checkpoint" {
-		state, err = restoreCheckpoint(firstCommit)
-		if err != nil {
-			return state, err
+	if len(ordered) > 0 {
+		firstCommit := ordered[0]
+		if len(firstCommit.Operations) > 0 {
+			if kind, kindErr := operationKind(firstCommit.Operations[0]); kindErr == nil && kind == "Checkpoint" {
+				state, err = restoreCheckpoint(firstCommit)
+				if err != nil {
+					return state, err
+				}
+				offset = state.Stats.Transactions
+				checkpointCount = 1
+				for epoch := range state.SeenEpochs {
+					epochs.add(epoch)
+				}
+				for generation := range state.SeenGenerations {
+					generations.add(generation)
+				}
+				ordered = ordered[1:]
+			}
 		}
-		offset = state.Stats.Transactions
-		checkpointCount = 1
-		for epoch := range state.SeenEpochs {
-			epochs.add(epoch)
-		}
-		for generation := range state.SeenGenerations {
-			generations.add(generation)
-		}
-		ordered = ordered[1:]
 	}
 	for ordinal, commit := range ordered {
 		if err := state.replayCommit(commit, offset+checkpointCount+ordinal, epochs, generations); err != nil {
@@ -199,10 +200,8 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 		return state.recordObservation(observation, commit)
 	case "Completion":
 		return state.applyCompletion(operation, commit)
-	case "ClaimCancellation":
-		return state.replayClaimCancellation(operation, commit)
-	case "WorkCancellation":
-		return state.replayWorkCancellation(operation, commit)
+	case "ClaimCancellation", "WorkCancellation":
+		return state.replayCancellation(operation, kind, commit)
 	case "WorkPriority":
 		return state.reprioritizeWork(operation)
 	case "IssueLink", "IssueComment":
@@ -212,52 +211,42 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	case "Release":
 		return state.release(operation, commit)
 	case "Result", "DeliveryFailure":
-		return state.replayResult(operation, kind, commit)
+		return state.replayTerminalResult(operation, kind, commit)
 	default:
 		return queueError("unsupported_protocol", "unknown operation")
 	}
 }
 
-func firstReplayOperation(commits []QueueCommit) (QueueCommit, Operation, bool) {
-	if len(commits) > 0 {
-		first := commits[0]
-		if len(first.Operations) > 0 {
-			return first, first.Operations[0], true
+func (state *Projection) replayCancellation(operation Operation, kind string, commit QueueCommit) error {
+	if kind == "ClaimCancellation" {
+		var value ClaimOperation
+		if err := json.Unmarshal(operation, &value); err != nil {
+			return err
 		}
+		if err := state.cancelClaim(operation, commit); err != nil {
+			return err
+		}
+		state.Cancellations[value.ClaimID] = operation
+		return nil
 	}
-	return QueueCommit{}, nil, false
-}
 
-func (state *Projection) replayClaimCancellation(operation Operation, commit QueueCommit) error {
-	if err := state.cancelClaim(operation, commit); err != nil {
-		return err
-	}
-	var value ClaimOperation
-	if err := json.Unmarshal(operation, &value); err != nil {
-		return err
-	}
-	state.Cancellations[value.ClaimID] = operation
-	return nil
-}
-
-func (state *Projection) replayWorkCancellation(operation Operation, commit QueueCommit) error {
-	if err := state.cancelWork(operation, commit); err != nil {
-		return err
-	}
 	var value WorkDefinition
 	if err := json.Unmarshal(operation, &value); err != nil {
+		return err
+	}
+	if err := state.cancelWork(operation, commit); err != nil {
 		return err
 	}
 	state.Cancellations[value.WorkID] = operation
 	return nil
 }
 
-func (state *Projection) replayResult(operation Operation, kind string, commit QueueCommit) error {
-	if err := state.settleResult(operation, commit, kind == "DeliveryFailure"); err != nil {
-		return err
-	}
+func (state *Projection) replayTerminalResult(operation Operation, kind string, commit QueueCommit) error {
 	var value WorkDefinition
 	if err := json.Unmarshal(operation, &value); err != nil {
+		return err
+	}
+	if err := state.settleResult(operation, commit, kind == "DeliveryFailure"); err != nil {
 		return err
 	}
 	state.TerminalBarriers[value.WorkID] = operation
