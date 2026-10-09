@@ -118,7 +118,7 @@ Read:
 
 ## Required flow
 
-1. Process every assigned Claim independently. If `/tmp/gh-aw/agent/lint-clean.flag` exists, finish each Claim as completed and call `noop`.
+1. Process every assigned Claim independently. If `/tmp/gh-aw/agent/lint-clean.flag` exists, cancel write-capable Claims and report the clean scan. Only an explicitly no-write assigned contract (`kind: "none"` or `no_writes: true`) permits finishing as completed with `noop`; a write-capable contract cannot settle Result from `noop` alone.
 2. Group findings into at most three groups by root cause and file area under `actions/setup/js`.
 3. For each selected group, create or update one issue with:
    - affected files
@@ -127,7 +127,7 @@ Read:
    - checklist with `npm run lint:setup-js` as final validation
 4. Assign new execution issues to Copilot (max three assignments total).
 5. Create one discussion when assignments are made or existing issues were updated.
-6. Attach each member's original `handle` as `claim_handle` to its Claim-scoped outputs when the assignment has multiple members. Finish every member independently with `work_queue_claim_finish` and its original handle, using `outcome: "completed"` or `"cancelled"` if unable to complete it; a single-member assignment may omit the selector. Under `<mcp-clis>`, pass `{"claim_handle":"<handle>","outcome":"completed"}` (or `"cancelled"`). If no assignments or issue updates were made, call `noop` with a reason.
+6. Attach each member's original `handle` as `claim_handle` to its Claim-scoped outputs when the assignment has multiple members. Finish every member independently with `work_queue_claim_finish` and its original handle, using `outcome: "completed"` or `"cancelled"` if unable to complete it; a single-member assignment may omit the selector. Under `<mcp-clis>`, pass `{"claim_handle":"<handle>","outcome":"completed"}` (or `"cancelled"`). If no resource-writing output is needed, cancel a write-capable Claim rather than completing it with only `noop`.
 
 ## Constraints
 

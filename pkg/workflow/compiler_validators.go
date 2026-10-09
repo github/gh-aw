@@ -575,7 +575,7 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 			} else {
 				fmt.Fprintln(writer, console.FormatWarningMessageStderr(warning.message))
 			}
-			c.IncrementWarningCount()
+			c.IncrementExperimentalWarningCount()
 		}
 	}
 

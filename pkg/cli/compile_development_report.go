@@ -13,14 +13,15 @@ const dryRunScopeMessage = "Dry-run is compile-only: compiler-managed GitHub mut
 
 // DryRunCompileReport describes the compilation gate, not execution authorization.
 type DryRunCompileReport struct {
-	Gate                    string                        `json:"gate"`
-	CompileOnly             bool                          `json:"compile_only"`
-	ExecutionAuthorized     bool                          `json:"execution_authorized"`
-	RequiredFlags           []string                      `json:"required_flags"`
-	Scanners                map[string]DryRunScannerCheck `json:"scanners"`
-	ValidateImagesRequired  bool                          `json:"validate_images_required"`
-	ModelInventoryAvailable bool                          `json:"model_inventory_available"`
-	UnverifiedEffects       []string                      `json:"unverified_effects"`
+	Gate                         string                        `json:"gate"`
+	CompileOnly                  bool                          `json:"compile_only"`
+	ExecutionAuthorized          bool                          `json:"execution_authorized"`
+	RequiredFlags                []string                      `json:"required_flags"`
+	Scanners                     map[string]DryRunScannerCheck `json:"scanners"`
+	ValidateImagesRequired       bool                          `json:"validate_images_required"`
+	ModelInventoryAvailable      bool                          `json:"model_inventory_available"`
+	UnverifiedEffects            []string                      `json:"unverified_effects"`
+	AcceptedExperimentalWarnings int                           `json:"accepted_experimental_warnings,omitempty"`
 }
 
 // DryRunScannerCheck records an invocation against emitted inputs.
@@ -71,7 +72,7 @@ func appendDryRunCompileReport(config CompileConfig, stats *CompilationStats, re
 		report = newDryRunCompileReport(config)
 	}
 	report.ModelInventoryAvailable = config.activeModels != nil
-	valid := stats.Errors == 0 && stats.Warnings == 0 && stats.Succeeded > 0
+	valid := stats.Errors == 0 && stats.Warnings <= report.AcceptedExperimentalWarnings && stats.Succeeded > 0
 	for _, result := range *results {
 		valid = valid && result.Valid && len(result.Errors) == 0 && len(result.Warnings) == 0
 	}
@@ -101,5 +102,8 @@ func displayDryRunCompileReport(report *DryRunCompileReport) {
 	}
 	message := fmt.Sprintf("Dry-run compilation gate: %s. Scanner coverage: %s. Unverified: %s.",
 		report.Gate, strings.Join(statuses, ", "), strings.Join(report.UnverifiedEffects, ", "))
+	if report.AcceptedExperimentalWarnings > 0 {
+		message += fmt.Sprintf(" Accepted %d experimental-feature notice(s) via --allow-experimental; all other warnings remain fatal.", report.AcceptedExperimentalWarnings)
+	}
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(message))
 }

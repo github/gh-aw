@@ -1,12 +1,11 @@
 package cli
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -312,30 +311,14 @@ func validateRemoteWorkflow(workflowName string, repoOverride string, verbose bo
 		fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Checking if workflow '%s' exists in repository '%s'...", lockFileName, repoOverride)))
 	}
 
-	// Use gh CLI to list workflows in the target repository
-	output, err := workflow.RunGH("Listing workflows...", "workflow", "list", "--repo", repoOverride, "--json", "name,path,state")
+	workflows, err := fetchGitHubWorkflows(context.Background(), repoOverride, verbose)
 	if err != nil {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			return fmt.Errorf("failed to list workflows in repository '%s': %s: %w", repoOverride, string(exitError.Stderr), err)
-		}
 		return fmt.Errorf("failed to list workflows in repository '%s': %w", repoOverride, err)
-	}
-
-	// Parse the JSON response
-	var workflows []struct {
-		Name  string `json:"name"`
-		Path  string `json:"path"`
-		State string `json:"state"`
-	}
-
-	if err := json.Unmarshal(output, &workflows); err != nil {
-		return fmt.Errorf("failed to parse workflow list response: %w", err)
 	}
 
 	// Look for the workflow by checking if the lock file path exists
 	for _, wf := range workflows {
-		if strings.HasSuffix(wf.Path, lockFileName) {
+		if filepath.Base(wf.Path) == lockFileName {
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Found workflow '%s' in repository (path: %s, state: %s)",
 					wf.Name, wf.Path, wf.State)))
