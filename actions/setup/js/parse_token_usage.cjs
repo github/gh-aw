@@ -93,7 +93,7 @@ function hasCorroboratedModelRoutingRequests(requestRecords, wireModel, endpoint
 }
 
 function getModelRoutingSelectionFailureCode(error) {
-  return /none compatible|not supported by this engine/.test(error) ? "unsupported_endpoint" : "invalid_selection";
+  return /none compatible|not supported by this engine|does not advertise endpoint/.test(error) ? "unsupported_endpoint" : "invalid_selection";
 }
 
 /** @returns {any|null} */
@@ -122,14 +122,21 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
       failure_code: wireModel ? "" : "invalid_selection",
     };
     const policy = getAWFModelRoutingPolicy(String(env.GH_AW_ENGINE_ID || ""));
-    const endpointOverride = !policy.endpoints.includes(routing.endpoint);
     const selectedAdvisory = advisory?.status === "selected" && (advisory.endpoint !== undefined || advisory.selected_endpoint !== undefined);
+    const advisoryEndpointOverride = selectedAdvisory && ((typeof advisory.endpoint === "string" && advisory.endpoint !== routing.endpoint) || advisory.selected_endpoint !== routing.endpoint);
+    const endpointOverride = !policy.endpoints.includes(routing.endpoint) || advisoryEndpointOverride;
     if (advisory?.status === "selected" && advisory.wire_model && advisory.wire_model !== wireModel) {
       routing = { ...routing, status: "rejected", failure_code: "harness_selection_mismatch", detail: "Harness routing outcome did not match the proxy selection" };
     } else if (["failed", "rejected", "pending", "unavailable"].includes(advisory?.status)) {
       routing = { ...routing, status: advisory.status, failure_code: advisory.failure_code || routing.failure_code, detail: advisory.detail || routing.detail };
     } else if (endpointOverride) {
-      const checked = resolveAWFModelRoutingSelection({ ...reflectData, routing: { status: "selected", selection: routing } }, true, policy.endpoints, policy.allowEndpointOverride);
+      const requestedEndpoint = selectedAdvisory && typeof advisory.endpoint === "string" ? advisory.endpoint : routing.endpoint;
+      const checked = resolveAWFModelRoutingSelection(
+        { ...reflectData, routing: { status: "selected", selection: { ...routing, endpoint: requestedEndpoint, selected_endpoint: routing.endpoint } } },
+        true,
+        policy.endpoints,
+        policy.allowEndpointOverride
+      );
       if (checked.error || !checked.selection) {
         const detail = checked.error || "AWF /reflect did not return a compatible model-routing selection";
         routing = { ...routing, status: "rejected", failure_code: getModelRoutingSelectionFailureCode(detail), detail };

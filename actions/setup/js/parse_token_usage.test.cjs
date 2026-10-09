@@ -244,6 +244,18 @@ describe("parse_token_usage", () => {
       expect(getEffectiveModelLabel(path.join(tmpDir, "aw_info.json"), "agent", process.env)).toBe("routed: opus50 max");
     });
 
+    test("records a corroborated pi effective endpoint even when AWF's endpoint is supported", async () => {
+      setupClaudeRoutingFixture({ engine: "pi" });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8")).model_routing).toMatchObject({
+        status: "selected",
+        endpoint: "/v1/messages",
+        selected_endpoint: "/chat/completions",
+      });
+    });
+
     test("attributes a corroborated Claude endpoint override from reflect when no harness outcome exists", async () => {
       setupClaudeRoutingFixture({ withOutcome: false });
 

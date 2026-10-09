@@ -79,8 +79,22 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   const provider = typeof selection.provider === "string" ? selection.provider.trim().toLowerCase() : "";
   const wireModel = typeof selection.wire_model === "string" ? selection.wire_model.trim() : "";
   const endpoint = typeof selection.endpoint === "string" ? selection.endpoint.trim() : "";
+  const selectedEndpoint = typeof selection.selected_endpoint === "string" ? selection.selected_endpoint.trim() : endpoint;
   if (!["copilot", "github-copilot", "github"].includes(provider) || !wireModel || !endpoint) {
     return { selection: null, error: "AWF /reflect returned an incomplete or unsupported Copilot routing selection" };
+  }
+  if (endpoint !== selectedEndpoint && allowedEndpoints) {
+    if (!allowEndpointOverride) {
+      return { selection: null, error: `AWF /reflect selected endpoint ${endpoint}, which is not supported by this engine` };
+    }
+    const routingModel = getAWFRoutingModel(reflectData, wireModel);
+    const supportedEndpoints = routingModel?.supported_endpoints;
+    if (routingModel?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints) || !supportedEndpoints.every(value => typeof value === "string")) {
+      return { selection: null, error: `AWF /reflect cannot verify endpoints for model ${wireModel}; candidate metadata is incomplete for engine API ${allowedEndpoints.join(", ")}` };
+    }
+    if (!supportedEndpoints.includes(endpoint)) {
+      return { selection: null, error: `AWF model ${wireModel} does not advertise endpoint ${endpoint}` };
+    }
   }
   if (!isModelAvailableInReflectData(wireModel, reflectData, REFLECT_PROVIDER_ALIASES.github)) {
     return { selection: null, error: `AWF /reflect selected unavailable Copilot wire model ${wireModel}` };

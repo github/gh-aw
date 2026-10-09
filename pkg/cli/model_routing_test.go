@@ -143,6 +143,26 @@ func TestApplyAwInfoModelRoutingAddsEndpointMetadata(t *testing.T) {
 	}
 }
 
+func TestApplyAwInfoModelRoutingPrefersAgentArtifactCopy(t *testing.T) {
+	runDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(runDir, "agent"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{"model":"agent"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "agent", "aw_info.json"), []byte(
+		`{"model":"claude-opus-5","model_routing":{"status":"selected","endpoint":"/v1/messages","selected_endpoint":"/chat/completions"}}`,
+	), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	result := applyAwInfoModelRouting(&ModelRoutingSummary{Status: "selected", Endpoint: "/chat/completions"}, runDir)
+	if result.EffectiveEndpoint != "/v1/messages" || result.SelectedEndpoint != "/chat/completions" {
+		t.Fatalf("agent artifact endpoint metadata was not preferred: %+v", result)
+	}
+}
+
 func TestBuildAuditComparisonCandidateFromLegacySummary(t *testing.T) {
 	runDir := t.TempDir()
 	routingDir := filepath.Join(runDir, "sandbox", "firewall", "logs", "api-proxy-logs")
