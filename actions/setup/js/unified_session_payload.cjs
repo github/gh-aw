@@ -166,6 +166,8 @@ const EVENT_FIELDS = {
   "firewall.token_usage": {
     provider: ["provider"],
     model: ["model"],
+    purpose: ["purpose"],
+    path: ["path", "endpoint"],
     requestId: ["requestId", "request_id"],
     status: ["status"],
     aic: ["aic", "ai_credits_this_response", "aiCreditsThisResponse"],

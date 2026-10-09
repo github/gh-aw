@@ -43,6 +43,8 @@ function transformPiV3Entries(records) {
   records = records.filter(record => record && typeof record === "object" && !Array.isArray(record));
   /** @type {SessionEvent[]} */
   const events = [];
+  const subagentInvocations = new Map();
+  const subagentInvocationCounts = new Map();
   const executionEnds = new Set(records.filter(r => r.type === "tool_execution_end" && r.toolCallId !== undefined).map(r => r.toolCallId));
   const calls = new Map();
   const completions = new Set();
@@ -59,10 +61,53 @@ function transformPiV3Entries(records) {
    * @param {T} type
    * @param {import("./types/agent_session").SessionEventData<T>} data
    */
-  const emit = (raw, type, data) => {
+  const emit = (raw, type, data, metadata = {}) => {
     const event = createSessionEvent(raw, type, data);
+    Object.assign(event, metadata);
     events.push(event);
     return event;
+  };
+  const invocationIdentity = (raw, dispatch) => {
+    const agentName = raw.agent ?? raw.agentName ?? "unknown";
+    const supplied = raw.invocation_id ?? raw.invocationId;
+    if (typeof supplied === "string" && supplied !== "") {
+      if (dispatch) subagentInvocations.set(agentName, supplied);
+      else if (raw.type === "gh_aw_subagent_result" && subagentInvocations.get(agentName) === supplied) subagentInvocations.delete(agentName);
+      return supplied;
+    }
+    if (!dispatch && subagentInvocations.has(agentName)) return subagentInvocations.get(agentName);
+    if (!dispatch) return `legacy:pi:${agentName}:unknown`;
+    const count = (subagentInvocationCounts.get(agentName) ?? 0) + 1;
+    subagentInvocationCounts.set(agentName, count);
+    const identity = `legacy:pi:${agentName}:${count}`;
+    subagentInvocations.set(agentName, identity);
+    return identity;
+  };
+  const emitSubagentRequest = (raw, invocationId) => {
+    const message = raw.event?.message;
+    if (!message || message.role !== "assistant") return;
+    const failed = ["error", "aborted"].includes(message.stopReason) || typeof message.errorMessage === "string";
+    const usage = message.usage && typeof message.usage === "object" && !Array.isArray(message.usage) ? message.usage : {};
+    const hasTokens = ["input", "output", "cacheRead", "cacheWrite"].some(key => Number.isSafeInteger(usage[key]) && usage[key] >= 0);
+    if (failed && !hasTokens) return;
+    const model = message.responseModel ?? message.model;
+    if (typeof model !== "string" || model === "") return;
+    const data = {
+      invocationId,
+      agentName: raw.agent ?? raw.agentName ?? "unknown",
+      model,
+      ...(message.requestId !== undefined ? { requestId: message.requestId } : {}),
+    };
+    for (const [source, target] of [
+      ["input", "inputTokens"],
+      ["output", "outputTokens"],
+      ["cacheRead", "cacheReadTokens"],
+      ["cacheWrite", "cacheWriteTokens"],
+    ]) {
+      const value = usage[source] ?? usage[target];
+      if (Number.isSafeInteger(value) && value >= 0) data[target] = value;
+    }
+    emit(raw, "subagent.request", data, { agentId: invocationId });
   };
 
   const emitText = (raw, state, kind, index, text, delta, role = "assistant", metadata = {}) => {
@@ -158,9 +203,38 @@ function transformPiV3Entries(records) {
       events.push(event);
       if (event.type === "tool.execution_start" && event.data.toolCallId !== undefined) calls.set(event.data.toolCallId, event);
     } else if (raw.type === "gh_aw_subagent_dispatch") {
-      emit(raw, "pi.subagent_dispatch", { agent: raw.agent, requestedModel: raw.requested_model, resolvedModel: raw.resolved_model });
+      const invocationId = invocationIdentity(raw, true);
+      const agentName = raw.agent ?? raw.agentName ?? "unknown";
+      emit(
+        raw,
+        "subagent.started",
+        {
+          invocationId,
+          agentName,
+          ...((raw.requested_model ?? raw.requestedModel) ? { model: raw.requested_model ?? raw.requestedModel } : {}),
+          ...((raw.resolved_model ?? raw.resolvedModel) ? { resolvedModel: raw.resolved_model ?? raw.resolvedModel } : {}),
+        },
+        { agentId: invocationId }
+      );
+      if (raw.resolved_model ?? raw.resolvedModel) {
+        emit(raw, "subagent.configured", { invocationId, model: raw.resolved_model ?? raw.resolvedModel }, { agentId: invocationId });
+      }
     } else if (raw.type === "gh_aw_subagent_event") {
-      emit(raw, "pi.subagent_event", { agent: raw.agent, event: raw.event });
+      emitSubagentRequest(raw, invocationIdentity(raw, false));
+    } else if (raw.type === "gh_aw_subagent_result") {
+      const invocationId = invocationIdentity(raw, false);
+      const failed = raw.outcome !== "completed";
+      const data = {
+        invocationId,
+        agentName: raw.agent ?? raw.agentName ?? "unknown",
+        outcome: raw.outcome,
+        ...((raw.error_code ?? raw.errorCode) ? { errorCode: raw.error_code ?? raw.errorCode } : {}),
+        ...(raw.error ? { error: raw.error } : {}),
+      };
+      emit(raw, failed ? "subagent.failed" : "subagent.completed", data, { agentId: invocationId });
+      if (subagentInvocations.get(raw.agent ?? raw.agentName ?? "unknown") === invocationId) {
+        subagentInvocations.delete(raw.agent ?? raw.agentName ?? "unknown");
+      }
     } else if (raw.type === "session") emit(raw, "session.init", { sourceEngine: "pi", sessionId: raw.id, cwd: raw.cwd, model: raw.model });
     else if (raw.type === "turn_start") {
       assistantState = activeState = newMessageState();
