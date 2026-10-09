@@ -74,7 +74,7 @@ const OP_FIELDS = {
 const REQUEST_KINDS = {
   policy: ["Policy"],
   control: ["Control", "WorkPriority"],
-  submit: ["Work"],
+  submit: ["Policy", "Work"],
   dispatch_next: ["Observation", "Claim"],
   finish: ["Completion", "ClaimCancellation", "WorkCancellation"],
   observe: ["Observation"],
@@ -89,7 +89,7 @@ const REQUEST_KINDS = {
 };
 
 const OP_ROLES = {
-  Policy: ["administrator"],
+  Policy: ["administrator", "producer", "dispatcher"],
   Control: ["administrator"],
   Work: ["producer", "dispatcher", "worker", "administrator"],
   Claim: ["dispatcher", "administrator", "worker"],
@@ -262,7 +262,11 @@ function validateCommit(commit) {
     if (!REQUEST_KINDS[commit.request.kind].includes(operation.kind) || !OP_ROLES[operation.kind].includes(commit.actor.role))
       throw queueError("unauthorized_operation", `${commit.actor.role} cannot publish ${operation.kind} through ${commit.request.kind}`);
   }
-  if (commit.request.kind === "submit" && canonical(commit.request.parameters.nodes) !== canonical(commit.operations)) throw queueError("request_invalid", "submission differs from validated stable semantics");
+  if (commit.request.kind === "submit") {
+    const ordinary = canonical(commit.request.parameters.nodes) === canonical(commit.operations);
+    const bootstrap = commit.operations[0]?.kind === "Policy" && commit.operations.slice(1).every(operation => operation.kind === "Work") && canonical(commit.request.parameters.nodes) === canonical(commit.operations.slice(1));
+    if (!ordinary && !bootstrap) throw queueError("request_invalid", "submission differs from validated stable semantics");
+  }
   if (
     commit.request.kind === "checkpoint" &&
     (commit.operations.length !== 1 ||
@@ -975,12 +979,29 @@ function replayOrdered(ordered) {
     if (ordinal === 0 && !offset) state.repository = commit.actor.repository;
     const priorRequest = state.requests.get(commit.request.id);
     if (priorRequest) throw queueError("request_reused", priorRequest.request.fingerprint === commit.request.fingerprint ? "committed request cannot appear in another commit" : "request identity has different semantics");
-    if (ordinal === 0 && !offset && (commit.operations.length !== 1 || commit.operations[0].kind !== "Policy" || commit.request.kind !== "policy" || commit.actor.role !== "administrator"))
+    const bootstrap =
+      ordinal === 0 &&
+      !offset &&
+      commit.request.kind === "submit" &&
+      ["producer", "dispatcher"].includes(commit.actor.role) &&
+      commit.operations[0]?.kind === "Policy" &&
+      commit.operations.length > 1 &&
+      commit.operations.slice(1).every(operation => operation.kind === "Work") &&
+      canonical(commit.request.parameters.nodes) === canonical(commit.operations.slice(1));
+    if (ordinal === 0 && !offset && !bootstrap && (commit.operations.length !== 1 || commit.operations[0].kind !== "Policy" || commit.request.kind !== "policy" || commit.actor.role !== "administrator"))
       throw queueError("policy_missing", "genesis must install exactly one mandatory Policy");
     if (state.policy && commit.actor.repository !== state.repository) throw queueError("actor_unauthorized", "foreign queue repository origin");
     const policies = commit.operations.filter(operation => operation.kind === "Policy");
     if (policies.length) {
-      if (policies.length !== 1 || commit.operations.length !== 1 || commit.policy_epoch !== policies[0].epoch || epochs.has(policies[0].epoch) || (state.policy && !quiescent(state)))
+      if (
+        policies.length !== 1 ||
+        (!bootstrap && commit.operations.length !== 1) ||
+        (bootstrap && (commit.operations[0] !== policies[0] || commit.actor.role === "administrator")) ||
+        (!bootstrap && state.policy && commit.actor.role !== "administrator") ||
+        commit.policy_epoch !== policies[0].epoch ||
+        epochs.has(policies[0].epoch) ||
+        (state.policy && !quiescent(state))
+      )
         throw queueError("policy_not_quiescent", "Policy epoch changes require a drained queue and new immutable identity");
       epochs.add(policies[0].epoch);
       state.policy = policies[0].policy;

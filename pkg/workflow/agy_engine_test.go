@@ -322,6 +322,10 @@ func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 					case "safe_outputs":
 						allowedPermissions = map[string]string{"actions": "write", "contents": "write"}
 					}
+					if name == "activation" || name == "safe_outputs" {
+						assert.Equal(t, allowedPermissions, config.Permissions, "%s must have only its required queue permissions", name)
+						continue
+					}
 				}
 				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
 					allowedPermissions = map[string]string{
@@ -352,12 +356,11 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 	assert.Equal(t, map[string]any{"workflow_dispatch": nil}, canonical["on"])
 	assert.Equal(t, []any{"shared/agy-conformance.md", "shared/engine-conformance-worker.md"}, canonical["imports"])
 	assert.Equal(t, map[string]any{
-		"cli-proxy": false,
-		"work-queue": map[string]any{
-			"worker":             true,
-			"require-assignment": true,
-		},
+		"cli-proxy":  false,
+		"work-queue": map[string]any{"worker": true, "require-assignment": true},
 	}, canonical["tools"])
+	canonical["imports"] = []any{"shared/agy-conformance.md"}
+	delete(canonical, "tools")
 	assert.EqualValues(t, 5, canonical["max-ai-credits"])
 	delete(canonical, "name")
 	delete(canonical, "description")
