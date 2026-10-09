@@ -101,15 +101,20 @@ func (e *CodexEngine) buildNativeConfig(workflowData *WorkflowData, mcpTools []s
 	config.Defaults["features"] = features
 	if isFirewallEnabled(workflowData) {
 		config.Defaults["model_provider"] = codexOpenAIProxyProviderID
+		proxy := map[string]any{
+			"name":                 codexOpenAIProxyProviderName,
+			"base_url":             e.getOpenAIProxyProviderBaseURL(workflowData),
+			"env_key":              "CODEX_API_KEY",
+			"wire_api":             "responses",
+			"requires_openai_auth": false,
+			"supports_websockets":  false,
+		}
+		if workflowData.NetworkPermissions != nil && workflowData.NetworkPermissions.HostedWeb != nil &&
+			workflowData.NetworkPermissions.HostedWeb.Enabled && e.ResolveLLMProvider(workflowData) == LLMProviderOpenAI {
+			proxy["supports_standalone_web_search"] = true
+		}
 		config.Defaults["model_providers"] = map[string]any{
-			codexOpenAIProxyProviderID: map[string]any{
-				"name":                 codexOpenAIProxyProviderName,
-				"base_url":             e.getOpenAIProxyProviderBaseURL(workflowData),
-				"env_key":              "CODEX_API_KEY",
-				"wire_api":             "responses",
-				"requires_openai_auth": false,
-				"supports_websockets":  false,
-			},
+			codexOpenAIProxyProviderID: proxy,
 		}
 	}
 	config.Defaults["mcp_servers"] = codexNativeServerDefaults(workflowData, mcpTools)

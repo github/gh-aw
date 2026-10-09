@@ -60,7 +60,7 @@ const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode } = require("./awf_model_routing.cjs");
 const CODEX_ROUTING_POLICY = getAWFModelRoutingPolicy("codex");
 
 // Pattern to detect OpenAI rate-limit errors.
@@ -515,7 +515,11 @@ function applyCodexRoutingEffort(args, effort) {
 function resolveCodexModelRouting(reflectData, args) {
   const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride);
   if (result.error || !result.selection) {
-    recordAWFModelRoutingOutcome({ status: reflectData?.routing?.status === "failed" ? "failed" : "rejected", failure_code: reflectData?.routing?.failure_code, detail: result.error });
+    recordAWFModelRoutingOutcome({
+      status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",
+      failure_code: reflectData?.routing?.failure_code || getAWFModelRoutingFailureCode(result.error),
+      detail: result.error,
+    });
     return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
   }
   const mappedEffort = mapAWFRoutingEffort("codex", result.selection.effort);

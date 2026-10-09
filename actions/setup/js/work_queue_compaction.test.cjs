@@ -1,11 +1,12 @@
-"use strict";
+import { it as test } from "vitest";
+import { createRequire } from "node:module";
 
+const require = createRequire(import.meta.url);
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-import { it as test } from "vitest";
 const { canonical } = require("./work_queue_codec.cjs");
 const { main: planCompaction, planFor } = require("./work_queue_compaction_plan.cjs");
 const { isRetryablePublicationError, main: apply, PLAN_MAX_BYTES, readPlan } = require("./work_queue_compaction_apply.cjs");
