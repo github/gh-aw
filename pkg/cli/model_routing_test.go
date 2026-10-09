@@ -128,6 +128,25 @@ func TestAnalyzeModelRoutingFromCompactUsageArtifact(t *testing.T) {
 	}
 }
 
+func TestAnalyzeModelRoutingFromSessionWithoutRawFile(t *testing.T) {
+	runDir := t.TempDir()
+	sessionDir := filepath.Join(runDir, "usage")
+	if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(
+		`{"type":"workflow.info","data":{"modelRouting":{"status":"selected","wireModel":"claude-sonnet-5","model":"claude-sonnet-5","effort":"medium"}},"provenance":{"component":"workflow","phase":"agent"}}`+"\n",
+	), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	summary := analyzeModelRouting(runDir)
+	if summary == nil || summary.Status != "selected" || summary.SelectedModel != "claude-sonnet-5" ||
+		summary.SelectedEffort != "medium" {
+		t.Fatalf("session-only routing was not used when the raw routing file is absent: %+v", summary)
+	}
+}
+
 func TestApplyAwInfoModelRoutingAddsEndpointMetadata(t *testing.T) {
 	runDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(
