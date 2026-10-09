@@ -88,7 +88,7 @@ Native API-key authentication passed on a clean Actions runner in
 including real fresh-challenge inference, missing/invalid keys, an unknown
 model and controlled endpoint routing. That evidence does not prove AWF or MCP.
 
-Release of Agy and Gemini soft deprecation together requires bounded production
+Stable promotion of Agy requires bounded production
 conformance through the actual installer, Gemini AWF endpoint, native MCP,
 CLI-mounted MCP and staged safe outputs. The manual
 `engine-conformance-agy.md` workflow prepares that gate and remains dispatch-only.
@@ -99,8 +99,10 @@ Both checkers require the exact staged noop receipt. The Gemini-key-only gate
 disables the unrelated Copilot threat-detection job directly in each entry point;
 its native/shared checks and execution budgets remain mandatory.
 Production conformance
-has not passed; no Gemini deprecation notice or release changeset is enabled by
-this implementation checkpoint.
+has not passed. Gemini soft deprecation is now enabled by explicit maintainer
+direction, independently of Agy's stable-promotion gate. The informational notice
+and release changeset do not claim production conformance or feature equivalence;
+Agy remains experimental and Gemini remains supported.
 
 ## Consequences
 

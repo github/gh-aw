@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,8 +114,8 @@ func TestAnalyzeModelRoutingFromCompactUsageArtifact(t *testing.T) {
 	), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(usageDir, "token_usage.jsonl"), []byte(
-		"{\"request_id\":\"usage-request\",\"ai_credits_this_response\":0.4}\n",
+	if err := os.WriteFile(filepath.Join(runDir, "usage", "aw_session.jsonl"), []byte(
+		"{\"type\":\"firewall.token_usage\",\"data\":{\"requestId\":\"usage-request\",\"aic\":0.4,\"usage\":{\"inputTokens\":1,\"outputTokens\":2}},\"timestamp\":\"2026-10-08T10:00:00Z\",\"provenance\":{\"component\":\"firewall\",\"phase\":\"agent\"}}\n",
 	), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +196,11 @@ func TestBuildModelRoutingLogsSummary(t *testing.T) {
 		Mode: "economy", SelectedModel: "gpt-5.6-luna", SelectedEffort: "high", RouterVersion: "0.1.3",
 		RoutedCounts:   map[string]int{"as_selected": 3, "deviated": 1},
 		ClassifierCost: ModelRoutingCost{AIC: 0.05}, SelectedModelCost: ModelRoutingCost{AIC: 0.60},
-		DeviatedTrafficCost: ModelRoutingCost{AIC: 0.10},
+		DeviatedTrafficCost: ModelRoutingCost{AIC: 0.10}, MainAgentCost: ModelRoutingCost{Requests: 2, AIC: 0.12},
+		SubagentCosts: []ModelRoutingAgentCost{{
+			AgentName: "reader", AgentType: "subagent", InstanceCount: 1, CompletedCount: 1,
+			Effort: "low", Models: []string{"claude-haiku-4.5"}, ModelRoutingCost: ModelRoutingCost{Requests: 3, AIC: 0.34},
+		}},
 	}
 	summary := buildModelRoutingLogsSummary([]ProcessedRun{
 		{ModelRouting: routing},
@@ -209,8 +214,31 @@ func TestBuildModelRoutingLogsSummary(t *testing.T) {
 		summary.Routes[0].TotalAIC != 1.5 || summary.Routes[0].AverageAIC != 0.75 {
 		t.Fatalf("unexpected route aggregate: %+v", summary.Routes)
 	}
+	if summary.MainAgentCost.Requests != 4 || math.Abs(summary.MainAgentCost.AIC-0.24) > 0.000001 ||
+		len(summary.SubagentCosts) != 1 || summary.SubagentCosts[0].Requests != 6 ||
+		math.Abs(summary.SubagentCosts[0].AIC-0.68) > 0.000001 || summary.SubagentCosts[0].CompletedCount != 2 {
+		t.Fatalf("unexpected per-agent routing costs: main=%+v subagents=%+v", summary.MainAgentCost, summary.SubagentCosts)
+	}
 }
 
+func TestApplyAgentUsageToModelRouting(t *testing.T) {
+	summary := &ModelRoutingSummary{}
+	applyAgentUsageToModelRouting(summary, []AgentUsageBreakdown{
+		{AgentName: "main", AgentType: "main", Requests: 10, AIC: 389.122},
+		{
+			AgentName: "research", AgentType: "subagent", InstanceCount: 1, CompletedCount: 1,
+			Effort: "xhigh", ServedModels: []string{"claude-opus-5"},
+			Requests: 45, TokenCoreMetrics: TokenCoreMetrics{InputTokens: 400}, AIC: 494.207,
+		},
+	})
+	if summary.MainAgentCost.Requests != 10 || summary.MainAgentCost.AIC != 389.122 {
+		t.Fatalf("unexpected main-agent routing cost: %+v", summary.MainAgentCost)
+	}
+	if len(summary.SubagentCosts) != 1 || summary.SubagentCosts[0].Requests != 45 ||
+		summary.SubagentCosts[0].AIC != 494.207 || summary.SubagentCosts[0].Effort != "xhigh" {
+		t.Fatalf("unexpected sub-agent routing cost: %+v", summary.SubagentCosts)
+	}
+}
 func TestModelRoutingTextReports(t *testing.T) {
 	routing := &ModelRoutingSummary{
 		Status: "failed", Objective: "cost", Failure: &ModelRoutingFailure{Code: "no_route", Detail: "no eligible choice"},

@@ -47,6 +47,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/goccy/go-yaml"
 )
 
 var runtimeValidationLog = logger.New("workflow:runtime_validation")
@@ -307,4 +308,54 @@ func (c *Compiler) validateRuntimePackages(workflowData *WorkflowData) error {
 
 	runtimeValidationLog.Print("Runtime package validation passed")
 	return nil
+}
+
+func customSetupUVCacheWarnings(customSteps string) []string {
+	var stepsWrapper map[string]any
+	if err := yaml.Unmarshal([]byte(customSteps), &stepsWrapper); err != nil {
+		return nil
+	}
+
+	steps, ok := stepsWrapper["steps"].([]any)
+	if !ok {
+		return nil
+	}
+
+	var warnings []string
+	for index, stepValue := range steps {
+		step, ok := stepValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		uses, ok := step["uses"].(string)
+		if !ok || !strings.EqualFold(extractActionRepo(uses), "astral-sh/setup-uv") {
+			continue
+		}
+
+		withFields, hasWithFields := step["with"].(map[string]any)
+		if value, hasCacheSetting := withFields["enable-cache"]; hasWithFields && hasCacheSetting && isExplicitlyFalse(value) {
+			continue
+		}
+
+		stepDescription := fmt.Sprintf("step %d", index+1)
+		if name, ok := step["name"].(string); ok && strings.TrimSpace(name) != "" {
+			stepDescription = fmt.Sprintf("step %q", name)
+		}
+		warnings = append(warnings, fmt.Sprintf(
+			"custom setup-uv %s does not explicitly disable Actions caching; set `with.enable-cache: false` to disable caching",
+			stepDescription,
+		))
+	}
+	return warnings
+}
+
+func isExplicitlyFalse(value any) bool {
+	switch value := value.(type) {
+	case bool:
+		return !value
+	case string:
+		return strings.EqualFold(strings.TrimSpace(value), "false")
+	default:
+		return false
+	}
 }

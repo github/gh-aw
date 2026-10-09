@@ -405,7 +405,7 @@ func TestGetEngineOption_AllBuiltInEngines(t *testing.T) {
 		{string(CopilotEngine), "GitHub Copilot", CopilotGitHubToken, nil},
 		{string(ClaudeEngine), "Claude", AnthropicAPIKey, []string{}},
 		{string(CodexEngine), "Codex", OpenAIAPIKey, []string{CodexAPIKey}},
-		{string(GeminiEngine), "Gemini", GeminiAPIKey, nil},
+		{string(GeminiEngine), "Gemini (Deprecated)", GeminiAPIKey, nil},
 		{string(PiEngine), "Pi", CopilotGitHubToken, []string{AnthropicAPIKey, OpenAIAPIKey, CodexAPIKey, GeminiAPIKey}},
 	}
 

@@ -148,7 +148,7 @@ If organization billing is enabled in your organization, you can choose **Use co
 
 For keyless authentication, configure [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif) with a federation rule in your Anthropic workspace and grant the workflow `id-token: write`. GitHub Actions exchanges a short-lived OIDC token for Anthropic credentials, so you don't need a repository secret.
 
-A Claude subscription token from `claude login` (`CLAUDE_CODE_OAUTH_TOKEN`) is not supported. It is silently ignored, and the run fails with a Claude CLI authentication error that does not mention the token.
+A Claude subscription token from `claude login` (`CLAUDE_CODE_OAUTH_TOKEN`) is not supported. The CLI detects it and fails with an error naming `CLAUDE_CODE_OAUTH_TOKEN` and pointing to `ANTHROPIC_API_KEY` or Anthropic WIF as the supported alternatives.
 
 Follow [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/) for the complete setup.
 
