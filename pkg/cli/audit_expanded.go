@@ -181,8 +181,8 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 		return nil
 	}
 
-	awInfoPath := findAwInfoPath(logsPath)
-	if awInfoPath == "" {
+	awInfo := loadAwInfoForEngineConfig(logsPath)
+	if awInfo == nil {
 		auditExpandedLog.Printf("aw_info.json not found in %s", logsPath)
 		if inferredEngineID != "" {
 			registry := workflow.GetGlobalEngineRegistry()
@@ -196,14 +196,9 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 		}
 		return nil
 	}
-	awInfo, err := parseAwInfo(awInfoPath, false)
-	if err != nil || awInfo == nil {
-		auditExpandedLog.Printf("Failed to parse aw_info.json for engine config: %v", err)
-		return nil
-	}
 
 	routing := analyzeModelRouting(logsPath)
-	attribution := resolveEffectiveModelAttribution(awInfo, routing, nil)
+	attribution := resolveEffectiveModelAttribution(logsPath, awInfo, routing, nil)
 	config := &AuditEngineConfig{
 		EngineID:           awInfo.EngineID,
 		EngineName:         awInfo.EngineName,
@@ -227,6 +222,25 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 	auditExpandedLog.Printf("Extracted engine config: engine=%s, model=%s, mcp_servers=%d",
 		config.EngineID, config.Model, len(config.MCPServers))
 	return config
+}
+
+func loadAwInfoForEngineConfig(logsPath string) *AwInfo {
+	if awInfoPath := findAwInfoPath(logsPath); awInfoPath != "" {
+		awInfo, err := parseAwInfo(awInfoPath, false)
+		if err != nil || awInfo == nil {
+			auditExpandedLog.Printf("Failed to parse aw_info.json for engine config: %v", err)
+			return nil
+		}
+		return awInfo
+	}
+	sessionRouting, found, err := readSessionModelRouting(logsPath)
+	if err != nil {
+		auditExpandedLog.Printf("Failed to read unified session workflow metadata: %v", err)
+	}
+	if found {
+		return sessionRouting.awInfo()
+	}
+	return nil
 }
 
 func inferFallbackLogMetrics(logsPath string) (LogMetrics, string) {

@@ -492,7 +492,7 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
 
 /**
  * Apply the model and API endpoint selected by AWF, bypassing compile-time model resolution.
- * @param {{wire_model: string, effort: string|null, endpoint: string}} selection
+ * @param {{wire_model: string, effort: string|null, endpoint: string, selected_endpoint: string}} selection
  * @param {(msg: string) => void} [logger]
  */
 function applyCopilotRoutingSelection(selection, logger = log) {
@@ -505,7 +505,14 @@ function applyCopilotRoutingSelection(selection, logger = log) {
   } else {
     delete process.env.GH_AW_COPILOT_ROUTING_EFFORT;
   }
-  recordAWFModelRoutingOutcome({ status: "selected", wire_model: selection.wire_model, effort: selection.effort, applied_effort: selection.effort });
+  recordAWFModelRoutingOutcome({
+    status: "selected",
+    wire_model: selection.wire_model,
+    endpoint: selection.endpoint,
+    selected_endpoint: selection.selected_endpoint,
+    effort: selection.effort,
+    applied_effort: selection.effort,
+  });
   logger(`inference routing: mode=awf-routed model=${selection.wire_model} effort=${selection.effort || "(unset)"} wire_api=${wireApi}`);
 }
 

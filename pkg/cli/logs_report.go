@@ -579,7 +579,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 // newRunData assembles the base RunData fields for a processed run.
 func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutputChainMetrics, comparison *AuditComparisonData, failureKind string, gitHubAPICalls int) RunData {
 	run := pr.Run
-	modelAttribution := resolveEffectiveModelAttribution(engineInfo.awInfo, pr.ModelRouting, pr.TokenUsage)
+	modelAttribution := resolveEffectiveModelAttribution(pr.Run.LogsPath, engineInfo.awInfo, pr.ModelRouting, pr.TokenUsage)
 	runData := RunData{
 		RunID:                      run.DatabaseID,
 		Number:                     run.Number,

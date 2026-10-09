@@ -25,76 +25,64 @@ func flattenSingleFileArtifacts(outputDir string, verbose bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to read output directory: %w", err)
 	}
-
 	for _, entry := range entries {
-		if !entry.IsDir() || entry.Name() == downloadedArtifactsMarkerDir {
-			continue
-		}
-
-		artifactDir := filepath.Join(outputDir, entry.Name())
-
-		// Read contents of artifact directory
-		artifactEntries, err := os.ReadDir(artifactDir)
-		if err != nil {
-			logsDownloadLog.Printf("Failed to read artifact directory %s: %v", artifactDir, err)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read artifact directory %s: %v", artifactDir, err)))
-			}
-			continue
-		}
-
-		logsDownloadLog.Printf("Artifact directory %s contains %d entries", entry.Name(), len(artifactEntries))
-
-		// Apply unfold rule: Check if directory contains exactly one entry and it's a file
-		if len(artifactEntries) != 1 {
-			if verbose && len(artifactEntries) > 1 {
-				// Log what's in multi-file artifacts for debugging
-				var fileNames []string
-				for _, e := range artifactEntries {
-					fileNames = append(fileNames, e.Name())
-				}
-				logsDownloadLog.Printf("Artifact directory %s has %d files, not flattening: %v", entry.Name(), len(artifactEntries), fileNames)
-			}
-			continue
-		}
-
-		singleEntry := artifactEntries[0]
-		if singleEntry.IsDir() {
-			logsDownloadLog.Printf("Artifact directory %s contains a subdirectory, not flattening", entry.Name())
-			continue
-		}
-
-		// Unfold: Move the single file to parent directory and remove the artifact folder
-		sourcePath := filepath.Join(artifactDir, singleEntry.Name())
-		destPath := filepath.Join(outputDir, singleEntry.Name())
-
-		logsDownloadLog.Printf("Flattening: %s → %s", sourcePath, destPath)
-
-		// Move the file to root (parent directory)
-		if err := os.Rename(sourcePath, destPath); err != nil {
-			logsDownloadLog.Printf("Failed to move file %s to %s: %v", sourcePath, destPath, err)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to move file %s to %s: %v", sourcePath, destPath, err)))
-			}
-			continue
-		}
-
-		// Delete the now-empty artifact folder
-		if err := os.Remove(artifactDir); err != nil {
-			logsDownloadLog.Printf("Failed to remove empty directory %s: %v", artifactDir, err)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to remove empty directory %s: %v", artifactDir, err)))
-			}
-			continue
-		}
-
-		logsDownloadLog.Printf("Successfully flattened: %s/%s → %s", entry.Name(), singleEntry.Name(), singleEntry.Name())
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Unfolded single-file artifact: %s → %s", filepath.Join(entry.Name(), singleEntry.Name()), singleEntry.Name())))
+		if entry.IsDir() && entry.Name() != downloadedArtifactsMarkerDir {
+			flattenSingleFileArtifact(outputDir, entry, verbose)
 		}
 	}
-
 	return nil
+}
+
+func flattenSingleFileArtifact(outputDir string, entry os.DirEntry, verbose bool) {
+	artifactDir := filepath.Join(outputDir, entry.Name())
+	artifactEntries, err := os.ReadDir(artifactDir)
+	if err != nil {
+		logsDownloadLog.Printf("Failed to read artifact directory %s: %v", artifactDir, err)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read artifact directory %s: %v", artifactDir, err)))
+		}
+		return
+	}
+	logsDownloadLog.Printf("Artifact directory %s contains %d entries", entry.Name(), len(artifactEntries))
+	if len(artifactEntries) != 1 {
+		if verbose && len(artifactEntries) > 1 {
+			var fileNames []string
+			for _, artifactEntry := range artifactEntries {
+				fileNames = append(fileNames, artifactEntry.Name())
+			}
+			logsDownloadLog.Printf("Artifact directory %s has %d files, not flattening: %v", entry.Name(), len(artifactEntries), fileNames)
+		}
+		return
+	}
+	var singleEntry os.DirEntry
+	for _, artifactEntry := range artifactEntries {
+		singleEntry = artifactEntry
+	}
+	if singleEntry.IsDir() {
+		logsDownloadLog.Printf("Artifact directory %s contains a subdirectory, not flattening", entry.Name())
+		return
+	}
+	sourcePath := filepath.Join(artifactDir, singleEntry.Name())
+	destPath := filepath.Join(outputDir, singleEntry.Name())
+	logsDownloadLog.Printf("Flattening: %s → %s", sourcePath, destPath)
+	if err := os.Rename(sourcePath, destPath); err != nil {
+		logsDownloadLog.Printf("Failed to move file %s to %s: %v", sourcePath, destPath, err)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to move file %s to %s: %v", sourcePath, destPath, err)))
+		}
+		return
+	}
+	if err := os.Remove(artifactDir); err != nil {
+		logsDownloadLog.Printf("Failed to remove empty directory %s: %v", artifactDir, err)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to remove empty directory %s: %v", artifactDir, err)))
+		}
+		return
+	}
+	logsDownloadLog.Printf("Successfully flattened: %s/%s → %s", entry.Name(), singleEntry.Name(), singleEntry.Name())
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Unfolded single-file artifact: %s → %s", filepath.Join(entry.Name(), singleEntry.Name()), singleEntry.Name())))
+	}
 }
 
 // findArtifactDir looks for an artifact directory by its base name (suffix) in outputDir.
@@ -143,50 +131,10 @@ func flattenArtifactTree(sourceDir, artifactDir, outputDir, label string, verbos
 		if err != nil {
 			return err
 		}
-
-		// Skip the source directory itself
 		if path == sourceDir {
 			return nil
 		}
-
-		// Calculate relative path from source
-		relPath, err := filepath.Rel(sourceDir, path)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path for %s: %w", path, err)
-		}
-
-		destPath := filepath.Join(outputDir, relPath)
-
-		if info.IsDir() {
-			// Create directory in destination with world-readable permissions (0755)
-			if err := os.MkdirAll(destPath, constants.DirPermPublic); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", destPath, err)
-			}
-			logsDownloadLog.Printf("Created directory: %s", destPath)
-		} else {
-			// Ensure parent directory exists with world-readable permissions (0755)
-			if err := os.MkdirAll(filepath.Dir(destPath), constants.DirPermPublic); err != nil {
-				return fmt.Errorf("failed to create parent directory for %s: %w", destPath, err)
-			}
-
-			if fileutil.FileExists(destPath) {
-				logsDownloadLog.Printf("Skipping duplicate flattened file %s from %s; destination already exists", relPath, label)
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipped duplicate flattened file: "+relPath))
-				}
-				return nil
-			}
-
-			if err := os.Rename(path, destPath); err != nil {
-				return fmt.Errorf("failed to move file %s to %s: %w", path, destPath, err)
-			}
-			logsDownloadLog.Printf("Moved file: %s → %s", path, destPath)
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Flattened: %s → %s", relPath, relPath)))
-			}
-		}
-
-		return nil
+		return flattenArtifactPath(sourceDir, path, info, outputDir, label, verbose)
 	})
 
 	if walkErr != nil {
@@ -210,6 +158,39 @@ func flattenArtifactTree(sourceDir, artifactDir, outputDir, label string, verbos
 	return nil
 }
 
+func flattenArtifactPath(sourceDir, path string, info os.FileInfo, outputDir, label string, verbose bool) error {
+	relPath, err := filepath.Rel(sourceDir, path)
+	if err != nil {
+		return fmt.Errorf("failed to get relative path for %s: %w", path, err)
+	}
+	destPath := filepath.Join(outputDir, relPath)
+	if info.IsDir() {
+		if err := os.MkdirAll(destPath, constants.DirPermPublic); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", destPath, err)
+		}
+		logsDownloadLog.Printf("Created directory: %s", destPath)
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(destPath), constants.DirPermPublic); err != nil {
+		return fmt.Errorf("failed to create parent directory for %s: %w", destPath, err)
+	}
+	if fileutil.FileExists(destPath) {
+		logsDownloadLog.Printf("Skipping duplicate flattened file %s from %s; destination already exists", relPath, label)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipped duplicate flattened file: "+relPath))
+		}
+		return nil
+	}
+	if err := os.Rename(path, destPath); err != nil {
+		return fmt.Errorf("failed to move file %s to %s: %w", path, destPath, err)
+	}
+	logsDownloadLog.Printf("Moved file: %s → %s", path, destPath)
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Flattened: %s → %s", relPath, relPath)))
+	}
+	return nil
+}
+
 // flattenUnifiedArtifact flattens the unified agent artifact directory structure.
 // The artifact is uploaded with all paths under /tmp/gh-aw/, so the action strips the
 // common prefix and files land directly inside the artifact directory (new structure).
@@ -227,9 +208,23 @@ func flattenUnifiedArtifact(outputDir string, verbose bool) error {
 
 	logsDownloadLog.Printf("Flattening unified agent artifact directory: %s", agentArtifactsDir)
 
-	// Determine the source path: old structure preserves the tmp/gh-aw/ prefix inside the artifact
-	sourceDir := agentArtifactsDir
-	tmpGhAwPath := filepath.Join(agentArtifactsDir, "tmp", "gh-aw")
+	// Move the artifact outside its eventual output paths before flattening. New
+	// artifacts contain an "agent/" subtree which would otherwise be written
+	// back into agentArtifactsDir and deleted by flattenArtifactTree cleanup.
+	stagingDir, err := os.MkdirTemp(outputDir, ".gh-aw-agent-artifact-*")
+	if err != nil {
+		return fmt.Errorf("failed to create agent artifact staging directory: %w", err)
+	}
+	if err := os.Remove(stagingDir); err != nil {
+		return fmt.Errorf("failed to prepare agent artifact staging directory: %w", err)
+	}
+	if err := os.Rename(agentArtifactsDir, stagingDir); err != nil {
+		return fmt.Errorf("failed to stage agent artifact directory: %w", err)
+	}
+
+	// Determine the source path: old structure preserves the tmp/gh-aw/ prefix inside the artifact.
+	sourceDir := stagingDir
+	tmpGhAwPath := filepath.Join(stagingDir, "tmp", "gh-aw")
 	if fileutil.DirExists(tmpGhAwPath) {
 		logsDownloadLog.Printf("Found old artifact structure with tmp/gh-aw prefix")
 		sourceDir = tmpGhAwPath
@@ -237,7 +232,19 @@ func flattenUnifiedArtifact(outputDir string, verbose bool) error {
 		logsDownloadLog.Printf("Found new artifact structure without tmp/gh-aw prefix")
 	}
 
-	return flattenArtifactTree(sourceDir, agentArtifactsDir, outputDir, "unified agent artifact", verbose)
+	if err := flattenArtifactTree(sourceDir, stagingDir, outputDir, "unified agent artifact", verbose); err != nil {
+		return err
+	}
+
+	// Keep the agent's final metadata at the canonical root path for consumers
+	// that predate findAwInfoPath's agent-first lookup.
+	agentAwInfo := filepath.Join(outputDir, "agent", "aw_info.json")
+	if fileutil.FileExists(agentAwInfo) {
+		if err := fileutil.CopyFile(agentAwInfo, filepath.Join(outputDir, "aw_info.json")); err != nil {
+			return fmt.Errorf("failed to publish final agent aw_info.json: %w", err)
+		}
+	}
+	return nil
 }
 
 // flattenAgentOutputFallbackArtifact flattens the tiny fallback artifact that carries

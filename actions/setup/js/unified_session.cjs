@@ -284,9 +284,10 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     return files;
   };
   const choose = candidates => candidates.map(file => path.join(rootDir, file)).find(exists);
-  const metadata = choose(["aw_info.json", "usage/aw_info.json"]);
+  const metadata = choose(["agent/aw_info.json", "aw_info.json", "usage/aw_info.json"]);
   if (metadata) {
-    add(metadata, "workflow", "activation", "workflow.info");
+    const phase = metadata === path.join(rootDir, "agent/aw_info.json") ? "agent" : metadata === path.join(rootDir, "usage/aw_info.json") ? "conclusion" : "activation";
+    add(metadata, "workflow", phase, "workflow.info");
     const observedEngine = sources.at(-1)?.events[0]?.data.engine_id;
     if (engine === undefined && typeof observedEngine === "string") engine = observedEngine;
   }
@@ -437,6 +438,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   }
   /** @type {Array<[string[], string, string, `${string}.${string}`]>} */
   const observations = [
+    [["agent/awf-routing-outcome.json"], "agent", "agent", "model_routing.outcome"],
     [["safeoutputs.jsonl"], "safe_output", "agent", "safe_output.request"],
     [["safe-output-items.jsonl"], "safe_output", "safe_outputs", "safe_output.result"],
     [["safe-output-errors.json"], "safe_output", "safe_outputs", "safe_output.error"],
@@ -458,6 +460,19 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   ];
   for (const [candidates, component, phase, type] of observations) {
     const file = choose(candidates);
+    if (type === "model_routing.outcome" && file) {
+      /** @type {SessionEvent[]} */
+      const events = records(file).flatMap(record => {
+        if (!record || typeof record !== "object" || Array.isArray(record)) {
+          incompleteSources.add(file);
+          report(file, "non_object_record", undefined);
+          return [];
+        }
+        return [/** @type {SessionEvent} */ { type, data: record, ...(record.timestamp !== undefined ? { timestamp: record.timestamp } : {}) }];
+      });
+      sources.push({ component, phase, path: path.relative(rootDir, file), events });
+      continue;
+    }
     if (file) add(file, component, phase, type);
   }
   const executionFile = path.join(rootDir, "agent-errors.jsonl");
@@ -519,13 +534,22 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       sources: sources.map(({ events, ...source }) => ({ ...source, events: events.length })),
       warnings: warnings.length,
       untimedEvents: sources.reduce((total, source) => total + source.events.filter(event => sessionTimestamp(event, source.timestampUnit) === undefined).length, 0),
-      absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval"].filter(component => !sources.some(source => source.component === component)),
+      absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval", "workflow"].filter(component => !sources.some(source => source.component === component)),
     },
   };
   /** @type {import("./types/agent_session").SessionFileFormatEvent} */
   const format = { type: "session.format", data: { version: SESSION_FILE_FORMAT_VERSION } };
   sources.push({ component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", events: [format, ...warnings, summary] });
   const events = mergeSessionSources(sources);
+  const workflowEvent = events.find(event => event.type === "workflow.info");
+  const routingOutcome = events.find(event => event.type === "model_routing.outcome");
+  if (workflowEvent && routingOutcome) {
+    const modelRouting = workflowEvent.data.modelRouting ?? {};
+    for (const field of ["status", "wireModel", "effectiveEndpoint", "selectedEndpoint", "effort", "appliedEffort", "failureCode"]) {
+      if (routingOutcome.data[field] !== undefined) modelRouting[field] = routingOutcome.data[field];
+    }
+    workflowEvent.data.modelRouting = modelRouting;
+  }
   const formatIndex = events.findIndex(event => event.type === "session.format" && event.provenance.component === "collector" && event.provenance.index === 0);
   // File metadata leads the stream without inventing a timestamp for it.
   const [header] = events.splice(formatIndex, 1);

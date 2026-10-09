@@ -66,6 +66,21 @@ const GRADER_FIELDS = {
   threshold: ["threshold"],
   error: ["error"],
 };
+const MODEL_ROUTING_FIELDS = {
+  status: ["status"],
+  source: ["source"],
+  provider: ["provider"],
+  wireModel: ["wire_model", "wireModel"],
+  model: ["model"],
+  effort: ["effort"],
+  appliedEffort: ["applied_effort", "appliedEffort"],
+  effectiveEndpoint: ["effective_endpoint", "effectiveEndpoint", "endpoint"],
+  selectedEndpoint: ["selected_endpoint", "selectedEndpoint"],
+  mode: ["mode"],
+  selectedId: ["selected_id", "selectedId"],
+  routerVersion: ["router_version", "routerVersion"],
+  failureCode: ["failure_code", "failureCode"],
+};
 /** @type {Fields} */
 const SAFE_OUTPUT_FIELDS = {
   type: ["type"],
@@ -175,6 +190,36 @@ const EVENT_FIELDS = {
     premiumRequests: ["premiumRequests", "premium_requests"],
     durationMs: ["durationMs", "duration_ms"],
   },
+  "firewall.model_routing": {
+    schema: ["_schema", "schema"],
+    stage: ["stage"],
+    purpose: ["purpose"],
+    attempt: ["attempt"],
+    classifierModel: ["classifier_model", "classifierModel"],
+    classifierEffort: ["classifier_effort", "classifierEffort"],
+    objective: ["objective"],
+    provider: ["provider"],
+    labels: ["labels"],
+    mode: ["mode"],
+    classifierAttempts: ["classifier_attempts", "classifierAttempts"],
+    degradedClassification: ["degraded_classification", "degradedClassification"],
+    degradedReason: ["degraded_reason", "degradedReason"],
+    selectedId: ["selected_id", "selectedId"],
+    selectedProvider: ["selected_provider", "selectedProvider"],
+    selectedModel: ["selected_model", "selectedModel"],
+    selectedEffort: ["selected_effort", "selectedEffort"],
+    wireModel: ["wire_model", "wireModel"],
+    endpoint: ["endpoint"],
+    router: ["router"],
+    latencyMs: ["latency_ms", "latencyMs"],
+    code: ["code"],
+    requestId: ["request_id", "requestId"],
+    routed: ["routed"],
+    deviations: ["deviations"],
+    requestedModel: ["requested_model", "requestedModel"],
+    requestedEffort: ["requested_effort", "requestedEffort"],
+    outcome: ["outcome"],
+  },
   "safe_output.request": SAFE_OUTPUT_FIELDS,
   "safe_output.result": SAFE_OUTPUT_FIELDS,
   "safe_output.error": SAFE_OUTPUT_FIELDS,
@@ -218,11 +263,22 @@ const EVENT_FIELDS = {
     cliVersion: ["cliVersion", "cli_version"],
     awfVersion: ["awfVersion", "awf_version"],
     mcpgVersion: ["mcpgVersion", "mcpg_version", "awmg_version"],
-    requestedModel: ["requestedModel", "model"],
+    model: ["model"],
+    requestedModel: ["requested_model", "requestedModel", "model"],
+    modelRouting: ["modelRouting", "model_routing"],
     triggerType: ["triggerType", "event_name"],
     workflow: ["workflow", "workflow_name"],
     repository: ["repository"],
     runId: ["runId", "run_id"],
+  },
+  "model_routing.outcome": {
+    status: ["status"],
+    wireModel: ["wire_model", "wireModel"],
+    effectiveEndpoint: ["effective_endpoint", "effectiveEndpoint", "endpoint"],
+    selectedEndpoint: ["selected_endpoint", "selectedEndpoint"],
+    effort: ["effort"],
+    appliedEffort: ["applied_effort", "appliedEffort"],
+    failureCode: ["failure_code", "failureCode"],
   },
 };
 EVENT_FIELDS["session.start"] = EVENT_FIELDS["session.init"];
@@ -279,6 +335,12 @@ function normalizeUnifiedSessionEvent(event, phase) {
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (event.type === "workflow.info") {
+    const modelRouting = source.modelRouting ?? source.model_routing;
+    if (modelRouting && typeof modelRouting === "object" && !Array.isArray(modelRouting)) {
+      data.modelRouting = selectFields(modelRouting, MODEL_ROUTING_FIELDS);
+    }
+  }
   if (SCOPED_AGENT_TYPES.has(event.type) || (Object.hasOwn(COPILOT_WORKFLOW_EVENT_FIELDS, event.type) && event.type.startsWith("subagent."))) {
     for (const [key, value] of Object.entries(sessionContext(event))) if (!Object.hasOwn(data, key)) data[key] = value;
   }

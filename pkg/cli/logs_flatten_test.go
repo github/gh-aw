@@ -3,6 +3,8 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +16,65 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFlattenDownloadedAgentRoutingArtifacts(t *testing.T) {
+	for _, artifactName := range []string{"agent", "agent-artifacts", "abc123-agent"} {
+		t.Run(artifactName, func(t *testing.T) {
+			t.Parallel()
+			runDir := t.TempDir()
+			write := func(relative, content string) {
+				path := filepath.Join(runDir, relative)
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
+				require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+			}
+			write("info/aw_info.json", `{"model":"agent","engine_id":"claude"}`)
+			write("activation/aw_info.json", `{"model":"agent","engine_id":"claude"}`)
+			write("activation/aw-prompts/prompt.txt", "prompt")
+			write("usage/aw_info.json", `{"model":"agent","engine_id":"claude"}`)
+			write("usage/aw_session.jsonl", "{\"type\":\"session.format\"}\n")
+			write(filepath.Join(artifactName, "agent", "aw_info.json"), `{"model":"claude-sonnet-5","requested_model":"agent","engine_id":"claude","model_routing":{"status":"selected"}}`)
+			write(filepath.Join(artifactName, "agent", "awf-routing-outcome.json"), `{"status":"selected","endpoint":"/v1/messages"}`)
+
+			require.NoError(t, flattenDownloadedArtifacts(context.Background(), downloadArtifactsOptions{outputDir: runDir}))
+			assert.Equal(t, "claude-sonnet-5", readAwInfoModel(t, filepath.Join(runDir, "aw_info.json")))
+			assert.JSONEq(t, `{"status":"selected","endpoint":"/v1/messages"}`, readFlattenTestFile(t, filepath.Join(runDir, "agent", "awf-routing-outcome.json")))
+			assert.Equal(t, filepath.Join(runDir, "agent", "aw_info.json"), findAwInfoPath(runDir))
+			assert.FileExists(t, filepath.Join(runDir, "aw-prompts", "prompt.txt"))
+			assert.FileExists(t, filepath.Join(runDir, "usage", "aw_session.jsonl"))
+			assert.DirExists(t, filepath.Join(runDir, "agent"))
+		})
+	}
+}
+
+func TestFlattenDownloadedUsageOnlyAwInfo(t *testing.T) {
+	t.Parallel()
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "usage"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "usage", "aw_info.json"), []byte(`{"model":"final-from-usage"}`), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "usage", "aw_session.jsonl"), []byte("{}\n"), 0600))
+	require.NoError(t, flattenDownloadedArtifacts(context.Background(), downloadArtifactsOptions{
+		outputDir: runDir, artifactFilter: []string{constants.UsageArtifactName.String()},
+	}))
+	assert.Equal(t, "final-from-usage", readAwInfoModel(t, filepath.Join(runDir, "aw_info.json")))
+}
+
+func readAwInfoModel(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var info struct {
+		Model string `json:"model"`
+	}
+	require.NoError(t, json.Unmarshal(data, &info))
+	return info.Model
+}
+
+func readFlattenTestFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(data)
+}
 
 func TestFlattenSingleFileArtifacts(t *testing.T) {
 	t.Parallel()

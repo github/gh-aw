@@ -27,6 +27,7 @@ const RUNTIME_TYPES = new Set([
   "firewall.http_access",
   "firewall.token_usage",
   "firewall.model_routing",
+  "model_routing.outcome",
   "firewall.steering",
   "firewall.event",
   "safe_output.request",
@@ -132,7 +133,9 @@ function eventDetail(event) {
     case "usage.report":
       return fields(data, ["provider", "model", "aic", "totalAic", "premiumRequests", "durationMs"]) + " " + fields(data.usage, ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"]);
     case "firewall.model_routing":
-      return fields(data, ["stage", "routed", "outcome", "selected_model", "selected_effort", "router"]);
+      return fields(data, ["stage", "routed", "outcome", "selectedModel", "selectedEffort", "router"]);
+    case "model_routing.outcome":
+      return fields(data, ["status", "wireModel", "effectiveEndpoint", "selectedEndpoint", "effort", "appliedEffort", "failureCode"]);
     case "mcp.event":
     case "firewall.event":
       return fields(data, ["event", "level", "status"]);
@@ -159,7 +162,7 @@ function eventDetail(event) {
     case "detection.result":
       return fields(data, ["jobResult", "conclusion", "reason", "promptInjection", "secretLeak", "maliciousPatch"]);
     case "workflow.info":
-      return fields(data, ["engineId", "requestedModel", "triggerType", "cliVersion", "awfVersion", "mcpgVersion", "agentVersion", "workflow", "repository", "runId"]);
+      return fields(data, ["engineId", "model", "requestedModel", "modelRouting", "triggerType", "cliVersion", "awfVersion", "mcpgVersion", "agentVersion", "workflow", "repository", "runId"]);
     case "session.collection_warning":
       return fields(data, ["path", "line", "code"]);
     case "session.collection":
