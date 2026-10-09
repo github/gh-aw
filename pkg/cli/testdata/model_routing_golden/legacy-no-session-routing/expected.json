@@ -22,12 +22,12 @@
       }
     ],
     "classifier_cost": {
-      "requests": 0,
-      "input_tokens": 0,
-      "output_tokens": 0,
+      "requests": 1,
+      "input_tokens": 892,
+      "output_tokens": 177,
       "cache_read_tokens": 0,
       "cache_write_tokens": 0,
-      "aic": 0
+      "aic": 0.03908
     },
     "selected_model_cost": {
       "requests": 86,
@@ -286,7 +286,6 @@
           }
         ]
       }
-    ],
-    "warnings": ["per-agent AI credits (933.446) differ from non-classifier proxy total (933.486) for endpoint /responses"]
+    ]
   }
 }

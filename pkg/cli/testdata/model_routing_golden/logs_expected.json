@@ -54,11 +54,11 @@
       "router_version": "0.1.2",
       "endpoint": "/v1/messages",
       "run_count": 1,
-      "total_aic": 933.44645,
-      "average_aic": 933.44645
+      "total_aic": 933.48553,
+      "average_aic": 933.48553
     }
   ],
-  "classifier_aic": 0.85578,
+  "classifier_aic": 0.89486,
   "main_agent_cost": {
     "requests": 50,
     "input_tokens": 4575305,

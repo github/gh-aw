@@ -12,20 +12,20 @@
       "completed": 4
     },
     "classifier_cost": {
-      "requests": 0,
-      "input_tokens": 0,
-      "output_tokens": 0,
+      "requests": 1,
+      "input_tokens": 802,
+      "output_tokens": 131,
       "cache_read_tokens": 0,
       "cache_write_tokens": 0,
-      "aic": 0
+      "aic": 0.03176
     },
     "selected_model_cost": {
-      "requests": 0,
-      "input_tokens": 0,
-      "output_tokens": 0,
-      "cache_read_tokens": 0,
+      "requests": 4,
+      "input_tokens": 97401,
+      "output_tokens": 535,
+      "cache_read_tokens": 70123,
       "cache_write_tokens": 0,
-      "aic": 0
+      "aic": 0.750006
     },
     "deviated_traffic_cost": {
       "requests": 0,

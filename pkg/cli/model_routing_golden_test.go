@@ -24,25 +24,31 @@ type modelRoutingGoldenCase struct {
 var modelRoutingGoldenCases = []modelRoutingGoldenCase{
 	{
 		name:                 "copilot-routed-gpt-responses",
-		legacyDifference:     "legacy routing reads no classifier cost because tokenUsageEntriesForRun has no token-usage.jsonl fallback",
+		legacyDifference:     "the legacy variant attributes routing costs from raw token-usage.jsonl instead of unified firewall.token_usage events",
 		unifiedClassifierAIC: new(0.03176),
-		legacyClassifierAIC:  new(0.0),
+		legacyClassifierAIC:  new(0.03176),
 	},
 	{
-		name:             "claude-awf-selected-messages",
-		legacyDifference: "without aw_session.jsonl, routing cost attribution from unified firewall.token_usage is unavailable",
+		name:                 "claude-awf-selected-messages",
+		legacyDifference:     "the legacy variant attributes routing costs from raw token-usage.jsonl instead of unified firewall.token_usage events",
+		unifiedClassifierAIC: new(0.776),
+		legacyClassifierAIC:  new(0.776),
 	},
 	{
 		name:             "pi-claude-two-subagents",
 		legacyDifference: "the legacy agent-session.jsonl fallback lacks pi tool execution events needed to correlate proxy requests to agents",
 	},
 	{
-		name:             "copilot-subagent-failed-and-alias",
-		legacyDifference: "without aw_session.jsonl, routing costs cannot use unified firewall.token_usage entries",
+		name:                 "copilot-subagent-failed-and-alias",
+		legacyDifference:     "the legacy variant attributes routing costs from raw token-usage.jsonl instead of unified firewall.token_usage events",
+		unifiedClassifierAIC: new(0.04802),
+		legacyClassifierAIC:  new(0.04802),
 	},
 	{
-		name:             "legacy-no-session-routing",
-		legacyDifference: "the old session has no routing events; the legacy variant removes the session entirely and relies on raw routing and agent-session fallbacks",
+		name:                 "legacy-no-session-routing",
+		legacyDifference:     "the old session has no routing events; classifier cost is recovered from raw token-usage.jsonl",
+		unifiedClassifierAIC: new(0.03908),
+		legacyClassifierAIC:  new(0.03908),
 	},
 }
 
@@ -440,18 +446,16 @@ func assertModelRoutingGoldenVariantAgreement(t *testing.T, downloaded, legacy m
 
 func assertModelRoutingGoldenCase(t *testing.T, testCase modelRoutingGoldenCase, legacy bool, routing *ModelRoutingSummary, usage *TokenUsageSummary) {
 	t.Helper()
+	expectedClassifierAIC := testCase.unifiedClassifierAIC
+	if legacy && testCase.legacyClassifierAIC != nil {
+		expectedClassifierAIC = testCase.legacyClassifierAIC
+	}
+	if expectedClassifierAIC != nil &&
+		(routing == nil || routing.ClassifierCost.Requests != 1 || routing.ClassifierCost.AIC != *expectedClassifierAIC) {
+		t.Fatalf("unexpected classifier routing cost for legacy=%t: %+v", legacy, routing)
+	}
 	switch testCase.name {
 	case "copilot-routed-gpt-responses":
-		expectedClassifierAIC := *testCase.unifiedClassifierAIC
-		expectedClassifierRequests := 1
-		if legacy {
-			expectedClassifierAIC = *testCase.legacyClassifierAIC
-			expectedClassifierRequests = 0
-		}
-		if routing == nil || routing.ClassifierCost.Requests != expectedClassifierRequests ||
-			routing.ClassifierCost.AIC != expectedClassifierAIC {
-			t.Fatalf("unexpected classifier routing cost for legacy=%t: %+v", legacy, routing)
-		}
 		if !legacy && routing.SelectedModelCost.AIC == 0 {
 			t.Fatal("routed GPT selection should have non-zero selected-model cost")
 		}

@@ -388,6 +388,18 @@ func tokenUsageEntriesForRun(runDir string) []TokenUsageEntry {
 		tokenUsageSubagentLog.Printf("failed to read unified firewall token usage: %v", err)
 		return nil
 	}
+	if len(entries) > 0 {
+		return entries
+	}
+	rawPath := findTokenUsageFile(runDir)
+	if rawPath == "" {
+		return entries
+	}
+	entries, _, err = scanTokenUsageEntries(rawPath)
+	if err != nil {
+		tokenUsageSubagentLog.Printf("failed to read raw firewall token usage: %v", err)
+		return nil
+	}
 	return entries
 }
 

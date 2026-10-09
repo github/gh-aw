@@ -22,28 +22,28 @@
       }
     ],
     "classifier_cost": {
-      "requests": 0,
-      "input_tokens": 0,
-      "output_tokens": 0,
+      "requests": 1,
+      "input_tokens": 892,
+      "output_tokens": 177,
       "cache_read_tokens": 0,
       "cache_write_tokens": 0,
-      "aic": 0
+      "aic": 0.03908
     },
     "selected_model_cost": {
-      "requests": 0,
-      "input_tokens": 0,
-      "output_tokens": 0,
-      "cache_read_tokens": 0,
-      "cache_write_tokens": 0,
-      "aic": 0
+      "requests": 86,
+      "input_tokens": 9919,
+      "output_tokens": 54243,
+      "cache_read_tokens": 7404011,
+      "cache_write_tokens": 397538,
+      "aic": 759.2288
     },
     "deviated_traffic_cost": {
-      "requests": 0,
-      "input_tokens": 0,
-      "output_tokens": 0,
-      "cache_read_tokens": 0,
-      "cache_write_tokens": 0,
-      "aic": 0
+      "requests": 15,
+      "input_tokens": 30,
+      "output_tokens": 14800,
+      "cache_read_tokens": 2130103,
+      "cache_write_tokens": 49116,
+      "aic": 174.21765
     },
     "main_agent_cost": {
       "requests": 41,
