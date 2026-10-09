@@ -131,13 +131,30 @@ describe("awf_model_routing.cjs", () => {
     const env = { GH_AW_MODEL_ROUTING: "1", GH_AW_TMP_DIR: tmpDir };
     const recordPath = path.join(tmpDir, "agent", "awf-routing-outcome.json");
     try {
-      expect(recordAWFModelRoutingOutcome({ status: "selected", wire_model: "gpt-5.6-luna", effort: "high", applied_effort: "high" }, env)).toBe(true);
+      expect(
+        recordAWFModelRoutingOutcome(
+          {
+            status: "selected",
+            wire_model: "gpt-5.6-luna",
+            endpoint: "/responses",
+            selected_endpoint: "/chat/completions",
+            effort: "high",
+            applied_effort: "high",
+          },
+          env
+        )
+      ).toBe(true);
       expect(JSON.parse(fs.readFileSync(recordPath, "utf8"))).toMatchObject({
         status: "selected",
         wire_model: "gpt-5.6-luna",
+        endpoint: "/responses",
+        selected_endpoint: "/chat/completions",
         effort: "high",
         applied_effort: "high",
       });
+      expect(recordAWFModelRoutingOutcome({ status: "selected", wire_model: "gpt-5.6-luna", endpoint: "/invalid", selected_endpoint: "\n" }, env)).toBe(true);
+      expect(JSON.parse(fs.readFileSync(recordPath, "utf8"))).not.toHaveProperty("endpoint");
+      expect(JSON.parse(fs.readFileSync(recordPath, "utf8"))).not.toHaveProperty("selected_endpoint");
       expect(recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort" }, env)).toBe(true);
       expect(JSON.parse(fs.readFileSync(recordPath, "utf8"))).toMatchObject({ status: "rejected", failure_code: "unsupported_effort" });
       expect(recordAWFModelRoutingOutcome({ status: "selected", wire_model: "gpt-5.6-luna\nrouted: false" }, env)).toBe(false);
