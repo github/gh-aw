@@ -30,6 +30,50 @@ This directory retains executable specifications and formal evidence, not a
 second current user guide. The historical material below is model provenance,
 not supported deployment guidance.
 
+## First-submit bootstrap model
+
+`QueueBootstrap.tla` is a separate bounded refinement of the first valid producer
+submission with a compiler-approved Policy and Work. It covers both initialized
+repositories with an absent queue branch and repositories with no branches.
+Only a not-found ref or a conflict independently confirmed by matching repository
+identity and native `isEmpty` permits absence handling; generic conflicts,
+foreign-repository responses and failed confirmation are rejected.
+
+Candidate validation precedes default-branch preparation. Reads, dispatches,
+invalid requests and workers cannot prepare a repository. The empty repository's
+default branch must differ from the queue branch. A lost preparation response is
+accepted only after the default branch is readable. Preparation does not publish
+queue facts: the first queue commit contains Policy and Work together, and requires
+independent verification of the approved worker route. An unavailable route stops
+publication; deploying the worker permits retry of the same immutable submission.
+Repeating an already-published request recovers its receipt without another commit.
+
+Run the focused checks using the official jar documented below:
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=QueueBootstrap \
+  bash specs/work-queue/check.sh
+```
+
+| Configuration | Scope / expected result |
+|---|---|
+| `BootstrapEmpty.cfg`, `BootstrapInitialized.cfg`, `BootstrapSameBranch.cfg` | Exhaust bounded `Safety`, including rejection when both branches would coincide. |
+| `BrokenBootstrapConflict.cfg` | Treat unconfirmed ref responses as absence; `AbsenceAuthority` fails. |
+| `BrokenBootstrapPreparation.cfg` | Prepare before valid producer admission; `PreparationAuthority` fails. |
+| `BrokenBootstrapBranch.cfg` | Initialize on the queue branch itself; `SeparateQueueBranch` fails. |
+| `BrokenBootstrapRoute.cfg` | Publish without a verified route; `PublicationAuthority` fails. |
+| `BrokenBootstrapAtomic.cfg` | Publish Policy without Work; `AtomicGenesis` fails. |
+| `BootstrapDeferredWitness.cfg` | Reach a prepared default branch with no queue publication and an unavailable worker. |
+| `BootstrapRetryWitness.cfg` | Reach atomic publication after preparation, route failure, worker deployment and retry. |
+| `BootstrapLostResponseWitness.cfg` | Reach publication after recovering a lost default-branch initialization response. |
+
+Witness configurations check `Safety` before their deliberately false
+reachability invariant. They do not establish eventual deployment or submission
+success. This model abstracts one immutable request, native observations and
+publication; it does not prove GitHub API semantics, concurrent Git CAS, JSON
+parsing, optional-setting normalization or credential/writer restrictions.
+Scheduling and Claim authority remain covered by the other models.
+
 ## Local stress simulator
 
 Run the simulator from the repository root with Node.js 24 or later and Git.
@@ -923,7 +967,7 @@ JAVA_BIN=/path/to/java \
 bash specs/work-queue/check.sh
 ```
 
-The runner checks every registered configuration across the six models,
+The runner checks every registered configuration across the seven models,
 including the historical configurations below. Positive configurations require
 exhaustive successful termination; negative controls and guarded witnesses
 require their exact named diagnostic and exit status, not a parse/tooling failure.
