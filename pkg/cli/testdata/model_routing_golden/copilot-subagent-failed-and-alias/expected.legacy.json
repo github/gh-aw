@@ -295,6 +295,6 @@
         ]
       }
     ],
-    "warnings": ["per-agent AI credits (3.309) differ from non-classifier proxy total (3.118) for endpoint /responses"]
+    "warnings": ["per-agent AI credits (3.309) differ from non-classifier proxy total (3.118) for endpoint unknown endpoint"]
   }
 }

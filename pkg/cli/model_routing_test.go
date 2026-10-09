@@ -147,6 +147,139 @@ func TestAnalyzeModelRoutingFromSessionWithoutRawFile(t *testing.T) {
 	}
 }
 
+func TestAnalyzeRoutedClassifierUsageFromUnifiedSession(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		legacy bool
+		rawLog bool
+	}{
+		{name: "current unified fields", rawLog: false},
+		{name: "legacy fields with raw proxy fallback", legacy: true, rawLog: true},
+		{name: "legacy fields with model-routing timing fallback", legacy: true, rawLog: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runDir := writeRoutedUnifiedAuditFixture(t, test.legacy, test.rawLog, "/responses", "/responses")
+			usageEntries, err := readUnifiedTokenUsageEntries(runDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(usageEntries) != 3 || usageEntries[0].Purpose != "routing_classification" ||
+				usageEntries[0].Path != "/responses" || usageEntries[0].XInitiator != "agent" {
+				t.Fatalf("unified usage metadata was not preserved or recovered: %+v", usageEntries)
+			}
+			routing := analyzeModelRouting(runDir)
+			if routing == nil || routing.ClassifierCost.Requests != 1 || math.Abs(routing.ClassifierCost.AIC-0.323) > 0.000001 {
+				t.Fatalf("classifier cost was not attributed: %+v", routing)
+			}
+			total := routing.ClassifierCost.AIC + routing.SelectedModelCost.AIC + routing.DeviatedTrafficCost.AIC
+			if math.Abs(total-17.341) > 0.000001 {
+				t.Fatalf("routed cost buckets total %.3f, want proxy total 17.341", total)
+			}
+
+			summary := &TokenUsageSummary{AICFound: true, TotalAIC: 17.341}
+			augmentSubagentModelAttribution(runDir, summary)
+			if len(summary.Warnings) != 0 {
+				t.Fatalf("per-agent reconciliation emitted warnings: %v", summary.Warnings)
+			}
+		})
+	}
+}
+
+func TestReconcileRoutedClaudeClassifierNamesAgentEndpoint(t *testing.T) {
+	runDir := writeRoutedUnifiedAuditFixture(t, true, true, "/chat/completions", "/v1/messages")
+	summary := &TokenUsageSummary{AICFound: true, TotalAIC: 17.401}
+	augmentSubagentModelAttribution(runDir, summary)
+	if len(summary.Warnings) != 1 {
+		t.Fatalf("expected one reconciliation warning, got %v", summary.Warnings)
+	}
+	if !strings.Contains(summary.Warnings[0], "/v1/messages") || strings.Contains(summary.Warnings[0], "/chat/completions") {
+		t.Fatalf("warning used classifier endpoint instead of agent endpoint: %s", summary.Warnings[0])
+	}
+}
+
+func writeRoutedUnifiedAuditFixture(t *testing.T, legacy, includeRaw bool, classifierPath, agentPath string) string {
+	t.Helper()
+	runDir := t.TempDir()
+	usageDir := filepath.Join(runDir, "usage", "agent")
+	if err := os.MkdirAll(usageDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	routingRecords := []map[string]any{
+		{"_schema": "model-routing/v0.28.44", "stage": "classification", "attempt": 1, "classifier_model": "github-copilot/claude-sonnet-5", "endpoint": classifierPath, "x_initiator": "agent"},
+		{"_schema": "model-routing/v0.28.44", "stage": "selection", "classifier_model": "github-copilot/claude-sonnet-5", "classifier_attempts": 1, "selected_model": "claude-sonnet-5", "endpoint": agentPath},
+		{"_schema": "model-routing/v0.28.44", "stage": "request", "request_id": "main-1", "routed": "as_selected"},
+		{"_schema": "model-routing/v0.28.44", "stage": "request", "request_id": "subagent-1", "routed": "deviated"},
+	}
+	writeAuditJSONLines(t, filepath.Join(usageDir, "model-routing.jsonl"), routingRecords...)
+
+	routingEvents := []map[string]any{
+		{"type": "firewall.model_routing", "data": routingRecords[0], "timestamp": "2026-10-08T00:00:00Z", "provenance": map[string]string{"component": "firewall", "phase": "agent"}},
+		{"type": "firewall.token_usage", "data": routedUsageEvent("classifier-1", "claude-sonnet-5", 0.323, classifierPath, "routing_classification", legacy), "timestamp": "2026-10-08T00:00:00.200Z", "provenance": map[string]string{"component": "firewall", "phase": "agent"}},
+		{"type": "firewall.model_routing", "data": routingRecords[1], "timestamp": "2026-10-08T00:00:00.500Z", "provenance": map[string]string{"component": "firewall", "phase": "agent"}},
+		{"type": "firewall.model_routing", "data": routingRecords[2], "timestamp": "2026-10-08T00:00:00.600Z", "provenance": map[string]string{"component": "firewall", "phase": "agent"}},
+		{"type": "firewall.model_routing", "data": routingRecords[3], "timestamp": "2026-10-08T00:00:00.700Z", "provenance": map[string]string{"component": "firewall", "phase": "agent"}},
+		{"type": "firewall.token_usage", "data": routedUsageEvent("main-1", "claude-sonnet-5", 15.227, agentPath, "agent", legacy), "timestamp": "2026-10-08T00:00:01Z", "provenance": map[string]string{"component": "firewall", "phase": "agent"}},
+		{"type": "firewall.token_usage", "data": routedUsageEvent("subagent-1", "claude-haiku-4.5", 1.791, agentPath, "subagent", legacy), "timestamp": "2026-10-08T00:00:02Z", "provenance": map[string]string{"component": "firewall", "phase": "agent"}},
+		{"type": "session.shutdown", "data": map[string]any{"agentMetrics": map[string]any{
+			"main":  map[string]any{"totalNanoAiu": 15_227_000_000, "modelMetrics": map[string]any{"claude-sonnet-5": map[string]any{"requests": map[string]int{"count": 1}, "usage": map[string]int{"inputTokens": 100, "outputTokens": 10}, "totalNanoAiu": 15_227_000_000}}},
+			"child": map[string]any{"agentName": "quick-checker", "agentDisplayName": "quick-checker", "totalNanoAiu": 1_791_000_000, "modelMetrics": map[string]any{"claude-haiku-4.5": map[string]any{"requests": map[string]int{"count": 1}, "usage": map[string]int{"inputTokens": 20, "outputTokens": 2}, "totalNanoAiu": 1_791_000_000}}},
+		}}, "timestamp": "2026-10-08T00:00:03Z", "provenance": map[string]string{"component": "agent", "phase": "agent"}},
+	}
+	session := append([]map[string]any{{"type": "session.format", "data": map[string]int{"version": 1}, "provenance": map[string]string{"component": "collector"}}}, routingEvents...)
+	writeAuditJSONLines(t, filepath.Join(runDir, "usage", "aw_session.jsonl"), session...)
+
+	if includeRaw {
+		rawDir := filepath.Join(runDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		if err := os.MkdirAll(rawDir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		writeAuditJSONLines(t, filepath.Join(rawDir, "token-usage.jsonl"),
+			routedRawUsage("classifier-1", "claude-sonnet-5", 0.323, classifierPath, "routing_classification"),
+			routedRawUsage("main-1", "claude-sonnet-5", 15.227, agentPath, "agent"),
+			routedRawUsage("subagent-1", "claude-haiku-4.5", 1.791, agentPath, "subagent"),
+		)
+	}
+	return runDir
+}
+
+func routedUsageEvent(requestID, model string, credits float64, path, purpose string, legacy bool) map[string]any {
+	data := map[string]any{
+		"provider": "github-copilot", "model": model, "requestId": requestID, "aic": credits,
+		"durationMs": 50, "usage": map[string]int{"inputTokens": 100, "outputTokens": 10},
+	}
+	if !legacy {
+		data["purpose"] = purpose
+		data["path"] = path
+		data["xInitiator"] = "agent"
+	}
+	return data
+}
+
+func routedRawUsage(requestID, model string, credits float64, path, purpose string) map[string]any {
+	return map[string]any{
+		"event": "token_usage", "timestamp": "2026-10-08T00:00:00Z", "request_id": requestID,
+		"purpose": purpose, "provider": "github-copilot", "model": model, "path": path,
+		"x_initiator": "agent", "status": 200, "input_tokens": 100, "output_tokens": 10,
+		"duration_ms": 50, "ai_credits_this_response": credits,
+	}
+}
+
+func writeAuditJSONLines(t *testing.T, path string, records ...map[string]any) {
+	t.Helper()
+	var content strings.Builder
+	for _, record := range records {
+		encoded, err := json.Marshal(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		content.Write(encoded)
+		content.WriteByte('\n')
+	}
+	if err := os.WriteFile(path, []byte(content.String()), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestApplyAwInfoModelRoutingAddsEndpointMetadata(t *testing.T) {
 	runDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(
