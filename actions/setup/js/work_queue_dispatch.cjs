@@ -11,7 +11,7 @@ const { assignmentsForRequest, generateRequestOperations, validateWorkerContinua
 const store = require("./work_queue_store.cjs");
 const { normalizeAssignment, normalizeClaimScope, readClaimScopeContext } = require("./work_queue_claim_scope.cjs");
 const { readStagedIntentBatch, requestIdForIntent, requestForIntent, normalizeDispatchParameters, normalizeSubmitParameters } = require("./work_queue_intents.cjs");
-const { assertPolicyProposal, loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
+const { assertPolicyProposal, loadQueue, policyProposalFor, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
 const { authenticatePublisher, authenticateIntentPublisher, immutableRef, fetchNativeRun, postQueueDispatch, validateNativeRun } = require("./work_queue_native.cjs");
 const { dependencyKey, allowedScope, resolveDependencies, resolveExternalEdges } = require("./work_queue_dependency_resolver.cjs");
 const { lifecycleEvidence, reconcileDispatch, reconcileQueue, releaseAssignment } = require("./work_queue_reconciler.cjs");
@@ -437,16 +437,18 @@ async function processParsedWorkQueueIntents(options, runtime, intents, errors) 
         }
         const trustedContext = await intentContext(options, intent, { recoverAccepted: true });
         const latest = await loadQueue({ ...options, policyProposal: undefined, initializationContext: undefined });
-        if (!latest.projection.policy) throw new Error("policy_missing");
+        const bootstrapPolicy = !latest.projection.policy && latest.sha === null && ["producer", "dispatcher"].includes(trustedContext.role) ? policyProposalFor(options) : undefined;
+        const admissionState = bootstrapPolicy ? { ...latest.projection, policy: bootstrapPolicy } : latest.projection;
+        if (!admissionState.policy) throw new Error("policy_missing");
         if (!Number.isSafeInteger(trustedContext.created_at) || trustedContext.created_at < 0) throw new Error("publisher_origin_time_missing");
         const prior = latest.projection.requests.get(requestIdForIntent(trustedContext, intent.intent_id));
-        if (!prior) assertPolicyProposal(latest.projection, options);
+        if (!prior && !bootstrapPolicy) assertPolicyProposal(latest.projection, options);
         const parameters = prior
           ? acceptedSubmissionParameters(latest.projection, trustedContext, intent.parameters, prior)
           : await resolveAdmissionResources(
               options,
-              latest.projection,
-              normalizeSubmitParameters(inheritWorkerSubmission(latest.projection, trustedContext, intent.parameters), latest.projection.policy, trustedContext.created_at, latest.projection),
+              admissionState,
+              normalizeSubmitParameters(inheritWorkerSubmission(admissionState, trustedContext, intent.parameters), admissionState.policy, trustedContext.created_at, admissionState),
               trustedContext
             );
         const request = requestForIntent(trustedContext, intent.intent_id, "submit", parameters);
@@ -459,6 +461,7 @@ async function processParsedWorkQueueIntents(options, runtime, intents, errors) 
           context: trustedContext,
           actor: actorFromContext(trustedContext),
           request,
+          ...(bootstrapPolicy === undefined ? {} : { policyProposal: bootstrapPolicy }),
           remediationVerifier: options.remediationVerifier,
           generateOperations: (state, stable, actor, at, id) => {
             assertPolicyProposal(state, options);

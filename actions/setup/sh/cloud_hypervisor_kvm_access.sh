@@ -13,42 +13,8 @@ if [[ "${RUNNER_ENVIRONMENT:-}" != "github-hosted" || "${RUNNER_OS:-}" != "Linux
   exit 1
 fi
 
-if [[ ! -e /dev/kvm ]]; then
-  echo "::error::/dev/kvm is missing. cloud-hypervisor preview requires a KVM-capable runner."
-  exit 1
-fi
+source "${BASH_SOURCE[0]%/*}/kvm_access.sh"
+prepare_kvm_access "$(command -v id)" "$(command -v sudo)" \
+  "$(command -v setfacl || true)" "$(command -v getfacl || true)"
 
-if [[ ! -c /dev/kvm ]]; then
-  echo "::error::/dev/kvm must be a character device."
-  exit 1
-fi
-
-if ! command -v setfacl >/dev/null 2>&1; then
-  echo "::error::setfacl is required to grant scoped access to /dev/kvm."
-  exit 1
-fi
-
-runner_uid="$(id -u)"
-if [[ ! "${runner_uid}" =~ ^[0-9]+$ ]]; then
-  echo "::error::failed to resolve a numeric runner UID."
-  exit 1
-fi
-sudo setfacl -m "u:${runner_uid}:rw" /dev/kvm
-
-if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
-  echo "::error::failed to grant the runner user read/write access to /dev/kvm."
-  exit 1
-fi
-
-acl_output="$(getfacl -ncp /dev/kvm | sed 's/[[:space:]]#effective:.*$//' || true)"
-if [[ -z "${acl_output}" ]]; then
-  echo "::error::failed to read /dev/kvm ACLs for verification."
-  exit 1
-fi
-if ! grep -Eq "^user:${runner_uid}:rw-$" <<<"${acl_output}"; then
-  echo "::error::failed to verify scoped ACL entry for the runner user on /dev/kvm."
-  exit 1
-fi
-
-echo "runner user has scoped read/write access to /dev/kvm"
 echo "::endgroup::"

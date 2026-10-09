@@ -4,29 +4,25 @@ description: Agent instructions for Git-backed work queue producers, dispatchers
 
 # Work Queue
 
-Choose the queue pattern: Git storage for fair scheduling and Claim authority, or
-[WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md) for
-issue-backed WorkQueueOps: lists, sub-issues, Discussions or cache backlogs.
-
-Use `tools.work-queue` for fair scheduling, immutable Work DAGs and Claim-scoped
-effects. The causal `work-queue.jsonl` log is authoritative. Weights distribute
-Claim opportunities, not CPU or successful completions. Protocol v3 always uses
-Git; Issues/PRs are dependencies, not storage. Never set `storage`. WorkQueueOps
-is a separate pattern.
+Choose Git-backed `tools.work-queue` for fair scheduling, immutable Work DAGs
+and Claim-scoped effects; `work-queue.jsonl` is authoritative. Protocol v3 has
+no storage selector; Issues/PRs are dependencies, not storage. Weights distribute
+Claim opportunities, not CPU or successful completions. For issue-backed WorkQueueOps
+alternatives, see [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md).
 
 ## Select the role
 
-- **Observer:** read/explain only; use ordinary configured report or `noop`
-  authorization. Do not submit, dispatch or finish Work.
-- **Producer/dispatcher:** stage entitled task plans and bounded pool requests.
-  Queue-control authority does not permit arbitrary resource-writing outputs.
-- **Worker:** require a compiler-supplied version-3 `claims` array. Never
-  construct/override reserved `work_queue_assignment` or caller context.
+- **Observer:** read/explain only; never submit, dispatch or finish Work.
+- **Producer/dispatcher:** submit entitled plans and request bounded pool work;
+  queue authority grants no arbitrary resource-writing outputs.
+- **Worker:** require compiler-supplied version-3 `claims`; never override
+  reserved `work_queue_assignment` or caller context.
 
-Trust the compiler/runtime role, never snapshot metadata or assignment alone;
-don't downgrade declared workers. Activation authenticates run/workflow/revision,
-and reruns cannot inherit attempt 1 authority. Report absent queues as
-uninitialized; reject empty, malformed or unsupported logs.
+Trust compiler/runtime role, not snapshot metadata; don't downgrade workers.
+Activation authenticates run/workflow/revision; reruns cannot inherit attempt 1.
+An absent branch is uninitialized/empty. Its first producer submit atomically
+creates it with compiled Policy and Work; reads and dispatch alone never do.
+Reject malformed or unsupported existing logs.
 
 ## Configure deployment
 
@@ -39,23 +35,23 @@ tools:
     worker: true
 ```
 
-Dispatchers need `tools.work-queue: true`, an explicit
-`safe-outputs.dispatch-workflow.workflows` allowlist and a bounded `max`.
-The allowlist is compiler approval, not authority: installed Policy binds each
-profile's exact workflow path, immutable SHA, authenticated principal, trust
-domain and effect scope. Queue dispatch ignores moving `target-ref`.
+Dispatchers need `tools.work-queue: true`, a worker allowlist and bounded
+`dispatch-workflow.max`. Compiler-approved Policy binds each profile's workflow,
+immutable SHA, principal, trust domain and effect scope; moving `target-ref` is
+ignored.
 
-Require administrator-installed Policy and protected queue-branch writers;
-frontmatter provisions neither, and administrator status grants no producer
-entitlement. Never give agents or snapshot MCP queue-write credentials. Read the
-[deployment guide](../../docs/src/content/docs/guides/deploy-work-queue.md) only
-for installation; writer-restriction automation remains deferred.
+Configure producer entitlements and branch protections before enabling
+producers; rulesets must match before branch creation. First submit installs
+compiled Policy; later changes are admin-only. Admin status grants no producer
+entitlement. Never expose queue-write credentials to agents/snapshot MCP. See
+[deployment](../../docs/src/content/docs/guides/deploy-work-queue.md);
+writer-restriction automation remains deferred.
 
 ## Mirror admitted Work with Issues
 
-`tools.work-queue.issues: true` mirrors admitted Work with the `work` label.
-An object may set `label` and a pre-provisioned native organization
-`status-field`. Require installed projector authority: only protected hooks
+`tools.work-queue.issues: true` mirrors admitted Work with purple `work` and
+`work: <status>` labels. An object may customize the tracking label and status
+label prefix with `label`. Require installed projector authority: only protected hooks
 project their own admissions/original Claims. Immutable `backing_issue` binds
 one Work per Issue. Agents never write mirrors; human edits never establish
 Result. Pre-existing Issues need exact installed `backing_issues` grants.
@@ -66,16 +62,12 @@ Upgrade all closed-schema readers first. See the
 
 ## Plan and dispatch
 
-- Use `work_queue_read` / `work_queue_explain` for the immutable activation
-  snapshot. Predictions may be stale; sorting cannot override Policy.
-- Stage bounded, secret-free task/graph plans with `work_queue_submit`, within
-  installed producer pools, priorities and accounting keys.
-- Request a pool prefix using `work_queue_dispatch_next` with `pool`,
-  `max_claims` and `max_dispatches`. Never select winning Work or a target, or
-  use legacy `dispatch_workflow` with `work_queue: {work_id: ...}`.
-- Let trusted processing refresh the ledger, enforce Policy/DAG/scope and commit
-  a compatible fair prefix atomically. A CAS loser discards tentative choices
-  and charges before recomputing. Ordinary non-queue dispatch is separate.
+- Read the immutable snapshot; predictions may be stale and cannot override
+  Policy. Submit bounded, secret-free plans within producer entitlements.
+- Request a pool prefix with `work_queue_dispatch_next` (`pool`, `max_claims`,
+  `max_dispatches`). Never choose winners/targets or use scalar dispatch.
+- Trusted processing refreshes the ledger and commits a compatible fair prefix.
+  CAS losers discard tentative choices/charges and recompute.
 
 ## Execute original Claims
 
@@ -92,11 +84,11 @@ Upgrade all closed-schema readers first. See the
 - Treat finish as an intent: trusted processing publishes Completion before
   scoped effects and Result only after independently verified delivery.
 
-Use `<mcp-clis>` advertised MCP subcommands with one JSON argument (not
-structured-tool `command`/`description`). Dispatcher: `uninitialized` plus
-null `snapshot_sha` means absent; stop with `noop`, not submit/dispatch.
-Existing policyless ledgers are deployment failures; workers require Policy.
-`status: "staged"` is no grant or launch.
+Use advertised `<mcp-clis>` subcommands with one JSON argument, not
+structured-tool `command`/`description`. `uninitialized` plus null SHA is empty;
+first `work_queue_submit` atomically installs compiled Policy and Work. Submit
+before dispatch. Existing policyless ledgers are failures; workers require
+Policy. `status: "staged"` is no grant or launch.
 
 ## Dependencies and recovery
 

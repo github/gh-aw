@@ -24,7 +24,7 @@ flowchart LR
 
 ## Native Work Queue
 
-The native queue stores immutable tasks and lifecycle events in `work-queue.jsonl` on a dedicated Git branch. A trusted producer submits tasks, a dispatcher requests assignments, and workers process them. The scheduler selects eligible tasks under an administrator-installed Policy; the agent does not choose which task receives a Claim.
+The native queue stores immutable tasks and lifecycle events in `work-queue.jsonl` on a dedicated Git branch. A trusted producer submits tasks, a dispatcher requests assignments, and workers process them. On an absent branch, the first producer submit atomically installs its compiler-approved Policy with Work; later Policy updates remain administrator-only. The scheduler selects eligible tasks under Policy; the agent does not choose which task receives a Claim.
 
 A Claim authorizes one attempt at a task. Workers stage safe outputs and a finish intent for each original Claim. Trusted processing records Completion before authorizing those effects and records Result only after independently verified delivery. Dependent tasks wait for their predecessors' Results, not merely for a worker run to finish.
 
@@ -44,7 +44,7 @@ tools:
     worker: true
 ```
 
-These declarations are only part of deployment. Configure approved worker routes, producer permissions, capacity limits, and queue-branch writer restrictions using the [work-queue deployment guide](/gh-aw/guides/deploy-work-queue/). Frontmatter does not install Policy or protect the queue branch, and automated enforcement of writer restrictions remains deferred.
+These declarations are only part of deployment. Configure approved worker routes, producer permissions, capacity limits, and queue-branch writer restrictions using the [work-queue deployment guide](/gh-aw/guides/deploy-work-queue/). Frontmatter alone does not install Policy or protect the queue branch; the first trusted producer submit bootstraps Policy, and automated enforcement of writer restrictions remains deferred.
 
 ```mermaid
 flowchart LR

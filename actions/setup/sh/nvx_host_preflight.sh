@@ -69,10 +69,14 @@ if [[ "$(tool uname -m)" != "x86_64" ]]; then
   echo "::error::NVX supports only Linux x86_64 hosts."
   exit 1
 fi
-if [[ ! -c /dev/kvm || ! -r /dev/kvm || ! -w /dev/kvm ]]; then
-  echo "::error::NVX requires read/write access to the /dev/kvm character device."
+if [[ "$(tool sudo -n "${trusted_tools[id]}" -u)" != "0" ]]; then
+  echo "::error::NVX requires non-interactive sudo so AWF can run with effective UID 0."
   exit 1
 fi
+source "${BASH_SOURCE[0]%/*}/kvm_access.sh"
+prepare_kvm_access "${trusted_tools[id]}" "${trusted_tools[sudo]}" \
+  "${trusted_tools[setfacl]}" "${trusted_tools[getfacl]}" "${GITHUB_ENV:?GITHUB_ENV is required}"
+
 if [[ ! -r /sys/fs/cgroup/cgroup.controllers ]]; then
   echo "::error::NVX requires a readable cgroup v2 hierarchy."
   exit 1
@@ -89,11 +93,6 @@ if [[ ! -r /proc/sys/kernel/seccomp/actions_avail ]] ||
   echo "::error::NVX requires seccomp kill_process support."
   exit 1
 fi
-if [[ "$(tool sudo -n "${trusted_tools[id]}" -u)" != "0" ]]; then
-  echo "::error::NVX requires non-interactive sudo so AWF can run with effective UID 0."
-  exit 1
-fi
-
 for variable in \
   GH_AW_AWF_VERSION \
   GH_AW_NVX_LAYER_SOURCE \

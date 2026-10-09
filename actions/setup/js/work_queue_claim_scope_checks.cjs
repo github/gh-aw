@@ -322,8 +322,13 @@ function registerTests({ describe, it }) {
         for (const role of ["dispatcher", "worker"]) {
           process.env.GH_AW_WORK_QUEUE_ROLE = role;
           write({ ...snapshot, role });
-          for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message));
-          await assert.rejects(manager.processMessages(handlers, messages));
+          if (role === "dispatcher") {
+            assert.deepEqual(scope.normalizeRuntimeMessage(messages[0]), messages[0]);
+            assert.throws(() => scope.normalizeRuntimeMessage(messages[1]), /unassigned dispatcher/);
+          } else {
+            for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message));
+            await assert.rejects(manager.processMessages(handlers, messages));
+          }
           assert.equal(writes, 3);
         }
       } finally {

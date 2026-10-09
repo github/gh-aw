@@ -160,15 +160,20 @@ func TestCloudHypervisorAWFCommandEmitsAwfHomeMkdirBeforeInvocation(t *testing.T
 	// /workspace already exists (checked out by actions/checkout) and must not be mkdir'd.
 	assert.NotContains(t, command, `mkdir -p "${GITHUB_WORKSPACE}"`+"\n")
 	assert.Contains(t, command, `mkdir -p "${GITHUB_WORKSPACE}/.awf-home" "/tmp/gh-aw/agent"`)
+	assert.Contains(t, command, `if GH_AW_GIT_EXCLUDE="$(git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude 2>/dev/null)"; then`)
+	assert.Contains(t, command, `if ! grep -qxF -- '/.awf-home/' "$GH_AW_GIT_EXCLUDE"`)
 
 	mkdirIdx := strings.Index(command, "mkdir -p")
+	excludeIdx := strings.Index(command, `printf '\n%s\n' '/.awf-home/'`)
 	configWriteIdx := strings.Index(command, "cp \"")
 	require.NotEqual(t, -1, mkdirIdx)
+	require.NotEqual(t, -1, excludeIdx)
 	require.NotEqual(t, -1, configWriteIdx)
-	assert.Less(t, mkdirIdx, configWriteIdx, "mkdir for .awf-home must run before the AWF config file is finalized")
+	assert.Less(t, mkdirIdx, excludeIdx)
+	assert.Less(t, excludeIdx, configWriteIdx, "HOME exclusion must run before the AWF config file is finalized")
 }
 
-func TestCloudHypervisorAWFCommandOmitsAwfHomeMkdirBelowCHMinVersion(t *testing.T) {
+func TestCloudHypervisorAWFCommandOmitsAwfHomeExcludeWithoutHomeSetup(t *testing.T) {
 	config := AWFCommandConfig{
 		EngineName: "copilot",
 		WorkflowData: &WorkflowData{
@@ -190,6 +195,126 @@ func TestCloudHypervisorAWFCommandOmitsAwfHomeMkdirBelowCHMinVersion(t *testing.
 
 	command := BuildAWFCommand(config)
 	assert.NotContains(t, command, "mkdir -p \"${GITHUB_WORKSPACE}/.awf-home\"")
+	assert.NotContains(t, command, "GH_AW_GIT_EXCLUDE")
+
+	config.WorkflowData.NetworkPermissions.Firewall.Version = string(constants.AWFCloudHypervisorFilesystemAllowWriteMinVersion)
+	config.WorkflowData.SandboxConfig.Agent.Runtime = AgentRuntimeDocker
+	command = BuildAWFCommand(config)
+	assert.NotContains(t, command, "GH_AW_GIT_EXCLUDE")
+
+	config.WorkflowData.SandboxConfig.Agent.Runtime = AgentRuntimeCloudHypervisor
+	config.WorkflowData.SandboxConfig.Agent.Config.Filesystem.AllowWrite = []string{"/workspace", "/tmp/gh-aw/agent"}
+	command = BuildAWFCommand(config)
+	assert.NotContains(t, command, "GH_AW_GIT_EXCLUDE")
+}
+
+func TestCloudHypervisorHomeGitExclude(t *testing.T) {
+	workflowData := &WorkflowData{
+		NetworkPermissions: &NetworkPermissions{
+			Firewall: &FirewallConfig{Enabled: true, Version: string(constants.AWFCloudHypervisorFilesystemAllowWriteMinVersion)},
+		},
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
+			ID:      "awf",
+			Runtime: AgentRuntimeCloudHypervisor,
+			Config: &SandboxRuntimeConfig{
+				Filesystem: &SRTFilesystemConfig{AllowWrite: []string{cloudHypervisorAwfHomeWritePath}},
+			},
+		}},
+	}
+	script := buildCloudHypervisorFilesystemMkdirScript(workflowData)
+	require.NotEmpty(t, script)
+
+	t.Run("not a git repository", func(t *testing.T) {
+		workspace := t.TempDir()
+		cmd := exec.Command("bash", "-e", "-c", script+"\nprintf 'setup complete\\n'")
+		cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		assert.Equal(t, "setup complete\n", string(output))
+		info, err := os.Stat(filepath.Join(workspace, ".awf-home"))
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
+		assert.NoDirExists(t, filepath.Join(workspace, ".git"))
+		assert.NoFileExists(t, filepath.Join(workspace, "info", "exclude"))
+	})
+
+	for _, worktree := range []bool{false, true} {
+		for _, tc := range []struct {
+			name     string
+			existing string
+			missing  bool
+		}{
+			{name: "missing", missing: true},
+			{name: "empty"},
+			{name: "existing entries", existing: "# local excludes\n/local-cache/\n"},
+			{name: "no trailing newline", existing: "# local excludes\n/local-cache/"},
+			{name: "already excluded", existing: "/.awf-home/\n"},
+			{name: "already excluded without newline", existing: "/.awf-home/"},
+		} {
+			t.Run(fmt.Sprintf("worktree=%t/%s", worktree, tc.name), func(t *testing.T) {
+				repoDir := t.TempDir()
+				git := func(args ...string) string {
+					t.Helper()
+					cmd := exec.Command("git", append([]string{"-C", repoDir}, args...)...)
+					output, err := cmd.CombinedOutput()
+					require.NoError(t, err, "git %v: %s", args, output)
+					return string(output)
+				}
+				git("init")
+				require.NoError(t, os.WriteFile(filepath.Join(repoDir, "source.txt"), []byte("before\n"), 0o644))
+				git("add", "source.txt")
+				git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Initial source")
+				if worktree {
+					worktreeDir := filepath.Join(t.TempDir(), "checkout with spaces")
+					git("worktree", "add", "-b", "agent", worktreeDir)
+					repoDir = worktreeDir
+					info, err := os.Stat(filepath.Join(repoDir, ".git"))
+					require.NoError(t, err)
+					require.False(t, info.IsDir())
+				}
+				excludePath := strings.TrimSpace(git("rev-parse", "--path-format=absolute", "--git-path", "info/exclude"))
+				if tc.missing {
+					require.NoError(t, os.Remove(excludePath))
+				} else {
+					require.NoError(t, os.WriteFile(excludePath, []byte(tc.existing), 0o644))
+				}
+				runSetup := func() {
+					t.Helper()
+					cmd := exec.Command("bash", "-e", "-c", script)
+					cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+repoDir)
+					output, err := cmd.CombinedOutput()
+					require.NoError(t, err, "%s", output)
+				}
+				runSetup()
+				exclude, err := os.ReadFile(excludePath)
+				require.NoError(t, err)
+				assert.True(t, strings.HasPrefix(string(exclude), tc.existing), "existing excludes must be preserved")
+				assert.Equal(t, 1, strings.Count(string(exclude), "/.awf-home/"))
+				assert.Contains(t, strings.Split(string(exclude), "\n"), "/.awf-home/")
+				runSetup()
+				repeatedExclude, err := os.ReadFile(excludePath)
+				require.NoError(t, err)
+				assert.Equal(t, exclude, repeatedExclude, "setup must be idempotent")
+
+				homeCache := filepath.Join(repoDir, ".awf-home", ".cache", "uv")
+				require.NoError(t, os.MkdirAll(homeCache, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(homeCache, "state"), []byte("tool state\n"), 0o644))
+				require.NoError(t, os.WriteFile(filepath.Join(repoDir, "source.txt"), []byte("after\n"), 0o644))
+				nestedHome := filepath.Join(repoDir, "nested", ".awf-home")
+				require.NoError(t, os.MkdirAll(nestedHome, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(nestedHome, "source.txt"), []byte("intentional source\n"), 0o644))
+				assert.Equal(t, "nested/.awf-home/source.txt\n", git("ls-files", "--others", "--exclude-standard"))
+				git("add", "-A")
+				assert.Equal(t, "nested/.awf-home/source.txt\nsource.txt\n", git("diff", "--cached", "--name-only"))
+				git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Intentional changes")
+				patch := git("format-patch", "-1", "--stdout")
+				assert.Contains(t, patch, "+after")
+				assert.Contains(t, patch, "+intentional source")
+				assert.NotContains(t, patch, "tool state")
+				assert.NotContains(t, patch, ".cache/uv")
+			})
+		}
+	}
 }
 
 func TestCloudHypervisorFirewallLogsUsePrivilegedMode(t *testing.T) {
@@ -417,10 +542,18 @@ sandbox:
 	lockStr := string(lockContent)
 
 	assert.Contains(t, lockStr, `\"allowWrite\":[\"/tmp/gh-aw/agent\",\"/workspace\",\"/workspace/.awf-home\",\"/tmp/gh-aw/cache-memory\"]`)
+	assert.Contains(t, lockStr, `mkdir -p "${GITHUB_WORKSPACE}/.awf-home"`)
+	assert.Contains(t, lockStr, `git -C "${GITHUB_WORKSPACE}" rev-parse --path-format=absolute --git-path info/exclude`)
+	assert.Contains(t, lockStr, `if ! grep -qxF -- '/.awf-home/' "$GH_AW_GIT_EXCLUDE"`)
+	homeMkdirIdx := strings.Index(lockStr, `mkdir -p "${GITHUB_WORKSPACE}/.awf-home"`)
+	homeExcludeIdx := strings.Index(lockStr, `printf '\n%s\n' '/.awf-home/'`)
 	createDirIdx := strings.Index(lockStr, "Create cache-memory directory")
 	awfIdx := strings.Index(lockStr, "sudo --preserve-env awf")
+	require.NotEqual(t, -1, homeExcludeIdx)
 	require.NotEqual(t, -1, createDirIdx)
 	require.NotEqual(t, -1, awfIdx)
+	assert.Less(t, homeMkdirIdx, homeExcludeIdx)
+	assert.Less(t, homeExcludeIdx, awfIdx, "HOME must be excluded before AWF starts")
 	assert.Less(t, createDirIdx, awfIdx, "cache-memory directory must exist before AWF starts")
 }
 
@@ -441,7 +574,11 @@ func TestCloudHypervisorShellScriptContent(t *testing.T) {
 	}{
 		{
 			script:   "cloud_hypervisor_kvm_access.sh",
-			contains: []string{"RUNNER_ENVIRONMENT", "github-hosted", "ImageOS", "setfacl", "u:${runner_uid}:rw", "/dev/kvm", "-c /dev/kvm", "getfacl -ncp /dev/kvm", "-r /dev/kvm", "-w /dev/kvm"},
+			contains: []string{"RUNNER_ENVIRONMENT", "github-hosted", "ImageOS", "kvm_access.sh", "prepare_kvm_access", "command -v setfacl", "command -v getfacl"},
+		},
+		{
+			script:   "kvm_access.sh",
+			contains: []string{"u:${runner_uid}:rw", "/dev/kvm", "-c /dev/kvm", "-ncp /dev/kvm", "-r /dev/kvm", "-w /dev/kvm"},
 		},
 		{
 			script:   "cloud_hypervisor_host_preflight.sh",
