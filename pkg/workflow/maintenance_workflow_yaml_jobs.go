@@ -442,7 +442,6 @@ func buildMaintenanceForecastRunSteps(opts buildMaintenanceWorkflowYAMLOptions) 
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEBUG: "*"
           GH_AW_CMD_PREFIX: ` + getCLICmdPrefix(opts.actionMode) + `
         run: |
           mkdir -p ./.cache/gh-aw/forecast
