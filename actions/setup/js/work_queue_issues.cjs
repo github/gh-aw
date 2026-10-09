@@ -32,7 +32,7 @@ function ownProjectionTargets(state, origin, ref, assignment) {
   const actor = { ...actorFromContext(origin), role: "projector" };
   const targets = new Map();
   for (const work of state.works.values()) {
-    const admission = state.transactions[work.position.commit]?.actor;
+    const admission = state.workCreators?.get(work.work_id);
     if (admission && ["principal", "repository", "workflow", "run_id", "run_attempt"].every(field => admission[field] === actor[field])) targets.set(work.work_id, { work_id: work.work_id, claim_ids: [] });
   }
   if (assignment) {
@@ -101,7 +101,8 @@ function summaryBody(state, work, at, diagnostics = [], branch = "work-queue", r
         outcomes.push(`Verified ${resource.kind}: https://github.com/${resource.repository}/${resource.kind === "issue" ? "issues" : "pull"}/${resource.number}`);
     }
   }
-  const origin = run || state.transactions[work.position.commit].actor;
+  const origin = run || state.workCreators?.get(work.work_id);
+  if (!origin) throw queueError("projection_unauthorized", "Work admission provenance is unavailable");
   return renderSummary(
     {
       work_id: work.work_id,

@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const { canonical, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { defaultPolicy } = require("./work_queue_policy.cjs");
-const { replayTransactions, serializeProjection, validateClaimAuthority } = require("./work_queue_replay.cjs");
+const { compactTransactions, replayTransactions, serializeProjection, validateClaimAuthority } = require("./work_queue_replay.cjs");
 const { frozenResourceScope, validateEffectResource } = require("./work_queue_resource_scope.cjs");
 const { bind, context, finish, genesis, grant, submission, workerActor } = require("./work_queue_test_helpers.cjs");
 const fixture = require("../../../specs/work-queue/fixtures/resource-scope.json");
@@ -571,8 +571,14 @@ function registerTests({ describe, it }) {
         const actor = { ...f.queue.workerActor, run_id: "43", dispatch_id: child.dispatch_id, claim_handle: member.handle };
         f.queue.append("finish", { dispatch_id: child.dispatch_id, claim_handle: member.handle, outcome: "completed" }, actor);
         const authorizeChild = () => validateClaimAuthority(f.queue.state, member.claim_id, context(actor, { ref: REF, event: "workflow_dispatch" }), { requireCompletion: true, resource: target });
-        if (widened) assert.throws(authorizeChild, /immutable Work resource_scope|positive immutable Work target binding/);
-        else assert.doesNotThrow(authorizeChild);
+        const authorizeCompactedChild = state => validateClaimAuthority(state, member.claim_id, context(actor, { ref: REF, event: "workflow_dispatch" }), { requireCompletion: true, resource: target });
+        if (widened) {
+          assert.throws(authorizeChild, /immutable Work resource_scope|positive immutable Work target binding/);
+        } else assert.doesNotThrow(authorizeChild);
+        const checkpoint = compactTransactions(f.queue.transactions, "c".repeat(40), f.queue.administrator, f.queue.at + 1);
+        const restored = replayTransactions(checkpoint);
+        if (widened) assert.throws(() => authorizeCompactedChild(restored), /immutable Work resource_scope|positive immutable Work target binding/);
+        else assert.doesNotThrow(() => authorizeCompactedChild(restored));
       }
     });
     it("resolves GraphQL numeric targets independently and rejects missing Work bindings before mutations", async () => {

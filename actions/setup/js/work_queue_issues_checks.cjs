@@ -7,6 +7,8 @@ const helpers = require("./work_queue_test_helpers.cjs");
 const { newWork } = require("./work_queue_graph.cjs");
 const { defaultPolicy, validatePolicy } = require("./work_queue_policy.cjs");
 const { main, ownProjectionTargets, workIssueStatus, summaryBody, journalPath } = require("./work_queue_issues.cjs");
+const { issueBody } = require("./work_queue_issue_messages.cjs");
+const { issueCompletionPolicy } = require("./work_queue_issue_contract.cjs");
 const { STATUSES, discoverTarget, ensureStatusLabel, mutateIssues } = require("./work_queue_issue_api.cjs");
 const { withProjectionLocks } = require("./work_queue_issue_coordination.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
@@ -74,6 +76,7 @@ function mock(f, { labelMissing = false } = {}) {
   const calls = [];
   const locks = new Set();
   const warnings = [];
+  const restBlobs = new Map();
   const nativeRun = {
     id: Number(f.origin.run_id),
     run_attempt: f.origin.run_attempt,
@@ -107,7 +110,7 @@ function mock(f, { labelMissing = false } = {}) {
       repos: {
         get: async () => {
           calls.push(["authentication-repository"]);
-          return { status: 200, data: { id: 1, full_name: "owner/repo" } };
+          return { status: 200, data: { id: 1, full_name: "owner/repo", default_branch: "main", size: 1 } };
         },
       },
       actions: {
@@ -117,6 +120,27 @@ function mock(f, { labelMissing = false } = {}) {
         },
       },
       git: {
+        getRef: async ({ ref }) => {
+          if (ref === "heads/main") return { data: { object: { sha: "b".repeat(40) } } };
+          if (ref === "heads/work-queue") return { data: { object: { sha } } };
+          throw Object.assign(new Error("Not found"), { status: 404 });
+        },
+        getCommit: async () => ({ data: { tree: { sha: "c".repeat(40) }, parents: [] } }),
+        getTree: async () => {
+          restBlobs.clear();
+          const files = [["work-queue.jsonl", transactions.map(commit => canonical(commit)).join("\n") + "\n"], ...[...journals].map(([file, value]) => [file, canonical(value) + "\n"])];
+          const tree = files.map(([file, content]) => {
+            const blobSha = digest({ file, content });
+            restBlobs.set(blobSha, content);
+            return { path: file, type: "blob", mode: "100644", sha: blobSha };
+          });
+          return { data: { truncated: false, tree } };
+        },
+        getBlob: async ({ file_sha }) => {
+          const content = restBlobs.get(file_sha);
+          assert.equal(typeof content, "string");
+          return { data: { encoding: "base64", content: Buffer.from(content, "utf8").toString("base64"), size: Buffer.byteLength(content) } };
+        },
         createRef: async ({ ref }) => {
           calls.push(["lock", ref]);
           if (locks.has(ref)) throw Object.assign(new Error("held"), { status: 422 });
@@ -469,6 +493,26 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const foreign = structuredClone(f.assignment);
       foreign.claims[0].work_id = "foreign";
       assert.throws(() => ownProjectionTargets(state, f.origin, ref, foreign), /assignment_mismatch/);
+    });
+    it("uses restored admission and policy history instead of suffix transaction offsets", () => {
+      const checkpoint = require("../../../specs/work-queue/fixtures/checkpoint.json");
+      const state = q.replayTransactions(checkpoint.checkpoint);
+      const work = state.works.values().next().value;
+      const originalAdmission = { role: "dispatcher", principal: "1001", repository: "owner/repo", workflow: ".github/workflows/dispatcher.lock.yml", run_id: "100", run_attempt: 1 };
+      const otherRun = { ...originalAdmission, run_id: "999" };
+      const projector = { principal: "1001", workflow: originalAdmission.workflow, ref, pools: [work.pool], repositories: ["owner/repo"] };
+      state.workCreators.set(work.work_id, originalAdmission);
+      state.policy.projectors = [{ ...projector, completion_policy: "keep-open" }];
+      state.historicalTransactions[0].operations[0].policy = state.policy;
+      state.transactions.push({
+        actor: otherRun,
+        operations: [{ kind: "Policy", policy: { projectors: [{ ...projector, completion_policy: "close-on-result" }] } }],
+      });
+      assert.equal(ownProjectionTargets(state, helpers.context(otherRun, { ref }), ref).targets.length, 0);
+      assert.equal(ownProjectionTargets(state, helpers.context(originalAdmission, { ref }), ref).targets.length, 1);
+      assert.equal(issueCompletionPolicy(state, work, { ...originalAdmission, role: "projector" }, ref, "owner/repo"), "keep-open");
+      assert.ok(summaryBody(state, work, 10).includes(`/actions/runs/${originalAdmission.run_id}`));
+      assert.ok(issueBody(state, work, helpers.context(otherRun, { ref }), { label: "work" }, "work-queue").includes(`/actions/runs/${originalAdmission.run_id}`));
     });
     it("does not treat configuration or API access as installed projector authority", async () => {
       const f = fixture();

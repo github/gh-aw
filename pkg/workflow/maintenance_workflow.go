@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -204,8 +205,9 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	// Scan workflows for expires fields and track the minimum expires value
 	hasExpires, minExpires, triggerReason := scanWorkflowsForExpires(workflowDataList, repoConfig)
 	compactionLedgers := collectMaintenanceCompactionLedgers(workflowDataList)
+	hasWorkQueue := slices.ContainsFunc(workflowDataList, isWorkQueueEnabled)
 
-	if !hasExpires && len(compactionLedgers) == 0 {
+	if !hasExpires && len(compactionLedgers) == 0 && !hasWorkQueue {
 		maintenanceLog.Print("No workflows use expires field, skipping maintenance workflow generation")
 
 		// No maintenance workflow means no scheduled close-expired-issues consumer.
@@ -262,7 +264,11 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	}
 
 	if triggerReason == "" {
-		triggerReason = fmt.Sprintf("%d compaction-enabled ledger(s)", len(compactionLedgers))
+		if hasWorkQueue {
+			triggerReason = "work queue maintenance"
+		} else {
+			triggerReason = fmt.Sprintf("%d compaction-enabled ledger(s)", len(compactionLedgers))
+		}
 	}
 	maintenanceLog.Printf("Maintenance workflow generation triggered: %s", triggerReason)
 	maintenanceLog.Printf("Generating maintenance workflow for expired discussions, issues, and pull requests (minimum expires: %d hours)", minExpires)
@@ -319,6 +325,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		createCompilePR:     enableCompileCreatePullRequest,
 		copilotOrgBilling:   copilotOrgBilling,
 		compactionLedgers:   compactionLedgers,
+		hasWorkQueue:        hasWorkQueue,
 		hasCacheMemory:      hasCacheMemory,
 	})
 	if err != nil {

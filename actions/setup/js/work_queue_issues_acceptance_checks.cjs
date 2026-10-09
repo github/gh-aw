@@ -109,7 +109,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.ok(result.pending);
       assert.match(result.pending[0].reason, /Failed to read file/);
       assert.equal(m.issues.size, 0);
-      assert.equal(m.calls.filter(call => call[0] === "mutation").length, 0);
+      assert.equal(m.calls.filter(call => call[0] === "mutation" && call[1].includes("WorkQueueIssueProjection")).length, 0);
     });
     it("authenticates staged activation without binding Claims or writing Issues", async () => {
       const f = fixture({ worker: true });

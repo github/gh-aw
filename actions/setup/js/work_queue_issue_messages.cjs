@@ -35,7 +35,8 @@ function renderWorkQueueMessage(template, values, run) {
 }
 
 function issueBody(state, work, origin, config, branch) {
-  const admission = state.transactions[work.position.commit].actor;
+  const admission = state.workCreators?.get(work.work_id);
+  if (!admission) throw new Error("work_queue_admission_provenance_missing");
   const ledgerUrl = `https://github.com/${state.repository}/blob/${branch}/work-queue.jsonl`;
   return renderWorkQueueMessage(
     "work_queue_issue_body.md",

@@ -31,7 +31,7 @@ var requestSchemas = sync.OnceValues(func() (map[string]*jsonschema.Schema, erro
 })
 
 var requestRoleKinds = map[string][]string{
-	"administrator": {"policy", "control", "submit", "dispatch_next", "observe", "cancel_work"},
+	"administrator": {"policy", "control", "submit", "dispatch_next", "observe", "cancel_work", "checkpoint"},
 	"producer":      {"submit", "cancel_work"},
 	"dispatcher":    {"submit", "dispatch_next", "observe", "dispatch"},
 	"worker":        {"submit", "dispatch_next", "observe", "finish", "dispatch"},
