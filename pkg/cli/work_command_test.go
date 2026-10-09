@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -269,6 +270,8 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	const remote = "owner/repo"
 	var log, pending string
 	head := 0
+	commitSHA := func(n int) string { return fmt.Sprintf("%040x", n) }
+	history := map[string]string{}
 	apiWrites := 0
 	admin := true
 	actorID := 1001
@@ -305,14 +308,28 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 			if head == 0 {
 				status, result = http.StatusNotFound, map[string]string{"message": "Not Found"}
 			} else {
-				result = map[string]any{"ref": "refs/heads/" + workqueue.DefaultBranch, "object": map[string]string{"sha": strconv.Itoa(head)}}
+				result = map[string]any{"ref": "refs/heads/" + workqueue.DefaultBranch, "object": map[string]string{"sha": commitSHA(head)}}
 			}
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "git/commits/"):
-			result = map[string]any{"tree": map[string]string{"sha": "tree"}}
-		case r.Method == http.MethodGet && path == "git/trees/tree":
-			result = map[string]any{"tree": []map[string]string{{"path": workqueue.FileName, "mode": "100644", "type": "blob", "sha": "blob"}}}
-		case r.Method == http.MethodGet && path == "git/blobs/blob":
-			result = map[string]string{"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(log))}
+			sha := strings.TrimPrefix(path, "git/commits/")
+			n, err := strconv.ParseInt(sha, 16, 64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result = map[string]any{
+				"tree":    map[string]string{"sha": sha},
+				"parents": []map[string]string{{"sha": commitSHA(int(n) - 1)}},
+			}
+		case r.Method == http.MethodGet && strings.HasPrefix(path, "git/trees/"):
+			sha := strings.TrimPrefix(path, "git/trees/")
+			result = map[string]any{"tree": []map[string]string{{"path": workqueue.FileName, "mode": "100644", "type": "blob", "sha": sha}}}
+		case r.Method == http.MethodGet && strings.HasPrefix(path, "git/blobs/"):
+			sha := strings.TrimPrefix(path, "git/blobs/")
+			content := history[sha]
+			if sha == commitSHA(head) {
+				content = log
+			}
+			result = map[string]string{"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))}
 		case r.Method == http.MethodPost && path == "git/trees":
 			var body struct {
 				Tree []struct {
@@ -323,9 +340,10 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 			pending = body.Tree[0].Content
 			result = map[string]string{"sha": "tree"}
 		case r.Method == http.MethodPost && path == "git/commits":
-			result = map[string]string{"sha": strconv.Itoa(head + 1)}
+			result = map[string]string{"sha": commitSHA(head + 1)}
 		case r.Method == http.MethodPost && path == "git/refs" ||
 			r.Method == http.MethodPatch && path == "git/refs/heads/"+workqueue.DefaultBranch:
+			history[commitSHA(head)] = log
 			head++
 			log = pending
 			result = map[string]string{"ref": "refs/heads/" + workqueue.DefaultBranch}
@@ -460,9 +478,6 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	if log != before || apiWrites != writes {
 		t.Fatal("read-only trace/explanation made a remote mutation or changed debt/history")
 	}
-	if result := run("", "compact"); result["changed"] != false || apiWrites != writes {
-		t.Fatal("already canonical queue was unnecessarily published")
-	}
 	parsed, err := workqueue.Parse([]byte(log))
 	if err != nil {
 		t.Fatal(err)
@@ -487,8 +502,42 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	reject("", "actor_unauthorized", "compact")
 	admin = true
 	compacted := run("", "compact")
-	if compacted["changed"] != true || compacted["duplicates_removed"] != float64(1) || log != before {
-		t.Fatalf("public compact changed a unique logical commit or lost canonical history: %v", compacted)
+	if compacted["changed"] != true || compacted["duplicates_removed"] != float64(1) || compacted["commits"] != float64(1) {
+		t.Fatalf("public compact did not replace duplicate history with a checkpoint: %v", compacted)
+	}
+	beforeState, err := workqueue.Replay(parsed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint, err := workqueue.Parse([]byte(log))
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterState, err := workqueue.Replay(checkpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pair := range [][2]any{
+		{beforeState.Works, afterState.Works},
+		{beforeState.Claims, afterState.Claims},
+		{beforeState.Dispatches, afterState.Dispatches},
+		{beforeState.Clocks, afterState.Clocks},
+	} {
+		oldJSON, err := json.Marshal(pair[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		newJSON, err := json.Marshal(pair[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(oldJSON, newJSON) {
+			t.Fatal("public compact changed queue authority")
+		}
+	}
+	writes = apiWrites
+	if result := run("", "compact"); result["changed"] != false || apiWrites != writes {
+		t.Fatal("already checkpointed queue was unnecessarily published")
 	}
 	canonicalLog := log
 	log = "{\"version\":2}\n"
