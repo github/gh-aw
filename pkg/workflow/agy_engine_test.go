@@ -284,7 +284,7 @@ type agyConformanceWorkflow struct {
 	Jobs        map[string]agyConformanceJob `yaml:"jobs"`
 }
 
-func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
+func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 	var caller agyConformanceWorkflow
 	parent, err := os.ReadFile("../../.github/workflows/credentials-check.yml")
 	require.NoError(t, err)
@@ -315,17 +315,23 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 			}
 			for name, config := range callee.Jobs {
 				allowedPermissions := binding.Permissions
-				if entry.id == "engine-conformance-agy" && name == "activation" {
-					allowedPermissions = map[string]string{"actions": "read", "contents": "write"}
-				} else if entry.id == "engine-conformance-agy" && name == "safe_outputs" {
-					allowedPermissions = map[string]string{"actions": "write", "contents": "write"}
-				} else if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
+				if entry.id == "engine-conformance-agy" {
+					switch name {
+					case "activation":
+						allowedPermissions = map[string]string{"actions": "read", "contents": "write"}
+					case "safe_outputs":
+						allowedPermissions = map[string]string{"actions": "write", "contents": "write"}
+					}
+				}
+				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
 					allowedPermissions = map[string]string{
 						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
 					}
 				}
 				for permission, level := range config.Permissions {
-					assert.Equal(t, allowedPermissions[permission], level, "%s must allow only scoped %s permission", name, permission)
+					expectedLevel, allowed := allowedPermissions[permission]
+					assert.True(t, allowed, "%s must not grant unscoped %s permission", name, permission)
+					assert.Equal(t, expectedLevel, level, "%s must use the scoped %s permission", name, permission)
 				}
 			}
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
@@ -335,7 +341,7 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 			assert.Contains(t, string(lock), `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
 			assert.Contains(t, string(lock), `"threat_detection":{"mode":"disabled"}`)
 			assert.NotContains(t, callee.Jobs, "detection")
-			assertAgyConformanceProbes(t, callee)
+			assertAgyConformanceProbes(t, callee, false)
 		})
 	}
 }
@@ -417,7 +423,7 @@ func TestAgySmokeLabelCommandIsCentrallyRouted(t *testing.T) {
 	assert.NotContains(t, string(lock), "remove_trigger_label")
 }
 
-func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {
+func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, workQueueCLIServer bool) {
 	t.Helper()
 	steps, environment, commands := agyConformanceStepContent(compiled)
 	execution := steps["Execute experimental Agy CLI"]
@@ -447,7 +453,11 @@ func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow) {
 	for _, expected := range []string{`"agy-native"`, `"native-challenge"`, "--exclude-env GEMINI_API_KEY"} {
 		assert.Contains(t, commands, expected, "compiled commands must retain %s", expected)
 	}
-	assert.NotContains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
+	if workQueueCLIServer {
+		assert.Contains(t, commands, `export GH_AW_MCP_CLI_SERVERS='["agy-native","mcpscripts","safeoutputs","work-queue"]'`)
+	} else {
+		assert.NotContains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
+	}
 }
 
 func agyConformanceStepContent(compiled agyConformanceWorkflow) (map[string]map[string]any, string, string) {
