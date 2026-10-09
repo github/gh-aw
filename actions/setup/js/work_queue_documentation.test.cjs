@@ -18,7 +18,7 @@ describe("work-queue deployment documentation", () => {
   it("omits removed storage selectors from the generated frontmatter reference", () => {
     const source = readRepositoryFile("docs/src/content/docs/reference/frontmatter-full.md");
     const queue = source.slice(source.indexOf("  # Read the immutable version-3 activation snapshot."), source.indexOf("  # Cache memory MCP configuration"));
-    expect(queue).toContain("work-queue: true");
+    expect(queue).toMatch(/^  work-queue:\s*$/m);
     expect(queue).toContain("work-queue: null");
     expect(queue).toContain("worker: true");
     expect(queue).not.toMatch(/\bstorage:/);
@@ -58,6 +58,8 @@ describe("work-queue deployment documentation", () => {
     expect(instructions.trim().split(/\s+/).length).toBeLessThanOrEqual(800);
     expect(instructions).not.toContain("```json");
     expect(instructions).toContain("issue-backed WorkQueueOps");
+    expect(instructions).toContain("null `snapshot_sha` means absent; stop with `noop`");
+    expect(instructions).toContain("Existing policyless ledgers are deployment failures");
     expect(readRepositoryFile(referencePath)).toContain("Work queues can be Git-backed or issue-backed");
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       expect(instructions).toContain(file.replace(/^docs\//, "../../docs/"));
@@ -86,14 +88,13 @@ describe("work-queue deployment documentation", () => {
     expect(automation).not.toContain('pass `work_queue: {work_id: "<id>"}`');
   });
 
-  it("distinguishes an uninitialized factory from an empty backlog and documents real CLI boundaries", () => {
+  it("treats genuine factory queue absence as empty without bypassing Policy", () => {
     const dispatcher = readRepositoryFile(".github/workflows/eslint-factory-dispatcher.md");
     expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"default","limit":32}\'');
     expect(dispatcher).toContain("Check `queue_state`, not just `total`");
-    expect(dispatcher).toContain("then stop without");
-    expect(dispatcher).toContain("dispatching or calling `noop`");
-    expect(dispatcher).toContain("safeoutputs missing_data");
-    expect(dispatcher).toContain("not that an initialized queue");
+    expect(dispatcher).toContain("Treat it as an empty backlog and stop with `noop`");
+    expect(dispatcher).toMatch(/no\s+installed Policy to authorize submission or dispatch/);
+    expect(dispatcher).toContain("existing policyless ledger");
     expect(dispatcher).toContain('work-queue work_queue_dispatch_next \'{"pool":"default","max_claims":3,"max_dispatches":3}\'');
     expect(dispatcher).toContain('`status: "staged"`');
     expect(dispatcher).toContain("an empty snapshot or a prediction of no eligible Work can be stale");

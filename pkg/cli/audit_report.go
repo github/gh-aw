@@ -346,7 +346,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 		recommendations:       recommendations,
 		observabilityInsights: observabilityInsights,
 	})
-	auditData.ModelRouting = processedRun.ModelRouting
+	auditData.ModelRouting = applyAwInfoModelRouting(processedRun.ModelRouting, processedRun.Run.LogsPath)
 	return auditData, createdItems
 }
 
