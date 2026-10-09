@@ -5390,8 +5390,14 @@
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
-                        "label": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S", "default": "work" },
-                        "status-field": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S", "description": "Pre-provisioned native organization single-select field. Omit for comment-only status." }
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 33,
+                          "pattern": "\\S",
+                          "default": "work",
+                          "description": "Repository label prefix; GitHub labels are limited to 50 characters, leaving at most 33 bytes for the prefix before the longest status suffix, ': Needs attention'."
+                        }
                       }
                     }
                   ]
