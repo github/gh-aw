@@ -1,0 +1,42 @@
+{
+  "$defs": {
+    "CheckpointParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "history_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "prior_git_sha": {
+          "$ref": "#/$defs/Revision"
+        },
+        "prior_tip": {
+          "$ref": "#/$defs/Identity"
+        },
+        "state_sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": ["prior_git_sha", "prior_tip", "history_sha256", "state_sha256"],
+      "type": "object"
+    },
+    "Digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "CheckpointParameters.json",
+  "$ref": "#/$defs/CheckpointParameters",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CheckpointParameters"
+}

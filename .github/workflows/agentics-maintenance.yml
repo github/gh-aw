@@ -1984,3 +1984,40 @@ jobs:
       - name: Report ledger compaction application failures
         if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' }}
         run: exit 1
+
+  work_queue_compaction:
+    name: Compact work queue
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan and apply work queue compaction
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main: plan } = require(path.join(actionsDir, 'work_queue_compaction_plan.cjs'));
+            const result = await plan();
+            if (result.status === 'planned') {
+              const { main: apply } = require(path.join(actionsDir, 'work_queue_compaction_apply.cjs'));
+              await apply();
+            }

@@ -20,8 +20,8 @@ type Compaction struct {
 	BytesAfter              int    `json:"bytes_after"`
 }
 
-// Compact canonicalizes representation only. Every unique commit, operation,
-// logical request and charged turn remains in the original causal chain.
+// Compact replaces validated history with a canonical checkpoint rooted at
+// the Git commit that supplied the prior ledger.
 func (b Branch) Compact(ctx context.Context) (Compaction, error) {
 	b, err := b.withClient()
 	if err != nil {
@@ -45,7 +45,7 @@ func (b Branch) Compact(ctx context.Context) (Compaction, error) {
 		if len(previous) > 0 && !extending(previous, commits) {
 			return Compaction{}, queueError("ledger_nonextending", "queue history was deleted or rewritten during compaction")
 		}
-		candidate, err := prepareCompaction(commits, snapshot.data)
+		candidate, err := prepareCheckpointCompaction(commits, snapshot.data, snapshot.head, actor)
 		if err != nil {
 			return Compaction{}, err
 		}
@@ -83,27 +83,30 @@ type compactionCandidate struct {
 	result  Compaction
 }
 
-func prepareCompaction(commits []QueueCommit, before []byte) (compactionCandidate, error) {
+func prepareCheckpointCompaction(commits []QueueCommit, before []byte, priorGitSHA string, actor Actor) (compactionCandidate, error) {
 	ordered, err := Compact(commits)
 	if err != nil {
 		return compactionCandidate{}, err
+	}
+	duplicates := len(commits) - len(ordered)
+	if len(ordered) != 1 || !isCheckpoint(ordered[0]) {
+		ordered, err = CompactCheckpoint(ordered, priorGitSHA, actor, time.Now().UnixMilli())
+		if err != nil {
+			return compactionCandidate{}, err
+		}
 	}
 	data, err := Serialize(ordered)
 	if err != nil {
 		return compactionCandidate{}, err
 	}
-	tip, err := compactionTip(ordered)
-	if err != nil {
-		return compactionCandidate{}, err
-	}
-	return compactionCandidate{
-		commits: ordered, data: data,
-		result: Compaction{
-			Tip: tip, At: time.Now().UnixMilli(),
-			Commits: len(ordered), DuplicatesRemoved: len(commits) - len(ordered),
-			BytesBefore: len(before), BytesAfter: len(data),
-		},
-	}, nil
+	return compactionCandidate{commits: ordered, data: data, result: Compaction{
+		Tip: ordered[0].ID, At: time.Now().UnixMilli(), Commits: 1,
+		DuplicatesRemoved: duplicates, BytesBefore: len(before), BytesAfter: len(data),
+	}}, nil
+}
+
+func isCheckpoint(commit QueueCommit) bool {
+	return len(commit.Operations) == 1 && commit.Request.Kind == "checkpoint"
 }
 
 func (b Branch) recoverCompactionAcknowledgment(ctx context.Context, previous []QueueCommit, pendingErr error) (Compaction, error) {

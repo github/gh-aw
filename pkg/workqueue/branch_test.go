@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -172,7 +173,11 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		}
 	case r.Method == http.MethodGet && strings.HasPrefix(path, "git/commits/"):
 		commit := mock.commits[strings.TrimPrefix(path, "git/commits/")]
-		respond(map[string]any{"tree": map[string]string{"sha": commit.Tree}})
+		parents := make([]map[string]string, 0, len(commit.Parents))
+		for _, sha := range commit.Parents {
+			parents = append(parents, map[string]string{"sha": sha})
+		}
+		respond(map[string]any{"tree": map[string]string{"sha": commit.Tree}, "parents": parents})
 	case r.Method == http.MethodGet && strings.HasPrefix(path, "git/trees/"):
 		tree := []map[string]string{{"path": "unrelated", "mode": "100644", "type": "blob", "sha": "unrelated"}}
 		if !mock.missingLog {
@@ -203,7 +208,7 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		if commit.Parents == nil {
 			t.Error("orphan parents must be an explicit array")
 		}
-		sha := fmt.Sprintf("commit-%d", len(mock.commits)+1)
+		sha := hashBytes([]byte(fmt.Sprintf("commit-%d", len(mock.commits)+1)))[:40]
 		mock.commits[sha] = commit
 		respond(map[string]string{"sha": sha})
 	case r.Method == http.MethodPost && path == "git/refs" ||
@@ -262,8 +267,56 @@ func installMockLog(t *testing.T, mock *queueAPI, commits []QueueCommit) {
 		t.Fatal(err)
 	}
 	tree := fmt.Sprintf("installed-tree-%d", len(mock.logs)+1)
-	head := fmt.Sprintf("installed-commit-%d", len(mock.commits)+1)
+	head := hashBytes([]byte(fmt.Sprintf("installed-commit-%d", len(mock.commits)+1)))[:40]
 	mock.logs[tree], mock.commits[head], mock.head = string(data), gitQueueCommit{Tree: tree}, head
+}
+
+func TestBranchVerifiesCheckpointChainsBeyondFormerDepthLimit(t *testing.T) {
+	data, err := os.ReadFile("../../specs/work-queue/fixtures/checkpoint.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		History    []QueueCommit `json:"history"`
+		Checkpoint []QueueCommit `json:"checkpoint"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	branch, mock := newQueueAPI(t)
+	head := strings.Repeat("a", 40)
+	tree := "checkpoint-chain-base"
+	contents, err := Serialize(fixture.History)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mock.logs[tree] = string(contents)
+	mock.commits[head] = gitQueueCommit{Tree: tree}
+	commits := fixture.History
+	actor := fixture.Checkpoint[0].Actor
+	for index := range 66 {
+		ordered, err := causalOrder(commits)
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkpoint, err := CompactCheckpoint(commits, head, actor, ordered[len(ordered)-1].At+1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nextTree := fmt.Sprintf("checkpoint-chain-%d", index)
+		nextHead := fmt.Sprintf("%040x", index+1)
+		contents, err := Serialize(checkpoint)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mock.logs[nextTree] = string(contents)
+		mock.commits[nextHead] = gitQueueCommit{Tree: nextTree, Parents: []string{head}}
+		commits, head = checkpoint, nextHead
+	}
+	mock.head = head
+	if _, err := branch.Read(context.Background()); err != nil {
+		t.Fatalf("valid checkpoint chain was rejected after 66 compactions: %v", err)
+	}
 }
 
 func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {

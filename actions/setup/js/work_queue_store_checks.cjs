@@ -90,7 +90,7 @@ function fakeGitHub(initial = []) {
         },
         getCommit: async ({ commit_sha }) => {
           if (!commits.has(commit_sha)) throw missing();
-          return { data: { tree: { sha: commits.get(commit_sha).tree } } };
+          return { data: { tree: { sha: commits.get(commit_sha).tree }, parents: commits.get(commit_sha).parents.map(sha => ({ sha })) } };
         },
         getTree: async ({ tree_sha }) => ({ data: { truncated: state.truncated, tree: state.missingLog ? [] : [{ path: "work-queue.jsonl", type: "blob", mode: "100644", sha: trees.get(tree_sha) }] } }),
         getBlob: async ({ file_sha }) => {
