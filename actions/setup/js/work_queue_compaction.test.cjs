@@ -8,7 +8,7 @@ const path = require("node:path");
 const { test } = require("node:test");
 const { canonical } = require("./work_queue_codec.cjs");
 const { planFor } = require("./work_queue_compaction_plan.cjs");
-const { isRetryablePublicationError, main: apply, readPlan } = require("./work_queue_compaction_apply.cjs");
+const { isRetryablePublicationError, main: apply, PLAN_MAX_BYTES, readPlan } = require("./work_queue_compaction_apply.cjs");
 const { fakeGitHub } = require("./work_queue_store_checks.cjs");
 
 function planFile(plan) {
@@ -93,6 +93,20 @@ test("apply rejects malformed plans and defers stale plans without writing", asy
     assert.equal(fake.state.updates, 0);
   } finally {
     global.core = original;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("compaction plans accept up to 16 KiB", () => {
+  const valid = planFor({ sha: "a".repeat(40), branch: "work-queue", state: { tip: "tip" }, transactions: [{}, {}] });
+  const { directory, file } = planFile(valid);
+  try {
+    const contents = canonical(valid);
+    fs.writeFileSync(file, contents + " ".repeat(PLAN_MAX_BYTES - Buffer.byteLength(contents)));
+    assert.equal(readPlan(file).plan_id, valid.plan_id);
+    fs.writeFileSync(file, `${contents}${" ".repeat(PLAN_MAX_BYTES - Buffer.byteLength(contents) + 1)}`);
+    assert.throws(() => readPlan(file), /Unable to read work queue compaction plan/);
+  } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });

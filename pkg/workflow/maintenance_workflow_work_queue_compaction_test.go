@@ -4,27 +4,25 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestMaintenanceWorkQueueCompactionJobsSeparatePlanAndApply(t *testing.T) {
+func TestMaintenanceWorkQueueCompactionUsesSingleJob(t *testing.T) {
 	opts := buildMaintenanceWorkflowYAMLOptions{runsOnValue: "ubuntu-latest"}
 	jobs := buildMaintenanceWorkQueueCompactionJobs(opts, "./actions/setup")
-	plan := strings.Split(jobs, "  work_queue_compaction_apply:")[0]
-	applyJob := strings.Split(jobs, "  work_queue_compaction_apply:")[1]
-
-	assert.Contains(t, plan, "contents: read")
-	assert.Contains(t, plan, "work_queue_compaction_plan.cjs")
-	assert.Contains(t, plan, "steps.plan.outputs.plan_created == 'true'")
-	assert.NotContains(t, plan, "work_queue_compaction_apply.cjs")
-	assert.Contains(t, applyJob, "needs: work_queue_compaction_plan")
-	assert.Contains(t, applyJob, "contents: write")
-	assert.Contains(t, applyJob, "work_queue_compaction_apply.cjs")
-	assert.NotContains(t, applyJob, "work_queue_compaction_plan.cjs")
+	assert.Contains(t, jobs, "  work_queue_compaction:")
+	assert.Contains(t, jobs, "contents: write")
+	assert.Contains(t, jobs, "work_queue_compaction_plan.cjs")
+	assert.Contains(t, jobs, "steps.plan.outputs.plan_created == 'true'")
+	assert.Contains(t, jobs, "work_queue_compaction_apply.cjs")
+	assert.NotContains(t, jobs, "work_queue_compaction_plan:")
+	assert.NotContains(t, jobs, "work_queue_compaction_apply:")
+	assert.NotContains(t, jobs, "work-queue-compaction-plan")
+	assert.NotContains(t, jobs, "actions/upload-artifact")
+	assert.NotContains(t, jobs, "actions/download-artifact")
 }
 
 func TestMaintenanceGeneratedForWorkQueueOnly(t *testing.T) {
@@ -39,7 +37,8 @@ func TestMaintenanceGeneratedForWorkQueueOnly(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(directory, "agentics-maintenance.yml"))
 	require.NoError(t, err)
 	jobs := parseMaintenanceJobs(t, string(content))
-	assert.NotEmpty(t, jobs["work_queue_compaction_plan"])
-	assert.NotEmpty(t, jobs["work_queue_compaction_apply"])
+	assert.NotEmpty(t, jobs["work_queue_compaction"])
+	assert.Empty(t, jobs["work_queue_compaction_plan"])
+	assert.Empty(t, jobs["work_queue_compaction_apply"])
 	assert.Empty(t, jobs["ledger_compaction_plan"])
 }

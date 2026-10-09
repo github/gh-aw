@@ -11,7 +11,7 @@ const { actorFromContext, validateTrustedContext } = require("./work_queue_polic
 const { authenticatePublisher } = require("./work_queue_native.cjs");
 
 const MAX_ATTEMPTS = 3;
-const PLAN_MAX_BYTES = 4096;
+const PLAN_MAX_BYTES = 16 * 1024;
 
 function readPlan(file) {
   let contents;
@@ -109,4 +109,4 @@ async function main(options = {}) {
 
 if (require.main === module) main().catch(error => core.setFailed(error instanceof Error ? error.message : "Work queue compaction failed"));
 
-module.exports = { isRetryablePublicationError, main, readPlan };
+module.exports = { isRetryablePublicationError, main, PLAN_MAX_BYTES, readPlan };
