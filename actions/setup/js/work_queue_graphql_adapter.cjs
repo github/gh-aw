@@ -39,7 +39,7 @@ function validateGraphqlAdapter(adapter) {
   const config = adapter.graphql;
   closed(config, ["mutation", "input-type", "response-field", "resource-type", "resource-kind", "repository-field", "repository-input", "permission", "fields"], ["number-field"], "trusted GraphQL adapter");
   for (const field of ["mutation", "input-type", "response-field", "resource-type"]) {
-    if (typeof config[field] !== "string" || config[field].length > 128 || !NAME.test(config[field]) || RESERVED.has(config[field])) throw new Error("Trusted GraphQL adapter requires fixed native operation names");
+    if (typeof config[field] !== "string" || config[field].length > 128 || !NAME.test(config[field]) || RESERVED.has(config[field])) throw new Error("E001: Trusted GraphQL adapter requires fixed native operation names");
   }
   if (!["none", "repositoryId", "repositoryNameWithOwner"].includes(config["repository-input"])) throw new Error("Trusted GraphQL adapter requires explicit repository input binding");
   if (!["checks", "contents", "issues", "pull-requests", "deployments", "discussions"].includes(config.permission)) throw new Error("Trusted GraphQL adapter requires an explicit native write permission");

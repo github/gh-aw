@@ -60,7 +60,7 @@ async function main(config = {}) {
    * @returns {Promise<Object>} Result with success/error status
    */
   return async function handleCustomAction(message, resolvedTemporaryIds, temporaryIdMap = new Map()) {
-    if (currentClaimHandle() !== factoryClaim) throw new Error("Custom action handler cannot escape its original Claim factory");
+    if (currentClaimHandle() !== factoryClaim) throw new Error("E001: Custom action handler cannot escape its original Claim factory");
     if (factoryIdentity) assertClaimIdentity(factoryIdentity);
     // Enforce once-only constraint
     if (called) {

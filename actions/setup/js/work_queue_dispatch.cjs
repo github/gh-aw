@@ -22,7 +22,7 @@ const { normalizeDispatchCredential, createDispatchCredentialValidator, isDispat
 
 function assertQueueControlRole(options) {
   const runtime = resolveWorkQueueRuntime(options.context?.payload, { role: options.role, requireAssignment: options.requireAssignment });
-  if (runtime.role === "observer") throw new Error("work_queue_observer_read_only");
+  if (runtime.role === "observer") throw new Error("E001: work_queue_observer_read_only");
   return runtime;
 }
 

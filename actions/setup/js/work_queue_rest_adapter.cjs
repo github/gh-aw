@@ -33,7 +33,7 @@ const RESERVED = new Set([
 const privateReceipts = new WeakMap();
 
 function routeFields(route) {
-  if (typeof route !== "string" || !/^\/repos\/\{owner\}\/\{repo\}\/[A-Za-z0-9_{}./-]+$/.test(route) || route.includes("..") || route.includes("//")) throw new Error("Trusted REST adapter requires a fixed repository-relative route");
+  if (typeof route !== "string" || !/^\/repos\/\{owner\}\/\{repo\}\/[A-Za-z0-9_{}./-]+$/.test(route) || route.includes("..") || route.includes("//")) throw new Error("E001: Trusted REST adapter requires a fixed repository-relative route");
   const fields = [...route.matchAll(/\{([A-Za-z_][A-Za-z_0-9]*)\}/g)].map(match => match[1]);
   if (route.replace(/\{[A-Za-z_][A-Za-z_0-9]*\}/g, "").match(/[{}]/)) throw new Error("Malformed trusted REST adapter route");
   return fields;

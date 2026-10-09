@@ -22,7 +22,7 @@ function issuesConfiguration(value) {
   if (value === true) return { label: "work" };
   closed(value, [], ["label", "status-field"], "work-queue issues");
   for (const [key, field] of Object.entries(value)) {
-    if (typeof field !== "string" || !field.trim() || field.includes("${{") || Buffer.byteLength(field) > 256 || /[\x00-\x1f\x7f]/.test(field)) throw queueError("projection_invalid", `${key} must be a nonblank bounded literal`);
+    if (typeof field !== "string" || !field.trim() || field.includes("${{") || Buffer.byteLength(field) > 256 || /[\x00-\x1f\x7f]/.test(field)) throw queueError("projection_invalid", `E001: ${key} must be a nonblank bounded literal`);
   }
   return { label: "work", ...value };
 }

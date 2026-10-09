@@ -66,7 +66,7 @@ async function discoverRuns(options, expected) {
       headers: { "X-GitHub-Api-Version": API_VERSION },
       request: { retries: 0, timeout: 15000 },
     });
-    if (response.status !== undefined && response.status !== 200) throw new Error("native_discovery_unavailable");
+    if (response.status !== undefined && response.status !== 200) throw new Error("E007: native_discovery_unavailable");
     const runs = response.data?.workflow_runs;
     if (!Array.isArray(runs)) throw new Error("native_discovery_invalid");
     log.debug("discovery.page", { page, runs: runs.length });

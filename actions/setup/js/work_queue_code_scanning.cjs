@@ -24,7 +24,7 @@ const privateReceipts = new WeakMap();
 /** @param {{ "target-repo"?: string, "target-ref"?: string, driver?: string, max?: number, workflow_filename?: string, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
-  if (!handle) throw new Error("Queue code scanning requires a Claim factory");
+  if (!handle) throw new Error("E001: Queue code scanning requires a Claim factory");
   const factoryIdentity = claimIdentity(handle);
   /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
   const selectedClient = suppliedClient || global.github;

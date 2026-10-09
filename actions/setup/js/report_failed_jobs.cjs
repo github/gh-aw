@@ -71,7 +71,7 @@ async function getFailedNonBuiltinJobs() {
     jobResults = JSON.parse(process.env.GH_AW_JOB_RESULTS || "");
     jobDisplayNames = JSON.parse(process.env.GH_AW_JOB_DISPLAY_NAMES || "");
   } catch (error) {
-    throw new Error(`Failed to parse failed-job reporting metadata: ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`E001: Failed to parse failed-job reporting metadata: ${getErrorMessage(error)}`, { cause: error });
   }
   if (!jobResults || typeof jobResults !== "object" || Array.isArray(jobResults) || !jobDisplayNames || typeof jobDisplayNames !== "object" || Array.isArray(jobDisplayNames)) {
     throw new Error("GH_AW_JOB_RESULTS and GH_AW_JOB_DISPLAY_NAMES must be JSON objects");

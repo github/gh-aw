@@ -27,7 +27,7 @@ const { normalizeDispatchCredential, createDispatchCredentialValidator } = requi
 
 function credentialBindings(raw) {
   const value = raw === undefined ? {} : parseStrictJSON(raw);
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 64) throw new Error("work_queue_dependency_credentials_invalid");
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 64) throw new Error("E001: work_queue_dependency_credentials_invalid");
   const normalized = new Map();
   for (const [repository, variable] of Object.entries(value)) {
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9._-]+$/.test(repository) || typeof variable !== "string" || !/^GH_AW_WORK_QUEUE_DEPENDENCY_READ_TOKEN_(?:0|[1-9][0-9]*)$/.test(variable)) throw new Error("work_queue_dependency_credentials_invalid");

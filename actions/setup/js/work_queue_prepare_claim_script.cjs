@@ -11,7 +11,7 @@ async function main() {
   const inputFile = process.env.GH_AW_CLAIM_INPUT;
   const outputFile = process.env.GH_AW_CLAIM_OUTPUT;
   const runtimeRoot = process.env.RUNNER_TEMP;
-  if (!inputFile || !outputFile || !runtimeRoot) throw new Error("Claim script requires the compiler-produced isolated paths");
+  if (!inputFile || !outputFile || !runtimeRoot) throw new Error("E001: Claim script requires the compiler-produced isolated paths");
   const input = parseStrictJSON(fs.readFileSync(inputFile, "utf8"));
   closed(input, ["version", "claim_handle", "type", "messages"], [], "Claim script input");
   identity(input.claim_handle, "prepared Claim handle");

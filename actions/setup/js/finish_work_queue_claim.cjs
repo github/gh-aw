@@ -49,7 +49,7 @@ function snapshotClaimDelivery(proof) {
    */
   function inspect(value, depth) {
     if (value === null || typeof value !== "object") return;
-    if (depth > 64 || ancestors.has(value) || isProxy(value)) throw new Error("work_queue_delivery_proof_invalid");
+    if (depth > 64 || ancestors.has(value) || isProxy(value)) throw new Error("E001: work_queue_delivery_proof_invalid");
     ancestors.add(value);
     for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
       if (descriptor.get || descriptor.set) throw new Error("work_queue_delivery_proof_invalid");
