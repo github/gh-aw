@@ -269,7 +269,7 @@ func TestReconcileAgentUsageCreditsNamesEndpoint(t *testing.T) {
 	}
 	reconcileAgentUsageCredits(summary, nil)
 	require.Len(t, summary.Warnings, 1)
-	require.Contains(t, summary.Warnings[0], "/responses")
+	require.Contains(t, summary.Warnings[0], "unknown endpoint")
 	require.Contains(t, summary.Warnings[0], "differ from non-classifier proxy total")
 }
 

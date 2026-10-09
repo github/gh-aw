@@ -167,6 +167,7 @@ func readUnifiedTokenUsageEntries(runDir string) ([]TokenUsageEntry, error) {
 	defer file.Close()
 
 	entries := make([]TokenUsageEntry, 0)
+	var routingEvents []unifiedRoutingEvent
 	reader := bufio.NewReader(file)
 	for lineNumber := 1; ; lineNumber++ {
 		line, oversized, readErr := readUnifiedSessionLine(reader)
@@ -177,6 +178,12 @@ func readUnifiedTokenUsageEntries(runDir string) ([]TokenUsageEntry, error) {
 			var event sessionSubagentEvent
 			if err := json.Unmarshal(line, &event); err != nil {
 				return nil, fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
+			}
+			if event.Type == "firewall.model_routing" && event.Provenance.Component == "firewall" && event.Provenance.Phase == "agent" {
+				var data unifiedModelRoutingData
+				if err := json.Unmarshal(event.Data, &data); err == nil {
+					routingEvents = append(routingEvents, unifiedRoutingEvent{event: event, data: data})
+				}
 			}
 			if event.Type == "firewall.token_usage" && event.Provenance.Component == "firewall" && event.Provenance.Phase == "agent" {
 				entry, err := unifiedTokenUsageEntry(event)
@@ -193,20 +200,173 @@ func readUnifiedTokenUsageEntries(runDir string) ([]TokenUsageEntry, error) {
 			break
 		}
 	}
+	enrichUnifiedTokenUsageEntries(runDir, entries, routingEvents)
 	return entries, nil
+}
+
+type unifiedModelRoutingData struct {
+	Stage              string `json:"stage"`
+	Attempt            int    `json:"attempt"`
+	ClassifierModel    string `json:"classifier_model"`
+	ClassifierAttempts int    `json:"classifier_attempts"`
+	RequestID          string `json:"request_id"`
+	Endpoint           string `json:"endpoint"`
+	Path               string `json:"path"`
+	XInitiator         string `json:"x_initiator"`
+	XInitiatorCamel    string `json:"xInitiator"`
+}
+
+type unifiedRoutingEvent struct {
+	event sessionSubagentEvent
+	data  unifiedModelRoutingData
+}
+
+func enrichUnifiedTokenUsageEntries(runDir string, entries []TokenUsageEntry, routingEvents []unifiedRoutingEvent) {
+	rawByRequestID := make(map[string]TokenUsageEntry)
+	if rawPath := findTokenUsageFile(runDir); rawPath != "" {
+		rawEntries, _, err := scanTokenUsageEntries(rawPath)
+		if err == nil {
+			for _, entry := range rawEntries {
+				if entry.RequestID != "" {
+					rawByRequestID[entry.RequestID] = entry
+				}
+			}
+		} else {
+			tokenUsageSubagentLog.Printf("failed to read raw token usage for unified metadata fallback: %v", err)
+		}
+	}
+
+	for i := range entries {
+		entry := &entries[i]
+		if raw, ok := rawByRequestID[entry.RequestID]; ok {
+			if fillTokenUsageMetadata(entry, raw) {
+				tokenUsageSubagentLog.Printf("filled unified token usage metadata from raw proxy log for request %s", entry.RequestID)
+			}
+		}
+	}
+
+	for _, classifier := range unifiedRoutingClassifierRequests(routingEvents, entries) {
+		if classifier.index < 0 || classifier.index >= len(entries) {
+			continue
+		}
+		entry := &entries[classifier.index]
+		changed := false
+		if entry.Purpose == "" {
+			entry.Purpose = "routing_classification"
+			changed = true
+		}
+		if entry.Path == "" {
+			entry.Path = firstNonEmptyModel(classifier.data.Path, classifier.data.Endpoint)
+			changed = changed || entry.Path != ""
+		}
+		if entry.XInitiator == "" {
+			entry.XInitiator = firstNonEmptyModel(classifier.data.XInitiator, classifier.data.XInitiatorCamel)
+			changed = changed || entry.XInitiator != ""
+		}
+		if changed {
+			tokenUsageSubagentLog.Printf("filled unified token usage metadata from firewall.model_routing timing join for request %s", entry.RequestID)
+		}
+	}
+}
+
+func fillTokenUsageMetadata(entry *TokenUsageEntry, source TokenUsageEntry) bool {
+	changed := false
+	if entry.Purpose == "" && source.Purpose != "" {
+		entry.Purpose = source.Purpose
+		changed = true
+	}
+	if entry.Path == "" && source.Path != "" {
+		entry.Path = source.Path
+		changed = true
+	}
+	if entry.XInitiator == "" && source.XInitiator != "" {
+		entry.XInitiator = source.XInitiator
+		changed = true
+	}
+	return changed
+}
+
+type routedClassifierRequest struct {
+	index int
+	data  unifiedModelRoutingData
+}
+
+func unifiedRoutingClassifierRequests(events []unifiedRoutingEvent, entries []TokenUsageEntry) []routedClassifierRequest {
+	requestIDs := make(map[string]struct{})
+	for _, event := range events {
+		if event.data.Stage == "request" && event.data.RequestID != "" {
+			requestIDs[event.data.RequestID] = struct{}{}
+		}
+	}
+	classifiers := make([]routedClassifierRequest, 0)
+	usedEntries := make(map[int]struct{})
+	for i, event := range events {
+		if event.data.Stage != "classification" || event.data.ClassifierModel == "" {
+			continue
+		}
+		start, err := subagentSessionStart(event.event)
+		if err != nil || start.IsZero() {
+			continue
+		}
+		var selection time.Time
+		for _, candidate := range events[i+1:] {
+			if candidate.data.Stage != "selection" {
+				continue
+			}
+			selection, err = subagentSessionStart(candidate.event)
+			if err == nil && selection.After(start) {
+				break
+			}
+			selection = time.Time{}
+		}
+		if selection.IsZero() {
+			continue
+		}
+		for entryIndex, entry := range entries {
+			if entry.RequestID == "" || entry.Purpose != "" || entry.DurationMs < 0 ||
+				!unifiedModelMatches(entry.Model, event.data.ClassifierModel) {
+				continue
+			}
+			if _, used := usedEntries[entryIndex]; used {
+				continue
+			}
+			if _, isRoutedRequest := requestIDs[entry.RequestID]; isRoutedRequest {
+				continue
+			}
+			timestamp, ok := parseTokenUsageTimestamp(entry.Timestamp)
+			if !ok || timestamp.Before(start) {
+				continue
+			}
+			end := timestamp.Add(time.Duration(entry.DurationMs) * time.Millisecond)
+			if end.After(selection) {
+				continue
+			}
+			classifiers = append(classifiers, routedClassifierRequest{index: entryIndex, data: event.data})
+			usedEntries[entryIndex] = struct{}{}
+		}
+	}
+	return classifiers
+}
+
+func unifiedModelMatches(model, classifierModel string) bool {
+	model = modelNameWithoutProvider(model)
+	classifierModel = modelNameWithoutProvider(classifierModel)
+	return model != "" && classifierModel != "" && normalizeModelIdentity(model) == normalizeModelIdentity(classifierModel)
 }
 
 func unifiedTokenUsageEntry(event sessionSubagentEvent) (TokenUsageEntry, error) {
 	var data struct {
-		Provider   string          `json:"provider"`
-		Model      string          `json:"model"`
-		Purpose    string          `json:"purpose"`
-		Path       string          `json:"path"`
-		RequestID  string          `json:"requestId"`
-		AIC        json.RawMessage `json:"aic"`
-		TotalAIC   json.RawMessage `json:"totalAic"`
-		DurationMs int             `json:"durationMs"`
-		Usage      struct {
+		Provider        string          `json:"provider"`
+		Model           string          `json:"model"`
+		Purpose         string          `json:"purpose"`
+		Path            string          `json:"path"`
+		XInitiator      string          `json:"xInitiator"`
+		XInitiatorSnake string          `json:"x_initiator"`
+		RequestID       string          `json:"requestId"`
+		AIC             json.RawMessage `json:"aic"`
+		TotalAIC        json.RawMessage `json:"totalAic"`
+		DurationMs      int             `json:"durationMs"`
+		Usage           struct {
 			InputTokens              int             `json:"inputTokens"`
 			OutputTokens             int             `json:"outputTokens"`
 			CacheReadInputTokens     int             `json:"cacheReadInputTokens"`
@@ -224,7 +384,8 @@ func unifiedTokenUsageEntry(event sessionSubagentEvent) (TokenUsageEntry, error)
 	}
 	entry := TokenUsageEntry{
 		Provider: data.Provider, Model: data.Model, Purpose: data.Purpose, Path: data.Path,
-		RequestID: data.RequestID, Timestamp: timestamp.Format(time.RFC3339Nano), DurationMs: data.DurationMs,
+		XInitiator: firstNonEmptyModel(data.XInitiator, data.XInitiatorSnake),
+		RequestID:  data.RequestID, Timestamp: timestamp.Format(time.RFC3339Nano), DurationMs: data.DurationMs,
 		TokenCoreMetrics: TokenCoreMetrics{
 			InputTokens: data.Usage.InputTokens, OutputTokens: data.Usage.OutputTokens,
 			CacheReadTokens: data.Usage.CacheReadInputTokens, CacheWriteTokens: data.Usage.CacheCreationInputTokens,
