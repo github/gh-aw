@@ -156,6 +156,74 @@ completed Work. Cancellation alone does not stop a worker or release its
 reservation; reconcile exact termination or nonlaunch evidence separately.
 Frontmatter never installs or updates Policy.
 
+## Enable backing Issue projection
+
+Upgrade all queue readers and workflow runtime deployments first. Older
+version-3 closed-schema readers cannot read the new projector rules, Issue
+links, or comment handles; do not enable them during a mixed-reader rollout.
+
+Add `issues: true` under each participating `tools.work-queue` object for
+comment-only status with the `work` label. For a native status field, configure
+`issues: {label: cookie, status-field: WorkStatus}` instead. Provision that
+organization single-select field and its nine required options separately;
+see the [backing Issue reference](/gh-aw/reference/work-queue/#backing-issues).
+Do not create a Project-local Status field or expect automatic field provisioning.
+
+Add an explicit `projectors` array to the installed Policy, using the actual
+authenticated principal and immutable workflow revision for each producer and
+worker hook:
+
+```json
+{
+  "projectors": [
+    {
+      "principal": "REPLACE_WITH_NATIVE_PRINCIPAL_ID",
+      "workflow": ".github/workflows/eslint-refiner.lock.yml",
+      "ref": "REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA",
+      "pools": ["default"],
+      "repositories": ["github/gh-aw"],
+      "completion_policy": "keep-open",
+      "backing_issues": [
+        {
+          "kind": "issue",
+          "host": "github.com",
+          "repository": "github/gh-aw",
+          "repository_id": "REPLACE_WITH_NUMERIC_REPOSITORY_ID",
+          "resource_id": "REPLACE_WITH_NUMERIC_ISSUE_ID",
+          "number": "REPLACE_WITH_ISSUE_NUMBER"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Merge this property into the complete Policy, not a standalone policy file.
+Replace the resource placeholders with the existing Issue's exact decimal
+identities, kept as strings. Omit `backing_issues` entirely when only
+projector-created Issues are needed.
+Install the amended Policy while the queue is quiescent. Scope the
+protected hook credential to queue contents writes, Actions reads, and Issue
+writes in its allowed backing repositories. If `safe-outputs.github-app` is
+configured, each hook mints its own scoped projector token; the runtime checks
+the actual token's field capability. Keep this credential out of agent execution.
+Protect both the queue branch and `gh-aw-issue-projection/*` coordination refs
+against unauthorized updates/deletion; hooks need permission to create/delete
+their own coordination refs.
+
+Submit one independently tracked Work per Issue. Supply `backing_issue` for an
+existing Issue only after installing its full resource identity in each
+relevant projector rule's `backing_issues` array. A repository allowlist alone
+does not authorize a pre-existing Issue. Alternatively, let the authorized
+hook create it after durable admission; its verified creation receipt and
+checked `IssueLink` establish the binding.
+Keep Issues open by default, or install `completion_policy: "close-on-result"`
+on the relevant projector rules before admission. This trusted policy, not
+agent payload, controls closure after verified non-PR delivery.
+Native runs and failed/skipped jobs never substitute for Result. Pending
+synchronization leaves Git authority intact and can be retried only by a hook
+owning the same Work/Claims; unrelated runs do not repair it.
+
 ## Submit and inspect work
 
 Use `work_queue_submit` as the trusted producer to stage tasks within the

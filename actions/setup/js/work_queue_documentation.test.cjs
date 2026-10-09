@@ -27,13 +27,24 @@ describe("work-queue deployment documentation", () => {
   it("installs the documented policy after replacing identity placeholders", () => {
     const source = readRepositoryFile(deploymentPath);
     const examples = [...source.matchAll(/```json(?: [^\n]*)?\n([\s\S]*?)\n```/g)];
-    expect(examples).toHaveLength(1);
+    expect(examples).toHaveLength(2);
     const policy = JSON.parse(examples[0][1].replaceAll("REPLACE_WITH_PRODUCER_ACTOR_ID", "11").replaceAll("REPLACE_WITH_WORKER_CREDENTIAL_ACTOR_ID", "12").replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40)));
 
     expect(validatePolicy(policy)).toBe(policy);
     expect(policy.accounting_weights).toEqual({ "": 1 });
     expect(policy.producers["11"].fairness_keys).toEqual([""]);
     expect(policy.limits).toEqual(DEFAULT_LIMITS);
+    const projection = JSON.parse(
+      examples[1][1]
+        .replaceAll("REPLACE_WITH_NATIVE_PRINCIPAL_ID", "12")
+        .replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40))
+        .replaceAll("REPLACE_WITH_NUMERIC_REPOSITORY_ID", "9876")
+        .replaceAll("REPLACE_WITH_NUMERIC_ISSUE_ID", "9007199254740993")
+        .replaceAll("REPLACE_WITH_ISSUE_NUMBER", "42")
+    );
+    expect(validatePolicy({ ...policy, ...projection }).projectors).toEqual(projection.projectors);
+    expect(projection.projectors[0].completion_policy).toBe("keep-open");
+    expect(projection.projectors[0].backing_issues[0]).toEqual({ kind: "issue", host: "github.com", repository: "github/gh-aw", repository_id: "9876", resource_id: "9007199254740993", number: "42" });
   });
 
   it("separates published docs and specifications from bounded agent instructions", () => {

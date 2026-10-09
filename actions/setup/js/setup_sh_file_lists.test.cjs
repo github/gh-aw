@@ -127,6 +127,13 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
     expect(safeOutputsFiles).toContain("work_queue_logging.cjs");
   });
 
+  it("deploys checked transport and Issue binding dependencies with the queue runtime", () => {
+    expect(getDirectLocalRequires("work_queue_store.cjs")).toContain("work_queue_checked_transport.cjs");
+    expect(getDirectLocalRequires("work_queue_replay.cjs")).toContain("work_queue_issue_contract.cjs");
+    expect(safeOutputsFiles).toContain("work_queue_checked_transport.cjs");
+    expect(safeOutputsFiles).toContain("work_queue_issue_contract.cjs");
+  });
+
   it("deploys Claim authority and worker route provisioning dependencies", () => {
     expect(getDirectLocalRequires("safe_outputs_handlers.cjs")).toContain("work_queue_claim_scope.cjs");
     expect(getDirectLocalRequires("work_queue_provisioning.cjs")).toContain("work_queue_yaml.cjs");

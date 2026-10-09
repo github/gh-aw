@@ -67,6 +67,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 // failed-jobs reporting, the optional status-comment update, and the steering-issue step.
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
+	steps = append(steps, c.buildWorkQueueIssuesStep(data)...)
 	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)
 	if isWorkQueueParticipant(data) {
 		// Queue outputs and failure reports are settled only in their trusted Claim pass.
@@ -129,6 +130,10 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		conclusionPerms = NewPermissions()
 		conclusionPerms.Set(PermissionContents, PermissionRead)
 		conclusionPerms.Set(PermissionActions, PermissionRead)
+		if workQueueIssuesConfig(data) != nil {
+			conclusionPerms.Set(PermissionContents, PermissionWrite)
+			conclusionPerms.Set(PermissionIssues, PermissionWrite)
+		}
 		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 			conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 		}

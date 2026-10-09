@@ -172,6 +172,9 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 			return err
 		}
 	}
+	if err := state.validateBackingIssueAdmission(node, pool); err != nil {
+		return err
+	}
 	if existing := state.Works[node.WorkID]; existing != nil {
 		if !sameJSON(existing.WorkDefinition, node) {
 			return queueError("work_conflict", "immutable node %s differs", node.WorkID)
@@ -194,7 +197,7 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 		}
 	}
 	state.Works[node.WorkID] = &WorkState{
-		WorkDefinition: node, State: "available", Position: position, Barrier: "none",
+		WorkDefinition: node, State: "available", Position: position, Barrier: "none", admissionRequestID: commit.Request.ID,
 	}
 	return state.validateWorkAssignmentSize(node, commit, payload)
 }

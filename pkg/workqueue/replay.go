@@ -114,7 +114,7 @@ func (state *Projection) replayCommit(commit QueueCommit, ordinal int, epochs, g
 			return queueError("packing_invalid", "observations must precede the atomic Claim prefix")
 		}
 		hasAdmission = hasAdmission || kind == "Work"
-		hasObservations = hasObservations || kind == "Observation"
+		hasObservations = hasObservations || kind == "Observation" || kind == "IssueLink" || kind == "IssueComment"
 		if err := state.replayOperation(operation, kind, commit, Position{Commit: ordinal, Operation: index}, isPolicy, epochs, generations); err != nil {
 			return err
 		}
@@ -166,6 +166,8 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 		return state.cancelWork(operation, commit)
 	case "WorkPriority":
 		return state.reprioritizeWork(operation)
+	case "IssueLink", "IssueComment":
+		return state.applyIssueBinding(operation, kind, commit)
 	case "Dispatch":
 		return state.applyDispatch(operation, commit)
 	case "Release":

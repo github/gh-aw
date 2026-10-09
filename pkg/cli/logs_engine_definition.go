@@ -7,10 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/goccy/go-yaml"
 )
+
+var logsEngineDefinitionLog = logger.New("cli:logs_engine_definition")
 
 // Resolve only catalogued checkout definitions, never code from downloaded artifacts.
 func loadLocalLogParserEngine(id string) (*workflow.BehaviorDefinedEngine, error) {
@@ -22,6 +25,7 @@ func loadLocalLogParserEngine(id string) (*workflow.BehaviorDefinedEngine, error
 		catalogPath := filepath.Join(directory, ".github", "aw", "engines.json")
 		content, err := os.ReadFile(catalogPath)
 		if err == nil {
+			logsEngineDefinitionLog.Printf("Found engine catalog at %s, resolving log parser for engine %q", catalogPath, id)
 			return loadLocalLogParserEngineAt(directory, id, content)
 		}
 		if !os.IsNotExist(err) {
@@ -29,6 +33,7 @@ func loadLocalLogParserEngine(id string) (*workflow.BehaviorDefinedEngine, error
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
+			logsEngineDefinitionLog.Printf("No engine catalog found walking up from working directory while resolving engine %q", id)
 			return nil, nil
 		}
 		directory = parent
@@ -68,6 +73,7 @@ func loadLocalLogParserEngineAt(root, id string, content []byte) (*workflow.Beha
 		if entry.ID != id || strings.ContainsAny(id, "/\\.") {
 			continue
 		}
+		logsEngineDefinitionLog.Printf("Matched catalog entry for engine %q: import=%s", id, entry.Import)
 		const prefix = "github/gh-aw/"
 		if !strings.HasPrefix(entry.Import, prefix) {
 			continue
@@ -105,9 +111,11 @@ func loadLocalLogParserEngineAt(root, id string, content []byte) (*workflow.Beha
 			return nil, fmt.Errorf("engine %q log parser definition has id %q", id, definition.ID)
 		}
 		if definition.Behaviors == nil || definition.Behaviors.LogParser == "" {
+			logsEngineDefinitionLog.Printf("Engine %q has no log-parser behavior defined, skipping", id)
 			return nil, nil
 		}
 		return workflow.NewBehaviorDefinedEngine(&definition)
 	}
+	logsEngineDefinitionLog.Printf("Engine %q not found in catalog", id)
 	return nil, nil
 }

@@ -36,6 +36,7 @@ var requestRoleKinds = map[string][]string{
 	"dispatcher":    {"submit", "dispatch_next", "observe", "dispatch"},
 	"worker":        {"submit", "dispatch_next", "observe", "finish", "dispatch"},
 	"reconciler":    {"observe", "dispatch", "release", "result", "delivery_failure", "cancel_claim", "cancel_work"},
+	"projector":     {"issue_link"},
 }
 
 func validateRequestOrigin(actor Actor, request Request) error {

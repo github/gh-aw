@@ -211,14 +211,31 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	}
 
 	compilerActivationJobLog.Print("Adding activation-time work queue snapshot")
+	if workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
+		ctx.steps = append(ctx.steps, c.workQueueProjectorTokenSteps(ctx.data, "activation")...)
+	}
 	ctx.steps = append(ctx.steps,
 		"      - name: Snapshot work queue state\n",
 		"        id: work_queue_snapshot\n",
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)),
 	)
 	ctx.steps = append(ctx.steps, workQueuePolicyEnvironment(ctx.data)...)
+	if workQueueIssuesConfig(ctx.data) != nil {
+		var staged *TemplatableBool
+		if ctx.data.SafeOutputs != nil {
+			staged = ctx.data.SafeOutputs.Staged
+		}
+		if value := resolveSafeOutputsStagedValue(c.trialMode, staged); value != nil {
+			ctx.steps = append(ctx.steps, "          GH_AW_SAFE_OUTPUTS_STAGED: "+fmt.Sprintf("%q", *value)+"\n")
+		}
+	}
 	ctx.steps = append(ctx.steps,
 		"        with:\n",
+	)
+	if workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
+		c.addWorkQueueProjectorToken(&ctx.steps, ctx.data)
+	}
+	ctx.steps = append(ctx.steps,
 		"          script: |\n",
 		generateGitHubScriptWithRequire("write_work_queue_snapshot.cjs"),
 	)
