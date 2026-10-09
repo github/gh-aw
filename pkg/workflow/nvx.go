@@ -287,10 +287,56 @@ func generateNVXRuntimeCleanupStep(workflowData *WorkflowData) GitHubActionStep 
 	if !isNVXRuntime(workflowData) {
 		return nil
 	}
-	return GitHubActionStep{
+	step := GitHubActionStep{
 		"      - name: Remove staged NVX artifacts",
 		"        if: always()",
 		"        run: |",
+	}
+	step = append(step, generateNVXKVMACLTeardownLines()...)
+	step = append(step, generateNVXArtifactTeardownLines()...)
+	return step
+}
+
+func generateNVXKVMACLTeardownLines() GitHubActionStep {
+	return GitHubActionStep{
+		`          acl_uid="${GH_AW_NVX_KVM_ACL_UID:-}"`,
+		`          if [[ -n "$acl_uid" ]]; then`,
+		`            acl_exists="${GH_AW_NVX_KVM_ACL_EXISTS:-}"`,
+		`            acl_permissions="${GH_AW_NVX_KVM_ACL_PERMISSIONS:-}"`,
+		`            sudo_bin="${GH_AW_NVX_KVM_SUDO:-}"`,
+		`            setfacl_bin="${GH_AW_NVX_KVM_SETFACL:-}"`,
+		`            getfacl_bin="${GH_AW_NVX_KVM_GETFACL:-}"`,
+		`            if [[ ! "$acl_uid" =~ ^[0-9]+$ || ! "$acl_permissions" =~ ^[r-][w-][x-]$ || ( "$acl_exists" != true && "$acl_exists" != false ) ]]; then`,
+		`              echo "::error::refusing to restore invalid NVX KVM ACL state"`,
+		"              exit 1",
+		"            fi",
+		`            case "$sudo_bin" in /usr/sbin/sudo|/usr/bin/sudo|/sbin/sudo|/bin/sudo) ;; *) echo "::error::refusing an untrusted NVX KVM cleanup tool"; exit 1 ;; esac`,
+		`            case "$setfacl_bin" in /usr/sbin/setfacl|/usr/bin/setfacl|/sbin/setfacl|/bin/setfacl) ;; *) echo "::error::refusing an untrusted NVX KVM cleanup tool"; exit 1 ;; esac`,
+		`            case "$getfacl_bin" in /usr/sbin/getfacl|/usr/bin/getfacl|/sbin/getfacl|/bin/getfacl) ;; *) echo "::error::refusing an untrusted NVX KVM cleanup tool"; exit 1 ;; esac`,
+		`            if [[ -e /dev/kvm ]]; then`,
+		`              if [[ ! -c /dev/kvm ]]; then echo "::error::refusing to change ACLs on a non-character /dev/kvm"; exit 1; fi`,
+		`              current_acl="$("$getfacl_bin" -ncp /dev/kvm)"`,
+		`              current_acl_permissions=""`,
+		`              while IFS= read -r acl_entry; do`,
+		`                acl_entry="${acl_entry%%#effective:*}"`,
+		`                if [[ "$acl_entry" == "user:${acl_uid}:"* ]]; then current_acl_permissions="${acl_entry#user:${acl_uid}:}"; break; fi`,
+		`              done <<<"$current_acl"`,
+		`              if [[ -n "$current_acl_permissions" && ! "$current_acl_permissions" =~ ^[r-][w-][x-]$ ]]; then echo "::error::refusing to restore malformed NVX KVM ACL state"; exit 1; fi`,
+		`              if [[ "$acl_exists" == true && "$current_acl_permissions" != "$acl_permissions" ]]; then`,
+		`                sudo -n "$sudo_bin" "$setfacl_bin" -m "u:${acl_uid}:${acl_permissions}" /dev/kvm`,
+		`              elif [[ "$acl_exists" == false && "$current_acl_permissions" == rw- ]]; then`,
+		`                sudo -n "$sudo_bin" "$setfacl_bin" -x "u:${acl_uid}" /dev/kvm`,
+		`              elif [[ "$acl_exists" == false && -n "$current_acl_permissions" ]]; then`,
+		`                echo "::error::refusing to remove an unexpected NVX KVM ACL entry"`,
+		"                exit 1",
+		"              fi",
+		"            fi",
+		"          fi",
+	}
+}
+
+func generateNVXArtifactTeardownLines() GitHubActionStep {
+	return GitHubActionStep{
 		`          stage_dir="${GH_AW_NVX_STAGE_DIR:-}"`,
 		`          if [[ -n "$stage_dir" ]]; then`,
 		`            if [[ ! "$stage_dir" =~ ^/tmp/gh-aw-nvx\.[[:alnum:]]{10}$ || ! -d "$stage_dir" || -L "$stage_dir" ]]; then`,
