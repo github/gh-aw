@@ -87,8 +87,8 @@ func validateWorkQueueIssuesConfig(data *WorkflowData) error {
 			return fmt.Errorf("tools.work-queue.issues: unsupported field %q; use label", key)
 		}
 		text, ok := value.(string)
-		if !ok || strings.TrimSpace(text) == "" || len(text) > 239 || strings.Contains(text, "${{") || strings.IndexFunc(text, func(r rune) bool { return r < 32 || r == 127 }) >= 0 {
-			return fmt.Errorf("tools.work-queue.issues.%s must be a nonblank literal of at most 239 bytes", key)
+		if !ok || strings.TrimSpace(text) == "" || len(text) > 33 || strings.Contains(text, "${{") || strings.IndexFunc(text, func(r rune) bool { return r < 32 || r == 127 }) >= 0 {
+			return fmt.Errorf("tools.work-queue.issues.%s must be a nonblank literal of at most 33 bytes", key)
 		}
 	}
 	return nil

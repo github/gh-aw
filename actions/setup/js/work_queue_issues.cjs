@@ -22,7 +22,7 @@ function issuesConfiguration(value) {
   if (value === true) return { label: "work" };
   closed(value, [], ["label"], "work-queue issues");
   for (const [key, field] of Object.entries(value)) {
-    if (typeof field !== "string" || !field.trim() || field.includes("${{") || Buffer.byteLength(field) > 239 || /[\x00-\x1f\x7f]/.test(field))
+    if (typeof field !== "string" || !field.trim() || field.includes("${{") || Buffer.byteLength(field) > 33 || /[\x00-\x1f\x7f]/.test(field))
       throw queueError("projection_invalid", `${SAFE_OUTPUT_E001}: ${key} must be a nonblank bounded literal`);
   }
   return { label: "work", ...value };
@@ -213,9 +213,6 @@ async function projectBatch(options, initial, origin, assignment, config, target
     validateJournal(journal, current.state, target.work_id, repository);
     journals.set(path, structuredClone(journal));
     const work = current.state.works.get(target.work_id);
-    summaryBody(current.state, work, options.now ?? Date.now(), [], current.branch, origin);
-    if (!target.resource) issueBody(current.state, work, origin, config, current.branch);
-    for (const claimId of target.claim_ids) claimBody(current.state, current.state.claims.get(claimId), options.now ?? Date.now());
     if (!discovery.has(repository)) discovery.set(repository, await discoverTarget(options.githubClient, repository, config, current.nativeResponse?.[issueRead.repositoryAliases.get(repository)]));
     const status = workIssueStatus(current.state, work, options.now ?? Date.now());
     const statusKey = `${repository}:${status}`;

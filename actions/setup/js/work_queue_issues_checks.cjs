@@ -7,7 +7,7 @@ const helpers = require("./work_queue_test_helpers.cjs");
 const { newWork } = require("./work_queue_graph.cjs");
 const { defaultPolicy, validatePolicy } = require("./work_queue_policy.cjs");
 const { main, ownProjectionTargets, workIssueStatus, summaryBody, journalPath } = require("./work_queue_issues.cjs");
-const { STATUSES, discoverTarget, mutateIssues } = require("./work_queue_issue_api.cjs");
+const { STATUSES, discoverTarget, ensureStatusLabel, mutateIssues } = require("./work_queue_issue_api.cjs");
 const { withProjectionLocks } = require("./work_queue_issue_coordination.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
 const ref = "0".repeat(40);
@@ -372,6 +372,43 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       );
       assert.equal(m.labels.get("work: Queued")?.color, "7057FF");
       assert.equal(m.calls.filter(call => call[0] === "mutation").length, 3);
+    });
+    it("recovers concurrent status-label creation and recolors the discovered label", async () => {
+      const repositoryId = "Repository1";
+      const name = "work: Queued";
+      let label;
+      let lookups = 0;
+      let creates = 0;
+      let recolors = 0;
+      const github = {
+        graphql: async (query, variables) => {
+          if (query.includes("WorkQueueStatusLabel")) {
+            lookups++;
+            return { node: { id: repositoryId, label: lookups <= 2 ? null : structuredClone(label) } };
+          }
+          if (query.includes("WorkQueueTrackingLabel")) {
+            creates++;
+            label ||= { id: "label-queued", name, color: "808080" };
+            throw Object.assign(new Error("Name has already been taken"), { errors: [{ message: "Name has already been taken" }] });
+          }
+          if (query.includes("WorkQueueLabelColor")) {
+            recolors++;
+            label.color = variables.input.color;
+            return { updateLabel: { label: structuredClone(label) } };
+          }
+          throw new Error(`unexpected query ${query}`);
+        },
+      };
+      const ids = await Promise.all([ensureStatusLabel(github, repositoryId, { label: "work" }, "Queued"), ensureStatusLabel(github, repositoryId, { label: "work" }, "Queued")]);
+      assert.deepEqual(ids, ["label-queued", "label-queued"]);
+      assert.equal(creates, 2);
+      assert.equal(lookups, 4);
+      assert.ok(recolors > 0);
+      assert.equal(label.color, "7057FF");
+    });
+    it("accepts the maximum status-label prefix and rejects longer ones", async () => {
+      assert.equal((await main({ issues: { label: "x".repeat(33) }, staged: true })).staged, true);
+      await assert.rejects(main({ issues: { label: "x".repeat(34) } }), /nonblank bounded literal/);
     });
     it("recolors an existing work-queue tracking label purple", async () => {
       const m = mock(fixture());

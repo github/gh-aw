@@ -41,9 +41,26 @@ function statusLabelName(config, status) {
 
 async function ensureStatusLabel(github, repositoryId, config, status) {
   const name = statusLabelName(config, status);
-  const response = await github.graphql("query WorkQueueStatusLabel($repositoryId:ID!,$name:String!) { node(id:$repositoryId) { ... on Repository { id label(name:$name) { id name color } } } }", { repositoryId, name });
+  const response = await findStatusLabel(github, repositoryId, name);
   if (response?.node?.id !== repositoryId) throw queueError("projection_label_pending", "status label target is inaccessible");
-  return ensureLabel(github, repositoryId, response.node.label, name);
+  try {
+    return await ensureLabel(github, repositoryId, response.node.label, name);
+  } catch (error) {
+    if (response.node.label || !labelAlreadyExists(error)) throw error;
+    const concurrent = await findStatusLabel(github, repositoryId, name);
+    if (concurrent?.node?.id !== repositoryId || !concurrent.node.label) throw error;
+    return ensureLabel(github, repositoryId, concurrent.node.label, name);
+  }
+}
+
+async function findStatusLabel(github, repositoryId, name) {
+  return github.graphql("query WorkQueueStatusLabel($repositoryId:ID!,$name:String!) { node(id:$repositoryId) { ... on Repository { id label(name:$name) { id name color } } } }", { repositoryId, name });
+}
+
+function labelAlreadyExists(error) {
+  const failure = error?.originalError || error;
+  const messages = [failure?.message, ...(Array.isArray(failure?.errors) ? failure.errors.map(item => item?.message) : [])];
+  return messages.some(message => typeof message === "string" && /already (?:exists|been taken)/i.test(message));
 }
 
 async function discoverTarget(github, repository, config, firstPage = undefined) {
@@ -128,44 +145,35 @@ async function preflightIssues(github, targets, options = {}) {
     }
     issues.set(target.work_id, issue);
   }
-  await completeIssueConnections(github, [...issues.values()]);
-  return issues;
-}
-
-async function completeIssueConnections(github, issues) {
+  const issueList = [...issues.values()];
   const seen = new Map();
   for (let page = 0; page < 16; page++) {
     const declarations = [];
     const selections = [];
     const variables = {};
     const pending = [];
-    for (const [index, issue] of issues.entries()) {
-      for (const connection of ["labels"]) {
-        const values = issue[connection];
-        if (values?.pageInfo?.hasNextPage === false) continue;
-        const cursor = values?.pageInfo?.endCursor;
-        const key = `${index}:${connection}`;
-        const cursors = seen.get(key) || new Set();
-        if (typeof cursor !== "string" || !cursor || cursors.has(cursor)) throw queueError("projection_pagination_pending", "Issue connection pagination is incomplete");
-        cursors.add(cursor);
-        seen.set(key, cursors);
-        const alias = `p${pending.length}`;
-        declarations.push(`$${alias}:ID!,$${alias}Cursor:String!`);
-        Object.assign(variables, { [alias]: issue.id, [`${alias}Cursor`]: cursor });
-        selections.push(`${alias}: node(id:$${alias}) { ... on Issue { id repository { id } ${connection}(first:${LABELS_PAGE_SIZE},after:$${alias}Cursor) { nodes { id name } pageInfo { hasNextPage endCursor } } } }`);
-        pending.push({ issue, connection, alias });
-      }
+    for (const [index, issue] of issueList.entries()) {
+      if (issue.labels?.pageInfo?.hasNextPage === false) continue;
+      const cursor = issue.labels?.pageInfo?.endCursor;
+      const cursors = seen.get(index) || new Set();
+      if (typeof cursor !== "string" || !cursor || cursors.has(cursor)) throw queueError("projection_pagination_pending", "Issue label pagination is incomplete");
+      cursors.add(cursor);
+      seen.set(index, cursors);
+      const alias = `p${pending.length}`;
+      declarations.push(`$${alias}:ID!,$${alias}Cursor:String!`);
+      Object.assign(variables, { [alias]: issue.id, [`${alias}Cursor`]: cursor });
+      selections.push(`${alias}: node(id:$${alias}) { ... on Issue { id repository { id } labels(first:${LABELS_PAGE_SIZE},after:$${alias}Cursor) { nodes { id name } pageInfo { hasNextPage endCursor } } } }`);
+      pending.push({ issue, alias });
     }
-    if (!pending.length) return;
+    if (!pending.length) return issues;
     const response = await github.graphql(`query WorkQueueIssuePages(${declarations.join(",")}) { ${selections.join("\n")} }`, variables);
-    for (const { issue, connection, alias } of pending) {
+    for (const { issue, alias } of pending) {
       const node = response?.[alias];
-      if (node?.id !== issue.id || node.repository?.id !== issue.repository.id || !Array.isArray(node[connection]?.nodes))
-        throw queueError("projection_target_unavailable", "Issue was deleted, transferred, or its pagination is inaccessible");
-      issue[connection] = { nodes: [...issue[connection].nodes, ...node[connection].nodes], pageInfo: node[connection].pageInfo };
+      if (node?.id !== issue.id || node.repository?.id !== issue.repository.id || !Array.isArray(node.labels?.nodes)) throw queueError("projection_target_unavailable", "Issue was deleted, transferred, or its pagination is inaccessible");
+      issue.labels = { nodes: [...issue.labels.nodes, ...node.labels.nodes], pageInfo: node.labels.pageInfo };
     }
   }
-  throw queueError("projection_pagination_pending", "Issue connection pagination exhausted");
+  throw queueError("projection_pagination_pending", "Issue label pagination exhausted");
 }
 
 async function mutateIssues(github, operations, { sleep = delay => new Promise(resolve => setTimeout(resolve, delay)) } = {}) {

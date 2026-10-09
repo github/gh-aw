@@ -35,6 +35,14 @@ describe("Issue projection pacing", () => {
     expect(calls[1][1].request).toEqual({ retries: 0, timeout: 123 });
   });
 
+  it("paces a batch of label removals by mutation count", async () => {
+    const timer = clock();
+    const { client } = wrapGithubClient({ graphql: async () => ({ value: true }) }, timer);
+    const removals = Array.from({ length: 50 }, (_, index) => `r${index}: removeLabelsFromLabelable(input:$r${index}) { clientMutationId }`).join(" ");
+    await client.graphql(`mutation { ${removals} }`, {});
+    expect(timer.delays).toEqual([50000]);
+  });
+
   it("preserves REST method receivers and paces only writes", async () => {
     const timer = clock();
     const issues = {

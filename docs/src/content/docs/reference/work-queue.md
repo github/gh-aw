@@ -64,8 +64,9 @@ tools:
 `issues: true` enables projection with the `work` tracking label and a
 `work: <status>` label. An object may override `label` (for example, `cookie`
 produces `cookie: Queued`); an empty object uses defaults. Absent or false
-disables the integration. The tracking label must be a nonblank literal of at
-most 239 bytes; unknown keys are rejected.
+disables the integration. The label prefix must be a nonblank literal of at
+most 33 bytes, leaving room for the longest status suffix within GitHub's
+50-character label limit; unknown keys are rejected.
 
 Status labels are created as needed in the target repository with purple
 (`7057FF`), using **Queued**, **Blocked**, **Assigned**, **Running**,
