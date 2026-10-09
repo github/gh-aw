@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.45 | Extended CTR-017 with OTLP collector endpoint/header exclusions for agent and inline/external threat-detection AWF sandboxes when `--exclude-env` is supported; retained host-side exporter access and mapped OTLP-enabled/disabled regression coverage. |
 | 1.0.44 | Clarified CTR-001: the `id-token: write` audience/trust-policy reminder is informational and does not increment compiler warnings or block warnings-as-errors validation; OIDC permission enforcement remains unchanged. |
 | 1.0.43 | Clarified CTR-008 for the scoped `pull_request_target` checkout policy: exact literal allowlist matching, warning-only risk acknowledgment, and rejection of configured `fetch` values. |
 | 1.0.42 | Audit-only clarification that same-repository bot PR checkout authorization is a runtime trust control governed by Security Architecture Specification RS-05a, not a new compiler threat rule. |
