@@ -225,6 +225,7 @@ describe("essential unified session payloads", () => {
       model: "gpt-5.4-mini",
       purpose: "subagent",
       path: "/v1/messages",
+      x_initiator: "agent",
       request_id: "request-1",
       inputTokens: 0,
       output_tokens: 2,
@@ -241,12 +242,18 @@ describe("essential unified session payloads", () => {
       model: "gpt-5.4-mini",
       purpose: "subagent",
       path: "/v1/messages",
+      xInitiator: "agent",
       requestId: "request-1",
       aic: 0,
       totalAic: 0,
       durationMs: 0,
       usage: { inputTokens: 0, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
     });
+    const report = normalizeUnifiedSessionEvent({
+      type: "usage.report",
+      data: { purpose: "routing_classification", path: "/responses", x_initiator: "router" },
+    });
+    expect(report.data).toEqual({ purpose: "routing_classification", path: "/responses", xInitiator: "router" });
     const agent = normalizeUnifiedSessionEvent({ type: "session.result", data: { num_turns: 0, usage: { inputTokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"], unused: 10 } } });
     expect(agent.data).toEqual({ numTurns: 0, usage: { inputTokens: 0, outputTokens: 2, overflowedTokens: ["cacheReadInputTokens"] } });
     const reconciled = reconcileSessionUsage({ cache_read_input_tokens: 4 }, agent.data.usage);

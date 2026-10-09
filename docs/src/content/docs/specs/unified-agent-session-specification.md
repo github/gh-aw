@@ -591,6 +591,18 @@ source for opaque fields.
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 
+`firewall.token_usage` and its `usage.report` alias expose the following
+source-dependent fields: `provider`, `model`, `purpose` (for example `agent`,
+`subagent`, or `routing_classification`), `path`, `xInitiator`, `requestId`,
+`status`, `durationMs`, `aic`, `totalAic`, `premiumRequests`, and `usage`.
+Consumers identify router and classifier traffic by `purpose`; a missing
+`purpose` means unknown, not agent.
+
+**T-UAS-070 — Firewall usage purpose.** A producer MUST preserve supplied
+`purpose`, `path`, and `xInitiator` values on `firewall.token_usage` and
+`usage.report` events. A consumer MUST treat a missing `purpose` as unknown and
+MUST NOT classify the event as agent traffic by default.
+
 **T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
 firewall, or accounting observations to produce another session total. Readers
 MUST scope tool correlation, result selection, and accounting by provenance
@@ -873,10 +885,11 @@ retain sanitized error text and any supplied failure code.
 Audit and logs read sub-agent lifecycle and model evidence from
 `usage/aw_session.jsonl`. Per-agent proxy credits are correlated from that
 file's `firewall.token_usage` observations with sub-agent requests using model,
-token counts, and observation order. Structured per-model actuals include only
-sub-agent requests, not main-agent or router traffic. `agent-session.jsonl` is
-used only for older runs without a unified-session artifact. `agent-stdio.log`
-is not a source of sub-agent rows.
+token counts, and observation order. Classifier credits are identified by
+`purpose` and excluded from per-agent reconciliation. Structured per-model
+actuals include only sub-agent requests, not main-agent or router traffic.
+`agent-session.jsonl` is used only for older runs without a unified-session
+artifact. `agent-stdio.log` is not a source of sub-agent rows.
 
 Subagent attribution is scoped to the final retry session; earlier source
 records cannot contribute even when merged timestamps interleave them.
@@ -1229,6 +1242,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-065–T-UAS-066 | Unified file through both publication sinks and the conversation renderer; colliding source IDs; overlapping accounting; hostile/secret text; exhausted summary budget | Known runtime types remain visible, scopes and accounting remain independent, private prompts/payloads stay omitted, output is bounded and safely redacted, source artifact remains intact. |
 | T-UAS-067 | Repeated native/canonical/detector error observations, live timeout evidence, final-zero and missing exits, malformed or duplicate aggregate records, quoted errors and tool failures | One deterministic `agent.execution` record with distinct native codes/types, stable categories, observed exit precedence, unchanged error evidence, and matching JS/Go reader validation. |
 | T-UAS-068 | Goose stream messages/deltas, tool requests/results, cumulative completion usage, source-second timestamps, malformed records, error-only and partial sessions | Exact supported content and IDs, observed outcomes only, no duplicated snapshots or invented partial results, explicit diagnostics. |
+| T-UAS-070 | Firewall token usage with supplied or absent purpose/path/initiator; `usage.report` alias | Supplied routing metadata survives projection; consumers treat absent purpose as unknown, not agent. |
 
 ### 9.3 Engine and integration fixture matrix
 

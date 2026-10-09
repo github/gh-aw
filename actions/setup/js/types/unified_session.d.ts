@@ -100,10 +100,14 @@ export interface RuntimeObservationData {
 
 export interface ModelRoutingData {
   stage?: JsonValue;
+  attempt?: JsonValue;
+  classifier_model?: JsonValue;
+  classifier_attempts?: JsonValue;
   routed?: JsonValue;
   outcome?: JsonValue;
   selected_model?: JsonValue;
   selected_effort?: JsonValue;
+  endpoint?: JsonValue;
   router?: JsonValue;
   request_id?: JsonValue;
   deviations?: JsonValue;
@@ -137,6 +141,9 @@ export interface FirewallAccessData {
 export interface UsageReportData {
   provider?: JsonValue;
   model?: JsonValue;
+  purpose?: JsonValue;
+  path?: JsonValue;
+  xInitiator?: JsonValue;
   requestId?: JsonValue;
   status?: JsonValue;
   aic?: JsonValue;

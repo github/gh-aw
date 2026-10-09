@@ -168,6 +168,7 @@ const EVENT_FIELDS = {
     model: ["model"],
     purpose: ["purpose"],
     path: ["path", "endpoint"],
+    xInitiator: ["x_initiator", "xInitiator"],
     requestId: ["requestId", "request_id"],
     status: ["status"],
     aic: ["aic", "ai_credits_this_response", "aiCreditsThisResponse"],

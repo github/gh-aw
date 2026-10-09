@@ -411,10 +411,14 @@
       "type": "object",
       "properties": {
         "stage": { "$ref": "#/definitions/JsonValue" },
+        "attempt": { "$ref": "#/definitions/JsonValue" },
+        "classifier_model": { "$ref": "#/definitions/JsonValue" },
+        "classifier_attempts": { "$ref": "#/definitions/JsonValue" },
         "routed": { "$ref": "#/definitions/JsonValue" },
         "outcome": { "$ref": "#/definitions/JsonValue" },
         "selected_model": { "$ref": "#/definitions/JsonValue" },
         "selected_effort": { "$ref": "#/definitions/JsonValue" },
+        "endpoint": { "$ref": "#/definitions/JsonValue" },
         "router": { "$ref": "#/definitions/JsonValue" },
         "request_id": { "$ref": "#/definitions/JsonValue" },
         "deviations": { "$ref": "#/definitions/JsonValue" }
@@ -550,6 +554,9 @@
       "properties": {
         "provider": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
+        "purpose": { "$ref": "#/definitions/JsonValue" },
+        "path": { "$ref": "#/definitions/JsonValue" },
+        "xInitiator": { "$ref": "#/definitions/JsonValue" },
         "requestId": { "$ref": "#/definitions/JsonValue" },
         "status": { "$ref": "#/definitions/JsonValue" },
         "aic": { "$ref": "#/definitions/JsonValue" },
