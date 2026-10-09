@@ -566,6 +566,9 @@ func (c *Compiler) buildConclusionScriptEnvVars(data *WorkflowData, mainJobName 
 
 // buildConclusionJobCondition builds the condition guarding the conclusion job.
 func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ConditionNode {
+	if workQueueIssuesConfig(data) != nil && isWorkQueueParticipant(data) {
+		return BuildFunctionCall("always")
+	}
 	// Build the condition for this job:
 	// 1. always() - run even if agent fails
 	// 2. agent was activated (not skipped) OR an activation guardrail failed

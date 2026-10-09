@@ -26,11 +26,15 @@ const workQueueWorkerRunName = `run-name: "${{ github.event_name == 'workflow_di
 type WorkQueuePolicyConfig struct {
 	Policy                 workqueue.Policy
 	ForeignReadCredentials map[string]string
+	IssuesJSON             string
 }
 
 func validateWorkQueueConfiguration(data *WorkflowData) error {
 	if data == nil {
 		return nil
+	}
+	if err := validateWorkQueueIssuesConfig(data); err != nil {
+		return err
 	}
 	if err := configureWorkQueueMemory(data); err != nil {
 		return err
@@ -173,6 +177,9 @@ func hasExplicitWorkQueueProducers(data *WorkflowData) bool {
 func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 	defaults := workqueue.DefaultPolicy("${{ github.actor_id }}", "${{ github.repository }}")
 	result := &WorkQueuePolicyConfig{Policy: defaults, ForeignReadCredentials: map[string]string{}}
+	if err := configureWorkQueueIssues(data, result); err != nil {
+		return nil, err
+	}
 	raw, exists := data.RawFrontmatter["work-queue-policy"]
 	if !exists {
 		return result, nil
@@ -181,7 +188,7 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 	if !ok {
 		return nil, errors.New("work-queue-policy must be an object; scheduling cannot be disabled")
 	}
-	allowed := []string{"mode", "class-weights", "accounting-weights", "producers", "pools", "limits", "worker-profiles", "outstanding", "dependencies"}
+	allowed := []string{"mode", "class-weights", "accounting-weights", "producers", "projectors", "pools", "limits", "worker-profiles", "outstanding", "dependencies"}
 	for key := range block {
 		if !slices.Contains(allowed, key) {
 			return nil, fmt.Errorf("work-queue-policy: unsupported field %q", key)
@@ -344,7 +351,7 @@ func configureWorkQueueDependencies(block map[string]any, result *WorkQueuePolic
 
 func decodeWorkQueuePolicyProposal(block map[string]any, policy *workqueue.Policy, explicitPools, explicitProducers bool) error {
 	base := map[string]any{}
-	for _, key := range []string{"mode", "class-weights", "accounting-weights", "producers", "pools", "limits"} {
+	for _, key := range []string{"mode", "class-weights", "accounting-weights", "producers", "projectors", "pools", "limits"} {
 		if value, exists := block[key]; exists {
 			base[key] = value
 		}
@@ -655,6 +662,7 @@ func workQueuePolicyEnvironment(data *WorkflowData) []string {
 		"          GH_AW_WORK_QUEUE_ENABLED: \"true\"\n",
 		"          GH_AW_WORK_QUEUE_ROLE: " + fmt.Sprintf("%q", workQueueRuntimeRole(data)) + "\n",
 	}
+	lines = append(lines, workQueueIssuesEnvironment(data)...)
 	if !isWorkQueueParticipant(data) {
 		return lines
 	}

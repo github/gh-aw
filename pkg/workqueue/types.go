@@ -81,6 +81,7 @@ type WorkDefinition struct {
 	DependsOn        []Dependency    `json:"depends_on"`
 	Enqueued         int64           `json:"enqueued"`
 	Subject          *Resource       `json:"subject,omitempty"`
+	BackingIssue     *Resource       `json:"backing_issue,omitempty"`
 	ReplacementOf    *Replacement    `json:"replacement_of,omitempty"`
 }
 
@@ -89,6 +90,7 @@ type Policy struct {
 	ClassWeights      []int                   `json:"class_weights"`
 	AccountingWeights map[string]int          `json:"accounting_weights"`
 	Producers         map[string]ProducerRule `json:"producers"`
+	Projectors        []ProjectorRule         `json:"projectors,omitempty"`
 	Pools             map[string]PoolPolicy   `json:"pools"`
 	Limits            Limits                  `json:"limits"`
 }
@@ -97,6 +99,33 @@ type ProducerRule struct {
 	Pools        []string `json:"pools"`
 	Priorities   []int    `json:"priorities"`
 	FairnessKeys []string `json:"fairness_keys"`
+}
+
+type ProjectorRule struct {
+	Principal        string     `json:"principal"`
+	Workflow         string     `json:"workflow"`
+	Ref              string     `json:"ref"`
+	Pools            []string   `json:"pools"`
+	Repositories     []string   `json:"repositories"`
+	BackingIssues    []Resource `json:"backing_issues,omitempty"`
+	CompletionPolicy string     `json:"completion_policy,omitempty"`
+}
+
+type IssueLinkOperation struct {
+	Kind         string   `json:"kind"`
+	WorkID       string   `json:"work_id"`
+	Resource     Resource `json:"resource"`
+	ProjectorRef string   `json:"projector_ref"`
+	ClaimID      string   `json:"claim_id,omitempty"`
+}
+
+type IssueCommentOperation struct {
+	Kind             string `json:"kind"`
+	WorkID           string `json:"work_id"`
+	CommentID        string `json:"comment_id"`
+	ProjectorRef     string `json:"projector_ref"`
+	ClaimID          string `json:"claim_id,omitempty"`
+	AuthorityClaimID string `json:"authority_claim_id,omitempty"`
 }
 
 type PoolPolicy struct {
@@ -253,7 +282,10 @@ type WorkState struct {
 	CancellationReason   string          `json:"cancellation_reason,omitempty"`
 	CancellationClaimID  string          `json:"cancellation_claim_id,omitempty"`
 	CancellationCommitID string          `json:"cancellation_commit_id,omitempty"`
+	IssueLink            *Resource       `json:"issue_link,omitempty"`
+	IssueSummary         string          `json:"issue_summary,omitempty"`
 	completionAt         int64
+	admissionRequestID   string
 }
 
 // SchedulingPriority leaves the admitted definition and historical Claims immutable.
@@ -272,6 +304,7 @@ type ClaimState struct {
 	TerminalCommitID   string `json:"terminal_commit_id,omitempty"`
 	CancellationReason string `json:"cancellation_reason,omitempty"`
 	RetryNotBefore     int64  `json:"retry_not_before,omitempty"`
+	IssueComment       string `json:"issue_comment,omitempty"`
 }
 
 type DispatchState struct {
