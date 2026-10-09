@@ -1,8 +1,1 @@
-{
-  "date": "2026-10-07",
-  "headline": "v0.91.4 shipped; model routing + Claude/Copilot inference merged; agent safe-output cascade needs cleanup",
-  "merged_prs_highlight_count": 20,
-  "open_prs": 15,
-  "aw_top10_open": 9,
-  "commits_30d": 725
-}
+{"date": "2026-10-09", "latest_release": "v0.91.6", "commits_30d": 777, "open_prs": 8, "discussion": "Daily Status - 2026-10-09"}
