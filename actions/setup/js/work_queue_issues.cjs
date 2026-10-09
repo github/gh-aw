@@ -212,8 +212,12 @@ async function projectBatch(options, initial, origin, assignment, config, target
     const repository = target.resource?.repository || origin.repository;
     validateJournal(journal, current.state, target.work_id, repository);
     journals.set(path, structuredClone(journal));
+    const work = current.state.works.get(target.work_id);
+    summaryBody(current.state, work, options.now ?? Date.now(), [], current.branch, origin);
+    if (!target.resource) issueBody(current.state, work, origin, config, current.branch);
+    for (const claimId of target.claim_ids) claimBody(current.state, current.state.claims.get(claimId), options.now ?? Date.now());
     if (!discovery.has(repository)) discovery.set(repository, await discoverTarget(options.githubClient, repository, config, current.nativeResponse?.[issueRead.repositoryAliases.get(repository)]));
-    const status = workIssueStatus(current.state, current.state.works.get(target.work_id), options.now ?? Date.now());
+    const status = workIssueStatus(current.state, work, options.now ?? Date.now());
     const statusKey = `${repository}:${status}`;
     if (!statusLabels.has(statusKey)) statusLabels.set(statusKey, await ensureStatusLabel(options.githubClient, discovery.get(repository).repositoryId, config, status));
     if (!target.resource && journal.create?.resource) {
@@ -221,7 +225,6 @@ async function projectBatch(options, initial, origin, assignment, config, target
       target.resource = journal.create.resource;
     }
     target.comments = {};
-    const work = current.state.works.get(target.work_id);
     if (work.issue_summary) target.comments.summary = work.issue_summary;
     for (const claimId of target.claim_ids) {
       const claim = current.state.claims.get(claimId);

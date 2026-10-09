@@ -196,6 +196,7 @@ function mock(f, { labelMissing = false } = {}) {
       if (query.includes("WorkQueueStatusLabel")) return { node: { id: "Repository1", label: structuredClone(labels.get(variables.name) || null) } };
       if (query.includes("WorkQueueLabelColor")) {
         const label = [...labels.values()].find(label => label.id === variables.input.id);
+        assert.ok(label);
         label.color = variables.input.color;
         if (label.name === "work") discovery.label = label;
         return { updateLabel: { label: structuredClone(label) } };
@@ -369,14 +370,15 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
         m.issues.get("1").labels.nodes.map(label => label.name),
         ["work", "work: Queued"]
       );
-      assert.equal(m.labels.get("work: Queued").color, "7057FF");
+      assert.equal(m.labels.get("work: Queued")?.color, "7057FF");
       assert.equal(m.calls.filter(call => call[0] === "mutation").length, 3);
     });
     it("recolors an existing work-queue tracking label purple", async () => {
       const m = mock(fixture());
+      assert.ok(m.discovery.label);
       m.discovery.label.color = "808080";
       assert.deepEqual((await main(m.options)).pending, []);
-      assert.equal(m.labels.get("work").color, "7057FF");
+      assert.equal(m.labels.get("work")?.color, "7057FF");
       assert.ok(m.calls.some(call => call[1]?.includes("WorkQueueLabelColor")));
     });
     it("keeps queue authority when a status label cannot be provisioned", async () => {
