@@ -228,6 +228,9 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 			},
 		},
 	}
+	if isOTLPEnabled(data) {
+		evalsData.ExcludedEnv = append(evalsData.ExcludedEnv, otlpSandboxExcludedEnvVarNames...)
+	}
 	if firewallConfig := getFirewallConfig(data); firewallConfig != nil {
 		firewallCopy := *firewallConfig
 		evalsData.NetworkPermissions.Firewall = &firewallCopy

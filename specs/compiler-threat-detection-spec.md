@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.45
+**Version**: 1.0.46
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.46` | Unreleased | Extends CTR-017 OTLP sandbox exclusions to evals AWF invocations. No lock-file schema change. |
 | `1.0.45` | Unreleased | Extends CTR-017 with host-only OTLP exporter configuration: regenerated agent and threat-detection AWF commands exclude collector endpoints and headers when AWF supports `--exclude-env`. No lock-file schema change. |
 | `1.0.44` | Unreleased | Clarifies CTR-001: `id-token: write` is exempt from repository-write rejection, and its OIDC trust-policy reminder is informational rather than a warning. No lock-file compatibility change. |
 | `1.0.43` | `v0.87.9` | Clarifies CTR-008 trusted `pull_request_target` checkouts: acknowledgment suppresses only the trigger warning, allowlisted checkouts require an exact literal repository/ref pair, and any configured `fetch` is rejected. |
@@ -67,7 +68,7 @@ Sandbox bypass includes the provenance of the agent's own configuration. On pull
 
 Activation also reads workflow imports and skills before the agent job runs. Restoring agent configuration later cannot make instructions already loaded during activation trustworthy; the activation sparse checkout must select a trusted ref independently.
 
-Host-side OTLP exporter configuration is another secret-bearing trust boundary. Passing collector headers and endpoints through AWF's `--env-all` exposes collector credentials to sandboxed processes and can cause an agent CLI to export duplicate telemetry. CTR-017 covers compiler-generated exclusions for the agent and threat-detection sandboxes.
+Host-side OTLP exporter configuration is another secret-bearing trust boundary. Passing collector headers and endpoints through AWF's `--env-all` exposes collector credentials to sandboxed processes and can cause an agent CLI to export duplicate telemetry. CTR-017 covers compiler-generated exclusions for the agent, threat-detection, and evals sandboxes.
 
 ## 4. Governance and Responsibilities
 
@@ -95,7 +96,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-014 Supply Chain Attack via Install Scripts**: Warn, or reject in strict mode, when Node install scripts are enabled.
 - **CTR-015 Allowed Label Glob Scope**: Reject bare `*` safe-output allowed-label patterns.
 - **CTR-016 Compile-Time Manifest Drift**: Reject new restricted secrets or action references absent from an existing manifest.
-- **CTR-017 Secret Leakage via Environment Variables**: Warn, or reject in strict mode, for uncontrolled secret-expression placement. When OTLP is enabled and the effective AWF version supports `--exclude-env`, generated agent and threat-detection AWF invocations using `--env-all` MUST exclude `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, and `GH_AW_OTLP_ENDPOINTS`. These values MUST remain available to host-side exporters. Both inline and external threat-detection paths MUST preserve the exclusions. Workflows without OTLP MUST NOT gain these OTLP-specific exclusions unless independently required by another exclusion policy.
+- **CTR-017 Secret Leakage via Environment Variables**: Warn, or reject in strict mode, for uncontrolled secret-expression placement. When OTLP is enabled and the effective AWF version supports `--exclude-env`, generated agent, threat-detection, and evals AWF invocations using `--env-all` MUST exclude `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, and `GH_AW_OTLP_ENDPOINTS`. These values MUST remain available to host-side exporters. Both inline and external threat-detection paths and evals execution MUST preserve the exclusions. Workflows without OTLP MUST NOT gain these OTLP-specific exclusions unless independently required by another exclusion policy.
 - **CTR-018 Version Integrity Bypass**: Warn, or reject in strict mode, for `check-for-updates: false`.
 - **CTR-019 Cache-Memory Integrity Enforcement**: Require cache updates only after successful agent and threat-detection jobs.
 - **CTR-020 Conditional Import Security**: Reject `imports` entries containing `if`.
@@ -167,7 +168,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-014 Supply Chain Attack via Install Scripts | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
 | CTR-015 Allowed Label Glob Scope | name, install-script, and allowed-label validation | `argument_injection_test.go`, corresponding validation tests |
 | CTR-016 Compile-Time Manifest Drift | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
-| CTR-017 Secret Leakage via Environment Variables | safe-update, strict env/update, cache, and expression builder; `pkg/workflow/awf_command_builder.go`, `threat_detection_external.go` | corresponding enforcement, secrets, update, and cache tests; `TestOTLPEnvExcludedFromAWFSandboxes` in `awf_env_test.go`, `TestCompiledOTLPEnvExcludedFromAgentAndDetection` in `threat_detection_isolation_test.go` |
+| CTR-017 Secret Leakage via Environment Variables | safe-update, strict env/update, cache, and expression builder; `pkg/workflow/awf_command_builder.go`, `threat_detection_external.go`, `evals_steps.go` | corresponding enforcement, secrets, update, and cache tests; `TestOTLPEnvExcludedFromAWFSandboxes` in `awf_env_test.go`, `TestEvalsOTLPEnvExcludedFromSandbox` in `evals_steps_test.go`, `TestCompiledOTLPEnvExcludedFromAgentDetectionAndEvals` in `threat_detection_isolation_test.go` |
 | CTR-018 Version Integrity Bypass | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
 | CTR-019 Cache-Memory Integrity Enforcement | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
 | CTR-020 Conditional Import Security | `pkg/parser/import_bfs.go` | `pkg/parser/import_bfs_test.go` |
@@ -210,7 +211,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-014** | CTR-014 Supply Chain Attack via Install Scripts | Warn, or reject in strict mode, when Node install scripts are enabled | Warn, or reject in strict mode, when Node install scripts are enabled. | `CTR-014` |
 | **T-CTR-015** | CTR-015 Allowed Label Glob Scope | Reject bare `*` safe-output allowed-label patterns | Reject bare `*` safe-output allowed-label patterns. | `CTR-015` |
 | **T-CTR-016** | CTR-016 Compile-Time Manifest Drift | Reject new restricted secrets or action references absent from an existing manifest | Reject new restricted secrets or action references absent from an existing manifest. | `CTR-016` |
-| **T-CTR-017** | CTR-017 Secret Leakage via Environment Variables | Uncontrolled secret-expression placement, or OTLP-enabled agent/threat-detection AWF generation with `--exclude-env` support | Warn, or reject in strict mode, for uncontrolled secret-expression placement; exclude all three host-side OTLP variables from agent and inline/external detection sandboxes while retaining them for host exporters; preserve behavior without OTLP. | `CTR-017` |
+| **T-CTR-017** | CTR-017 Secret Leakage via Environment Variables | Uncontrolled secret-expression placement, or OTLP-enabled agent/threat-detection/evals AWF generation with `--exclude-env` support | Warn, or reject in strict mode, for uncontrolled secret-expression placement; exclude all three host-side OTLP variables from agent, inline/external detection, and evals sandboxes while retaining them for host exporters; preserve behavior without OTLP. | `CTR-017` |
 | **T-CTR-018** | CTR-018 Version Integrity Bypass | Warn, or reject in strict mode, for `check-for-updates: false` | Warn, or reject in strict mode, for `check-for-updates: false`. | `CTR-018` |
 | **T-CTR-019** | CTR-019 Cache-Memory Integrity Enforcement | Require cache updates only after successful agent and threat-detection jobs | Require cache updates only after successful agent and threat-detection jobs. | `CTR-019` |
 | **T-CTR-020** | CTR-020 Conditional Import Security | Reject `imports` entries containing `if` | Reject `imports` entries containing `if`. | `CTR-020` |

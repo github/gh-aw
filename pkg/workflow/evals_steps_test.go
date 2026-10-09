@@ -70,6 +70,49 @@ func TestEvalsExecutionEvidence(t *testing.T) {
 	}
 }
 
+func TestEvalsOTLPEnvExcludedFromSandbox(t *testing.T) {
+	for _, engineID := range []string{"copilot", "claude", "codex"} {
+		for _, tt := range []struct {
+			name   string
+			env    string
+			dryRun bool
+			want   bool
+		}{
+			{name: "configured endpoint", env: "env:\n  OTEL_EXPORTER_OTLP_ENDPOINT: https://traces.example.com\n", want: true},
+			{name: "no endpoint", env: "env:\n  OTHER: value\n"},
+			{name: "dry run", env: "env:\n  OTEL_EXPORTER_OTLP_ENDPOINT: https://traces.example.com\n", dryRun: true},
+		} {
+			t.Run(engineID+"/"+tt.name, func(t *testing.T) {
+				data := &WorkflowData{
+					AI:           engineID,
+					EngineConfig: &EngineConfig{ID: engineID},
+					Env:          tt.env,
+					DryRun:       tt.dryRun,
+				}
+				steps := strings.Join(NewCompiler().buildEvalsEngineSteps(data), "")
+				if !strings.Contains(steps, "--env-all") {
+					t.Fatal("evals must execute through AWF")
+				}
+				for _, name := range otlpSandboxExcludedEnvVarNames {
+					wantCount := 0
+					if tt.want {
+						wantCount = 1
+					}
+					if got := strings.Count(steps, "--exclude-env "+name); got != wantCount {
+						t.Errorf("expected %d exclusions for %s, got %d", wantCount, name, got)
+					}
+				}
+				if strings.Contains(steps, "https://traces.example.com") {
+					t.Fatal("evals steps must not copy the host OTLP endpoint")
+				}
+				if data.ExcludedEnv != nil {
+					t.Fatal("evals must not mutate the parent workflow exclusions")
+				}
+			})
+		}
+	}
+}
+
 func TestDailyAICEvalsCollectorTopology(t *testing.T) {
 	for _, topology := range []string{"default", "arc-dind"} {
 		t.Run(topology, func(t *testing.T) {

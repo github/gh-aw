@@ -80,7 +80,7 @@ Review documentation.
 	}
 }
 
-func TestCompiledOTLPEnvExcludedFromAgentAndDetection(t *testing.T) {
+func TestCompiledOTLPEnvExcludedFromAgentDetectionAndEvals(t *testing.T) {
 	for _, external := range []bool{false, true} {
 		t.Run(fmt.Sprintf("external=%t", external), func(t *testing.T) {
 			workflowPath := filepath.Join(t.TempDir(), "otlp-detection.md")
@@ -96,6 +96,9 @@ observability:
 safe-outputs:
   create-issue:
   threat-detection: true
+evals:
+  - id: completed
+    question: Did the workflow complete?
 features:
   gh-aw-detection: %t
 ---
@@ -116,7 +119,7 @@ Test workflow
 				if !strings.Contains(compiled, name+":") {
 					t.Errorf("host-side OTLP environment must retain %s", name)
 				}
-				for _, job := range []string{"agent", "detection"} {
+				for _, job := range []string{"agent", "detection", "evals"} {
 					section := extractJobSection(compiled, job)
 					if section == "" {
 						t.Fatalf("%s job missing", job)
