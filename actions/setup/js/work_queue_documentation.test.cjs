@@ -75,14 +75,13 @@ describe("work-queue deployment documentation", () => {
     expect(automation).not.toContain('pass `work_queue: {work_id: "<id>"}`');
   });
 
-  it("distinguishes an uninitialized factory from an empty backlog and documents real CLI boundaries", () => {
+  it("treats genuine factory queue absence as empty without bypassing Policy", () => {
     const dispatcher = readRepositoryFile(".github/workflows/eslint-factory-dispatcher.md");
     expect(dispatcher).toContain('work-queue work_queue_read \'{"pool":"default","limit":32}\'');
     expect(dispatcher).toContain("Check `queue_state`, not just `total`");
-    expect(dispatcher).toContain("then stop without");
-    expect(dispatcher).toContain("dispatching or calling `noop`");
-    expect(dispatcher).toContain("safeoutputs missing_data");
-    expect(dispatcher).toContain("not that an initialized queue");
+    expect(dispatcher).toContain("Treat it as an empty backlog and stop with `noop`");
+    expect(dispatcher).toMatch(/no\s+installed Policy to authorize submission or dispatch/);
+    expect(dispatcher).toContain("existing policyless ledger");
     expect(dispatcher).toContain('work-queue work_queue_dispatch_next \'{"pool":"default","max_claims":3,"max_dispatches":3}\'');
     expect(dispatcher).toContain('`status: "staged"`');
     expect(dispatcher).toContain("an empty snapshot or a prediction of no eligible Work can be stale");

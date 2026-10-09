@@ -36,6 +36,17 @@ describe("fair DAG queue lifecycle summaries", () => {
     ).rejects.toThrow(/summarize/);
   });
 
+  it("summarizes genuine dispatcher absence but rejects an existing policyless ledger", async () => {
+    const fixture = queueFixture({ granted: false });
+    const snapshotPath = snapshotFile(fixture);
+    fs.writeFileSync(snapshotPath, JSON.stringify({ version: 3, sha: null, worker: null, origin: fixture.dispatcher, role: "dispatcher", captured_at: fixture.at, transactionLog: "" }));
+    const addRaw = vi.fn(() => ({ write: async () => {} }));
+    const options = { snapshotPath, githubClient: fixture.githubClient, context: fixture.dispatcherContext, core: { summary: { addRaw }, warning: vi.fn() } };
+    await main({ ...options, readWorkQueueLog: async () => ({ sha: null, transactions: [] }) });
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("0 Work nodes; 0 new checked commits"));
+    await expect(main({ ...options, readWorkQueueLog: async () => ({ sha: "existing", transactions: [] }) })).rejects.toThrow(/summarize/);
+  });
+
   it("distinguishes observer reports from unassigned queue-control authority", () => {
     const fixture = queueFixture({ granted: false });
     const summary = renderSummary({ projection: fixture.state, worker: null, role: "observer" }, fixture.state);

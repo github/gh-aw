@@ -66,7 +66,7 @@ async function main(options = {}) {
     const githubClient = options.githubClient || github;
     const repositoryContext = options.context || context;
     const latest = await (options.readWorkQueueLog || readWorkQueueLog)({ githubClient, owner: repositoryContext.repo.owner, repo: repositoryContext.repo.repo, core: coreApi });
-    const current = snapshot.role === "observer" && snapshot.sha === null && latest.sha === null && latest.transactions.length === 0 ? newState() : replayTransactions(latest.transactions);
+    const current = snapshot.role !== "worker" && snapshot.sha === null && latest.sha === null && latest.transactions.length === 0 ? newState() : replayTransactions(latest.transactions);
     await coreApi.summary.addRaw(renderSummary(snapshot, current) + "\n" + renderWorkQueue(current)).write();
   } catch (error) {
     coreApi.warning("Work queue activity is unavailable; snapshot or authoritative ledger validation failed.");

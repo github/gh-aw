@@ -34,10 +34,10 @@ function loadWorkQueueSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPS
   integer(snapshot.captured_at, 0, Number.MAX_SAFE_INTEGER, "snapshot timestamp");
   const worker = snapshot.worker === null ? null : normalizeAssignment(snapshot.worker);
   const role = snapshotRuntimeRole({ ...snapshot, worker });
-  const absent = role === "observer" && snapshot.sha === null && snapshot.transactionLog === "";
+  const absent = role !== "worker" && snapshot.sha === null && snapshot.transactionLog === "";
   if (snapshot.transactionLog === "" && !absent) throw new Error("work_queue_policy_missing");
   const projection = absent ? queue.newState() : queue.replayTransactions(queue.parseTransactionLog(snapshot.transactionLog));
-  if (!projection.policy && !(role === "observer" && snapshot.sha === null && snapshot.transactionLog === "")) throw new Error("work_queue_policy_missing");
+  if (!projection.policy && !absent) throw new Error("work_queue_policy_missing");
   if (snapshot.visible_work_ids !== undefined && (!Array.isArray(snapshot.visible_work_ids) || snapshot.visible_work_ids.some(id => typeof id !== "string"))) throw new TypeError("work queue snapshot visibility is invalid");
   log.debug("snapshot.load.complete", { bytes: stat.size, works: projection.works.size, worker: !!worker, absent });
   return Object.freeze({ sha: snapshot.sha, worker, role, captured_at: snapshot.captured_at, origin: snapshot.origin, visible_work_ids: snapshot.visible_work_ids, projection });

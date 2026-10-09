@@ -138,8 +138,8 @@ function readClaimScopeContext() {
   if ((role === "worker") !== (value !== null)) throw scopeError("declared workers require their original assignment and nonworkers cannot acquire one");
   if (role === "observer" && configuredRole !== "observer") throw scopeError("ordinary observer outputs require an explicit protected compiler role");
   const runtime = require("./aw_context.cjs").resolveWorkQueueRuntime(value === null ? {} : { inputs: { work_queue_assignment: value } }, { role: configuredRole ?? snapshot.role });
-  if (snapshot.transactionLog === "" && !(configuredRole === "observer" && role === "observer" && snapshot.sha === null))
-    throw scopeError("work_queue_policy_missing: existing and participant queues require an installed Policy; only a protected observer may read a genuinely absent branch", "work_queue_policy_missing");
+  if (snapshot.transactionLog === "" && !(snapshot.sha === null && role !== "worker" && (role !== "observer" || configuredRole === "observer")))
+    throw scopeError("work_queue_policy_missing: existing queues and workers require an installed Policy", "work_queue_policy_missing");
   if (role === "observer") {
     if (snapshot.transactionLog !== "") {
       const queue = require("./work_queue_replay.cjs");
