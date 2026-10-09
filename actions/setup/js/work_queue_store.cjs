@@ -527,7 +527,6 @@ async function initializeWorkQueue(options) {
   return publishWorkQueueRequest({ ...options, actor, request, initializeOnly: true });
 }
 
-module.exports = { WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, applyAndPublishWorkQueueTransactions, compactWorkQueue, freshAuthorizer, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog, stableRequestResult, verifyRepository };
 module.exports = {
   WORK_QUEUE_BRANCH,
   WORK_QUEUE_LOG_PATH,

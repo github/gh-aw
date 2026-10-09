@@ -15,31 +15,15 @@
               "epoch": "initial",
               "policy": {
                 "mode": "weighted-priority",
-                "class_weights": [
-                  8,
-                  4,
-                  2,
-                  1,
-                  1
-                ],
+                "class_weights": [8, 4, 2, 1, 1],
                 "accounting_weights": {
                   "": 1
                 },
                 "producers": {
                   "1001": {
-                    "pools": [
-                      "default"
-                    ],
-                    "priorities": [
-                      1,
-                      2,
-                      3,
-                      4,
-                      5
-                    ],
-                    "fairness_keys": [
-                      ""
-                    ]
+                    "pools": ["default"],
+                    "priorities": [1, 2, 3, 4, 5],
+                    "fairness_keys": [""]
                   }
                 },
                 "pools": {
@@ -59,9 +43,7 @@
                     },
                     "logical_limit": 16,
                     "native_limit": 16,
-                    "allowed_repositories": [
-                      "owner/repo"
-                    ],
+                    "allowed_repositories": ["owner/repo"],
                     "max_observation_age_ms": 60000,
                     "retry": {
                       "max_attempts": 3,
@@ -105,31 +87,15 @@
           "epoch": "initial",
           "policy": {
             "mode": "weighted-priority",
-            "class_weights": [
-              8,
-              4,
-              2,
-              1,
-              1
-            ],
+            "class_weights": [8, 4, 2, 1, 1],
             "accounting_weights": {
               "": 1
             },
             "producers": {
               "1001": {
-                "pools": [
-                  "default"
-                ],
-                "priorities": [
-                  1,
-                  2,
-                  3,
-                  4,
-                  5
-                ],
-                "fairness_keys": [
-                  ""
-                ]
+                "pools": ["default"],
+                "priorities": [1, 2, 3, 4, 5],
+                "fairness_keys": [""]
               }
             },
             "pools": {
@@ -149,9 +115,7 @@
                 },
                 "logical_limit": 16,
                 "native_limit": 16,
-                "allowed_repositories": [
-                  "owner/repo"
-                ],
+                "allowed_repositories": ["owner/repo"],
                 "max_observation_age_ms": 60000,
                 "retry": {
                   "max_attempts": 3,
@@ -340,31 +304,15 @@
             "policy_epoch": "initial",
             "policy": {
               "mode": "weighted-priority",
-              "class_weights": [
-                8,
-                4,
-                2,
-                1,
-                1
-              ],
+              "class_weights": [8, 4, 2, 1, 1],
               "accounting_weights": {
                 "": 1
               },
               "producers": {
                 "1001": {
-                  "pools": [
-                    "default"
-                  ],
-                  "priorities": [
-                    1,
-                    2,
-                    3,
-                    4,
-                    5
-                  ],
-                  "fairness_keys": [
-                    ""
-                  ]
+                  "pools": ["default"],
+                  "priorities": [1, 2, 3, 4, 5],
+                  "fairness_keys": [""]
                 }
               },
               "pools": {
@@ -384,9 +332,7 @@
                   },
                   "logical_limit": 16,
                   "native_limit": 16,
-                  "allowed_repositories": [
-                    "owner/repo"
-                  ],
+                  "allowed_repositories": ["owner/repo"],
                   "max_observation_age_ms": 60000,
                   "retry": {
                     "max_attempts": 3,
@@ -605,31 +551,15 @@
             "policy_epoch": "initial",
             "policy": {
               "mode": "weighted-priority",
-              "class_weights": [
-                8,
-                4,
-                2,
-                1,
-                1
-              ],
+              "class_weights": [8, 4, 2, 1, 1],
               "accounting_weights": {
                 "": 1
               },
               "producers": {
                 "1001": {
-                  "pools": [
-                    "default"
-                  ],
-                  "priorities": [
-                    1,
-                    2,
-                    3,
-                    4,
-                    5
-                  ],
-                  "fairness_keys": [
-                    ""
-                  ]
+                  "pools": ["default"],
+                  "priorities": [1, 2, 3, 4, 5],
+                  "fairness_keys": [""]
                 }
               },
               "pools": {
@@ -649,9 +579,7 @@
                   },
                   "logical_limit": 16,
                   "native_limit": 16,
-                  "allowed_repositories": [
-                    "owner/repo"
-                  ],
+                  "allowed_repositories": ["owner/repo"],
                   "max_observation_age_ms": 60000,
                   "retry": {
                     "max_attempts": 3,
