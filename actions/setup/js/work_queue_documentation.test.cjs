@@ -19,6 +19,7 @@ describe("work-queue deployment documentation", () => {
     const source = readRepositoryFile("docs/src/content/docs/reference/frontmatter-full.md");
     const queue = source.slice(source.indexOf("  # Read the immutable version-3 activation snapshot."), source.indexOf("  # Cache memory MCP configuration"));
     expect(queue).toMatch(/^  work-queue:\s*$/m);
+    expect(queue).toContain("work-queue: null");
     expect(queue).toContain("worker: true");
     expect(queue).not.toMatch(/\bstorage:/);
   });
