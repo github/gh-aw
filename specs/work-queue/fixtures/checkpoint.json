@@ -1,0 +1,726 @@
+{
+  "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "history": [
+    {
+      "version": 3,
+      "id": "genesis",
+      "previous": null,
+      "request": {
+        "id": "request-genesis",
+        "kind": "policy",
+        "parameters": {
+          "operations": [
+            {
+              "kind": "Policy",
+              "epoch": "initial",
+              "policy": {
+                "mode": "weighted-priority",
+                "class_weights": [8, 4, 2, 1, 1],
+                "accounting_weights": {
+                  "": 1
+                },
+                "producers": {
+                  "1001": {
+                    "pools": ["default"],
+                    "priorities": [1, 2, 3, 4, 5],
+                    "fairness_keys": [""]
+                  }
+                },
+                "pools": {
+                  "default": {
+                    "default_profile": "default",
+                    "profiles": {
+                      "default": {
+                        "workflow": ".github/workflows/worker.lock.yml",
+                        "ref": "0000000000000000000000000000000000000000",
+                        "principal": "1001",
+                        "trust_domain": "default",
+                        "credential_scope": "repository",
+                        "effect_scope": "owner/repo",
+                        "max_claims": 1,
+                        "share_keys": false
+                      }
+                    },
+                    "logical_limit": 16,
+                    "native_limit": 16,
+                    "allowed_repositories": ["owner/repo"],
+                    "max_observation_age_ms": 60000,
+                    "retry": {
+                      "max_attempts": 3,
+                      "backoff_ms": 30000
+                    },
+                    "reconciliation": {
+                      "max_attempts": 5,
+                      "deadline_ms": 300000
+                    }
+                  }
+                },
+                "limits": {
+                  "ledger_bytes": 67108864,
+                  "recovery_bytes": 16777216,
+                  "payload_bytes": 16384,
+                  "graph_nodes": 4096,
+                  "predecessors": 64,
+                  "pending_nodes": 4096,
+                  "operations": 256,
+                  "assignment_bytes": 49152,
+                  "result_bytes": 4096,
+                  "evidence_bytes": 1024,
+                  "observation_writes": 4096
+                }
+              }
+            }
+          ]
+        },
+        "fingerprint": "c879d664ad7fc8d39d1a15353a4fa8d893d5171a1b3e97b34e592be6b6379648"
+      },
+      "actor": {
+        "role": "administrator",
+        "principal": "1001",
+        "repository": "owner/repo"
+      },
+      "policy_epoch": "initial",
+      "at": 0,
+      "operations": [
+        {
+          "kind": "Policy",
+          "epoch": "initial",
+          "policy": {
+            "mode": "weighted-priority",
+            "class_weights": [8, 4, 2, 1, 1],
+            "accounting_weights": {
+              "": 1
+            },
+            "producers": {
+              "1001": {
+                "pools": ["default"],
+                "priorities": [1, 2, 3, 4, 5],
+                "fairness_keys": [""]
+              }
+            },
+            "pools": {
+              "default": {
+                "default_profile": "default",
+                "profiles": {
+                  "default": {
+                    "workflow": ".github/workflows/worker.lock.yml",
+                    "ref": "0000000000000000000000000000000000000000",
+                    "principal": "1001",
+                    "trust_domain": "default",
+                    "credential_scope": "repository",
+                    "effect_scope": "owner/repo",
+                    "max_claims": 1,
+                    "share_keys": false
+                  }
+                },
+                "logical_limit": 16,
+                "native_limit": 16,
+                "allowed_repositories": ["owner/repo"],
+                "max_observation_age_ms": 60000,
+                "retry": {
+                  "max_attempts": 3,
+                  "backoff_ms": 30000
+                },
+                "reconciliation": {
+                  "max_attempts": 5,
+                  "deadline_ms": 300000
+                }
+              }
+            },
+            "limits": {
+              "ledger_bytes": 67108864,
+              "recovery_bytes": 16777216,
+              "payload_bytes": 16384,
+              "graph_nodes": 4096,
+              "predecessors": 64,
+              "pending_nodes": 4096,
+              "operations": 256,
+              "assignment_bytes": 49152,
+              "result_bytes": 4096,
+              "evidence_bytes": 1024,
+              "observation_writes": 4096
+            }
+          }
+        }
+      ]
+    },
+    {
+      "version": 3,
+      "id": "submit",
+      "previous": "genesis",
+      "request": {
+        "id": "request-submit",
+        "kind": "submit",
+        "parameters": {
+          "nodes": [
+            {
+              "kind": "Work",
+              "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+              "graph_id": "graph",
+              "node_key": "a",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "default",
+              "batch_trust_domain": "default",
+              "payload": {
+                "task": "a"
+              },
+              "depends_on": [],
+              "enqueued": 1
+            },
+            {
+              "kind": "Work",
+              "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60",
+              "graph_id": "graph",
+              "node_key": "b",
+              "pool": "default",
+              "priority": 3,
+              "fairness_key": "",
+              "worker_profile": "default",
+              "batch_trust_domain": "default",
+              "payload": {
+                "task": "b"
+              },
+              "depends_on": [],
+              "enqueued": 1
+            }
+          ]
+        },
+        "fingerprint": "32903ab0abc20d63dca201930057401d0acb127098ccb9e02794e3a6b39098a1"
+      },
+      "actor": {
+        "role": "producer",
+        "principal": "1001",
+        "repository": "owner/repo"
+      },
+      "policy_epoch": "initial",
+      "at": 1,
+      "operations": [
+        {
+          "kind": "Work",
+          "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+          "graph_id": "graph",
+          "node_key": "a",
+          "pool": "default",
+          "priority": 3,
+          "fairness_key": "",
+          "worker_profile": "default",
+          "batch_trust_domain": "default",
+          "payload": {
+            "task": "a"
+          },
+          "depends_on": [],
+          "enqueued": 1
+        },
+        {
+          "kind": "Work",
+          "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60",
+          "graph_id": "graph",
+          "node_key": "b",
+          "pool": "default",
+          "priority": 3,
+          "fairness_key": "",
+          "worker_profile": "default",
+          "batch_trust_domain": "default",
+          "payload": {
+            "task": "b"
+          },
+          "depends_on": [],
+          "enqueued": 1
+        }
+      ]
+    },
+    {
+      "version": 3,
+      "id": "grant",
+      "previous": "submit",
+      "request": {
+        "id": "request-grant",
+        "kind": "dispatch_next",
+        "parameters": {
+          "pool": "default",
+          "max_claims": 1,
+          "max_dispatches": 1,
+          "max_bytes": 49152
+        },
+        "fingerprint": "2c2671c61e68a6c5690b308c7c53e6b7f59ef7c16abac2a881e24a09222297c3"
+      },
+      "actor": {
+        "role": "dispatcher",
+        "principal": "1001",
+        "repository": "owner/repo",
+        "workflow": ".github/workflows/dispatcher.lock.yml",
+        "run_id": "100",
+        "run_attempt": 1
+      },
+      "policy_epoch": "initial",
+      "at": 10,
+      "operations": [
+        {
+          "kind": "Claim",
+          "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+          "claim_id": "c_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+          "dispatch_id": "d_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+          "handle": "h1",
+          "observations": []
+        }
+      ]
+    }
+  ],
+  "checkpoint": [
+    {
+      "version": 3,
+      "id": "q_7db09b8a3f5f5835bed15afa150271d760b2da0a791d14d9bc4ac1416d6bce10",
+      "previous": null,
+      "request": {
+        "id": "checkpoint_1bc7d47b8b7501907d1cb10e879de6eae2f23d8a74cb6e4b8e73a20e2f747a6f",
+        "kind": "checkpoint",
+        "parameters": {
+          "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "prior_tip": "grant",
+          "history_sha256": "eea10ee905b3e70dbcfaf2d20ffb6ba60f3e3a58824792c51047096306c95a30",
+          "state_sha256": "5a04614c9f263003bff377238b00de233e72578943c87291c8128f66b0a4fb4b"
+        },
+        "fingerprint": "8728075e4437e858dfdfe55e7ad30b14007532bdc35767c19169b281d4f22cce"
+      },
+      "actor": {
+        "role": "administrator",
+        "principal": "1001",
+        "repository": "owner/repo"
+      },
+      "policy_epoch": "initial",
+      "at": 100,
+      "operations": [
+        {
+          "kind": "Checkpoint",
+          "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "prior_tip": "grant",
+          "history_sha256": "eea10ee905b3e70dbcfaf2d20ffb6ba60f3e3a58824792c51047096306c95a30",
+          "state_sha256": "5a04614c9f263003bff377238b00de233e72578943c87291c8128f66b0a4fb4b",
+          "state": {
+            "repository": "owner/repo",
+            "tip": "grant",
+            "policy_epoch": "initial",
+            "policy": {
+              "mode": "weighted-priority",
+              "class_weights": [8, 4, 2, 1, 1],
+              "accounting_weights": {
+                "": 1
+              },
+              "producers": {
+                "1001": {
+                  "pools": ["default"],
+                  "priorities": [1, 2, 3, 4, 5],
+                  "fairness_keys": [""]
+                }
+              },
+              "pools": {
+                "default": {
+                  "default_profile": "default",
+                  "profiles": {
+                    "default": {
+                      "workflow": ".github/workflows/worker.lock.yml",
+                      "ref": "0000000000000000000000000000000000000000",
+                      "principal": "1001",
+                      "trust_domain": "default",
+                      "credential_scope": "repository",
+                      "effect_scope": "owner/repo",
+                      "max_claims": 1,
+                      "share_keys": false
+                    }
+                  },
+                  "logical_limit": 16,
+                  "native_limit": 16,
+                  "allowed_repositories": ["owner/repo"],
+                  "max_observation_age_ms": 60000,
+                  "retry": {
+                    "max_attempts": 3,
+                    "backoff_ms": 30000
+                  },
+                  "reconciliation": {
+                    "max_attempts": 5,
+                    "deadline_ms": 300000
+                  }
+                }
+              },
+              "limits": {
+                "ledger_bytes": 67108864,
+                "recovery_bytes": 16777216,
+                "payload_bytes": 16384,
+                "graph_nodes": 4096,
+                "predecessors": 64,
+                "pending_nodes": 4096,
+                "operations": 256,
+                "assignment_bytes": 49152,
+                "result_bytes": 4096,
+                "evidence_bytes": 1024,
+                "observation_writes": 4096
+              }
+            },
+            "works": {
+              "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d": {
+                "kind": "Work",
+                "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+                "graph_id": "graph",
+                "node_key": "a",
+                "pool": "default",
+                "priority": 3,
+                "fairness_key": "",
+                "worker_profile": "default",
+                "batch_trust_domain": "default",
+                "payload": {
+                  "task": "a"
+                },
+                "depends_on": [],
+                "enqueued": 1,
+                "state": "claimed",
+                "position": {
+                  "commit": 1,
+                  "operation": 0
+                },
+                "attempts": 1,
+                "retry_not_before": 0,
+                "barrier": "none",
+                "claim_id": "c_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1"
+              },
+              "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60": {
+                "kind": "Work",
+                "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60",
+                "graph_id": "graph",
+                "node_key": "b",
+                "pool": "default",
+                "priority": 3,
+                "fairness_key": "",
+                "worker_profile": "default",
+                "batch_trust_domain": "default",
+                "payload": {
+                  "task": "b"
+                },
+                "depends_on": [],
+                "enqueued": 1,
+                "state": "available",
+                "position": {
+                  "commit": 1,
+                  "operation": 1
+                },
+                "attempts": 0,
+                "retry_not_before": 0,
+                "barrier": "none"
+              }
+            },
+            "claims": {
+              "c_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1": {
+                "kind": "Claim",
+                "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+                "claim_id": "c_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+                "dispatch_id": "d_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+                "handle": "h1",
+                "observations": [],
+                "state": "open",
+                "commit_id": "grant",
+                "request_id": "request-grant"
+              }
+            },
+            "dispatches": {
+              "d_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1": {
+                "version": 3,
+                "dispatch_id": "d_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+                "request_id": "request-grant",
+                "commit_id": "grant",
+                "policy_epoch": "initial",
+                "pool": "default",
+                "worker_profile": "default",
+                "claims": [
+                  {
+                    "handle": "h1",
+                    "claim_id": "c_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+                    "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+                    "work": {
+                      "task": "a"
+                    },
+                    "result_refs": []
+                  }
+                ],
+                "profile": {
+                  "workflow": ".github/workflows/worker.lock.yml",
+                  "ref": "0000000000000000000000000000000000000000",
+                  "principal": "1001",
+                  "trust_domain": "default",
+                  "credential_scope": "repository",
+                  "effect_scope": "owner/repo",
+                  "max_claims": 1,
+                  "share_keys": false
+                },
+                "state": "reserved",
+                "released": false,
+                "lifecycle_writes": 0
+              }
+            },
+            "observations": {},
+            "requests": [
+              {
+                "id": "genesis",
+                "request_id": "request-genesis",
+                "kind": "policy",
+                "fingerprint": "c879d664ad7fc8d39d1a15353a4fa8d893d5171a1b3e97b34e592be6b6379648",
+                "parameters_digest": "216c5eac490357b494a21580d0070aa3083a6906dcdcd32e19b46a06b57eb929",
+                "actor": {
+                  "role": "administrator",
+                  "principal": "1001",
+                  "repository": "owner/repo"
+                },
+                "policy_epoch": "initial",
+                "at": 0,
+                "claims": []
+              },
+              {
+                "id": "submit",
+                "request_id": "request-submit",
+                "kind": "submit",
+                "fingerprint": "32903ab0abc20d63dca201930057401d0acb127098ccb9e02794e3a6b39098a1",
+                "parameters_digest": "6ed95047a2d094bed60b753318d81d3f6db57d7875d2925d8483c01c552cc64a",
+                "actor": {
+                  "role": "producer",
+                  "principal": "1001",
+                  "repository": "owner/repo"
+                },
+                "policy_epoch": "initial",
+                "at": 1,
+                "claims": []
+              },
+              {
+                "id": "grant",
+                "request_id": "request-grant",
+                "kind": "dispatch_next",
+                "fingerprint": "2c2671c61e68a6c5690b308c7c53e6b7f59ef7c16abac2a881e24a09222297c3",
+                "parameters_digest": "32a2b265e7c2e527a89b86ebf8af0f5970c3582e4ea38b97e550ff9ac8d3a39a",
+                "dispatch_parameters": {
+                  "pool": "default",
+                  "max_claims": 1,
+                  "max_dispatches": 1,
+                  "max_bytes": 49152
+                },
+                "actor": {
+                  "role": "dispatcher",
+                  "principal": "1001",
+                  "repository": "owner/repo",
+                  "workflow": ".github/workflows/dispatcher.lock.yml",
+                  "run_id": "100",
+                  "run_attempt": 1
+                },
+                "policy_epoch": "initial",
+                "at": 10,
+                "claims": [
+                  {
+                    "kind": "Claim",
+                    "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+                    "claim_id": "c_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+                    "dispatch_id": "d_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
+                    "handle": "h1",
+                    "observations": []
+                  }
+                ]
+              }
+            ],
+            "clocks": {
+              "default": {
+                "classes": {
+                  "v": "4",
+                  "pass": {
+                    "3": "8"
+                  },
+                  "active": {
+                    "3": true
+                  }
+                },
+                "keys": {
+                  "3": {
+                    "v": "1",
+                    "pass": {
+                      "": "2"
+                    },
+                    "active": {
+                      "": true
+                    }
+                  }
+                }
+              }
+            },
+            "admission_paused": false,
+            "grants_paused": false,
+            "credential_generation": "initial",
+            "stats": {
+              "work": 2,
+              "available": 1,
+              "claimed": 1,
+              "completed": 0,
+              "cancelled": 0,
+              "claims": 1,
+              "dispatches": 1,
+              "transactions": 3,
+              "nodes": 2
+            },
+            "ledger_bytes": 4539,
+            "observation_writes": {},
+            "seen_epochs": {
+              "initial": true
+            },
+            "seen_generations": {
+              "initial": true
+            },
+            "observation_ids": {},
+            "terminal_barriers": {},
+            "cancellations": {},
+            "completion_times": {},
+            "last_at": 10
+          }
+        }
+      ]
+    }
+  ],
+  "genesis_checkpoint": [
+    {
+      "version": 3,
+      "id": "q_189f3ece618e6b8233dc0e8fec939c3e8089e41b8b65b91e5d44be616ca7bf28",
+      "previous": null,
+      "request": {
+        "id": "checkpoint_0b2e49a1eefb1b8a77fe78ee57114178b1ac205bd2cf5bc963677aaa27144c0b",
+        "kind": "checkpoint",
+        "parameters": {
+          "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "prior_tip": "genesis",
+          "history_sha256": "c999b11f7c40f2d47d351c3141fc13f5559d0751cbe1931ddfc6f8b691076c08",
+          "state_sha256": "7ca83da33c753cae2f1e355fe6fe12eda1fde26348d2361575a00ca1ddfcd120"
+        },
+        "fingerprint": "38309947491041cd29d692aad0ab3da3ed7f8dcbddf00838beaed3c5773a09d4"
+      },
+      "actor": {
+        "role": "administrator",
+        "principal": "1001",
+        "repository": "owner/repo"
+      },
+      "policy_epoch": "initial",
+      "at": 0,
+      "operations": [
+        {
+          "kind": "Checkpoint",
+          "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "prior_tip": "genesis",
+          "history_sha256": "c999b11f7c40f2d47d351c3141fc13f5559d0751cbe1931ddfc6f8b691076c08",
+          "state_sha256": "7ca83da33c753cae2f1e355fe6fe12eda1fde26348d2361575a00ca1ddfcd120",
+          "state": {
+            "repository": "owner/repo",
+            "tip": "genesis",
+            "policy_epoch": "initial",
+            "policy": {
+              "mode": "weighted-priority",
+              "class_weights": [8, 4, 2, 1, 1],
+              "accounting_weights": {
+                "": 1
+              },
+              "producers": {
+                "1001": {
+                  "pools": ["default"],
+                  "priorities": [1, 2, 3, 4, 5],
+                  "fairness_keys": [""]
+                }
+              },
+              "pools": {
+                "default": {
+                  "default_profile": "default",
+                  "profiles": {
+                    "default": {
+                      "workflow": ".github/workflows/worker.lock.yml",
+                      "ref": "0000000000000000000000000000000000000000",
+                      "principal": "1001",
+                      "trust_domain": "default",
+                      "credential_scope": "repository",
+                      "effect_scope": "owner/repo",
+                      "max_claims": 1,
+                      "share_keys": false
+                    }
+                  },
+                  "logical_limit": 16,
+                  "native_limit": 16,
+                  "allowed_repositories": ["owner/repo"],
+                  "max_observation_age_ms": 60000,
+                  "retry": {
+                    "max_attempts": 3,
+                    "backoff_ms": 30000
+                  },
+                  "reconciliation": {
+                    "max_attempts": 5,
+                    "deadline_ms": 300000
+                  }
+                }
+              },
+              "limits": {
+                "ledger_bytes": 67108864,
+                "recovery_bytes": 16777216,
+                "payload_bytes": 16384,
+                "graph_nodes": 4096,
+                "predecessors": 64,
+                "pending_nodes": 4096,
+                "operations": 256,
+                "assignment_bytes": 49152,
+                "result_bytes": 4096,
+                "evidence_bytes": 1024,
+                "observation_writes": 4096
+              }
+            },
+            "works": {},
+            "claims": {},
+            "dispatches": {},
+            "observations": {},
+            "requests": [
+              {
+                "id": "genesis",
+                "request_id": "request-genesis",
+                "kind": "policy",
+                "fingerprint": "c879d664ad7fc8d39d1a15353a4fa8d893d5171a1b3e97b34e592be6b6379648",
+                "parameters_digest": "216c5eac490357b494a21580d0070aa3083a6906dcdcd32e19b46a06b57eb929",
+                "actor": {
+                  "role": "administrator",
+                  "principal": "1001",
+                  "repository": "owner/repo"
+                },
+                "policy_epoch": "initial",
+                "at": 0,
+                "claims": []
+              }
+            ],
+            "clocks": {},
+            "admission_paused": false,
+            "grants_paused": false,
+            "credential_generation": "initial",
+            "stats": {
+              "work": 0,
+              "available": 0,
+              "claimed": 0,
+              "completed": 0,
+              "cancelled": 0,
+              "claims": 0,
+              "dispatches": 0,
+              "transactions": 1,
+              "nodes": 0
+            },
+            "ledger_bytes": 2308,
+            "observation_writes": {},
+            "seen_epochs": {
+              "initial": true
+            },
+            "seen_generations": {
+              "initial": true
+            },
+            "observation_ids": {},
+            "terminal_barriers": {},
+            "cancellations": {},
+            "completion_times": {},
+            "last_at": 0
+          }
+        }
+      ]
+    }
+  ]
+}

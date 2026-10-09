@@ -7,7 +7,7 @@ const { tickScale } = require("./work_queue_scheduler.cjs");
 
 const ROLES = new Set(["administrator", "producer", "dispatcher", "worker", "reconciler"]);
 const ROLE_KINDS = {
-  administrator: ["policy", "control", "submit", "dispatch_next", "observe", "cancel_work"],
+  administrator: ["policy", "control", "submit", "dispatch_next", "observe", "cancel_work", "checkpoint"],
   producer: ["submit", "cancel_work"],
   dispatcher: ["submit", "dispatch_next", "observe", "dispatch"],
   worker: ["submit", "dispatch_next", "observe", "finish", "dispatch"],

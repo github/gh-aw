@@ -51,8 +51,15 @@ jobs:
         id: invariants
         run: |
           mkdir -p stress-results
-          node --test .github/scripts/work-queue-stress.test.cjs .github/scripts/work-queue-stress-summary.test.cjs \
+          node --test --test-skip-pattern='checkpoint loses real-Git' \
+            .github/scripts/work-queue-stress.test.cjs .github/scripts/work-queue-stress-summary.test.cjs \
             | tee stress-results/invariants.tap
+
+      - name: Exercise checkpoint publication races
+        id: checkpoint
+        run: |
+          node --test --test-name-pattern='checkpoint loses real-Git' .github/scripts/work-queue-stress.test.cjs \
+            | tee stress-results/checkpoint.tap
 
       - name: Replay retained Work and Claim items
         id: history

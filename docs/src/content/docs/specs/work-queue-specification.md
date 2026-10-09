@@ -710,7 +710,7 @@ The same exact algorithm and fixtures MUST be used for authoritative runtime sch
 
 ### 7.6 One causal transaction log, one atomic envelope
 
-Use **one `QueueCommit` JSON object per line of the existing `work-queue.jsonl`**. Every accepted mutation, not just scheduler decisions, uses this envelope. There is one causal chain and no separate scheduler chain, observation digest, source-fact delta, checkpoint, manifest, or authoritative state file.
+Use **one `QueueCommit` JSON object per line of the existing `work-queue.jsonl`**. Every accepted mutation, not just scheduler decisions, uses this envelope. There is one causal chain and no separate scheduler chain, manifest, or authoritative state file. A version-3 checkpoint is a root QueueCommit containing deterministic replay state and a pointer to the prior Git commit; subsequent commits extend that checkpoint.
 
 | Envelope field | Meaning |
 |---|---|
@@ -1151,12 +1151,13 @@ Initial deployment is a breaking replacement, not a compatibility rollout:
 
 There is no runtime migration or backward-compatible reader for old queues. Encountering an old ledger MUST produce an explicit unsupported-protocol error and leave it unchanged; it must not erase, reset, reinterpret, or silently copy existing work. Do not rewrite committed current-protocol grants or retrospective fairness measurements. Missing policy, unsupported transaction/policy versions, and mismatched compiled policies MUST fail closed.
 
-Compaction must preserve the complete causal commit chain and all operations,
-including ownership, delivery outcomes, controls, charge history, request
-idempotency, dispatch bindings, and releases. Removing unique old commits can
-change future selections or lose an uncertain launch. Current compaction only
-removes exact duplicate commit records and writes causal order. Authoritative
-checkpoints/history truncation remain outside scope; disposable indexes and
+Compaction must preserve the effects of the complete causal commit chain,
+including ownership, delivery outcomes, controls, fairness debt, request
+idempotency, dispatch bindings, and releases. A checkpoint replaces a validated
+prefix with deterministic state; its prior Git commit SHA and canonical history
+digest retain a pointer to earlier evidence. A stale plan must not overwrite
+concurrent worker commits: the trusted apply step revalidates the plan against
+the current queue and defers after bounded contention. Disposable indexes and
 bounded operation are specified in section 7.17.
 
 ### 7.11 Guarantees and non-guarantees
@@ -2030,7 +2031,10 @@ Matching a tip/blob hash proves which ledger was named, not that the cached
 projection was computed correctly. Unless trusted cache integrity and derivation
 can be established, rebuild the projection by cold replay; untrusted activation
 or agent-produced cache contents cannot seed publication.
-No projection checkpoint authorizes removing unique log records.
+A validated version-3 checkpoint may replace the active log prefix; it is
+authoritative only as part of the Git-backed queue, not as an agent-produced
+projection cache. Earlier history remains accessible through the referenced
+Git commit, subject to repository retention.
 
 ```mermaid
 flowchart LR

@@ -1,0 +1,133 @@
+import { describe, it } from "vitest";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const fixture = require("../../../specs/work-queue/fixtures/checkpoint.json");
+const { administrator, bind, context, finish, genesis, grant, submission } = require("./work_queue_test_helpers.cjs");
+const { canonical, digest } = require("./work_queue_codec.cjs");
+const { diagnostics } = require("./work_queue_scheduler.cjs");
+const { appendCommit, compactTransactions, generateRequestOperations, newRequest, prepareCheckpoint, proposedCommitId, replayTransactions, serializeTransactionLog } = require("./work_queue_replay.cjs");
+const { readWorkQueueLog } = require("./work_queue_store.cjs");
+const { acceptedSubmissionParameters } = require("./work_queue_dispatch.cjs");
+
+describe("shared version-3 checkpoint conformance", () => {
+  it("preserves pending delivery deadline and bound native capacity", () => {
+    const history = [genesis()];
+    history.push(submission(history, ["delivery"]));
+    const decision = grant(history);
+    history.push(decision.commit);
+    history.push(...bind(history, decision.assignments[0].dispatch_id).slice(history.length));
+    history.push(finish(history, decision.assignments[0].dispatch_id, decision.assignments[0].claims[0].handle, "completed"));
+    const before = replayTransactions(history);
+    const checkpoint = prepareCheckpoint(history, "c".repeat(40), administrator);
+    const after = replayTransactions(checkpoint);
+    const workId = decision.assignments[0].claims[0].work_id;
+    assert.equal(after.works.get(workId).completion_at, before.works.get(workId).completion_at);
+    assert.equal(after.works.get(workId).barrier, "pending");
+    assert.equal(canonical([...after.dispatches]), canonical([...before.dispatches]));
+  });
+
+  it("restores the historical projection and all stable request identities", () => {
+    const before = replayTransactions(fixture.history);
+    const after = replayTransactions(fixture.checkpoint);
+    for (const field of ["works", "claims", "dispatches", "observations", "clocks"]) {
+      const entries = map => [...map].map(([key, value]) => [key, field === "clocks" ? diagnostics(value) : value]);
+      assert.equal(canonical(entries(after[field])), canonical(entries(before[field])), field);
+    }
+    assert.equal(after.requests.size, before.requests.size + 1);
+    for (const original of fixture.history) {
+      const restored = after.requests.get(original.request.id);
+      assert.equal(restored.request.fingerprint, original.request.fingerprint);
+      assert.deepEqual(restored.request.parameters, ["submit", "dispatch_next"].includes(original.request.kind) ? original.request.parameters : null);
+    }
+    const originalSubmission = fixture.history[1];
+    const intent = {
+      nodes: originalSubmission.request.parameters.nodes.map(({ kind, batch_trust_domain, enqueued, ...node }) => node),
+    };
+    assert.deepEqual(
+      acceptedSubmissionParameters(after, context(originalSubmission.actor, { created_at: originalSubmission.at }), intent, after.requests.get(originalSubmission.request.id)),
+      originalSubmission.request.parameters
+    );
+    assert.equal(after.transactions.length, 1);
+    assert.equal(serializeTransactionLog(after.transactions), serializeTransactionLog(fixture.checkpoint));
+    assert.deepEqual(compactTransactions(fixture.history, fixture.prior_git_sha, administrator, 100), fixture.checkpoint);
+    assert.deepEqual(prepareCheckpoint(fixture.history.slice(0, 1), fixture.prior_git_sha, administrator, 0), fixture.genesis_checkpoint);
+    assert.equal(canonical(prepareCheckpoint(before, fixture.prior_git_sha)), canonical(prepareCheckpoint(fixture.history, fixture.prior_git_sha)));
+    assert.equal(prepareCheckpoint(before, fixture.prior_git_sha)[0].operations[0].prior_git_sha, fixture.prior_git_sha);
+    const originalRequest = fixture.history[1].request;
+    assert.equal(generateRequestOperations(after, originalRequest, fixture.history[1].actor, 101, "unused").commit.id, fixture.history[1].id);
+    const operation = { kind: "Control", control: "grants_paused", value: true, reason: "pause" };
+    const request = newRequest("post-checkpoint-pause", "control", administrator, { operations: [operation] });
+    const next = {
+      version: 3,
+      id: proposedCommitId(after, request),
+      previous: after.tip,
+      request,
+      actor: administrator,
+      policy_epoch: after.policy_epoch,
+      at: 101,
+      operations: [operation],
+    };
+    const extended = appendCommit(fixture.checkpoint, next).state;
+    assert.equal(extended.grants_paused, true);
+    assert.equal(extended.stats.transactions, fixture.history.length + 2);
+    assert.equal(canonical([...extended.clocks].map(([pool, debt]) => [pool, diagnostics(debt)])), canonical([...after.clocks].map(([pool, debt]) => [pool, diagnostics(debt)])));
+    const nested = replayTransactions(compactTransactions([fixture.checkpoint[0], next], "b".repeat(40), administrator, 102));
+    assert.equal(nested.stats.transactions, fixture.history.length + 3);
+    assert.equal(nested.requests.size, extended.requests.size + 1);
+    assert.equal(nested.grants_paused, true);
+  });
+
+  it("rejects malformed state, digest, predecessor and stable request binding", () => {
+    const base = fixture.checkpoint[0];
+    const rejects = [
+      { ...base, previous: "bogus" },
+      { ...base, operations: [{ ...base.operations[0], state: { ...base.operations[0].state, works: {} } }] },
+      { ...base, operations: [{ ...base.operations[0], prior_tip: "false-tip" }] },
+      { ...base, operations: [{ ...base.operations[0], state_sha256: "0".repeat(64) }], request: newRequest("tampered", "checkpoint", administrator, { ...base.request.parameters, state_sha256: "0".repeat(64) }) },
+    ];
+    for (const bad of rejects) assert.throws(() => replayTransactions([bad]), /checkpoint_invalid|ledger_invalid/);
+    const forged = structuredClone(base);
+    const [claimId] = Object.keys(forged.operations[0].state.claims);
+    forged.operations[0].state.claims[claimId].work_id = "missing-work";
+    forged.operations[0].state_sha256 = digest(forged.operations[0].state);
+    forged.request = newRequest(base.request.id, "checkpoint", administrator, { ...base.request.parameters, state_sha256: forged.operations[0].state_sha256 });
+    assert.throws(() => replayTransactions([forged]), /checkpoint_invalid/);
+    const receiptForgery = structuredClone(base);
+    receiptForgery.operations[0].state.requests[1].parameters_digest = "0".repeat(64);
+    receiptForgery.operations[0].state_sha256 = digest(receiptForgery.operations[0].state);
+    receiptForgery.request = newRequest(base.request.id, "checkpoint", administrator, { ...base.request.parameters, state_sha256: receiptForgery.operations[0].state_sha256 });
+    assert.throws(() => replayTransactions([receiptForgery]), /checkpoint_invalid/);
+    const rogue = { ...base, id: "rogue", previous: base.id, request: newRequest("rogue", "checkpoint", administrator, base.request.parameters) };
+    assert.throws(() => replayTransactions([base, rogue]), /checkpoint_invalid/);
+  });
+
+  it("authenticates the checkpoint against its actual Git parent ledger", async () => {
+    const head = "f".repeat(40);
+    const foreign = "e".repeat(40);
+    const prior = fixture.prior_git_sha;
+    const blobs = { root: serializeTransactionLog(fixture.checkpoint), history: serializeTransactionLog(fixture.history) };
+    let parent = prior;
+    const githubClient = {
+      rest: {
+        repos: { get: async () => ({ data: { full_name: "owner/repo", size: 1, default_branch: "main" } }) },
+        git: {
+          getRef: async () => ({ data: { object: { sha: head } } }),
+          getCommit: async ({ commit_sha }) => ({
+            data: { tree: { sha: commit_sha === head ? "root" : "history" }, parents: commit_sha === head ? [{ sha: parent }] : [] },
+          }),
+          getTree: async ({ tree_sha }) => ({ data: { tree: [{ path: "work-queue.jsonl", mode: "100644", type: "blob", sha: tree_sha }] } }),
+          getBlob: async ({ file_sha }) => ({ data: { encoding: "base64", content: Buffer.from(blobs[file_sha]).toString("base64") } }),
+        },
+      },
+    };
+    const read = () => readWorkQueueLog({ githubClient, owner: "owner", repo: "repo" });
+    assert.equal((await read()).state.tip, fixture.checkpoint[0].id);
+    parent = foreign;
+    await assert.rejects(read(), /checkpoint_invalid/);
+    parent = prior;
+    blobs.history = serializeTransactionLog(fixture.history.slice(0, 1));
+    await assert.rejects(read(), /checkpoint_invalid/);
+  });
+});

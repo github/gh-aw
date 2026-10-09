@@ -47,6 +47,32 @@
       "required": ["role", "principal", "repository"],
       "type": "object"
     },
+    "CheckpointOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "history_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "kind": {
+          "const": "Checkpoint"
+        },
+        "prior_git_sha": {
+          "$ref": "#/$defs/Revision"
+        },
+        "prior_tip": {
+          "$ref": "#/$defs/Identity"
+        },
+        "state": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "state_sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": ["kind", "prior_git_sha", "prior_tip", "history_sha256", "state_sha256", "state"],
+      "type": "object"
+    },
     "ClaimBound": {
       "maximum": 16,
       "minimum": 1,
@@ -228,6 +254,10 @@
           "$ref": "#/$defs/PullRequestEdge"
         }
       ]
+    },
+    "Digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
     },
     "DispatchOperation": {
       "additionalProperties": false,
@@ -662,6 +692,9 @@
         },
         {
           "$ref": "#/$defs/WorkPriorityOperation"
+        },
+        {
+          "$ref": "#/$defs/CheckpointOperation"
         }
       ]
     },

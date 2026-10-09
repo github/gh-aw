@@ -41,25 +41,44 @@ func TestBranchCompactionPreservesCompleteAuthorityAndIsIdempotent(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected, err := Serialize(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
 	noncanonicalMockLog(t, mock, commits)
+	priorGitSHA := mock.head
 	result, err := branch.Compact(context.Background())
 	if err != nil || !result.Changed || result.DuplicatesRemoved != 1 ||
-		result.Tip != before.Tip || result.Commits != len(commits) || result.BytesAfter != len(expected) {
+		result.Tip == before.Tip || result.Commits != 1 || result.BytesAfter >= result.BytesBefore {
 		t.Fatalf("canonical/deduplicating compaction failed: %+v %v", result, err)
-	}
-	if actual := mock.logs[mock.commits[mock.head].Tree]; actual != string(expected) {
-		t.Fatal("compaction rewrote a unique operation or failed to retain the causal chain")
 	}
 	latest, err := branch.Read(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
+	originalParents := slices.Clone(mock.commits[mock.head].Parents)
+	mock.commits[strings.Repeat("e", 40)] = gitQueueCommit{Tree: mock.commits[originalParents[0]].Tree}
+	forged := mock.commits[mock.head]
+	forged.Parents = []string{strings.Repeat("e", 40)}
+	mock.commits[mock.head] = forged
+	if _, err := branch.Read(context.Background()); err == nil {
+		t.Fatal("checkpoint with unrelated Git parent was trusted")
+	}
+	forged.Parents = originalParents
+	mock.commits[mock.head] = forged
+	if len(latest) != 1 || !isCheckpoint(latest[0]) {
+		t.Fatal("compaction did not publish one canonical checkpoint transaction")
+	}
+	var checkpoint CheckpointOperation
+	if err := json.Unmarshal(latest[0].Operations[0], &checkpoint); err != nil ||
+		checkpoint.PriorGitSHA != priorGitSHA || checkpoint.PriorTip != before.Tip {
+		t.Fatal("checkpoint does not bind prior Git commit and logical tip")
+	}
+	_, err = restoreCheckpoint(latest[0])
+	expected, _ := Serialize(commits)
+	if err != nil || checkpoint.HistorySHA256 != hashBytes(expected) {
+		t.Fatal("checkpoint did not bind validated prior history digest")
+	}
 	after, err := Replay(latest)
-	if err != nil || !sameJSON(before, after) || after.Stats.Dispatches != 1 {
+	if err != nil || !sameJSON(before.Works, after.Works) || !sameJSON(before.Clocks, after.Clocks) ||
+		!sameJSON(before.Claims, after.Claims) || !sameJSON(before.Dispatches, after.Dispatches) ||
+		after.Stats.Dispatches != 1 {
 		t.Fatal("compaction changed debt, request identity, outcomes or held native capacity")
 	}
 	next, err := branch.Compact(context.Background())
@@ -86,7 +105,8 @@ func TestBranchCompactionPreservesCompleteAuthorityAndIsIdempotent(t *testing.T)
 		t.Fatal(err)
 	}
 	afterRelease, err := Replay(latest)
-	if err != nil || !sameJSON(closedState, afterRelease) ||
+	if err != nil || !sameJSON(closedState.Works, afterRelease.Works) ||
+		!sameJSON(closedState.Clocks, afterRelease.Clocks) ||
 		afterRelease.Stats.Dispatches != 0 || afterRelease.Works[assignment.Claims[0].WorkID].Barrier != "verified" {
 		t.Fatal("compaction lost terminal release, verified delivery or independent retry history")
 	}
@@ -119,11 +139,17 @@ func TestBranchCompactionRecomputesOnConflictAndRecoversLostAcknowledgment(t *te
 			if err != nil {
 				t.Fatal(err)
 			}
-			data, err := Serialize(expected)
-			if err != nil {
+			latest, err := branch.Read(context.Background())
+			if err != nil || len(latest) != 1 {
 				t.Fatal(err)
 			}
-			if mock.logs[mock.commits[mock.head].Tree] != string(data) {
+			after, err := restoreCheckpoint(latest[0])
+			data, _ := Serialize(expected)
+			var op CheckpointOperation
+			_ = json.Unmarshal(latest[0].Operations[0], &op)
+			before, replayErr := Replay(expected)
+			if err != nil || replayErr != nil || op.HistorySHA256 != hashBytes(data) ||
+				!sameJSON(before.Works, after.Works) || !sameJSON(before.Clocks, after.Clocks) {
 				t.Fatal("CAS compaction discarded a concurrent operation or duplicated history")
 			}
 			if name == "ambiguous" && (!result.AcknowledgmentRecovered || result.Changed || mock.refWrites != 1) {

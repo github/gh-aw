@@ -38,6 +38,7 @@ simulated GitHub Git/Actions API; it does not contact GitHub or need credentials
 
 ```bash
 node --test .github/scripts/work-queue-stress.test.cjs
+node --test --test-name-pattern='checkpoint loses real-Git' .github/scripts/work-queue-stress.test.cjs
 node .github/scripts/work-queue-stress.cjs --mode history --items 100000 --workers 2
 node .github/scripts/work-queue-stress.cjs --items 1024 --workers 4 --queue-items 64 --seed 7
 node .github/scripts/work-queue-stress.cjs --mode saturation --items 100000 --workers 4
@@ -57,6 +58,12 @@ publication response. JSON diagnostics report CAS conflicts, recovered requests,
 native POST counts, ledger bytes, cold replay timings, memory and workload scope.
 Workers have bounded deadlines and fixtures are cleaned up on completion or
 failure. Canonicalization must preserve the complete causal history and projection.
+The checkpoint race test rejects a stale prepared checkpoint after a competing
+Work publication, retries against the fresh HEAD, cold-replays the minimal
+state snapshot (never an embedded history archive), appends new Work after the
+checkpoint and races two checkpoint writers. It also forces an intervening
+Work mutation and nested checkpoint between another writer's read and CAS,
+checking that retry preserves both the original state and the intervening Work.
 
 The separate [Work Queue Stress workflow](../../.github/workflows/work-queue-stress.yml)
 runs on pull requests and `main` pushes changing `actions/setup/js` JavaScript,
@@ -91,12 +98,44 @@ generators still receive isolated copies. Multi-MiB base64 blobs use linear
 validation rather than a repeated-quartet regular expression that can overflow
 the JavaScript engine's stack.
 
-Compaction remains canonical ordering and identical-commit deduplication only.
-It does not erase terminal Work, historical Claims, request identities, FIFO
-positions or scheduling debt. Native ledger, graph, pending-node and recovery
-bounds still apply; 100,000 submitted Work items are not interchangeable with
-100,000 combined Work/Claim records. A workload that reaches admission limits
-must report that boundary, not raise policy ceilings or silently drop history.
+The simulator's canonicalization probe remains ordering and exact deduplication
+only. Separately, trusted checkpoint compaction replaces a validated ledger
+with a minimal deterministic projection snapshot, preserving terminal Work,
+Claim identities, request receipts, FIFO positions and scheduling debt without
+embedding the historical transaction log. Native ledger, graph, pending-node
+and recovery bounds still apply; 100,000 submitted Work items are not
+interchangeable with 100,000 combined Work/Claim records. A workload that
+reaches admission limits must report that boundary, not silently drop state.
+
+### Checkpoint model
+
+`FairWorkQueue.tla` also models a checkpoint of a validated causal prefix.
+`ReplayCheckpoint` applies the remaining log suffix to its saved state; the
+`ProjectionSoundness` invariant compares that result with full replay and
+requires the checkpoint to match the current log prefix. A checkpoint writer
+prepares against an exact HEAD and log, then publishes a marker only while both
+still match. Competing Claim publication invalidates that preparation; retry
+refreshes the entire source rather than applying stale state. The model retains
+the prefix as a **ghost proof variable**, not as serialized checkpoint data.
+It does **not** prove snapshot minimality, physical history pruning, checkpoint
+encoding, or Git API atomicity; those are separate runtime checks.
+
+With the official TLC jar configured as below, run the focused safety/progress
+case from the repository root (using a results directory inside the repository):
+
+```bash
+mkdir -p .work-queue-tlc-results
+java -cp /path/to/tla2tools.jar tlc2.TLC -workers 2 \
+  -config specs/work-queue/FairCheckpoint.cfg \
+  -metadir .work-queue-tlc-results/checkpoint \
+  specs/work-queue/FairWorkQueue.tla
+```
+
+`FairCheckpoint.cfg` verifies `Safety` and eventual checkpoint publication under
+weak fairness for preparation, stale-source retry and publication in a bounded
+two-dispatcher competing-publication subset. `CheckpointRaceWitness.cfg` expects
+`CheckpointRace` to fail: TLC finds an interleaving where another writer advances
+HEAD between checkpoint preparation and publication, forcing a refresh.
 
 ## Historical queue inspection and operator commands
 

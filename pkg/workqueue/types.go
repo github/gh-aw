@@ -39,6 +39,23 @@ type QueueCommit struct {
 	Trace       *Trace      `json:"trace,omitempty"`
 }
 
+// CheckpointOperation carries a minimal projection bound to prior Git history.
+type CheckpointOperation struct {
+	Kind          string          `json:"kind"`
+	PriorGitSHA   string          `json:"prior_git_sha"`
+	PriorTip      string          `json:"prior_tip"`
+	HistorySHA256 string          `json:"history_sha256"`
+	StateSHA256   string          `json:"state_sha256"`
+	State         json.RawMessage `json:"state"`
+}
+
+type CheckpointParameters struct {
+	PriorGitSHA   string `json:"prior_git_sha"`
+	PriorTip      string `json:"prior_tip"`
+	HistorySHA256 string `json:"history_sha256"`
+	StateSHA256   string `json:"state_sha256"`
+}
+
 type Trace struct {
 	TraceID          string `json:"trace_id,omitempty"`
 	SpanID           string `json:"span_id,omitempty"`
@@ -341,6 +358,13 @@ type Projection struct {
 	Stats                Stats                     `json:"stats"`
 	LedgerBytes          int64                     `json:"ledger_bytes"`
 	ObservationWrites    map[string]int            `json:"observation_writes"`
+	RequestOrder         []string                  `json:"-"`
+	CheckpointReceipts   []checkpointReceipt       `json:"-"`
+	SeenEpochs           map[string]bool           `json:"-"`
+	SeenGenerations      map[string]bool           `json:"-"`
+	ObservationIDs       map[string]*Observation   `json:"-"`
+	TerminalBarriers     map[string]Operation      `json:"-"`
+	Cancellations        map[string]Operation      `json:"-"`
 }
 
 type Selection struct {

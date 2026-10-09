@@ -29,6 +29,7 @@ type buildMaintenanceWorkflowYAMLOptions struct {
 	createCompilePR     bool
 	copilotOrgBilling   bool // all Copilot workflows use copilot-requests: write (GITHUB_TOKEN); COPILOT_GITHUB_TOKEN is not required
 	compactionLedgers   []LedgerConfig
+	hasWorkQueue        bool
 	hasCacheMemory      bool
 }
 
@@ -67,6 +68,9 @@ func buildMaintenanceWorkflowYAML(
 		return "", err
 	}
 	yaml.WriteString(ledgerJobs)
+	if opts.hasWorkQueue {
+		yaml.WriteString(buildMaintenanceWorkQueueCompactionJobs(opts, setupActionRef))
+	}
 	finalYAML, err := finalizeRunnerTempSafety(yaml.String())
 	if err != nil {
 		return "", fmt.Errorf("runner temp safety: %w", err)
@@ -89,7 +93,7 @@ func buildMaintenanceWorkflowHeaderYAML(opts buildMaintenanceWorkflowYAMLOptions
 It runs scheduled cleanup for expiring safe outputs and supports manual maintenance operations.
 
 This workflow is generated automatically when workflows use expiring safe outputs,
-when workflows declare compaction-enabled ledgers (tools.ledger), or when repository
+when workflows declare compaction-enabled ledgers (tools.ledger) or use tools.work-queue, or when repository
 maintenance features are enabled in .github/workflows/aw.json.
 
 To disable maintenance workflow generation, set in .github/workflows/aw.json:
@@ -100,7 +104,7 @@ Agentic maintenance docs:
 
 	scheduleBasis := "based on minimum expires: " + strconv.Itoa(opts.minExpiresDays) + " days"
 	if opts.minExpiresDays <= 0 {
-		scheduleBasis = "for ledger compaction"
+		scheduleBasis = "for queue compaction"
 	}
 	return GenerateWorkflowHeader("", "pkg/workflow/maintenance_workflow.go", customInstructions) + `name: Agentic Maintenance
 

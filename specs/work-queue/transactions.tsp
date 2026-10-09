@@ -325,11 +325,27 @@ model ReleaseOperation {
   evidence: Evidence;
 }
 @jsonSchema
+model CheckpointOperation {
+  kind: "Checkpoint";
+  prior_git_sha: Revision;
+  prior_tip: Identity;
+  history_sha256: Digest;
+  state_sha256: Digest;
+  state: Record<unknown>;
+}
+@jsonSchema
 union QueueOperation {
   PolicyOperation, ControlOperation, WorkOperation, ClaimOperation,
   CompletionOperation, ResultOperation, DeliveryFailureOperation,
   ObservationOperation, ClaimCancellationOperation, WorkCancellationOperation,
-  DispatchOperation, ReleaseOperation, WorkPriorityOperation
+  DispatchOperation, ReleaseOperation, WorkPriorityOperation, CheckpointOperation
+}
+@jsonSchema
+model CheckpointParameters {
+  prior_git_sha: Revision;
+  prior_tip: Identity;
+  history_sha256: Digest;
+  state_sha256: Digest;
 }
 
 @jsonSchema
@@ -359,12 +375,12 @@ model OperationsParameters {
 }
 @jsonSchema
 union RequestParameters {
-  SubmitParameters, DispatchNextParameters, FinishParameters, OperationsParameters
+  SubmitParameters, DispatchNextParameters, FinishParameters, OperationsParameters, CheckpointParameters
 }
 @jsonSchema
 model QueueRequest {
   id: Identity;
-  kind: "policy" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim";
+  kind: "policy" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim" | "checkpoint";
   parameters: RequestParameters;
   fingerprint: Digest;
 }

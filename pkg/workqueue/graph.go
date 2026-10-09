@@ -354,13 +354,11 @@ func (state Projection) recordObservation(observation Observation, commit QueueC
 			return queueError("observation_invalid", "ready must have positive typed predicate evidence")
 		}
 	}
-	for _, current := range state.Observations {
-		if current.ObservationID == observation.ObservationID {
-			if sameJSON(current, observation) {
-				return nil
-			}
-			return queueError("observation_conflict", "observation identity reused")
+	if previous := state.ObservationIDs[observation.ObservationID]; previous != nil {
+		if sameJSON(previous, observation) {
+			return nil
 		}
+		return queueError("observation_conflict", "observation identity reused")
 	}
 	if state.ObservationWrites[key] >= state.Policy.Limits.ObservationWrites {
 		return queueError("observation_limit", "finite observation-write budget exhausted")
@@ -377,6 +375,7 @@ func (state Projection) recordObservation(observation Observation, commit QueueC
 	}
 	state.ObservationWrites[key]++
 	state.Observations[key] = &observation
+	state.ObservationIDs[observation.ObservationID] = &observation
 	return nil
 }
 
