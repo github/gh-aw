@@ -141,10 +141,11 @@ type AgentUsageBreakdown struct {
 	Effort          string   `json:"effort,omitempty"`
 	Requests        int      `json:"requests"`
 	TokenCoreMetrics
-	AIC                float64           `json:"aic,omitempty"`
-	TotalApiDurationMs int               `json:"total_api_duration_ms,omitempty"`
-	Models             []AgentModelUsage `json:"models,omitempty"`
-	requestUsages      []agentRequestUsage
+	AIC                 float64           `json:"aic,omitempty"`
+	TotalApiDurationMs  int               `json:"total_api_duration_ms,omitempty"`
+	Models              []AgentModelUsage `json:"models,omitempty"`
+	requestUsages       []agentRequestUsage
+	hasInstanceEvidence bool
 }
 
 type agentRequestUsage struct {
