@@ -30,6 +30,15 @@ This directory retains executable specifications and formal evidence, not a
 second current user guide. The historical material below is model provenance,
 not supported deployment guidance.
 
+### Evaluation identity and worker routing
+
+[`HarnessIdentity.tla`](HarnessIdentity.tla) models the distinction between
+evaluation identity and dispatch identity. The harness version is the
+frontmatter hash, so a body-only edit preserves it; frontmatter edits change
+it. A worker assignment captures the current immutable source revision, and
+later edits do not alter that route. Run the focused model with
+`TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=HarnessIdentity TLC_CONFIG_FILTER=HarnessIdentity bash specs/work-queue/check.sh`.
+
 ## Local stress simulator
 
 Run the simulator from the repository root with Node.js 24 or later and Git.
