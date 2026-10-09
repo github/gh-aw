@@ -50,6 +50,51 @@
       "required": ["role", "principal", "repository"],
       "type": "object"
     },
+    "CheckpointOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "history_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "kind": {
+          "const": "Checkpoint"
+        },
+        "prior_git_sha": {
+          "$ref": "#/$defs/Revision"
+        },
+        "prior_tip": {
+          "$ref": "#/$defs/Identity"
+        },
+        "state": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "state_sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": ["kind", "prior_git_sha", "prior_tip", "history_sha256", "state_sha256", "state"],
+      "type": "object"
+    },
+    "CheckpointParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "history_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "prior_git_sha": {
+          "$ref": "#/$defs/Revision"
+        },
+        "prior_tip": {
+          "$ref": "#/$defs/Identity"
+        },
+        "state_sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": ["prior_git_sha", "prior_tip", "history_sha256", "state_sha256"],
+      "type": "object"
+    },
     "ClaimBound": {
       "maximum": 16,
       "minimum": 1,
@@ -871,6 +916,9 @@
           "$ref": "#/$defs/WorkPriorityOperation"
         },
         {
+          "$ref": "#/$defs/CheckpointOperation"
+        },
+        {
           "$ref": "#/$defs/IssueLinkOperation"
         },
         {
@@ -986,6 +1034,9 @@
               "const": "cancel_claim"
             },
             {
+              "const": "checkpoint"
+            },
+            {
               "const": "issue_link"
             }
           ]
@@ -1071,6 +1122,9 @@
         },
         {
           "$ref": "#/$defs/OperationsParameters"
+        },
+        {
+          "$ref": "#/$defs/CheckpointParameters"
         }
       ]
     },

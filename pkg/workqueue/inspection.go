@@ -139,6 +139,10 @@ func ExplainBeforeClaim(commits []QueueCommit, claimID string) (ClaimExplanation
 	if claim == nil {
 		return ClaimExplanation{}, queueError("claim_missing", "unknown Claim %q", claimID)
 	}
+	if explanation, ok := state.ClaimExplanations[claimID]; ok {
+		explanation.Tip = state.Tip
+		return explanation, nil
+	}
 	ordered, err := causalOrder(commits)
 	if err != nil {
 		return ClaimExplanation{}, err
@@ -176,6 +180,19 @@ func ExplainRequest(commits []QueueCommit, requestID string) (RequestExplanation
 		PolicyEpoch: commit.PolicyEpoch, Claims: []ClaimExplanation{},
 	}
 	if commit.Request.Kind != "dispatch_next" {
+		return result, nil
+	}
+	for _, operation := range commit.Operations {
+		var claim ClaimOperation
+		if err := json.Unmarshal(operation, &claim); err != nil || claim.ClaimID == "" {
+			continue
+		}
+		if explanation, ok := state.ClaimExplanations[claim.ClaimID]; ok {
+			explanation.Tip = state.Tip
+			result.Claims = append(result.Claims, explanation)
+		}
+	}
+	if len(result.Claims) > 0 {
 		return result, nil
 	}
 	ordered, err := causalOrder(commits)
@@ -257,6 +274,25 @@ type TracePage struct {
 	Events            []TraceEvent `json:"events"`
 }
 
+func traceEventForOperation(operation Operation) (TraceEvent, error) {
+	fields := map[string]json.RawMessage{}
+	if err := json.Unmarshal(operation, &fields); err != nil {
+		return TraceEvent{}, err
+	}
+	if state := fields["state"]; len(state) > 0 && (state[0] == '{' || state[0] == '[') {
+		delete(fields, "state")
+	}
+	sanitized, err := json.Marshal(fields)
+	if err != nil {
+		return TraceEvent{}, err
+	}
+	var event TraceEvent
+	if err := json.Unmarshal(sanitized, &event); err != nil {
+		return TraceEvent{}, err
+	}
+	return event, nil
+}
+
 // TraceQueue exposes bounded ledger provenance, never payloads, descriptors,
 // receipt contents or request parameters. Missing telemetry does not lose facts.
 func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePage, error) {
@@ -281,23 +317,59 @@ func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePag
 		RequestID: options.RequestID, ClaimID: options.ClaimID,
 		Offset: options.Offset, Limit: options.Limit, Events: []TraceEvent{},
 	}
-	for ordinal, commit := range ordered {
-		for index, operation := range commit.Operations {
-			var event TraceEvent
-			if err := json.Unmarshal(operation, &event); err != nil {
-				return TracePage{}, err
+	appendEvent := func(event TraceEvent) {
+		if event.Trace != nil && event.Trace.TraceID != "" {
+			result.TraceAvailability = "correlated"
+		}
+		if result.TotalEvents >= options.Offset && len(result.Events) < options.Limit {
+			result.Events = append(result.Events, event)
+		}
+		result.TotalEvents++
+	}
+	if len(ordered) > 0 && isCheckpoint(ordered[0]) {
+		for receiptIndex, receipt := range state.CheckpointReceipts {
+			commit := QueueCommit{
+				ID: receipt.ID, Previous: receipt.Previous,
+				Request: Request{ID: receipt.RequestID, Kind: receipt.Kind},
+				Actor:   receipt.Actor, PolicyEpoch: receipt.PolicyEpoch, At: receipt.At,
 			}
-			if !scope.matches(event, commit, options) {
-				continue
+			for index, operation := range receipt.Events {
+				event, err := traceEventForOperation(operation)
+				if err != nil {
+					return TracePage{}, err
+				}
+				annotateTraceEvent(&event, state, commit, Position{Commit: receiptIndex, Operation: index})
+				if scope.matches(event, commit, options) {
+					appendEvent(event)
+				}
 			}
-			annotateTraceEvent(&event, state, commit, Position{Commit: ordinal, Operation: index})
-			if event.Trace != nil && event.Trace.TraceID != "" {
-				result.TraceAvailability = "correlated"
+		}
+		for ordinal, commit := range ordered[1:] {
+			for index, operation := range commit.Operations {
+				event, err := traceEventForOperation(operation)
+				if err != nil {
+					return TracePage{}, err
+				}
+				if !scope.matches(event, commit, options) {
+					continue
+				}
+				annotateTraceEvent(&event, state, commit, Position{Commit: len(state.CheckpointReceipts) + 1 + ordinal, Operation: index})
+				appendEvent(event)
 			}
-			if result.TotalEvents >= options.Offset && len(result.Events) < options.Limit {
-				result.Events = append(result.Events, event)
+		}
+	} else {
+		for ordinal, commit := range ordered {
+			for index, operation := range commit.Operations {
+				event, err := traceEventForOperation(operation)
+				if err != nil {
+					return TracePage{}, err
+				}
+				if !scope.matches(event, commit, options) {
+					continue
+				}
+				annotateTraceEvent(&event, state, commit, Position{Commit: ordinal, Operation: index})
+				appendEvent(event)
 			}
-			result.TotalEvents++
 		}
 	}
 	if options.Offset > result.TotalEvents {
@@ -333,6 +405,14 @@ func traceScopeFor(state Projection, options TraceOptions) (traceScope, error) {
 		if err := scope.addRequestRoots(state, commit); err != nil {
 			return scope, err
 		}
+		for _, receipt := range state.CheckpointReceipts {
+			if receipt.RequestID == options.RequestID {
+				if err := scope.addOperationRoots(state, receipt.Events); err != nil {
+					return scope, err
+				}
+				break
+			}
+		}
 	}
 	for id, claim := range state.Claims {
 		if options.ClaimID == "" && scope.works.contains(claim.WorkID) {
@@ -345,6 +425,31 @@ func traceScopeFor(state Projection, options TraceOptions) (traceScope, error) {
 		}
 	}
 	return scope, nil
+}
+
+func (scope *traceScope) addOperationRoots(state Projection, operations []Operation) error {
+	for _, operation := range operations {
+		event, err := traceEventForOperation(operation)
+		if err != nil {
+			return err
+		}
+		if event.WorkID != "" {
+			scope.works.add(event.WorkID)
+		}
+		if event.ClaimID != "" {
+			scope.claims.add(event.ClaimID)
+		}
+		if event.DispatchID != "" {
+			scope.dispatches.add(event.DispatchID)
+			if dispatch := state.Dispatches[event.DispatchID]; dispatch != nil {
+				for _, member := range dispatch.Claims {
+					scope.claims.add(member.ClaimID)
+					scope.works.add(member.WorkID)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (scope traceScope) addRequestRoots(state Projection, commit QueueCommit) error {

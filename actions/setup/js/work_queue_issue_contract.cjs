@@ -7,6 +7,12 @@ function issueIdentity(resource) {
   return canonical([resource.host, resource.repository_id, resource.resource_id]);
 }
 
+function transactionAt(state, ordinal) {
+  if (!Number.isSafeInteger(ordinal) || ordinal < 0) return undefined;
+  const historical = state.historicalTransactions || [];
+  return ordinal < historical.length ? historical[ordinal] : state.transactions[ordinal - historical.length];
+}
+
 function assertProjectionAuthority(state, actor, workId, ref, repository, claimId) {
   const work = state.works.get(workId);
   if (!work || actor.role !== "projector" || !actor.workflow || !actor.run_id || !actor.run_attempt) throw queueError("projection_unauthorized", "projection requires an authenticated originating run");
@@ -43,7 +49,7 @@ function assertProjectionAuthority(state, actor, workId, ref, repository, claimI
     )
       throw queueError("projection_unauthorized", "projection is outside the original authenticated Claims");
   } else {
-    const admission = state.transactions[work.position.commit]?.actor;
+    const admission = state.workCreators?.get(workId);
     if (!admission || ["principal", "repository", "workflow", "run_id", "run_attempt"].some(field => admission[field] !== actor[field])) throw queueError("projection_unauthorized", "projection is outside this run's checked admissions");
   }
   return work;
@@ -53,7 +59,7 @@ function issueCompletionPolicy(state, work, actor, ref, repository) {
   // Closure is fixed by trusted policy at admission, not agent payload or a later
   // policy expansion. Original worker Claims still need current projection authority.
   for (let commit = work.position.commit; commit >= 0; commit--) {
-    const operations = state.transactions[commit].operations;
+    const operations = transactionAt(state, commit)?.operations || [];
     const end = commit === work.position.commit ? work.position.operation : operations.length;
     for (let index = end - 1; index >= 0; index--) {
       if (operations[index].kind !== "Policy") continue;
@@ -102,4 +108,4 @@ function applyIssueBinding(state, operation, commit) {
   }
 }
 
-module.exports = { issueIdentity, assertProjectionAuthority, applyIssueBinding, issueCompletionPolicy };
+module.exports = { issueIdentity, transactionAt, assertProjectionAuthority, applyIssueBinding, issueCompletionPolicy };

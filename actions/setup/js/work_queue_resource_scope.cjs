@@ -123,7 +123,9 @@ function validateEffectResourceAuthority(state, authority, resource) {
   const visited = new Set([work.work_id]);
   let descendant = work;
   for (;;) {
-    const creator = state.transactions.find(commit => commit.operations.some(operation => operation.kind === "Work" && operation.work_id === descendant.work_id))?.actor;
+    const creator =
+      state.workCreators?.get(descendant.work_id) ??
+      [...(state.historicalTransactions ?? []), ...state.transactions].find(commit => commit.operations.some(operation => operation.kind === "Work" && operation.work_id === descendant.work_id))?.actor;
     if (creator?.role !== "worker") break;
     const parentDispatch = state.dispatches.get(creator.dispatch_id);
     const parentMember = parentDispatch?.claims.find(member => member.handle === creator.claim_handle);
