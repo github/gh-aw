@@ -549,11 +549,9 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	sessionAnalysis := buildSessionAnalysis(inputs.processedRun, inputs.metrics)
 	safeOutputSummary := buildSafeOutputSummary(inputs.createdItems, chainMetrics)
 	mcpServerHealth := buildMCPServerHealth(inputs.mcpToolUsage, inputs.processedRun.MCPFailures)
+	warnings := auditEngineConfigWarnings(engineConfig)
 
-	if auditReportLog.Enabled() {
-		auditReportLog.Printf("Built audit data: %d jobs, %d errors, %d tool types, %d findings, %d recommendations",
-			len(inputs.jobs), len(inputs.errors), len(inputs.toolUsage), len(inputs.findings), len(inputs.recommendations))
-	}
+	logAuditDataBuild(inputs)
 
 	return AuditData{
 		SchemaVersion:           auditSchemaVersion,
@@ -588,11 +586,26 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		PolicyAnalysis:          inputs.processedRun.PolicyAnalysis,
 		RedactedDomainsAnalysis: inputs.processedRun.RedactedDomainsAnalysis,
 		Errors:                  inputs.errors,
+		Warnings:                warnings,
 		ToolUsage:               inputs.toolUsage,
 		MCPToolUsage:            inputs.mcpToolUsage,
 		CreatedItems:            inputs.createdItems,
 		Experiments:             inputs.expData,
 		Graders:                 extractGradersData(run.LogsPath),
+	}
+}
+
+func auditEngineConfigWarnings(config *AuditEngineConfig) []ValidationIssue {
+	if config == nil || config.RoutingWarning == "" {
+		return nil
+	}
+	return []ValidationIssue{{Type: "model_routing_outcome_disagreement", Message: config.RoutingWarning}}
+}
+
+func logAuditDataBuild(inputs auditDataInputs) {
+	if auditReportLog.Enabled() {
+		auditReportLog.Printf("Built audit data: %d jobs, %d errors, %d tool types, %d findings, %d recommendations",
+			len(inputs.jobs), len(inputs.errors), len(inputs.toolUsage), len(inputs.findings), len(inputs.recommendations))
 	}
 }
 

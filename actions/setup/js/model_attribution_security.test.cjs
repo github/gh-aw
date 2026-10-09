@@ -114,7 +114,7 @@ describe("model attribution trust boundaries", () => {
       infoPath,
       JSON.stringify({
         fallback_model: "runner-fallback",
-        model_routing: { status: "selected", wire_model: "runner-model", effort: "high" },
+        model_routing: { status: "selected", wire_model: "runner-model", endpoint: "/runner", effort: "high" },
       })
     );
     fs.writeFileSync(
@@ -124,9 +124,10 @@ describe("model attribution trust boundaries", () => {
         model_routing: { status: "selected", wire_model: "forged-model", effort: "max" },
       })
     );
+    fs.writeFileSync(path.join(dir, "agent", "awf-routing-outcome.json"), JSON.stringify({ status: "rejected", wire_model: "forged-outcome-model", effort: "max", endpoint: "/forged" }));
 
     expect(getFallbackModel(infoPath)).toBe("runner-fallback");
-    expect(getModelRouting(infoPath)).toMatchObject({ wire_model: "runner-model", effort: "high" });
+    expect(getModelRouting(infoPath)).toMatchObject({ status: "selected", wire_model: "runner-model", endpoint: "/runner", effort: "high" });
     expect(resolveEffectiveModel(infoPath).model).toBe("runner-fallback");
   });
 

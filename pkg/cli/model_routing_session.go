@@ -89,7 +89,7 @@ func readSessionModelRouting(runDir string) (*sessionModelRoutingAttribution, bo
 		if err != nil {
 			return nil, false, fmt.Errorf("%s: %w", relative, err)
 		}
-		found := attribution.WorkflowInfo != nil || attribution.Outcome != nil
+		found := attribution.WorkflowInfo != nil
 		return attribution, found, nil
 	}
 	return nil, false, nil
@@ -158,40 +158,24 @@ func (attribution *sessionModelRoutingAttribution) modelRouting() *AwInfoModelRo
 		}
 		found = true
 	}
-	if outcome := attribution.Outcome; outcome != nil {
-		if outcome.Status != "" {
-			routing.Status = outcome.Status
-			found = true
-		}
-		if outcome.WireModel != "" {
-			routing.WireModel = outcome.WireModel
-			found = true
-		}
-		if outcome.EffectiveEndpoint != "" {
-			routing.Endpoint = outcome.EffectiveEndpoint
-			found = true
-		}
-		if outcome.SelectedEndpoint != "" {
-			routing.SelectedEndpoint = outcome.SelectedEndpoint
-			found = true
-		}
-		if outcome.Effort != "" {
-			routing.Effort = outcome.Effort
-			found = true
-		}
-		if outcome.AppliedEffort != "" {
-			routing.AppliedEffort = outcome.AppliedEffort
-			found = true
-		}
-		if outcome.FailureCode != "" {
-			routing.FailureCode = outcome.FailureCode
-			found = true
-		}
-	}
 	if !found {
 		return nil
 	}
 	return &routing
+}
+
+func (attribution *sessionModelRoutingAttribution) outcomeDisagreesWith(routing *AwInfoModelRouting) bool {
+	if attribution == nil || attribution.Outcome == nil || routing == nil {
+		return false
+	}
+	outcome := attribution.Outcome
+	return (outcome.Status != "" && outcome.Status != routing.Status) ||
+		(outcome.WireModel != "" && outcome.WireModel != routing.WireModel) ||
+		(outcome.EffectiveEndpoint != "" && outcome.EffectiveEndpoint != routing.Endpoint) ||
+		(outcome.SelectedEndpoint != "" && outcome.SelectedEndpoint != routing.SelectedEndpoint) ||
+		(outcome.Effort != "" && outcome.Effort != routing.Effort) ||
+		(outcome.AppliedEffort != "" && outcome.AppliedEffort != routing.AppliedEffort) ||
+		(outcome.FailureCode != "" && outcome.FailureCode != routing.FailureCode)
 }
 
 func (attribution *sessionModelRoutingAttribution) awInfo() *AwInfo {

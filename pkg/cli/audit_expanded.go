@@ -21,19 +21,31 @@ var auditExpandedLog = logger.New("cli:audit_expanded")
 
 // AuditEngineConfig represents the engine configuration extracted from aw_info.json
 type AuditEngineConfig struct {
-	EngineID           string   `json:"engine_id" console:"header:Engine ID"`
-	EngineName         string   `json:"engine_name,omitempty" console:"header:Engine Name,omitempty"`
-	Model              string   `json:"model,omitempty" console:"header:Model,omitempty"`
-	RequestedModel     string   `json:"requested_model,omitempty" console:"header:Requested Model,omitempty"`
-	ModelEffort        string   `json:"model_effort,omitempty" console:"header:Model Effort,omitempty"`
-	ModelRoutingStatus string   `json:"model_routing_status,omitempty" console:"header:Model Routing,omitempty"`
-	Version            string   `json:"version,omitempty" console:"header:Version,omitempty"`
-	CLIVersion         string   `json:"cli_version,omitempty" console:"header:CLI Version,omitempty"`
-	FirewallVersion    string   `json:"firewall_version,omitempty" console:"header:Firewall Version,omitempty"`
-	MCPServers         []string `json:"mcp_servers,omitempty"`
-	TriggerEvent       string   `json:"trigger_event,omitempty" console:"header:Trigger Event,omitempty"`
-	Repository         string   `json:"repository,omitempty" console:"header:Repository,omitempty"`
-	DryRun             bool     `json:"dry_run" console:"header:Dry Run"`
+	EngineID           string                      `json:"engine_id" console:"header:Engine ID"`
+	EngineName         string                      `json:"engine_name,omitempty" console:"header:Engine Name,omitempty"`
+	Model              string                      `json:"model,omitempty" console:"header:Model,omitempty"`
+	RequestedModel     string                      `json:"requested_model,omitempty" console:"header:Requested Model,omitempty"`
+	ModelEffort        string                      `json:"model_effort,omitempty" console:"header:Model Effort,omitempty"`
+	ModelRoutingStatus string                      `json:"model_routing_status,omitempty" console:"header:Model Routing,omitempty"`
+	HarnessOutcome     *AuditHarnessRoutingOutcome `json:"harness_outcome,omitempty"`
+	RoutingWarning     string                      `json:"routing_warning,omitempty"`
+	Version            string                      `json:"version,omitempty" console:"header:Version,omitempty"`
+	CLIVersion         string                      `json:"cli_version,omitempty" console:"header:CLI Version,omitempty"`
+	FirewallVersion    string                      `json:"firewall_version,omitempty" console:"header:Firewall Version,omitempty"`
+	MCPServers         []string                    `json:"mcp_servers,omitempty"`
+	TriggerEvent       string                      `json:"trigger_event,omitempty" console:"header:Trigger Event,omitempty"`
+	Repository         string                      `json:"repository,omitempty" console:"header:Repository,omitempty"`
+	DryRun             bool                        `json:"dry_run" console:"header:Dry Run"`
+}
+
+type AuditHarnessRoutingOutcome struct {
+	Status            string `json:"status,omitempty"`
+	WireModel         string `json:"wire_model,omitempty"`
+	EffectiveEndpoint string `json:"effective_endpoint,omitempty"`
+	SelectedEndpoint  string `json:"selected_endpoint,omitempty"`
+	Effort            string `json:"effort,omitempty"`
+	AppliedEffort     string `json:"applied_effort,omitempty"`
+	FailureCode       string `json:"failure_code,omitempty"`
 }
 
 // PromptAnalysis represents analysis of the input prompt
@@ -213,6 +225,7 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 		Repository:         awInfo.Repository,
 		DryRun:             awInfo.DryRun,
 	}
+	addHarnessRoutingOutcome(config, awInfo, logsPath)
 
 	// Extract MCP server names from aw_info.json steps metadata
 	if mcpNames, ok := extractMCPServerNamesFromAwInfo(logsPath); ok {
@@ -222,6 +235,35 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 	auditExpandedLog.Printf("Extracted engine config: engine=%s, model=%s, mcp_servers=%d",
 		config.EngineID, config.Model, len(config.MCPServers))
 	return config
+}
+
+func addHarnessRoutingOutcome(config *AuditEngineConfig, awInfo *AwInfo, logsPath string) {
+	sessionRouting, _, err := readSessionModelRouting(logsPath)
+	if err != nil || sessionRouting == nil || sessionRouting.Outcome == nil {
+		return
+	}
+	outcome := sessionRouting.Outcome
+	config.HarnessOutcome = &AuditHarnessRoutingOutcome{
+		Status:            outcome.Status,
+		WireModel:         outcome.WireModel,
+		EffectiveEndpoint: outcome.EffectiveEndpoint,
+		SelectedEndpoint:  outcome.SelectedEndpoint,
+		Effort:            outcome.Effort,
+		AppliedEffort:     outcome.AppliedEffort,
+		FailureCode:       outcome.FailureCode,
+	}
+	routing := awInfo.ModelRouting
+	if workflowInfo := sessionRouting.WorkflowInfo; workflowInfo != nil && workflowInfo.ModelRouting != nil {
+		data := workflowInfo.ModelRouting
+		routing = &AwInfoModelRouting{
+			Status: data.Status, WireModel: data.WireModel, Endpoint: data.EffectiveEndpoint,
+			SelectedEndpoint: data.SelectedEndpoint, Effort: data.Effort,
+			AppliedEffort: data.AppliedEffort, FailureCode: data.FailureCode,
+		}
+	}
+	if sessionRouting.outcomeDisagreesWith(routing) {
+		config.RoutingWarning = "Harness routing outcome disagrees with runner-written model routing metadata."
+	}
 }
 
 func loadAwInfoForEngineConfig(logsPath string) *AwInfo {

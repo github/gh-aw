@@ -366,12 +366,13 @@ describe("Unified conclusion session", () => {
       },
     });
     write("agent/awf-routing-outcome.json", {
-      status: "selected",
-      wire_model: "claude-sonnet-5",
-      endpoint: "/v1/messages",
-      selected_endpoint: "/chat/completions",
-      effort: "medium",
-      applied_effort: "medium",
+      status: "rejected",
+      wire_model: "forged-model",
+      endpoint: "/forged",
+      selected_endpoint: "/forged-selected",
+      effort: "forged-effort",
+      applied_effort: "forged-applied-effort",
+      failure_code: "forged-failure",
       detail: "omit this detail",
     });
 
@@ -388,9 +389,8 @@ describe("Unified conclusion session", () => {
           wireModel: "claude-sonnet-5",
           model: "claude-sonnet-5",
           effort: "medium",
-          appliedEffort: "medium",
+          appliedEffort: "low",
           effectiveEndpoint: "/v1/messages",
-          selectedEndpoint: "/chat/completions",
           mode: "awf-routed",
           selectedId: "sonnet",
           routerVersion: "0.28.49",
@@ -399,15 +399,18 @@ describe("Unified conclusion session", () => {
       provenance: { component: "workflow", phase: "agent", path: "agent/aw_info.json" },
     });
     expect(workflow.data.modelRouting).not.toHaveProperty("detail");
+    expect(workflow.data.modelRouting).not.toHaveProperty("selectedEndpoint");
+    expect(workflow.data.modelRouting.failureCode).toBe("");
     const outcome = events.find(event => event.type === "model_routing.outcome");
     expect(outcome).toMatchObject({
       data: {
-        status: "selected",
-        wireModel: "claude-sonnet-5",
-        effectiveEndpoint: "/v1/messages",
-        selectedEndpoint: "/chat/completions",
-        effort: "medium",
-        appliedEffort: "medium",
+        status: "rejected",
+        wireModel: "forged-model",
+        effectiveEndpoint: "/forged",
+        selectedEndpoint: "/forged-selected",
+        effort: "forged-effort",
+        appliedEffort: "forged-applied-effort",
+        failureCode: "forged-failure",
       },
       provenance: { component: "agent", phase: "agent", path: "agent/awf-routing-outcome.json" },
     });

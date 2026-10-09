@@ -541,15 +541,6 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const format = { type: "session.format", data: { version: SESSION_FILE_FORMAT_VERSION } };
   sources.push({ component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", events: [format, ...warnings, summary] });
   const events = mergeSessionSources(sources);
-  const workflowEvent = events.find(event => event.type === "workflow.info");
-  const routingOutcome = events.find(event => event.type === "model_routing.outcome");
-  if (workflowEvent && routingOutcome) {
-    const modelRouting = workflowEvent.data.modelRouting ?? {};
-    for (const field of ["status", "wireModel", "effectiveEndpoint", "selectedEndpoint", "effort", "appliedEffort", "failureCode"]) {
-      if (routingOutcome.data[field] !== undefined) modelRouting[field] = routingOutcome.data[field];
-    }
-    workflowEvent.data.modelRouting = modelRouting;
-  }
   const formatIndex = events.findIndex(event => event.type === "session.format" && event.provenance.component === "collector" && event.provenance.index === 0);
   // File metadata leads the stream without inventing a timestamp for it.
   const [header] = events.splice(formatIndex, 1);
