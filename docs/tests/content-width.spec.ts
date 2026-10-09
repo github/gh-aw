@@ -1,23 +1,51 @@
 import { test, expect } from "@playwright/test";
 
-test("documentation fills the available column without changing the hero", async ({ page }) => {
+// Docs prose is capped at a comfortable reading measure; tables, diagrams and
+// images may run wider. See .github/skills/docs-design/SKILL.md.
+const PROSE_WIDTH = 620;
+const MIN_GUTTER = 60;
+
+test("docs prose stays within the reading measure, centred with gutters", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/gh-aw/reference/work-queue/");
 
-  const widths = await page.locator("main > .content-panel:has(h1#_top) + .content-panel").evaluate(panel => {
-    const container = panel.querySelector(".sl-container");
-    if (!container) throw new Error("Documentation content container not found");
-    const styles = getComputedStyle(panel);
+  const layout = await page.evaluate(() => {
+    const box = (el: Element | null) => {
+      if (!el) throw new Error("Element not found");
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right, width: r.width };
+    };
     return {
-      available: panel.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight),
-      content: container.getBoundingClientRect().width,
+      sidebar: box(document.querySelector("#starlight__sidebar")),
+      toc: box(document.querySelector(".right-sidebar-panel")),
+      title: box(document.querySelector("h1#_top")),
+      footer: box(document.querySelector(".content-panel footer")),
+      prose: [...document.querySelectorAll(".sl-markdown-content > :not(.table-scroll-wrapper, pre.mermaid, figure, picture, img, video)")].map(el => box(el)),
+      tables: [...document.querySelectorAll(".sl-markdown-content > .table-scroll-wrapper")].map(el => box(el)),
     };
   });
-  expect(widths.available).toBeGreaterThan(608);
-  expect(widths.content).toBeGreaterThanOrEqual(widths.available - 2);
 
+  for (const el of [layout.title, layout.footer, ...layout.prose]) {
+    expect(el.width).toBeLessThanOrEqual(PROSE_WIDTH + 1);
+    expect(el.left - layout.sidebar.right).toBeGreaterThanOrEqual(MIN_GUTTER);
+    expect(layout.toc.left - el.right).toBeGreaterThanOrEqual(MIN_GUTTER);
+  }
+
+  // Centred between the sidebar and "On this page"
+  const p = layout.prose[0];
+  expect(Math.abs(p.left - layout.sidebar.right - (layout.toc.left - p.right))).toBeLessThanOrEqual(2);
+
+  // Wide tables may run past the measure, still clear of the navigation
+  expect(Math.max(...layout.tables.map(t => t.width))).toBeGreaterThan(PROSE_WIDTH);
+  for (const t of layout.tables) {
+    expect(t.left - layout.sidebar.right).toBeGreaterThanOrEqual(MIN_GUTTER);
+    expect(layout.toc.left - t.right).toBeGreaterThanOrEqual(MIN_GUTTER);
+  }
+});
+
+test("the landing page keeps its own wide layout", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/gh-aw/");
-  expect(await page.locator("body").evaluate(body => getComputedStyle(body).getPropertyValue("--sl-content-width").trim())).toBe("38rem");
   expect(
     await page
       .locator(".aw-hero-inner")

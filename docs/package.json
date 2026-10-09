@@ -9,7 +9,7 @@
     "dev": "astro dev",
     "predev": "npm run build:slides",
     "start": "astro dev",
-    "prebuild": "npm run generate-agent-factory && npm run generate-model-tables && npm run build:slides",
+    "prebuild": "node scripts/check-reading-measure.mjs && npm run generate-agent-factory && npm run generate-model-tables && npm run build:slides",
     "build": "rm -rf dist && astro build",
     "build:slides": "node ../scripts/ensure-docs-slide-pdf.js",
     "preview": "astro preview",
