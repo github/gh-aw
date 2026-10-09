@@ -31,7 +31,7 @@ import "embed"
 //go:embed js/work_queue_dispatch_credential.cjs js/work_queue_provisioning.cjs js/work_queue_reconciler.cjs
 //go:embed js/work_queue_git_tree_adapter.cjs js/work_queue_graphql_adapter.cjs js/work_queue_rest_adapter.cjs
 //go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_yaml.cjs
-//go:embed js/work_queue_indexes.cjs
+//go:embed js/work_queue_indexes.cjs js/work_queue_issue_contract.cjs js/work_queue_checked_transport.cjs
 //go:embed js/mcp_server_core.cjs js/mcp_dependencies_manager.cjs js/mcp_enhanced_errors.cjs js/mcp_logger.cjs
 //go:embed js/mcp_handler_go.cjs js/mcp_handler_javascript.cjs js/mcp_handler_process.cjs
 //go:embed js/mcp_handler_python.cjs js/mcp_handler_shell.cjs js/mcp_scripts_validation.cjs
