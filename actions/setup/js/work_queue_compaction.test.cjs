@@ -5,7 +5,7 @@ const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-import { test } from "vitest";
+const { test } = require("node:test");
 const { canonical } = require("./work_queue_codec.cjs");
 const { main: planCompaction, planFor } = require("./work_queue_compaction_plan.cjs");
 const { isRetryablePublicationError, main: apply, PLAN_MAX_BYTES, readPlan } = require("./work_queue_compaction_apply.cjs");
