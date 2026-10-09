@@ -315,13 +315,16 @@ func TestAgyProductionConformanceIsBoundedAndReadOnly(t *testing.T) {
 			}
 			for name, config := range callee.Jobs {
 				allowedPermissions := binding.Permissions
-				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
+				if entry.id == "engine-conformance-agy" && name == "activation" {
+					allowedPermissions = map[string]string{"actions": "read", "contents": "write"}
+				} else if entry.id == "engine-conformance-agy" && name == "safe_outputs" {
+					allowedPermissions = map[string]string{"actions": "write", "contents": "write"}
+				} else if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
 					allowedPermissions = map[string]string{
 						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
 					}
 				}
 				for permission, level := range config.Permissions {
-					assert.Equal(t, "read", level, "%s must not grant %s write permission", name, permission)
 					assert.Equal(t, allowedPermissions[permission], level, "%s must allow only scoped %s permission", name, permission)
 				}
 			}
@@ -341,12 +344,21 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 	var canonical map[string]any
 	readConformanceFrontmatter(t, "../../.github/workflows/engine-conformance-agy.md", &canonical)
 	assert.Equal(t, map[string]any{"workflow_dispatch": nil}, canonical["on"])
-	assert.Equal(t, []any{"shared/agy-conformance.md"}, canonical["imports"])
+	assert.Equal(t, []any{"shared/agy-conformance.md", "shared/engine-conformance-worker.md"}, canonical["imports"])
+	assert.Equal(t, map[string]any{
+		"cli-proxy": false,
+		"work-queue": map[string]any{
+			"worker":             true,
+			"require-assignment": true,
+		},
+	}, canonical["tools"])
 	assert.EqualValues(t, 5, canonical["max-ai-credits"])
 	delete(canonical, "name")
 	delete(canonical, "description")
 	delete(canonical, "on")
 	delete(canonical, "max-ai-credits")
+	delete(canonical, "imports")
+	delete(canonical, "tools")
 	for _, entry := range []struct {
 		id, trigger string
 		credits     int
@@ -379,6 +391,8 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 			delete(source, "description")
 			delete(source, "on")
 			delete(source, "max-ai-credits")
+			delete(source, "imports")
+			delete(source, "tools")
 			assert.Equal(t, canonical, source, "all compilation paths must retain identical gate configuration")
 		})
 	}

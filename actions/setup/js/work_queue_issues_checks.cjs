@@ -120,6 +120,20 @@ function mock(f, { field = false, labelMissing = false } = {}) {
         },
       },
       git: {
+        getRef: async ({ ref }) => ({
+          data: { object: { sha: ref === "heads/work-queue" ? sha : "b".repeat(40) } },
+        }),
+        getCommit: async () => ({ data: { tree: { sha: "c".repeat(40) }, parents: [] } }),
+        getTree: async () => ({
+          data: {
+            truncated: false,
+            tree: [{ path: "work-queue.jsonl", type: "blob", mode: "100644", sha: "d".repeat(40) }],
+          },
+        }),
+        getBlob: async ({ file_sha }) => {
+          const content = `${transactions.map(commit => canonical(commit)).join("\n")}\n`;
+          return { data: { sha: file_sha, encoding: "base64", content: Buffer.from(content, "utf8").toString("base64"), size: Buffer.byteLength(content) } };
+        },
         createRef: async ({ ref }) => {
           calls.push(["lock", ref]);
           if (locks.has(ref)) throw Object.assign(new Error("held"), { status: 422 });
