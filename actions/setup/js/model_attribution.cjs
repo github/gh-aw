@@ -6,6 +6,8 @@ const ROUTING_STATUSES = new Set(["selected", "pending", "failed", "rejected", "
 const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "off"]);
 const MODEL_ROUTING_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
 
+/** @typedef {{ status: string, mode: string, router_version: string, failure_code?: string, objective: string, task_type: string, scope: string, complexity: string, degraded?: boolean, deviated_requests?: number }} ModelRoutingSummary */
+
 /** @param {unknown} value @returns {string} */
 function validateModelIdentifier(value) {
   if (typeof value !== "string") return "";
@@ -223,6 +225,7 @@ function resolveModelRoutingSummary({
   const selection = sessionSelection || proxySelection || {};
   const objective = selection.objective?.goal ?? selection.objective?.Goal;
   const labels = selection.labels ?? {};
+  /** @type {ModelRoutingSummary} */
   const result = {
     status,
     mode: firstValidated(sessionRouting.mode, sessionRouting.Mode, selection.mode, infoRouting?.mode, proxySelection?.mode),
