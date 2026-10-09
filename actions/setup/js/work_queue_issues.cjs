@@ -269,6 +269,8 @@ async function projectBatch(options, initial, origin, assignment, config, target
     });
   }
   if (creates.length) {
+    // Record intent before sending: an accepted native write followed by a crash
+    // must never leave retryable state. Git and Issue writes are not atomic.
     current = await publishProjection(options, current, actor, journals, []);
     const batch = await mutateIssues(options.githubClient, creates);
     for (const result of batch.results) {
@@ -512,7 +514,14 @@ async function main(options = {}) {
   try {
     const runtime = resolveWorkQueueRuntime(repositoryContext.payload, { role: options.role });
     if (runtime.role === "observer") return { disabled: true, observer: true };
-    const origin = options.trustedContext || (await authenticatePublisher({ ...boundOptions, context: repositoryContext, role: runtime.assignment ? "worker" : "dispatcher" }));
+    const origin =
+      options.trustedContext ||
+      (await authenticatePublisher({
+        ...boundOptions,
+        context: repositoryContext,
+        role: runtime.assignment ? "worker" : "dispatcher",
+        ...(runtime.assignment ? { dispatch_id: runtime.assignment.dispatch_id } : {}),
+      }));
     const assignment = runtime.assignment || readInboundWorkQueueAssignment(repositoryContext.payload);
     const initial = await (options.readCheckedQueue || readCheckedQueue)(boundOptions);
     const permitted = ownProjectionTargets(initial.state, origin, origin.ref, assignment).targets;

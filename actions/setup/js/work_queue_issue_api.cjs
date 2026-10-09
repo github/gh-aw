@@ -206,7 +206,6 @@ async function mutateIssues(github, operations, { sleep = delay => new Promise(r
     }
     return { results, ambiguous: false };
   }
-  if (operations.length > 100) throw queueError("projection_limit", "projection mutation batch is oversized");
   if (!operations.length) return { results: [], ambiguous: false };
   const variables = {};
   const declarations = [];

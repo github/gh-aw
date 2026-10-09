@@ -313,6 +313,81 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.equal(uncertain.ambiguous, true);
     });
 
+    for (const kind of ["Issue", "comment"]) {
+      it(`cannot distinguish interrupted ${kind} creation from an accepted write with a lost receipt`, async () => {
+        const receipts = [];
+        for (const remoteAccepted of [false, true]) {
+          const f = fixture({ backing: kind === "comment" });
+          const m = mock(f);
+          const send = m.options.githubClient.graphql;
+          let sends = 0;
+          m.options.githubClient.graphql = async (query, variables) => {
+            if (query.includes("WorkQueueIssueProjection")) {
+              sends++;
+              if (remoteAccepted) await send(query, variables);
+              throw new Error("interrupted before saving a native receipt");
+            }
+            return send(query, variables);
+          };
+          const options = nativeOptions(m, f);
+          const first = await main(options);
+          assert.ok(first.pending?.length);
+          assert.equal(sends, 1);
+          assert.equal(kind === "Issue" ? m.issues.size : m.comments.size, remoteAccepted ? 1 : 0);
+          const journal = m.journals.get(journalPath(f.nodes[0].work_id));
+          const receipt = kind === "Issue" ? journal.create : journal.comments.summary;
+          assert.equal(receipt.resource, undefined);
+          assert.equal(receipt.id, undefined);
+          receipts.push({ ...receipt, nonce: "opaque-nonce" });
+          assert.ok(m.locks.size > 0);
+          const next = await main(options);
+          assert.ok(next.pending?.some(item => /lock is held|acquisition is uncertain/.test(item.reason)));
+          assert.equal(sends, 1);
+          assert.equal(kind === "Issue" ? m.issues.size : m.comments.size, remoteAccepted ? 1 : 0);
+        }
+        assert.deepEqual(receipts[0], receipts[1]);
+      });
+    }
+
+    it("does not let an authenticated rerun rewrite attempt-one execution status", async () => {
+      const f = fixture({ worker: true });
+      const m = mock(f, { field: true });
+      const options = nativeOptions(m, f);
+      assert.deepEqual((await main(options)).pending, []);
+      assert.equal(m.issues.get("1").issueFieldValues.nodes[0].optionId, "option-Running");
+      const before = m.calls.length;
+      const comments = [...m.comments.values()].map(comment => comment.body);
+      m.nativeRun.run_attempt = 2;
+      const rerun = await main({ ...options, context: { ...options.context, runAttempt: 2 } });
+      assert.ok(rerun.pending?.length);
+      assert.match(rerun.pending[0].reason, /rerun_not_authorized|native attempt 1|original authenticated Claims/);
+      assert.equal(m.calls.slice(before).filter(call => call[0] === "mutation").length, 0);
+      assert.equal(m.issues.get("1").issueFieldValues.nodes[0].optionId, "option-Running");
+      assert.deepEqual(
+        [...m.comments.values()].map(comment => comment.body),
+        comments
+      );
+    });
+
+    it("chunks arbitrarily large operation lists into bounded native batches", async () => {
+      const operations = Array.from({ length: 101 }, (_, key) => ({ key, name: "addComment", type: "AddCommentInput", input: {}, selection: "commentEdge { node { id } }" }));
+      const sizes = [];
+      const batch = await mutateIssues(
+        {
+          graphql: async (_query, variables) => {
+            const aliases = Object.keys(variables).filter(key => /^m\d+$/.test(key));
+            sizes.push(aliases.length);
+            return Object.fromEntries(aliases.map(key => [key, { commentEdge: { node: { id: key } } }]));
+          },
+        },
+        operations,
+        { sleep: async () => {} }
+      );
+      assert.deepEqual(sizes, [50, 50, 1]);
+      assert.equal(batch.results.length, 101);
+      assert.equal(batch.ambiguous, false);
+    });
+
     it("persists valid native receipts even when a sibling creation response is malformed", async () => {
       const f = fixture({ count: 2, backing: false });
       const m = mock(f);

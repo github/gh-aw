@@ -145,6 +145,16 @@ explicitly pending. Marker text or bot identity is not proof of creation.
 Ambiguous native writes retain coordination: locks never expire or get stolen,
 and absent verified receipts never authorize blind recreation.
 
+Creation intent is durable before sending either an Issue or comment mutation.
+An interruption before sending and a crash after GitHub accepted the write but
+before saving its receipt are indistinguishable to the next hook. Both remain
+pending, potentially indefinitely; a later hook alone cannot unblock a retained
+lock or prove that an unreceipted creation never happened. Recording a
+`sent` flag after the call would permit duplicates in that second crash window.
+GitHub does not provide documented creation deduplication, and marker text or an
+empty discovery result is not proof of noncreation. Automatic crash recovery
+that can safely clear these fences is not implemented.
+
 Hooks batch up to 25 owned targets. Checked GraphQL reads combine immutable-head
 ledger/journal reads, field discovery, and scoped Issue preflight; an explicitly
 truncated blob uses an OID-checked REST fallback. Writes are paced and exhausted
