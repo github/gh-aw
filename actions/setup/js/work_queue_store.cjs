@@ -350,37 +350,30 @@ async function writeCandidate({ githubClient, owner, repo, current, transactions
   const commit = await githubClient.rest.git.createCommit({ owner, repo, message: "Publish checked fair work queue request", tree: tree.data.sha, parents: current.sha ? [current.sha] : [] });
   log.debug("candidate.ref.publish.start", { initialized: !!current.sha });
   if (current.sha) await githubClient.rest.git.updateRef({ owner, repo, ref: `heads/${current.branch}`, sha: commit.data.sha, force: false });
-  else {
-    try {
-      await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${current.branch}`, sha: commit.data.sha });
-    } catch (error) {
-      // GitHub cannot create a ref in a repository with no branches. Only a
-      // verified empty repository may receive the bootstrap default branch.
-      if (httpStatus(error) !== 422) throw error;
-      const repository = await verifyRepository(githubClient, owner, repo);
-      if (repository.size !== 0 || typeof repository.default_branch !== "string") throw error;
-      validateBranch(repository.default_branch);
-      if (await readRef(githubClient, owner, repo, current.branch)) throw error;
-      if (!(await readRef(githubClient, owner, repo, repository.default_branch))) {
-        try {
-          await githubClient.rest.repos.createOrUpdateFileContents({
-            owner,
-            repo,
-            path: ".gh-aw/work-queue-bootstrap",
-            message: "Initialize repository for work queue",
-            content: Buffer.from("The work-queue branch holds the authoritative queue ledger.\n").toString("base64"),
-          });
-        } catch (bootstrapError) {
-          // A lost response or concurrent initializer is only acceptable if
-          // the default branch can now be read.
-          if (!(await readRef(githubClient, owner, repo, repository.default_branch))) throw bootstrapError;
-        }
-      }
-      await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${current.branch}`, sha: commit.data.sha });
-    }
-  }
+  else await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${current.branch}`, sha: commit.data.sha });
   log.debug("candidate.write.complete");
   return commit.data.sha;
+}
+
+async function prepareEmptyRepository(githubClient, owner, repo, branch) {
+  const repository = await verifyRepository(githubClient, owner, repo);
+  if (repository.size !== 0 || typeof repository.default_branch !== "string") return;
+  validateBranch(repository.default_branch);
+  if (repository.default_branch === branch) throw queueError("branch_invalid", "queue branch cannot be the default branch of an empty repository");
+  if (await readRef(githubClient, owner, repo, repository.default_branch)) return;
+  try {
+    await githubClient.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path: ".gh-aw/work-queue-bootstrap",
+      message: "Initialize repository for work queue",
+      content: Buffer.from("The work-queue branch holds the authoritative queue ledger.\n").toString("base64"),
+    });
+  } catch (error) {
+    // A lost response or concurrent initializer is only acceptable if the
+    // default branch is now readable; it never substitutes for a queue commit.
+    if (!(await readRef(githubClient, owner, repo, repository.default_branch))) throw error;
+  }
 }
 
 /**
@@ -502,6 +495,7 @@ async function publishWorkQueueRequest({
     const candidate = { version: 3, id, previous: current.state.tip || null, request: stable, actor: stableActor, policy_epoch: policyOp?.epoch ?? current.state.policy_epoch, at, operations: decision.operations };
     const checked = appendCommit(current.transactions, candidate);
     log.debug("request.candidate.checked", { operations: checked.commit.operations.length });
+    if (bootstrapOperation) await prepareEmptyRepository(githubClient, owner, repo, branch);
     if (policyOp) await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
     let sha;
     try {

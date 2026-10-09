@@ -326,12 +326,14 @@ Those restrictions must be established independently; automated enforcement
 remains deferred. A trusted workflow producer can publish only the exact
 compiler-approved proposal with its first Work on an absent branch; the agent
 cannot choose or update Policy or receive queue-write credentials.
-On a repository with no branches, a verified first submission initializes the
-default branch with `.gh-aw/work-queue-bootstrap` before creating the queue
-branch. Policy and Work still enter the queue together in its first commit;
-reads and dispatches never initialize a repository. The approved worker
-workflow must already be verifiable at its immutable revision, or submission
-fails without bootstrapping.
+On a repository with no branches, a valid first producer submission initializes
+the default branch with `.gh-aw/work-queue-bootstrap`. If the approved worker
+workflow is not yet deployed and verifiable at its immutable revision, the
+submission stops there: deploy the worker, then retry the same submission.
+Policy and Work enter the queue together only after verification, in its first
+commit on a separate queue branch. Reads and dispatches never initialize a
+repository. The queue branch must differ from the empty repository's default
+branch.
 
 Worker finish is a Claim-scoped MCP intent, not an operator command that can
 impersonate a worker. Direct `claim --work-id`, legacy scalar assignments

@@ -951,6 +951,24 @@ function registerTests({ describe, it }) {
       const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
       const request = newRequest("unverified-route", "submit", producer, { nodes: [newWork({ task: "first work" }, "graph", "root", "default", policy, 100)] });
       await assert.rejects(publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 })), /policy_missing/);
+      assert.equal(fake.state.bootstrapWrites, 1);
+      assert.equal(fake.refs.has("work-queue"), false);
+      fake.state.workerContent = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\n";
+      const result = await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
+      assert.equal(result.publishedNow, true);
+      assert.equal(fake.state.bootstrapWrites, 1);
+    });
+    it("never initializes an empty repository on the queue branch itself", async () => {
+      const fake = fakeGitHub();
+      fake.state.emptyRepository = true;
+      const originalGet = fake.githubClient.rest.repos.get;
+      fake.githubClient.rest.repos.get = async () => {
+        const response = await originalGet();
+        return { data: { ...response.data, default_branch: "work-queue" } };
+      };
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
+      const request = newRequest("same-default-branch", "submit", producer, { nodes: [newWork({ task: "first work" }, "graph", "root", "default", policy, 100)] });
+      await assert.rejects(publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy })), /branch_invalid/);
       assert.equal(fake.state.bootstrapWrites, 0);
       assert.equal(fake.refs.has("work-queue"), false);
     });
