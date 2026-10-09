@@ -9,6 +9,7 @@ const {
   ERR_PARSE,
   ERR_SYSTEM,
   SAFE_OUTPUT_E001,
+  SAFE_OUTPUT_E002,
   SAFE_OUTPUT_E007,
   SAFE_OUTPUT_E009,
   SAFE_OUTPUT_E010,
@@ -28,6 +29,7 @@ describe("error_codes", () => {
       expect(ERR_PARSE).toBeDefined();
       expect(ERR_SYSTEM).toBeDefined();
       expect(SAFE_OUTPUT_E001).toBeDefined();
+      expect(SAFE_OUTPUT_E002).toBeDefined();
       expect(SAFE_OUTPUT_E007).toBeDefined();
       expect(SAFE_OUTPUT_E009).toBeDefined();
       expect(SAFE_OUTPUT_E010).toBeDefined();
@@ -46,6 +48,7 @@ describe("error_codes", () => {
         ERR_PARSE,
         ERR_SYSTEM,
         SAFE_OUTPUT_E001,
+        SAFE_OUTPUT_E002,
         SAFE_OUTPUT_E007,
         SAFE_OUTPUT_E009,
         SAFE_OUTPUT_E010,
@@ -92,6 +95,10 @@ describe("error_codes", () => {
   describe("legacy safe-output codes", () => {
     it("SAFE_OUTPUT_E001 is 'E001'", () => {
       expect(SAFE_OUTPUT_E001).toBe("E001");
+    });
+
+    it("SAFE_OUTPUT_E002 is 'E002'", () => {
+      expect(SAFE_OUTPUT_E002).toBe("E002");
     });
 
     it("SAFE_OUTPUT_E007 is 'E007'", () => {
@@ -146,6 +153,7 @@ describe("error_codes", () => {
         ERR_PARSE,
         ERR_SYSTEM,
         SAFE_OUTPUT_E001,
+        SAFE_OUTPUT_E002,
         SAFE_OUTPUT_E007,
         SAFE_OUTPUT_E009,
         SAFE_OUTPUT_E010,

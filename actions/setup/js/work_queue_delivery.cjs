@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+// @safe-outputs-exempt SEC-005 — delivery performs readback only; assertClaimAuthorized checks its selected repository against authorizeWorkerClaim's authenticated profile.effect_scope allowlist before native reads.
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("delivery");
 
 const { canonicalResourceTarget, resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");

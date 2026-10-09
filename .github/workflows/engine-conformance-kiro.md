@@ -16,11 +16,16 @@ engine:
   id: kiro
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-kiro
+tools:
+  work-queue:
+    worker: true
+    require-assignment: true
 imports:
   - shared/kiro.md
   - uses: shared/engine-conformance.md
     with:
       engine-id: kiro
+  - shared/engine-conformance-worker.md
 ---
 
 Execute the imported engine configuration conformance suite once.

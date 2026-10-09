@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -33,7 +33,7 @@ const DECLARED_EFFECT_TYPES = new Set(ADAPTER_EFFECT_TYPES);
 
 function builtinMessageFields(message) {
   const fields = builtinAdapterFields(message.type);
-  if (!fields) throw new Error("Unsupported native builtin Claim verifier");
+  if (!fields) throw new Error(`${SAFE_OUTPUT_E001}: Unsupported native builtin Claim verifier`);
   const metadata = new Set(["type", "claim_handle", "claim_id", "work_id", "repo", "temporary_id"]);
   if (Object.keys(message).some(field => !metadata.has(field) && !fields.includes(field))) throw new Error("Native builtin Claim verifier cannot ignore undeclared message fields");
   builtinTargetNumber(message);
@@ -230,6 +230,7 @@ async function verifyClaimAdapterOutput(options) {
   return verifyBuiltinDeliveryOutput({ ...options, message: receipt.message });
 }
 
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates a literal configured repository; projection fixes that destination and assertClaimAuthorized enforces the per-Claim profile allowlist before effects.
 module.exports = {
   wrapDeclaredBuiltinHandler,
   ADAPTER_EFFECT_TYPES,

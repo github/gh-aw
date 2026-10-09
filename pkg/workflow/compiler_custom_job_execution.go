@@ -154,7 +154,11 @@ func (c *Compiler) configureCustomJobSteps(job *Job, jobName string, configMap m
 }
 
 func formatIndentedYAMLField(fieldName string, value any, trimTrailingNewline bool) (string, error) {
-	yamlBytes, err := yaml.Marshal(value)
+	// IndentSequence ensures list items (e.g. strategy.matrix arrays, runs-on
+	// lists, services ports) are indented under their parent key rather than
+	// aligned with it, satisfying yamllint's default indentation rule.
+	marshalOptions := append(append([]yaml.EncodeOption{}, DefaultMarshalOptions...), yaml.IndentSequence(true))
+	yamlBytes, err := yaml.MarshalWithOptions(value, marshalOptions...)
 	if err != nil {
 		return "", err
 	}

@@ -555,6 +555,21 @@ describe("independent trusted Claim finalization", () => {
     await expect(authorizeWorkerClaim({ ...options, claim_handle: "h1", message: { claim_handle: "h1", repo: effectScope, repository: "foreign/unapproved" } })).rejects.toThrow(/scope/);
   });
 
+  it("rejects repositories outside the authenticated profile allowlist with E004", async () => {
+    const { options } = setup(1);
+    const request = { ...options, claim_handle: "h1", requireCompletion: false };
+    expect(await authorizeWorkerClaim({ ...request, message: { claim_handle: "h1", repo: REPOSITORY } })).toMatchObject({ authorized: true });
+    for (const field of ["repository", "repo", "target_repo", "target-repo"]) {
+      await expect(authorizeWorkerClaim({ ...request, message: { claim_handle: "h1", [field]: "foreign/repo" } })).rejects.toMatchObject({
+        code: "E004",
+        message: "work_queue_effect_scope_denied",
+      });
+    }
+    for (const resource of [{ repository: "foreign/repo" }, { repo: "foreign/repo" }, { repository: REPOSITORY, repo: "foreign/repo" }]) {
+      await expect(authorizeWorkerClaim({ ...request, resource })).rejects.toMatchObject({ code: "E004", message: "work_queue_effect_scope_denied" });
+    }
+  });
+
   it("intersects actual lifecycle effect targets with the authoritative immutable Work subject without changing assignment payloads", async () => {
     const subject = { kind: "issue", host: "github.com", repository: REPOSITORY, repository_id: "7", resource_id: "501", number: "19" };
     const { fixture, options } = setup(1, { workerPrincipal: "22", workDefaults: { subject } });

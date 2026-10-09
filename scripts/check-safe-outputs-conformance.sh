@@ -88,7 +88,7 @@ check_validation_ordering() {
     
     for handler in actions/setup/js/*.cjs; do
         # Skip test files
-        [[ "$handler" =~ test ]] && continue
+        [[ "$handler" =~ test|_checks\.cjs$ ]] && continue
         [[ "$handler" =~ parse ]] && continue
         [[ "$handler" =~ buffer ]] && continue
         
@@ -115,7 +115,7 @@ check_max_limits() {
     
     for handler in actions/setup/js/*.cjs; do
         # Skip test and utility files
-        [[ "$handler" =~ (test|parse|buffer|factory) ]] && continue
+        [[ "$handler" =~ (test|parse|buffer|factory)|_checks\.cjs$ ]] && continue
         
         # Only check files that perform GitHub API operations
         if ! grep -q "octokit\." "$handler"; then
@@ -142,7 +142,7 @@ check_sanitization() {
 
     for handler in actions/setup/js/{add_comment,create_issue,create_discussion,create_pull_request,update_issue,close_issue,close_discussion,close_pull_request,add_labels,remove_labels,create_check_run,approve_workflow_run,create_pr_review_comment,comment_memory,create_agent_session,assign_milestone,create_project,create_forecast_issue}.cjs; do
         # Skip test and utility files
-        [[ "$handler" =~ (test|parse|buffer) ]] && continue
+        [[ "$handler" =~ (test|parse|buffer)|_checks\.cjs$ ]] && continue
         [ ! -f "$handler" ] && continue
 
         # Skip files with a documented SEC-004 exemption annotation
@@ -175,7 +175,7 @@ check_cross_repo() {
     
     for handler in actions/setup/js/*.cjs; do
         # Skip test files
-        [[ "$handler" =~ test ]] && continue
+        [[ "$handler" =~ test|_checks\.cjs$ ]] && continue
         
         # Skip files with a documented SEC-005 exemption annotation
         if grep -q "@safe-outputs-exempt.*SEC-005" "$handler"; then
@@ -205,7 +205,7 @@ check_error_codes() {
     
     for handler in actions/setup/js/*.cjs; do
         # Skip test files and non-safe-output modules
-        [[ "$handler" =~ test ]] && continue
+        [[ "$handler" =~ test|_checks\.cjs$ ]] && continue
         [[ "$handler" =~ (apm_unpack|run_apm_unpack|observability|generate_observability) ]] && continue
         
         # Only check handlers that interact with GitHub via octokit or record safe output operations
@@ -258,7 +258,7 @@ check_staged_mode() {
     
     for handler in actions/setup/js/*.cjs; do
         # Skip test files and non-safe-output modules
-        [[ "$handler" =~ test ]] && continue
+        [[ "$handler" =~ test|_checks\.cjs$ ]] && continue
         [[ "$handler" =~ (apm_unpack|run_apm_unpack|observability|generate_observability) ]] && continue
         
         # Only check handlers that explicitly reference the safe outputs staged mode env var

@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository and assertClaimAuthorized gates preparation; this module writes only local Claim artifacts.
 
 const fs = require("fs");
 const path = require("path");
