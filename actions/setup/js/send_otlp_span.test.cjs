@@ -3098,7 +3098,7 @@ describe("sendJobConclusionSpan", () => {
           _schema: "model-routing/v0.28.49",
           stage: "selection",
           objective: { goal: "cost" },
-          labels: { task_type: "code", scope: "repository", task_complexity: "moderate" },
+          labels: { task_type: "fix", scope: "local", task_complexity: "medium" },
           degraded_classification: true,
         }),
         JSON.stringify({ _schema: "model-routing/v0.28.49", stage: "request", routed: "deviated", deviations: ["effort"] }),
@@ -3122,9 +3122,9 @@ describe("sendJobConclusionSpan", () => {
     expect(attrs["gh-aw.model_routing.mode"]).toBe("awf-routed");
     expect(attrs["gh-aw.model_routing.router_version"]).toBe("0.28.49");
     expect(attrs["gh-aw.model_routing.objective"]).toBe("cost");
-    expect(attrs["gh-aw.model_routing.task_type"]).toBe("code");
-    expect(attrs["gh-aw.model_routing.scope"]).toBe("repository");
-    expect(attrs["gh-aw.model_routing.complexity"]).toBe("moderate");
+    expect(attrs["gh-aw.model_routing.task_type"]).toBe("fix");
+    expect(attrs["gh-aw.model_routing.scope"]).toBe("local");
+    expect(attrs["gh-aw.model_routing.complexity"]).toBe("medium");
     expect(attrs["gh-aw.model_routing.degraded"]).toBe(true);
     expect(attrs["gh-aw.model_routing.deviated_requests"]).toBe(1);
   });
@@ -3154,7 +3154,7 @@ describe("sendJobConclusionSpan", () => {
             schema: "model-routing/v0.28.49",
             stage: "selection",
             objective: { goal: "cost" },
-            labels: { task_type: "code", scope: "repository", task_complexity: "moderate" },
+            labels: { task_type: "fix", scope: "local", task_complexity: "medium" },
             degraded_classification: false,
             degraded_reason: "not for telemetry",
             selected_id: "not-for-telemetry",
@@ -3186,9 +3186,9 @@ describe("sendJobConclusionSpan", () => {
       "gh-aw.model_routing.mode": "session-mode",
       "gh-aw.model_routing.router_version": "1.2.3",
       "gh-aw.model_routing.objective": "cost",
-      "gh-aw.model_routing.task_type": "code",
-      "gh-aw.model_routing.scope": "repository",
-      "gh-aw.model_routing.complexity": "moderate",
+      "gh-aw.model_routing.task_type": "fix",
+      "gh-aw.model_routing.scope": "local",
+      "gh-aw.model_routing.complexity": "medium",
       "gh-aw.model_routing.degraded": false,
       "gh-aw.model_routing.deviated_requests": 1,
     });

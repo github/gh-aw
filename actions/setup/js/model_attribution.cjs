@@ -4,6 +4,9 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 const ROUTING_STATUSES = new Set(["selected", "pending", "failed", "rejected", "unavailable"]);
 const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "off"]);
+const ROUTING_TASK_TYPES = new Set(["explain", "plan", "fix", "refactor", "chore", "implement", "unknown"]);
+const ROUTING_SCOPES = new Set(["local", "multi_file", "subsystem", "cross_system", "unknown"]);
+const ROUTING_COMPLEXITIES = new Set(["trivial", "easy", "medium", "hard", "expert", "unknown"]);
 const MODEL_ROUTING_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
 
 /** @typedef {{ status: string, mode: string, router_version: string, failure_code?: string, objective: string, task_type: string, scope: string, complexity: string, degraded?: boolean, deviated_requests?: number }} ModelRoutingSummary */
@@ -192,6 +195,10 @@ function firstValidated(...values) {
   return "";
 }
 
+function firstAllowed(allowedValues, ...values) {
+  return values.find(value => typeof value === "string" && allowedValues.has(value)) || "";
+}
+
 function resolveModelRoutingSummary({
   infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`,
   sessionPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/usage/aw_session.jsonl`,
@@ -236,9 +243,9 @@ function resolveModelRoutingSummary({
         }
       : {}),
     objective: firstValidated(objective),
-    task_type: firstValidated(labels.task_type, labels.taskType),
-    scope: firstValidated(labels.scope),
-    complexity: firstValidated(labels.task_complexity, labels.taskComplexity),
+    task_type: firstAllowed(ROUTING_TASK_TYPES, labels.task_type, labels.taskType),
+    scope: firstAllowed(ROUTING_SCOPES, labels.scope),
+    complexity: firstAllowed(ROUTING_COMPLEXITIES, labels.task_complexity, labels.taskComplexity),
   };
   if (typeof selection.degraded_classification === "boolean") {
     result.degraded = selection.degraded_classification;
