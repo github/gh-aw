@@ -17,11 +17,16 @@ engine:
   id: crush
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-crush
+tools:
+  work-queue:
+    worker: true
+    require-assignment: true
 imports:
   - shared/crush.md
   - uses: shared/engine-conformance.md
     with:
       engine-id: crush
+  - shared/engine-conformance-worker.md
 ---
 
 Execute the imported engine configuration conformance suite once.
