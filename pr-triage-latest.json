@@ -1,28 +1,128 @@
 {
-  "run_date": "2026-10-09T01:06:29Z",
-  "run_id": "37867912491",
+  "run_date": "2026-10-09T06:42:39Z",
+  "run_id": "37894774364",
   "source": "pr-triage-agent",
-  "eligible_total": 1,
-  "cooldown_skipped": 12,
+  "eligible_total": 7,
+  "cooldown_skipped": 3,
   "category_counts": {
-    "bug": 1
+    "bug": 4,
+    "feature": 1,
+    "chore": 1,
+    "docs": 1
   },
   "risk_counts": {
-    "high": 1
+    "high": 4,
+    "medium": 1,
+    "low": 2
   },
   "priority_counts": {
-    "medium": 1
+    "high": 3,
+    "medium": 3,
+    "low": 1
   },
   "action_counts": {
     "auto_merge": 0,
-    "batch_review": 1,
-    "close": 0,
-    "defer": 0,
-    "fast_track": 0
+    "fast_track": 3,
+    "batch_review": 3,
+    "defer": 1,
+    "close": 0
   },
-  "batches": [],
-  "selected_candidates": [56568],
+  "batches": [
+    {
+      "id": "bugfix-cluster",
+      "prs": [
+        67114,
+        67092,
+        67020,
+        56568
+      ]
+    }
+  ],
+  "selected_candidates": [
+    67114,
+    67092,
+    67020,
+    56568,
+    67105,
+    67091,
+    66942
+  ],
   "prs": [
+    {
+      "number": 67114,
+      "title": "Preserve model routing attribution in audit and logs",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "score": 82,
+      "score_breakdown": {
+        "impact": 38,
+        "urgency": 26,
+        "quality": 18
+      },
+      "action": "fast_track",
+      "batch": "bugfix-cluster",
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:bugfix-cluster"
+      ]
+    },
+    {
+      "number": 67092,
+      "title": "Restore classifier cost attribution in routed-run audits",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "score": 79,
+      "score_breakdown": {
+        "impact": 36,
+        "urgency": 25,
+        "quality": 18
+      },
+      "action": "fast_track",
+      "batch": "bugfix-cluster",
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:bugfix-cluster"
+      ]
+    },
+    {
+      "number": 67020,
+      "title": "Exclude Cloud Hypervisor HOME state from Git staging and agent patches",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "score": 84,
+      "score_breakdown": {
+        "impact": 40,
+        "urgency": 26,
+        "quality": 18
+      },
+      "action": "fast_track",
+      "batch": "bugfix-cluster",
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:bugfix-cluster"
+      ]
+    },
     {
       "number": 56568,
       "title": "Fall back to unsigned push instead of failing when a rebase hits a genuine merge conflict in `pushSignedCommits`",
@@ -36,7 +136,7 @@
         "quality": 11
       },
       "action": "batch_review",
-      "batch": null,
+      "batch": "bugfix-cluster",
       "ci_status": "unknown",
       "review_status": "changes_requested",
       "labels": [
@@ -44,6 +144,79 @@
         "pr-risk:high",
         "pr-priority:medium",
         "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:bugfix-cluster"
+      ]
+    },
+    {
+      "number": 67105,
+      "title": "Extending work queue protocol to support checkpoints and maintenance jobs",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 71,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 21,
+        "quality": 20
+      },
+      "action": "batch_review",
+      "batch": null,
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 67091,
+      "title": "[yamllint-fixer] fix: indent sequence items under custom-job strategy/runs-on/services fields",
+      "category": "chore",
+      "risk": "low",
+      "priority": "medium",
+      "score": 40,
+      "score_breakdown": {
+        "impact": 14,
+        "urgency": 9,
+        "quality": 17
+      },
+      "action": "batch_review",
+      "batch": null,
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:chore",
+        "pr-risk:low",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 66942,
+      "title": "docs: replace Gemini with Antigravity in the homepage hero",
+      "category": "docs",
+      "risk": "low",
+      "priority": "low",
+      "score": 27,
+      "score_breakdown": {
+        "impact": 10,
+        "urgency": 6,
+        "quality": 11
+      },
+      "action": "defer",
+      "batch": null,
+      "ci_status": "unknown",
+      "review_status": "unknown",
+      "labels": [
+        "pr-type:docs",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:defer",
         "pr-agent:copilot"
       ]
     }
