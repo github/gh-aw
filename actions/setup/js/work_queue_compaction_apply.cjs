@@ -7,6 +7,8 @@ const { createHash } = require("node:crypto");
 const { canonical, parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
 const { compactTransactions, replayTransactions } = require("./work_queue_replay.cjs");
 const { readWorkQueueLog } = require("./work_queue_store.cjs");
+const { actorFromContext, validateTrustedContext } = require("./work_queue_policy.cjs");
+const { authenticatePublisher } = require("./work_queue_native.cjs");
 
 const MAX_ATTEMPTS = 3;
 const PLAN_MAX_BYTES = 4096;
@@ -36,13 +38,17 @@ function readPlan(file) {
 }
 
 async function main(options = {}) {
+  const context = options.context || global.context;
   const githubClient = options.githubClient || github;
   const owner = options.owner || context.repo.owner;
   const repo = options.repo || context.repo.repo;
   const file = options.planFile || process.env.GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE;
   if (!file) throw new Error("Missing work queue compaction plan path");
   const plan = readPlan(file);
-  const actor = options.actor || { role: "administrator", repository: `${owner}/${repo}`, principal: process.env.GITHUB_ACTOR_ID };
+  const trustedContext = await authenticatePublisher({ ...options, githubClient, context, owner, repo, role: "administrator" });
+  const actor = actorFromContext(trustedContext);
+  validateTrustedContext(trustedContext, actor);
+  if (options.actor !== undefined) validateTrustedContext(trustedContext, options.actor);
   const sleep = options.sleep || (delay => new Promise(resolve => setTimeout(resolve, delay)));
   core.setOutput("result", "deferred");
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
