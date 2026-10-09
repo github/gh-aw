@@ -86,7 +86,7 @@ describe("resolveModelRoutingSummary", () => {
     const proxyPath = path.join(root, "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl");
     try {
       fs.writeFileSync(infoPath, JSON.stringify({ model_routing: { status: "selected", mode: "awf-routed", router_version: "0.28.49" } }));
-      writeJSONL(proxyPath, [
+      const proxyRecords = [
         {
           _schema: "model-routing/v0.28.49",
           stage: "selection",
@@ -95,7 +95,9 @@ describe("resolveModelRoutingSummary", () => {
           degraded_classification: true,
         },
         { _schema: "model-routing/v0.28.49", stage: "request", routed: "deviated", deviations: ["effort"] },
-      ]);
+      ];
+      writeJSONL(proxyPath, proxyRecords);
+      writeJSONL(path.join(root, "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl"), proxyRecords);
 
       expect(resolveModelRoutingSummary({ infoPath, sessionPath: path.join(root, "missing.jsonl"), ghAwDir: root })).toEqual({
         status: "selected",

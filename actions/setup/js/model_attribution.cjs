@@ -151,7 +151,6 @@ function readModelRoutingSession(sessionPath) {
 
 function readModelRoutingProxyRecords(ghAwDir) {
   const fs = require("fs");
-  const records = [];
   for (const relativePath of MODEL_ROUTING_LOG_PATHS) {
     let content;
     try {
@@ -159,6 +158,7 @@ function readModelRoutingProxyRecords(ghAwDir) {
     } catch {
       continue;
     }
+    const records = [];
     for (const line of content.split("\n")) {
       try {
         const record = JSON.parse(line);
@@ -167,8 +167,9 @@ function readModelRoutingProxyRecords(ghAwDir) {
         // Ignore incomplete proxy records.
       }
     }
+    return records;
   }
-  return records;
+  return [];
 }
 
 function isLegacyEndpointOnlyDeviation(schema) {
