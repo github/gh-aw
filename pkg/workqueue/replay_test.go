@@ -83,6 +83,48 @@ func testOperations(t *testing.T, commits []QueueCommit, actor Actor, id, kind s
 	return next
 }
 
+func TestProducerSubmitBootstrapsAbsentQueuePolicy(t *testing.T) {
+	policy := DefaultPolicy(testPrincipal, testRepository)
+	node, err := NewWork([]byte(`{"task":"first producer submission"}`), "bootstrap", "root", "default", policy, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyOperation, err := Op(map[string]any{"kind": "Policy", "epoch": "bootstrap-epoch", "policy": policy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workOperation, err := Op(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := testActor("producer")
+	request, err := NewRequest("bootstrap-submit", "submit", actor, SubmitParameters{Nodes: []WorkDefinition{node}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := QueueCommit{
+		Version: Version, ID: "bootstrap-commit", Request: request, Actor: actor,
+		PolicyEpoch: "bootstrap-epoch", At: 1000,
+		Operations: []Operation{policyOperation, workOperation},
+	}
+	state, err := Replay([]QueueCommit{commit})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Policy == nil || state.PolicyEpoch != "bootstrap-epoch" || state.Works[node.WorkID] == nil {
+		t.Fatalf("first submit did not install Policy and Work: %#v", state)
+	}
+
+	commit.Actor = testActor("administrator")
+	commit.Request, err = NewRequest("administrator-bootstrap-submit", "submit", commit.Actor, SubmitParameters{Nodes: []WorkDefinition{node}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Replay([]QueueCommit{commit}); err == nil {
+		t.Fatal("administrator submit must not bypass the standalone Policy genesis contract")
+	}
+}
+
 func TestCausalReplayAndCanonicalDedup(t *testing.T) {
 	commits := testGenesis(t, nil)
 	a, b := testNode(t, commits, "a"), testNode(t, commits, "b")

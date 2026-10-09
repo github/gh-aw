@@ -221,7 +221,7 @@ func (state Projection) quiescent() bool {
 func permitted(role, kind string) bool {
 	switch kind {
 	case "Policy", "Control":
-		return role == "administrator"
+		return role == "administrator" || kind == "Policy" && (role == "producer" || role == "dispatcher")
 	case "Work":
 		return role == "producer" || role == "dispatcher" || role == "worker" || role == "administrator"
 	case "Claim":
@@ -255,7 +255,7 @@ func validateRequest(commit QueueCommit) error {
 		return err
 	}
 	kinds := map[string][]string{
-		"policy": {"Policy"}, "control": {"Control", "WorkPriority"}, "submit": {"Work"},
+		"policy": {"Policy"}, "control": {"Control", "WorkPriority"}, "submit": {"Policy", "Work"},
 		"dispatch_next": {"Observation", "Claim"}, "finish": {"Completion", "ClaimCancellation", "WorkCancellation"},
 		"observe": {"Observation"}, "dispatch": {"Dispatch"}, "release": {"ClaimCancellation", "WorkCancellation", "Release"},
 		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"},
@@ -286,21 +286,7 @@ func validateRequest(commit QueueCommit) error {
 func validateRequestIntent(commit QueueCommit, parameterCount int) error {
 	switch commit.Request.Kind {
 	case "submit":
-		var params SubmitParameters
-		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil || params.Nodes == nil {
-			return queueError("request_invalid", "submit requires nodes")
-		}
-		if len(params.Nodes) != len(commit.Operations) {
-			return queueError("request_invalid", "submission differs from stable intent")
-		}
-		for i, node := range params.Nodes {
-			if i < 0 || i >= len(commit.Operations) {
-				return queueError("request_invalid", "submission differs from stable intent")
-			}
-			if !sameJSON(node, commit.Operations[i]) {
-				return queueError("request_invalid", "submission changes immutable node")
-			}
-		}
+		return validateSubmitIntent(commit)
 	case "dispatch_next":
 		var params DispatchParameters
 		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
@@ -336,6 +322,38 @@ func validateRequestIntent(commit QueueCommit, parameterCount int) error {
 		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil ||
 			!sameJSON(params.Operations, commit.Operations) {
 			return queueError("request_invalid", "operations differ from stable intent")
+		}
+	}
+	return nil
+}
+
+func validateSubmitIntent(commit QueueCommit) error {
+	var params SubmitParameters
+	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil || params.Nodes == nil {
+		return queueError("request_invalid", "submit requires nodes")
+	}
+	offset := 0
+	if len(commit.Operations) == len(params.Nodes)+1 {
+		if len(commit.Operations) > 0 {
+			kind, err := operationKind(commit.Operations[0])
+			if err != nil || kind != "Policy" || commit.Actor.Role != "producer" && commit.Actor.Role != "dispatcher" {
+				return queueError("request_invalid", "first submission Policy bootstrap requires a trusted producer")
+			}
+		} else {
+			return queueError("request_invalid", "first submission Policy bootstrap requires a trusted producer")
+		}
+		offset = 1
+	}
+	if len(params.Nodes) != len(commit.Operations)-offset {
+		return queueError("request_invalid", "submission differs from stable intent")
+	}
+	for i, node := range params.Nodes {
+		operationIndex := i + offset
+		if operationIndex < 0 || operationIndex >= len(commit.Operations) {
+			return queueError("request_invalid", "submission differs from stable intent")
+		}
+		if !sameJSON(node, commit.Operations[operationIndex]) {
+			return queueError("request_invalid", "submission changes immutable node")
 		}
 	}
 	return nil

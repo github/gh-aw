@@ -188,7 +188,7 @@ describe("authenticated immutable activation snapshots", () => {
     expect(snapshot).toMatchObject({ sha: null, worker: null, role: "dispatcher" });
     expect(initialize).not.toHaveBeenCalled();
     expect(readWorkQueueState(loadWorkQueueSnapshot(options.snapshotPath)).queue_state).toBe("uninitialized");
-    expect(options.core.info).toHaveBeenCalledWith(expect.stringContaining("administrator must protect the work-queue branch and install Policy"));
+    expect(options.core.info).toHaveBeenCalledWith(expect.stringContaining("first trusted producer submission can provision the protected branch"));
   });
 
   it("rejects actual oversized encoded framing before creating a snapshot or publishing origin output", async () => {

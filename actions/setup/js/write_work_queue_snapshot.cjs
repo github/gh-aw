@@ -67,7 +67,7 @@ async function main(options = {}) {
   fs.chmodSync(outputPath, 0o444);
   configuration.core.setOutput?.("work_queue_origin", canonical(snapshot.origin));
   configuration.core.info(
-    `Work queue activation: ${worker ? `${worker.claims.length} immutable Claims authenticated${staged ? " for staged preview (not bound)" : " and bound"}` : latest.sha === null ? "queue uninitialized; an administrator must protect the work-queue branch and install Policy before workers can be dispatched" : runtime.role === "observer" ? "read-only observer" : "unassigned queue-control context"}; snapshot captured`
+    `Work queue activation: ${worker ? `${worker.claims.length} immutable Claims authenticated${staged ? " for staged preview (not bound)" : " and bound"}` : latest.sha === null ? "queue uninitialized; the first trusted producer submission can provision the protected branch and install its compiled Policy" : runtime.role === "observer" ? "read-only observer" : "unassigned queue-control context"}; snapshot captured`
   );
   return snapshot;
 }

@@ -1,6 +1,6 @@
 ---
 title: How to deploy a work queue
-description: Configure trusted producers, dispatchers, workers and an administrator-installed Git-backed queue policy.
+description: Configure trusted producers, dispatchers, workers and first-submit bootstrap for a Git-backed queue.
 ---
 
 Use this guide to deploy a native Git-backed queue with `tools.work-queue`.
@@ -10,11 +10,12 @@ use GitHub read tools and safe outputs, but do not provide native fair
 scheduling, Claim authority, or verified dependency graphs. Native version-3
 `tools.work-queue` always uses Git; no storage selector is available.
 
-Before you begin, prepare a trusted producer identity and an approved worker.
-The producer submits tasks; the dispatcher requests assignments; the worker
-processes them. You also need a Policy (the queue's scheduling and authorization
-rules) and a protected queue branch. Workflow frontmatter does not install
-Policy or configure restrictions on who can write to that branch.
+Before you begin, prepare a trusted producer identity, an approved worker, and
+a compiler-approved Policy proposal (the queue's scheduling and authorization
+rules). The first accepted producer submission installs that proposal with its
+Work when the branch is absent. Protect the queue branch before enabling
+producers; workflow frontmatter alone does not install Policy or configure
+restrictions on who can write to that branch.
 
 ## Publish the worker and dispatcher
 
@@ -125,12 +126,12 @@ The ledger is the queue's transaction log. Its 64 MiB ordinary budget and
 to 80 MiB. If you add accounting keys, retain `"": 1` and explicitly grant
 producers permission to use each additional key.
 
-## Protect the queue branch and install Policy
+## Protect the queue branch and bootstrap Policy
 
-Before installing Policy, configure branch protections separately. Allow only
-the trusted operator or runtime host to write to the queue branch. Prevent
-force updates and branch deletion, and ensure that workflow-agent credentials
-cannot bypass these rules.
+Before enabling a producer, configure a branch/ruleset pattern for the queue
+branch. Allow only trusted publishers to write it, prevent force updates and
+deletion, and ensure that workflow-agent credentials cannot bypass these rules.
+The ruleset must apply before the branch exists.
 
 > [!WARNING]
 > Automated verification and provisioning of writer restrictions are still
@@ -138,9 +139,14 @@ cannot bypass these rules.
 > You must establish them independently. See the
 > [implementation coverage table](/gh-aw/specs/work-queue-specification/#91-implementation-coverage-and-remaining-requirements).
 
-Make sure the configured worker route is active. Then run the following command
-as an explicitly authenticated administrator with permission to update the
-protected queue branch:
+Make sure the configured worker routes are active and the trusted producer
+workflow embeds its complete compiler-approved Policy proposal. On an absent
+branch, the first accepted `work_queue_submit` safe output atomically creates
+the branch with one Policy-and-Work genesis commit. No administrator seed is
+required. Dispatch-only requests, reads, and snapshots do not provision it.
+
+For an explicit operator-managed genesis or a later Policy update, an
+authenticated administrator may still run:
 
 ```bash
 gh aw work-queue --repo github/gh-aw policy \
@@ -148,13 +154,16 @@ gh aw work-queue --repo github/gh-aw policy \
 ```
 
 The default queue branch is `work-queue`. To use another protected branch, put
-`--branch QUEUE_BRANCH` before `policy`.
+`--branch QUEUE_BRANCH` before `policy`. If Policy is seeded explicitly, the
+subsequent producer submission must match that installed Policy proposal.
 
 Before changing Policy later, make the queue quiescent: settle all nonterminal
 (unfinished) Work, outstanding reservations, and unresolved delivery of
 completed Work. Cancellation alone does not stop a worker or release its
 reservation; reconcile exact termination or nonlaunch evidence separately.
-Frontmatter never installs or updates Policy.
+Frontmatter alone does not install or update Policy; the first accepted producer
+submission installs its compiled proposal, and later changes remain
+administrator-only.
 
 ## Enable backing Issue projection
 

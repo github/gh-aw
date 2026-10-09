@@ -79,8 +79,16 @@ func (state *Projection) validateReplayCommit(commit QueueCommit, ordinal int) (
 		}
 		isPolicy = kind == "Policy"
 	}
+	bootstrap := isBootstrapSubmit(commit, ordinal)
+	if bootstrap {
+		isPolicy = true
+	}
 	if ordinal == 0 && !isPolicy {
 		return false, queueError("policy_missing", "genesis must install exactly one policy")
+	}
+	if isPolicy && !bootstrap &&
+		(len(commit.Operations) != 1 || commit.Request.Kind != "policy" || commit.Actor.Role != "administrator") {
+		return false, queueError("policy_not_quiescent", "only an administrator may install Policy outside first-submit bootstrap")
 	}
 	if !isPolicy && commit.PolicyEpoch != state.PolicyEpoch {
 		return false, queueError("policy_epoch_invalid", "commit names a non-current epoch")
@@ -89,6 +97,52 @@ func (state *Projection) validateReplayCommit(commit QueueCommit, ordinal int) (
 		return false, queueError("operation_limit", "commit exceeds installed operation limit")
 	}
 	return isPolicy, nil
+}
+
+func isBootstrapSubmit(commit QueueCommit, ordinal int) bool {
+	if ordinal != 0 || commit.Request.Kind != "submit" ||
+		(commit.Actor.Role != "producer" && commit.Actor.Role != "dispatcher") ||
+		len(commit.Operations) < 2 {
+		return false
+	}
+	if !isPolicyOperation(commit.Operations) {
+		return false
+	}
+	return operationsAreWork(commit.Operations[1:]) && submissionMatchesOperations(commit.Request, commit.Operations[1:])
+}
+
+func isPolicyOperation(operations []Operation) bool {
+	if len(operations) > 0 {
+		kind, err := operationKind(operations[0])
+		return err == nil && kind == "Policy"
+	}
+	return false
+}
+
+func operationsAreWork(operations []Operation) bool {
+	for _, operation := range operations {
+		kind, err := operationKind(operation)
+		if err != nil || kind != "Work" {
+			return false
+		}
+	}
+	return len(operations) > 0
+}
+
+func submissionMatchesOperations(request Request, operations []Operation) bool {
+	var parameters SubmitParameters
+	if request.Kind != "submit" || json.Unmarshal(request.Parameters, &parameters) != nil || len(parameters.Nodes) != len(operations) {
+		return false
+	}
+	for index, node := range parameters.Nodes {
+		if index < 0 || index >= len(operations) {
+			return false
+		}
+		if !sameJSON(node, operations[index]) {
+			return false
+		}
+	}
+	return true
 }
 
 func (state *Projection) replayCommit(commit QueueCommit, ordinal int, epochs, generations identitySet) error {

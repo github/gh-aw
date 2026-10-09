@@ -24,7 +24,7 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 
 The current operator commands and keyboard browser are documented in the
 [queue reference](../../docs/src/content/docs/reference/work-queue.md#operator-commands).
-Policy installation is documented in the
+First-submit Policy bootstrap and explicit operator Policy installation are documented in the
 [deployment guide](../../docs/src/content/docs/guides/deploy-work-queue.md).
 This directory retains executable specifications and formal evidence, not a
 second current user guide. The historical material below is model provenance,

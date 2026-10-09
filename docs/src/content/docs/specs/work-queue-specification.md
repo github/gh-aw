@@ -496,7 +496,18 @@ The words **MUST**, **SHOULD**, and **MAY** below describe the proposed feature,
 
 Every queue MUST have an installed scheduling policy, and every new Claim MUST be created through the trusted scheduler. Scheduling cannot be disabled through configuration, an omitted setting, an API argument, or an operator command.
 
-When policy configuration is omitted for a new queue, trusted initialization MUST install the default `weighted-priority` policy as a transaction in the same canonical log before accepting Work or Claims. Explicit disable values and unrecognized modes MUST be rejected. An existing ledger without a valid current-protocol policy MUST fail; it MUST NOT be silently initialized over old Work or Claims.
+An absent queue ref denotes an empty queue. On the first safe-output `submit` by
+an authenticated producer or dispatcher, if the compiler supplies a validated
+Policy proposal, publication MUST atomically create the protected queue branch
+with one genesis commit containing that Policy followed by the submitted Work.
+The proposal MUST authorize the submitting principal and the Work's pool,
+priority, and accounting keys; the runtime MUST validate its immutable worker
+routes before writing. This replaces administrator-seeded genesis for normal
+workflow bootstrap. Reads and dispatch-only requests MUST NOT initialize an
+absent queue. Existing nonempty ledgers without a valid Policy, empty or
+malformed logs, and unsupported histories MUST fail closed rather than being
+overwritten. Later Policy epochs remain administrator-only and require a drained
+queue.
 
 One scheduling **pool** is one durable decision domain with a fixed worker-capability class, worker-routing policy, capacity model, and authoritative policy epoch. All dispatchers in that domain MUST use the same policy. Arbitrary agent-chosen filters MUST NOT redefine the competition set.
 
@@ -724,6 +735,14 @@ Use **one `QueueCommit` JSON object per line of the existing `work-queue.jsonl`*
 | `operations` | Nonempty ordered array of typed operations, accepted atomically |
 | `trace` | Optional validated correlation metadata; never authority or a scheduling input |
 
+For workflow bootstrap, the first producer/dispatcher `submit` may carry a
+genesis `operations` array containing exactly one `Policy` operation first,
+followed by the submitted Work nodes. Its request parameters still bind only
+those Work nodes, and `policy_epoch` binds the Policy operation. Replay permits
+this combined form only at ordinal zero; a producer cannot update Policy in an
+existing ledger. The ordinary administrator-only Policy request remains valid
+for explicit operator installation and later quiescent updates.
+
 The request fingerprint binds the actor and the validated logical intent, not the observed branch SHA or tentative selected Work. Reusing a request ID with different meaning MUST fail. A conflict retry may regenerate the tentative operations and predecessor, but must reuse the same logical request. Once committed, its identity and result are immutable.
 
 Keep the logical request's origin fixed across job retries of the same serialized intent. A new publisher attempt belongs in diagnostics/trace metadata, not in a regenerated fingerprint that makes the same request look different. New agent runs/intents receive new handles; recovering an old handle preserves its trusted origin.
@@ -912,10 +931,11 @@ Every queue MUST refuse unscheduled new Claims and old writers. There is no lega
 
 The deployment MUST restrict queue-branch updates to configured trusted
 publisher principals, forbid force updates/deletion, and keep publication
-credentials out of agent jobs and untrusted workflow code. Use enforceable
-repository branch/ruleset controls; if the host cannot restrict the required
-writers, reject that deployment rather than claim enforced scheduling. An
-authorized operator uses the same checked publisher, not a raw Git bypass.
+credentials out of agent jobs and untrusted workflow code. Configure a matching
+branch/ruleset pattern before the branch is created. Use enforceable repository
+branch/ruleset controls; if the host cannot restrict the required writers,
+reject that deployment rather than claim enforced scheduling. An authorized
+operator uses the same checked publisher, not a raw Git bypass.
 
 `actor` is provenance asserted by that trusted boundary, not authentication.
 Derive it from authenticated workflow/job/operator context and validate the
@@ -923,6 +943,9 @@ operation's role: producers submit allowed Work, dispatchers request fair
 grants, workers finalize assigned Claims, reconcilers establish trusted
 lifecycle evidence, and administrators change policy/controls. Commit author
 strings, trace IDs, and agent-supplied actor fields are not proof of identity.
+Only the first compiler-approved producer/dispatcher submit may install Policy
+as part of genesis; the request is authenticated, its Work is checked against
+that Policy, and every later Policy change requires administrator authority.
 Workers' trusted bootstrap/finalization steps may hold publisher credentials;
 the worker agent and its snapshot MCP may not.
 
@@ -2682,7 +2705,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Full JS typecheck/existing dependency-based tests | The earlier `create_project.cjs` SDK layout error is fixed in merge checkpoint `2dcce92c1c`, using validated literals and endpoint-derived request typing without unsafe casts. Genuine TypeScript 7.0.2 typecheck passes; 36 project tests include 12 layout/endpoint/invalid-input regressions. That merge's final component checks passed 2,122 setup-JavaScript tests in 52 files after correcting a stale workflow lock. The later `303b402810` merge ran 2,323 tests in 56 files: 2,322 passed and one real multi-repository fixture exceeded its 10-second deadline. A fixture-local 30-second deadline preserves all assertions and production retry behavior; all 109 repo-memory tests then passed. Impacted Go tests, build, typecheck, standard lint, schema freshness and JavaScript/shell lint passed. After committing the merge, change-scoped custom lint and full 328-workflow drift also passed; the initial custom-lint failures were confined to nine files byte-identical to main that the pre-merge base calculation included. Failed aggregate invocations remain failed records, not retrospectively green; global custom lint is not claimed clean. The approved feed does not supply pinned `@types/node` 26.6.4; existing 26.6.3 remains without changing pins. No dedicated hosted Actions run is claimed |
 | TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 45 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
 | Protected launch credentials, immutable effect targets and native delivery verification | Implemented with exact selected-client/profile proofs, immutable Work/profile/ancestor target intersection and private native readback. Both public and compiler control entry points reject missing/invalid protected launch metadata before client construction or queue publication, while previews and submit-only controls remain credential-independent. Local positive and refusal regressions pass; writer deployment automation is separate |
-| Workflow administrator bootstrap and live native-dispatch host compatibility | Automatic workflow bootstrap is unsupported: initialize Policy through an explicitly authenticated operator/trusted host. Hosted immutable-SHA dispatch and the pinned run-details response remain unverified live compatibility gates; injected SDK checks are not hosted evidence |
+| First-submit Policy bootstrap and live native-dispatch host compatibility | Safe-output first submit can atomically create the absent queue branch with its compiler-approved Policy and Work; local authenticated tests cover genesis replay and ref creation. Hosted branch/ruleset behavior, immutable-SHA dispatch, and the pinned run-details response remain unverified live compatibility gates |
 | Automated verification/provisioning of queue-branch writer restrictions | **Deferred by user direction; not implemented** |
 
 The writer-restriction deferral does not relax the normative trust requirement
