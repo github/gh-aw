@@ -46,8 +46,13 @@ for (const name of Object.keys(expected)) {
   if (!new RegExp(`${name}\\s*:`).test(tokens)) errors.push(`${tokensFile}: ${name} is missing.`);
 }
 
-if (!/max-width:\s*var\(--aw-prose-width\)/.test(readFileSync(join(docsDir, "src/styles/chrome.css"), "utf8"))) {
+// The tokens only matter if chrome.css still applies them
+const chrome = readFileSync(join(docsDir, "src/styles/chrome.css"), "utf8");
+if (!/max-width:\s*var\(--aw-prose-width\)/.test(chrome)) {
   errors.push("src/styles/chrome.css: docs content is no longer capped at max-width: var(--aw-prose-width).");
+}
+if (!/padding-inline:\s*var\(--aw-content-gutter\)/.test(chrome)) {
+  errors.push("src/styles/chrome.css: docs content no longer has padding-inline: var(--aw-content-gutter) on both sides.");
 }
 
 if (errors.length) {
