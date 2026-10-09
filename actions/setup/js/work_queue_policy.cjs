@@ -5,13 +5,14 @@ const { canonical, closed, identity, integer, queueError } = require("./work_que
 const { DEFAULT_LIMITS, validateLimits } = require("./work_queue_limits.cjs");
 const { tickScale } = require("./work_queue_scheduler.cjs");
 
-const ROLES = new Set(["administrator", "producer", "dispatcher", "worker", "reconciler"]);
+const ROLES = new Set(["administrator", "producer", "dispatcher", "worker", "reconciler", "projector"]);
 const ROLE_KINDS = {
   administrator: ["policy", "control", "submit", "dispatch_next", "observe", "cancel_work"],
   producer: ["submit", "cancel_work"],
   dispatcher: ["submit", "dispatch_next", "observe", "dispatch"],
   worker: ["submit", "dispatch_next", "observe", "finish", "dispatch"],
   reconciler: ["observe", "dispatch", "release", "result", "delivery_failure", "cancel_claim", "cancel_work"],
+  projector: ["issue_link"],
 };
 const ACTOR_FIELDS = ["role", "principal", "repository"];
 const ACTOR_OPTIONAL = ["workflow", "run_id", "run_attempt", "dispatch_id", "claim_handle"];
@@ -85,7 +86,31 @@ function validateProfile(profile) {
 }
 
 function validatePolicy(policy) {
-  closed(policy, ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"], [], "policy");
+  closed(policy, ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"], ["projectors"], "policy");
+  if (Object.hasOwn(policy, "projectors")) {
+    if (!Array.isArray(policy.projectors) || !policy.projectors.length || policy.projectors.length > 256) throw queueError("policy_invalid", "projectors require 1..256 installed rules");
+    for (const rule of policy.projectors) {
+      closed(rule, ["principal", "workflow", "ref", "pools", "repositories"], ["backing_issues", "completion_policy"], "projector rule");
+      decimal(rule.principal, "projector principal", "policy_invalid");
+      identity(rule.workflow, "projector workflow");
+      if (!rule.workflow.startsWith(".github/workflows/") || !rule.workflow.endsWith(".lock.yml") || rule.workflow.includes("..") || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(rule.ref))
+        throw queueError("policy_invalid", "projectors require approved immutable workflow revisions");
+      for (const field of ["pools", "repositories"]) {
+        if (!Array.isArray(rule[field]) || !rule[field].length || rule[field].length > 256) throw queueError("policy_invalid", "projectors require bounded explicit targets");
+        for (const value of rule[field]) identity(value, field);
+      }
+      if (rule.pools.some(pool => !Object.hasOwn(policy.pools, pool)) || rule.repositories.some(repository => !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))) throw queueError("policy_invalid", "invalid projector pool/repository");
+      if (Object.hasOwn(rule, "completion_policy") && !["keep-open", "close-on-result"].includes(rule.completion_policy)) throw queueError("policy_invalid", "invalid projector completion policy");
+      if (Object.hasOwn(rule, "backing_issues")) {
+        if (!Array.isArray(rule.backing_issues) || !rule.backing_issues.length || rule.backing_issues.length > 256) throw queueError("policy_invalid", "backing Issues require 1..256 explicit targets");
+        for (const resource of rule.backing_issues) {
+          closed(resource, ["kind", "host", "repository", "repository_id", "resource_id", "number"], [], "projector backing Issue", "policy_invalid");
+          if (resource.kind !== "issue" || resource.host !== "github.com" || !rule.repositories.includes(resource.repository)) throw queueError("policy_invalid", "backing Issue target must be an installed GitHub Issue");
+          for (const field of ["repository_id", "resource_id", "number"]) decimal(resource[field], field, "policy_invalid");
+        }
+      }
+    }
+  }
   if (!["weighted-priority", "strict-priority"].includes(policy.mode)) throw queueError("policy_invalid", "mandatory scheduler mode is unsupported");
   if (!Array.isArray(policy.class_weights) || policy.class_weights.length !== 5) throw queueError("policy_invalid", "five priority class weights are required");
   for (const weight of policy.class_weights) integer(weight, 1, 1000, "class weight");

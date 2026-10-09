@@ -1,0 +1,44 @@
+{
+  "$defs": {
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "IssueCommentOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "authority_claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "comment_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "IssueComment"
+        },
+        "projector_ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "work_id", "comment_id", "projector_ref"],
+      "type": "object"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "IssueCommentOperation.json",
+  "$ref": "#/$defs/IssueCommentOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IssueCommentOperation"
+}

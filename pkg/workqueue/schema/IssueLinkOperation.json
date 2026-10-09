@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "IssueLinkOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "IssueLink"
+        },
+        "projector_ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "work_id", "resource", "projector_ref"],
+      "type": "object"
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "issue"
+            },
+            {
+              "const": "pull_request"
+            }
+          ]
+        },
+        "number": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "resource_id": {
+          "$ref": "#/$defs/Decimal"
+        }
+      },
+      "required": ["kind", "host", "repository", "repository_id", "resource_id", "number"],
+      "type": "object"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "IssueLinkOperation.json",
+  "$ref": "#/$defs/IssueLinkOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IssueLinkOperation"
+}

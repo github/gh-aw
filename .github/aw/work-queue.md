@@ -4,17 +4,15 @@ description: Agent instructions for Git-backed work queue producers, dispatchers
 
 # Work Queue
 
-Choose the queue pattern first: use native Git storage for fair scheduling and
-Claim authority, or [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md)
-for issue-backed checklists/sub-issues, Discussions or cache-memory backlogs.
+Choose the queue pattern: Git storage for fair scheduling and Claim authority, or
+[WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md) for
+issue-backed WorkQueueOps: lists, sub-issues, Discussions or cache backlogs.
 
-Use `tools.work-queue` for durable fair scheduling, immutable Work DAGs and
-Claim-scoped effects. Treat the causal `work-queue.jsonl` log as the only
-authority. Defaults are FIFO-like; configured weights share Claim opportunities,
-not CPU time or successful completions. In this version-3 native protocol,
-Issues/PRs are dependency nodes, not queue-storage backends. Git is always used;
-do not configure a `storage` field. Do not confuse this with
-issue-backed WorkQueueOps, which is a separate pattern.
+Use `tools.work-queue` for fair scheduling, immutable Work DAGs and Claim-scoped
+effects. The causal `work-queue.jsonl` log is authoritative. Weights distribute
+Claim opportunities, not CPU or successful completions. Protocol v3 always uses
+Git; Issues/PRs are dependencies, not storage. Never set `storage`. WorkQueueOps
+is a separate pattern.
 
 ## Select the role
 
@@ -25,11 +23,10 @@ issue-backed WorkQueueOps, which is a separate pattern.
 - **Worker:** require a compiler-supplied version-3 `claims` array. Never
   construct/override reserved `work_queue_assignment` or caller context.
 
-Trust the compiler/runtime role channel, not snapshot metadata, agent files or
-assignment input alone. Never downgrade a declared worker when input is missing.
-Trusted activation must authenticate the actual run/workflow/revision; reruns
-cannot inherit attempt 1 authority. Report a genuinely absent queue as
-uninitialized; fail explicitly on an existing empty, malformed or unsupported log.
+Trust the compiler/runtime role, never snapshot metadata or assignment alone;
+don't downgrade declared workers. Activation authenticates run/workflow/revision,
+and reruns cannot inherit attempt 1 authority. Report absent queues as
+uninitialized; reject empty, malformed or unsupported logs.
 
 ## Configure deployment
 
@@ -48,11 +45,24 @@ The allowlist is compiler approval, not authority: installed Policy binds each
 profile's exact workflow path, immutable SHA, authenticated principal, trust
 domain and effect scope. Queue dispatch ignores moving `target-ref`.
 
-Require administrator-installed Policy and independently protected queue-branch
-writers; frontmatter provisions neither. Administrator status does not grant
-producer entitlement. Never give agent execution or snapshot MCP queue-write
-credentials. Read the [deployment guide](../../docs/src/content/docs/guides/deploy-work-queue.md)
-only for installation tasks; writer-restriction automation remains deferred.
+Require administrator-installed Policy and protected queue-branch writers;
+frontmatter provisions neither, and administrator status grants no producer
+entitlement. Never give agents or snapshot MCP queue-write credentials. Read the
+[deployment guide](../../docs/src/content/docs/guides/deploy-work-queue.md) only
+for installation; writer-restriction automation remains deferred.
+
+## Mirror admitted Work with Issues
+
+`tools.work-queue.issues: true` mirrors admitted Work with the `work` label.
+An object may set `label` and a pre-provisioned native organization
+`status-field`. Require installed projector authority: only protected hooks
+project their own admissions/original Claims. Immutable `backing_issue` binds
+one Work per Issue. Agents never write mirrors; human edits never establish
+Result. Pre-existing Issues need exact installed `backing_issues` grants.
+Only trusted admission-time `completion_policy` permits closure, never payload.
+Uncertain writes stay pending, never recreated or globally repaired.
+Upgrade all closed-schema readers first. See the
+[backing Issue reference](../../docs/src/content/docs/reference/work-queue.md#backing-issues).
 
 ## Plan and dispatch
 
@@ -85,11 +95,9 @@ only for installation tasks; writer-restriction automation remains deferred.
 When `<mcp-clis>` advertises the wrapper, use
 `work-queue work_queue_read '{}'` or
 `work-queue work_queue_claim_finish '{"claim_handle":"h1","outcome":"completed"}'`.
-These are MCP subcommands, not `gh aw work-queue` operator commands.
-Pass one JSON argument to each wrapper subcommand; do not invoke a wrapper as
-a structured tool with `command`/`description`. Check `queue_state` before
-interpreting counts: `uninitialized` is a deployment failure, not an empty
-backlog. A dispatch response with `status: "staged"` is not a grant or launch.
+These are MCP subcommands, not operator commands. Pass one JSON argument, not
+structured-tool `command`/`description`. Check `queue_state`: `uninitialized`
+means deployment failure, not empty; `status: "staged"` is not a grant or launch.
 
 ## Dependencies and recovery
 
@@ -108,10 +116,10 @@ automatic upgrades; preserve old evidence before explicit redeployment.
 
 - Operator commands, TUI and diagnostic artifacts:
   [queue reference](../../docs/src/content/docs/reference/work-queue.md).
-  Cancellation is terminal for Work, not a native-worker stop; reconcile separately.
-  In this checkout, build with `go build -o ./gh-aw ./cmd/gh-aw` and use
+  Cancellation is terminal for Work, not a worker stop; reconcile separately.
+  Build with `go build -o ./gh-aw ./cmd/gh-aw`; use
   `./gh-aw work-queue --repo OWNER/REPO stats --json`. `dispatch-next` grants
-  reservations but never launches workers; use the authorized dispatcher workflow.
+  reservations, never launches; use the authorized dispatcher.
 - Daily report rotation, dedicated Policy and Claim examples:
   [portfolio walkthrough](../../docs/src/content/docs/patterns/daily-report-portfolio.md)
   and [shared worker instructions](../workflows/shared/daily-report-worker.md).

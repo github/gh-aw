@@ -10,9 +10,9 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle|IssueProjection) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, or QueueLifecycle when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, QueueLifecycle, or IssueProjection when set." >&2
         exit 1
         ;;
 esac
@@ -119,6 +119,13 @@ run_model BrokenLifecycleVerificationBudget DeliveryFailureBudget Invariant 12 Q
 run_model LifecycleMixedDAGWitness NoMixedLifecycleWitness Invariant 12 QueueLifecycle
 run_model LifecycleActivationWitness NoActivationRecoveryWitness Invariant 12 QueueLifecycle
 run_model LifecycleConflictWitness NoConflictReservationWitness Invariant 12 QueueLifecycle
+run_model IssueExisting "" Invariant 0 IssueProjection
+run_model IssueCreated "" Invariant 0 IssueProjection
+run_model IssueDefaultOpen "" Invariant 0 IssueProjection
+run_model IssuePRStaysOpen "" Invariant 0 IssueProjection
+run_model IssueBrokenUnowned AdmissionAuthority Invariant 12 IssueProjection
+run_model IssueBrokenPayloadClose ClosureAuthority Invariant 12 IssueProjection
+run_model IssueBrokenRetry SingleCreation Invariant 12 IssueProjection
 if [ "$RUN_COUNT" -eq 0 ]; then
     echo "No configuration matches the requested TLC filters." >&2
     exit 1
