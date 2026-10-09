@@ -30,7 +30,7 @@ The native protocol distinguishes the following records and lifecycle events:
 | --- | --- |
 | Work | An immutable task definition. Tasks can form a directed acyclic graph (DAG), a dependency graph with no cycles. |
 | Claim | Authorization for one attempt at a Work item. Its original `claim_handle` identifies that attempt. |
-| Policy | Administrator-installed rules for scheduling, producer permissions, worker routing, and limits. |
+| Policy | Compiler-approved rules for scheduling, producer permissions, worker routing, and limits. The first trusted producer submission installs the proposal with Work when the branch is absent; later changes are administrator-only. |
 | Pool | A group of tasks with shared worker routes and capacity limits. |
 | Reservation | Native worker capacity held for an assignment, including while launch or termination is uncertain. |
 | Native launch | The request to start a GitHub Actions worker run. A committed assignment is not proof of launch. |
@@ -59,21 +59,21 @@ tools:
     worker: true
     issues:
       label: cookie
-      status-field: WorkStatus
 ```
 
-`issues: true` enables comment-only projection with the `work` label. An object
-may override `label` and select `status-field`; an empty object uses defaults.
-Absent or false disables the integration. Both names must be nonblank literal
-strings of at most 256 bytes; unknown keys are rejected.
+`issues: true` enables projection with the `work` tracking label and a
+`work:<status>` label. An object may override `label` (for example, `cookie`
+produces `cookie:queued`); an empty object uses defaults. Absent or false
+disables the integration. The label prefix must be a nonblank literal of at
+most 33 bytes, leaving room for the longest status suffix within GitHub's
+50-character label limit; unknown keys are rejected.
 
-`status-field` names a pre-provisioned native organization single-select Issue
-field, not Project-local Status. Its required options are **Queued**, **Blocked**,
-**Assigned**, **Running**, **Verifying**, **Needs review**, **Done**,
-**Needs attention**, and **Cancelled**. `WorkStatus` is a naming convention,
-not a reserved name. No Project is required. Missing, inaccessible, incompatible,
-or unwritable fields report **queue committed; field sync pending**. They are
-never provisioned automatically or silently replaced with comment-only mode.
+Status labels are created as needed in the target repository with purple
+(`7057FF`). Statuses use lowercase, hyphenated names with no spaces (for
+example, `work:queued` and `work:needs-review`); whitespace in a configured
+prefix is replaced with hyphens. The projector replaces only its own status
+labels, preserving unrelated labels. No organization Issue field or Project
+is required.
 
 The existing activation and conclusion jobs project only Work admitted by
 their authenticated run/attempt and Work in their original authenticated Claims.
@@ -110,9 +110,8 @@ created if missing and repaired when removed. Human titles, bodies, types,
 unrelated labels/fields, and discussion are preserved.
 
 Each backing Issue has a canonical summary and one historical comment per
-owned Claim, with run, ledger, and verified outcome links. Comment-only summaries
-include changing status; native-field summaries avoid status-only duplicate
-edits. Completion projects **Verifying**, verified PR delivery **Needs review**,
+owned Claim, with run, ledger, and verified outcome links. Summaries include
+changing status alongside its label. Completion projects **Verifying**, verified PR delivery **Needs review**,
 and verified non-PR delivery **Done**. Native job failure/cancellation is
 diagnostic, not Work cancellation or Result. Human closure/status changes
 cannot establish either.
@@ -163,14 +162,14 @@ empty discovery result is not proof of noncreation. Automatic crash recovery
 that can safely clear these fences is not implemented.
 
 Hooks batch up to 25 owned targets. Checked GraphQL reads combine immutable-head
-ledger/journal reads, field discovery, and scoped Issue preflight; an explicitly
+ledger/journal reads, label discovery, and scoped Issue preflight; an explicitly
 truncated blob uses an OID-checked REST fallback. Writes are paced and exhausted
 rate limits stop subsequent live requests. Hook metrics count authentication,
 coordination, native writes, journals, and retries within the projection phase;
 shared activation work and GitHub App token minting are additional requests.
 Local full-hook mocks also count ordinary queue publication and both hooks.
 For 25 unchanged existing Issues, the authenticated projection currently uses
-six requests: four reads and two batched coordination mutations, with no Issue
+seven requests: five reads and two batched coordination mutations, with no Issue
 writes. An ordinary checked queue read/publication takes two requests instead
 of the previous five/nine-call REST paths.
 Mutation primary cost remains unmeasured; baseline Issue-operation estimates
@@ -306,7 +305,7 @@ initialize Policy over an invalid log.
 | `trace --request-id ID` or `trace --claim-id ID` | Read causal events within size limits, without exposing payloads or receipt contents. `--offset` and `--limit` control pagination. |
 | `compact` | Replace the current log prefix with a version-3 checkpoint of deterministic replay state. The checkpoint names the prior Git commit and preserves fairness accounting, ownership, delivery barriers, and request identities. |
 | `policy --file policy.json --epoch EPOCH` | Install an authorized Policy for future work only when the queue is quiescent. |
-| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed producer permissions. |
+| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed producer permissions. The CLI requires an existing Policy; a workflow producer's first safe-output submit can bootstrap an absent branch. |
 | `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. |
 | `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit the next assignments selected by deterministic fair scheduling and their reservations. Does not send a workflow-dispatch POST. |
 | `control`, `cancel-work` | Apply authorized pause, cutover, or cancellation decisions without refunding accounted service or force-releasing a reservation for a possible native run. |
@@ -324,8 +323,9 @@ A Policy update requires a quiescent queue: no nonterminal (unfinished) Work,
 outstanding reservations, or unresolved delivery barriers for completed Work.
 Installing Policy does not configure or verify queue-branch writer restrictions.
 Those restrictions must be established independently; automated enforcement
-remains deferred. The agent cannot install Policy or receive queue-write
-credentials.
+remains deferred. A trusted workflow producer can publish only the exact
+compiler-approved proposal with its first Work on an absent branch; the agent
+cannot choose or update Policy or receive queue-write credentials.
 
 Worker finish is a Claim-scoped MCP intent, not an operator command that can
 impersonate a worker. Direct `claim --work-id`, legacy scalar assignments

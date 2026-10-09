@@ -102,7 +102,8 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(source).toContain("run.created_at");
     expect(source).toContain("cat /tmp/gh-aw/agent/eslint-factory-plan.json");
     expect(source.indexOf("Call `work_queue_submit` once")).toBeLessThan(source.indexOf("request the trusted scheduler"));
-    expect(source).toContain("Do not bootstrap Policy");
+    expect(source).toContain("will atomically bootstrap the branch with its compiler-approved Policy and Work.");
+    expect(source).toContain("Safe-output processing uses only the compiler-approved Policy proposal; never");
   });
 
   it("executes the actual preparation step with only two metadata reads and no ambient filesystem or credentials", async () => {
