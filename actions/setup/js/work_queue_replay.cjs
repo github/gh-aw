@@ -988,7 +988,7 @@ function replayOrdered(ordered) {
       commit.operations.length > 1 &&
       commit.operations.slice(1).every(operation => operation.kind === "Work") &&
       canonical(commit.request.parameters.nodes) === canonical(commit.operations.slice(1));
-    if (ordinal === 0 && !offset && (commit.operations.length !== 1 || commit.operations[0].kind !== "Policy" || commit.request.kind !== "policy" || commit.actor.role !== "administrator"))
+    if (ordinal === 0 && !offset && !bootstrap && (commit.operations.length !== 1 || commit.operations[0].kind !== "Policy" || commit.request.kind !== "policy" || commit.actor.role !== "administrator"))
       throw queueError("policy_missing", "genesis must install exactly one mandatory Policy");
     if (state.policy && commit.actor.repository !== state.repository) throw queueError("actor_unauthorized", "foreign queue repository origin");
     const policies = commit.operations.filter(operation => operation.kind === "Policy");

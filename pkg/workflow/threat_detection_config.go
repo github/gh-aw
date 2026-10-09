@@ -135,7 +135,7 @@ func (c *Compiler) parseThreatDetectionObjectConfig(configMap map[string]any) *T
 }
 
 // parseThreatDetectionScalarFields parses the non-engine fields of the threat-detection
-// object configuration (prompt, steps, post-steps, budgets, runner, and reporting flags)
+// object configuration (prompt, model, steps, post-steps, budgets, runner, and reporting flags)
 // into threatConfig.
 func parseThreatDetectionScalarFields(configMap map[string]any, threatConfig *ThreatDetectionConfig) {
 	// Parse prompt field
@@ -145,6 +145,8 @@ func parseThreatDetectionScalarFields(configMap map[string]any, threatConfig *Th
 		}
 	}
 
+	parseThreatDetectionModel(configMap, threatConfig)
+
 	// Parse steps field (pre-execution steps, run before engine execution)
 	if steps, exists := configMap["steps"]; exists {
 		if stepsArray, ok := steps.([]any); ok {
@@ -152,7 +154,7 @@ func parseThreatDetectionScalarFields(configMap map[string]any, threatConfig *Th
 		}
 	}
 
-	// Parse post-steps field (post-execution steps, run after engine execution)
+	// Parse post-steps field (run after engine execution)
 	if postSteps, exists := configMap["post-steps"]; exists {
 		if postStepsArray, ok := postSteps.([]any); ok {
 			threatConfig.PostSteps = postStepsArray
@@ -190,13 +192,20 @@ func parseThreatDetectionScalarFields(configMap map[string]any, threatConfig *Th
 		threatConfig.RunsOn = renderRunsOnSnippet(runOn)
 	}
 
-	if artifactBaseURL, exists := configMap["artifact-base-url"]; exists {
-		if artifactBaseURLString, ok := artifactBaseURL.(string); ok {
-			threatConfig.ArtifactBaseURL = artifactBaseURLString
-		}
+	if artifactBaseURL, ok := configMap["artifact-base-url"].(string); ok {
+		threatConfig.ArtifactBaseURL = artifactBaseURL
 	}
 
 	parseThreatDetectionReportingFields(configMap, threatConfig)
+}
+
+func parseThreatDetectionModel(configMap map[string]any, threatConfig *ThreatDetectionConfig) {
+	// Parse model override
+	if model, exists := configMap["model"]; exists {
+		if modelStr, ok := model.(string); ok {
+			threatConfig.Model = modelStr
+		}
+	}
 }
 
 // parseThreatDetectionReportingFields parses the fields that control how detection
@@ -251,7 +260,9 @@ func (c *Compiler) parseThreatDetectionEngineField(configMap map[string]any, thr
 		// Handle object format - use extractEngineConfig logic
 		_, engineConfig, model := c.ExtractEngineConfig(map[string]any{"engine": engineObj})
 		threatConfig.EngineConfig = engineConfig
-		threatConfig.Model = model
+		if model != "" {
+			threatConfig.Model = model
+		}
 	}
 }
 

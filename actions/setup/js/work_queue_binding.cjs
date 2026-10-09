@@ -60,7 +60,12 @@ async function loadQueue(options) {
     projection = log.state || queue.replayTransactions(log.transactions);
     if (!projection.policy) throw new Error("work_queue_policy_missing");
   }
-  assertPolicyProposal(projection, options);
+  if (!projection.policy && log.sha === null && log.transactions.length === 0) {
+    // Validate the proposal, but defer installing it to the first checked commit.
+    policyProposalFor(options);
+  } else {
+    assertPolicyProposal(projection, options);
+  }
   return { ...log, projection };
 }
 
