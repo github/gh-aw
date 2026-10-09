@@ -3430,7 +3430,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const message = normalizeRuntimeMessage(type ? { ...(args[0] || {}), type } : args[0] || {});
       if (type && !Object.hasOwn(args[0] || {}, "type")) delete message.type;
       if (executionHandle) return handler(message, ...args.slice(1));
-      if (scope && scope.assignment === null && message.type === "noop") return handler(message, ...args.slice(1));
       return withClaimExecution({ ...scope, claim_handle: message.claim_handle }, () => handler(message, ...args.slice(1)));
     };
   return Object.fromEntries(

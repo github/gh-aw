@@ -237,7 +237,7 @@ function registerTests({ describe, it }) {
       }
     });
 
-    it("permits protected observer outputs and dispatcher no-op only for a genuine absent branch", async () => {
+    it("permits genuine absent-branch outputs only for a protected observer and rejects existing empty ledgers before handlers", async () => {
       const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
       const { serializeTransactionLog } = require("./work_queue_replay.cjs");
       const fixture = queueFixture({ granted: false });
@@ -319,21 +319,13 @@ function registerTests({ describe, it }) {
         for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message), /protected compiler role/);
         await assert.rejects(manager.processMessages(handlers, messages), /protected compiler role/);
         assert.equal(writes, 3);
-        process.env.GH_AW_WORK_QUEUE_ROLE = "dispatcher";
-        write({ ...snapshot, role: "dispatcher" });
-        assert.deepEqual(scope.normalizeRuntimeMessage(messages[0]), messages[0]);
-        assert.throws(() => scope.normalizeRuntimeMessage(messages[1]), /unassigned dispatcher/);
-        const dispatcherNoop = await manager.processMessages(handlers, [messages[0]]);
-        assert.equal(dispatcherNoop.success, true);
-        assert.equal(dispatcherNoop.results[0].success, true);
-        await assert.rejects(manager.processMessages(handlers, [messages[1]]), /trusted per-Claim handler context/);
-        assert.equal(writes, 3);
-
-        process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
-        write({ ...snapshot, role: "worker" });
-        for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message));
-        await assert.rejects(manager.processMessages(handlers, messages));
-        assert.equal(writes, 3);
+        for (const role of ["dispatcher", "worker"]) {
+          process.env.GH_AW_WORK_QUEUE_ROLE = role;
+          write({ ...snapshot, role });
+          for (const message of messages) assert.throws(() => scope.normalizeRuntimeMessage(message));
+          await assert.rejects(manager.processMessages(handlers, messages));
+          assert.equal(writes, 3);
+        }
       } finally {
         for (const key of keys) {
           if (previous[key] === undefined) delete process.env[key];
