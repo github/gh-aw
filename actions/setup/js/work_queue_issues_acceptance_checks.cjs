@@ -109,7 +109,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.ok(result.pending);
       assert.match(result.pending[0].reason, /Failed to read file/);
       assert.equal(m.issues.size, 0);
-      assert.equal(m.calls.filter(call => call[0] === "mutation").length, 0);
+      assert.equal(m.calls.filter(call => call[0] === "mutation" && call[1].includes("WorkQueueIssueProjection")).length, 0);
     });
     it("authenticates staged activation without binding Claims or writing Issues", async () => {
       const f = fixture({ worker: true });
@@ -235,9 +235,9 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const options = nativeOptions(m, f);
       const activation = await main(options);
       assert.deepEqual(activation.pending, []);
-      assert.equal(activation.metrics.requests, 9);
-      assert.equal(activation.metrics.reads, 4);
-      assert.equal(activation.metrics.mutations, 5);
+      assert.equal(activation.metrics.requests, 11);
+      assert.equal(activation.metrics.reads, 5);
+      assert.equal(activation.metrics.mutations, 6);
       const env = process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT;
       process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT = "graphql";
       const before = m.calls.length;
@@ -271,16 +271,16 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
 
     it("combines immutable-head discovery, handles, and preflight for 25 owned targets", async () => {
       const f = fixture({ count: 25 });
-      const m = mock(f, { field: true });
+      const m = mock(f);
       const options = nativeOptions(m, f);
       assert.deepEqual((await main(options)).pending, []);
       const before = m.calls.length;
       const unchanged = await main(options);
       assert.deepEqual(unchanged.pending, []);
-      assert.equal(unchanged.metrics.requests, 6);
-      assert.equal(unchanged.metrics.reads, 4);
+      assert.equal(unchanged.metrics.requests, 7);
+      assert.equal(unchanged.metrics.reads, 5);
       assert.equal(unchanged.metrics.mutations, 2);
-      assert.equal(m.calls.length - before, 6);
+      assert.equal(m.calls.length - before, 7);
       assert.ok(
         m.calls
           .slice(before)
@@ -291,10 +291,10 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
 
     it("measures native creation, receipt journals, bindings, and new Issue coordination", async () => {
       const f = fixture({ backing: false });
-      const m = mock(f, { field: true });
+      const m = mock(f);
       const result = await main(nativeOptions(m, f));
       assert.deepEqual(result.pending, []);
-      assert.equal(result.metrics.requests, 15);
+      assert.equal(result.metrics.requests, 17);
       assert.equal(result.metrics.requests, m.calls.length);
       assert.equal(m.locks.size, 0);
     });
@@ -434,10 +434,10 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
 
     it("does not let an authenticated rerun rewrite attempt-one execution status", async () => {
       const f = fixture({ worker: true });
-      const m = mock(f, { field: true });
+      const m = mock(f);
       const options = nativeOptions(m, f);
       assert.deepEqual((await main(options)).pending, []);
-      assert.equal(m.issues.get("1").issueFieldValues.nodes[0].optionId, "option-Running");
+      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work:running"));
       const before = m.calls.length;
       const comments = [...m.comments.values()].map(comment => comment.body);
       m.nativeRun.run_attempt = 2;
@@ -445,7 +445,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.ok(rerun.pending?.length);
       assert.match(rerun.pending[0].reason, /rerun_not_authorized|native attempt 1|original authenticated Claims/);
       assert.equal(m.calls.slice(before).filter(call => call[0] === "mutation").length, 0);
-      assert.equal(m.issues.get("1").issueFieldValues.nodes[0].optionId, "option-Running");
+      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work:running"));
       assert.deepEqual(
         [...m.comments.values()].map(comment => comment.body),
         comments
@@ -529,7 +529,8 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const send = m.options.githubClient.graphql;
       m.options.githubClient.graphql = async (query, variables) => {
         const response = await send(query, variables);
-        if (query.includes("addComment")) response.m0.commentEdge.node.body = "not the requested body";
+        const alias = query.match(/m\d+: addComment/);
+        if (alias) response[alias[0].split(":")[0]].commentEdge.node.body = "not the requested body";
         return response;
       };
       const result = await main(m.options);
@@ -543,7 +544,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
 
     it("excludes an overlapping projector until the old checked-read/write phase finishes", async () => {
       const f = fixture();
-      const m = mock(f, { field: true });
+      const m = mock(f);
       const send = m.options.githubClient.graphql;
       let overlap;
       let once = true;
@@ -561,7 +562,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.equal(m.comments.size, 1);
       assert.equal(m.locks.size, 0);
       assert.deepEqual((await main(nativeOptions(m, f))).pending, []);
-      assert.equal(m.issues.get("1").issueFieldValues.nodes[0].optionId, "option-Assigned");
+      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work:assigned"));
     });
 
     it("does not confuse unattempted aliases with uncertain native writes", async () => {
@@ -580,34 +581,31 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.ok(batch.results.slice(50).every(result => result.unattempted && !result.uncertain));
     });
 
-    it("paginates scoped labels and field-value unions without overwriting unrelated values", async () => {
+    it("paginates scoped labels without overwriting unrelated values", async () => {
       const f = fixture();
-      const m = mock(f, { field: true });
+      const m = mock(f);
       const issue = m.issues.get("1");
       issue.labels.pageInfo = { hasNextPage: true, endCursor: "label-next" };
-      issue.issueFieldValues.pageInfo = { hasNextPage: true, endCursor: "field-next" };
       const original = m.options.githubClient.graphql;
       m.options.githubClient.graphql = async (query, variables) => {
         if (query.includes("WorkQueueIssuePages"))
           return {
             p0: { id: issue.id, repository: { id: issue.repository.id }, labels: { nodes: [{ id: "human", name: "human" }], pageInfo: { hasNextPage: false } } },
-            p1: { id: issue.id, repository: { id: issue.repository.id }, issueFieldValues: { nodes: [{ field: { id: "human-field" }, optionId: "human-option" }], pageInfo: { hasNextPage: false } } },
           };
         return original(query, variables);
       };
       const issues = await preflightIssues(m.options.githubClient, [{ work_id: f.nodes[0].work_id, resource: f.nodes[0].backing_issue }]);
       assert.equal(issues.get(f.nodes[0].work_id).labels.nodes.length, 2);
-      assert.equal(issues.get(f.nodes[0].work_id).issueFieldValues.nodes[0].optionId, "human-option");
+      assert.equal(issues.get(f.nodes[0].work_id).labels.nodes[1].name, "human");
       assert.equal(m.calls.filter(call => call[1]?.includes("WorkQueueIssuePreflight")).length, 1);
     });
 
-    it("reports changed field types, missing options, transferred/deleted Issues, and deleted handles as pending", async () => {
-      for (const alteration of ["type", "options", "transfer", "delete", "comment"]) {
+    it("reports inaccessible labels, transferred/deleted Issues, and deleted handles as pending", async () => {
+      for (const alteration of ["label", "transfer", "delete", "comment"]) {
         const f = fixture();
-        const m = mock(f, { field: true });
+        const m = mock(f);
         await main(m.options);
-        if (alteration === "type") m.discovery.issueFields.nodes[0].__typename = "IssueFieldText";
-        if (alteration === "options") m.discovery.issueFields.nodes[0].options.pop();
+        if (alteration === "label") m.issues.get("1").labels = null;
         if (alteration === "transfer") m.issues.get("1").repository.nameWithOwner = "owner/foreign";
         if (alteration === "delete") m.issues.delete("1");
         if (alteration === "comment") m.comments.clear();
@@ -616,13 +614,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
         assert.ok(result.pending);
         assert.ok(result.pending.length > 0, alteration);
         const writes = m.calls.slice(before).filter(call => call[0] === "mutation");
-        if (alteration === "type" || alteration === "options") {
-          assert.ok(
-            writes.every(call => !/setIssueFieldValue|createIssueField/.test(call[1])),
-            alteration
-          );
-          assert.ok([...m.comments.values()].some(comment => /field sync pending/.test(comment.body) && !/Status:/.test(comment.body)));
-        } else assert.equal(writes.length, 0, alteration);
+        assert.equal(writes.length, 0, alteration);
       }
     });
 
@@ -771,7 +763,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const state = q.replayTransactions(f.log);
       const work = state.works.get(f.nodes[0].work_id);
       work.result = { outputs: [{ resource: { repository: "owner/repo", kind: "pull_request", number: "9007199254740993" } }] };
-      assert.match(summaryBody(state, work, undefined, 100), /pull\/9007199254740993/);
+      assert.match(summaryBody(state, work, 100), /pull\/9007199254740993/);
     });
   });
 }

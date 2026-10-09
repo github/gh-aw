@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// parseMaintenanceJobs splits the generated maintenance workflow into top-level job bodies.
 func parseMaintenanceJobs(t *testing.T, content string) map[string]string {
 	t.Helper()
 	_, jobsSection, found := strings.Cut(content, "\njobs:\n")

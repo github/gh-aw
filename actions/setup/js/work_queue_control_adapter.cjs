@@ -2,7 +2,7 @@
 "use strict";
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const { parseStrictJSON, utf8Compare } = require("./work_queue_codec.cjs");
-const { loadQueue } = require("./work_queue_binding.cjs");
+const { loadQueue, policyProposalFor } = require("./work_queue_binding.cjs");
 const { readStagedIntentBatch } = require("./work_queue_intents.cjs");
 const { DEFAULT_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
 const { API_VERSION, nativeId } = require("./work_queue_native.cjs");
@@ -126,6 +126,11 @@ function createCompilerDependencyResolver(options) {
   return Object.freeze({ scopes, getClient });
 }
 
+function dependencyStateForIntents(latest, intents, options) {
+  const bootstrapPolicy = !latest.projection.policy && latest.sha === null && intents.some(intent => intent.kind === "submit") ? policyProposalFor(options) : undefined;
+  return bootstrapPolicy ? { ...latest.projection, policy: bootstrapPolicy } : latest.projection;
+}
+
 /** @param {CompilerControlOptions} [options] */
 async function main(options = {}) {
   /** @type {CompilerControlOptions & {githubClient: object, context: {repo: {owner: string, repo: string}}}} */
@@ -147,7 +152,7 @@ async function main(options = {}) {
   }
   if (intents.some(intent => ["submit", "dispatch_next"].includes(intent.kind)) && !preview) {
     const latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
-    configured.dependencyResolver = createCompilerDependencyResolver({ ...configured, state: latest.projection });
+    configured.dependencyResolver = createCompilerDependencyResolver({ ...configured, state: dependencyStateForIntents(latest, intents, configured) });
   }
   if (launching) {
     const token = configured.config?.["github-token"];
@@ -164,4 +169,4 @@ async function main(options = {}) {
   return require("./work_queue_dispatch.cjs").main(configured);
 }
 
-module.exports = { credentialBindings, readOnlyRepositoryClient, createCompilerDependencyResolver, main };
+module.exports = { credentialBindings, readOnlyRepositoryClient, createCompilerDependencyResolver, dependencyStateForIntents, main };
