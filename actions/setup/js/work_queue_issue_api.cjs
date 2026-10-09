@@ -126,7 +126,9 @@ function issueReadQuery(targets, config, repository) {
   return { ...read, repositoryAliases };
 }
 
-async function preflightIssues(github, targets, { fields = true, response = undefined } = {}) {
+/** @param {{fields?: boolean, response?: Record<string, any>}} [options] */
+async function preflightIssues(github, targets, options = {}) {
+  const { fields = true, response } = options;
   const read = issuePreflightQuery(targets, fields);
   if (!read.selections.length) return new Map();
   const result = response || (await github.graphql(`query WorkQueueIssuePreflight(${read.declarations.join(",")}) { ${read.selections.join("\n")} }`, read.variables));
@@ -136,8 +138,9 @@ async function preflightIssues(github, targets, { fields = true, response = unde
     const issue = result?.[`i${index}`]?.issue;
     if (
       !issue ||
+      !issue.repository ||
       nativeId(issue.databaseId) !== target.resource.resource_id ||
-      nativeId(issue.repository?.databaseId) !== target.resource.repository_id ||
+      nativeId(issue.repository.databaseId) !== target.resource.repository_id ||
       issue.repository.nameWithOwner !== target.resource.repository ||
       nativeId(issue.number) !== target.resource.number
     )

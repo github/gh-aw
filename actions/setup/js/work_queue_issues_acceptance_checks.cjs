@@ -49,6 +49,27 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.ok(!m.calls.some(call => call[0] === "mutation" || call[0] === "lock"));
     });
 
+    it("rejects an Issue preflight with an inaccessible repository as a typed pending target", async () => {
+      const f = fixture({ backing: true });
+      const target = f.nodes[0];
+      const resource = target.backing_issue;
+      if (!resource) throw new Error("fixture is missing its backing Issue");
+      await assert.rejects(
+        preflightIssues({}, [{ work_id: target.work_id, resource }], {
+          response: {
+            i0: {
+              issue: {
+                databaseId: resource.resource_id,
+                number: resource.number,
+                repository: null,
+              },
+            },
+          },
+        }),
+        { code: "projection_target_unavailable" }
+      );
+    });
+
     it("renders delightful packaged templates with generated-by footers on every body and Claim comment", async () => {
       const f = fixture({ worker: true, backing: false });
       const m = mock(f);
