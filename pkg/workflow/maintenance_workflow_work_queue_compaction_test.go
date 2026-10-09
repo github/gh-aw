@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,8 +17,8 @@ func TestMaintenanceWorkQueueCompactionUsesSingleJob(t *testing.T) {
 	assert.Contains(t, jobs, "  work_queue_compaction:")
 	assert.Contains(t, jobs, "contents: write")
 	assert.Contains(t, jobs, "work_queue_compaction_plan.cjs")
-	assert.Contains(t, jobs, "steps.plan.outputs.plan_created == 'true'")
 	assert.Contains(t, jobs, "work_queue_compaction_apply.cjs")
+	assert.Equal(t, 1, strings.Count(jobs, "script: |"))
 	assert.NotContains(t, jobs, "work_queue_compaction_plan:")
 	assert.NotContains(t, jobs, "work_queue_compaction_apply:")
 	assert.NotContains(t, jobs, "work-queue-compaction-plan")

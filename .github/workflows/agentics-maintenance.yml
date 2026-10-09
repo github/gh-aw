@@ -2005,8 +2005,7 @@ jobs:
         with:
           destination: ${{ runner.temp }}/gh-aw/actions
 
-      - name: Plan existing work queue
-        id: plan
+      - name: Plan and apply work queue compaction
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
@@ -2016,18 +2015,9 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'work_queue_compaction_plan.cjs'));
-            await main();
-      - name: Validate and apply work queue compaction
-        if: ${{ steps.plan.outputs.plan_created == 'true' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'work_queue_compaction_apply.cjs'));
-            await main();
+            const { main: plan } = require(path.join(actionsDir, 'work_queue_compaction_plan.cjs'));
+            const result = await plan();
+            if (result.status === 'planned') {
+              const { main: apply } = require(path.join(actionsDir, 'work_queue_compaction_apply.cjs'));
+              await apply();
+            }

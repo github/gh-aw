@@ -16,8 +16,7 @@ func buildMaintenanceWorkQueueCompactionJobs(opts buildMaintenanceWorkflowYAMLOp
 `)
 	writeMaintenanceConditionalActionsCheckoutStep(&b, opts)
 	writeMaintenanceSetupScriptsStep(&b, setupActionRef)
-	b.WriteString(`      - name: Plan existing work queue
-        id: plan
+	b.WriteString(`      - name: Plan and apply work queue compaction
         uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + `
         env:
           GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
@@ -25,19 +24,12 @@ func buildMaintenanceWorkQueueCompactionJobs(opts buildMaintenanceWorkflowYAMLOp
           script: |
             const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_compaction_plan.cjs');
-            await main();
-      - name: Validate and apply work queue compaction
-        if: ${{ steps.plan.outputs.plan_created == 'true' }}
-        uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + `
-        env:
-          GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
-        with:
-          script: |
-            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_compaction_apply.cjs');
-            await main();
+            const { main: plan } = require('${{ runner.temp }}/gh-aw/actions/work_queue_compaction_plan.cjs');
+            const result = await plan();
+            if (result.status === 'planned') {
+              const { main: apply } = require('${{ runner.temp }}/gh-aw/actions/work_queue_compaction_apply.cjs');
+              await apply();
+            }
 `)
 	return b.String()
 }
