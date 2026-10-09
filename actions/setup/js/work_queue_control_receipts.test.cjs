@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { claimControlReceipts, controlReceiptForRequest, readClaimQueueControls, isTrustedClaimQueueControlInventory, isUncommittedClaimDispatchNext, verifyClaimQueueControl } from "./work_queue_control_receipts.cjs";
 import { intentContext, acceptedSubmissionParameters } from "./work_queue_dispatch.cjs";
 import { normalizeDispatchParameters, requestForIntent } from "./work_queue_intents.cjs";
+import { compactTransactions, replayTransactions } from "./work_queue_replay.cjs";
 import { queueFixture, REF, REPOSITORY, WORKFLOW } from "./work_queue_lifecycle.test_helpers.cjs";
 
 async function setup(count = 2) {
@@ -38,6 +39,19 @@ describe("independent Claim-scoped queue control readback", () => {
     const proof = await verifyClaimQueueControl({ ...options, claim_handle: "h1", message, inventory });
     expect(proof).toMatchObject({ verified: true, claim_handle: "h1", resource: { kind: "queue_commit", repository: REPOSITORY, id: inventory.controls[0].commit_id }, evidence: inventory.controls[0] });
     expect(controlReceiptForRequest(fixture.state, request.id)).toEqual(inventory.controls[0]);
+  });
+
+  it("verifies compacted current-epoch controls using the restored policy", async () => {
+    const { fixture, options, message, request } = await setup();
+    const history = fixture.transactions;
+    const checkpoint = compactTransactions(history, "c".repeat(40), history[0].actor, history.at(-1).at + 1);
+    const state = replayTransactions(checkpoint);
+    options.readWorkQueueLog = async () => ({ sha: "checkpoint-head", transactions: checkpoint, state });
+    const inventory = await readClaimQueueControls({ ...options, claim_handle: message.claim_handle });
+    const proof = await verifyClaimQueueControl({ ...options, message, inventory });
+    expect(state.transactions).toHaveLength(1);
+    expect(inventory.controls[0].request_id).toBe(request.id);
+    expect(proof).toMatchObject({ verified: true, resource: { id: inventory.controls[0].commit_id } });
   });
 
   it("never trusts serialized inventory, foreign sibling scope, changed parameters or an unaccepted request", async () => {

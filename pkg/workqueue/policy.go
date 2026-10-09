@@ -200,6 +200,9 @@ func newProjection() Projection {
 		Dispatches: map[string]*DispatchState{}, Observations: map[string]*Observation{},
 		Requests: map[string]QueueCommit{}, Clocks: map[string]PoolClocks{},
 		CredentialGeneration: "initial", ObservationWrites: map[string]int{},
+		RequestOrder: []string{}, WorkCreators: map[string]Actor{}, ClaimExplanations: map[string]ClaimExplanation{},
+		SeenEpochs: map[string]bool{}, SeenGenerations: map[string]bool{"initial": true},
+		ObservationIDs: map[string]*Observation{}, TerminalBarriers: map[string]Operation{}, Cancellations: map[string]Operation{},
 	}
 }
 
@@ -220,7 +223,7 @@ func (state Projection) quiescent() bool {
 
 func permitted(role, kind string) bool {
 	switch kind {
-	case "Policy", "Control":
+	case "Policy", "Control", "Checkpoint":
 		return role == "administrator"
 	case "Work":
 		return role == "producer" || role == "dispatcher" || role == "worker" || role == "administrator"
@@ -260,6 +263,7 @@ func validateRequest(commit QueueCommit) error {
 		"observe": {"Observation"}, "dispatch": {"Dispatch"}, "release": {"ClaimCancellation", "WorkCancellation", "Release"},
 		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"},
 		"cancel_work": {"WorkCancellation"}, "cancel_claim": {"ClaimCancellation", "WorkCancellation"},
+		"checkpoint": {"Checkpoint"},
 		"issue_link": {"IssueLink", "IssueComment"},
 	}
 	for _, operation := range commit.Operations {
@@ -285,6 +289,20 @@ func validateRequest(commit QueueCommit) error {
 
 func validateRequestIntent(commit QueueCommit, parameterCount int) error {
 	switch commit.Request.Kind {
+	case "checkpoint":
+		if parameterCount != 4 || len(commit.Operations) != 1 {
+			return queueError("checkpoint_invalid", "checkpoint requires one bound history operation")
+		}
+		var params CheckpointParameters
+		var op CheckpointOperation
+		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+			return queueError("checkpoint_invalid", "invalid checkpoint parameters")
+		}
+		if err := json.Unmarshal(commit.Operations[0], &op); err != nil ||
+			op.PriorGitSHA != params.PriorGitSHA || op.PriorTip != params.PriorTip ||
+			op.HistorySHA256 != params.HistorySHA256 || op.StateSHA256 != params.StateSHA256 {
+			return queueError("checkpoint_invalid", "checkpoint history differs from stable request")
+		}
 	case "submit":
 		var params SubmitParameters
 		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil || params.Nodes == nil {

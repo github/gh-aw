@@ -7,6 +7,8 @@ const helpers = require("./work_queue_test_helpers.cjs");
 const { newWork } = require("./work_queue_graph.cjs");
 const { defaultPolicy, validatePolicy } = require("./work_queue_policy.cjs");
 const { main, ownProjectionTargets, workIssueStatus, summaryBody, journalPath } = require("./work_queue_issues.cjs");
+const { issueBody } = require("./work_queue_issue_messages.cjs");
+const { issueCompletionPolicy } = require("./work_queue_issue_contract.cjs");
 const { STATUSES, discoverTarget, mutateIssues } = require("./work_queue_issue_api.cjs");
 const { withProjectionLocks } = require("./work_queue_issue_coordination.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
@@ -414,6 +416,26 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const foreign = structuredClone(f.assignment);
       foreign.claims[0].work_id = "foreign";
       assert.throws(() => ownProjectionTargets(state, f.origin, ref, foreign), /assignment_mismatch/);
+    });
+    it("uses restored admission and policy history instead of suffix transaction offsets", () => {
+      const checkpoint = require("../../../specs/work-queue/fixtures/checkpoint.json");
+      const state = q.replayTransactions(checkpoint.checkpoint);
+      const work = state.works.values().next().value;
+      const originalAdmission = { role: "dispatcher", principal: "1001", repository: "owner/repo", workflow: ".github/workflows/dispatcher.lock.yml", run_id: "100", run_attempt: 1 };
+      const otherRun = { ...originalAdmission, run_id: "999" };
+      const projector = { principal: "1001", workflow: originalAdmission.workflow, ref, pools: [work.pool], repositories: ["owner/repo"] };
+      state.workCreators.set(work.work_id, originalAdmission);
+      state.policy.projectors = [{ ...projector, completion_policy: "keep-open" }];
+      state.historicalTransactions[0].operations[0].policy = state.policy;
+      state.transactions.push({
+        actor: otherRun,
+        operations: [{ kind: "Policy", policy: { projectors: [{ ...projector, completion_policy: "close-on-result" }] } }],
+      });
+      assert.equal(ownProjectionTargets(state, helpers.context(otherRun, { ref }), ref).targets.length, 0);
+      assert.equal(ownProjectionTargets(state, helpers.context(originalAdmission, { ref }), ref).targets.length, 1);
+      assert.equal(issueCompletionPolicy(state, work, { ...originalAdmission, role: "projector" }, ref, "owner/repo"), "keep-open");
+      assert.ok(summaryBody(state, work, false, 10).includes(`/actions/runs/${originalAdmission.run_id}`));
+      assert.ok(issueBody(state, work, helpers.context(otherRun, { ref }), { label: "work" }, "work-queue").includes(`/actions/runs/${originalAdmission.run_id}`));
     });
     it("does not treat configuration or API access as installed projector authority", async () => {
       const f = fixture();
