@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+// @safe-outputs-exempt SEC-005 — runtime repository fallbacks are checked by assertClaimAuthorized against authorizeWorkerClaim's profile.effect_scope allowlist (E004); the guarded effect client reauthorizes SARIF writes.
 
 const crypto = require("crypto");
 const path = require("path");
