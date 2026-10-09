@@ -253,7 +253,10 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
           now: () => 100,
           core: { info: () => {} },
         });
-        assert.equal(m.calls.length - before, 2);
+        assert.deepEqual(
+          m.calls.slice(before).map(call => call[0]),
+          ["authentication-repository", "ledger-ref", "ledger-commit", "ledger-tree", "ledger-blob", "mutation"]
+        );
       } finally {
         if (env === undefined) delete process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT;
         else process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT = env;
@@ -263,7 +266,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.equal(m.issues.size, 2);
       assert.equal(m.comments.size, 2);
       assert.ok([...m.comments.values()].every(comment => /does not establish Work cancellation or Result/.test(comment.body)));
-      assert.equal(activation.metrics.requests + 2 + conclusion.metrics.requests, m.calls.length);
+      assert.equal(activation.metrics.requests + 6 + conclusion.metrics.requests, m.calls.length);
     });
 
     it("combines immutable-head discovery, handles, and preflight for 25 owned targets", async () => {

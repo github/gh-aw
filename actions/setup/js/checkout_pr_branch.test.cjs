@@ -462,38 +462,42 @@ If the pull request is still open, verify that:
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
 
-      it.each(["issue_comment", "pull_request_review_comment"])("should allow an allow-listed App comment on a same-repository PR for %s", async eventName => {
-        mockContext.eventName = eventName;
-        mockContext.actor = "my-app[bot]";
-        mockContext.payload.sender = { login: "my-app[bot]", type: "Bot" };
-        mockContext.payload.comment = { user: { login: "my-app[bot]" } };
-        mockContext.payload.repository.id = 42;
-        mockContext.payload.pull_request = { number: 123, state: "open" };
-        if (eventName === "issue_comment") {
-          mockContext.payload.issue = { number: 123, state: "open", pull_request: {} };
-          delete mockContext.payload.pull_request;
+      it.each(["issue_comment", "pull_request_review_comment"].flatMap(eventName => ["my-app", "my-app[bot]"].flatMap(actor => ["my-app", "my-app[bot]"].map(login => [eventName, actor, login]))))(
+        "should allow an allow-listed App comment on a same-repository PR for %s with actor %s and login %s",
+        async (eventName, actor, login) => {
+          mockContext.eventName = eventName;
+          mockContext.actor = actor;
+          mockContext.payload.sender = { login, type: "Bot" };
+          mockContext.payload.comment = { user: { login } };
+          mockContext.payload.repository.id = 42;
+          mockContext.payload.pull_request = { number: 123, state: "open" };
+          if (eventName === "issue_comment") {
+            mockContext.payload.issue = { number: 123, state: "open", pull_request: {} };
+            delete mockContext.payload.pull_request;
+          }
+          mockGithub.rest.pulls.get.mockResolvedValue({
+            data: {
+              commits: 1,
+              head: { ref: "feature-branch", repo: { id: 42, full_name: "test-owner/test-repo" } },
+              base: { repo: { id: 42, full_name: "test-owner/test-repo" } },
+            },
+          });
+          process.env.GH_AW_ALLOWED_BOTS = "other-bot,my-app";
+          mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+          await runScript();
+
+          expect(mockGithub.rest.pulls.get).toHaveBeenCalledTimes(1);
+          expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+          expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+          expect(mockExec.exec).toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin"]));
         }
-        mockGithub.rest.pulls.get.mockResolvedValue({
-          data: {
-            commits: 1,
-            head: { ref: "feature-branch", repo: { id: 42, full_name: "test-owner/test-repo" } },
-            base: { repo: { id: 42, full_name: "test-owner/test-repo" } },
-          },
-        });
-        process.env.GH_AW_ALLOWED_BOTS = "other-bot,my-app";
-        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
-
-        await runScript();
-
-        expect(mockGithub.rest.pulls.get).toHaveBeenCalledTimes(1);
-        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
-        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
-        expect(mockExec.exec).toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin"]));
-      });
+      );
 
       it.each([
         ["bot not allow-listed", "", "my-app[bot]", "Bot", 42, 42, 42],
         ["different comment author", "my-app[bot]", "other[bot]", "Bot", 42, 42, 42],
+        ["different author login form", "my-app[bot]", "my-app", "Bot", 42, 42, 42],
         ["missing comment author", "my-app[bot]", undefined, "Bot", 42, 42, 42],
         ["non-bot sender", "my-app[bot]", "my-app[bot]", "User", 42, 42, 42],
         ["fork PR", "my-app[bot]", "my-app[bot]", "Bot", 43, 42, 42],
@@ -521,6 +525,23 @@ If the pull request is still open, verify that:
         await runScript();
 
         expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      });
+
+      it.each(["issue_comment", "pull_request_review_comment"])("should reject an allow-listed comment sender that differs from the runtime actor for %s", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.actor = "other-app";
+        mockContext.payload.sender = { login: "my-app[bot]", type: "Bot" };
+        mockContext.payload.comment = { user: { login: "my-app[bot]" } };
+        mockContext.payload.repository.id = 42;
+        mockContext.payload.issue = { number: 123, state: "open", pull_request: {} };
+        process.env.GH_AW_ALLOWED_BOTS = "my-app,other-app";
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "other-app" }));
         expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
         expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
       });

@@ -33,7 +33,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
 const { detectForkPR } = require("./pr_helpers.cjs");
-const { parseAllowedBots, isAllowedBot } = require("./check_permissions_utils.cjs");
+const { parseAllowedBots, isAllowedBot, canonicalizeBotIdentifier } = require("./check_permissions_utils.cjs");
 const { ERR_API, ERR_PERMISSION } = require("./error_codes.cjs");
 const TRUSTED_CHECKOUT_PERMISSIONS = ["write", "maintain", "admin"];
 // Centralized command/label routing uses the repository GITHUB_TOKEN, whose
@@ -310,11 +310,13 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
   }
 
   const runtimeRepositoryId = context.payload.repository?.id;
+  const senderLogin = context.payload.sender?.login;
   if (
     (context.eventName === "issue_comment" || context.eventName === "pull_request_review_comment") &&
     senderType === "Bot" &&
-    context.payload.sender?.login === actor &&
-    context.payload.comment?.user?.login === actor &&
+    typeof senderLogin === "string" &&
+    context.payload.comment?.user?.login === senderLogin &&
+    canonicalizeBotIdentifier(senderLogin) === canonicalizeBotIdentifier(actor) &&
     isAllowedBot(actor, parseAllowedBots()) &&
     Number.isSafeInteger(runtimeRepositoryId) &&
     runtimeRepositoryId > 0

@@ -48,20 +48,25 @@ func Replay(commits []QueueCommit) (Projection, error) {
 	generations := identitySet{state.CredentialGeneration: {}}
 	offset := 0
 	checkpointCount := 0
-	if kind, kindErr := operationKind(ordered[0].Operations[0]); kindErr == nil && kind == "Checkpoint" {
-		state, err = restoreCheckpoint(ordered[0])
-		if err != nil {
-			return state, err
+	if len(ordered) > 0 {
+		first := ordered[0]
+		if len(first.Operations) > 0 {
+			if kind, kindErr := operationKind(first.Operations[0]); kindErr == nil && kind == "Checkpoint" {
+				state, err = restoreCheckpoint(first)
+				if err != nil {
+					return state, err
+				}
+				offset = state.Stats.Transactions
+				checkpointCount = 1
+				for epoch := range state.SeenEpochs {
+					epochs.add(epoch)
+				}
+				for generation := range state.SeenGenerations {
+					generations.add(generation)
+				}
+				ordered = ordered[1:]
+			}
 		}
-		offset = state.Stats.Transactions
-		checkpointCount = 1
-		for epoch := range state.SeenEpochs {
-			epochs.add(epoch)
-		}
-		for generation := range state.SeenGenerations {
-			generations.add(generation)
-		}
-		ordered = ordered[1:]
 	}
 	for ordinal, commit := range ordered {
 		if err := state.replayCommit(commit, offset+checkpointCount+ordinal, epochs, generations); err != nil {
@@ -176,17 +181,7 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	case "Control":
 		return state.applyReplayControl(operation, generations)
 	case "Work":
-		var node WorkDefinition
-		if err := json.Unmarshal(operation, &node); err != nil {
-			return err
-		}
-		if err := state.admitWork(node, commit, position); err != nil {
-			return err
-		}
-		if _, exists := state.WorkCreators[node.WorkID]; !exists {
-			state.WorkCreators[node.WorkID] = commit.Actor
-		}
-		return nil
+		return state.admitReplayWork(operation, commit, position)
 	case "Observation":
 		var observation Observation
 		if err := json.Unmarshal(operation, &observation); err != nil {
@@ -200,7 +195,9 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 			return err
 		}
 		var value ClaimOperation
-		_ = json.Unmarshal(operation, &value)
+		if err := json.Unmarshal(operation, &value); err != nil {
+			return err
+		}
 		state.Cancellations[value.ClaimID] = operation
 		return nil
 	case "WorkCancellation":
@@ -208,7 +205,9 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 			return err
 		}
 		var value WorkDefinition
-		_ = json.Unmarshal(operation, &value)
+		if err := json.Unmarshal(operation, &value); err != nil {
+			return err
+		}
 		state.Cancellations[value.WorkID] = operation
 		return nil
 	case "WorkPriority":
@@ -224,12 +223,28 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 			return err
 		}
 		var value WorkDefinition
-		_ = json.Unmarshal(operation, &value)
+		if err := json.Unmarshal(operation, &value); err != nil {
+			return err
+		}
 		state.TerminalBarriers[value.WorkID] = operation
 		return nil
 	default:
 		return queueError("unsupported_protocol", "unknown operation")
 	}
+}
+
+func (state *Projection) admitReplayWork(operation Operation, commit QueueCommit, position Position) error {
+	var node WorkDefinition
+	if err := json.Unmarshal(operation, &node); err != nil {
+		return err
+	}
+	if err := state.admitWork(node, commit, position); err != nil {
+		return err
+	}
+	if _, exists := state.WorkCreators[node.WorkID]; !exists {
+		state.WorkCreators[node.WorkID] = commit.Actor
+	}
+	return nil
 }
 
 func (state *Projection) installReplayPolicy(op Operation, commit QueueCommit, isPolicy bool, epochs identitySet) error {
