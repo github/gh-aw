@@ -12,16 +12,6 @@
     "outcome_counts": {
       "completed": 3
     },
-    "deviations": [
-      {
-        "requested_model": "claude-sonnet-5",
-        "requested_effort": "medium",
-        "selected_model": "github-copilot/claude-sonnet-5",
-        "selected_effort": "medium",
-        "deviation": "endpoint",
-        "count": 3
-      }
-    ],
     "classifier_cost": {
       "requests": 0,
       "input_tokens": 0,

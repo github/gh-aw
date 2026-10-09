@@ -415,9 +415,6 @@ func parseModelRoutingFile(path string, usageEntries []TokenUsageEntry) *ModelRo
 		summary.Status = "selected"
 	}
 	for _, request := range requests {
-		legacyEndpointOnly := request.Routed == "deviated" &&
-			slices.Equal(request.Deviations, []string{"endpoint"}) &&
-			isAWFBefore02839(summary.Schema)
 		normalizeLegacyEndpointDeviation(summary, &request)
 		if request.Routed != "" {
 			summary.RoutedCounts[request.Routed]++
@@ -425,7 +422,7 @@ func parseModelRoutingFile(path string, usageEntries []TokenUsageEntry) *ModelRo
 		if request.Outcome != "" {
 			summary.OutcomeCounts[request.Outcome]++
 		}
-		if len(request.Deviations) > 0 && !legacyEndpointOnly {
+		if request.Routed == "deviated" && len(request.Deviations) > 0 {
 			appendRoutingDeviation(summary, request, strings.Join(request.Deviations, ","))
 		}
 	}

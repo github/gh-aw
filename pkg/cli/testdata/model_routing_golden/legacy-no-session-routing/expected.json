@@ -31,19 +31,19 @@
     },
     "selected_model_cost": {
       "requests": 86,
-      "input_tokens": 6500,
-      "output_tokens": 60963,
-      "cache_read_tokens": 9380261,
-      "cache_write_tokens": 413852,
-      "aic": 883.32805
+      "input_tokens": 9919,
+      "output_tokens": 54243,
+      "cache_read_tokens": 7404011,
+      "cache_write_tokens": 397538,
+      "aic": 759.2288
     },
     "deviated_traffic_cost": {
       "requests": 15,
-      "input_tokens": 3449,
-      "output_tokens": 8080,
-      "cache_read_tokens": 153853,
-      "cache_write_tokens": 32802,
-      "aic": 50.1184
+      "input_tokens": 30,
+      "output_tokens": 14800,
+      "cache_read_tokens": 2130103,
+      "cache_write_tokens": 49116,
+      "aic": 174.21765
     },
     "main_agent_cost": {
       "requests": 41,

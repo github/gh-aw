@@ -461,7 +461,7 @@ func assertModelRoutingGoldenCase(t *testing.T, testCase modelRoutingGoldenCase,
 		}
 		if routing == nil || routing.Status != "selected" || routing.Endpoint != "/chat/completions" ||
 			routing.EffectiveEndpoint != "/v1/messages" || routing.SelectedEndpoint != "/chat/completions" ||
-			len(routing.Deviations) != 1 || routing.Deviations[0].Deviation != "endpoint" {
+			len(routing.Deviations) != 0 {
 			t.Fatalf("unexpected Claude AWF endpoint routing: %+v", routing)
 		}
 	case "pi-claude-two-subagents":
