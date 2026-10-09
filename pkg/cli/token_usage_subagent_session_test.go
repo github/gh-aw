@@ -513,25 +513,6 @@ func TestCopilotAgentMetricsWithoutLifecycleRetainAttribution(t *testing.T) {
 	require.Equal(t, TokenCoreMetrics{InputTokens: 6000, OutputTokens: 600, CacheReadTokens: 60, CacheWriteTokens: 120}, summary.SubagentModelActuals[0].TokenCoreMetrics)
 }
 
-func TestAgentMetricsDoNotDuplicateLifecycleInstanceCount(t *testing.T) {
-	content := subagentSessionHeader +
-		subagentSessionRecord(`{"type":"session.init","data":{"sourceEngine":"copilot","sessionId":"instance-count"}}`) +
-		subagentSessionRecord(`{"type":"subagent.started","agentId":"toolu_123","data":{"agentDisplayName":"Research","model":"opus"}}`) +
-		subagentSessionRecord(`{"type":"subagent.completed","agentId":"toolu_123","data":{}}`) +
-		subagentSessionRecord(`{"type":"session.shutdown","data":{"agentMetrics":{"agent-uuid":{"agentDisplayName":"Research","totalNanoAiu":50000000,"modelMetrics":{"opus":{"requests":{"count":1},"usage":{"inputTokens":10,"outputTokens":2}}}}}}}`)
-
-	_, _, agents, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
-	require.NoError(t, err)
-	require.True(t, found)
-	require.Len(t, agents, 1)
-	require.Equal(t, "Research", agents[0].AgentName)
-	require.Equal(t, 1, agents[0].InstanceCount)
-	require.Equal(t, 1, agents[0].CompletedCount)
-	require.Equal(t, 1, agents[0].Requests)
-	require.Equal(t, 10, agents[0].InputTokens)
-	require.InDelta(t, 0.05, agents[0].AIC, 0.000001)
-}
-
 func TestPiUnifiedFixtureAttributesInterleavedRequestsFromFirewallEvents(t *testing.T) {
 	fixture := filepath.Join("testdata", "subagent_attribution", "pi-interleaved")
 	_, actuals, agents, found, err := readSessionSubagentModelsDetailed(fixture)

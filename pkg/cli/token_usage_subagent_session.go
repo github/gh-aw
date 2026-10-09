@@ -541,7 +541,6 @@ func (models *subagentSessionModels) recordSubagentRequest(
 	agentUsage.AgentName = agentName
 	agentUsage.AgentType = "subagent"
 	agentUsage.SourceEngine = models.sourceEngine
-	agentUsage.hasInstanceEvidence = true
 	agentUsage.InstanceCount = max(agentUsage.InstanceCount, 1)
 	agentUsage.Requests++
 	agentUsage.InputTokens += usage.InputTokens
@@ -712,7 +711,6 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 	agentUsage.AgentType = "subagent"
 	agentUsage.SourceEngine = models.sourceEngine
 	if event.Type == "subagent.started" {
-		agentUsage.hasInstanceEvidence = true
 		row.RequestedModel = data.Model
 		row.ResolvedModel = data.ResolvedModel
 		row.IncompleteCount = 1
@@ -784,7 +782,6 @@ func (models *subagentSessionModels) observePiDispatch(event sessionSubagentEven
 	agentUsage.AgentName = agentName
 	agentUsage.AgentType = "subagent"
 	agentUsage.SourceEngine = models.sourceEngine
-	agentUsage.hasInstanceEvidence = true
 	agentUsage.InstanceCount = 1
 	agentUsage.IncompleteCount = max(agentUsage.IncompleteCount, 1)
 	agentUsage.RequestedModels = appendUnique(agentUsage.RequestedModels, data.RequestedModel)
@@ -851,7 +848,6 @@ func (models *subagentSessionModels) recordPiAgentUsage(identity, agentName, mod
 	agentUsage.AgentName = firstNonEmptyModel(agentUsage.AgentName, agentName)
 	agentUsage.AgentType = "subagent"
 	agentUsage.SourceEngine = models.sourceEngine
-	agentUsage.hasInstanceEvidence = true
 	agentUsage.Requests++
 	agentUsage.InputTokens += payload.Message.Usage.Input
 	agentUsage.OutputTokens += payload.Message.Usage.Output
@@ -904,8 +900,6 @@ func (models *subagentSessionModels) observePiResult(event sessionSubagentEvent,
 		agentUsage = &AgentUsageBreakdown{AgentName: agentName, AgentType: "subagent", InstanceCount: 1}
 		models.agentUsage[identity] = agentUsage
 	}
-	agentUsage.hasInstanceEvidence = true
-	agentUsage.InstanceCount = max(agentUsage.InstanceCount, 1)
 	agentUsage.AgentName = firstNonEmptyModel(agentUsage.AgentName, agentName)
 	if row.FailedCount > 0 {
 		agentUsage.FailedCount++
@@ -1105,13 +1099,6 @@ func sortedSubagentRequests(grouped map[subagentModelKey]SubagentModelRequest, c
 
 func (models *subagentSessionModels) agentRows() []AgentUsageBreakdown {
 	grouped := make(map[string]*AgentUsageBreakdown)
-	knownInstanceAgents := make(map[string]struct{})
-	for _, usage := range models.agentUsage {
-		if usage.hasInstanceEvidence {
-			key := usage.AgentType + "\x00" + usage.AgentName
-			knownInstanceAgents[key] = struct{}{}
-		}
-	}
 	for agentID, usage := range models.agentUsage {
 		if usage.AgentName == "" {
 			usage.AgentName = "subagent"
@@ -1122,9 +1109,7 @@ func (models *subagentSessionModels) agentRows() []AgentUsageBreakdown {
 			row = &AgentUsageBreakdown{AgentName: usage.AgentName, AgentType: usage.AgentType, SourceEngine: usage.SourceEngine}
 			grouped[key] = row
 		}
-		_, hasKnownInstance := knownInstanceAgents[key]
-		includeInstanceCount := !hasKnownInstance || usage.hasInstanceEvidence
-		mergeAgentUsageBreakdown(row, usage, models.agents[agentID], includeInstanceCount)
+		mergeAgentUsageBreakdown(row, usage, models.agents[agentID])
 	}
 	result := make([]AgentUsageBreakdown, 0, len(grouped))
 	for _, row := range grouped {
@@ -1148,10 +1133,8 @@ func (models *subagentSessionModels) agentRows() []AgentUsageBreakdown {
 	return result
 }
 
-func mergeAgentUsageBreakdown(row, usage *AgentUsageBreakdown, request *SubagentModelRequest, includeInstanceCount bool) {
-	if includeInstanceCount {
-		row.InstanceCount += usage.InstanceCount
-	}
+func mergeAgentUsageBreakdown(row, usage *AgentUsageBreakdown, request *SubagentModelRequest) {
+	row.InstanceCount += usage.InstanceCount
 	if row.SourceEngine == "" {
 		row.SourceEngine = usage.SourceEngine
 	}
