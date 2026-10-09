@@ -18,12 +18,15 @@ function fakeGitHub(initial = []) {
   const trees = new Map();
   const commits = new Map();
   const refs = new Map();
-  /** @type {{calls: string[], beforeUpdate: ((snapshot: {log: ReturnType<typeof log>, candidate: ReturnType<typeof log>, install: typeof install}) => Promise<unknown>) | null, ambiguousOnce: boolean, visibility: boolean, defaultRevision: string, workerContent: string | null, workerWorkflow: {id: number, path: string, state: string} | null, missingLog: boolean, truncated: boolean, badBlob: {encoding: string, content: string} | null, emptyLog: boolean, updates: number}} */
+  /** @type {{calls: string[], beforeUpdate: ((snapshot: {log: ReturnType<typeof log>, candidate: ReturnType<typeof log>, install: typeof install}) => Promise<unknown>) | null, ambiguousOnce: boolean, visibility: boolean, emptyRepository: boolean, bootstrapAmbiguous: boolean, bootstrapWrites: number, defaultRevision: string, workerContent: string | null, workerWorkflow: {id: number, path: string, state: string} | null, missingLog: boolean, truncated: boolean, badBlob: {encoding: string, content: string} | null, emptyLog: boolean, updates: number}} */
   const state = {
     calls: [],
     beforeUpdate: null,
     ambiguousOnce: false,
     visibility: true,
+    emptyRepository: false,
+    bootstrapAmbiguous: false,
+    bootstrapWrites: 0,
     defaultRevision: "a".repeat(40),
     workerContent: "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n        required: true\n",
     workerWorkflow: { id: 42, path: ".github/workflows/worker.lock.yml", state: "active" },
@@ -56,7 +59,16 @@ function fakeGitHub(initial = []) {
         get: async () => {
           state.calls.push("repos.get");
           if (!state.visibility) throw missing();
-          return { data: { full_name: "owner/repo", default_branch: "main", size: 1 } };
+          return { data: { full_name: "owner/repo", default_branch: "main", size: state.emptyRepository && !refs.has("main") ? 0 : 1 } };
+        },
+        createOrUpdateFileContents: async ({ path, content }) => {
+          assert.equal(path, ".gh-aw/work-queue-bootstrap");
+          assert.ok(Buffer.from(content, "base64").toString("utf8").includes("authoritative queue ledger"));
+          state.bootstrapWrites++;
+          if (refs.has("main")) throw Object.assign(new Error("Already initialized"), { status: 422 });
+          refs.set("main", state.defaultRevision);
+          if (state.bootstrapAmbiguous) throw Object.assign(new Error("Transport response lost"), { status: 502 });
+          return { data: {} };
         },
         getContent: async ({ owner, repo, path, ref }) => {
           assert.equal(`${owner}/${repo}`, "owner/repo");
@@ -81,7 +93,7 @@ function fakeGitHub(initial = []) {
         getRef: async ({ ref }) => {
           state.calls.push(`getRef:${ref}`);
           if (ref === "heads/main") {
-            if (!state.defaultRevision) throw missing();
+            if (!state.defaultRevision || (state.emptyRepository && !refs.has("main"))) throw missing();
             return { data: { object: { sha: state.defaultRevision } } };
           }
           const sha = refs.get(ref.slice("heads/".length));
@@ -119,6 +131,7 @@ function fakeGitHub(initial = []) {
         },
         createRef: async ({ ref, sha }) => {
           const branch = ref.slice("refs/heads/".length);
+          if (state.emptyRepository && !refs.has("main")) throw Object.assign(new Error("Git Repository is empty"), { status: 422 });
           if (refs.has(branch)) throw Object.assign(new Error("Reference already exists"), { status: 422 });
           refs.set(branch, sha);
           return { data: {} };
@@ -909,6 +922,37 @@ function registerTests({ describe, it }) {
       assert.ok(fake.state.calls.includes("getWorkflow:worker.lock.yml"));
       await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
       assert.equal(fake.log().length, 1);
+    });
+    it("initializes a branchless repository only after validating the first Policy and Work", async () => {
+      for (const ambiguous of [false, true]) {
+        const fake = fakeGitHub();
+        fake.state.emptyRepository = true;
+        fake.state.bootstrapAmbiguous = ambiguous;
+        const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
+        const nodes = [newWork({ task: "first work" }, "bootstrap-graph", "root", "default", policy, 100)];
+        const request = newRequest("empty-repository-bootstrap", "submit", producer, { nodes });
+        const empty = await readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+        assert.equal(empty.sha, null);
+        assert.equal(fake.state.bootstrapWrites, 0);
+        const result = await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
+        assert.equal(result.publishedNow, true);
+        assert.equal(fake.state.bootstrapWrites, 1);
+        assert.equal(fake.refs.get("work-queue"), result.sha);
+        assert.deepEqual(
+          result.transactions[0].operations.map(operation => operation.kind),
+          ["Policy", "Work"]
+        );
+        await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
+        assert.equal(fake.state.bootstrapWrites, 1);
+      }
+      const fake = fakeGitHub();
+      fake.state.emptyRepository = true;
+      fake.state.workerContent = null;
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
+      const request = newRequest("unverified-route", "submit", producer, { nodes: [newWork({ task: "first work" }, "graph", "root", "default", policy, 100)] });
+      await assert.rejects(publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 })), /policy_missing/);
+      assert.equal(fake.state.bootstrapWrites, 0);
+      assert.equal(fake.refs.has("work-queue"), false);
     });
     it("installs mandatory defaults only on genuine genesis and does not overlay authoritative installed Policy", async () => {
       const fake = fakeGitHub();

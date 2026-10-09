@@ -570,6 +570,8 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const m = mock(fixture());
       assert.equal((await main({ ...m.options, staged: true })).staged, true);
       assert.equal((await main({ ...m.options, issues: false })).disabled, true);
+      assert.equal((await main({ ...m.options, issues: "" })).disabled, true);
+      await assert.rejects(main({ ...m.options, issues: "{" }));
       assert.equal(m.calls.length, 0);
     });
     it("leaves ambiguous Issue creation pending rather than blindly retrying", async () => {
