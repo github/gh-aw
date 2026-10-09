@@ -433,6 +433,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"body":         {Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 			"issue_number": {OptionalPositiveInteger: true},
 			"duplicate_of": {IssueOrPRNumber: true},
+			"state_reason": {Type: "string", Enum: closeIssueStateReasonValues},
 			"rationale":    {Type: "string", Sanitize: true, MaxLength: 280, StripOnError: true},
 			"confidence":   {Type: "string", Enum: []string{"LOW", "MEDIUM", "HIGH"}, StripOnError: true},
 			"suggest":      {Type: "boolean"},

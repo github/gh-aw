@@ -104,6 +104,12 @@ async function readRef(githubClient, owner, repo, branch) {
   } catch (error) {
     log.failure("ref.read.failed", error);
     if (httpStatus(error) === 404) return null;
+    if (httpStatus(error) === 409) {
+      // GitHub returns 409 rather than 404 for refs in a branchless repository.
+      // A generic conflict is not proof of absence: confirm the native state.
+      const response = await githubClient.graphql("query WorkQueueEmptyRepository($owner:String!,$repo:String!) { repository(owner:$owner,name:$repo) { nameWithOwner isEmpty } }", { owner, repo });
+      if (response?.repository?.nameWithOwner?.toLowerCase() === `${owner}/${repo}`.toLowerCase() && response.repository.isEmpty === true) return null;
+    }
     throw error;
   }
 }
@@ -355,6 +361,27 @@ async function writeCandidate({ githubClient, owner, repo, current, transactions
   return commit.data.sha;
 }
 
+async function prepareEmptyRepository(githubClient, owner, repo, branch) {
+  const repository = await verifyRepository(githubClient, owner, repo);
+  if (repository.size !== 0 || typeof repository.default_branch !== "string") return;
+  validateBranch(repository.default_branch);
+  if (repository.default_branch === branch) throw queueError("branch_invalid", "queue branch cannot be the default branch of an empty repository");
+  if (await readRef(githubClient, owner, repo, repository.default_branch)) return;
+  try {
+    await githubClient.rest.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path: ".gh-aw/work-queue-bootstrap",
+      message: "Initialize repository for work queue",
+      content: Buffer.from("The work-queue branch holds the authoritative queue ledger.\n").toString("base64"),
+    });
+  } catch (error) {
+    // A lost response or concurrent initializer is only acceptable if the
+    // default branch is now readable; it never substitutes for a queue commit.
+    if (!(await readRef(githubClient, owner, repo, repository.default_branch))) throw error;
+  }
+}
+
 /**
  * @param {QueueReadOptions & {
  * request: ReturnType<typeof newRequest>,
@@ -474,6 +501,7 @@ async function publishWorkQueueRequest({
     const candidate = { version: 3, id, previous: current.state.tip || null, request: stable, actor: stableActor, policy_epoch: policyOp?.epoch ?? current.state.policy_epoch, at, operations: decision.operations };
     const checked = appendCommit(current.transactions, candidate);
     log.debug("request.candidate.checked", { operations: checked.commit.operations.length });
+    if (bootstrapOperation) await prepareEmptyRepository(githubClient, owner, repo, branch);
     if (policyOp) await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
     let sha;
     try {

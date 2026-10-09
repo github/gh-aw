@@ -141,6 +141,8 @@ const SAMPLE_VALIDATION_CONFIG = {
     defaultMax: 1,
     fields: {
       issue_number: { optionalPositiveInteger: true },
+      duplicate_of: { issueOrPRNumber: true },
+      state_reason: { type: "string", enum: ["completed", "not_planned", "duplicate"] },
     },
   },
   dismiss_pull_request_review: {
@@ -313,6 +315,15 @@ describe("safe_output_type_validator", () => {
   });
 
   describe("validateItem", () => {
+    it("preserves an agent-selected duplicate state reason in API casing", async () => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+
+      const result = validateItem({ type: "close_issue", issue_number: 2, duplicate_of: 1, state_reason: "DUPLICATE" }, "close_issue", 1);
+
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem).toEqual({ type: "close_issue", issue_number: 2, duplicate_of: 1, state_reason: "duplicate" });
+    });
+
     it("preserves explicit JSON null for built-in ledger values", async () => {
       const { validateItem, resetValidationConfigCache } = await import("./safe_output_type_validator.cjs");
       process.env.GH_AW_VALIDATION_CONFIG = JSON.stringify({
@@ -1601,7 +1612,6 @@ describe("safe_output_type_validator", () => {
       { itemType: "upload_asset", item: { type: "upload_asset", path: "image.png", targetFileName: "../../.git/config" }, fieldName: "targetFileName" },
       { itemType: "create_issue", item: { type: "create_issue", title: "Test", body: "Detailed issue body text.", assignees: ["octocat"] }, fieldName: "assignees" },
       { itemType: "create_discussion", item: { type: "create_discussion", title: "Test", body: "This discussion body is intentionally long enough for validation.", labels: ["security"] }, fieldName: "labels" },
-      { itemType: "close_issue", item: { type: "close_issue", issue_number: 1, state_reason: "not_planned" }, fieldName: "state_reason" },
       { itemType: "push_to_pull_request_branch", item: { type: "push_to_pull_request_branch", message: "Apply changes", diff_size: 0 }, fieldName: "diff_size" },
       { itemType: "create_pull_request", item: { type: "create_pull_request", title: "Fix bug", body: "Fixes the thing", branch: "fix/bug", base_commit: "abc123deadbeef" }, fieldName: "base_commit" },
     ])("should strip undeclared $itemType.$fieldName", async ({ itemType, item, fieldName }) => {
