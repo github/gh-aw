@@ -63,13 +63,14 @@ function workerProtocolFixture() {
   return f;
 }
 
-function mock(f, { field = false, labelMissing = false } = {}) {
+function mock(f, { labelMissing = false } = {}) {
   let transactions = f.log;
   let sha = "a".repeat(40);
   let sequence = 0;
   const journals = new Map();
   const issues = new Map(f.nodes.filter(node => node.backing_issue).map(node => [node.backing_issue.number, makeIssue(node.backing_issue)]));
   const comments = new Map();
+  const labels = new Map([["work", { id: "label-work", name: "work", color: "7057FF" }]]);
   const calls = [];
   const locks = new Set();
   const warnings = [];
@@ -87,8 +88,7 @@ function mock(f, { field = false, labelMissing = false } = {}) {
   const discovery = {
     id: "Repository1",
     nameWithOwner: "owner/repo",
-    label: labelMissing ? null : { id: "label-work", name: "work" },
-    issueFields: { nodes: [{ __typename: "IssueFieldSingleSelect", id: "Field", name: "CustomStatus", options: STATUSES.map(name => ({ id: `option-${name}`, name })) }], pageInfo: { hasNextPage: false } },
+    label: labelMissing ? null : { id: "label-work", name: "work", color: "7057FF" },
   };
   function makeIssue(r) {
     return {
@@ -100,7 +100,6 @@ function mock(f, { field = false, labelMissing = false } = {}) {
       repository: { id: "Repository1", databaseId: 1, nameWithOwner: "owner/repo" },
       author: { login: "bot" },
       labels: { nodes: [{ id: "label-work", name: "work" }], pageInfo: { hasNextPage: false } },
-      issueFieldValues: { nodes: [], pageInfo: { hasNextPage: false } },
     };
   }
   const githubClient = {
@@ -194,9 +193,18 @@ function mock(f, { field = false, labelMissing = false } = {}) {
       }
       if (query.includes("WorkQueueIssueTarget")) return { repository: structuredClone(discovery) };
       if (query.includes("WorkQueueIssuePreflight")) return preflightResponse(variables);
+      if (query.includes("WorkQueueStatusLabel")) return { node: { id: "Repository1", label: structuredClone(labels.get(variables.name) || null) } };
+      if (query.includes("WorkQueueLabelColor")) {
+        const label = [...labels.values()].find(label => label.id === variables.input.id);
+        label.color = variables.input.color;
+        if (label.name === "work") discovery.label = label;
+        return { updateLabel: { label: structuredClone(label) } };
+      }
       if (query.includes("WorkQueueTrackingLabel")) {
-        discovery.label = { id: "label-work", name: variables.input.name };
-        return { createLabel: { label: structuredClone(discovery.label) } };
+        const label = { id: `label-${variables.input.name}`, name: variables.input.name, color: variables.input.color };
+        labels.set(label.name, label);
+        if (label.name === "work") discovery.label = label;
+        return { createLabel: { label: structuredClone(label) } };
       }
       if (query.includes("WorkQueueIssueProjection")) {
         const result = {};
@@ -209,7 +217,7 @@ function mock(f, { field = false, labelMissing = false } = {}) {
             const created = makeIssue(resource(number));
             created.body = input.body;
             created.title = input.title;
-            if (input.issueFields) created.issueFieldValues.nodes = input.issueFields.map(value => ({ field: { id: value.fieldId }, optionId: value.singleSelectOptionId }));
+            created.labels.nodes = input.labelIds.map(id => [...labels.values()].find(label => label.id === id));
             issues.set(String(number), created);
             result[key] = { issue: structuredClone(created) };
           } else if (name === "addComment") {
@@ -219,14 +227,11 @@ function mock(f, { field = false, labelMissing = false } = {}) {
           } else if (name === "updateIssueComment") {
             comments.get(input.id).body = input.body;
             result[key] = { issueComment: structuredClone(comments.get(input.id)) };
-          } else if (name === "setIssueFieldValue") {
-            issue.issueFieldValues.nodes = [
-              ...issue.issueFieldValues.nodes.filter(value => value.field.id !== input.issueFields[0].fieldId),
-              ...input.issueFields.map(value => ({ field: { id: value.fieldId }, optionId: value.singleSelectOptionId })),
-            ];
-            result[key] = { issue: structuredClone(issue) };
           } else if (name === "addLabelsToLabelable") {
-            issue.labels.nodes.push({ id: "label-work", name: "work" });
+            issue.labels.nodes.push(...input.labelIds.map(id => [...labels.values()].find(label => label.id === id)));
+            result[key] = { labelable: { id: issue.id, labels: structuredClone(issue.labels) } };
+          } else if (name === "removeLabelsFromLabelable") {
+            issue.labels.nodes = issue.labels.nodes.filter(label => !input.labelIds.includes(label.id));
             result[key] = { labelable: { id: issue.id, labels: structuredClone(issue.labels) } };
           } else if (name === "closeIssue") {
             issue.state = "CLOSED";
@@ -265,7 +270,7 @@ function mock(f, { field = false, labelMissing = false } = {}) {
     context: { repo: { owner: "owner", repo: "repo" }, payload: f.assignment ? { inputs: { work_queue_assignment: f.assignment } } : {} },
     role: f.assignment ? "worker" : "dispatcher",
     trustedContext: f.origin,
-    issues: field ? { "status-field": "CustomStatus" } : true,
+    issues: true,
     now: 100,
     readCheckedQueue,
     writeCheckedFiles,
@@ -280,6 +285,7 @@ function mock(f, { field = false, labelMissing = false } = {}) {
     comments,
     journals,
     discovery,
+    labels,
     warnings,
     nativeRun,
     state: () => q.replayTransactions(transactions),
@@ -329,48 +335,58 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.match([...m.comments.values()][0].body, /Generated by \[dispatcher\]/);
       assert.equal(m.comments.size, 1);
     });
-    it("writes selective native fields and preserves unrelated values", async () => {
+    it("replaces only queue status labels and preserves unrelated labels", async () => {
       const f = fixture();
-      const m = mock(f, { field: true });
-      m.issues.get("1").issueFieldValues.nodes.push({ field: { id: "human-field" }, optionId: "human-option" });
+      const m = mock(f);
+      m.issues.get("1").labels.nodes.push({ id: "human", name: "human" });
       assert.deepEqual((await main(m.options)).pending, []);
-      assert.ok(m.issues.get("1").issueFieldValues.nodes.some(value => value.field.id === "human-field"));
-      assert.ok(m.issues.get("1").issueFieldValues.nodes.some(value => value.optionId === "option-Queued"));
-      assert.doesNotMatch([...m.comments.values()][0].body, /Status:/);
+      assert.deepEqual(
+        m.issues.get("1").labels.nodes.map(label => label.name),
+        ["work", "human", "work: Queued"]
+      );
+      assert.match([...m.comments.values()][0].body, /Status: \*\*Queued\*\*/);
       const before = m.calls.length;
       const grant = helpers.grant(m.state().transactions);
       m.setLog([...m.state().transactions, grant.commit]);
       assert.deepEqual((await main(m.options)).pending, []);
+      assert.deepEqual(
+        m.issues.get("1").labels.nodes.map(label => label.name),
+        ["work", "human", "work: Assigned"]
+      );
       const writes = m.calls
         .slice(before)
         .filter(call => call[0] === "mutation")
         .map(call => call[1])
         .join("\n");
-      assert.match(writes, /setIssueFieldValue/);
-      assert.doesNotMatch(writes, /updateIssueComment/);
+      assert.match(writes, /addLabelsToLabelable/);
+      assert.match(writes, /removeLabelsFromLabelable/);
+      assert.match(writes, /updateIssueComment/);
     });
-    it("initializes and verifies fields during creation", async () => {
-      const m = mock(fixture({ backing: false }), { field: true });
+    it("initializes status labels during creation with purple color", async () => {
+      const m = mock(fixture({ backing: false }));
       assert.deepEqual((await main(m.options)).pending, []);
-      assert.equal(m.issues.get("1").issueFieldValues.nodes[0].optionId, "option-Queued");
-      assert.equal(m.calls.filter(call => call[0] === "mutation").length, 2);
+      assert.deepEqual(
+        m.issues.get("1").labels.nodes.map(label => label.name),
+        ["work", "work: Queued"]
+      );
+      assert.equal(m.labels.get("work: Queued").color, "7057FF");
+      assert.equal(m.calls.filter(call => call[0] === "mutation").length, 3);
     });
-    it("keeps committed queue authority when fields are missing or unwritable", async () => {
-      const f = fixture();
-      const m = mock(f, { field: true });
-      m.discovery.issueFields.nodes = [];
+    it("recolors an existing work-queue tracking label purple", async () => {
+      const m = mock(fixture());
+      m.discovery.label.color = "808080";
+      assert.deepEqual((await main(m.options)).pending, []);
+      assert.equal(m.labels.get("work").color, "7057FF");
+      assert.ok(m.calls.some(call => call[1]?.includes("WorkQueueLabelColor")));
+    });
+    it("keeps queue authority when a status label cannot be provisioned", async () => {
+      const m = mock(fixture());
+      const original = m.options.githubClient.graphql;
+      m.options.githubClient.graphql = (query, variables) => (query.includes("WorkQueueStatusLabel") ? Promise.resolve({ node: null }) : original(query, variables));
       const result = await main(m.options);
       assert.ok(result.pending);
-      assert.equal(result.pending.length, 1);
-      assert.match(result.pending[0].reason, /field sync pending/);
+      assert.match(result.pending[0].reason, /status label target is inaccessible/);
       assert.equal(m.state().works.size, 1);
-      assert.ok(m.calls.filter(call => call[0] === "mutation").every(call => !call[1].includes("setIssueFieldValue")));
-      assert.ok([...m.comments.values()].some(comment => /field sync pending/.test(comment.body) && !/Status:/.test(comment.body)));
-      m.discovery.issueFields.nodes = [{ __typename: "IssueFieldSingleSelect", id: "Field", name: "CustomStatus", options: STATUSES.map(name => ({ id: name, name })) }];
-      m.issues.get("1").viewerCanSetFields = false;
-      const unwritable = await main(m.options);
-      assert.ok(unwritable.pending);
-      assert.match(unwritable.pending[0].reason, /token cannot set fields/);
     });
     it("repairs labels only on owned Issues and preserves human-owned text and closure", async () => {
       const f = fixture();
@@ -382,7 +398,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       await main(m.options);
       assert.deepEqual(
         m.issues.get("1").labels.nodes.map(value => value.name),
-        ["human", "work"]
+        ["human", "work", "work: Queued"]
       );
       assert.equal(m.issues.get("1").state, "CLOSED");
       assert.equal(m.issues.get("1").title, "A human title");
@@ -528,13 +544,13 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const m = mock(fixture({ count: 25 }));
       assert.deepEqual((await main(m.options)).pending, []);
       assert.equal(m.comments.size, 25);
-      assert.equal(m.calls.filter(call => call[0] === "mutation").length, 1);
+      assert.equal(m.calls.filter(call => call[0] === "mutation").length, 2);
       assert.equal(m.calls.filter(call => call[0] === "lock").length, 50);
       const before = m.calls.length;
       await main(m.options);
       assert.equal(m.calls.slice(before).filter(call => call[0] === "mutation").length, 0);
-      // 2 checked reads + discovery + scoped preflight + 100 coordination requests.
-      assert.equal(m.calls.length - before, 104);
+      // 2 checked reads + discovery + status-label lookup + scoped preflight + 100 coordination requests.
+      assert.equal(m.calls.length - before, 105);
     });
     it("handles partial native batches without retrying successful aliases", async () => {
       const client = {
@@ -562,7 +578,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.equal(workIssueStatus(state, work, 100), "Needs review");
       work.barrier = "failed";
       assert.equal(workIssueStatus(state, work, 100), "Needs attention");
-      assert.doesNotMatch(summaryBody(state, work, { id: "Field" }, 100), /Status:/);
+      assert.match(summaryBody(state, work, 100), /Status: \*\*Needs attention\*\*/);
     });
     it("rejects concurrent Issue rebinding and immutable comment-handle replacement", () => {
       const f = protocolFixture();

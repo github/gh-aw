@@ -5390,8 +5390,7 @@
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
-                        "label": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S", "default": "work" },
-                        "status-field": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S", "description": "Pre-provisioned native organization single-select field. Omit for comment-only status." }
+                        "label": { "type": "string", "minLength": 1, "maxLength": 239, "pattern": "\\S", "default": "work" }
                       }
                     }
                   ]

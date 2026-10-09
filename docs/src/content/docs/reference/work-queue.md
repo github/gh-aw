@@ -59,21 +59,19 @@ tools:
     worker: true
     issues:
       label: cookie
-      status-field: WorkStatus
 ```
 
-`issues: true` enables comment-only projection with the `work` label. An object
-may override `label` and select `status-field`; an empty object uses defaults.
-Absent or false disables the integration. Both names must be nonblank literal
-strings of at most 256 bytes; unknown keys are rejected.
+`issues: true` enables projection with the `work` tracking label and a
+`work: <status>` label. An object may override `label` (for example, `cookie`
+produces `cookie: Queued`); an empty object uses defaults. Absent or false
+disables the integration. The tracking label must be a nonblank literal of at
+most 239 bytes; unknown keys are rejected.
 
-`status-field` names a pre-provisioned native organization single-select Issue
-field, not Project-local Status. Its required options are **Queued**, **Blocked**,
-**Assigned**, **Running**, **Verifying**, **Needs review**, **Done**,
-**Needs attention**, and **Cancelled**. `WorkStatus` is a naming convention,
-not a reserved name. No Project is required. Missing, inaccessible, incompatible,
-or unwritable fields report **queue committed; field sync pending**. They are
-never provisioned automatically or silently replaced with comment-only mode.
+Status labels are created as needed in the target repository with purple
+(`7057FF`), using **Queued**, **Blocked**, **Assigned**, **Running**,
+**Verifying**, **Needs review**, **Done**, **Needs attention**, or **Cancelled**.
+The projector replaces only its own status labels, preserving unrelated labels.
+No organization Issue field or Project is required.
 
 The existing activation and conclusion jobs project only Work admitted by
 their authenticated run/attempt and Work in their original authenticated Claims.
@@ -110,9 +108,8 @@ created if missing and repaired when removed. Human titles, bodies, types,
 unrelated labels/fields, and discussion are preserved.
 
 Each backing Issue has a canonical summary and one historical comment per
-owned Claim, with run, ledger, and verified outcome links. Comment-only summaries
-include changing status; native-field summaries avoid status-only duplicate
-edits. Completion projects **Verifying**, verified PR delivery **Needs review**,
+owned Claim, with run, ledger, and verified outcome links. Summaries include
+changing status alongside its label. Completion projects **Verifying**, verified PR delivery **Needs review**,
 and verified non-PR delivery **Done**. Native job failure/cancellation is
 diagnostic, not Work cancellation or Result. Human closure/status changes
 cannot establish either.
@@ -163,14 +160,14 @@ empty discovery result is not proof of noncreation. Automatic crash recovery
 that can safely clear these fences is not implemented.
 
 Hooks batch up to 25 owned targets. Checked GraphQL reads combine immutable-head
-ledger/journal reads, field discovery, and scoped Issue preflight; an explicitly
+ledger/journal reads, label discovery, and scoped Issue preflight; an explicitly
 truncated blob uses an OID-checked REST fallback. Writes are paced and exhausted
 rate limits stop subsequent live requests. Hook metrics count authentication,
 coordination, native writes, journals, and retries within the projection phase;
 shared activation work and GitHub App token minting are additional requests.
 Local full-hook mocks also count ordinary queue publication and both hooks.
 For 25 unchanged existing Issues, the authenticated projection currently uses
-six requests: four reads and two batched coordination mutations, with no Issue
+seven requests: five reads and two batched coordination mutations, with no Issue
 writes. An ordinary checked queue read/publication takes two requests instead
 of the previous five/nine-call REST paths.
 Mutation primary cost remains unmeasured; baseline Issue-operation estimates
