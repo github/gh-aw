@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {
@@ -1100,6 +1100,12 @@
                         "router_version": {
                           "type": "string"
                         },
+                        "effective_endpoint": {
+                          "type": "string"
+                        },
+                        "selected_endpoint": {
+                          "type": "string"
+                        },
                         "main_agent_cost": {
                           "type": "object",
                           "properties": {
@@ -1228,6 +1234,12 @@
                       "type": "string"
                     },
                     "router_version": {
+                      "type": "string"
+                    },
+                    "effective_endpoint": {
+                      "type": "string"
+                    },
+                    "selected_endpoint": {
                       "type": "string"
                     },
                     "main_agent_cost": {
@@ -1459,6 +1471,12 @@
                             "router_version": {
                               "type": "string"
                             },
+                            "effective_endpoint": {
+                              "type": "string"
+                            },
+                            "selected_endpoint": {
+                              "type": "string"
+                            },
                             "main_agent_cost": {
                               "type": "object",
                               "properties": {
@@ -1581,6 +1599,12 @@
                               "type": "string"
                             },
                             "router_version": {
+                              "type": "string"
+                            },
+                            "effective_endpoint": {
+                              "type": "string"
+                            },
+                            "selected_endpoint": {
                               "type": "string"
                             },
                             "main_agent_cost": {
@@ -3256,6 +3280,12 @@
                             "router_version": {
                               "type": "string"
                             },
+                            "effective_endpoint": {
+                              "type": "string"
+                            },
+                            "selected_endpoint": {
+                              "type": "string"
+                            },
                             "main_agent_cost": {
                               "type": "object",
                               "properties": {
@@ -3384,6 +3414,12 @@
                           "type": "string"
                         },
                         "router_version": {
+                          "type": "string"
+                        },
+                        "effective_endpoint": {
+                          "type": "string"
+                        },
+                        "selected_endpoint": {
                           "type": "string"
                         },
                         "main_agent_cost": {
@@ -3615,6 +3651,12 @@
                                 "router_version": {
                                   "type": "string"
                                 },
+                                "effective_endpoint": {
+                                  "type": "string"
+                                },
+                                "selected_endpoint": {
+                                  "type": "string"
+                                },
                                 "main_agent_cost": {
                                   "type": "object",
                                   "properties": {
@@ -3737,6 +3779,12 @@
                                   "type": "string"
                                 },
                                 "router_version": {
+                                  "type": "string"
+                                },
+                                "effective_endpoint": {
+                                  "type": "string"
+                                },
+                                "selected_endpoint": {
                                   "type": "string"
                                 },
                                 "main_agent_cost": {
@@ -7952,7 +8000,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {
@@ -8069,7 +8117,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {
@@ -8158,7 +8206,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            4
+            5
           ]
         },
         "kind": {

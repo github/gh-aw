@@ -38,12 +38,14 @@ type AuditComparisonBaseline struct {
 }
 
 type AuditComparisonRoute struct {
-	Model         string                  `json:"model,omitempty"`
-	Effort        string                  `json:"effort,omitempty"`
-	Mode          string                  `json:"mode,omitempty"`
-	RouterVersion string                  `json:"router_version,omitempty"`
-	MainAgentCost ModelRoutingCost        `json:"main_agent_cost,omitzero"`
-	SubagentCosts []ModelRoutingAgentCost `json:"subagent_costs,omitempty"`
+	Model             string                  `json:"model,omitempty"`
+	Effort            string                  `json:"effort,omitempty"`
+	Mode              string                  `json:"mode,omitempty"`
+	RouterVersion     string                  `json:"router_version,omitempty"`
+	EffectiveEndpoint string                  `json:"effective_endpoint,omitempty"`
+	SelectedEndpoint  string                  `json:"selected_endpoint,omitempty"`
+	MainAgentCost     ModelRoutingCost        `json:"main_agent_cost,omitzero"`
+	SubagentCosts     []ModelRoutingAgentCost `json:"subagent_costs,omitempty"`
 }
 
 type AuditComparisonDelta struct {
@@ -129,6 +131,7 @@ func modelRoutingComparisonRoute(routing *ModelRoutingSummary) *AuditComparisonR
 	return &AuditComparisonRoute{
 		Model: routing.SelectedModel, Effort: routing.SelectedEffort,
 		Mode: routing.Mode, RouterVersion: routing.RouterVersion,
+		EffectiveEndpoint: routing.EffectiveEndpoint, SelectedEndpoint: routing.SelectedEndpoint,
 		MainAgentCost: routing.MainAgentCost, SubagentCosts: routing.SubagentCosts,
 	}
 }
@@ -138,7 +141,8 @@ func sameModelRoutingRoute(left, right *AuditComparisonRoute) bool {
 		return left == right
 	}
 	return left.Model == right.Model && left.Effort == right.Effort &&
-		left.Mode == right.Mode && left.RouterVersion == right.RouterVersion
+		left.Mode == right.Mode && left.RouterVersion == right.RouterVersion &&
+		left.EffectiveEndpoint == right.EffectiveEndpoint && left.SelectedEndpoint == right.SelectedEndpoint
 }
 
 func loadAuditComparisonSnapshotFromArtifacts(run WorkflowRun, logsPath string, verbose bool) (auditComparisonSnapshot, error) {

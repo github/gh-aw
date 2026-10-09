@@ -215,7 +215,7 @@ describe("essential unified session payloads", () => {
       engineId: "custom",
     });
     const metadata = normalizeUnifiedSessionEvent({ type: "workflow.info", data: { engine: "claude", model: "requested", event_name: "schedule", cli_version: "1.0", mcpg_version: "2.0" } });
-    expect(metadata.data).toEqual({ engineId: "claude", cliVersion: "1.0", mcpgVersion: "2.0", requestedModel: "requested", triggerType: "schedule" });
+    expect(metadata.data).toEqual({ engineId: "claude", cliVersion: "1.0", mcpgVersion: "2.0", model: "requested", requestedModel: "requested", triggerType: "schedule" });
     expect(normalizeUnifiedSessionEvent(metadata)).toEqual(metadata);
   });
 

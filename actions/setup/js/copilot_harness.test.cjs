@@ -134,7 +134,7 @@ function withTemporaryPromptTemplate(prefix, sourceTemplateDir, promptDirResolve
 
 describe("copilot_harness.cjs", () => {
   describe("AWF task-level model routing", () => {
-    const routingEnvKeys = ["GH_AW_MODEL_ROUTING", "GH_AW_COPILOT_ROUTING_EFFORT", "COPILOT_MODEL", "COPILOT_PROVIDER_WIRE_API"];
+    const routingEnvKeys = ["GH_AW_MODEL_ROUTING", "GH_AW_COPILOT_ROUTING_EFFORT", "GH_AW_TMP_DIR", "COPILOT_MODEL", "COPILOT_PROVIDER_WIRE_API"];
     const originalRoutingEnv = Object.fromEntries(routingEnvKeys.map(key => [key, process.env[key]]));
 
     afterEach(() => {
@@ -155,23 +155,41 @@ describe("copilot_harness.cjs", () => {
     it("applies the selected model, endpoint and effort over existing values", () => {
       process.env.COPILOT_MODEL = "configured-model";
       process.env.COPILOT_PROVIDER_WIRE_API = "completions";
-      const messages = [];
-      const result = resolveAWFModelRoutingSelection(
-        {
-          routing: {
-            status: "selected",
-            selection: { provider: "copilot", model: "github-copilot/gpt-5.4-mini", wire_model: "gpt-5.4-mini", effort: "xhigh", endpoint: "/responses" },
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-routing-outcome-"));
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_MODEL_ROUTING = "1";
+      try {
+        const messages = [];
+        const result = resolveAWFModelRoutingSelection(
+          {
+            routing: {
+              status: "selected",
+              selection: {
+                provider: "copilot",
+                model: "github-copilot/gpt-5.4-mini",
+                wire_model: "gpt-5.4-mini",
+                effort: "xhigh",
+                endpoint: "/responses",
+                selected_endpoint: "/chat/completions",
+              },
+            },
+            endpoints: [{ provider: "copilot", configured: true, models: ["gpt-5.4-mini"] }],
           },
-          endpoints: [{ provider: "copilot", configured: true, models: ["gpt-5.4-mini"] }],
-        },
-        true
-      );
-      expect(result.error).toBeNull();
-      applyCopilotRoutingSelection(result.selection, message => messages.push(message));
-      expect(process.env.COPILOT_MODEL).toBe("gpt-5.4-mini");
-      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
-      expect(process.env.GH_AW_COPILOT_ROUTING_EFFORT).toBe("xhigh");
-      expect(messages[0]).toContain("inference routing: mode=awf-routed");
+          true
+        );
+        expect(result.error).toBeNull();
+        applyCopilotRoutingSelection(result.selection, message => messages.push(message));
+        expect(process.env.COPILOT_MODEL).toBe("gpt-5.4-mini");
+        expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+        expect(process.env.GH_AW_COPILOT_ROUTING_EFFORT).toBe("xhigh");
+        expect(messages[0]).toContain("inference routing: mode=awf-routed");
+        expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "agent", "awf-routing-outcome.json"), "utf8"))).toMatchObject({
+          endpoint: "/responses",
+          selected_endpoint: "/responses",
+        });
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
 
     it("removes compile-time model and effort flags when the route has no effort", () => {
