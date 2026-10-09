@@ -2462,11 +2462,74 @@ sandbox:
     # Docker with a privileged AWF, legacy iptables networking, and host/service
     # access (required for allow-host-ports and GitHub Actions services:
     # connectivity); 'cloud-hypervisor' runs the agent in AWF's preview Cloud
-    # Hypervisor microVM runtime on GitHub-hosted Ubuntu x86_64, sized at 2 vCPUs and
-    # 4096 MiB. Omitting runtime is equivalent to 'docker'. cloud-hypervisor is
-    # incompatible with runner.topology: arc-dind.
+    # Hypervisor microVM runtime; 'nvx' runs the agent in AWF's fail-closed preview
+    # NVX microVM with secure defaults. Omitting runtime is equivalent to 'docker'.
     # (optional)
     runtime: "docker"
+
+    # Optional overrides for AWF's fail-closed NVX preview runtime. Safe defaults
+    # apply when omitted. Artifact paths may be GitHub Actions expressions; setup
+    # verifies release provenance and stages trusted files before AWF starts.
+    # (optional)
+    nvx:
+      # NVX preview is always enabled.
+      preview: true
+
+      # Strict AWF network isolation is always enabled.
+      network-isolation: true
+
+      # API proxy credential isolation is always enabled.
+      api-proxy: true
+
+      # (optional)
+      mount-policy: "workspace-only"
+
+      # Workload-specific guest distro layer directory; defaults to
+      # runner.temp/nvx/guest-layer and supports GitHub Actions expressions.
+      layer-path: "example-value"
+
+      # Path to the trusted, attested OpenVMM binary; defaults to
+      # runner.temp/nvx/openvmm and supports GitHub Actions expressions.
+      openvmm-path: "example-value"
+
+      # Path to the trusted, attested guest kernel; defaults to runner.temp/nvx/vmlinux
+      # and supports GitHub Actions expressions.
+      kernel-path: "example-value"
+
+      # Path to the trusted, attested guest initramfs; defaults to
+      # runner.temp/nvx/initramfs.cpio.gz and supports GitHub Actions expressions.
+      initramfs-path: "example-value"
+
+      # Path to the AWF release artifact manifest; defaults to
+      # runner.temp/nvx/nvx-test-x86_64.manifest.json and supports GitHub Actions
+      # expressions.
+      artifact-manifest-path: "example-value"
+
+      # Path to the offline Sigstore attestation bundle; defaults to
+      # runner.temp/nvx/nvx-test-x86_64.manifest.sigstore.jsonl and supports GitHub
+      # Actions expressions.
+      artifact-manifest-bundle-path: "example-value"
+
+      # Expected trusted workflow identity that signed the manifest.
+      # (optional)
+      signer-workflow: "github/gh-aw-firewall/.github/workflows/release.yml"
+
+      # (optional)
+      memory-mib: 1
+
+      # (optional)
+      memory-max-bytes: 1
+
+      # (optional)
+      pids-max: 1
+
+      # Optional bounded per-run guest-writable scratch image size in bytes.
+      # (optional)
+      scratch-bytes: 1
+
+      # Optional guest working directory, restricted to /workspace or a descendant.
+      # (optional)
+      container-workdir: "example-value"
 
     # Custom sandbox runtime configuration. Note: Network configuration is controlled
     # by the top-level 'network' field, not here.
@@ -4456,7 +4519,6 @@ tools:
 
   # Format 1: Enable read-only queue observation, or queue-control intents when
   # approved worker dispatch targets are configured.
-  work-queue: true
 
   # Format 2: Enable the work-queue MCP server.
   work-queue: null

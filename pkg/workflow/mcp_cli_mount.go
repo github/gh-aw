@@ -297,11 +297,8 @@ func withMountedCLIShellCommandsInRestrictedBash(workflowData *WorkflowData) map
 // getMCPCLIExcludeFromAgentConfig returns the sorted list of MCP server names that
 // should be excluded from the agent's MCP config (because they are CLI-only).
 //
-// Only excludes servers when tools.cli-proxy is explicitly enabled. Infrastructure
-// servers (safeoutputs, mcpscripts) are CLI-mounted even without cli-proxy (so the
-// agent can call them as shell commands), but they remain in the agent's MCP config
-// unless cli-proxy is explicitly enabled. This preserves existing agent behaviour
-// for workflows that use safeoutputs via MCP rather than via the CLI wrapper.
+// Only explicit tools.cli-proxy excludes CLI-mounted servers. Infrastructure
+// wrappers do not otherwise prevent native MCP access.
 func getMCPCLIExcludeFromAgentConfig(data *WorkflowData) []string {
 	if data == nil || data.ParsedTools == nil || !data.ParsedTools.CLIProxy {
 		return nil
@@ -328,7 +325,7 @@ func (c *Compiler) generateMCPCLIMountStep(yaml *strings.Builder, data *Workflow
 	}
 	yaml.WriteString("          MCP_GATEWAY_DOMAIN: ${{ steps.start-mcp-gateway.outputs.gateway-domain }}\n")
 	yaml.WriteString("          MCP_GATEWAY_PORT: ${{ steps.start-mcp-gateway.outputs.gateway-port }}\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getActionPin("actions/github-script"))
+	yaml.WriteString("        uses: " + getActionPin("actions/github-script") + "\n")
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")

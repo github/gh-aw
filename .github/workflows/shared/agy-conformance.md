@@ -29,6 +29,26 @@ mcp-scripts:
       const receipt = { fileNonce: file_nonce, toolNonce: crypto.randomBytes(24).toString("hex") };
       fs.writeFileSync(path.join(host, "native-receipt.json"), JSON.stringify(receipt), { mode: 0o600 });
       return { toolNonce: receipt.toolNonce };
+  native-infrastructure-challenge:
+    description: Return a fresh nonce and record evidence for native MCP scripts access.
+    inputs:
+      file_nonce:
+        type: string
+        required: true
+        description: The fileNonce from the conformance fixture.
+    env:
+      CONFORMANCE_STATE: ${{ runner.temp }}/engine-conformance
+    script: |
+      const crypto = require("node:crypto");
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const host = process.env.CONFORMANCE_STATE;
+      if (!host) throw new Error("CONFORMANCE_STATE is missing");
+      const expected = JSON.parse(fs.readFileSync(path.join(host, "expected.json"), "utf8"));
+      if (file_nonce !== expected.fileNonce) throw new Error("The fixture nonce does not match");
+      const receipt = { fileNonce: file_nonce, toolNonce: crypto.randomBytes(24).toString("hex") };
+      fs.writeFileSync(path.join(host, "native-infrastructure-receipt.json"), JSON.stringify(receipt), { mode: 0o600 });
+      return { toolNonce: receipt.toolNonce };
 post-steps:
   - name: Assert native Agy MCP transport and inference accounting
     if: always()
@@ -50,8 +70,29 @@ post-steps:
         try { return [JSON.parse(line)]; } catch { return []; }
       });
       const tools = entries.filter(entry => entry.event === "step_update" && entry.step_update?.step_type === "tool");
-      assert.ok(tools.some(entry => /agy[-_]native.*native[-_]challenge/.test(entry.step_update.tool_info?.name || "")),
+      const completedCall = (server, tool, args) => tools.find(entry => {
+        const step = entry.step_update;
+        const info = step.tool_info;
+        return step.state === "DONE" && info?.name === "call_mcp_tool" &&
+          info.parameters?.ServerName === server &&
+          info.parameters?.ToolName === tool &&
+          Object.entries(args).every(([key, value]) => info.parameters?.Arguments?.[key] === value);
+      })?.step_update.tool_info;
+      const native = completedCall("agy-native", "native_challenge", { file_nonce: expected.fileNonce });
+      assert.ok(native,
         "The challenge must be called through the native MCP client, not its CLI wrapper");
+      assert.equal(native.error, undefined, "The native MCP challenge must complete without an error");
+      assert.deepEqual(JSON.parse(native.output), { toolNonce: receipt.toolNonce });
+      const infrastructureReceipt = JSON.parse(fs.readFileSync(path.join(host, "native-infrastructure-receipt.json"), "utf8"));
+      assert.equal(infrastructureReceipt.fileNonce, expected.fileNonce);
+      assert.match(infrastructureReceipt.toolNonce, /^[a-f0-9]{48}$/);
+      const infrastructure = completedCall("mcpscripts", "native_infrastructure_challenge", { file_nonce: expected.fileNonce });
+      assert.ok(infrastructure, "MCP scripts must be called through the native MCP client");
+      assert.equal(infrastructure.error, undefined, "The native MCP scripts challenge must complete without an error");
+      assert.deepEqual(JSON.parse(infrastructure.output), { toolNonce: infrastructureReceipt.toolNonce });
+      const noop = completedCall("safeoutputs", "noop", { message: "Conformance probes completed" });
+      assert.ok(noop, "The final noop must be called through the native safeoutputs MCP server");
+      assert.equal(noop.error, undefined, "The native safe-output call must complete without an error");
       const terminal = entries.filter(entry => entry.event === "result").at(-1)?.result;
       assert.equal(terminal?.status, "SUCCESS");
       assert.ok(Number.isSafeInteger(terminal?.num_turns) && terminal.num_turns > 0);
@@ -74,7 +115,7 @@ post-steps:
         }
       }
       fs.writeFileSync(path.join(host, "native-report.json"),
-        JSON.stringify({ status: "passed", nativeMCP: true, inference: true, stagedSafeOutputs: true, usage }, null, 2),
+        JSON.stringify({ status: "passed", nativeMCP: true, nativeInfrastructureMCP: true, nativeSafeOutputs: true, inference: true, stagedSafeOutputs: true, usage }, null, 2),
         { mode: 0o600 });
       JS
   - name: Upload native Agy conformance evidence
@@ -96,3 +137,10 @@ Execute the imported engine configuration conformance suite once.
 Also call the `native_challenge` tool through the native MCP server `agy-native`,
 using the actual fixture `fileNonce`. Do not call `mcpscripts native-challenge`
 or substitute a shell/HTTP request; the checker requires a native MCP tool event.
+Complete this native challenge before the shared suite's final safe-output call.
+Also call `native_infrastructure_challenge` through the native MCP server
+`mcpscripts`, using the same fixture `fileNonce`. Do not use its CLI wrapper.
+For this suite, emit the final noop exactly once through the native MCP server
+`safeoutputs`, with message `"Conformance probes completed"`, after all probes.
+This replaces the shared suite's default CLI completion call; do not also run
+`safeoutputs noop` or emit another completion message.

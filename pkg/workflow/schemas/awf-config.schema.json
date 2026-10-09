@@ -628,7 +628,7 @@
         "containerRuntime": {
           "type": "string",
           "enum": ["docker", "gvisor", "sbx", "cloud-hypervisor", "nvx"],
-          "description": "Runtime for the primary agent, independent of enclave executor runtimes."
+          "description": "Runtime for the primary agent, independent of enclave executor runtimes. The nvx runtime selects the explicit Linux x86_64 KVM one-shot microVM preview."
         },
         "memoryLimit": {
           "type": "string",
@@ -857,6 +857,69 @@
               "$ref": "#/$defs/sha256Digest"
             }
           }
+        }
+      }
+    },
+    "nvx": {
+      "type": "object",
+      "description": "NVX preview one-shot microVM configuration. Requires container.containerRuntime: \"nvx\" and explicit preview opt-in; supported only on Linux x86_64 KVM hosts.",
+      "additionalProperties": false,
+      "properties": {
+        "previewEnabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "mountPolicy": {
+          "type": "string",
+          "enum": ["workspace-only", "workspace-and-tool-cache"],
+          "default": "workspace-only"
+        },
+        "layerPath": {
+          "type": "string",
+          "description": "Absolute path to the workload-specific guest distro layer."
+        },
+        "artifactManifestPath": {
+          "type": "string",
+          "description": "Absolute path to the AWF release artifact manifest."
+        },
+        "artifactManifestBundlePath": {
+          "type": "string",
+          "description": "Absolute path to the offline manifest Sigstore attestation bundle."
+        },
+        "signerWorkflow": {
+          "type": "string",
+          "description": "Expected trusted workflow identity that signed the artifact manifest."
+        },
+        "openvmmPath": {
+          "type": "string",
+          "description": "Absolute path to the trusted, attested OpenVMM binary."
+        },
+        "kernelPath": {
+          "type": "string",
+          "description": "Absolute path to the trusted, attested guest kernel."
+        },
+        "initramfsPath": {
+          "type": "string",
+          "description": "Absolute path to the trusted, attested guest initramfs."
+        },
+        "memoryMib": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 512
+        },
+        "memoryMaxBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 536870912
+        },
+        "pidsMax": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 128
+        },
+        "scratchBytes": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },

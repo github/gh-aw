@@ -1,0 +1,3 @@
+-r requirements.txt
+hypothesis>=6.100,<7
+mypy>=1.15,<2
