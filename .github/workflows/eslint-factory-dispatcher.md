@@ -51,21 +51,19 @@ Do not invent additional tasks or broaden resource scopes.
 
 Read the activation snapshot first with `work_queue_read`, using
 `{"pool":"default","limit":32}`. Check `queue_state`, not just `total`:
-`"uninitialized"` means the queue Policy is absent, not that an initialized queue
-has no work. Report this deployment failure with `missing_data`, then stop without
-dispatching or calling `noop`. Surface read/tool errors explicitly; never turn an
-error into an empty-backlog report.
+`"uninitialized"` with a null snapshot SHA means the queue branch does not
+exist yet. Treat it as an empty backlog and stop with `noop`; there is no
+installed Policy to authorize submission or dispatch. Surface read/tool errors
+explicitly; never turn an error or an existing policyless ledger into an
+empty-backlog report.
 
 When `<mcp-clis>` advertises the wrappers, invoke their subcommands with one JSON
 argument through the shell tool:
 
 ```bash
 work-queue work_queue_read '{"pool":"default","limit":32}'
-safeoutputs missing_data '{"data_type":"work-queue policy","reason":"Queue is uninitialized; an authenticated administrator must install Policy and producer entitlements before dispatch."}'
 ```
 
-Run the second command only for an uninitialized queue. Do not call `safeoutputs`
-as a structured tool with `command` and `description`; it is a CLI wrapper.
 Use the advertised MCP tools directly when wrappers are not available.
 
 For an initialized queue, submit the prepared cohort:
@@ -102,6 +100,7 @@ revision, or principal binding. Do not call ordinary `dispatch_workflow` or type
 per-worker dispatch tools.
 
 The authenticated operator provisions the queue Policy and grants this
-dispatcher's authenticated principal producer entitlement before this workflow
-runs. Do not bootstrap Policy. If producer entitlement is missing, report the
-admission failure explicitly; do not call `noop` or ordinary worker dispatch.
+dispatcher's authenticated principal producer entitlement before it can submit
+or dispatch. Do not bootstrap Policy. If producer entitlement is missing from
+an existing queue, report the admission failure explicitly; do not call `noop`
+or ordinary worker dispatch.

@@ -195,6 +195,34 @@ describe("disabled safe-output behavioral parity", () => {
 });
 
 describe("real immutable Claim routing", () => {
+  it("allows only noop safe outputs for a genuinely absent dispatcher queue", () => {
+    process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+    process.env.GH_AW_WORK_QUEUE_ROLE = "dispatcher";
+    process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "absent-dispatcher-snapshot.json");
+    const snapshot = {
+      version: 3,
+      sha: null,
+      transactionLog: "",
+      captured_at: 0,
+      origin: {},
+      worker: null,
+      role: "dispatcher",
+    };
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify(snapshot));
+    const outputFile = path.join(root, "absent-dispatcher-output.jsonl");
+    fs.writeFileSync(outputFile, "");
+    const append = createAppendFunction(outputFile);
+
+    append({ type: "noop", message: "Queue branch does not exist" });
+    expect(fs.readFileSync(outputFile, "utf8").trim()).toBe(JSON.stringify({ type: "noop", message: "Queue branch does not exist" }));
+    for (const type of ["create_issue", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish", "dispatch_workflow"]) {
+      expect(() => append({ type })).toThrow(/unassigned dispatcher/);
+    }
+    fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, JSON.stringify({ ...snapshot, sha: "existing" }));
+    expect(() => append({ type: "noop", message: "Policyless ledger" })).toThrow(/policy_missing/);
+    expect(fs.readFileSync(outputFile, "utf8").trim().split("\n")).toHaveLength(1);
+  });
+
   it.each([1, 2])("cannot disable an already trusted %i-Claim execution by changing ambient enablement or role", async count => {
     const fixture = activate(count, () => []);
     const handle = fixture.assignment.claims[0].handle;
