@@ -25,10 +25,10 @@ ledgers.
 
 | Workflow | Assigned work | Intended outputs |
 | --- | --- | --- |
-| [Dispatcher](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-factory-dispatcher.md) | Request a fair prefix within the installed pool policy | Launch approved worker profiles; no eligible work produces `noop` |
-| [Miner](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-miner.md) | Find and implement a useful new ESLint rule | At most one draft rule PR per Claim, or `noop` |
+| [Dispatcher](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-factory-dispatcher.md) | Admit the daily cohort, then request a fair prefix within the installed pool policy | Three independent tasks and a bounded dispatch request; report an absent Policy explicitly |
+| [Miner](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-miner.md) | Find and implement a useful new ESLint rule | At most one draft rule PR per Claim; cancel write-capable Work when no rule is needed |
 | [Refiner](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-refiner.md) | Identify false positives, missing edge cases, or weak diagnostics | Up to three issues, a discussion, and one immutable memory snapshot per Claim |
-| [Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-monster.md) | Group actionable diagnostics and arrange remediation | Issue updates, Copilot assignments, and a discussion, or `noop` after a clean scan |
+| [Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-monster.md) | Group actionable diagnostics and arrange remediation | Issue updates, Copilot assignments, and a discussion; cancel write-capable Work after a clean scan |
 
 An authenticated operator must first install Policy, producer entitlements,
 worker profiles, immutable workflow revisions, and resource scopes. An
@@ -36,12 +36,123 @@ authorized producer explicitly admits Work with its output contract. The
 supplied workflows do **not** automatically create a miner-to-refiner-to-monster
 DAG, and creating a refinement issue does not submit another Work.
 
+The dispatcher is also the producer. A trusted preparation step creates one
+independent root task for each worker, keyed by the UTC date of the original
+dispatcher run's creation time. The agent stages those exact nodes with
+`work_queue_submit` before requesting grants. Scheduled runs, manual runs, and
+reruns on the same date reuse the same graph/node identities and immutable
+payloads; they do not admit another copy. A new UTC day admits a new cohort.
+Older eligible work can still run before the new cohort.
+
+Producer entitlement is required for the dispatcher's authenticated principal,
+pool `default`, priority `3`, and empty accounting key (`""`). Installing Policy
+does not itself admit any Work. Workers still require authenticated assignments;
+they do not seed tasks. The separate `daily-report-dispatcher` uses the
+`daily-reports` pool and is not this factory's producer.
+
+### Provision the factory policy
+
+The checked-in policy generator provides three immutable worker profiles,
+singleton assignments, three native slots, and a 30-pending-task limit:
+
+```bash
+node actions/setup/js/eslint_factory_portfolio.cjs policy \
+  github/gh-aw IMMUTABLE_WORKER_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID \
+  > eslint-factory-policy.json
+./gh-aw work-queue --repo github/gh-aw policy \
+  --file eslint-factory-policy.json --epoch eslint-factory-v1
+```
+
+Generation does not authenticate principals, install Policy, protect the queue
+branch, or launch workers. Use verified positive decimal principal IDs from the
+trusted producer and dispatch credential flows, not display names or assumed
+`github.actor` values. Follow the [deployment guide](/gh-aw/guides/deploy-work-queue/)
+before the administrator-only installation command. If the queue already serves
+other pools, retain their configuration when preparing a quiescent Policy update;
+do not replace it with this single-pool template.
+
+Prepared payloads freeze the repository's verified numeric identity and
+worker-specific output contracts. The miner permits one draft PR; the refiner
+requires one memory snapshot and bounds issues/discussions; the monster bounds
+issue changes, assignments, and its discussion. If no rule or remediation is
+needed, cancel the write-capable task rather than claiming a verified Result from
+`noop`. Only explicitly no-write Work permits a completed no-write Result. Producer
+permission does not authorize the agent to broaden these scopes or install Policy.
+
 The dispatcher requests
 `work_queue_dispatch_next({"pool":"default","max_claims":3,"max_dispatches":3})`.
 Those are request ceilings, not guaranteed assignments. The scheduler chooses
 the fair eligible prefix; it stops at the first winner it cannot pack. Different
 worker profiles use separate dispatches. A profile permits singleton
 assignments by default; compatible multi-Claim batches require explicit policy.
+
+## Diagnose the factory with the local CLI
+
+From a gh-aw source checkout, build and invoke the local binary rather than an
+installed extension that might have a different queue protocol:
+
+```bash
+go build -o ./gh-aw ./cmd/gh-aw
+./gh-aw version
+./gh-aw work-queue --repo github/gh-aw stats --json
+./gh-aw work-queue --repo github/gh-aw state --json --limit 32
+./gh-aw work-queue --repo github/gh-aw explain --pool default --json
+```
+
+`queue_missing: queue branch work-queue does not exist` means deployment has not
+initialized the queue. It is not an initialized empty backlog. The agent's
+`work_queue_read` snapshot reports this distinction as
+`queue_state: "uninitialized"`. Report the missing Policy explicitly rather than
+recording a successful empty-queue `noop`. Install Policy and producer entitlements
+through the [deployment guide](/gh-aw/guides/deploy-work-queue/); do not invent
+worker principal IDs or bypass queue-branch writer protections.
+
+Hosted activation can fail at **Snapshot work queue state**, before the agent
+starts. Diagnose that boundary separately from the agent's queue tools.
+Installation-token repository metadata can report `permissions.pull: false`
+despite usable contents access; actual Git reads establish visibility, not
+collaborator flags. A denied Git read is not an empty queue. Even with readable
+refs, dispatcher activation requires installed Policy and otherwise fails with
+`work_queue_policy_missing`; prompt instructions cannot bootstrap it.
+
+Inspect an existing dispatcher run without launching another:
+
+```bash
+./gh-aw audit RUN_ID --repo github/gh-aw --no-baseline --json
+```
+
+`--no-baseline` avoids downloading comparison runs. A successful Actions conclusion
+or `noop` does not establish that any Work was admitted or any worker launched.
+Check the snapshot, queue intents, and authoritative ledger, not just the audit's
+overall success recommendation.
+
+Validate the dispatcher and write-capable workers locally without dispatching:
+
+```bash
+./gh-aw compile eslint-factory-dispatcher eslint-miner eslint-refiner eslint-monster \
+  --dry-run --allow-experimental --json
+```
+
+`--allow-experimental` explicitly acknowledges the miner's LSP and steering
+feature notices; it does not waive security warnings, source validation,
+shellcheck, model checks, or requested scanners. The JSON dry-run summary records
+the accepted notice count. Preserve diagnostic locks for inspection, then
+recompile normally before publishing production locks. Neither this compile
+command nor `run --dry-run` launches a workflow.
+
+When live execution is authorized, invoke the dispatcher by its Markdown basename
+and select the reviewed published ref explicitly:
+
+```bash
+./gh-aw run eslint-factory-dispatcher --repo github/gh-aw --ref REVIEWED_REF --json
+```
+
+The default `run` ref is the current checkout branch, not necessarily `main`.
+Do not use operator `work-queue dispatch-next` as a launch command: it commits
+Claims and reservations but does not send a workflow-dispatch request. The
+dispatcher stages a request; trusted processing handles actual launch and binding.
+Only independently verified Results and exact native termination demonstrate
+delivery and reservation release. A missing queue cannot exercise that lifecycle.
 
 ## AW source excerpts
 
@@ -67,9 +178,14 @@ safe-outputs:
 ---
 
 Do not select Work IDs, workers, revisions, or targets from a queue snapshot.
+Read work_queue_read first and check queue_state. Report an uninitialized queue
+with missing_data; it is not an empty backlog and must not produce noop.
+Read the trusted daily plan and stage its exact nodes with work_queue_submit.
+Repeated admissions of the same UTC date are idempotent.
 Request the trusted scheduler's fair prefix with work_queue_dispatch_next:
 {"pool":"default","max_claims":3,"max_dispatches":3}.
 Issue at most one request for this pool in a run.
+The response stages an intent, not a native launch.
 Do not call ordinary dispatch_workflow or typed per-worker dispatch tools.
 ```
 
@@ -77,6 +193,8 @@ Do not call ordinary dispatch_workflow or typed per-worker dispatch tools.
 supplies the compiler-approved worker allowlist and run budget, not policy
 installation. Queue dispatch uses the profile's installed immutable revision;
 the ordinary dispatch `target-ref` does not override that binding.
+The complete workflow prepares the daily nodes with
+`buildESLintFactoryPlan`; that step and its plan file are omitted from this excerpt.
 
 ### Worker: require an assignment and consume every Claim
 
