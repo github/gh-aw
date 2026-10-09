@@ -10,7 +10,17 @@ function issueIdentity(resource) {
 function assertProjectionAuthority(state, actor, workId, ref, repository, claimId) {
   const work = state.works.get(workId);
   if (!work || actor.role !== "projector" || !actor.workflow || !actor.run_id || !actor.run_attempt) throw queueError("projection_unauthorized", "projection requires an authenticated originating run");
-  if (!state.policy.projectors?.some(rule => rule.principal === actor.principal && rule.workflow === actor.workflow && rule.ref === ref && rule.pools.includes(work.pool) && rule.repositories.includes(repository)))
+  if (
+    !state.policy.projectors?.some(
+      rule =>
+        rule.principal === actor.principal &&
+        rule.workflow === actor.workflow &&
+        rule.ref === ref &&
+        rule.pools.includes(work.pool) &&
+        rule.repositories.includes(repository) &&
+        (!work.backing_issue || rule.backing_issues?.some(resource => canonical(resource) === canonical(work.backing_issue)))
+    )
+  )
     throw queueError("projection_unauthorized", "no installed projector authority for this revision and target");
   if (!state.policy.pools[work.pool].allowed_repositories.includes(repository)) throw queueError("resource_unauthorized", "backing Issue repository is not allowlisted by the Work pool");
   if (claimId !== undefined) {
@@ -39,6 +49,23 @@ function assertProjectionAuthority(state, actor, workId, ref, repository, claimI
   return work;
 }
 
+function issueCompletionPolicy(state, work, actor, ref, repository) {
+  // Closure is fixed by trusted policy at admission, not agent payload or a later
+  // policy expansion. Original worker Claims still need current projection authority.
+  for (let commit = work.position.commit; commit >= 0; commit--) {
+    const operations = state.transactions[commit].operations;
+    const end = commit === work.position.commit ? work.position.operation : operations.length;
+    for (let index = end - 1; index >= 0; index--) {
+      if (operations[index].kind !== "Policy") continue;
+      const rules = (operations[index].policy.projectors || []).filter(
+        rule => rule.principal === actor.principal && rule.workflow === actor.workflow && rule.ref === ref && rule.pools.includes(work.pool) && rule.repositories.includes(repository)
+      );
+      return rules.length && rules.every(rule => rule.completion_policy === "close-on-result") ? "close-on-result" : "keep-open";
+    }
+  }
+  return "keep-open";
+}
+
 function applyIssueBinding(state, operation, commit) {
   const work = state.works.get(operation.work_id);
   const resource = operation.kind === "IssueLink" ? operation.resource : work?.backing_issue || work?.issue_link;
@@ -47,7 +74,9 @@ function applyIssueBinding(state, operation, commit) {
   assertProjectionAuthority(state, commit.actor, operation.work_id, operation.projector_ref, resource.repository, operation.authority_claim_id ?? operation.claim_id);
   if (operation.kind === "IssueComment") {
     for (const other of state.works.values()) {
-      if (other.issue_summary === operation.comment_id && (other.work_id !== work.work_id || operation.claim_id !== undefined)) throw queueError("issue_binding_conflict", "comment handle already belongs to another summary");
+      if (other.issue_summary !== operation.comment_id) continue;
+      if (operation.claim_id !== undefined) throw queueError("issue_binding_conflict", "Claim comment handle already belongs to a Work summary");
+      if (other.work_id !== work.work_id) throw queueError("issue_binding_conflict", "summary handle already belongs to another Work");
     }
     for (const claim of state.claims.values()) {
       if (claim.issue_comment === operation.comment_id && claim.claim_id !== operation.claim_id) throw queueError("issue_binding_conflict", "comment handle already belongs to another Claim");
@@ -73,4 +102,4 @@ function applyIssueBinding(state, operation, commit) {
   }
 }
 
-module.exports = { issueIdentity, assertProjectionAuthority, applyIssueBinding };
+module.exports = { issueIdentity, assertProjectionAuthority, applyIssueBinding, issueCompletionPolicy };

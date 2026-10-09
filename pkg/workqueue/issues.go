@@ -7,8 +7,8 @@ import (
 )
 
 func validateProjectors(policy Policy) error {
-	if len(policy.Projectors) > 256 {
-		return queueError("policy_invalid", "at most 256 projector rules")
+	if policy.Projectors != nil && (len(policy.Projectors) == 0 || len(policy.Projectors) > 256) {
+		return queueError("policy_invalid", "projectors require 1..256 installed rules")
 	}
 	for _, rule := range policy.Projectors {
 		if !decimalIdentity(rule.Principal) || !revisionPattern.MatchString(rule.Ref) ||
@@ -25,6 +25,20 @@ func validateProjectors(policy Policy) error {
 		for _, repository := range rule.Repositories {
 			if !repoPattern.MatchString(repository) {
 				return queueError("policy_invalid", "invalid projector repository")
+			}
+		}
+		if rule.CompletionPolicy != "" && rule.CompletionPolicy != "keep-open" && rule.CompletionPolicy != "close-on-result" {
+			return queueError("policy_invalid", "invalid projector completion policy")
+		}
+		if rule.BackingIssues != nil && (len(rule.BackingIssues) == 0 || len(rule.BackingIssues) > 256) {
+			return queueError("policy_invalid", "backing Issues require 1..256 explicit targets")
+		}
+		for _, resource := range rule.BackingIssues {
+			if resource.Kind != "issue" {
+				return queueError("policy_invalid", "backing target must be an Issue")
+			}
+			if err := validateResource(resource, PoolPolicy{AllowedRepositories: rule.Repositories}); err != nil {
+				return queueError("policy_invalid", "invalid backing Issue target: %v", err)
 			}
 		}
 	}
@@ -49,7 +63,8 @@ func (state Projection) projectionAuthority(actor Actor, workID, ref, repository
 	}
 	installed := slices.ContainsFunc(state.Policy.Projectors, func(rule ProjectorRule) bool {
 		return rule.Principal == actor.Principal && rule.Workflow == actor.Workflow && rule.Ref == ref &&
-			slices.Contains(rule.Pools, work.Pool) && slices.Contains(rule.Repositories, repository)
+			slices.Contains(rule.Pools, work.Pool) && slices.Contains(rule.Repositories, repository) &&
+			(work.BackingIssue == nil || slices.Contains(rule.BackingIssues, *work.BackingIssue))
 	})
 	if !installed {
 		return queueError("projection_unauthorized", "no installed projector authority for this revision and target")
@@ -80,6 +95,35 @@ func (state Projection) projectionAuthority(actor Actor, workID, ref, repository
 		return nil
 	}
 	return queueError("projection_unauthorized", "projection is outside this run's checked admissions")
+}
+
+func (state Projection) backingIssueAuthorized(pool string, resource Resource) bool {
+	return slices.ContainsFunc(state.Policy.Projectors, func(rule ProjectorRule) bool {
+		return slices.Contains(rule.Pools, pool) && slices.Contains(rule.Repositories, resource.Repository) &&
+			slices.Contains(rule.BackingIssues, resource)
+	})
+}
+
+func (state Projection) validateBackingIssueAdmission(node WorkDefinition, pool PoolPolicy) error {
+	if node.BackingIssue == nil {
+		return nil
+	}
+	if node.BackingIssue.Kind != "issue" {
+		return queueError("resource_unauthorized", "backing resource must be an Issue")
+	}
+	if err := validateResource(*node.BackingIssue, pool); err != nil {
+		return err
+	}
+	if !state.backingIssueAuthorized(node.Pool, *node.BackingIssue) {
+		return queueError("resource_unauthorized", "pre-existing backing Issue requires an installed projector exact-target grant")
+	}
+	for _, other := range state.Works {
+		resource := backingIssue(other)
+		if resource != nil && other.WorkID != node.WorkID && issueIdentity(*resource) == issueIdentity(*node.BackingIssue) {
+			return queueError("issue_binding_conflict", "one Work per backing Issue")
+		}
+	}
+	return nil
 }
 
 func (state Projection) applyIssueBinding(operation Operation, kind string, commit QueueCommit) error {

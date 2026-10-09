@@ -5,7 +5,7 @@ const path = require("node:path");
 const q = require("./work_queue_replay.cjs");
 const helpers = require("./work_queue_test_helpers.cjs");
 const { newWork } = require("./work_queue_graph.cjs");
-const { defaultPolicy } = require("./work_queue_policy.cjs");
+const { defaultPolicy, validatePolicy } = require("./work_queue_policy.cjs");
 const { main, ownProjectionTargets, workIssueStatus, summaryBody, journalPath } = require("./work_queue_issues.cjs");
 const { STATUSES, discoverTarget, mutateIssues } = require("./work_queue_issue_api.cjs");
 const { withProjectionLocks } = require("./work_queue_issue_coordination.cjs");
@@ -17,7 +17,14 @@ const resource = number => ({ kind: "issue", host: "github.com", repository: "ow
 function fixture({ count = 1, backing = true, worker = false, payload = { task: "a" } } = {}) {
   const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
   policy.pools.default.profiles.default.max_claims = 16;
-  policy.projectors = [".github/workflows/dispatcher.lock.yml", ".github/workflows/worker.lock.yml"].map(workflow => ({ principal: "1001", workflow, ref, pools: ["default"], repositories: ["owner/repo"] }));
+  policy.projectors = [".github/workflows/dispatcher.lock.yml", ".github/workflows/worker.lock.yml"].map(workflow => ({
+    principal: "1001",
+    workflow,
+    ref,
+    pools: ["default"],
+    repositories: ["owner/repo"],
+    ...(backing ? { backing_issues: Array.from({ length: count }, (_, index) => resource(index + 1)) } : {}),
+  }));
   let log = [helpers.genesis(policy)];
   const nodes = Array.from({ length: count }, (_, index) => ({ ...newWork(payload, "graph", `n${index}`, "default", policy, 1), ...(backing ? { backing_issue: resource(index + 1) } : {}) }));
   log.push(helpers.commit("genesis", "admitted", "submit", helpers.dispatcher, { nodes }, nodes, 1));
@@ -417,6 +424,44 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.ok(result.pending);
       assert.match(result.pending[0].reason, /installed projector/);
       assert.equal(m.calls.filter(call => call[0] === "mutation").length, 0);
+    });
+    it("rejects empty projector rules and noncanonical repository names", () => {
+      const policy = fixture().log[0].operations[0].policy;
+      assert.throws(() => validatePolicy({ ...policy, projectors: [] }), /projectors require 1..256/);
+      for (const repository of ["owner:bad/repo", "owner/repo:bad", "owner/repo/path", "owner/rep\u00f3", "owner/repo name"]) {
+        const invalid = structuredClone(policy);
+        invalid.projectors[0].repositories = [repository];
+        assert.throws(() => validatePolicy(invalid), /policy_invalid/);
+      }
+      const valid = structuredClone(policy);
+      valid.projectors[0].repositories = ["owner-name_1/repo.name-2"];
+      delete valid.projectors[0].backing_issues;
+      assert.equal(validatePolicy(valid), valid);
+    });
+    it("validates trusted closure policies and bounded exact Issue grants", () => {
+      const policy = fixture().log[0].operations[0].policy;
+      for (const completion of ["keep-open", "close-on-result"]) {
+        const valid = structuredClone(policy);
+        valid.projectors[0].completion_policy = completion;
+        assert.equal(validatePolicy(valid), valid);
+      }
+      for (const grant of [
+        [],
+        Array(257).fill(resource(1)),
+        [{ ...resource(1), kind: "pull_request" }],
+        [{ ...resource(1), host: "other.example" }],
+        [{ ...resource(1), resource_id: "0" }],
+        [{ ...resource(1), repository: "owner/other" }],
+      ]) {
+        const invalid = structuredClone(policy);
+        invalid.projectors[0].backing_issues = grant;
+        assert.throws(() => validatePolicy(invalid), /policy_invalid/);
+      }
+      for (const completion of ["", "close", true]) {
+        const invalid = structuredClone(policy);
+        invalid.projectors[0].completion_policy = completion;
+        assert.throws(() => validatePolicy(invalid), /policy_invalid/);
+      }
     });
     it("does no live calls when staged or disabled", async () => {
       const m = mock(fixture());

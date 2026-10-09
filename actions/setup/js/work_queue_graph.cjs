@@ -101,6 +101,8 @@ function validateWork(node, state, actor) {
   if (Object.hasOwn(node, "backing_issue")) {
     validateResource(node.backing_issue);
     if (node.backing_issue.kind !== "issue" || !pool.allowed_repositories.includes(node.backing_issue.repository)) throw queueError("resource_unauthorized", "backing Issue must be an allowlisted Issue");
+    if (!state.policy.projectors?.some(rule => rule.pools.includes(node.pool) && rule.repositories.includes(node.backing_issue.repository) && rule.backing_issues?.some(resource => canonical(resource) === canonical(node.backing_issue))))
+      throw queueError("resource_unauthorized", "pre-existing backing Issue requires an installed projector exact-target grant");
   }
   if (Object.hasOwn(node, "replacement_of")) {
     closed(node.replacement_of, ["work_id", "disposition", "evidence"], [], "replacement");

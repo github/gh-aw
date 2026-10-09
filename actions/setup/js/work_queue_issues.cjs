@@ -6,12 +6,13 @@ const { actorFromContext } = require("./work_queue_policy.cjs");
 const { authenticatePublisher } = require("./work_queue_native.cjs");
 const { validateStoredAssignment } = require("./work_queue_binding.cjs");
 const { readInboundWorkQueueAssignment, resolveWorkQueueRuntime } = require("./aw_context.cjs");
-const { assertProjectionAuthority, issueIdentity } = require("./work_queue_issue_contract.cjs");
+const { assertProjectionAuthority, issueIdentity, issueCompletionPolicy } = require("./work_queue_issue_contract.cjs");
 const { dependencyStatus } = require("./work_queue_graph.cjs");
 const { appendCommit, newRequest, proposedCommitId, replayTransactions } = require("./work_queue_replay.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
 const { withProjectionLocks, projectionNonce } = require("./work_queue_issue_coordination.cjs");
-const { discoverTarget, preflightIssues, mutateIssues, issueResource, ISSUE_SELECTION, issueReadQuery } = require("./work_queue_issue_api.cjs");
+const { MAX_PROJECTION_TARGETS, LABELS_PAGE_SIZE, discoverTarget, preflightIssues, mutateIssues, issueResource, ISSUE_SELECTION, issueReadQuery } = require("./work_queue_issue_api.cjs");
+const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { validateJournal } = require("./work_queue_issue_journal.cjs");
 const { issueBody, renderSummary, renderClaim, runLink } = require("./work_queue_issue_messages.cjs");
@@ -345,7 +346,7 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
         name: "addLabelsToLabelable",
         type: "AddLabelsToLabelableInput",
         input: { labelableId: issue.id, labelIds: [discovered.labelId] },
-        selection: "labelable { id ... on Issue { labels(first:100) { nodes { id } pageInfo { hasNextPage } } } }",
+        selection: `labelable { id ... on Issue { labels(first:${LABELS_PAGE_SIZE}) { nodes { id } pageInfo { hasNextPage } } } }`,
       });
     const status = workIssueStatus(current.state, work, options.now ?? Date.now());
     if (discovered.field) {
@@ -357,7 +358,7 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
           name: "setIssueFieldValue",
           type: "SetIssueFieldValueInput",
           input: { issueId: issue.id, issueFields: [{ fieldId: discovered.field.id, singleSelectOptionId: discovered.field.options.get(status) }] },
-          selection: `issue { id issueFieldValues(first:25) { nodes { ... on IssueFieldSingleSelectValue { optionId field { ... on IssueFieldSingleSelect { id } } } } pageInfo { hasNextPage } } }`,
+          selection: `issue { id issueFieldValues(first:${MAX_PROJECTION_TARGETS}) { nodes { ... on IssueFieldSingleSelectValue { optionId field { ... on IssueFieldSingleSelect { id } } } } pageInfo { hasNextPage } } }`,
           expected: { field: discovered.field.id, option: discovered.field.options.get(status) },
         });
       }
@@ -393,7 +394,7 @@ async function projectLinkedIssues(options, current, actor, origin, config, targ
         newComments.push({ key: target.work_id, handle: key, name: "addComment", type: "AddCommentInput", input: { subjectId: issue.id, body }, selection: "commentEdge { node { id body ... on IssueComment { issue { id } } } }" });
       }
     }
-    if (status === "Done" && work.payload.issue_completion_policy === "close-on-result" && issue.state !== "CLOSED")
+    if (status === "Done" && issueCompletionPolicy(current.state, work, actor, origin.ref, target.resource.repository) === "close-on-result" && issue.state !== "CLOSED")
       edits.push({ key: target.work_id, name: "closeIssue", type: "CloseIssueInput", input: { issueId: issue.id, stateReason: "COMPLETED" }, selection: "issue { id state }" });
   }
   if (newComments.length) current = await publishProjection(options, current, actor, journals, []);
@@ -465,50 +466,7 @@ async function main(options = {}) {
   const githubClient = options.githubClient || github;
   const repositoryContext = options.context || context;
   const boundOptions = { ...options, githubClient, owner: repositoryContext.repo.owner, repo: repositoryContext.repo.repo };
-  const metrics = { requests: 0, reads: 0, mutations: 0, paced_ms: 0 };
-  let nextMutation = Date.now();
-  let rateLimited = false;
-  const invoke = async (mutation, cost, operation) => {
-    if (rateLimited) throw queueError("projection_rate_pending", "rate limit exhausted; remaining synchronization is pending");
-    if (mutation) {
-      const now = Date.now();
-      nextMutation = Math.max(now, nextMutation) + cost * 1000;
-      metrics.paced_ms += nextMutation - now;
-      await (options.sleep || (delay => new Promise(resolve => setTimeout(resolve, delay))))(nextMutation - now);
-    }
-    metrics.requests++;
-    metrics[mutation ? "mutations" : "reads"]++;
-    try {
-      return await operation();
-    } catch (error) {
-      const headers = error.response?.headers || {};
-      if (error.status === 429 || headers["retry-after"] || headers["x-ratelimit-remaining"] === "0") rateLimited = true;
-      throw error;
-    }
-  };
-  const measured = new Proxy(githubClient, {
-    get(target, key) {
-      if (key === "graphql")
-        return async (query, variables) => {
-          const mutation = /^\s*mutation/.test(query);
-          const cost = Math.max(1, [...query.matchAll(/:\s*(?:createIssue|addComment|updateIssueComment|setIssueFieldValue|addLabelsToLabelable|closeIssue|createRef|deleteRef)\(/g)].length);
-          return invoke(mutation, cost, () => target.graphql(query, { ...variables, request: { ...variables?.request, retries: 0 } }));
-        };
-      if (key === "rest")
-        return new Proxy(target.rest, {
-          get(apis, scope) {
-            return new Proxy(apis[scope], {
-              get(methods, name) {
-                return async (...args) => {
-                  return invoke(!/^(get|list)/.test(String(name)), 1, () => methods[name](...args));
-                };
-              },
-            });
-          },
-        });
-      return target[key];
-    },
-  });
+  const { client: measured, metrics } = wrapGithubClient(githubClient, { sleep: options.sleep });
   boundOptions.githubClient = measured;
   const pending = [];
   try {
@@ -525,8 +483,8 @@ async function main(options = {}) {
     const assignment = runtime.assignment || readInboundWorkQueueAssignment(repositoryContext.payload);
     const initial = await (options.readCheckedQueue || readCheckedQueue)(boundOptions);
     const permitted = ownProjectionTargets(initial.state, origin, origin.ref, assignment).targets;
-    for (let offset = 0; offset < permitted.length; offset += 25) {
-      const targets = permitted.slice(offset, offset + 25);
+    for (let offset = 0; offset < permitted.length; offset += MAX_PROJECTION_TARGETS) {
+      const targets = permitted.slice(offset, offset + MAX_PROJECTION_TARGETS);
       try {
         const scopes = targets.map(target => ({ work_id: target.work_id, keys: [`work:${target.work_id}`, ...(target.resource ? [`issue:${issueIdentity(target.resource)}`] : [])] }));
         const result = await (options.withProjectionLocks || withProjectionLocks)(

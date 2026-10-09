@@ -26,6 +26,11 @@ installed projector rules. A backing Issue tracks one Work. Scope every
 mutation to this run's checked admissions or original authenticated Claims,
 including workflow revision, principal, run and attempt. Worker reruns cannot
 inherit attempt-one Claim authority or establish authenticated execution.
+Authorize pre-existing Issues through exact lossless `backing_issues` grants
+in installed projector rules, checked at admission and again for the actual
+projecting workflow. Repository allowlists and summary handles are not target
+ownership. Closure comes from trusted `completion_policy` at admission,
+never opaque agent payload or a later expansion of installed policy.
 
 Use only existing activation and conclusion hooks, with fresh checked reads,
 expected-head GraphQL publication, durable receipt journals, and per-Work/Issue

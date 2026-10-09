@@ -154,6 +154,24 @@
     "ProjectorRule": {
       "additionalProperties": false,
       "properties": {
+        "backing_issues": {
+          "items": {
+            "$ref": "#/$defs/Resource"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "completion_policy": {
+          "anyOf": [
+            {
+              "const": "keep-open"
+            },
+            {
+              "const": "close-on-result"
+            }
+          ]
+        },
         "pools": {
           "items": {
             "$ref": "#/$defs/Identity"
@@ -236,6 +254,7 @@
             "$ref": "#/$defs/ProjectorRule"
           },
           "maxItems": 256,
+          "minItems": 1,
           "type": "array"
         }
       },
@@ -253,6 +272,38 @@
         }
       },
       "required": ["max_attempts", "deadline_ms"],
+      "type": "object"
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "issue"
+            },
+            {
+              "const": "pull_request"
+            }
+          ]
+        },
+        "number": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "resource_id": {
+          "$ref": "#/$defs/Decimal"
+        }
+      },
+      "required": ["kind", "host", "repository", "repository_id", "resource_id", "number"],
       "type": "object"
     },
     "RetryPolicy": {

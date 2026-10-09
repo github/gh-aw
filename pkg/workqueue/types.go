@@ -102,11 +102,13 @@ type ProducerRule struct {
 }
 
 type ProjectorRule struct {
-	Principal    string   `json:"principal"`
-	Workflow     string   `json:"workflow"`
-	Ref          string   `json:"ref"`
-	Pools        []string `json:"pools"`
-	Repositories []string `json:"repositories"`
+	Principal        string     `json:"principal"`
+	Workflow         string     `json:"workflow"`
+	Ref              string     `json:"ref"`
+	Pools            []string   `json:"pools"`
+	Repositories     []string   `json:"repositories"`
+	BackingIssues    []Resource `json:"backing_issues,omitempty"`
+	CompletionPolicy string     `json:"completion_policy,omitempty"`
 }
 
 type IssueLinkOperation struct {

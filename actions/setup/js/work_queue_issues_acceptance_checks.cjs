@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const { fixture, mock, protocolFixture } = require("./work_queue_issues_checks.cjs");
 const { main, journalPath, summaryBody } = require("./work_queue_issues.cjs");
 const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
-const { preflightIssues, mutateIssues } = require("./work_queue_issue_api.cjs");
+const { MAX_PROJECTION_TARGETS, preflightIssues, mutateIssues, issueReadQuery } = require("./work_queue_issue_api.cjs");
 const q = require("./work_queue_replay.cjs");
 const helpers = require("./work_queue_test_helpers.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
@@ -112,40 +112,99 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       }
     });
 
-    it("closes only a checked non-PR Result when the immutable admission policy opts in", async () => {
-      for (const policy of ["keep-open", "close-on-result"]) {
-        for (const pr of [false, true]) {
-          const f = fixture({ worker: true, payload: { task: "a", issue_completion_policy: policy } });
-          f.log.push(helpers.finish(f.log, f.assignment.dispatch_id, "h1", "completed"));
-          const state = q.replayTransactions(f.log);
-          const dispatch = state.dispatches.get(f.assignment.dispatch_id);
-          const claim = f.assignment.claims[0];
-          f.log.push(
-            helpers.operationCommit(
-              f.log,
-              "verified-result",
-              "result",
-              [
-                {
-                  kind: "Result",
-                  work_id: claim.work_id,
-                  claim_id: claim.claim_id,
-                  completion_id: state.works.get(claim.work_id).completion_id,
-                  descriptor: pr ? { outputs: [{ type: "create_pull_request", resource: { repository: "owner/repo", kind: "pull_request", number: "9" } }] } : { value: "verified" },
-                  evidence: helpers.evidence(state, dispatch, "delivery", 50, { source: "verified_receipts", run_id: dispatch.run.run_id, run_attempt: 1, receipt: "unit_verified_receipt" }),
-                },
-              ],
-              undefined,
-              50
-            )
-          );
-          const m = mock(f);
-          assert.deepEqual((await main(m.options)).pending, []);
-          assert.equal(m.issues.get("1").state, policy === "close-on-result" && !pr ? "CLOSED" : "OPEN");
-          const summary = m.comments.get(m.state().works.get(claim.work_id).issue_summary);
-          assert.match(summary.body, pr ? /Needs review/ : /Done/);
-          if (pr) assert.match(summary.body, /owner\/repo\/pull\/9/);
+    it("closes existing or projector-created Issues only for a checked non-PR Result and trusted admission policy", async () => {
+      const cases = ["keep-open", "close-on-result"].flatMap(policy => [false, true].flatMap(pr => [false, true].map(backing => ({ policy, pr, backing }))));
+      for (const { policy, pr, backing } of cases) {
+        const f = fixture({ worker: true, backing, payload: { task: "a", issue_completion_policy: policy === "keep-open" ? "close-on-result" : "keep-open" } });
+        for (const rule of f.log[0].operations[0].policy.projectors) rule.completion_policy = policy;
+        f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+        f.log.push(helpers.finish(f.log, f.assignment.dispatch_id, "h1", "completed"));
+        const state = q.replayTransactions(f.log);
+        const dispatch = state.dispatches.get(f.assignment.dispatch_id);
+        const claim = f.assignment.claims[0];
+        f.log.push(
+          helpers.operationCommit(
+            f.log,
+            "verified-result",
+            "result",
+            [
+              {
+                kind: "Result",
+                work_id: claim.work_id,
+                claim_id: claim.claim_id,
+                completion_id: state.works.get(claim.work_id).completion_id,
+                descriptor: pr ? { outputs: [{ type: "create_pull_request", resource: { repository: "owner/repo", kind: "pull_request", number: "9" } }] } : { value: "verified" },
+                evidence: helpers.evidence(state, dispatch, "delivery", 50, { source: "verified_receipts", run_id: dispatch.run.run_id, run_attempt: 1, receipt: "unit_verified_receipt" }),
+              },
+            ],
+            undefined,
+            50
+          )
+        );
+        if (policy === "keep-open" && !pr) {
+          const settled = q.replayTransactions(f.log);
+          const terminal = helpers.evidence(settled, dispatch, "terminal_run", 51, { run_id: dispatch.run.run_id, run_attempt: 1, status: "completed", conclusion: "success" });
+          f.log.push(helpers.operationCommit(f.log, "release-completed", "release", [{ kind: "Release", dispatch_id: dispatch.dispatch_id, evidence: terminal }], helpers.reconciler, 51));
+          const expanded = structuredClone(settled.policy);
+          for (const rule of expanded.projectors) rule.completion_policy = "close-on-result";
+          const operations = [{ kind: "Policy", epoch: "later", policy: expanded }];
+          f.log.push(helpers.commit(q.replayTransactions(f.log).tip, "later-close-policy", "policy", helpers.administrator, { operations }, operations, 52, "later"));
         }
+        const m = mock(f);
+        assert.deepEqual((await main(m.options)).pending, []);
+        assert.equal(m.issues.get("1").state, policy === "close-on-result" && !pr ? "CLOSED" : "OPEN");
+        const summary = m.comments.get(m.state().works.get(claim.work_id).issue_summary);
+        assert.match(summary.body, pr ? /Needs review/ : /Done/);
+        if (pr) assert.match(summary.body, /owner\/repo\/pull\/9/);
+      }
+    });
+
+    it("rejects an agent-selected human Issue before admission or any privileged Issue mutation", async () => {
+      const f = fixture({ backing: false, payload: { task: "unrelated", issue_completion_policy: "close-on-result" } });
+      f.nodes[0].backing_issue = fixture().nodes[0].backing_issue;
+      f.log[1] = helpers.commit("genesis", "admitted", "submit", helpers.dispatcher, { nodes: f.nodes }, f.nodes, 1);
+      assert.throws(() => q.replayTransactions(f.log), /installed projector exact-target grant/);
+      const m = mock(f, { labelMissing: true });
+      const issue = m.issues.get("1");
+      issue.title = "Unrelated human Issue";
+      issue.body = "Human-owned discussion";
+      issue.labels.nodes = [];
+      const result = await main(m.options);
+      assert.ok(result.pending);
+      assert.match(result.pending[0].reason, /exact-target grant/);
+      assert.equal(issue.state, "OPEN");
+      assert.equal(issue.title, "Unrelated human Issue");
+      assert.equal(issue.body, "Human-owned discussion");
+      assert.deepEqual(issue.labels.nodes, []);
+      assert.equal(m.comments.size, 0);
+      assert.ok(!m.calls.some(call => call[0] === "mutation" || call[0] === "lock"));
+    });
+
+    it("does not inherit another projector's exact-target grant", async () => {
+      const f = fixture({ payload: { task: "a", issue_completion_policy: "close-on-result" } });
+      delete f.log[0].operations[0].policy.projectors[0].backing_issues;
+      f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+      const m = mock(f, { labelMissing: true });
+      assert.equal(m.state().works.size, 1);
+      const result = await main(m.options);
+      assert.ok(result.pending);
+      assert.match(result.pending[0].reason, /installed projector authority/);
+      assert.equal(m.comments.size, 0);
+      assert.ok(!m.calls.some(call => call[0] === "mutation" || call[0] === "lock"));
+    });
+
+    it("requires the worker projector's entire lossless backing Issue identity", async () => {
+      for (const field of ["repository_id", "resource_id", "number"]) {
+        const f = fixture({ worker: true });
+        f.log[0].operations[0].policy.projectors[1].backing_issues[0] = { ...f.nodes[0].backing_issue, [field]: "9999" };
+        f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
+        const m = mock(f, { labelMissing: true });
+        assert.equal(m.state().works.size, 1);
+        const result = await main(m.options);
+        assert.ok(result.pending);
+        assert.match(result.pending[0].reason, /installed projector authority/);
+        assert.equal(m.comments.size, 0);
+        assert.ok(!m.calls.some(call => call[0] === "mutation" || call[0] === "lock"));
       }
     });
 
@@ -412,6 +471,9 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
 
     it("keeps native creation receipts durable when concurrent admission wins the Issue binding", async () => {
       const f = fixture({ backing: false });
+      const grantedIssue = fixture().nodes[0].backing_issue;
+      for (const rule of f.log[0].operations[0].policy.projectors) rule.backing_issues = [grantedIssue];
+      f.log[0].request = q.newRequest(f.log[0].request.id, "policy", f.log[0].actor, { operations: f.log[0].operations });
       const m = mock(f);
       const write = m.options.writeCheckedFiles;
       let once = true;
@@ -602,6 +664,36 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const actor = { ...helpers.dispatcher, role: "projector" };
       const operation = { kind: "IssueComment", work_id: protocol.nodes[1].work_id, comment_id: "summary-0", projector_ref: f.origin.ref };
       assert.throws(() => q.replayTransactions([...protocol.log, helpers.operationCommit(protocol.log, "reuse", "issue_link", [operation], actor)]), /already belongs/);
+    });
+
+    it("rejects Claim comments colliding with another Work's summary, but accepts the original summary handle", () => {
+      const f = fixture({ count: 2, worker: true });
+      const actor = { ...helpers.workerActor(q.replayTransactions(f.log), f.assignment.dispatch_id), role: "projector" };
+      const [first, second] = f.assignment.claims;
+      const summary = { kind: "IssueComment", work_id: second.work_id, comment_id: "shared-summary", projector_ref: f.origin.ref, authority_claim_id: second.claim_id };
+      f.log.push(helpers.operationCommit(f.log, "summary", "issue_link", [summary], actor));
+      const same = helpers.operationCommit(f.log, "same-summary", "issue_link", [summary], actor);
+      assert.equal(q.replayTransactions([...f.log, same]).works.get(second.work_id).issue_summary, "shared-summary");
+      for (const claim of [first, second]) {
+        const collision = { kind: "IssueComment", work_id: claim.work_id, claim_id: claim.claim_id, comment_id: "shared-summary", projector_ref: f.origin.ref };
+        assert.throws(() => q.replayTransactions([...f.log, helpers.operationCommit(f.log, `collision-${claim.claim_id}`, "issue_link", [collision], actor)]), /Claim comment handle already belongs to a Work summary/);
+      }
+    });
+
+    it("enforces the shared target cap while projecting all permitted targets in bounded batches", async () => {
+      const f = fixture({ count: MAX_PROJECTION_TARGETS + 1 });
+      assert.throws(
+        () =>
+          issueReadQuery(
+            f.nodes.map(node => ({ work_id: node.work_id, resource: node.backing_issue })),
+            { label: "work" },
+            "owner/repo"
+          ),
+        /projection_limit/
+      );
+      const m = mock(f);
+      assert.deepEqual((await main(m.options)).pending, []);
+      assert.equal(m.comments.size, MAX_PROJECTION_TARGETS + 1);
     });
 
     it("rejects moved immutable aliases, nonregular ledger modes, unsafe publication paths, and oversized journals", async () => {

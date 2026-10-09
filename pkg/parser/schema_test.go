@@ -9,6 +9,40 @@ import (
 	"testing"
 )
 
+func TestValidateIncludedFileFrontmatter_InternalMCPInfrastructureCapability(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		{name: "omitted"},
+		{name: "enabled rejected", value: true, wantErr: true},
+		{name: "disabled rejected", value: false, wantErr: true},
+		{name: "string rejected", value: "true", wantErr: true},
+		{name: "number rejected", value: 1, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			capabilities := map[string]any{}
+			if tt.value != nil {
+				capabilities["cli-only-mcp-infrastructure"] = tt.value
+			}
+			err := ValidateIncludedFileFrontmatterWithSchemaAndLocation(map[string]any{
+				"engine": map[string]any{
+					"id":           "custom-capability-engine",
+					"display-name": "Custom capability engine",
+					"behaviors": map[string]any{
+						"execution":    map[string]any{"command-name": "custom-capability-engine"},
+						"capabilities": capabilities,
+					},
+				},
+			}, "workflow.md")
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validation error = %v, wantErr %t", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateMainWorkflowFrontmatter_IssueFieldActivityTypes(t *testing.T) {
 	frontmatter := map[string]any{
 		"on": map[string]any{
@@ -68,6 +102,79 @@ func TestValidateMainWorkflowFrontmatter_DockerImagePullPolicy(t *testing.T) {
 			t.Errorf("policy %v: error = %v, want error %v", tt.policy, err, tt.wantErr)
 		}
 	}
+}
+
+func TestValidateMainWorkflowFrontmatter_NVX(t *testing.T) {
+	valid := map[string]any{
+		"on": "workflow_dispatch",
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"runtime": "nvx",
+				"nvx": map[string]any{
+					"preview":                       true,
+					"network-isolation":             true,
+					"api-proxy":                     true,
+					"layer-path":                    "${{ runner.temp }}/nvx/layer",
+					"openvmm-path":                  "${{ runner.temp }}/nvx/openvmm",
+					"kernel-path":                   "${{ runner.temp }}/nvx/vmlinux",
+					"initramfs-path":                "${{ runner.temp }}/nvx/initramfs.cpio.gz",
+					"artifact-manifest-path":        "${{ runner.temp }}/nvx/manifest.json",
+					"artifact-manifest-bundle-path": "${{ runner.temp }}/nvx/manifest.sigstore.jsonl",
+				},
+			},
+		},
+	}
+
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(valid, "workflow.md"); err != nil {
+		t.Fatalf("expected complete expression-valued NVX configuration to validate: %v", err)
+	}
+
+	for _, field := range []string{
+		"preview",
+		"network-isolation",
+		"api-proxy",
+		"layer-path",
+		"openvmm-path",
+		"kernel-path",
+		"initramfs-path",
+		"artifact-manifest-path",
+		"artifact-manifest-bundle-path",
+	} {
+		t.Run("missing "+field, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "workflow_dispatch",
+				"sandbox": map[string]any{
+					"agent": map[string]any{
+						"runtime": "nvx",
+						"nvx":     map[string]any{},
+					},
+				},
+			}
+			for key, value := range valid["sandbox"].(map[string]any)["agent"].(map[string]any)["nvx"].(map[string]any) {
+				if key != field {
+					frontmatter["sandbox"].(map[string]any)["agent"].(map[string]any)["nvx"].(map[string]any)[key] = value
+				}
+			}
+			if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md"); err == nil {
+				t.Fatalf("expected missing %q to fail schema validation", field)
+			}
+		})
+	}
+
+	t.Run("NVX settings require the NVX runtime", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"on": "workflow_dispatch",
+			"sandbox": map[string]any{
+				"agent": map[string]any{
+					"runtime": "docker",
+					"nvx":     valid["sandbox"].(map[string]any)["agent"].(map[string]any)["nvx"],
+				},
+			},
+		}
+		if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md"); err == nil {
+			t.Fatal("expected NVX settings with Docker runtime to fail schema validation")
+		}
+	})
 }
 
 func TestValidateMainWorkflowFrontmatter_RejectsUnsupportedTopLevelFields(t *testing.T) {

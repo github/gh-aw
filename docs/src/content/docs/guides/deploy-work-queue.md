@@ -181,13 +181,27 @@ worker hook:
       "workflow": ".github/workflows/eslint-refiner.lock.yml",
       "ref": "REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA",
       "pools": ["default"],
-      "repositories": ["github/gh-aw"]
+      "repositories": ["github/gh-aw"],
+      "completion_policy": "keep-open",
+      "backing_issues": [
+        {
+          "kind": "issue",
+          "host": "github.com",
+          "repository": "github/gh-aw",
+          "repository_id": "REPLACE_WITH_NUMERIC_REPOSITORY_ID",
+          "resource_id": "REPLACE_WITH_NUMERIC_ISSUE_ID",
+          "number": "REPLACE_WITH_ISSUE_NUMBER"
+        }
+      ]
     }
   ]
 }
 ```
 
 Merge this property into the complete Policy, not a standalone policy file.
+Replace the resource placeholders with the existing Issue's exact decimal
+identities, kept as strings. Omit `backing_issues` entirely when only
+projector-created Issues are needed.
 Install the amended Policy while the queue is quiescent. Scope the
 protected hook credential to queue contents writes, Actions reads, and Issue
 writes in its allowed backing repositories. If `safe-outputs.github-app` is
@@ -198,7 +212,14 @@ against unauthorized updates/deletion; hooks need permission to create/delete
 their own coordination refs.
 
 Submit one independently tracked Work per Issue. Supply `backing_issue` for an
-existing Issue or let the authorized hook create it after durable admission.
+existing Issue only after installing its full resource identity in each
+relevant projector rule's `backing_issues` array. A repository allowlist alone
+does not authorize a pre-existing Issue. Alternatively, let the authorized
+hook create it after durable admission; its verified creation receipt and
+checked `IssueLink` establish the binding.
+Keep Issues open by default, or install `completion_policy: "close-on-result"`
+on the relevant projector rules before admission. This trusted policy, not
+agent payload, controls closure after verified non-PR delivery.
 Native runs and failed/skipped jobs never substitute for Result. Pending
 synchronization leaves Git authority intact and can be retried only by a hook
 owning the same Work/Claims; unrelated runs do not repair it.

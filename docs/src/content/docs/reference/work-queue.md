@@ -78,7 +78,8 @@ never provisioned automatically or silently replaced with comment-only mode.
 The existing activation and conclusion jobs project only Work admitted by
 their authenticated run/attempt and Work in their original authenticated Claims.
 Installed `Policy.projectors` rules must authorize the exact principal, workflow
-revision, pool, and backing repository. A shared queue, workflow name, label,
+revision, pool, and backing repository. Pre-existing Issues also require
+explicit lossless identities in that rule's `backing_issues` array. A shared queue, workflow name, label,
 API token, or caller-supplied Work ID does not grant scope. Agent execution
 stages intents and receives no projector or queue-writer credential.
 Conclusion refreshes checked Git state after queue settlement, including when
@@ -99,6 +100,9 @@ lossless resource identity shape as an external dependency:
 ```
 
 This property is separate from `subject`, effect scope, and dependencies.
+Admission rejects pre-existing Issues without an installed exact-target grant;
+each projecting workflow must independently hold that grant. Repository
+allowlisting, marker text, and a generated summary do not establish ownership.
 Without it, the hook creates an Issue and publishes its checked `IssueLink`.
 Admission and link publication enforce one Work per Issue under concurrency;
 links and comment handles cannot be rebound. The configured tracking label is
@@ -124,9 +128,12 @@ execution does not receive those write credentials. Issue creation uses the
 shared `withRetry` helper only for a proven pre-execution rate-limit rejection;
 timeouts and partial or ambiguous mutation responses are not blindly retried.
 
-Issues stay open by default. An immutable admitted payload may opt into
-`"issue_completion_policy": "close-on-result"`; closure still requires a
-verified non-PR Result. PR delivery alone never authorizes closure.
+Issues stay open by default. An administrator may set a projector rule's
+`"completion_policy": "close-on-result"` before Work admission; closure still
+requires a verified non-PR Result and current target authority. Later policy
+expansion cannot retroactively authorize closure. Agent payload fields,
+including `issue_completion_policy`, never control closure. PR delivery alone
+never authorizes closure.
 
 ### Synchronization and recovery
 

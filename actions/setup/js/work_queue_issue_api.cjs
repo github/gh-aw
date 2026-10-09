@@ -5,14 +5,17 @@ const { queueError } = require("./work_queue_codec.cjs");
 const { nativeId } = require("./work_queue_native.cjs");
 const { withRetry } = require("./error_recovery.cjs");
 
+const MAX_PROJECTION_TARGETS = 25;
+const MAX_PROJECTION_MUTATIONS = 50;
+const LABELS_PAGE_SIZE = 100;
 const STATUSES = ["Queued", "Blocked", "Assigned", "Running", "Verifying", "Needs review", "Done", "Needs attention", "Cancelled"];
 const FIELD_SELECTION = `__typename ... on IssueFieldText { id name } ... on IssueFieldNumber { id name }
   ... on IssueFieldDate { id name } ... on IssueFieldMultiSelect { id name }
   ... on IssueFieldSingleSelect { id name options { id name } }`;
 const VALUE_SELECTION = `... on IssueFieldSingleSelectValue { optionId name field { ... on IssueFieldSingleSelect { id } } }`;
 const ISSUE_SELECTION = `id databaseId number state viewerCanSetFields repository { id databaseId nameWithOwner } author { login }
-  labels(first:100) { nodes { id name } pageInfo { hasNextPage endCursor } }
-  issueFieldValues(first:25) { nodes { ${VALUE_SELECTION} } pageInfo { hasNextPage endCursor } }`;
+  labels(first:${LABELS_PAGE_SIZE}) { nodes { id name } pageInfo { hasNextPage endCursor } }
+  issueFieldValues(first:${MAX_PROJECTION_TARGETS}) { nodes { ${VALUE_SELECTION} } pageInfo { hasNextPage endCursor } }`;
 
 async function ensureTrackingLabel(github, repositoryId, label, name) {
   if (label) {
@@ -36,7 +39,7 @@ async function discoverTarget(github, repository, config, firstPage = undefined)
   let label;
   try {
     for (let page = 0; page < 16; page++) {
-      const fieldQuery = config["status-field"] ? `issueFields(first:25,after:$cursor) { nodes { ${FIELD_SELECTION} } pageInfo { hasNextPage endCursor } }` : "";
+      const fieldQuery = config["status-field"] ? `issueFields(first:${MAX_PROJECTION_TARGETS},after:$cursor) { nodes { ${FIELD_SELECTION} } pageInfo { hasNextPage endCursor } }` : "";
       const result =
         page === 0 && firstPage
           ? { repository: firstPage }
@@ -80,7 +83,7 @@ async function discoverTarget(github, repository, config, firstPage = undefined)
 }
 
 function issuePreflightQuery(targets, fields) {
-  if (targets.length > 25) throw queueError("projection_limit", "at most 25 projection targets");
+  if (targets.length > MAX_PROJECTION_TARGETS) throw queueError("projection_limit", `at most ${MAX_PROJECTION_TARGETS} projection targets`);
   const variables = {};
   const declarations = [];
   const selections = [];
@@ -118,7 +121,7 @@ function issueReadQuery(targets, config, repository) {
     read.declarations.push(`$${alias}Owner:String!,$${alias}Name:String!`);
     Object.assign(read.variables, { [`${alias}Owner`]: owner, [`${alias}Name`]: name });
     read.selections.push(`${alias}: repository(owner:$${alias}Owner,name:$${alias}Name) { id nameWithOwner label(name:$trackingLabel) { id name }
-      ${config["status-field"] ? `issueFields(first:25) { nodes { ${FIELD_SELECTION} } pageInfo { hasNextPage endCursor } }` : ""} }`);
+      ${config["status-field"] ? `issueFields(first:${MAX_PROJECTION_TARGETS}) { nodes { ${FIELD_SELECTION} } pageInfo { hasNextPage endCursor } }` : ""} }`);
   }
   return { ...read, repositoryAliases };
 }
@@ -175,7 +178,7 @@ async function completeIssueConnections(github, issues, fields) {
         declarations.push(`$${alias}:ID!,$${alias}Cursor:String!`);
         Object.assign(variables, { [alias]: issue.id, [`${alias}Cursor`]: cursor });
         selections.push(
-          `${alias}: node(id:$${alias}) { ... on Issue { id repository { id } ${connection}(first:${connection === "labels" ? 100 : 25},after:$${alias}Cursor) { nodes { ${connection === "labels" ? "id name" : VALUE_SELECTION} } pageInfo { hasNextPage endCursor } } } }`
+          `${alias}: node(id:$${alias}) { ... on Issue { id repository { id } ${connection}(first:${connection === "labels" ? LABELS_PAGE_SIZE : MAX_PROJECTION_TARGETS},after:$${alias}Cursor) { nodes { ${connection === "labels" ? "id name" : VALUE_SELECTION} } pageInfo { hasNextPage endCursor } } } }`
         );
         pending.push({ issue, connection, alias });
       }
@@ -193,14 +196,14 @@ async function completeIssueConnections(github, issues, fields) {
 }
 
 async function mutateIssues(github, operations, { sleep = delay => new Promise(resolve => setTimeout(resolve, delay)) } = {}) {
-  if (operations.length > 50) {
+  if (operations.length > MAX_PROJECTION_MUTATIONS) {
     const results = [];
-    for (let offset = 0; offset < operations.length; offset += 50) {
+    for (let offset = 0; offset < operations.length; offset += MAX_PROJECTION_MUTATIONS) {
       if (offset) await sleep(1000);
-      const batch = await mutateIssues(github, operations.slice(offset, offset + 50), { sleep });
+      const batch = await mutateIssues(github, operations.slice(offset, offset + MAX_PROJECTION_MUTATIONS), { sleep });
       results.push(...batch.results);
       if (batch.ambiguous) {
-        results.push(...operations.slice(offset + 50).map(operation => ({ operation, value: undefined, pending: true, uncertain: false, unattempted: true })));
+        results.push(...operations.slice(offset + MAX_PROJECTION_MUTATIONS).map(operation => ({ operation, value: undefined, pending: true, uncertain: false, unattempted: true })));
         return { results, ambiguous: true };
       }
     }
@@ -220,7 +223,7 @@ async function mutateIssues(github, operations, { sleep = delay => new Promise(r
   let ambiguous = false;
   try {
     const send = () => github.graphql(`mutation WorkQueueIssueProjection(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request: { retries: 0, timeout: 30000 } });
-    result = operations.some(operation => operation.name === "createIssue") ? await withRetry(send, { maxRetries: 3, shouldRetry: isRejectedIssueCreation }, "work_queue createIssue batch") : await send();
+    result = operations.some(operation => operation.name === "createIssue") ? await withRetry(send, { maxRetries: 3, shouldRetry: isRetryableBeforeExecution }, "work_queue createIssue batch") : await send();
   } catch (error) {
     const nativeError = error.originalError || error;
     result = nativeError.data;
@@ -232,7 +235,7 @@ async function mutateIssues(github, operations, { sleep = delay => new Promise(r
     const value = result?.[`m${index}`];
     const failed = errors.some(error => !error.path || error.path[0] === `m${index}`);
     const pending = failed || !value;
-    const rejectedBeforeExecution = isRejectedIssueCreation({ data: result, errors });
+    const rejectedBeforeExecution = isConfirmedRejectionBeforeExecution({ data: result, errors });
     const uncertain = pending && !rejectedBeforeExecution && !errors.some(error => (!error.path || error.path[0] === `m${index}`) && ["FORBIDDEN", "NOT_FOUND", "GRAPHQL_VALIDATION_FAILED"].includes(error.type));
     return { operation, value: failed ? undefined : value, pending, uncertain };
   });
@@ -240,14 +243,34 @@ async function mutateIssues(github, operations, { sleep = delay => new Promise(r
   return { results, ambiguous };
 }
 
-function isRejectedIssueCreation(error) {
-  // No deduplication guarantee exists for createIssue: partial results and
-  // transport failures must never be replayed, even when normally transient.
-  return Array.isArray(error.errors) && error.errors.length > 0 && error.errors.every(item => item.type === "RATE_LIMITED" && (!item.path || item.path.length === 0)) && Object.values(error.data || {}).every(value => value == null);
+function isConfirmedRejectionBeforeExecution(error) {
+  // { errors: [{ type: "RATE_LIMITED" }], data: { m0: null } } is safe.
+  // Alias-specific errors, partial results, and transport failures are not proof.
+  if (!Array.isArray(error.errors) || !error.errors.length) return false;
+  const allRejected = error.errors.every(item => item?.type === "RATE_LIMITED" && (!item.path || item.path.length === 0));
+  const noReceipts = Object.values(error.data || {}).every(value => value == null);
+  return allRejected && noReceipts;
+}
+
+function isRetryableBeforeExecution(error) {
+  return isConfirmedRejectionBeforeExecution(error);
 }
 
 function issueResource(issue) {
   return { kind: "issue", host: "github.com", repository: issue.repository.nameWithOwner, repository_id: nativeId(issue.repository.databaseId), resource_id: nativeId(issue.databaseId), number: nativeId(issue.number) };
 }
 
-module.exports = { STATUSES, ISSUE_SELECTION, discoverTarget, preflightIssues, mutateIssues, issueResource, issueReadQuery };
+module.exports = {
+  MAX_PROJECTION_TARGETS,
+  MAX_PROJECTION_MUTATIONS,
+  LABELS_PAGE_SIZE,
+  STATUSES,
+  ISSUE_SELECTION,
+  discoverTarget,
+  preflightIssues,
+  mutateIssues,
+  issueResource,
+  issueReadQuery,
+  isRetryableBeforeExecution,
+  isConfirmedRejectionBeforeExecution,
+};

@@ -33,8 +33,17 @@ describe("work-queue deployment documentation", () => {
     expect(policy.accounting_weights).toEqual({ "": 1 });
     expect(policy.producers["11"].fairness_keys).toEqual([""]);
     expect(policy.limits).toEqual(DEFAULT_LIMITS);
-    const projection = JSON.parse(examples[1][1].replaceAll("REPLACE_WITH_NATIVE_PRINCIPAL_ID", "12").replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40)));
+    const projection = JSON.parse(
+      examples[1][1]
+        .replaceAll("REPLACE_WITH_NATIVE_PRINCIPAL_ID", "12")
+        .replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40))
+        .replaceAll("REPLACE_WITH_NUMERIC_REPOSITORY_ID", "9876")
+        .replaceAll("REPLACE_WITH_NUMERIC_ISSUE_ID", "9007199254740993")
+        .replaceAll("REPLACE_WITH_ISSUE_NUMBER", "42")
+    );
     expect(validatePolicy({ ...policy, ...projection }).projectors).toEqual(projection.projectors);
+    expect(projection.projectors[0].completion_policy).toBe("keep-open");
+    expect(projection.projectors[0].backing_issues[0]).toEqual({ kind: "issue", host: "github.com", repository: "github/gh-aw", repository_id: "9876", resource_id: "9007199254740993", number: "42" });
   });
 
   it("separates published docs and specifications from bounded agent instructions", () => {

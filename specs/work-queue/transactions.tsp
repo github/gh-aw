@@ -168,6 +168,10 @@ model ProjectorRule {
   @minItems(1)
   @maxItems(256)
   repositories: Identity[];
+  @minItems(1)
+  @maxItems(256)
+  backing_issues?: Resource[];
+  completion_policy?: "keep-open" | "close-on-result";
 }
 @jsonSchema
 model Limits {
@@ -194,6 +198,7 @@ model QueuePolicy {
   @extension("x-key-utf8-max-bytes", 256)
   @extension("x-forbid-key-ascii-controls", true)
   producers: Record<ProducerRule>;
+  @minItems(1)
   @maxItems(256)
   projectors?: ProjectorRule[];
   @extension("x-key-min-utf8-bytes", 1)

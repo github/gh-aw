@@ -716,6 +716,24 @@
     "ProjectorRule": {
       "additionalProperties": false,
       "properties": {
+        "backing_issues": {
+          "items": {
+            "$ref": "#/$defs/Resource"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "completion_policy": {
+          "anyOf": [
+            {
+              "const": "keep-open"
+            },
+            {
+              "const": "close-on-result"
+            }
+          ]
+        },
         "pools": {
           "items": {
             "$ref": "#/$defs/Identity"
@@ -863,6 +881,7 @@
             "$ref": "#/$defs/ProjectorRule"
           },
           "maxItems": 256,
+          "minItems": 1,
           "type": "array"
         }
       },

@@ -61,7 +61,9 @@ An object may set `label` and a pre-provisioned native organization
 `status-field`. Require installed projector authority: only protected hooks
 project their own admissions/original Claims. Immutable `backing_issue` binds
 one Work per Issue. Agents never write mirrors; human edits never establish
-Result. Uncertain writes stay pending, never recreated or globally repaired.
+Result. Pre-existing Issues need exact installed `backing_issues` grants.
+Only trusted admission-time `completion_policy` permits closure, never payload.
+Uncertain writes stay pending, never recreated or globally repaired.
 Upgrade all closed-schema readers first. See the
 [backing Issue reference](../../docs/src/content/docs/reference/work-queue.md#backing-issues).
 

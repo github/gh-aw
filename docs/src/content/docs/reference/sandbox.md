@@ -61,8 +61,11 @@ strict: false
 | `docker` (default) | Default Docker runtime, rootless AWF, network isolation |
 | `docker-sudo-iptables` | Docker with privileged AWF, legacy `iptables` networking, and host/service access |
 | `cloud-hypervisor` | Preview KVM runtime with its required privileged launcher |
+| `nvx` | Fail-closed preview NVX one-shot microVM; requires explicit configuration and a Linux x86_64 KVM host |
 
 Omitting `runtime` is equivalent to `runtime: docker`, which keeps the secure default.
+
+The `nvx` runtime never falls back to another runtime. It requires a workload-specific guest layer, the AWF release's provenance bundle and manifest, and all three security opt-ins. The compiler checks the host and verifies the offline attestation before starting AWF. See [Agent Runtime Selection](/gh-aw/reference/agent-runtimes/#nvx-preview) for the complete configuration and compatibility requirements.
 
 ```yaml wrap
 sandbox:
