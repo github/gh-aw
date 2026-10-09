@@ -4,7 +4,8 @@
 # tools so NVX can retain its trusted-tool policy.
 prepare_kvm_access() {
   local id_command="$1" sudo_command="$2" setfacl_command="$3" getfacl_command="$4"
-  local runner_uid acl_output entry acl_verified=false
+  local cleanup_env="${5:-}" runner_uid acl_output entry acl_verified=false
+  local previous_acl_exists=false previous_acl_permissions="---"
 
   if [[ ! -e /dev/kvm ]]; then
     echo "::error::/dev/kvm is missing. KVM preview runtimes require a KVM-capable runner."
@@ -24,6 +25,34 @@ prepare_kvm_access() {
     echo "::error::failed to resolve a numeric runner UID."
     exit 1
   fi
+  if ! acl_output="$("$getfacl_command" -ncp /dev/kvm)" || [[ -z "${acl_output}" ]]; then
+    echo "::error::failed to read /dev/kvm ACLs before setup."
+    exit 1
+  fi
+  while IFS= read -r entry; do
+    entry="${entry%%#effective:*}"
+    if [[ "$entry" == "user:${runner_uid}:"* ]]; then
+      previous_acl_permissions="${entry#user:"${runner_uid}":}"
+      if [[ ! "$previous_acl_permissions" =~ ^[r-][w-][x-]$ ]]; then
+        echo "::error::failed to parse the existing runner ACL entry on /dev/kvm."
+        exit 1
+      fi
+      previous_acl_exists=true
+      break
+    fi
+  done <<<"$acl_output"
+
+  if [[ -n "$cleanup_env" ]]; then
+    {
+      printf 'GH_AW_NVX_KVM_ACL_UID=%s\n' "$runner_uid"
+      printf 'GH_AW_NVX_KVM_ACL_EXISTS=%s\n' "$previous_acl_exists"
+      printf 'GH_AW_NVX_KVM_ACL_PERMISSIONS=%s\n' "$previous_acl_permissions"
+      printf 'GH_AW_NVX_KVM_SUDO=%s\n' "$sudo_command"
+      printf 'GH_AW_NVX_KVM_SETFACL=%s\n' "$setfacl_command"
+      printf 'GH_AW_NVX_KVM_GETFACL=%s\n' "$getfacl_command"
+    } >> "$cleanup_env"
+  fi
+
   if ! "$sudo_command" -n "$setfacl_command" -m "u:${runner_uid}:rw" /dev/kvm; then
     echo "::error::failed to configure scoped access to /dev/kvm for the runner user."
     exit 1

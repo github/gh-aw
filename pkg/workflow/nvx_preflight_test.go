@@ -98,10 +98,19 @@ func setupNVXPreflightFixture(t *testing.T, manifest string) (string, []string) 
 			body = "#!/bin/bash\nexit 0\n"
 		case "setfacl":
 			body = `#!/bin/bash
-[[ "${NVX_TEST_ACL_FAIL:-}" != 1 ]]
+[[ "${NVX_TEST_ACL_FAIL:-}" != 1 ]] || exit 1
+printf 'user:0:rw-\n' > "$NVX_TEST_ACL_STATE"
 `
 		case "getfacl":
-			body = "#!/bin/bash\necho user:0:rw-\n"
+			body = `#!/bin/bash
+if [[ -f "$NVX_TEST_ACL_STATE" ]]; then
+  cat "$NVX_TEST_ACL_STATE"
+elif [[ "${NVX_TEST_ACL_EXISTING:-1}" == 1 ]]; then
+  echo user:0:rw-
+else
+  printf 'user::rw-\ngroup::r--\nother::---\n'
+fi
+`
 		case "gh":
 			body = `#!/bin/bash
 set -e
@@ -220,6 +229,7 @@ esac
 		"NVX_TEST_BIN=" + binDir,
 		"NVX_TEST_TMP=" + filepath.Join(root, "tmp"),
 		"NVX_TEST_LOG=" + filepath.Join(root, "events"),
+		"NVX_TEST_ACL_STATE=" + filepath.Join(root, "acl_state"),
 		"PATH=" + binDir + ":" + os.Getenv("PATH"),
 	}
 	return fixtureScriptPath, env
@@ -258,17 +268,24 @@ func TestNVXHostPreflightExecutesAgainstFixtures(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(githubEnv), "GH_AW_NVX_STAGE_DIR=")
 		assert.Contains(t, string(githubEnv), "GH_AW_NVX_RM=")
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_EXISTS=true")
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_PERMISSIONS=rw-")
 	})
 
 	t.Run("missing host controller fails before staging", func(t *testing.T) {
 		scriptPath, env := setupNVXPreflightFixture(t, manifest)
+		env = append(env, "NVX_TEST_ACL_EXISTING=0")
 		hostControllerFile := filepath.Join(filepath.Dir(scriptPath), "sys", "fs", "cgroup", "cgroup.controllers")
 		require.NoError(t, os.WriteFile(hostControllerFile, []byte("cpu memory\n"), 0o644))
 		output, err := runNVXPreflightFixture(t, scriptPath, env)
 		require.Error(t, err)
 		assert.Contains(t, output, "requires the cgroup v2 pids controller")
 		_, statErr := os.Stat(filepath.Join(filepath.Dir(scriptPath), "events"))
-		assert.ErrorIs(t, statErr, os.ErrNotExist)
+		require.ErrorIs(t, statErr, os.ErrNotExist)
+		githubEnv, readErr := os.ReadFile(filepath.Join(filepath.Dir(scriptPath), "github_env"))
+		require.NoError(t, readErr)
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_EXISTS=false")
+		assert.Contains(t, string(githubEnv), "GH_AW_NVX_KVM_ACL_PERMISSIONS=---")
 	})
 
 	for _, tc := range []struct {

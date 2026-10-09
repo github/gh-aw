@@ -75,7 +75,7 @@ if [[ "$(tool sudo -n "${trusted_tools[id]}" -u)" != "0" ]]; then
 fi
 source "${BASH_SOURCE[0]%/*}/kvm_access.sh"
 prepare_kvm_access "${trusted_tools[id]}" "${trusted_tools[sudo]}" \
-  "${trusted_tools[setfacl]}" "${trusted_tools[getfacl]}"
+  "${trusted_tools[setfacl]}" "${trusted_tools[getfacl]}" "${GITHUB_ENV:?GITHUB_ENV is required}"
 
 if [[ ! -r /sys/fs/cgroup/cgroup.controllers ]]; then
   echo "::error::NVX requires a readable cgroup v2 hierarchy."
