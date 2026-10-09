@@ -36,6 +36,7 @@ safe-outputs:
     target-ref: ${{ github.event.repository.default_branch }}
     max: 3
   noop:
+    report-as-issue: false
 steps:
   - name: Prepare engine conformance cohort
     uses: actions/github-script@v9.0.0

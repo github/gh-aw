@@ -24,7 +24,9 @@ describe("engine conformance queue portfolio", () => {
     }
     expect([...seen].sort()).toEqual([...ENGINES]);
     expect(changedEngines([".github/workflows/shared/engine-conformance.md"]).size).toBe(ENGINES.length);
+    expect(changedEngines(["pkg/workflow/engine.go"]).size).toBe(ENGINES.length);
     expect([...changedEngines(["pkg/workflow/codex_config.go", ".github/workflows/shared/agy-conformance.md"])].sort()).toEqual(["agy", "codex"]);
+    expect([...changedEngines(["pkg/workflow/copilot_engine.go"])]).toEqual(["copilot"]);
   });
 
   it("rejects invalid dates, identities and changed-path inputs", () => {

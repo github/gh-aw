@@ -22,7 +22,15 @@ function assertRepository(repository) {
 
 function changedEngines(paths) {
   if (!Array.isArray(paths) || paths.some(path => typeof path !== "string")) throw new Error("Changed paths must be an array of strings");
-  const all = paths.some(path => path === ".github/workflows/shared/engine-conformance.md" || path.startsWith("actions/setup/js/work_queue_"));
+  const all = paths.some(
+    path =>
+      path === ".github/workflows/shared/engine-conformance.md" ||
+      path === ".github/workflows/shared/engine-conformance-worker.md" ||
+      path === "pkg/workflow/engine.go" ||
+      path === "pkg/workflow/agentic_engine.go" ||
+      path === "pkg/workflow/behavior_defined_engine.go" ||
+      path.startsWith("actions/setup/js/work_queue_")
+  );
   return new Set(
     ENGINES.filter(
       engine =>
@@ -32,7 +40,7 @@ function changedEngines(paths) {
             path === `.github/workflows/engine-conformance-${engine}.md` ||
             path === `.github/workflows/shared/${engine}.md` ||
             (path === `.github/workflows/shared/agy-conformance.md` && engine === "agy") ||
-            (path.startsWith("pkg/workflow/") && path.toLowerCase().includes(engine))
+            (path.startsWith("pkg/workflow/") && new RegExp(`(^|-)${engine}($|[-.])`).test(path.slice("pkg/workflow/".length).toLowerCase().replaceAll("_", "-")))
         )
     )
   );
