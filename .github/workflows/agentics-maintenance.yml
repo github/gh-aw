@@ -25,7 +25,7 @@
 # It runs scheduled cleanup for expiring safe outputs and supports manual maintenance operations.
 #
 # This workflow is generated automatically when workflows use expiring safe outputs,
-# when workflows declare compaction-enabled ledgers (tools.ledger), or when repository
+# when workflows declare compaction-enabled ledgers (tools.ledger) or use tools.work-queue, or when repository
 # maintenance features are enabled in .github/workflows/aw.json.
 #
 # To disable maintenance workflow generation, set in .github/workflows/aw.json:
@@ -1984,3 +1984,86 @@ jobs:
       - name: Report ledger compaction application failures
         if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' }}
         run: exit 1
+
+  work_queue_compaction_plan:
+    name: Plan work queue compaction
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    outputs:
+      plan_created: ${{ steps.plan.outputs.plan_created }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan existing work queue
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'work_queue_compaction_plan.cjs'));
+            await main();
+      - name: Upload work queue compaction plan
+        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: work-queue-compaction-plan
+          path: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
+          if-no-files-found: error
+
+  work_queue_compaction_apply:
+    name: Apply work queue compaction
+    needs: work_queue_compaction_plan
+    if: ${{ !cancelled() && needs.work_queue_compaction_plan.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download work queue compaction plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: work-queue-compaction-plan
+          path: ${{ runner.temp }}/gh-aw/work-queue-compaction
+      - name: Validate and apply work queue compaction
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/work-queue-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'work_queue_compaction_apply.cjs'));
+            await main();
