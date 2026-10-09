@@ -5,6 +5,7 @@ package workflow
 import (
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,12 @@ import (
 )
 
 const copilotAWFSessionStateDir = constants.TmpGhAwDir + "/sandbox/agent/session-state"
+
+var otlpSandboxExcludedEnvVarNames = []string{
+	"OTEL_EXPORTER_OTLP_ENDPOINT",
+	"OTEL_EXPORTER_OTLP_HEADERS",
+	"GH_AW_OTLP_ENDPOINTS",
+}
 
 // BuildAWFCommand builds a complete AWF command with all arguments.
 // This consolidates the AWF command building logic that was duplicated across
@@ -528,8 +535,14 @@ func appendTTYAndContainerRuntimeArgs(config AWFCommandConfig, firewallConfig *F
 func appendEnvAndMountArgs(config AWFCommandConfig, firewallConfig *FirewallConfig, agentConfig *AgentSandboxConfig, awfArgs []string) []string {
 	awfArgs = append(awfArgs, "--env-all")
 	if awfSupportsExcludeEnv(firewallConfig) {
-		sortedExclude := make([]string, len(config.ExcludeEnvVarNames))
-		copy(sortedExclude, config.ExcludeEnvVarNames)
+		sortedExclude := append([]string(nil), config.ExcludeEnvVarNames...)
+		if isOTLPEnabled(config.WorkflowData) {
+			for _, name := range otlpSandboxExcludedEnvVarNames {
+				if !slices.Contains(sortedExclude, name) {
+					sortedExclude = append(sortedExclude, name)
+				}
+			}
+		}
 		sort.Strings(sortedExclude)
 		for _, excludedVar := range sortedExclude {
 			awfArgs = append(awfArgs, "--exclude-env", excludedVar)
