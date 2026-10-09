@@ -7,7 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { test } = require("node:test");
 const { canonical } = require("./work_queue_codec.cjs");
-const { planFor } = require("./work_queue_compaction_plan.cjs");
+const { main: planCompaction, planFor } = require("./work_queue_compaction_plan.cjs");
 const { isRetryablePublicationError, main: apply, PLAN_MAX_BYTES, readPlan } = require("./work_queue_compaction_apply.cjs");
 const { fakeGitHub } = require("./work_queue_store_checks.cjs");
 
@@ -75,6 +75,29 @@ test("planning skips absent queues and binds the current head and tip", () => {
       .update(canonical({ version: 1, branch: "work-queue", base_sha: current.sha, tip: "tip" }))
       .digest("hex")
   );
+});
+
+test("planning skips when the work-queue branch is missing", async () => {
+  const original = global.core;
+  const outputs = {};
+  global.core = {
+    setOutput(name, value) {
+      outputs[name] = value;
+    },
+    info() {},
+  };
+  const fake = fakeGitHub();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "work-queue-compaction-test-"));
+  const file = path.join(directory, "plan.json");
+  try {
+    const result = await planCompaction({ githubClient: fake.githubClient, owner: "owner", repo: "repo", planFile: file });
+    assert.equal(result.status, "skipped");
+    assert.equal(outputs.plan_created, "false");
+    assert.equal(fs.existsSync(file), false);
+  } finally {
+    global.core = original;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("apply rejects malformed plans and defers stale plans without writing", async () => {
