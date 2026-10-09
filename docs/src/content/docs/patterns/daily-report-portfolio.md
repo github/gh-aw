@@ -1,11 +1,11 @@
 ---
 title: Daily Report Portfolio
-description: A three-of-ten discussion-report example with fair queue dispatch, immutable Claims, workflow source excerpts, and verified delivery
+description: A bounded daily and weekly discussion-report portfolio with fair queue dispatch, immutable Claims, and verified delivery
 sidebar:
   badge: { text: 'Work queue', variant: 'note' }
 ---
 
-The daily report portfolio turns ten independent reporting workflows into
+The daily report portfolio centralizes thirteen reporting workflows as
 dispatch-only workers. One daily dispatcher admits three report profiles,
 requests the queue's eligible fair prefix, and leaves publication to each
 worker's existing mission. Reports are GitHub Discussions, not a second queue.
@@ -22,7 +22,7 @@ Completion and verified delivery share that transaction log.
 > enabling a producer. Its first submission atomically bootstraps Policy and
 > Work; compiling a workflow alone does not protect the branch or launch workers.
 
-## Ten reports, one dispatcher
+## Thirteen reports, one dispatcher
 
 | Worker source | Primary Discussion |
 | --- | --- |
@@ -36,6 +36,9 @@ Completion and verified delivery share that transaction log.
 | [daily-secrets-analysis](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-secrets-analysis.md) | Secret-reference patterns, never secret values |
 | [daily-team-evolution-insights](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-team-evolution-insights.md) | Team evolution and collaboration |
 | [daily-token-consumption-report](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-token-consumption-report.md) | AI Credit consumption from telemetry |
+| [deep-report](https://github.com/github/gh-aw/blob/main/.github/workflows/deep-report.md) | Daily intelligence synthesis of previously published reports, with bounded follow-up tasks |
+| [artifacts-summary](https://github.com/github/gh-aw/blob/main/.github/workflows/artifacts-summary.md) | Artifact storage and retention; Sunday admission |
+| [repo-tree-map](https://github.com/github/gh-aw/blob/main/.github/workflows/repo-tree-map.md) | Repository structure and sizes; Monday admission |
 
 The [dispatcher source](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-report-dispatcher.md)
 has the only portfolio schedule. The workers keep their engines, read tools,
@@ -43,9 +46,47 @@ categories and report logic, but no longer have independent cron triggers.
 Compiler-quality's issue fallback is disabled; evals and token-consumption
 publish their primary reports as Discussions instead of issues.
 
+DeepReport reserves one of the three slots every day, replacing its former
+six-hour schedule. It synthesizes previously published reports within its
+assigned seven-day window, not staged outputs from its current cohort. Its Work
+is independent rather than a fan-in dependency: declined/no-data sibling reports
+must not block intelligence reporting. Like every worker, daily admission does
+not guarantee same-day publication when capacity is unavailable.
+
+DeepReport retains up to seven deduplicated issue outputs, three comments and
+three diagnostic artifacts, all declared in its Claim contract. Its historical
+notes use cache-memory instead of unscoped writes to `memory/deep-report`.
+Legacy Git memory is not automatically migrated; missing cache history is
+reported as a limitation, and actual open issues remain the deduplication source.
+
+The artifact and tree workers retain weekly admission, but share the dispatcher's
+10:00 UTC schedule rather than their former 06:00/15:00 times. Their weekly slots
+replace daily slots instead of increasing the three-node admission or launch
+budget. Publication can be delayed by queue capacity. The tree report describes
+the installed immutable worker revision's checkout, not a historical checkout
+at `report_date`; that date identifies its reporting opportunity.
+
+### Reports intentionally left on schedules
+
+Discussion creation alone does not make a workflow a report-only worker.
+The remaining scheduled discussion publishers retain their existing triggers:
+
+| Workflows | Reason for keeping the independent schedule |
+| --- | --- |
+| `daily-news`, `daily-arxiv-researcher`, `constraint-solving-potd` | Weekday news, new-paper discovery and the daily problem depend on freshness |
+| `daily-cache-strategy-analyzer`, `agent-performance-analyzer` | Remediation and shared history/coordination are part of the mission, not just reporting |
+| `daily-hippo-learn` | Stateful learning and memory consolidation require their daily cycle |
+| `org-health-report`, `portfolio-analyst` | Weekly organization-wide and 30-day financial reporting have distinct scope and cadence |
+| `archivx-agentic-workflows-analyzer`, `workflow-skill-extractor`, `dataflow-pr-discussion-dataset` | Weekly diagrams, skill extraction and dataset generation produce additional durable effects |
+| `firewall-escape`, `lint-monster`, `issue-arborist`, `auto-triage-issues` | Security tests, remediation, issue linking and triage must not become optional report opportunities |
+| `smoke-copilot` and its ARM/AOAI variants | Scheduled engine checks publish discussions as test outputs |
+
+Manual, command and PR-triggered discussion publishers also remain outside the
+portfolio. Upstream-managed workflow sources are not edited.
+
 ```mermaid
 flowchart TD
-    Roster["Ten dispatch-only report profiles"] --> Plan["Trusted UTC planner selects three profiles"]
+    Roster["Thirteen dispatch-only report profiles"] --> Plan["Trusted UTC planner reserves intelligence and weekly slots, then rotates other reports"]
     Date["Original GitHub run creation time"] --> Plan
     Plan --> Submit["Dispatcher stages three immutable Work nodes"]
     Submit --> Ledger["work-queue.jsonl: authoritative QueueCommit history"]
@@ -68,34 +109,38 @@ one report does not wait for another report's Result.
 ## Admission rotation is not queue authority
 
 The planner derives the previous complete UTC report date from the original
-run's GitHub API `created_at`. For a scheduled activation on October 8, the
-report date is October 7, and a one-day analysis window ends at midnight
-October 8. Longer analysis windows retain the workflow's existing duration but
+run's GitHub API `created_at`. For a scheduled activation on October 6, the
+report date is October 5, and a one-day analysis window ends at midnight
+October 6. Longer analysis windows retain the workflow's existing duration but
 use that same immutable endpoint, even after a delayed launch.
 
-The roster above is ordered. Its starting index is
-`(UTC epoch day * 3) % 10`; the planner selects that index and the next two,
-wrapping at the end of the roster. Every profile receives three admission
-slots in any ten consecutive days, including weekends.
+The ten rotating profiles are ordered. The planner reserves a DeepReport slot
+every day, an artifact slot for
+Saturday report dates (Sunday activations), and a tree slot for Sunday report
+dates (Monday activations). It fills the remaining one or two slots from the
+daily rotation. Its starting index is `(UTC epoch day * 2 - prior weekly slots)
+% 10`, so weekly slots never skip a daily profile. Every daily profile receives
+six admissions in any thirty-five consecutive days; each weekly profile
+receives five, and DeepReport receives thirty-five. These are admission
+frequencies, not delivery guarantees.
 
 ```javascript title="actions/setup/js/daily_report_portfolio.cjs (rotation excerpt)"
-function reportsForDay(date) {
-  const offset = (reportDay(date) * REPORTS_PER_DAY) % DAILY_REPORTS.length;
-  return Array.from(
-    { length: REPORTS_PER_DAY },
-    (_, index) => DAILY_REPORTS[(offset + index) % DAILY_REPORTS.length]
-  );
-}
+reportsForDay("2026-10-05");
+// team-evolution-insights, token-consumption, deep-report
+reportsForDay("2026-10-10");
+// team-evolution-insights, artifacts-summary, deep-report
+reportsForDay("2026-10-11");
+// token-consumption, repo-tree-map, deep-report
 ```
 
-For report date `2026-10-07`, the admitted profiles are token-consumption,
-compiler-quality and evals. The same date, repository and numeric repository ID
+For report date `2026-10-05`, the admitted profiles are team-evolution-insights,
+token-consumption and DeepReport. The same date, repository and numeric repository ID
 produce the same graph, nodes and payloads. No mutable run ID is embedded in
 those node definitions.
 
 | Boundary | Meaning |
 | --- | --- |
-| Rotation | Which three report profiles receive new Work today |
+| Reserved intelligence/weekly slots and rotation | Which three report profiles receive new Work today |
 | Priority `3` | All portfolio nodes enter the same priority class |
 | Per-profile fairness key, weight `1` | Scheduling debt is accounted equally across profiles |
 | `max_claims: 3`, `max_dispatches: 3` | Ceilings for the original daily activation, not guaranteed launches |
@@ -141,6 +186,9 @@ safe-outputs:
       - daily-secrets-analysis
       - daily-team-evolution-insights
       - daily-token-consumption-report
+      - deep-report
+      - artifacts-summary
+      - repo-tree-map
     target-ref: ${{ github.event.repository.default_branch }}
     max: 3
   noop:
@@ -209,7 +257,7 @@ Optional diagnostic output allowances are omitted from this excerpt.
 
 ```json wrap title="One of the three admitted Work nodes (excerpt)"
 {
-  "graph_id": "daily-report-cohort:2026-10-07",
+  "graph_id": "daily-report-cohort:2026-10-05",
   "node_key": "daily-token-consumption-report",
   "pool": "daily-reports",
   "priority": 3,
@@ -217,7 +265,7 @@ Optional diagnostic output allowances are omitted from this excerpt.
   "worker_profile": "daily-token-consumption-report",
   "payload": {
     "plan": "Run this workflow's existing discussion-report mission for the immutable report date. Publish at most one discussion; do not dispatch other reports.",
-    "report_date": "2026-10-07",
+    "report_date": "2026-10-05",
     "report_profile": "daily-token-consumption-report",
     "resource_scope": {
       "version": 1,
@@ -318,7 +366,7 @@ The original decoded assignment contains one member:
       "claim_id": "c_example",
       "work_id": "GENERATED_WORK_ID",
       "work": {
-        "report_date": "2026-10-07",
+        "report_date": "2026-10-05",
         "report_profile": "daily-token-consumption-report"
       },
       "result_refs": []
@@ -343,7 +391,7 @@ The following array groups separate calls for display:
     "name": "create_discussion",
     "arguments": {
       "claim_handle": "h1",
-      "title": "[token-consumption] Daily AIC Consumption Report - 2026-10-07",
+      "title": "[token-consumption] Daily AIC Consumption Report - 2026-10-05",
       "body": "The evidence-backed report body, including its UTC window, metrics, source references and any telemetry limitations."
     }
   },
@@ -365,6 +413,8 @@ For a no-data report, stage `noop` with the same handle and finish with
 count as successful delivery. Firewall and chronicle Work additionally permit
 up to three declared assets; regulatory Work permits its configured bounded
 Discussion-close output. Undeclared auxiliary writes remain unauthorized.
+DeepReport Work additionally permits up to seven issues, three comments and
+three artifacts; none substitutes for the required intelligence Discussion.
 
 ## One ledger from admission to verified Result
 
@@ -496,6 +546,12 @@ anything. If the queue already serves other workflows, merge the portfolio
 pool, accounting keys and producer entitlements into its complete policy;
 preserve other pools and limits, and quiesce before installation. Never
 overwrite a shared queue with the dedicated example policy.
+
+When expanding an already installed ten-profile portfolio, pause admission and
+drain its original Claims before installing a new Policy epoch with all thirteen
+profiles and the new verified immutable revisions. Existing Work definitions
+are immutable: do not resubmit an already admitted date with the new rotation.
+Resume on a report date that has not been admitted under the old planner.
 
 The example bounds pending nodes to thirty. An extended backlog becomes an
 explicit admission failure rather than an unbounded hidden schedule.

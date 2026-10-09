@@ -10,6 +10,9 @@ import { queueFixture, REF, REPOSITORY, WORKFLOW, DISPATCHER } from "./work_queu
 import { newRequest, newState, replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
 import { fakeGitHub } from "./work_queue_store_checks.cjs";
 import { MAX_SNAPSHOT_PARSE_BYTES } from "./work_queue_codec.cjs";
+import { loadQueue } from "./work_queue_binding.cjs";
+import { publishWorkQueueRequest } from "./work_queue_store.cjs";
+import { newWork } from "./work_queue_graph.cjs";
 
 const directories = [];
 function setup(options = {}) {
@@ -192,6 +195,62 @@ describe("authenticated immutable activation snapshots", () => {
     expect(options.core.info).toHaveBeenCalledWith(expect.stringContaining("protected queue branch 'custom-queue'"));
   });
 
+  it("defers branch creation with a compiled Policy until the first checked Policy-and-Work commit", async () => {
+    const { fixture, options } = setup({ granted: false });
+    const fake = fakeGitHub();
+    const githubClient = {
+      rest: {
+        ...fixture.githubClient.rest,
+        actions: { ...fixture.githubClient.rest.actions, ...fake.githubClient.rest.actions },
+        git: fake.githubClient.rest.git,
+        repos: {
+          ...fake.githubClient.rest.repos,
+          get: async () => ({ status: 200, data: { full_name: REPOSITORY, id: 7, default_branch: "main", size: 1 } }),
+        },
+      },
+    };
+    const configured = { ...options, githubClient, policyProposal: fixture.policy, readWorkQueueLog: undefined, publishWorkQueueRequest: undefined };
+    const snapshot = await main(configured);
+    expect(snapshot).toMatchObject({ sha: null, worker: null, transactionLog: "" });
+    expect(readWorkQueueState(loadWorkQueueSnapshot(options.snapshotPath))).toMatchObject({ queue_state: "uninitialized", total: 0 });
+    expect(fake.refs.size).toBe(0);
+    expect(fake.blobs.size).toBe(0);
+
+    const nodes = [newWork({ plan: "first admitted task", effect_contract: { kind: "none" } }, "activation-bootstrap", "root", "default", fixture.policy, fixture.at)];
+    const request = newRequest("activation-bootstrap", "submit", snapshot.origin, { nodes });
+    const createRef = vi.spyOn(githubClient.rest.git, "createRef");
+    const result = await publishWorkQueueRequest({
+      githubClient,
+      owner: "owner",
+      repo: "repo",
+      request,
+      context: { ...snapshot.origin, authenticated: true, roles: ["dispatcher"] },
+      policyProposal: fixture.policy,
+      now: () => fixture.at,
+    });
+    expect(result.publishedNow).toBe(true);
+    expect(result.transactions).toHaveLength(1);
+    expect(result.commit.operations.map(operation => operation.kind)).toEqual(["Policy", "Work"]);
+    expect(createRef).toHaveBeenCalledExactlyOnceWith({ owner: "owner", repo: "repo", ref: "refs/heads/work-queue", sha: result.sha });
+
+    const installedPath = path.join(path.dirname(options.snapshotPath), "installed.json");
+    const installed = await main({ ...configured, snapshotPath: installedPath });
+    expect(installed.sha).toBe(result.sha);
+    expect(readWorkQueueState(loadWorkQueueSnapshot(installedPath))).toMatchObject({ queue_state: "initialized", total: 1 });
+    expect(fake.log()).toHaveLength(1);
+  });
+
+  it("rejects invalid bootstrap proposals and missing worker queues without creating a branch", async () => {
+    const { fixture, options } = setup({ granted: false });
+    const absent = async () => ({ sha: null, transactions: [], state: newState() });
+    await expect(main({ ...options, policyProposal: { ...fixture.policy, mode: "invalid" }, readWorkQueueLog: absent })).rejects.toThrow();
+    expect(fs.existsSync(options.snapshotPath)).toBe(false);
+    const assigned = setup({ started: true });
+    await expect(main({ ...assigned.options, policyProposal: assigned.fixture.policy, readWorkQueueLog: absent })).rejects.toThrow(/policy_missing/);
+    expect(fs.existsSync(assigned.options.snapshotPath)).toBe(false);
+    await expect(loadQueue({ ...options, policyProposal: fixture.policy, readWorkQueueLog: async () => ({ sha: "existing", transactions: [], state: newState() }) })).rejects.toThrow(/policy_missing/);
+  });
+
   it("rejects actual oversized encoded framing before creating a snapshot or publishing origin output", async () => {
     const { fixture, options } = setup({ granted: false });
     const before = fixture.transactions;
@@ -370,8 +429,9 @@ describe("authenticated immutable activation snapshots", () => {
     expect(mismatched.fixture.state.dispatches.get(mismatched.fixture.assignment.dispatch_id).run).toBeUndefined();
     expect(fs.existsSync(mismatched.options.snapshotPath)).toBe(false);
     const missing = setup({ granted: false });
-    await expect(main({ ...missing.options, policyProposal: missing.fixture.policy, readWorkQueueLog: async () => ({ sha: null, transactions: [], state: newState() }) })).rejects.toThrow(/policy_missing/);
-    expect(fs.existsSync(missing.options.snapshotPath)).toBe(false);
+    const snapshot = await main({ ...missing.options, policyProposal: missing.fixture.policy, readWorkQueueLog: async () => ({ sha: null, transactions: [], state: newState() }) });
+    expect(snapshot).toMatchObject({ sha: null, transactionLog: "", worker: null });
+    expect(loadWorkQueueSnapshot(missing.options.snapshotPath).projection.policy).toBeNull();
   });
 
   it("reads only a bounded canonical environment proposal, never credentials or an authority flag", async () => {

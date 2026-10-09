@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +30,6 @@ func isTransientDockerBuildFailure(output string) bool {
 		"tls handshake timeout",
 		"connection reset by peer",
 		"temporary failure",
-		"failed to resolve source metadata for docker.io/library/alpine",
 		"warning: fetching https://dl-cdn.alpinelinux.org/alpine/",
 	}
 
@@ -96,6 +96,21 @@ func TestIsTransientDockerBuildFailure(t *testing.T) {
 			want:   true,
 		},
 		{
+			name:   "mirror_gateway_timeout",
+			output: "failed to resolve source metadata for mirror.gcr.io/library/alpine: 504 Gateway Timeout",
+			want:   true,
+		},
+		{
+			name:   "mirror_missing_manifest",
+			output: "failed to resolve source metadata for mirror.gcr.io/library/alpine: manifest unknown",
+			want:   false,
+		},
+		{
+			name:   "docker_hub_missing_manifest",
+			output: "failed to resolve source metadata for docker.io/library/alpine: manifest unknown",
+			want:   false,
+		},
+		{
 			name:   "non_transient_dockerfile_error",
 			output: "ERROR: failed to solve: failed to read dockerfile: open Dockerfile: no such file or directory",
 			want:   false,
@@ -139,19 +154,23 @@ func TestDockerfile_Exists(t *testing.T) {
 
 	// Verify essential components are present
 	requiredComponents := []string{
-		"FROM alpine:",           // Alpine base image
-		"github-cli",             // GitHub CLI package
-		"git",                    // Git package
-		"jq",                     // jq package
-		"bash",                   // Bash package
-		"ARG BINARY",             // Build argument for binary
-		"ENTRYPOINT [\"gh-aw\"]", // Entrypoint
+		"FROM mirror.gcr.io/library/alpine:", // Mirrored official Alpine base image
+		"github-cli",                         // GitHub CLI package
+		"git",                                // Git package
+		"jq",                                 // jq package
+		"bash",                               // Bash package
+		"ARG BINARY",                         // Build argument for binary
+		"ENTRYPOINT [\"gh-aw\"]",             // Entrypoint
 	}
 
 	for _, component := range requiredComponents {
 		if !strings.Contains(contentStr, component) {
 			t.Errorf("Dockerfile is missing required component: %s", component)
 		}
+	}
+
+	if !regexp.MustCompile(`(?m)^FROM mirror\.gcr\.io/library/alpine:[0-9]+\.[0-9]+@sha256:[a-f0-9]{64}$`).MatchString(contentStr) {
+		t.Error("Dockerfile must pin the mirrored Alpine base image by version and SHA-256 digest")
 	}
 }
 
