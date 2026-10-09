@@ -4,6 +4,7 @@ async function openPresentation(page: Page) {
   await page.goto("/gh-aw/");
   await page.getByRole("button", { name: "Start slideshow" }).click();
   await expect(page.locator("#landing-slideshow")).toBeVisible();
+  await page.keyboard.press("PageDown");
 }
 
 async function draw(page: Page, dx: number, dy: number, shift = false) {
@@ -62,13 +63,13 @@ test("keeps ink with its slide, preserves it on resize, and supports undo and cl
   await expect(ink.locator("[data-drawing-kind]")).toHaveCount(0);
   await draw(page, 100, 80);
   await page.getByRole("button", { name: "Previous slide", exact: true }).click();
-  await expect(page.locator("[data-slideshow-status]")).toContainText("1 / 9");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("2 / 12");
   await expect(ink.locator('[data-drawing-kind="arrow"]')).toHaveCount(1);
   expect(await ink.locator('[data-drawing-kind="arrow"]').evaluate(element => element.outerHTML)).toBe(original);
   await page.getByRole("button", { name: "Undo drawing", exact: true }).click();
   await expect(ink.locator("[data-drawing-kind]")).toHaveCount(0);
   await page.getByRole("button", { name: "Next slide", exact: true }).click();
-  await expect(page.locator("[data-slideshow-status]")).toContainText("2 / 9");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("3 / 12");
   await expect(ink.locator("[data-drawing-kind]")).toHaveCount(1);
   await page.keyboard.press("Control+z");
   await expect(ink.locator("[data-drawing-kind]")).toHaveCount(0);
@@ -119,7 +120,7 @@ test("Escape exits drawing mode and clears every slide without exiting the prese
   await expect(page.locator("[data-slideshow-ink]")).toHaveAttribute("data-tool", "pointer");
   await expect(page.locator("[data-slideshow-ink] [data-drawing-kind]")).toHaveCount(0);
   await page.getByRole("button", { name: "Previous slide", exact: true }).click();
-  await expect(page.locator("[data-slideshow-status]")).toContainText("1 / 9");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("2 / 12");
   await expect(page.locator("[data-slideshow-ink] [data-drawing-kind]")).toHaveCount(0);
   await page.getByRole("button", { name: "Drawing tools", exact: true }).click();
   await page.getByRole("button", { name: "Smile emoji", exact: true }).click();
@@ -164,7 +165,7 @@ test("expands snippets with larger type and smooth transitions without changing 
   await expect.poll(async () => (await zoom.boundingBox())?.height).toBe(page.viewportSize()?.height);
   expect(await zoom.evaluate(element => getComputedStyle(element).transitionDuration)).toContain("0.22s");
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator("[data-slideshow-status]")).toContainText("1 / 9");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("2 / 12");
   await page.keyboard.press("Escape");
   await expect(zoom).not.toBeVisible();
   await expect(source).toBeFocused();
@@ -226,7 +227,7 @@ test("edits enlarged code as plain text without changing the original slide", as
   await expect(editor).toContainText("# edited live");
   await editor.press("ArrowUp");
   await editor.press("Home");
-  await expect(page.locator("[data-slideshow-status]")).toContainText("1 / 9");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("2 / 12");
   await editor.press("ControlOrMeta+z");
   await expect(editor).not.toContainText("# edited live");
   await expect(zoom).toBeVisible();
@@ -243,7 +244,7 @@ test("edits enlarged code as plain text without changing the original slide", as
 test("makes standalone code editable and leaves non-code expanded content read-only", async ({ page }) => {
   await openPresentation(page);
   await page.keyboard.press("PageDown");
-  await expect(page.locator("[data-slideshow-status]")).toContainText("2 / 9");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("3 / 12");
   await page.getByRole("button", { name: "Expand repo-assist output", exact: true }).click();
   const zoom = page.locator("[data-slideshow-snippet-dialog]");
   await expect(zoom).toBeVisible();
@@ -254,7 +255,7 @@ test("makes standalone code editable and leaves non-code expanded content read-o
   await page.keyboard.press("PageDown");
   await page.keyboard.press("PageDown");
   await page.keyboard.press("PageDown");
-  await expect(page.locator("[data-slideshow-status]")).toContainText("5 / 9");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("6 / 12");
   const inlineCode = page.getByRole("button", { name: "Expand gh aw compile", exact: true });
   await inlineCode.click();
   const editor = zoom.getByRole("textbox");

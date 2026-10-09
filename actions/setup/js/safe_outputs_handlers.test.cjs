@@ -2538,11 +2538,9 @@ describe("safe_outputs_handlers", () => {
       }
     });
 
-    describe("full-branch allowed_files check", () => {
+    describe("incremental allowed_files check", () => {
       /**
-       * Creates a git repo whose history contains a file that violates `allowed_files`
-       * (a .js file when only .md is allowed).  Sets up `origin/main` as the tracking ref
-       * so `execGitSync` can compute the range `origin/main..<branch>`.
+       * Creates a PR branch with an author-owned .js file and an agent-owned .md file.
        */
       function createRepoWithDisallowedHistoryFile() {
         const repoDir = path.join(testWorkspaceDir, "allowed-files-repo");
@@ -2570,15 +2568,21 @@ describe("safe_outputs_handlers", () => {
         fs.writeFileSync(path.join(repoDir, "script.js"), "console.log('hi');\n");
         execSync("git add script.js", { cwd: repoDir, stdio: "pipe" });
         execSync("git commit -m 'add script'", { cwd: repoDir, stdio: "pipe" });
+        const prHeadSha = execSync("git rev-parse HEAD", { cwd: repoDir, stdio: "pipe" }).toString().trim();
 
-        // Set up origin/main tracking ref
+        fs.writeFileSync(path.join(repoDir, "agent.md"), "agent change\n");
+        execSync("git add agent.md", { cwd: repoDir, stdio: "pipe" });
+        execSync("git commit -m 'agent change'", { cwd: repoDir, stdio: "pipe" });
+
+        // Set up tracking refs at the original PR head.
         execSync("git remote add origin https://github.com/test-owner/test-repo.git", { cwd: repoDir, stdio: "pipe" });
         execSync(`git update-ref refs/remotes/origin/main ${mainSha}`, { cwd: repoDir, stdio: "pipe" });
+        execSync(`git update-ref refs/remotes/origin/feature/work ${prHeadSha}`, { cwd: repoDir, stdio: "pipe" });
 
         return { repoDir };
       }
 
-      it("returns isError when branch history contains a file outside allowed_files", async () => {
+      it("does not reject author-owned files outside allowed_files", async () => {
         let repoDir;
         try {
           ({ repoDir } = createRepoWithDisallowedHistoryFile());
@@ -2598,13 +2602,36 @@ describe("safe_outputs_handlers", () => {
         try {
           const result = await localHandlers.pushToPullRequestBranchHandler({ branch: "feature/work" });
 
+          expect(mockServer.debug).toHaveBeenCalledWith(expect.stringContaining("Generating incremental patch for push_to_pull_request_branch"));
+          if (result.isError) {
+            const data = JSON.parse(result.content[0].text);
+            expect(data.error).not.toContain("allowed-files configuration");
+            expect(data.disallowed_files).toBeUndefined();
+          }
+        } finally {
+          delete process.env.GITHUB_BASE_REF;
+          process.env.GITHUB_WORKSPACE = testWorkspaceDir;
+        }
+      });
+
+      it("rejects disallowed files introduced after the existing PR head", async () => {
+        const { repoDir } = createRepoWithDisallowedHistoryFile();
+        fs.writeFileSync(path.join(repoDir, "agent.js"), "console.log('agent');\n");
+        execSync("git add agent.js", { cwd: repoDir, stdio: "pipe" });
+        execSync("git commit -m 'agent script'", { cwd: repoDir, stdio: "pipe" });
+        execSync("git rm agent.js", { cwd: repoDir, stdio: "pipe" });
+        execSync("git commit -m 'revert agent script'", { cwd: repoDir, stdio: "pipe" });
+
+        process.env.GITHUB_BASE_REF = "main";
+        process.env.GITHUB_WORKSPACE = repoDir;
+        const localHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
+          push_to_pull_request_branch: { allowed_files: ["*.md"] },
+        });
+        try {
+          const result = await localHandlers.pushToPullRequestBranchHandler({ branch: "feature/work" });
           expect(result.isError).toBe(true);
           const data = JSON.parse(result.content[0].text);
-          expect(data.result).toBe("error");
-          expect(data.error).toContain("allowed-files");
-          expect(data.disallowed_files).toBeDefined();
-          expect(data.disallowed_files).toContain("script.js");
-          // Safe output must NOT have been recorded for a disallowed branch
+          expect(data.disallowed_files).toEqual(["agent.js"]);
           expect(mockAppendSafeOutput).not.toHaveBeenCalled();
         } finally {
           delete process.env.GITHUB_BASE_REF;
@@ -2612,7 +2639,34 @@ describe("safe_outputs_handlers", () => {
         }
       });
 
-      it("does not block when all branch history files are within allowed_files", async () => {
+      it("does not reject disallowed files merged from the updated base branch", async () => {
+        const { repoDir } = createRepoWithDisallowedHistoryFile();
+        execSync("git checkout main", { cwd: repoDir, stdio: "pipe" });
+        fs.writeFileSync(path.join(repoDir, "upstream.js"), "console.log('upstream');\n");
+        execSync("git add upstream.js", { cwd: repoDir, stdio: "pipe" });
+        execSync("git commit -m 'update base branch'", { cwd: repoDir, stdio: "pipe" });
+        execSync("git checkout feature/work", { cwd: repoDir, stdio: "pipe" });
+        execSync("git merge --no-ff main -m 'merge updated base'", { cwd: repoDir, stdio: "pipe" });
+
+        process.env.GITHUB_BASE_REF = "main";
+        process.env.GITHUB_WORKSPACE = repoDir;
+        const localHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
+          push_to_pull_request_branch: { allowed_files: ["*.md"] },
+        });
+        try {
+          const result = await localHandlers.pushToPullRequestBranchHandler({ branch: "feature/work" });
+          if (result.isError) {
+            const data = JSON.parse(result.content[0].text);
+            expect(data.error).not.toContain("allowed-files configuration");
+            expect(data.disallowed_files).toBeUndefined();
+          }
+        } finally {
+          delete process.env.GITHUB_BASE_REF;
+          process.env.GITHUB_WORKSPACE = testWorkspaceDir;
+        }
+      });
+
+      it("does not block when agent files are within allowed_files", async () => {
         const repoDir = path.join(testWorkspaceDir, "allowed-files-ok-repo");
         fs.mkdirSync(repoDir, { recursive: true });
         try {
@@ -2671,7 +2725,10 @@ describe("safe_outputs_handlers", () => {
 
         process.env.GITHUB_BASE_REF = "main";
         process.env.GITHUB_WORKSPACE = repoDir;
-        // excluded_files exempts .js files, so script.js should not trigger the error
+        fs.writeFileSync(path.join(repoDir, "agent.js"), "console.log('agent');\n");
+        execSync("git add agent.js", { cwd: repoDir, stdio: "pipe" });
+        execSync("git commit -m 'agent script'", { cwd: repoDir, stdio: "pipe" });
+        // excluded_files exempts the agent's .js file.
         const localHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
           push_to_pull_request_branch: {
             allowed_files: ["*.md"],
@@ -2694,7 +2751,7 @@ describe("safe_outputs_handlers", () => {
         }
       });
 
-      it("is non-fatal when origin/baseBranch is not available (continues without blocking)", async () => {
+      it("is non-fatal when the remote PR head is not available (continues without blocking)", async () => {
         const repoDir = path.join(testWorkspaceDir, "no-origin-repo");
         fs.mkdirSync(repoDir, { recursive: true });
         try {
@@ -2707,11 +2764,11 @@ describe("safe_outputs_handlers", () => {
           execSync("git commit -m 'base'", { cwd: repoDir, stdio: "pipe" });
 
           execSync("git checkout -b feature/work", { cwd: repoDir, stdio: "pipe" });
-          // Add a disallowed file — but since origin/main is absent the check must be skipped
+          // Add a disallowed file — but since the remote PR head is absent the check must be skipped
           fs.writeFileSync(path.join(repoDir, "script.js"), "// disallowed\n");
           execSync("git add script.js", { cwd: repoDir, stdio: "pipe" });
           execSync("git commit -m 'disallowed file'", { cwd: repoDir, stdio: "pipe" });
-          // No remote / no origin/main tracking ref
+          // No remote / no remote PR head tracking ref
         } catch {
           return;
         }

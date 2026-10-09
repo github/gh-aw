@@ -22,16 +22,17 @@ type TokenCoreMetrics struct {
 
 // TokenUsageEntry represents a single line from token-usage.jsonl
 type TokenUsageEntry struct {
-	Schema    string `json:"_schema,omitempty"` // Self-describing record type, e.g. "token-usage/v0.26.0"
-	Timestamp string `json:"timestamp"`
-	Event     string `json:"event"`
-	RequestID string `json:"request_id"`
-	Purpose   string `json:"purpose,omitempty"`
-	Provider  string `json:"provider"`
-	Model     string `json:"model"`
-	Path      string `json:"path"`
-	Status    int    `json:"status"`
-	Streaming bool   `json:"streaming"`
+	Schema     string `json:"_schema,omitempty"` // Self-describing record type, e.g. "token-usage/v0.26.0"
+	Timestamp  string `json:"timestamp"`
+	Event      string `json:"event"`
+	RequestID  string `json:"request_id"`
+	Purpose    string `json:"purpose,omitempty"`
+	XInitiator string `json:"x_initiator,omitempty"`
+	Provider   string `json:"provider"`
+	Model      string `json:"model"`
+	Path       string `json:"path"`
+	Status     int    `json:"status"`
+	Streaming  bool   `json:"streaming"`
 	TokenCoreMetrics
 	DurationMs              int             `json:"duration_ms"`
 	ResponseBytes           int             `json:"response_bytes"`

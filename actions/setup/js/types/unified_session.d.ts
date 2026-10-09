@@ -103,17 +103,22 @@ export interface ModelRoutingData {
   stage?: JsonValue;
   purpose?: JsonValue;
   attempt?: JsonValue;
+  classifier_model?: JsonValue;
+  classifier_attempts?: JsonValue;
   classifierModel?: JsonValue;
   classifierEffort?: JsonValue;
   objective?: JsonValue;
   provider?: JsonValue;
   labels?: JsonValue;
   mode?: JsonValue;
-  classifierAttempts?: JsonValue;
   degradedClassification?: JsonValue;
   degradedReason?: JsonValue;
   selectedId?: JsonValue;
   selectedProvider?: JsonValue;
+  routed?: JsonValue;
+  outcome?: JsonValue;
+  selected_model?: JsonValue;
+  selected_effort?: JsonValue;
   selectedModel?: JsonValue;
   selectedEffort?: JsonValue;
   wireModel?: JsonValue;
@@ -122,8 +127,8 @@ export interface ModelRoutingData {
   latencyMs?: JsonValue;
   code?: JsonValue;
   requestId?: JsonValue;
-  routed?: JsonValue;
-  outcome?: JsonValue;
+  request_id?: JsonValue;
+  classifierAttempts?: JsonValue;
   deviations?: JsonValue;
   requestedModel?: JsonValue;
   requestedEffort?: JsonValue;
@@ -183,6 +188,9 @@ export interface FirewallAccessData {
 export interface UsageReportData {
   provider?: JsonValue;
   model?: JsonValue;
+  purpose?: JsonValue;
+  path?: JsonValue;
+  xInitiator?: JsonValue;
   requestId?: JsonValue;
   status?: JsonValue;
   aic?: JsonValue;

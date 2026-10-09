@@ -143,6 +143,41 @@ function registerTests({ describe, it }) {
       assert.throws(() => replayTransactions([...log, { ...log[1], at: 2 }]), /duplicate commit/);
       assert.throws(() => parseTransactionLog(serializeTransactionLog(log) + "\n"), /empty|truncated/);
     });
+    it("replays atomic producer and dispatcher genesis with exactly one Policy and the submitted Work", () => {
+      const root = genesis();
+      const nodes = submission([root], ["a", "b"]).operations;
+      for (const actor of [producer, dispatcher]) {
+        const bootstrap = commit(null, "bootstrap", "submit", actor, { nodes }, [...root.operations, ...nodes], 1);
+        const state = replayTransactions([bootstrap]);
+        assert.deepEqual(state.policy, root.operations[0].policy);
+        assert.equal(state.policy_epoch, root.policy_epoch);
+        assert.deepEqual(
+          [...state.works.keys()],
+          nodes.map(node => node.work_id)
+        );
+        assert.equal(state.transactions.length, 1);
+        const later = submission([bootstrap], ["c"], { id: "later" });
+        assert.equal(replayTransactions([bootstrap, later]).works.size, 3);
+      }
+    });
+    it("rejects malformed, unauthorized and non-genesis producer Policy installation", () => {
+      const root = genesis();
+      const policy = root.operations[0];
+      const nodes = submission([root], ["a"]).operations;
+      const bootstrap = commit(null, "bootstrap", "submit", producer, { nodes }, [policy, ...nodes], 1);
+      for (const operations of [nodes, [policy], [...nodes, policy], [policy, policy, ...nodes]]) {
+        assert.throws(() => replayTransactions([{ ...bootstrap, operations }]), /policy_missing|request_invalid/);
+      }
+      const mismatched = [{ ...nodes[0], priority: 2 }];
+      assert.throws(() => replayTransactions([{ ...bootstrap, request: newRequest(bootstrap.request.id, "submit", producer, { nodes: mismatched }) }]), /request_invalid/);
+      const wrongEpoch = { ...bootstrap, policy_epoch: "other" };
+      assert.throws(() => replayTransactions([wrongEpoch]), /policy_not_quiescent/);
+      const unregistered = { ...producer, principal: "1002" };
+      assert.throws(() => replayTransactions([commit(null, "bootstrap", "submit", unregistered, { nodes }, bootstrap.operations, 1)]), /admission_unauthorized/);
+      assert.throws(() => replayTransactions([commit(null, "bootstrap", "submit", administrator, { nodes }, bootstrap.operations, 1)]), /policy_missing/);
+      assert.throws(() => replayTransactions([root, { ...bootstrap, previous: root.id }]), /policy_not_quiescent/);
+      assert.throws(() => replayTransactions([commit(null, "producer-policy", "policy", producer, { operations: [policy] }, [policy], 1)]), /actor_unauthorized|policy_missing/);
+    });
     it("appends once to canonical deduplicated history and rejects stale tips and reused commit IDs", () => {
       const log = fixture(["a"]);
       const operations = [{ kind: "Control", control: "grants_paused", value: true, reason: "stress_control" }];

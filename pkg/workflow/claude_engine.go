@@ -61,6 +61,10 @@ func (e *ClaudeEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvide
 	return resolveEngineLLMProviderFromModel(workflowData, LLMProviderAnthropic)
 }
 
+func (e *ClaudeEngine) GetHostedWebCapabilities(_ *WorkflowData) HostedWebCapabilities {
+	return HostedWebCapabilities{Supported: true, SupportsMaxUses: true}
+}
+
 // GetAPMTarget returns "claude" so that apm-action packs Claude-specific primitives.
 func (e *ClaudeEngine) GetAPMTarget() string {
 	return "claude"
