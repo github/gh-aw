@@ -131,14 +131,26 @@ describe("resolveModelRoutingSummary", () => {
     }
   });
 
-  it("uses an agent routing failure code and normalizes legacy endpoint-only deviations", () => {
+  it("uses runner-written routing and ignores agent outcomes", () => {
     const root = createRoot();
     const sessionPath = path.join(root, "usage/aw_session.jsonl");
+    const infoPath = path.join(root, "aw_info.json");
     try {
+      fs.writeFileSync(
+        infoPath,
+        JSON.stringify({
+          model_routing: {
+            status: "rejected",
+            failure_code: "runner_failure",
+            mode: "runner-mode",
+            router_version: "runner-version",
+          },
+        })
+      );
       writeJSONL(sessionPath, [
         {
           type: "model_routing.outcome",
-          data: { status: "rejected", failureCode: "unsupported_endpoint" },
+          data: { status: "selected", failureCode: "prompt-derived-failure" },
           provenance: { component: "agent", phase: "agent" },
         },
         {
@@ -157,11 +169,11 @@ describe("resolveModelRoutingSummary", () => {
         },
       ]);
 
-      expect(resolveModelRoutingSummary({ sessionPath, infoPath: path.join(root, "missing.json"), ghAwDir: root })).toEqual({
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath, ghAwDir: root })).toEqual({
         status: "rejected",
-        mode: "",
-        router_version: "",
-        failure_code: "unsupported_endpoint",
+        mode: "runner-mode",
+        router_version: "runner-version",
+        failure_code: "runner_failure",
         objective: "",
         task_type: "",
         scope: "",
@@ -176,7 +188,9 @@ describe("resolveModelRoutingSummary", () => {
   it("estimates classifier AIC from attributed token usage when response AIC is absent", () => {
     const root = createRoot();
     const sessionPath = path.join(root, "usage/aw_session.jsonl");
+    const infoPath = path.join(root, "aw_info.json");
     try {
+      fs.writeFileSync(infoPath, JSON.stringify({ model_routing: { status: "selected" } }));
       writeJSONL(sessionPath, [
         {
           type: "model_routing.outcome",
@@ -200,7 +214,7 @@ describe("resolveModelRoutingSummary", () => {
         },
       ]);
 
-      expect(resolveModelRoutingSummary({ sessionPath, infoPath: path.join(root, "missing.json"), ghAwDir: root }).classifier_aic).toBeGreaterThan(0);
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath, ghAwDir: root }).classifier_aic).toBeGreaterThan(0);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

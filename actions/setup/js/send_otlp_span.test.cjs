@@ -3189,8 +3189,8 @@ describe("sendJobConclusionSpan", () => {
     const attrs = Object.fromEntries(span.attributes.map(attr => [attr.key, attr.value.stringValue ?? attr.value.intValue ?? attr.value.doubleValue ?? attr.value.boolValue]));
     expect(attrs).toMatchObject({
       "gh-aw.model_routing.status": "selected",
-      "gh-aw.model_routing.mode": "session-mode",
-      "gh-aw.model_routing.router_version": "1.2.3",
+      "gh-aw.model_routing.mode": "awinfo-mode",
+      "gh-aw.model_routing.router_version": "0.28.49",
       "gh-aw.model_routing.objective": "cost",
       "gh-aw.model_routing.task_type": "fix",
       "gh-aw.model_routing.scope": "local",
@@ -3211,13 +3211,15 @@ describe("sendJobConclusionSpan", () => {
     process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
     process.env.INPUT_JOB_NAME = "agent";
     process.env.GH_AW_TMP_DIR = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-routing-failure-"));
+    const infoPath = path.join(process.env.GH_AW_TMP_DIR, "aw_info.json");
     const sessionPath = path.join(process.env.GH_AW_TMP_DIR, "usage/aw_session.jsonl");
+    nodeFs.writeFileSync(infoPath, JSON.stringify({ model_routing: { status: "rejected", failure_code: "unsupported_endpoint" } }));
     originalMkdirSync(path.dirname(sessionPath), { recursive: true });
     nodeFs.writeFileSync(
       sessionPath,
       JSON.stringify({
         type: "model_routing.outcome",
-        data: { status: "rejected", failureCode: "unsupported_endpoint" },
+        data: { status: "selected", failureCode: "prompt-derived-failure" },
         provenance: { component: "agent", phase: "agent" },
       })
     );

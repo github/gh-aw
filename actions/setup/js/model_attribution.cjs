@@ -140,7 +140,6 @@ function readModelRoutingSession(sessionPath) {
       const provenance = event?.provenance;
       const agentEvent =
         (event?.type === "workflow.info" && provenance?.component === "workflow" && provenance?.phase === "agent") ||
-        (event?.type === "model_routing.outcome" && provenance?.component === "agent" && provenance?.phase === "agent") ||
         ((event?.type === "firewall.model_routing" || event?.type === "firewall.token_usage") && provenance?.component === "firewall" && provenance?.phase === "agent");
       if (agentEvent) events.push(event);
     } catch {
@@ -233,27 +232,22 @@ function resolveModelRoutingSummary({
 } = {}) {
   const sessionEvents = readModelRoutingSession(sessionPath);
   const workflowInfo = sessionEvents.find(event => event.type === "workflow.info")?.data;
-  const outcome = sessionEvents.find(event => event.type === "model_routing.outcome")?.data;
   const sessionRouting = workflowInfo?.modelRouting ?? workflowInfo?.model_routing ?? {};
   const sessionRecords = sessionEvents.filter(event => event.type === "firewall.model_routing").map(event => event.data);
   const sessionSelection = sessionRecords.find(record => record?.stage === "selection");
-  const sessionFailure = sessionRecords.find(record => record?.stage === "failure");
-  const infoRouting = getModelRouting(infoPath);
+  const runnerRouting = resolveEffectiveModel(infoPath, "agent").routing ?? {};
 
   // The agent post-step runs before the usage-artifact step writes aw_session.jsonl.
-  // Use the session when available, then aw_info.json and proxy logs as fallbacks.
+  // Use runner-written routing metadata for routing state, and proxy records for classifier details.
   const proxyRecords = readModelRoutingProxyRecords(ghAwDir);
   const proxySelection = proxyRecords.filter(record => record.stage === "selection").at(-1);
-  const proxyFailure = proxyRecords.filter(record => record.stage === "failure").at(-1);
   const proxyRequests = proxyRecords.filter(record => record.stage === "request");
   const proxySchema = proxyRecords.find(record => record?._schema)?.["_schema"] || "";
   const sessionRequests = sessionRecords.filter(record => record?.stage === "request");
   const requestRecords = sessionRequests.length ? sessionRequests : proxyRequests;
   const requestSchema = sessionRecords.find(record => typeof (record?._schema || record?.schema) === "string")?._schema || sessionRecords.find(record => typeof record?.schema === "string")?.schema || proxySchema;
 
-  const status = [outcome?.status, sessionRouting.status, sessionSelection ? "selected" : "", sessionFailure ? "failed" : "", infoRouting?.status, proxySelection ? "selected" : "", proxyFailure ? "failed" : ""].find(
-    value => typeof value === "string" && ROUTING_STATUSES.has(value)
-  );
+  const status = [runnerRouting.status, sessionRouting.status].find(value => typeof value === "string" && ROUTING_STATUSES.has(value));
   if (!status) return null;
 
   const selection = sessionSelection || proxySelection || {};
@@ -263,11 +257,11 @@ function resolveModelRoutingSummary({
   /** @type {ModelRoutingSummary} */
   const result = {
     status,
-    mode: firstValidated(sessionRouting.mode, sessionRouting.Mode, selection.mode, infoRouting?.mode, proxySelection?.mode),
-    router_version: firstValidated(sessionRouting.routerVersion, sessionRouting.router_version, sessionRouting.router?.version, selection.router?.version, infoRouting?.router_version, proxySelection?.router?.version),
+    mode: firstValidated(runnerRouting.mode, sessionRouting.mode, sessionRouting.Mode),
+    router_version: firstValidated(runnerRouting.router_version, runnerRouting.routerVersion, runnerRouting.router?.version, sessionRouting.routerVersion, sessionRouting.router_version, sessionRouting.router?.version),
     ...(status !== "selected"
       ? {
-          failure_code: firstValidated(outcome?.failureCode, outcome?.failure_code, sessionRouting.failureCode, sessionRouting.failure_code, sessionFailure?.code, infoRouting?.failure_code, proxyFailure?.code),
+          failure_code: firstValidated(runnerRouting.failure_code, runnerRouting.failureCode, sessionRouting.failureCode, sessionRouting.failure_code),
         }
       : {}),
     objective: firstValidated(objective),
