@@ -171,6 +171,9 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 		}
 		return nil
 	}
+	if runtimeID == "codex" && NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+		return errors.New("network.hosted-web is not functional with Codex using Copilot inference; use OpenAI inference to enable standalone web search")
+	}
 	if len(policy.Allowed) == 0 && len(policy.Blocked) == 0 {
 		return errors.New("network.hosted-web requires exactly one non-empty allowed or blocked list")
 	}

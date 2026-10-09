@@ -284,10 +284,16 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			wantErr: "network.hosted-web.max-uses is not supported by Codex standalone web search",
 		},
 		{
-			name:     "allows Codex GitHub max-uses",
+			name:     "rejects Codex Copilot hosted web",
 			engine:   "codex",
 			provider: LLMProviderGitHub,
-			policy:   &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
+			policy:   &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}},
+			wantErr:  "not functional with Codex using Copilot inference",
+		},
+		{
+			name:     "allows Codex Copilot inference without hosted web",
+			engine:   "codex",
+			provider: LLMProviderGitHub,
 		},
 		{
 			name:    "requires a policy list",
