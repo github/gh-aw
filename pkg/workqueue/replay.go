@@ -76,6 +76,10 @@ func Replay(commits []QueueCommit) (Projection, error) {
 	for generation := range generations {
 		state.SeenGenerations[generation] = true
 	}
+	for id, explanation := range state.ClaimExplanations {
+		explanation.Tip = state.Tip
+		state.ClaimExplanations[id] = explanation
+	}
 	return state, nil
 }
 
@@ -149,7 +153,7 @@ func (state *Projection) replayCommit(commit QueueCommit, ordinal int, epochs, g
 		}
 	}
 	if firstClaim >= 0 {
-		if err := state.replayClaimPrefix(commit, firstClaim); err != nil {
+		if err := state.replayClaimPrefix(commit, firstClaim, ordinal); err != nil {
 			return err
 		}
 		hasAdmission = true
@@ -176,7 +180,13 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 		if err := json.Unmarshal(operation, &node); err != nil {
 			return err
 		}
-		return state.admitWork(node, commit, position)
+		if err := state.admitWork(node, commit, position); err != nil {
+			return err
+		}
+		if _, exists := state.WorkCreators[node.WorkID]; !exists {
+			state.WorkCreators[node.WorkID] = commit.Actor
+		}
+		return nil
 	case "Observation":
 		var observation Observation
 		if err := json.Unmarshal(operation, &observation); err != nil {
@@ -278,7 +288,7 @@ func (state *Projection) applyReplayControl(operation Operation, generations ide
 	return nil
 }
 
-func (state *Projection) replayClaimPrefix(commit QueueCommit, firstClaim int) error {
+func (state *Projection) replayClaimPrefix(commit QueueCommit, firstClaim, ordinal int) error {
 	var params DispatchParameters
 	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
 		return err
@@ -294,14 +304,10 @@ func (state *Projection) replayClaimPrefix(commit QueueCommit, firstClaim int) e
 	if len(actual) == 0 || !sameJSON(expected.Operations, actual) {
 		return queueError("selection_invalid", "Claims do not match the maximal deterministic fair prefix")
 	}
-	for _, operation := range actual {
+	for index, operation := range actual {
 		var claim ClaimOperation
 		if err := json.Unmarshal(operation, &claim); err != nil {
 			return err
-		}
-		selection, clocks, err := planNext(*state, params.Pool, commit.At)
-		if err != nil || selection.WorkID != claim.WorkID {
-			return queueError("selection_invalid", "Claim is not the next fair winner")
 		}
 		if _, ok := state.Claims[claim.ClaimID]; ok {
 			return queueError("claim_conflict", "Claim identity already exists")
@@ -309,7 +315,11 @@ func (state *Projection) replayClaimPrefix(commit QueueCommit, firstClaim int) e
 		if existing := state.Dispatches[claim.DispatchID]; existing != nil && existing.CommitID != commit.ID {
 			return queueError("assignment_immutable", "cannot extend an existing dispatch")
 		}
-		recordClaim(state, claim, commit, clocks)
+		explanation, err := explainAndRecordClaim(state, operation, commit, Position{Commit: ordinal, Operation: firstClaim + index}, state.Tip)
+		if err != nil || explanation.WorkID != claim.WorkID {
+			return queueError("selection_invalid", "Claim is not the next fair winner")
+		}
+		state.ClaimExplanations[claim.ClaimID] = explanation
 	}
 	return nil
 }

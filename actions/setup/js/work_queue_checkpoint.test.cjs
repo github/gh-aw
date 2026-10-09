@@ -45,10 +45,7 @@ describe("shared version-3 checkpoint conformance", () => {
     const intent = {
       nodes: originalSubmission.request.parameters.nodes.map(({ kind, batch_trust_domain, enqueued, ...node }) => node),
     };
-    assert.deepEqual(
-      acceptedSubmissionParameters(after, context(originalSubmission.actor, { created_at: originalSubmission.at }), intent, after.requests.get(originalSubmission.request.id)),
-      originalSubmission.request.parameters
-    );
+    assert.deepEqual(acceptedSubmissionParameters(after, context(originalSubmission.actor, { created_at: originalSubmission.at }), intent, after.requests.get(originalSubmission.request.id)), originalSubmission.request.parameters);
     assert.equal(after.transactions.length, 1);
     assert.equal(serializeTransactionLog(after.transactions), serializeTransactionLog(fixture.checkpoint));
     assert.deepEqual(compactTransactions(fixture.history, fixture.prior_git_sha, administrator, 100), fixture.checkpoint);
@@ -104,6 +101,8 @@ describe("shared version-3 checkpoint conformance", () => {
   });
 
   it("authenticates the checkpoint against its actual Git parent ledger", async () => {
+    const checkedTransport = process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT;
+    process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT = "graphql";
     const head = "f".repeat(40);
     const foreign = "e".repeat(40);
     const prior = fixture.prior_git_sha;
@@ -123,11 +122,54 @@ describe("shared version-3 checkpoint conformance", () => {
       },
     };
     const read = () => readWorkQueueLog({ githubClient, owner: "owner", repo: "repo" });
-    assert.equal((await read()).state.tip, fixture.checkpoint[0].id);
-    parent = foreign;
-    await assert.rejects(read(), /checkpoint_invalid/);
-    parent = prior;
-    blobs.history = serializeTransactionLog(fixture.history.slice(0, 1));
-    await assert.rejects(read(), /checkpoint_invalid/);
+    try {
+      assert.equal((await read()).state.tip, fixture.checkpoint[0].id);
+      parent = foreign;
+      await assert.rejects(read(), /checkpoint_invalid/);
+      parent = prior;
+      blobs.history = serializeTransactionLog(fixture.history.slice(0, 1));
+      await assert.rejects(read(), /checkpoint_invalid/);
+    } finally {
+      if (checkedTransport === undefined) delete process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT;
+      else process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT = checkedTransport;
+    }
+  });
+
+  it("verifies checkpoint ancestry without a finite compaction lifetime", async () => {
+    const commits = new Map();
+    const trees = new Map();
+    let parent = fixture.prior_git_sha;
+    let ledger = fixture.history;
+    let at = fixture.checkpoint[0].at;
+    const baseTree = "checkpoint-chain-base";
+    commits.set(parent, { tree: baseTree, parents: [] });
+    trees.set(baseTree, serializeTransactionLog(ledger));
+    for (let index = 0; index < 66; index++) {
+      const checkpoint = compactTransactions(ledger, parent, administrator, at++);
+      const tree = `checkpoint-chain-${index}`;
+      const head = index.toString(16).padStart(40, "0");
+      commits.set(head, { tree, parents: [parent] });
+      trees.set(tree, serializeTransactionLog(checkpoint));
+      ledger = checkpoint;
+      parent = head;
+    }
+    const githubClient = {
+      rest: {
+        repos: { get: async () => ({ data: { full_name: "owner/repo", size: 1, default_branch: "main" } }) },
+        git: {
+          getRef: async () => ({ data: { object: { sha: parent } } }),
+          getCommit: async ({ commit_sha }) => {
+            const commit = commits.get(commit_sha);
+            assert.ok(commit, `missing mock commit ${commit_sha}`);
+            return { data: { tree: { sha: commit.tree }, parents: commit.parents.map(sha => ({ sha })) } };
+          },
+          getTree: async ({ tree_sha }) => ({ data: { tree: [{ path: "work-queue.jsonl", mode: "100644", type: "blob", sha: tree_sha }] } }),
+          getBlob: async ({ file_sha }) => ({ data: { encoding: "base64", content: Buffer.from(trees.get(file_sha)).toString("base64") } }),
+        },
+      },
+    };
+    const current = await readWorkQueueLog({ githubClient, owner: "owner", repo: "repo" });
+    assert.equal(current.sha, parent);
+    assert.equal(current.transactions.length, 1);
   });
 });

@@ -37,6 +37,13 @@ function readPlan(file) {
   return plan;
 }
 
+function isRetryablePublicationError(error) {
+  if (!error || typeof error !== "object") return false;
+  const status = "status" in error ? error.status : undefined;
+  const message = error instanceof Error ? error.message : "";
+  return status === 409 || (status === 422 && /not a fast.forward|reference update failed/i.test(message)) || status === 408 || status === 429 || (typeof status === "number" && status >= 500 && status < 600);
+}
+
 async function main(options = {}) {
   const context = options.context || global.context;
   const githubClient = options.githubClient || github;
@@ -80,9 +87,7 @@ async function main(options = {}) {
       core.info("Work queue checkpoint committed");
       return { status: "applied" };
     } catch (error) {
-      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-      const conflict = status === 409 || (status === 422 && /not a fast.forward|reference update failed/i.test(error instanceof Error ? error.message : ""));
-      if (!conflict && status !== 408 && !(typeof status === "number" && status >= 500) && status !== undefined) throw error;
+      if (!isRetryablePublicationError(error)) throw error;
       const latest = await readWorkQueueLog({ githubClient, owner, repo, branch: plan.branch });
       if (latest.transactions[0]?.operations[0]?.kind === "Checkpoint" && latest.transactions[0].operations[0].prior_git_sha === plan.base_sha) {
         core.setOutput("result", "applied");
@@ -104,4 +109,4 @@ async function main(options = {}) {
 
 if (require.main === module) main().catch(error => core.setFailed(error instanceof Error ? error.message : "Work queue compaction failed"));
 
-module.exports = { main, readPlan };
+module.exports = { isRetryablePublicationError, main, readPlan };

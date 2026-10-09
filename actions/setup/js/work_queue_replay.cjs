@@ -3,6 +3,7 @@
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("replay");
 
 const { createHash } = require("node:crypto");
+const { deflateRawSync, inflateRawSync } = require("node:zlib");
 const { canonical, canonicalBytes, closed, digest, fingerprint, identity, integer, parseStrictJSON, queueError, utf8Compare, validateReason } = require("./work_queue_codec.cjs");
 const { boundedBytes, checkLedgerBudget } = require("./work_queue_limits.cjs");
 const { indexesFor, trackState, untrackState, updateIndexes } = require("./work_queue_indexes.cjs");
@@ -328,6 +329,8 @@ function newState() {
     observations: new Map(),
     observationsById: new Map(),
     requests: new Map(),
+    workCreators: new Map(),
+    claimExplanations: new Map(),
     clocks: new Map(),
     admission_paused: false,
     grants_paused: false,
@@ -657,18 +660,54 @@ function checkpointSnapshot(state, lastAt) {
     Object.entries(projection.clocks).filter(([, clocks]) => clocks.classes.v !== "0" || Object.keys(clocks.classes.pass).length > 0 || Object.values(clocks.keys).some(clock => clock.v !== "0" || Object.keys(clock.pass).length > 0))
   );
   const object = map => Object.fromEntries(map);
-  const receipts = [...state.requests.values()].map(commit => ({
-    id: commit.id,
-    request_id: commit.request.id,
-    kind: commit.request.kind,
-    fingerprint: commit.request.fingerprint,
-    parameters_digest: commit.compacted_parameters_digest ?? digest(commit.request.parameters),
-    ...(commit.request.kind === "dispatch_next" ? { dispatch_parameters: commit.request.parameters } : {}),
-    actor: commit.actor,
-    policy_epoch: commit.policy_epoch,
-    at: commit.at,
-    claims: commit.operations.filter(operation => operation.kind === "Claim"),
-  }));
+  const receipts = [...state.requests.values()].map(commit => {
+    const claims = commit.operations.filter(operation => operation.kind === "Claim");
+    const checkpointPriorTip = commit.checkpoint_prior_tip ?? commit.operations.find(operation => operation.kind === "Checkpoint")?.prior_tip;
+    const events =
+      commit.checkpoint_events ??
+      commit.operations.map(operation => {
+        const fields = [
+          "kind",
+          "work_id",
+          "claim_id",
+          "dispatch_id",
+          "claim_handle",
+          "completion_id",
+          "state",
+          "reason",
+          "disposition",
+          "control",
+          "value",
+          "observation_id",
+          "observations",
+          "run",
+          "run_id",
+          "run_attempt",
+          "evidence",
+          "trace",
+        ];
+        return Object.fromEntries(Object.entries(operation).filter(([field, value]) => fields.includes(field) && (field !== "state" || typeof value === "string") && (field !== "observations" || value.length > 0)));
+      });
+    return {
+      id: commit.id,
+      previous: commit.previous,
+      request_id: commit.request.id,
+      kind: commit.request.kind,
+      ...(commit.request.kind === "checkpoint" ? { prior_tip: checkpointPriorTip } : {}),
+      fingerprint: commit.request.fingerprint,
+      parameters_digest: commit.compacted_parameters_digest ?? digest(commit.request.parameters),
+      ...(commit.request.kind === "dispatch_next" ? { dispatch_parameters: commit.request.parameters } : {}),
+      actor: commit.actor,
+      policy_epoch: commit.policy_epoch,
+      at: commit.at,
+      events,
+      claim_explanations: claims.map(claim => {
+        const explanation = state.claimExplanations.get(claim.claim_id);
+        if (!explanation) throw queueError("checkpoint_invalid", "claim inspection provenance is missing");
+        return explanation;
+      }),
+    };
+  });
   const completionTimes = Object.fromEntries([...state.works].filter(([, work]) => work.state === "completed").map(([id, work]) => [id, work.completion_at]));
   return {
     ...projection,
@@ -687,7 +726,8 @@ function restoreCheckpointState(checkpoint) {
   const op = checkpoint.operations[0];
   const invalid = () => queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection");
   if (checkpoint.previous !== null || checkpoint.actor.role !== "administrator" || checkpoint.request.kind !== "checkpoint") throw invalid();
-  const snapshot = op.state;
+  const wire = op.state;
+  const snapshot = expandCheckpointSnapshot(wire);
   closed(
     snapshot,
     [
@@ -719,7 +759,9 @@ function restoreCheckpointState(checkpoint) {
     "checkpoint state",
     "checkpoint_invalid"
   );
-  if (digest(snapshot) !== op.state_sha256 || snapshot.tip !== op.prior_tip || snapshot.repository !== checkpoint.actor.repository || snapshot.policy_epoch !== checkpoint.policy_epoch || checkpoint.at < snapshot.last_at) throw invalid();
+  if (digest(snapshot) !== op.state_sha256 || snapshot.tip !== op.prior_tip || snapshot.repository !== checkpoint.actor.repository || snapshot.policy_epoch !== checkpoint.policy_epoch || checkpoint.at < snapshot.last_at) {
+    throw invalid();
+  }
   validatePolicy(snapshot.policy);
   const object = value => value && typeof value === "object" && !Array.isArray(value);
   for (const key of ["works", "claims", "dispatches", "observations", "clocks", "observation_writes", "seen_epochs", "seen_generations", "observation_ids", "terminal_barriers", "cancellations", "completion_times"])
@@ -745,6 +787,7 @@ function restoreCheckpointState(checkpoint) {
   state.claims = new Map(Object.entries(snapshot.claims));
   state.dispatches = new Map(Object.entries(snapshot.dispatches));
   state.observations = new Map(Object.entries(snapshot.observations));
+  state.workCreators = new Map();
   state.observationsById = new Map(Object.entries(snapshot.observation_ids));
   state.observation_writes = new Map(Object.entries(snapshot.observation_writes));
   state.terminalBarriers = new Map(Object.entries(snapshot.terminal_barriers));
@@ -762,10 +805,18 @@ function restoreCheckpointState(checkpoint) {
   );
   state.requests = new Map();
   state.historicalTransactions = [];
+  state.claimExplanations = new Map();
   const commitIDs = new Set();
   for (const receipt of snapshot.requests) {
-    closed(receipt, ["id", "request_id", "kind", "fingerprint", "parameters_digest", "actor", "policy_epoch", "at", "claims"], ["dispatch_parameters"], "checkpoint receipt", "checkpoint_invalid");
+    closed(
+      receipt,
+      ["id", "previous", "request_id", "kind", "fingerprint", "parameters_digest", "actor", "policy_epoch", "at", "events", "claim_explanations"],
+      ["prior_tip", "dispatch_parameters"],
+      "checkpoint receipt",
+      "checkpoint_invalid"
+    );
     identity(receipt.id, "checkpoint receipt commit");
+    if (receipt.previous !== null) identity(receipt.previous, "checkpoint receipt predecessor");
     identity(receipt.request_id, "checkpoint receipt request");
     validateActor(receipt.actor);
     validateRequestRole(receipt.actor, receipt.kind);
@@ -773,26 +824,44 @@ function restoreCheckpointState(checkpoint) {
       state.requests.has(receipt.request_id) ||
       commitIDs.has(receipt.id) ||
       receipt.actor.repository !== state.repository ||
+      (receipt.kind === "checkpoint") !== Object.hasOwn(receipt, "prior_tip") ||
       !/^[a-f0-9]{64}$/.test(receipt.fingerprint) ||
       !/^[a-f0-9]{64}$/.test(receipt.parameters_digest) ||
       (receipt.kind === "dispatch_next") !== Object.hasOwn(receipt, "dispatch_parameters") ||
       !Number.isSafeInteger(receipt.at) ||
       receipt.at < 0 ||
-      !Array.isArray(receipt.claims) ||
-      receipt.claims.some(operation => operation.kind !== "Claim")
+      !Array.isArray(receipt.events) ||
+      !Array.isArray(receipt.claim_explanations) ||
+      receipt.events.some(operation => !operation || typeof operation.kind !== "string")
     )
       throw invalid();
+    const claims = receipt.events.filter(operation => operation.kind === "Claim");
+    if (receipt.claim_explanations.length !== claims.length) throw invalid();
+    for (const operation of receipt.events) {
+      if (operation.kind === "Work") {
+        if (!Object.hasOwn(snapshot.works, operation.work_id) || state.workCreators.has(operation.work_id)) throw invalid();
+        state.workCreators.set(operation.work_id, receipt.actor);
+      }
+    }
     commitIDs.add(receipt.id);
     const prior = {
       version: 3,
       id: receipt.id,
+      previous: receipt.previous,
       request: { id: receipt.request_id, kind: receipt.kind, fingerprint: receipt.fingerprint, parameters: receipt.dispatch_parameters ?? null },
       compacted_parameters_digest: receipt.parameters_digest,
+      checkpoint_prior_tip: receipt.prior_tip,
       actor: receipt.actor,
       policy_epoch: receipt.policy_epoch,
       at: receipt.at,
-      operations: receipt.claims,
+      operations: receipt.events,
+      checkpoint_events: receipt.events,
     };
+    for (const [index, claim] of claims.entries()) {
+      const explanation = receipt.claim_explanations[index];
+      if (explanation.claim_id !== claim.claim_id || explanation.commit_id !== receipt.id || explanation.request_id !== receipt.request_id || explanation.work_id !== claim.work_id) throw invalid();
+      state.claimExplanations.set(claim.claim_id, { ...explanation });
+    }
     state.requests.set(receipt.request_id, prior);
     state.historicalTransactions.push(prior);
   }
@@ -808,6 +877,7 @@ function restoreCheckpointState(checkpoint) {
   }
   const installedPolicy = state.policy;
   if (!installedPolicy) throw invalid();
+  if (state.workCreators.size !== state.works.size) throw invalid();
   for (const [id, work] of state.works) {
     if (
       work.work_id !== id ||
@@ -837,6 +907,51 @@ function restoreCheckpointState(checkpoint) {
   const policy = state.policy;
   if (!policy || state.ledgerBytes + require("./work_queue_limits.cjs").recoveryHeadroom(state) > policy.limits.ledger_bytes + policy.limits.recovery_bytes) throw invalid();
   return state;
+}
+
+function expandCheckpointSnapshot(wire) {
+  const invalid = () => queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection");
+  closed(
+    wire,
+    [
+      "repository",
+      "tip",
+      "policy_epoch",
+      "policy",
+      "works",
+      "claims",
+      "dispatches",
+      "observations",
+      "requests_compressed",
+      "clocks",
+      "admission_paused",
+      "grants_paused",
+      "credential_generation",
+      "stats",
+      "ledger_bytes",
+      "observation_writes",
+      "seen_epochs",
+      "seen_generations",
+      "observation_ids",
+      "terminal_barriers",
+      "cancellations",
+      "completion_times",
+      "last_at",
+    ],
+    [],
+    "checkpoint state",
+    "checkpoint_invalid"
+  );
+  if (typeof wire.requests_compressed !== "string" || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(wire.requests_compressed)) throw invalid();
+  try {
+    const requestsText = inflateRawSync(Buffer.from(wire.requests_compressed, "base64"), { maxOutputLength: 64 << 20 }).toString("utf8");
+    const requests = parseStrictJSON(requestsText);
+    if (!Array.isArray(requests) || canonical(requests) !== requestsText) throw invalid();
+    const { requests_compressed: _, ...projection } = wire;
+    return { ...projection, requests };
+  } catch {
+    throw invalid();
+  }
 }
 
 function replayOrdered(ordered) {
@@ -899,7 +1014,10 @@ function replayOrdered(ordered) {
           boundedBytes(operation, state.policy.limits.evidence_bytes, "Control");
           break;
         case "Work":
-          if (!state.works.has(operation.work_id)) state.works.set(operation.work_id, { ...operation, state: "available", position: { commit: ordinal + offset, operation: index }, attempts: 0, retry_not_before: 0, barrier: "none" });
+          if (!state.works.has(operation.work_id)) {
+            state.works.set(operation.work_id, { ...operation, state: "available", position: { commit: ordinal + offset, operation: index }, attempts: 0, retry_not_before: 0, barrier: "none" });
+            state.workCreators.set(operation.work_id, commit.actor);
+          }
           break;
         case "IssueLink":
         case "IssueComment":
@@ -923,8 +1041,44 @@ function replayOrdered(ordered) {
             expected = planDispatch(state, commit.request.parameters, { requestId: commit.request.id, commitId: commit.id, at: commit.at, precedingOperations: index });
           }
           if (canonical(operation) !== canonical(expected.operations[claimIndex])) throw queueError("selection_invalid", "Claim/order/group/handle does not match deterministic fair packing");
+          const work = state.works.get(operation.work_id);
           const selection = planNext(state, commit.request.parameters.pool, commit.at);
+          const priority = work.effective_priority ?? work.priority;
+          const clocks = state.clocks.get(work.pool);
+          const classPassPrior = clocks?.classes.passes.get(String(priority))?.toString() ?? "0";
+          const keyPassPrior = clocks?.keys.get(priority)?.passes.get(work.fairness_key)?.toString() ?? "0";
+          const capacityBefore = reservationCounts(state, work.pool, work.fairness_key);
+          const position = { commit: ordinal + offset, operation: index };
           applyScheduledClaim(state, operation, selection, commit);
+          state.claimExplanations.set(operation.claim_id, {
+            tip: state.tip,
+            at: commit.at,
+            status: "committed_claim_prefix",
+            before_tip: state.tip,
+            position,
+            request_id: commit.request.id,
+            commit_id: commit.id,
+            policy_epoch: commit.policy_epoch,
+            claim_id: operation.claim_id,
+            dispatch_id: operation.dispatch_id,
+            claim_handle: operation.handle,
+            work_id: work.work_id,
+            pool: work.pool,
+            priority,
+            fairness_key: work.fairness_key,
+            work_position: work.position,
+            selection: {
+              work_id: selection.work_id,
+              reason: "selected",
+              observations: selection.observations,
+              class_pass: selection.class_pass,
+              key_pass: selection.key_pass,
+            },
+            class_pass_prior: classPassPrior,
+            key_pass_prior: keyPassPrior,
+            capacity_before: { logical: capacityBefore.logical, native: capacityBefore.native, account: capacityBefore.account },
+            capacity_after: reservationCounts(state, work.pool, work.fairness_key),
+          });
           claimIndex++;
           break;
         }
@@ -957,6 +1111,7 @@ function replayOrdered(ordered) {
   projectViews(state);
   state.seen_epochs = epochs;
   state.seen_generations = generations;
+  for (const explanation of state.claimExplanations.values()) explanation.tip = state.tip;
   untrackState(state);
   return Object.assign(state, { policy: state.policy });
 }
@@ -1042,8 +1197,12 @@ function compactTransactions(transactions, priorGitSHA, actor, at = Date.now()) 
   const history = serializeTransactionLog(validated.transactions);
   const history_sha256 = createHash("sha256").update(history, "utf8").digest("hex");
   const state = checkpointSnapshot(validated, validated.transactions.at(-1).at);
-  const parameters = { prior_git_sha: priorGitSHA, prior_tip: validated.tip, history_sha256, state_sha256: digest(state) };
-  const operation = { kind: "Checkpoint", ...parameters, state };
+  const state_sha256 = digest(state);
+  const requests_compressed = deflateRawSync(Buffer.from(canonical(state.requests), "utf8")).toString("base64");
+  const { requests: _, ...projection } = state;
+  const compressedState = { ...projection, requests_compressed };
+  const parameters = { prior_git_sha: priorGitSHA, prior_tip: validated.tip, history_sha256, state_sha256 };
+  const operation = { kind: "Checkpoint", ...parameters, state: compressedState };
   const requestId = `checkpoint_${createHash("sha256").update(`${validated.tip}\n${priorGitSHA}`, "utf8").digest("hex")}`;
   const request = newRequest(requestId, "checkpoint", actor, parameters);
   const checkpoint = {

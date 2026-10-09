@@ -95,7 +95,11 @@ func TestSharedCheckpointConformance(t *testing.T) {
 	if err := json.Unmarshal(malformed.Operations[0], &op); err != nil {
 		t.Fatal(err)
 	}
-	op.StateSHA256 = "0" + op.StateSHA256[1:]
+	replacement := "0"
+	if op.StateSHA256[0] == '0' {
+		replacement = "1"
+	}
+	op.StateSHA256 = replacement + op.StateSHA256[1:]
 	malformed.Operations[0], err = Op(op)
 	if err != nil {
 		t.Fatal(err)
@@ -156,5 +160,68 @@ func TestCheckpointPreservesPendingDeliveryDeadline(t *testing.T) {
 	if before.Works[id].completionAt != after.Works[id].completionAt ||
 		after.Works[id].Barrier != "pending" || !sameJSON(before.Dispatches, after.Dispatches) {
 		t.Fatal("checkpoint reset pending delivery deadline or native reservation")
+	}
+}
+
+func TestCheckpointPreservesInspectionProvenance(t *testing.T) {
+	data, err := os.ReadFile("../../specs/work-queue/fixtures/checkpoint.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		PriorGitSHA string        `json:"prior_git_sha"`
+		History     []QueueCommit `json:"history"`
+		Checkpoint  []QueueCommit `json:"checkpoint"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	var claim ClaimOperation
+	var requestID string
+	for _, commit := range fixture.History {
+		for _, operation := range commit.Operations {
+			if err := json.Unmarshal(operation, &claim); err == nil && claim.Kind == "Claim" {
+				requestID = commit.Request.ID
+				break
+			}
+		}
+		if requestID != "" {
+			break
+		}
+	}
+	if requestID == "" {
+		t.Fatal("checkpoint fixture has no Claim")
+	}
+	before, err := ExplainBeforeClaim(fixture.History, claim.ClaimID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeTrace, err := TraceQueue(fixture.History, TraceOptions{ClaimID: claim.ClaimID, Limit: 256}, 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint, err := CompactCheckpoint(fixture.History, fixture.PriorGitSHA, fixture.Checkpoint[0].Actor, fixture.Checkpoint[0].At)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := ExplainBeforeClaim(checkpoint, claim.ClaimID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before.Tip = checkpoint[0].ID
+	if !sameJSON(before, after) {
+		t.Fatalf("checkpoint changed historical Claim explanation: %+v != %+v", before, after)
+	}
+	request, err := ExplainRequest(checkpoint, requestID)
+	if err != nil || len(request.Claims) == 0 {
+		t.Fatalf("checkpoint lost historical request explanation: %+v %v", request, err)
+	}
+	afterTrace, err := TraceQueue(checkpoint, TraceOptions{ClaimID: claim.ClaimID, Limit: 256}, 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeTrace.Tip = checkpoint[0].ID
+	if !sameJSON(beforeTrace, afterTrace) {
+		t.Fatalf("checkpoint changed historical trace: %+v != %+v", beforeTrace, afterTrace)
 	}
 }

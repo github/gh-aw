@@ -375,29 +375,31 @@ type Stats struct {
 }
 
 type Projection struct {
-	Repository           string                    `json:"repository"`
-	Tip                  string                    `json:"tip"`
-	PolicyEpoch          string                    `json:"policy_epoch"`
-	Policy               *Policy                   `json:"policy"`
-	Works                map[string]*WorkState     `json:"works"`
-	Claims               map[string]*ClaimState    `json:"claims"`
-	Dispatches           map[string]*DispatchState `json:"dispatches"`
-	Observations         map[string]*Observation   `json:"observations"`
-	Requests             map[string]QueueCommit    `json:"requests"`
-	Clocks               map[string]PoolClocks     `json:"clocks"`
-	AdmissionPaused      bool                      `json:"admission_paused"`
-	GrantsPaused         bool                      `json:"grants_paused"`
-	CredentialGeneration string                    `json:"credential_generation"`
-	Stats                Stats                     `json:"stats"`
-	LedgerBytes          int64                     `json:"ledger_bytes"`
-	ObservationWrites    map[string]int            `json:"observation_writes"`
-	RequestOrder         []string                  `json:"-"`
-	CheckpointReceipts   []checkpointReceipt       `json:"-"`
-	SeenEpochs           map[string]bool           `json:"-"`
-	SeenGenerations      map[string]bool           `json:"-"`
-	ObservationIDs       map[string]*Observation   `json:"-"`
-	TerminalBarriers     map[string]Operation      `json:"-"`
-	Cancellations        map[string]Operation      `json:"-"`
+	Repository           string                      `json:"repository"`
+	Tip                  string                      `json:"tip"`
+	PolicyEpoch          string                      `json:"policy_epoch"`
+	Policy               *Policy                     `json:"policy"`
+	Works                map[string]*WorkState       `json:"works"`
+	Claims               map[string]*ClaimState      `json:"claims"`
+	Dispatches           map[string]*DispatchState   `json:"dispatches"`
+	Observations         map[string]*Observation     `json:"observations"`
+	Requests             map[string]QueueCommit      `json:"requests"`
+	Clocks               map[string]PoolClocks       `json:"clocks"`
+	AdmissionPaused      bool                        `json:"admission_paused"`
+	GrantsPaused         bool                        `json:"grants_paused"`
+	CredentialGeneration string                      `json:"credential_generation"`
+	Stats                Stats                       `json:"stats"`
+	LedgerBytes          int64                       `json:"ledger_bytes"`
+	ObservationWrites    map[string]int              `json:"observation_writes"`
+	RequestOrder         []string                    `json:"-"`
+	CheckpointReceipts   []checkpointReceipt         `json:"-"`
+	WorkCreators         map[string]Actor            `json:"-"`
+	ClaimExplanations    map[string]ClaimExplanation `json:"-"`
+	SeenEpochs           map[string]bool             `json:"-"`
+	SeenGenerations      map[string]bool             `json:"-"`
+	ObservationIDs       map[string]*Observation     `json:"-"`
+	TerminalBarriers     map[string]Operation        `json:"-"`
+	Cancellations        map[string]Operation        `json:"-"`
 }
 
 type Selection struct {

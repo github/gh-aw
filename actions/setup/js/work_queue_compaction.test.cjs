@@ -8,7 +8,7 @@ const path = require("node:path");
 const { test } = require("node:test");
 const { canonical } = require("./work_queue_codec.cjs");
 const { planFor } = require("./work_queue_compaction_plan.cjs");
-const { main: apply, readPlan } = require("./work_queue_compaction_apply.cjs");
+const { isRetryablePublicationError, main: apply, readPlan } = require("./work_queue_compaction_apply.cjs");
 const { fakeGitHub } = require("./work_queue_store_checks.cjs");
 
 function planFile(plan) {
@@ -50,6 +50,18 @@ function publisherOptions(githubClient, actorId = "11") {
     workflowRef: `owner/repo/.github/workflows/agentics-maintenance.yml@${sha}`,
   };
 }
+
+test("publication retries only known transient HTTP failures", () => {
+  for (const error of [
+    Object.assign(new Error("conflict"), { status: 409 }),
+    Object.assign(new Error("reference update failed"), { status: 422 }),
+    Object.assign(new Error("timeout"), { status: 408 }),
+    Object.assign(new Error("rate limited"), { status: 429 }),
+    Object.assign(new Error("unavailable"), { status: 503 }),
+  ])
+    assert.equal(isRetryablePublicationError(error), true);
+  for (const error of [new TypeError("bad response"), new Error("unexpected"), { status: "503" }, { status: 600 }, { status: 422, message: "unprocessable" }, null]) assert.equal(isRetryablePublicationError(error), false);
+});
 
 test("planning skips absent queues and binds the current head and tip", () => {
   assert.equal(planFor({ sha: null, transactions: [] }), null);

@@ -15,15 +15,31 @@
               "epoch": "initial",
               "policy": {
                 "mode": "weighted-priority",
-                "class_weights": [8, 4, 2, 1, 1],
+                "class_weights": [
+                  8,
+                  4,
+                  2,
+                  1,
+                  1
+                ],
                 "accounting_weights": {
                   "": 1
                 },
                 "producers": {
                   "1001": {
-                    "pools": ["default"],
-                    "priorities": [1, 2, 3, 4, 5],
-                    "fairness_keys": [""]
+                    "pools": [
+                      "default"
+                    ],
+                    "priorities": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "fairness_keys": [
+                      ""
+                    ]
                   }
                 },
                 "pools": {
@@ -43,7 +59,9 @@
                     },
                     "logical_limit": 16,
                     "native_limit": 16,
-                    "allowed_repositories": ["owner/repo"],
+                    "allowed_repositories": [
+                      "owner/repo"
+                    ],
                     "max_observation_age_ms": 60000,
                     "retry": {
                       "max_attempts": 3,
@@ -87,15 +105,31 @@
           "epoch": "initial",
           "policy": {
             "mode": "weighted-priority",
-            "class_weights": [8, 4, 2, 1, 1],
+            "class_weights": [
+              8,
+              4,
+              2,
+              1,
+              1
+            ],
             "accounting_weights": {
               "": 1
             },
             "producers": {
               "1001": {
-                "pools": ["default"],
-                "priorities": [1, 2, 3, 4, 5],
-                "fairness_keys": [""]
+                "pools": [
+                  "default"
+                ],
+                "priorities": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "fairness_keys": [
+                  ""
+                ]
               }
             },
             "pools": {
@@ -115,7 +149,9 @@
                 },
                 "logical_limit": 16,
                 "native_limit": 16,
-                "allowed_repositories": ["owner/repo"],
+                "allowed_repositories": [
+                  "owner/repo"
+                ],
                 "max_observation_age_ms": 60000,
                 "retry": {
                   "max_attempts": 3,
@@ -280,9 +316,9 @@
           "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "prior_tip": "grant",
           "history_sha256": "eea10ee905b3e70dbcfaf2d20ffb6ba60f3e3a58824792c51047096306c95a30",
-          "state_sha256": "5a04614c9f263003bff377238b00de233e72578943c87291c8128f66b0a4fb4b"
+          "state_sha256": "069cc844c14a4bff79bf2651afa3443d3df33a30640033359b76b034ea7bf386"
         },
-        "fingerprint": "8728075e4437e858dfdfe55e7ad30b14007532bdc35767c19169b281d4f22cce"
+        "fingerprint": "09a6bcccd3cc86029ea2f074193fe7aa11b1c18d6582219b2ca44d62c027065c"
       },
       "actor": {
         "role": "administrator",
@@ -297,22 +333,38 @@
           "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "prior_tip": "grant",
           "history_sha256": "eea10ee905b3e70dbcfaf2d20ffb6ba60f3e3a58824792c51047096306c95a30",
-          "state_sha256": "5a04614c9f263003bff377238b00de233e72578943c87291c8128f66b0a4fb4b",
+          "state_sha256": "069cc844c14a4bff79bf2651afa3443d3df33a30640033359b76b034ea7bf386",
           "state": {
             "repository": "owner/repo",
             "tip": "grant",
             "policy_epoch": "initial",
             "policy": {
               "mode": "weighted-priority",
-              "class_weights": [8, 4, 2, 1, 1],
+              "class_weights": [
+                8,
+                4,
+                2,
+                1,
+                1
+              ],
               "accounting_weights": {
                 "": 1
               },
               "producers": {
                 "1001": {
-                  "pools": ["default"],
-                  "priorities": [1, 2, 3, 4, 5],
-                  "fairness_keys": [""]
+                  "pools": [
+                    "default"
+                  ],
+                  "priorities": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "fairness_keys": [
+                    ""
+                  ]
                 }
               },
               "pools": {
@@ -332,7 +384,9 @@
                   },
                   "logical_limit": 16,
                   "native_limit": 16,
-                  "allowed_repositories": ["owner/repo"],
+                  "allowed_repositories": [
+                    "owner/repo"
+                  ],
                   "max_observation_age_ms": 60000,
                   "retry": {
                     "max_attempts": 3,
@@ -458,71 +512,6 @@
               }
             },
             "observations": {},
-            "requests": [
-              {
-                "id": "genesis",
-                "request_id": "request-genesis",
-                "kind": "policy",
-                "fingerprint": "c879d664ad7fc8d39d1a15353a4fa8d893d5171a1b3e97b34e592be6b6379648",
-                "parameters_digest": "216c5eac490357b494a21580d0070aa3083a6906dcdcd32e19b46a06b57eb929",
-                "actor": {
-                  "role": "administrator",
-                  "principal": "1001",
-                  "repository": "owner/repo"
-                },
-                "policy_epoch": "initial",
-                "at": 0,
-                "claims": []
-              },
-              {
-                "id": "submit",
-                "request_id": "request-submit",
-                "kind": "submit",
-                "fingerprint": "32903ab0abc20d63dca201930057401d0acb127098ccb9e02794e3a6b39098a1",
-                "parameters_digest": "6ed95047a2d094bed60b753318d81d3f6db57d7875d2925d8483c01c552cc64a",
-                "actor": {
-                  "role": "producer",
-                  "principal": "1001",
-                  "repository": "owner/repo"
-                },
-                "policy_epoch": "initial",
-                "at": 1,
-                "claims": []
-              },
-              {
-                "id": "grant",
-                "request_id": "request-grant",
-                "kind": "dispatch_next",
-                "fingerprint": "2c2671c61e68a6c5690b308c7c53e6b7f59ef7c16abac2a881e24a09222297c3",
-                "parameters_digest": "32a2b265e7c2e527a89b86ebf8af0f5970c3582e4ea38b97e550ff9ac8d3a39a",
-                "dispatch_parameters": {
-                  "pool": "default",
-                  "max_claims": 1,
-                  "max_dispatches": 1,
-                  "max_bytes": 49152
-                },
-                "actor": {
-                  "role": "dispatcher",
-                  "principal": "1001",
-                  "repository": "owner/repo",
-                  "workflow": ".github/workflows/dispatcher.lock.yml",
-                  "run_id": "100",
-                  "run_attempt": 1
-                },
-                "policy_epoch": "initial",
-                "at": 10,
-                "claims": [
-                  {
-                    "kind": "Claim",
-                    "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
-                    "claim_id": "c_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
-                    "dispatch_id": "d_c6ed3a1e97e7d7a4a5f5bc4eac4293d026499e991f13cbc0424a4be5bf9a957b_1",
-                    "handle": "h1",
-                    "observations": []
-                  }
-                ]
-              }
-            ],
             "clocks": {
               "default": {
                 "classes": {
@@ -573,7 +562,8 @@
             "terminal_barriers": {},
             "cancellations": {},
             "completion_times": {},
-            "last_at": 10
+            "last_at": 10,
+            "requests_compressed": "tVZNb+M4DP0vOntbfUv0df/A3vYwKAxKolqhju21nU6DIv99oThJOzPtYgbTvQQRBT4+ko+Uv7wwjOs4s/aFTXMZYpmwZy0TnAvWsJmmcSnrOB9Yy8avA8231VRvxp5YyzDtylCWdcYKcmwYrqzlDYs9ll1Hz1OPA65lHBbWfrlrGD3RsNb/L+yxDIm17K+xL/HAjncNy2W4p7nSWFnLoneQrNWYXI4+KUgChVFGoc7okweVjHACRVAELihNBmQgG6xyYLVnDSs1wD0NtJSFNZeI0xaxYRPOuKOV5qVL5Z6WGlUKGw1h1MCVcUGDRimM54lzxxEV9wotcJtiiklJEhC0RW6DcRRAQoU94Xc0jfGBtawMZS3Y14uZnsq4X1g77Pu+VvefPS1rd6J5PvxxoXtsfrM10zymfaRrV8SvdOXvcX5kDfs6zo8bvShtCCpwrsBrUoAatEkmAHFLkKzL5DIKQ84HKSUGrTQYbxx5L7NMp3w+AhfkdBLBYxKWG5UMyJS19smqIDNxsmRUBq65EmiFdihzBpMBo5LZ8nfUoyRwhYFjiJInq1JEyQUozo3TXCSOMQjpOPgYaxLSgSaFNijg4FFc1LPsw66sr+K5nt8Tj6UEhld6iYMOlCwPziglfPIiqWxTMC4570ySIE3y2qvIRTRGxmg1/px43ij6XQWdKf62gFJZJlzjA83Vth86XFfaTZuU6nnrHefnXuZ+/MpadnNf1od9uL2YlttXoJt+jI83h11/FeVHu+Lleh0ojzN1a5nelj/ihLGshw7zSqcUMcZxP2zs+vG+xJqsaFjFfCLWiuMbrw30Gzf+xo2/uvHjheEDDulUmIdavs22zUYXLSWFgsCRSw41mmxC1HWPSFCJS6sBCEBkoWKIXEuNOpAJGRCMC90ZcVm66fQzl9o3Vksbx92unFt8P+NQs79UdLOmz4mfscwDLUv3SFUSVfN0+JHPxwodxyqvRBn3/WlEqr7KONQyb1mwVjZsnGjGzV6Le8Iu64G16qOVeM56oZ7iFfBaLdYy/YZs1SRr2BgWmp/ebrmZcKm+ZxxKn73g2LLieprQLduVUrfJZJopl2fWsE3Fl4Q+MfoZ7L2Si+9KXpflVUCva6y67PC5C4eVFtZqEEY2J8sph+UEVI/Xcd5M37X9+M1z8vlT8r9I/7zc/6xsP1kVP7xMMkrrRLSCrEcbjQUeFPfRRaPIBpcNUHZRWAwYJXovSGrkIKWU4KK6ftecRXTmfq3LQM8fvU9KogzSGnJRkpEOPQRvKWSPmWcDjkdlvCRNqHwAR8bwXF9ZnxQq+Nn36bqk/2Oaj3f/Ag=="
           }
         }
       ]
@@ -591,9 +581,9 @@
           "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "prior_tip": "genesis",
           "history_sha256": "c999b11f7c40f2d47d351c3141fc13f5559d0751cbe1931ddfc6f8b691076c08",
-          "state_sha256": "7ca83da33c753cae2f1e355fe6fe12eda1fde26348d2361575a00ca1ddfcd120"
+          "state_sha256": "92587a49358521a536b82b9e8d5ee03414533d5b76fce1faa41a220393914b70"
         },
-        "fingerprint": "38309947491041cd29d692aad0ab3da3ed7f8dcbddf00838beaed3c5773a09d4"
+        "fingerprint": "0344ef9b00f1f00261f6e3b43a1a1780676fc6395593f71fdea77d15790d8673"
       },
       "actor": {
         "role": "administrator",
@@ -608,22 +598,38 @@
           "prior_git_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "prior_tip": "genesis",
           "history_sha256": "c999b11f7c40f2d47d351c3141fc13f5559d0751cbe1931ddfc6f8b691076c08",
-          "state_sha256": "7ca83da33c753cae2f1e355fe6fe12eda1fde26348d2361575a00ca1ddfcd120",
+          "state_sha256": "92587a49358521a536b82b9e8d5ee03414533d5b76fce1faa41a220393914b70",
           "state": {
             "repository": "owner/repo",
             "tip": "genesis",
             "policy_epoch": "initial",
             "policy": {
               "mode": "weighted-priority",
-              "class_weights": [8, 4, 2, 1, 1],
+              "class_weights": [
+                8,
+                4,
+                2,
+                1,
+                1
+              ],
               "accounting_weights": {
                 "": 1
               },
               "producers": {
                 "1001": {
-                  "pools": ["default"],
-                  "priorities": [1, 2, 3, 4, 5],
-                  "fairness_keys": [""]
+                  "pools": [
+                    "default"
+                  ],
+                  "priorities": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "fairness_keys": [
+                    ""
+                  ]
                 }
               },
               "pools": {
@@ -643,7 +649,9 @@
                   },
                   "logical_limit": 16,
                   "native_limit": 16,
-                  "allowed_repositories": ["owner/repo"],
+                  "allowed_repositories": [
+                    "owner/repo"
+                  ],
                   "max_observation_age_ms": 60000,
                   "retry": {
                     "max_attempts": 3,
@@ -673,23 +681,6 @@
             "claims": {},
             "dispatches": {},
             "observations": {},
-            "requests": [
-              {
-                "id": "genesis",
-                "request_id": "request-genesis",
-                "kind": "policy",
-                "fingerprint": "c879d664ad7fc8d39d1a15353a4fa8d893d5171a1b3e97b34e592be6b6379648",
-                "parameters_digest": "216c5eac490357b494a21580d0070aa3083a6906dcdcd32e19b46a06b57eb929",
-                "actor": {
-                  "role": "administrator",
-                  "principal": "1001",
-                  "repository": "owner/repo"
-                },
-                "policy_epoch": "initial",
-                "at": 0,
-                "claims": []
-              }
-            ],
             "clocks": {},
             "admission_paused": false,
             "grants_paused": false,
@@ -717,7 +708,8 @@
             "terminal_barriers": {},
             "cancellations": {},
             "completion_times": {},
-            "last_at": 0
+            "last_at": 0,
+            "requests_compressed": "NZDRbsMgDEX/xc+ZBoFA4Cv2XlWVA25nLYUMaLeq6r9PdNub7Svdc+TdHTC0XMDfYSucAm+4ggcphIQBCm25csvlBh7yV6Ly2k89ySuBB4xnTlxbwV7yGAAbeDFAWJHPB/reVkzYOKcKfrcfgK6UWp/v8MEpgoe3vHK4wWM/wJHTiUrXaOAhzNZFYzRGewxzVC5KlJOaFOojznF2Kk7SSpSLImcXpWly40JmMco6o2cYgDvgRIkqVxj+idsvcYANC56pUamHyCeqnTpKEybCoJ1Qk1200zjKaRZRCCsQlZgVGidMDDFENZJ0izYozDJZWtzoeu2z/0BbDu/ggRM3xrUHha6cLxV8uqxr/+7nhWo7PDX/lpd/3cf+Bw=="
           }
         }
       ]

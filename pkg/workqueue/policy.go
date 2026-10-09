@@ -200,7 +200,8 @@ func newProjection() Projection {
 		Dispatches: map[string]*DispatchState{}, Observations: map[string]*Observation{},
 		Requests: map[string]QueueCommit{}, Clocks: map[string]PoolClocks{},
 		CredentialGeneration: "initial", ObservationWrites: map[string]int{},
-		RequestOrder: []string{}, SeenEpochs: map[string]bool{}, SeenGenerations: map[string]bool{"initial": true},
+		RequestOrder: []string{}, WorkCreators: map[string]Actor{}, ClaimExplanations: map[string]ClaimExplanation{},
+		SeenEpochs: map[string]bool{}, SeenGenerations: map[string]bool{"initial": true},
 		ObservationIDs: map[string]*Observation{}, TerminalBarriers: map[string]Operation{}, Cancellations: map[string]Operation{},
 	}
 }

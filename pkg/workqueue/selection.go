@@ -259,6 +259,8 @@ func cloneProjection(state Projection) Projection {
 	copy.ObservationIDs = maps.Clone(state.ObservationIDs)
 	copy.TerminalBarriers = maps.Clone(state.TerminalBarriers)
 	copy.Cancellations = maps.Clone(state.Cancellations)
+	copy.WorkCreators = maps.Clone(state.WorkCreators)
+	copy.ClaimExplanations = maps.Clone(state.ClaimExplanations)
 	return copy
 }
 

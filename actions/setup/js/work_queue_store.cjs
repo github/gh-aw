@@ -112,7 +112,6 @@ async function readRef(githubClient, owner, repo, branch) {
 async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
   log.debug("ledger.read.start");
   validateBranch(branch);
-  if (process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT === "graphql") return require("./work_queue_checked_transport.cjs").readCheckedQueue({ githubClient, owner, repo, branch });
   const repository = await verifyRepository(githubClient, owner, repo);
   const sha = await readRef(githubClient, owner, repo, branch);
   if (!sha) {
@@ -128,7 +127,7 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
   return readVerifiedQueueAtSHA({ githubClient, owner, repo, branch, repository, coreApi }, sha);
 }
 
-async function readVerifiedQueueAtSHA(options, sha, verify = true, depth = 0) {
+async function readVerifiedQueueAtSHA(options, sha, verify = true) {
   const { githubClient, owner, repo, branch, repository, coreApi } = options;
   const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha });
   const treeSha = commit?.data?.tree?.sha;
@@ -159,39 +158,44 @@ async function readVerifiedQueueAtSHA(options, sha, verify = true, depth = 0) {
   const state = replayTransactionLog(contents);
   const transactions = state.transactions;
   if (transactions.some(transaction => transaction.actor.repository.toLowerCase() !== repository.full_name.toLowerCase())) throw queueError("actor_unauthorized", "queue log contains an actor from another repository");
-  if (verify && transactions[0]?.operations[0]?.kind === "Checkpoint") await verifyCheckpointGitHistory(options, sha, transactions[0], depth);
+  if (verify && transactions[0]?.operations[0]?.kind === "Checkpoint") await verifyCheckpointGitHistory(options, sha, transactions[0]);
   coreApi?.info(`Work queue: validated ${transactions.length} causal commits`);
   log.debug("ledger.read.complete", { bytes: bytes.length, transactions: transactions.length, works: state.works.size, claims: state.claims.size });
   return { sha, treeSha, transactions, state, branch, logPath: WORK_QUEUE_LOG_PATH };
 }
 
-async function verifyCheckpointGitHistory(options, head, root, depth) {
+async function verifyCheckpointGitHistory(options, head, root) {
   const { githubClient, owner, repo } = options;
   const invalid = () => queueError("checkpoint_invalid", "checkpoint does not match its Git parent history");
-  if (depth >= 64) throw invalid();
-  const checkpoint = root.operations[0];
-  let current = head;
-  for (;;) {
-    const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: current });
-    const parents = commit?.data?.parents;
-    if (!Array.isArray(parents) || parents.length !== 1 || !parents[0]?.sha || parents[0].sha === current) throw invalid();
-    const parent = parents[0].sha;
-    const previous = await readVerifiedQueueAtSHA({ ...options, coreApi: undefined }, parent, false, depth + 1);
-    if (previous.transactions[0]?.id === root.id) {
-      current = parent;
-      continue;
+  const visited = new Set();
+  while (root?.operations?.[0]?.kind === "Checkpoint") {
+    const checkpoint = root.operations[0];
+    let current = head;
+    for (;;) {
+      if (visited.has(current)) throw invalid();
+      visited.add(current);
+      const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: current });
+      const parents = commit?.data?.parents;
+      if (!Array.isArray(parents) || parents.length !== 1 || !parents[0]?.sha || parents[0].sha === current) throw invalid();
+      const parent = parents[0].sha;
+      const previous = await readVerifiedQueueAtSHA({ ...options, coreApi: undefined }, parent, false);
+      if (previous.transactions[0]?.id === root.id) {
+        current = parent;
+        continue;
+      }
+      if (
+        parent !== checkpoint.prior_git_sha ||
+        !previous.transactions.length ||
+        createHash("sha256")
+          .update(previous.transactions.map(transaction => canonical(transaction) + "\n").join(""), "utf8")
+          .digest("hex") !== checkpoint.history_sha256
+      )
+        throw invalid();
+      if (previous.state.tip !== checkpoint.prior_tip || prepareCheckpoint(previous.transactions, parent, root.actor, root.at)[0].operations[0].state_sha256 !== checkpoint.state_sha256) throw invalid();
+      head = parent;
+      root = previous.transactions[0];
+      break;
     }
-    if (
-      parent !== checkpoint.prior_git_sha ||
-      !previous.transactions.length ||
-      createHash("sha256")
-        .update(previous.transactions.map(transaction => canonical(transaction) + "\n").join(""), "utf8")
-        .digest("hex") !== checkpoint.history_sha256
-    )
-      throw invalid();
-    if (previous.state.tip !== checkpoint.prior_tip || prepareCheckpoint(previous.transactions, parent, root.actor, root.at)[0].operations[0].state_sha256 !== checkpoint.state_sha256) throw invalid();
-    if (previous.transactions[0]?.operations[0]?.kind === "Checkpoint") await verifyCheckpointGitHistory(options, parent, previous.transactions[0], depth + 1);
-    return;
   }
 }
 
