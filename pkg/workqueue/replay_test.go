@@ -83,6 +83,12 @@ func testOperations(t *testing.T, commits []QueueCommit, actor Actor, id, kind s
 	return next
 }
 
+func TestEmptyLedgerReplayRequiresPolicyGenesis(t *testing.T) {
+	if _, err := Replay(nil); err == nil || !strings.HasPrefix(err.Error(), "policy_missing:") {
+		t.Fatalf("empty ledger must report missing Policy genesis, got %v", err)
+	}
+}
+
 func TestProducerSubmitBootstrapsAbsentQueuePolicy(t *testing.T) {
 	policy := DefaultPolicy(testPrincipal, testRepository)
 	node, err := NewWork([]byte(`{"task":"first producer submission"}`), "bootstrap", "root", "default", policy, 1000)

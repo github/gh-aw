@@ -300,8 +300,12 @@ func validateRequestIntent(commit QueueCommit, parameterCount int) error {
 		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
 			return queueError("checkpoint_invalid", "invalid checkpoint parameters")
 		}
-		if err := json.Unmarshal(commit.Operations[0], &op); err != nil ||
-			op.PriorGitSHA != params.PriorGitSHA || op.PriorTip != params.PriorTip ||
+		for _, operation := range commit.Operations {
+			if err := json.Unmarshal(operation, &op); err != nil {
+				return queueError("checkpoint_invalid", "checkpoint history differs from stable request")
+			}
+		}
+		if op.PriorGitSHA != params.PriorGitSHA || op.PriorTip != params.PriorTip ||
 			op.HistorySHA256 != params.HistorySHA256 || op.StateSHA256 != params.StateSHA256 {
 			return queueError("checkpoint_invalid", "checkpoint history differs from stable request")
 		}
