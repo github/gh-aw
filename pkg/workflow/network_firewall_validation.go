@@ -180,6 +180,9 @@ func (c *Compiler) validateHostedWebPolicy(workflowData *WorkflowData) error {
 	if policy.MaxUses < 0 {
 		return errors.New("network.hosted-web.max-uses must be a positive integer")
 	}
+	if runtimeID == "codex" && policy.MaxUses > 0 && NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderOpenAI {
+		return errors.New("network.hosted-web.max-uses is not supported by Codex standalone web search; remove max-uses to enable hosted web")
+	}
 	if err := validateHostedWebDomains("allowed", policy.Allowed); err != nil {
 		return err
 	}

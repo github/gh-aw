@@ -264,6 +264,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 	tests := []struct {
 		name            string
 		engine          string
+		provider        LLMProvider
 		runtime         string
 		inline          bool
 		policy          *HostedWebPolicy
@@ -275,6 +276,18 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 			name:   "allows a lowercase allowlist",
 			engine: "claude",
 			policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
+		},
+		{
+			name:    "rejects Codex OpenAI standalone max-uses",
+			engine:  "codex",
+			policy:  &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
+			wantErr: "network.hosted-web.max-uses is not supported by Codex standalone web search",
+		},
+		{
+			name:     "allows Codex GitHub max-uses",
+			engine:   "codex",
+			provider: LLMProviderGitHub,
+			policy:   &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.github.com"}, MaxUses: 1},
 		},
 		{
 			name:    "requires a policy list",
@@ -376,7 +389,7 @@ func TestValidateHostedWebPolicy(t *testing.T) {
 				compiler.engineCatalog.Register(&EngineDefinition{ID: tt.engine, RuntimeID: tt.runtime})
 			}
 			err := compiler.validateHostedWebPolicy(&WorkflowData{
-				EngineConfig:       &EngineConfig{ID: tt.engine, IsInlineDefinition: tt.inline},
+				EngineConfig:       &EngineConfig{ID: tt.engine, IsInlineDefinition: tt.inline, LLMProvider: tt.provider},
 				NetworkPermissions: network,
 			})
 			if tt.wantErr == "" {

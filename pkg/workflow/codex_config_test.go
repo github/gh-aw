@@ -98,6 +98,36 @@ process.stdout.write(serializeConfig(buildConfig({github: {headers: {Authorizati
 	assert.Equal(t, "Bearer \"quoted\"\\token", headers["Authorization"])
 }
 
+func TestCodexStandaloneWebSearchProvider(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		provider LLMProvider
+		policy   *HostedWebPolicy
+		wantFlag bool
+	}{
+		{name: "OpenAI hosted web", provider: LLMProviderOpenAI, policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.example.com"}}, wantFlag: true},
+		{name: "OpenAI without hosted web", provider: LLMProviderOpenAI},
+		{name: "OpenAI disabled hosted web", provider: LLMProviderOpenAI, policy: &HostedWebPolicy{}},
+		{name: "GitHub hosted web", provider: LLMProviderGitHub, policy: &HostedWebPolicy{Enabled: true, Allowed: []string{"docs.example.com"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig:       &EngineConfig{ID: "codex", LLMProvider: test.provider},
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}, HostedWeb: test.policy},
+			}
+			var output strings.Builder
+			require.NoError(t, renderCodexMCPConfigForTest(t, NewCodexEngine(), &output, map[string]any{}, nil, data))
+			config := decodeCodexBootstrap(t, output.String())
+			proxy := config["model_providers"].(map[string]any)[codexOpenAIProxyProviderID].(map[string]any)
+			if test.wantFlag {
+				assert.Equal(t, true, proxy["supports_standalone_web_search"])
+			} else {
+				assert.NotContains(t, proxy, "supports_standalone_web_search")
+			}
+		})
+	}
+}
+
 func TestCodexGitHubInferenceDisablesUnsupportedExecTool(t *testing.T) {
 	for _, test := range []struct {
 		name         string

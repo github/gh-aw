@@ -77,6 +77,8 @@ Analyze the repository and create a concise daily status report covering:
 
 Codex enables its shared native search/browsing tool when either `tools.web-search` or `tools.web-fetch` is enabled. Search and page fetching cannot be disabled independently; use `network.hosted-web` to restrict hosted retrieval. Codex can disable shell execution completely but cannot enforce a nonempty per-command `tools.bash` allowlist.
 
+With OpenAI inference through the AWF sandbox, enabling `network.hosted-web` also enables Codex's standalone `web.run` search tool for Responses Lite models, which do not receive the hosted `web_search` tool. Without hosted web, this provider flag is not set. Codex standalone search does not support `network.hosted-web.max-uses`; omit that limit when using Codex with OpenAI inference.
+
 Codex does not support bare mode, Copilot-style `max-continuations`, or native `engine.agent` selection. `engine.harness.use` can select a replacement harness that has been provisioned in the setup-action directory before execution. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
 
 When a workflow does not declare any `plugins`, GitHub Agentic Workflows writes [`features.plugins=false`](https://developers.openai.com/codex/config-reference/#features) to Codex's generated `config.toml`. This prevents Codex from contacting the ChatGPT plugin catalog or synchronizing the curated plugin repository at startup. Codex does not provide a narrower setting that disables only startup synchronization, so workflows that declare Agent Plugins keep the plugin subsystem and its startup checks enabled. Directly configured MCP servers are unaffected.
