@@ -25,4 +25,9 @@ func TestSafeOutputsSpecificationDocumentsResolvePullRequestReviewThreadTargetAu
 	assert.Contains(t, section, "**RPT-004**", "spec should define wildcard target authorization")
 	assert.Contains(t, section, "Only `target: \"*\"`", "spec should reserve agent-selected targets for wildcard mode")
 	assert.Contains(t, section, "**RPT-005**", "spec should require runtime enforcement")
+	assert.Contains(t, section, "`PullRequestReviewComment`", "spec should describe review-comment node resolution")
+	assert.Contains(t, section, "`resolveReviewThread`", "spec should document the GraphQL mutation")
+	assert.Contains(t, section, "following GraphQL cursors", "spec should require complete comment lookup pagination")
+	assert.Contains(t, section, "successful no-ops", "spec should describe stale and already-resolved thread handling")
+	assert.Contains(t, section, "without calling the mutation", "spec should forbid mutation in staged mode")
 }

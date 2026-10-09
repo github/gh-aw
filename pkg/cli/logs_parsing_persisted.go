@@ -10,7 +10,10 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var logsParsingPersistedLog = logger.New("cli:logs_parsing_persisted")
 
 // Persisted and supported native transcripts carry their own schema and identity; rendering them
 // must not depend on an imported engine still being installed in the registry.
@@ -31,6 +34,7 @@ func parseUnifiedAgentLog(runDir, engineID string) (bool, error) {
 		found = found || stat.Mode().IsRegular()
 	}
 	if !found {
+		logsParsingPersistedLog.Printf("No recognizable agent log files in %s, skipping reconstruction", runDir)
 		return false, nil
 	}
 	args := []string{"reconstruct", runDir}
@@ -40,12 +44,14 @@ func parseUnifiedAgentLog(runDir, engineID string) (bool, error) {
 	session, err := runSessionParser(context.Background(), args...)
 	if err != nil {
 		if errors.Is(err, errNoRecognizableAgentSession) {
+			logsParsingPersistedLog.Printf("No recognizable agent session reconstructed from %s", runDir)
 			return false, nil
 		}
 		return false, err
 	}
 	readable, err := readableUnifiedAgentSession(session)
 	if err != nil || !readable {
+		logsParsingPersistedLog.Printf("Reconstructed session for %s is not readable (readable=%t, err=%v)", runDir, readable, err)
 		return false, err
 	}
 	output, err := runSessionParserWithSources(
@@ -59,6 +65,7 @@ func parseUnifiedAgentLog(runDir, engineID string) (bool, error) {
 	if err := os.WriteFile(filepath.Join(runDir, "log.md"), []byte(strings.TrimSpace(string(output))), constants.FilePermPublic); err != nil {
 		return false, fmt.Errorf("failed to write log.md: %w", err)
 	}
+	logsParsingPersistedLog.Printf("Wrote reconstructed markdown log for %s", runDir)
 	return true, nil
 }
 

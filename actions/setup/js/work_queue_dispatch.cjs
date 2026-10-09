@@ -116,6 +116,7 @@ async function resolveAdmissionResources(options, state, parameters, trustedCont
       references.push({ target: edge, field: "resource", resource: { ...edge.resource, condition: edge.condition } });
     }
     if (node.subject) references.push({ target: node, field: "subject", resource: { ...node.subject, condition: node.subject.kind === "issue" ? "completed" : "merged" } });
+    if (node.backing_issue) references.push({ target: node, field: "backing_issue", resource: { ...node.backing_issue, condition: "completed" } });
   }
   if (!references.length) return parameters;
   log.debug("admission.resolve.references", { references: references.length });
@@ -308,6 +309,7 @@ function acceptedSubmissionParameters(state, trustedContext, parameters, prior) 
       return edge.kind !== "work" && original?.kind === edge.kind && original.condition === edge.condition ? { ...edge, resource: restoreIdentity(edge.resource, original.resource) } : edge;
     });
     if (node.subject) node.subject = restoreIdentity(node.subject, accepted?.subject);
+    if (node.backing_issue) node.backing_issue = restoreIdentity(node.backing_issue, accepted?.backing_issue);
   }
   return normalized;
 }

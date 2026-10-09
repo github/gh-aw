@@ -38,7 +38,7 @@ scalar CountBound extends safeint;
 
 @jsonSchema
 model Actor {
-  role: "administrator" | "producer" | "dispatcher" | "worker" | "reconciler";
+  role: "administrator" | "producer" | "dispatcher" | "worker" | "reconciler" | "projector";
   principal: Identity;
   repository: Identity;
   workflow?: Identity;
@@ -111,6 +111,7 @@ model WorkOperation {
   depends_on: Dependency[];
   enqueued: Timestamp;
   subject?: Resource;
+  backing_issue?: Resource;
   replacement_of?: Replacement;
 }
 
@@ -157,6 +158,22 @@ model ProducerRule {
   fairness_keys: string[];
 }
 @jsonSchema
+model ProjectorRule {
+  principal: Decimal;
+  workflow: Identity;
+  ref: Revision;
+  @minItems(1)
+  @maxItems(256)
+  pools: Identity[];
+  @minItems(1)
+  @maxItems(256)
+  repositories: Identity[];
+  @minItems(1)
+  @maxItems(256)
+  backing_issues?: Resource[];
+  completion_policy?: "keep-open" | "close-on-result";
+}
+@jsonSchema
 model Limits {
   ledger_bytes: Timestamp;
   recovery_bytes: Timestamp;
@@ -181,6 +198,9 @@ model QueuePolicy {
   @extension("x-key-utf8-max-bytes", 256)
   @extension("x-forbid-key-ascii-controls", true)
   producers: Record<ProducerRule>;
+  @minItems(1)
+  @maxItems(256)
+  projectors?: ProjectorRule[];
   @extension("x-key-min-utf8-bytes", 1)
   @extension("x-key-utf8-max-bytes", 256)
   @extension("x-forbid-key-ascii-controls", true)
@@ -325,11 +345,29 @@ model ReleaseOperation {
   evidence: Evidence;
 }
 @jsonSchema
+model IssueLinkOperation {
+  kind: "IssueLink";
+  work_id: Identity;
+  resource: Resource;
+  projector_ref: Revision;
+  claim_id?: Identity;
+}
+@jsonSchema
+model IssueCommentOperation {
+  kind: "IssueComment";
+  work_id: Identity;
+  comment_id: Identity;
+  projector_ref: Revision;
+  claim_id?: Identity;
+  authority_claim_id?: Identity;
+}
+@jsonSchema
 union QueueOperation {
   PolicyOperation, ControlOperation, WorkOperation, ClaimOperation,
   CompletionOperation, ResultOperation, DeliveryFailureOperation,
   ObservationOperation, ClaimCancellationOperation, WorkCancellationOperation,
-  DispatchOperation, ReleaseOperation, WorkPriorityOperation
+  DispatchOperation, ReleaseOperation, WorkPriorityOperation,
+  IssueLinkOperation, IssueCommentOperation
 }
 
 @jsonSchema
@@ -364,7 +402,7 @@ union RequestParameters {
 @jsonSchema
 model QueueRequest {
   id: Identity;
-  kind: "policy" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim";
+  kind: "policy" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim" | "issue_link";
   parameters: RequestParameters;
   fingerprint: Digest;
 }

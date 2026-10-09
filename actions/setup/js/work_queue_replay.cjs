@@ -7,6 +7,7 @@ const { canonical, canonicalBytes, closed, fingerprint, identity, integer, parse
 const { boundedBytes, checkLedgerBudget } = require("./work_queue_limits.cjs");
 const { indexesFor, trackState, untrackState, updateIndexes } = require("./work_queue_indexes.cjs");
 const { validateEffectResourceAuthority } = require("./work_queue_resource_scope.cjs");
+const { applyIssueBinding } = require("./work_queue_issue_contract.cjs");
 const {
   actorFromContext,
   bindingAuthority,
@@ -43,7 +44,7 @@ const OP_FIELDS = {
   Control: [["kind", "control", "value", "reason"], []],
   Work: [
     ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
-    ["subject", "replacement_of"],
+    ["subject", "backing_issue", "replacement_of"],
   ],
   Claim: [["kind", "work_id", "claim_id", "dispatch_id", "handle", "observations"], []],
   Completion: [["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "run_id", "run_attempt"], []],
@@ -61,6 +62,11 @@ const OP_FIELDS = {
     ["sender", "run", "evidence", "reason"],
   ],
   Release: [["kind", "dispatch_id", "evidence"], []],
+  IssueLink: [["kind", "work_id", "resource", "projector_ref"], ["claim_id"]],
+  IssueComment: [
+    ["kind", "work_id", "comment_id", "projector_ref"],
+    ["claim_id", "authority_claim_id"],
+  ],
 };
 
 const REQUEST_KINDS = {
@@ -76,6 +82,7 @@ const REQUEST_KINDS = {
   delivery_failure: ["DeliveryFailure"],
   cancel_work: ["WorkCancellation"],
   cancel_claim: ["ClaimCancellation", "WorkCancellation"],
+  issue_link: ["IssueLink", "IssueComment"],
 };
 
 const OP_ROLES = {
@@ -92,6 +99,8 @@ const OP_ROLES = {
   WorkPriority: ["administrator"],
   Dispatch: ["dispatcher", "worker", "reconciler"],
   Release: ["reconciler"],
+  IssueLink: ["projector"],
+  IssueComment: ["projector"],
 };
 
 function validateEvidence(evidence) {
@@ -127,6 +136,12 @@ function validateOperation(operation) {
   if (Object.hasOwn(operation, "evidence")) validateEvidence(operation.evidence);
   if (Object.hasOwn(operation, "run")) validateRunBinding(operation.run);
   if (Object.hasOwn(operation, "sender")) validateActor(operation.sender);
+  if (["IssueLink", "IssueComment"].includes(operation.kind)) {
+    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(operation.projector_ref)) throw queueError("projection_unauthorized", "projection requires an immutable revision");
+    if (operation.kind === "IssueLink") validateResource(operation.resource);
+    else identity(operation.comment_id, "Issue comment");
+    if (operation.authority_claim_id !== undefined) identity(operation.authority_claim_id, "authority Claim");
+  }
   if (operation.kind === "Policy") validatePolicy(operation.policy);
   if (operation.kind === "WorkPriority") {
     integer(operation.priority, 1, 5, "priority");
@@ -653,6 +668,10 @@ function replayOrdered(ordered) {
         case "Work":
           if (!state.works.has(operation.work_id)) state.works.set(operation.work_id, { ...operation, state: "available", position: { commit: ordinal, operation: index }, attempts: 0, retry_not_before: 0, barrier: "none" });
           break;
+        case "IssueLink":
+        case "IssueComment":
+          applyIssueBinding(state, operation, commit);
+          break;
         case "WorkPriority": {
           const work = state.works.get(operation.work_id);
           if (!work) throw queueError("work_missing", "priority change references missing Work");
@@ -697,7 +716,7 @@ function replayOrdered(ordered) {
       state,
       bytes,
       commit.operations.some(operation => operation.kind === "Work" || operation.kind === "Claim"),
-      commit.operations.some(operation => operation.kind === "Observation")
+      commit.operations.some(operation => ["Observation", "IssueLink", "IssueComment"].includes(operation.kind))
     );
     state.ledgerBytes += bytes;
   }
