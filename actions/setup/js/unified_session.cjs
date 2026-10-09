@@ -546,8 +546,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   if (workflowEvent && routingOutcome) {
     const modelRouting = workflowEvent.data.modelRouting ?? {};
     for (const field of ["status", "wireModel", "effectiveEndpoint", "selectedEndpoint", "effort", "appliedEffort", "failureCode"]) {
-      if (modelRouting[field] !== undefined) routingOutcome.data[field] = modelRouting[field];
-      else if (routingOutcome.data[field] !== undefined) modelRouting[field] = routingOutcome.data[field];
+      if (routingOutcome.data[field] !== undefined) modelRouting[field] = routingOutcome.data[field];
     }
     workflowEvent.data.modelRouting = modelRouting;
   }

@@ -388,7 +388,7 @@ describe("Unified conclusion session", () => {
           wireModel: "claude-sonnet-5",
           model: "claude-sonnet-5",
           effort: "medium",
-          appliedEffort: "low",
+          appliedEffort: "medium",
           effectiveEndpoint: "/v1/messages",
           selectedEndpoint: "/chat/completions",
           mode: "awf-routed",
@@ -407,7 +407,7 @@ describe("Unified conclusion session", () => {
         effectiveEndpoint: "/v1/messages",
         selectedEndpoint: "/chat/completions",
         effort: "medium",
-        appliedEffort: "low",
+        appliedEffort: "medium",
       },
       provenance: { component: "agent", phase: "agent", path: "agent/awf-routing-outcome.json" },
     });
