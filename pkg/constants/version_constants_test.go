@@ -23,7 +23,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Agy CLI", DefaultAgyVersion, "1.3.1"},
 		{"Pi CLI", DefaultPiVersion, "1.0.0"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.2"},
-		{"Firewall", DefaultFirewallVersion, "v0.28.49"},
+		{"Firewall", DefaultFirewallVersion, "v0.28.50"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.30"},
 		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.2"},
