@@ -62,17 +62,18 @@ tools:
 ```
 
 `issues: true` enables projection with the `work` tracking label and a
-`work: <status>` label. An object may override `label` (for example, `cookie`
-produces `cookie: Queued`); an empty object uses defaults. Absent or false
+`work:<status>` label. An object may override `label` (for example, `cookie`
+produces `cookie:queued`); an empty object uses defaults. Absent or false
 disables the integration. The label prefix must be a nonblank literal of at
 most 33 bytes, leaving room for the longest status suffix within GitHub's
 50-character label limit; unknown keys are rejected.
 
 Status labels are created as needed in the target repository with purple
-(`7057FF`), using **Queued**, **Blocked**, **Assigned**, **Running**,
-**Verifying**, **Needs review**, **Done**, **Needs attention**, or **Cancelled**.
-The projector replaces only its own status labels, preserving unrelated labels.
-No organization Issue field or Project is required.
+(`7057FF`). Statuses use lowercase, hyphenated names with no spaces (for
+example, `work:queued` and `work:needs-review`); whitespace in a configured
+prefix is replaced with hyphens. The projector replaces only its own status
+labels, preserving unrelated labels. No organization Issue field or Project
+is required.
 
 The existing activation and conclusion jobs project only Work admitted by
 their authenticated run/attempt and Work in their original authenticated Claims.

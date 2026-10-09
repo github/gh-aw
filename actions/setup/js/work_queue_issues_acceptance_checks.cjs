@@ -434,7 +434,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       const m = mock(f);
       const options = nativeOptions(m, f);
       assert.deepEqual((await main(options)).pending, []);
-      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work: Running"));
+      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work:running"));
       const before = m.calls.length;
       const comments = [...m.comments.values()].map(comment => comment.body);
       m.nativeRun.run_attempt = 2;
@@ -442,7 +442,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.ok(rerun.pending?.length);
       assert.match(rerun.pending[0].reason, /rerun_not_authorized|native attempt 1|original authenticated Claims/);
       assert.equal(m.calls.slice(before).filter(call => call[0] === "mutation").length, 0);
-      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work: Running"));
+      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work:running"));
       assert.deepEqual(
         [...m.comments.values()].map(comment => comment.body),
         comments
@@ -559,7 +559,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
       assert.equal(m.comments.size, 1);
       assert.equal(m.locks.size, 0);
       assert.deepEqual((await main(nativeOptions(m, f))).pending, []);
-      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work: Assigned"));
+      assert.ok(m.issues.get("1").labels.nodes.some(label => label.name === "work:assigned"));
     });
 
     it("does not confuse unattempted aliases with uncertain native writes", async () => {

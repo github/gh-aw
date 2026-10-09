@@ -163,9 +163,11 @@ version-3 closed-schema readers cannot read the new projector rules, Issue
 links, or comment handles; do not enable them during a mixed-reader rollout.
 
 Add `issues: true` under each participating `tools.work-queue` object to project
-the `work` tracking label and purple `work: <status>` labels. To use a different
-prefix, configure `issues: {label: cookie}`. Labels are provisioned as needed in
-each target repository; no organization field or Project is required. See the
+the `work` tracking label and purple `work:<status>` labels (for example,
+`work:queued`). Status names are lowercase and hyphenated, without spaces. To
+use a different prefix, configure `issues: {label: cookie}`. Labels are
+provisioned as needed in each target repository; no organization field or
+Project is required. See the
 [backing Issue reference](/gh-aw/reference/work-queue/#backing-issues).
 
 Add an explicit `projectors` array to the installed Policy, using the actual

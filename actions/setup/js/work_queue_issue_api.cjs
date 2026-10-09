@@ -36,7 +36,9 @@ async function ensureLabel(github, repositoryId, label, name) {
 }
 
 function statusLabelName(config, status) {
-  return `${config.label}: ${status}`;
+  const prefix = config.label.replace(/\s+/g, "-");
+  const suffix = status.toLowerCase().replace(/\s+/g, "-");
+  return `${prefix}:${suffix}`;
 }
 
 async function ensureStatusLabel(github, repositoryId, config, status) {
