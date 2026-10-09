@@ -296,14 +296,6 @@ function resolvePiModelRouting(reflectData) {
     recordAWFModelRoutingOutcome({ status: "rejected", failure_code: "unsupported_effort", detail: mappedEffort.error });
     return { selection: null, error: mappedEffort.error };
   }
-  recordAWFModelRoutingOutcome({
-    status: "selected",
-    wire_model: result.selection.wire_model,
-    endpoint: result.selection.endpoint,
-    selected_endpoint: result.selection.selected_endpoint,
-    effort: result.selection.effort,
-    applied_effort: mappedEffort.effort,
-  });
   return {
     selection: { ...result.selection, mapped_effort: mappedEffort.effort },
     error: null,
@@ -400,6 +392,14 @@ async function main(options = {}) {
     const result = resolvePiRoutingEndpoint({ reflectData, modelId, api });
     if (result.error) throw new Error(`${result.error}; refusing to start Pi`);
     const endpointOverride = routingSelection.selected_endpoint && routingSelection.selected_endpoint !== result.endpoint ? ` selected_endpoint=${routingSelection.selected_endpoint}` : "";
+    recordAWFModelRoutingOutcome({
+      status: "selected",
+      wire_model: routingSelection.wire_model,
+      endpoint: result.endpoint,
+      selected_endpoint: routingSelection.selected_endpoint,
+      effort: routingSelection.effort,
+      applied_effort: routingSelection.mapped_effort,
+    });
     logger(`inference routing: mode=awf-routed model=${modelId} effort=${routingSelection.effort || "(unset)"} endpoint=${result.endpoint}${endpointOverride}`);
   }
   logger(`resolved gateway api=${api} (provider=${provider}, model=${modelId})`);

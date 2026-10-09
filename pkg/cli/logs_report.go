@@ -57,16 +57,19 @@ type ModelRoutingLogsSummary struct {
 }
 
 type ModelRoutingRouteSummary struct {
-	TaskType      string  `json:"task_type,omitempty" console:"header:Task"`
-	Scope         string  `json:"scope,omitempty" console:"header:Scope"`
-	Complexity    string  `json:"task_complexity,omitempty" console:"header:Complexity"`
-	Mode          string  `json:"mode,omitempty" console:"header:Mode"`
-	Model         string  `json:"model,omitempty" console:"header:Model"`
-	Effort        string  `json:"effort,omitempty" console:"header:Effort"`
-	RouterVersion string  `json:"router_version,omitempty" console:"header:Router"`
-	RunCount      int     `json:"run_count" console:"header:Runs"`
-	TotalAIC      float64 `json:"total_aic" console:"header:Total AIC"`
-	AverageAIC    float64 `json:"average_aic" console:"header:Average AIC"`
+	TaskType          string  `json:"task_type,omitempty" console:"header:Task"`
+	Scope             string  `json:"scope,omitempty" console:"header:Scope"`
+	Complexity        string  `json:"task_complexity,omitempty" console:"header:Complexity"`
+	Mode              string  `json:"mode,omitempty" console:"header:Mode"`
+	Model             string  `json:"model,omitempty" console:"header:Model"`
+	Effort            string  `json:"effort,omitempty" console:"header:Effort"`
+	RouterVersion     string  `json:"router_version,omitempty" console:"header:Router"`
+	Endpoint          string  `json:"endpoint,omitempty" console:"header:Endpoint"`
+	EffectiveEndpoint string  `json:"effective_endpoint,omitempty" console:"header:Effective Endpoint"`
+	SelectedEndpoint  string  `json:"selected_endpoint,omitempty" console:"header:Selected Endpoint"`
+	RunCount          int     `json:"run_count" console:"header:Runs"`
+	TotalAIC          float64 `json:"total_aic" console:"header:Total AIC"`
+	AverageAIC        float64 `json:"average_aic" console:"header:Average AIC"`
 }
 
 // ContinuationData provides parameters to continue an incomplete logs query.
@@ -450,6 +453,7 @@ func extractRunEngineInfo(pr ProcessedRun) runEngineInfo {
 
 // applyAwInfoToRunData copies repository/ref metadata from aw_info.json onto the run data.
 func applyAwInfoToRunData(runData *RunData, awInfo *AwInfo) {
+	runData.ModelRouting = applyAwInfoModelRoutingInfo(runData.ModelRouting, awInfo)
 	if awInfo.Repository != "" {
 		runData.Repository = awInfo.Repository
 		if organization, _, found := strings.Cut(awInfo.Repository, "/"); found {

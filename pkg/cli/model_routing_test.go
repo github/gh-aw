@@ -126,6 +126,22 @@ func TestAnalyzeModelRoutingFromCompactUsageArtifact(t *testing.T) {
 	}
 }
 
+func TestApplyAwInfoModelRoutingAddsEndpointMetadata(t *testing.T) {
+	runDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(
+		`{"model_routing":{"status":"selected","endpoint":"/v1/messages","selected_endpoint":"/chat/completions"}}`,
+	), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	routing := &ModelRoutingSummary{Status: "selected", Endpoint: "/chat/completions"}
+
+	result := applyAwInfoModelRouting(routing, runDir)
+	if result == routing || result.Endpoint != "/chat/completions" ||
+		result.EffectiveEndpoint != "/v1/messages" || result.SelectedEndpoint != "/chat/completions" {
+		t.Fatalf("aw_info endpoint metadata was not merged into the AWF routing summary: %+v", result)
+	}
+}
+
 func TestBuildAuditComparisonCandidateFromLegacySummary(t *testing.T) {
 	runDir := t.TempDir()
 	routingDir := filepath.Join(runDir, "sandbox", "firewall", "logs", "api-proxy-logs")
@@ -203,6 +219,7 @@ func TestBuildModelRoutingLogsSummary(t *testing.T) {
 	routing := &ModelRoutingSummary{
 		Status: "selected", Labels: ModelRoutingLabels{TaskType: "explain", Scope: "local", TaskComplexity: "trivial"},
 		Mode: "economy", SelectedModel: "gpt-5.6-luna", SelectedEffort: "high", RouterVersion: "0.1.3",
+		Endpoint: "/chat/completions", EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/chat/completions",
 		RoutedCounts:   map[string]int{"as_selected": 3, "deviated": 1},
 		ClassifierCost: ModelRoutingCost{AIC: 0.05}, SelectedModelCost: ModelRoutingCost{AIC: 0.60},
 		DeviatedTrafficCost: ModelRoutingCost{AIC: 0.10},
@@ -219,11 +236,17 @@ func TestBuildModelRoutingLogsSummary(t *testing.T) {
 		summary.Routes[0].TotalAIC != 1.5 || summary.Routes[0].AverageAIC != 0.75 {
 		t.Fatalf("unexpected route aggregate: %+v", summary.Routes)
 	}
+	if summary.Routes[0].Endpoint != "/chat/completions" ||
+		summary.Routes[0].EffectiveEndpoint != "/v1/messages" ||
+		summary.Routes[0].SelectedEndpoint != "/chat/completions" {
+		t.Fatalf("route endpoint metadata was not retained: %+v", summary.Routes[0])
+	}
 }
 
 func TestModelRoutingTextReports(t *testing.T) {
 	routing := &ModelRoutingSummary{
 		Status: "failed", Objective: "cost", Failure: &ModelRoutingFailure{Code: "no_route", Detail: "no eligible choice"},
+		Endpoint: "/chat/completions", EffectiveEndpoint: "/v1/messages", SelectedEndpoint: "/chat/completions",
 		ClassifierCost: ModelRoutingCost{AIC: 0.059}, SelectedModelCost: ModelRoutingCost{AIC: 0.4},
 		DeviatedTrafficCost: ModelRoutingCost{AIC: 0.3},
 	}
@@ -241,7 +264,7 @@ func TestModelRoutingTextReports(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = reader.Close()
-	for _, expected := range []string{"status=failed objective=cost", "failure: code=no_route", "classifier=0.059 selected_model=0.400 deviated=0.300"} {
+	for _, expected := range []string{"status=failed objective=cost", "endpoint=/chat/completions effective_endpoint=/v1/messages selected_endpoint=/chat/completions", "failure: code=no_route", "classifier=0.059 selected_model=0.400 deviated=0.300"} {
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("console routing report missing %q: %s", expected, output.String())
 		}

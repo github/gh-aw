@@ -170,6 +170,7 @@ describe("pi_models_json.cjs", () => {
     it("uses the Pi catalog API rather than AWF's selected endpoint for Claude models", async () => {
       const agentDir = path.join(tmpDir, "routed-claude-pi");
       const modelsPath = path.join(agentDir, "models.json");
+      process.env.GH_AW_TMP_DIR = tmpDir;
       process.env.GH_AW_MODEL_ROUTING = "1";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
       process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
@@ -212,6 +213,11 @@ describe("pi_models_json.cjs", () => {
       const models = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
       expect(models.providers["aw-gateway"].api).toBe("anthropic-messages");
       expect(messages.join("\n")).toContain("endpoint=/v1/messages selected_endpoint=/chat/completions");
+      expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "agent", "awf-routing-outcome.json"), "utf8"))).toMatchObject({
+        status: "selected",
+        endpoint: "/v1/messages",
+        selected_endpoint: "/chat/completions",
+      });
     });
 
     it.each([false, undefined])("rejects incomplete metadata on the selected model (%s)", candidate_metadata_complete => {

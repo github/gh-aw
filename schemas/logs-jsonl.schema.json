@@ -1778,6 +1778,12 @@
                 "endpoint": {
                   "type": "string"
                 },
+                "effective_endpoint": {
+                  "type": "string"
+                },
+                "selected_endpoint": {
+                  "type": "string"
+                },
                 "top_choices": {
                   "type": [
                     "null",
@@ -3951,6 +3957,12 @@
                       "type": "string"
                     },
                     "endpoint": {
+                      "type": "string"
+                    },
+                    "effective_endpoint": {
+                      "type": "string"
+                    },
+                    "selected_endpoint": {
                       "type": "string"
                     },
                     "top_choices": {
