@@ -17,11 +17,16 @@ engine:
   id: pydantic-ai
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-pydantic-ai
+tools:
+  work-queue:
+    worker: true
+    require-assignment: true
 imports:
   - pydantic/pydantic-ai/src/pydantic_ai_harness/gh-aw/pydantic.md@319d72ccf220427e59b9f4e61f17d7be52c90d68
   - uses: shared/engine-conformance.md
     with:
       engine-id: pydantic-ai
+  - shared/engine-conformance-worker.md
 ---
 
 Execute the imported engine configuration conformance suite once.
