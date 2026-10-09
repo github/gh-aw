@@ -102,13 +102,13 @@ Focus on:
    - Use `logs` to download parsed logs for recent runs, specifying `artifacts: ["agent"]` to include agent telemetry (turns, token usage, stdout) needed for AgentRx trajectory analysis.
      **`logs` precondition rules (follow strictly):**
      - Always include `workflow_name` — never call `logs` without it; an unfiltered scan will time out.
-     - Cap retries at **2 attempts** per workflow. If both return empty or time out, stop retrying and fall back to `audit` using any known `run_id` (from `status` or prior context).
+     - Query at most **3 workflows**, with `count: 10` and `start_date: "-1d"` for each. Cap retries at **2 attempts** per workflow; if both return empty or time out, stop retrying and fall back to `audit` using any known `run_id` (from `status` or prior context). Never widen the time window or run count.
      - If `logs` returns `total_runs=0` for a workflow with confirmed completed runs, treat this as a tool-health failure. Surface it via `missing_tool` and proceed with `audit`-only data; do not vary parameters and retry further.
      ```json
      {
        "workflow_name": "<workflow-id>",
-       "count": 50,
-       "start_date": "-2d",
+       "count": 10,
+       "start_date": "-1d",
        "artifacts": ["agent"]
      }
      ```
@@ -139,6 +139,8 @@ run_data_path: /tmp/gh-aw/agent/agentrx/mcp-runs.json
 ```
 Do not invoke `trajectory-builder` in this variant.
 {{/if}}
+
+Limit the trajectory to **10 runs total** across all sources. Prioritize failed runs, then the highest-latency runs, and omit raw log text.
 
 ### 2) Run AgentRx pipeline
 
