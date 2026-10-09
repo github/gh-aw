@@ -1,0 +1,102 @@
+{
+  "model_routing": {
+    "status": "selected",
+    "selected_model": "github-copilot/gpt-5.6-luna",
+    "selected_effort": "high",
+    "endpoint": "/responses",
+    "effective_endpoint": "/responses",
+    "routed_counts": {
+      "as_selected": 4
+    },
+    "outcome_counts": {
+      "completed": 4
+    },
+    "classifier_cost": {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0
+    },
+    "selected_model_cost": {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0
+    },
+    "deviated_traffic_cost": {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0
+    },
+    "main_agent_cost": {
+      "requests": 4,
+      "input_tokens": 97401,
+      "output_tokens": 535,
+      "cache_read_tokens": 70123,
+      "cache_write_tokens": 27266,
+      "aic": 0.886336
+    }
+  },
+  "firewall_token_usage": {
+    "total_input_tokens": 98203,
+    "total_output_tokens": 666,
+    "total_cache_read_tokens": 70123,
+    "total_cache_write_tokens": 0,
+    "total_requests": 5,
+    "total_duration_ms": 16128,
+    "total_response_bytes": 1453017,
+    "cache_efficiency": 0,
+    "total_aic": 0.781766,
+    "by_model": {
+      "gpt-5.6-luna": {
+        "provider": "copilot",
+        "input_tokens": 98203,
+        "output_tokens": 666,
+        "cache_read_tokens": 70123,
+        "cache_write_tokens": 0,
+        "requests": 5,
+        "duration_ms": 16128,
+        "response_bytes": 1453017,
+        "aic": 0.781766
+      }
+    },
+    "agent_usage": [
+      {
+        "agent_name": "main",
+        "agent_type": "main",
+        "source_engine": "copilot",
+        "instance_count": 1,
+        "served_models": ["gpt-5.6-luna"],
+        "requests": 4,
+        "input_tokens": 97401,
+        "output_tokens": 535,
+        "cache_read_tokens": 70123,
+        "cache_write_tokens": 27266,
+        "reasoning_tokens": 244,
+        "aic": 0.886336,
+        "total_api_duration_ms": 13645,
+        "models": [
+          {
+            "model": "gpt-5.6-luna",
+            "resolved_model": "gpt-5.6-luna",
+            "requests": 4,
+            "input_tokens": 97401,
+            "output_tokens": 535,
+            "cache_read_tokens": 70123,
+            "cache_write_tokens": 27266,
+            "reasoning_tokens": 244,
+            "aic": 0.886336
+          }
+        ]
+      }
+    ],
+    "warnings": ["per-agent AI credits (0.886) differ from non-classifier proxy total (0.782) for endpoint /responses"]
+  }
+}

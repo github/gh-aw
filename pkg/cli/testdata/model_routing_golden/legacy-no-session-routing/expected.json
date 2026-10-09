@@ -1,0 +1,292 @@
+{
+  "model_routing": {
+    "status": "selected",
+    "selected_model": "github-copilot/claude-opus-5",
+    "selected_effort": "xhigh",
+    "endpoint": "/v1/messages",
+    "routed_counts": {
+      "as_selected": 86,
+      "deviated": 15
+    },
+    "outcome_counts": {
+      "completed": 101
+    },
+    "deviations": [
+      {
+        "requested_model": "claude-opus-5",
+        "requested_effort": "low",
+        "selected_model": "github-copilot/claude-opus-5",
+        "selected_effort": "xhigh",
+        "deviation": "effort,endpoint",
+        "count": 15
+      }
+    ],
+    "classifier_cost": {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0
+    },
+    "selected_model_cost": {
+      "requests": 86,
+      "input_tokens": 6500,
+      "output_tokens": 60963,
+      "cache_read_tokens": 9380261,
+      "cache_write_tokens": 413852,
+      "aic": 883.32805
+    },
+    "deviated_traffic_cost": {
+      "requests": 15,
+      "input_tokens": 3449,
+      "output_tokens": 8080,
+      "cache_read_tokens": 153853,
+      "cache_write_tokens": 32802,
+      "aic": 50.1184
+    },
+    "main_agent_cost": {
+      "requests": 41,
+      "input_tokens": 4365737,
+      "output_tokens": 29635,
+      "cache_read_tokens": 4196446,
+      "cache_write_tokens": 0,
+      "aic": 389.12155
+    },
+    "subagent_costs": [
+      {
+        "agent_name": "awf-routing",
+        "agent_type": "subagent",
+        "instance_count": 2,
+        "completed_count": 1,
+        "models": ["claude-opus-5"],
+        "requests": 12,
+        "input_tokens": 168188,
+        "output_tokens": 6904,
+        "cache_read_tokens": 141157,
+        "cache_write_tokens": 0,
+        "aic": 40.97735
+      },
+      {
+        "agent_name": "ghaw-issues",
+        "agent_type": "subagent",
+        "instance_count": 2,
+        "completed_count": 1,
+        "models": ["claude-opus-5"],
+        "requests": 3,
+        "input_tokens": 21916,
+        "output_tokens": 1176,
+        "cache_read_tokens": 12696,
+        "cache_write_tokens": 0,
+        "aic": 9.14105
+      },
+      {
+        "agent_name": "subagent-research",
+        "agent_type": "subagent",
+        "instance_count": 2,
+        "completed_count": 1,
+        "models": ["claude-opus-5"],
+        "requests": 45,
+        "input_tokens": 5434876,
+        "output_tokens": 31328,
+        "cache_read_tokens": 5183815,
+        "cache_write_tokens": 0,
+        "aic": 494.2065
+      }
+    ],
+    "endpoint_only_deviation_normalized": true
+  },
+  "firewall_token_usage": {
+    "total_input_tokens": 10841,
+    "total_output_tokens": 69220,
+    "total_cache_read_tokens": 9534114,
+    "total_cache_write_tokens": 446654,
+    "total_requests": 102,
+    "total_duration_ms": 1009996,
+    "total_response_bytes": 2865152,
+    "cache_efficiency": 0,
+    "total_aic": 933.48553,
+    "by_model": {
+      "claude-opus-5": {
+        "provider": "copilot",
+        "input_tokens": 9949,
+        "output_tokens": 69043,
+        "cache_read_tokens": 9534114,
+        "cache_write_tokens": 446654,
+        "requests": 101,
+        "duration_ms": 1007394,
+        "response_bytes": 2855830,
+        "aic": 933.44645
+      },
+      "gpt-5.6-luna": {
+        "provider": "copilot",
+        "input_tokens": 892,
+        "output_tokens": 177,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "requests": 1,
+        "duration_ms": 2602,
+        "response_bytes": 9322,
+        "aic": 0.03908
+      }
+    },
+    "subagent_model_requests": [
+      {
+        "agent_name": "awf-routing",
+        "requested_model": "claude-opus-5",
+        "resolved_model": "claude-opus-5",
+        "served_models": ["claude-opus-5"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "claude-opus-5"
+      },
+      {
+        "agent_name": "ghaw-issues",
+        "requested_model": "claude-opus-5",
+        "resolved_model": "claude-opus-5",
+        "served_models": ["claude-opus-5"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "claude-opus-5"
+      },
+      {
+        "agent_name": "subagent-research",
+        "requested_model": "claude-opus-5",
+        "resolved_model": "claude-opus-5",
+        "served_models": ["claude-opus-5"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "claude-opus-5"
+      }
+    ],
+    "subagent_model_actuals": [
+      {
+        "model": "claude-opus-5",
+        "requests": 60,
+        "resolved_model": "claude-opus-5",
+        "served_models": ["claude-opus-5"],
+        "input_tokens": 5624980,
+        "output_tokens": 39408,
+        "cache_read_tokens": 5337668,
+        "cache_write_tokens": 0,
+        "aic": 544.3249
+      }
+    ],
+    "agent_usage": [
+      {
+        "agent_name": "awf-routing",
+        "agent_type": "subagent",
+        "source_engine": "copilot",
+        "instance_count": 2,
+        "completed_count": 1,
+        "requested_models": ["claude-opus-5"],
+        "resolved_models": ["claude-opus-5"],
+        "served_models": ["claude-opus-5"],
+        "requests": 12,
+        "input_tokens": 168188,
+        "output_tokens": 6904,
+        "cache_read_tokens": 141157,
+        "cache_write_tokens": 0,
+        "aic": 40.97735,
+        "total_api_duration_ms": 100230,
+        "models": [
+          {
+            "model": "claude-opus-5",
+            "resolved_model": "claude-opus-5",
+            "requests": 12,
+            "input_tokens": 168188,
+            "output_tokens": 6904,
+            "cache_read_tokens": 141157,
+            "cache_write_tokens": 0,
+            "aic": 40.97735
+          }
+        ]
+      },
+      {
+        "agent_name": "ghaw-issues",
+        "agent_type": "subagent",
+        "source_engine": "copilot",
+        "instance_count": 2,
+        "completed_count": 1,
+        "requested_models": ["claude-opus-5"],
+        "resolved_models": ["claude-opus-5"],
+        "served_models": ["claude-opus-5"],
+        "requests": 3,
+        "input_tokens": 21916,
+        "output_tokens": 1176,
+        "cache_read_tokens": 12696,
+        "cache_write_tokens": 0,
+        "aic": 9.14105,
+        "total_api_duration_ms": 17390,
+        "models": [
+          {
+            "model": "claude-opus-5",
+            "resolved_model": "claude-opus-5",
+            "requests": 3,
+            "input_tokens": 21916,
+            "output_tokens": 1176,
+            "cache_read_tokens": 12696,
+            "cache_write_tokens": 0,
+            "aic": 9.14105
+          }
+        ]
+      },
+      {
+        "agent_name": "main",
+        "agent_type": "main",
+        "source_engine": "copilot",
+        "instance_count": 1,
+        "served_models": ["claude-opus-5"],
+        "requests": 41,
+        "input_tokens": 4365737,
+        "output_tokens": 29635,
+        "cache_read_tokens": 4196446,
+        "cache_write_tokens": 0,
+        "aic": 389.12155,
+        "total_api_duration_ms": 449127,
+        "models": [
+          {
+            "model": "claude-opus-5",
+            "resolved_model": "claude-opus-5",
+            "requests": 41,
+            "input_tokens": 4365737,
+            "output_tokens": 29635,
+            "cache_read_tokens": 4196446,
+            "cache_write_tokens": 0,
+            "aic": 389.12155
+          }
+        ]
+      },
+      {
+        "agent_name": "subagent-research",
+        "agent_type": "subagent",
+        "source_engine": "copilot",
+        "instance_count": 2,
+        "completed_count": 1,
+        "requested_models": ["claude-opus-5"],
+        "resolved_models": ["claude-opus-5"],
+        "served_models": ["claude-opus-5"],
+        "requests": 45,
+        "input_tokens": 5434876,
+        "output_tokens": 31328,
+        "cache_read_tokens": 5183815,
+        "cache_write_tokens": 0,
+        "aic": 494.2065,
+        "total_api_duration_ms": 441614,
+        "models": [
+          {
+            "model": "claude-opus-5",
+            "resolved_model": "claude-opus-5",
+            "requests": 45,
+            "input_tokens": 5434876,
+            "output_tokens": 31328,
+            "cache_read_tokens": 5183815,
+            "cache_write_tokens": 0,
+            "aic": 494.2065
+          }
+        ]
+      }
+    ],
+    "warnings": ["per-agent AI credits (933.446) differ from non-classifier proxy total (933.486) for endpoint /responses"]
+  }
+}

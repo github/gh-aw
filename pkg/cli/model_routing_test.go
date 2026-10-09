@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -384,6 +385,93 @@ func TestApplyAgentUsageToModelRouting(t *testing.T) {
 		t.Fatalf("unexpected sub-agent routing cost: %+v", summary.SubagentCosts)
 	}
 }
+
+func TestAppendRoutingDeviation(t *testing.T) {
+	summary := &ModelRoutingSummary{SelectedModel: "gpt-5.6-luna", SelectedEffort: "high"}
+	request := modelRoutingRecord{
+		RequestedModel: "gpt-5.6-luna", RequestedEffort: "low",
+	}
+	appendRoutingDeviation(summary, request, "effort")
+	appendRoutingDeviation(summary, request, "effort")
+
+	appendRoutingDeviation(summary, modelRoutingRecord{
+		RequestedModel: "gpt-5.4", RequestedEffort: request.RequestedEffort,
+	}, "effort")
+	appendRoutingDeviation(summary, modelRoutingRecord{
+		RequestedModel: request.RequestedModel, RequestedEffort: "medium",
+	}, "effort")
+	summary.SelectedEffort = "medium"
+	appendRoutingDeviation(summary, request, "effort")
+	summary.SelectedEffort = "high"
+	appendRoutingDeviation(summary, request, "endpoint")
+
+	if len(summary.Deviations) != 5 || summary.Deviations[0].Count != 2 {
+		t.Fatalf("identical deviations should increment while distinct fields create separate rows: %+v", summary.Deviations)
+	}
+	for i, deviation := range summary.Deviations[1:] {
+		if deviation.Count != 1 {
+			t.Errorf("distinct deviation row %d has count %d, want 1", i+1, deviation.Count)
+		}
+	}
+
+	legacy := &ModelRoutingSummary{Schema: "model-routing/v0.28.35", SelectedModel: "claude-opus-5", SelectedEffort: "max"}
+	legacyRequest := modelRoutingRecord{Routed: "deviated", Deviations: []string{"endpoint"}}
+	normalizeLegacyEndpointDeviation(legacy, &legacyRequest)
+	if legacyRequest.Routed == "deviated" {
+		appendRoutingDeviation(legacy, legacyRequest, strings.Join(legacyRequest.Deviations, ","))
+	}
+	if len(legacy.Deviations) != 0 || !legacy.EndpointOnlyDeviationNormalized {
+		t.Fatalf("legacy endpoint-only deviation should normalize without a row: %+v", legacy)
+	}
+}
+
+func TestAppendModelRoutingSubagentCosts(t *testing.T) {
+	empty := &ModelRoutingLogsSummary{}
+	appendModelRoutingSubagentCosts(empty, nil)
+	if len(empty.SubagentCosts) != 0 {
+		t.Fatalf("empty totals should not append sub-agent costs: %+v", empty.SubagentCosts)
+	}
+
+	totals := make(map[string]ModelRoutingAgentCost)
+	addModelRoutingSubagentTotals(totals, []ModelRoutingAgentCost{
+		{
+			AgentName: "reader", AgentType: "subagent", Effort: "low", Models: []string{"z-model", "a-model"},
+			InstanceCount: 1, ModelRoutingCost: ModelRoutingCost{Requests: 2, AIC: 0.1},
+		},
+		{
+			AgentName: "reader", AgentType: "subagent", Effort: "low", Models: []string{"a-model", "m-model"},
+			InstanceCount: 2, ModelRoutingCost: ModelRoutingCost{Requests: 3, AIC: 0.2},
+		},
+		{
+			AgentName: "reader", AgentType: "subagent", Effort: "high", Models: []string{"high-model"},
+			InstanceCount: 1, ModelRoutingCost: ModelRoutingCost{Requests: 1, AIC: 0.3},
+		},
+		{
+			AgentName: "alpha", AgentType: "subagent", Effort: "low", Models: []string{"alpha-model"},
+			InstanceCount: 1, ModelRoutingCost: ModelRoutingCost{Requests: 1, AIC: 0.4},
+		},
+	})
+
+	summary := &ModelRoutingLogsSummary{}
+	appendModelRoutingSubagentCosts(summary, totals)
+	if len(summary.SubagentCosts) != 3 {
+		t.Fatalf("same agent and effort should merge, but different efforts should remain separate: %+v", summary.SubagentCosts)
+	}
+	gotOrder := make([]string, 0, len(summary.SubagentCosts))
+	for _, cost := range summary.SubagentCosts {
+		gotOrder = append(gotOrder, cost.AgentName+":"+cost.Effort)
+	}
+	wantOrder := []string{"alpha:low", "reader:high", "reader:low"}
+	if !slices.Equal(gotOrder, wantOrder) {
+		t.Fatalf("sub-agent costs are not ordered by agent and effort: got %v, want %v", gotOrder, wantOrder)
+	}
+	readerLow := summary.SubagentCosts[2]
+	if !slices.Equal(readerLow.Models, []string{"a-model", "m-model", "z-model"}) ||
+		readerLow.InstanceCount != 3 || readerLow.Requests != 5 || math.Abs(readerLow.AIC-0.3) > 0.000001 {
+		t.Fatalf("merged sub-agent costs or models are incorrect: %+v", readerLow)
+	}
+}
+
 func TestModelRoutingTextReports(t *testing.T) {
 	routing := &ModelRoutingSummary{
 		Status: "failed", Objective: "cost", Failure: &ModelRoutingFailure{Code: "no_route", Detail: "no eligible choice"},
