@@ -182,13 +182,14 @@ describe("authenticated immutable activation snapshots", () => {
     const initialize = vi.fn();
     const snapshot = await main({
       ...options,
+      branch: "custom-queue",
       readWorkQueueLog: async () => ({ sha: null, transactions: [], state: newState() }),
       initializeWorkQueue: initialize,
     });
     expect(snapshot).toMatchObject({ sha: null, worker: null, role: "dispatcher" });
     expect(initialize).not.toHaveBeenCalled();
     expect(readWorkQueueState(loadWorkQueueSnapshot(options.snapshotPath)).queue_state).toBe("uninitialized");
-    expect(options.core.info).toHaveBeenCalledWith(expect.stringContaining("first trusted producer submission can provision the protected branch"));
+    expect(options.core.info).toHaveBeenCalledWith(expect.stringContaining("protected queue branch 'custom-queue'"));
   });
 
   it("rejects actual oversized encoded framing before creating a snapshot or publishing origin output", async () => {

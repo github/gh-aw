@@ -10,8 +10,16 @@ const { readInboundWorkQueueAssignment, resolveWorkQueueRuntime } = require("./a
 const { authenticatePublisher, validateNativeRun } = require("./work_queue_native.cjs");
 const { bindWorkerAssignment, loadQueue, validateStoredAssignment, expectedWorkerRun } = require("./work_queue_binding.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { WORK_QUEUE_BRANCH } = require("./work_queue_store.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
+
+function activationMessage({ worker, staged, latest, runtime, branch }) {
+  if (worker) return `${worker.claims.length} immutable Claims authenticated${staged ? " for staged preview (not bound)" : " and bound"}`;
+  if (latest.sha === null) return `queue uninitialized; the first trusted producer submission can provision the protected queue branch '${branch}' and install its compiled Policy`;
+  if (runtime.role === "observer") return "read-only observer";
+  return "unassigned queue-control context";
+}
 
 function resolveWorkerAssignment(payload, transactions) {
   const assignment = readInboundWorkQueueAssignment(payload);
@@ -66,9 +74,7 @@ async function main(options = {}) {
   fs.writeFileSync(outputPath, encoded, { mode: 0o444 });
   fs.chmodSync(outputPath, 0o444);
   configuration.core.setOutput?.("work_queue_origin", canonical(snapshot.origin));
-  configuration.core.info(
-    `Work queue activation: ${worker ? `${worker.claims.length} immutable Claims authenticated${staged ? " for staged preview (not bound)" : " and bound"}` : latest.sha === null ? "queue uninitialized; the first trusted producer submission can provision the protected branch and install its compiled Policy" : runtime.role === "observer" ? "read-only observer" : "unassigned queue-control context"}; snapshot captured`
-  );
+  configuration.core.info(`Work queue activation: ${activationMessage({ worker, staged, latest, runtime, branch: configuration.branch ?? WORK_QUEUE_BRANCH })}; snapshot captured`);
   return snapshot;
 }
 
