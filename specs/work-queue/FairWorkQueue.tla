@@ -163,12 +163,26 @@ ValidOps(s, ops) ==
 \* Observe abstracts a trusted exact-resource GitHub metadata read.
 \* One group abstracts one approved worker profile and its actual bound run.
 \* Claims are individually charged; a group's native run slot survives closure.
-VARIABLES log, head, pending, worker, intents, handled, authorized, effects, completed, projection
-vars == <<log, head, pending, worker, intents, handled, authorized, effects, completed, projection>>
+VARIABLES log, head, pending, worker, intents, handled, authorized, effects, completed,
+          projection, checkpoint, checkpointPending, checkpointConflicts
+vars == <<log, head, pending, worker, intents, handled, authorized, effects, completed,
+          projection, checkpoint, checkpointPending, checkpointConflicts>>
 \* The cache has no independent authority: every checked state must equal complete log replay.
 State == projection
-ProjectionSoundness == projection = Replay(log)
-Projected(action) == action /\ projection' = Replay(log')
+RECURSIVE ReplayCheckpoint(_, _)
+ReplayCheckpoint(saved, history) ==
+    IF Len(history) = Len(saved.prefix) THEN saved.state
+    ELSE ApplyOps(ReplayCheckpoint(saved, SubSeq(history, 1, Len(history) - 1)),
+                  history[Len(history)].ops, Len(history) * (WorkCount + 1))
+ProjectionSoundness ==
+    /\ checkpoint.prefix = SubSeq(log, 1, Len(checkpoint.prefix))
+    /\ checkpoint.state = Replay(checkpoint.prefix)
+    /\ projection = ReplayCheckpoint(checkpoint, log)
+    /\ projection = Replay(log)
+Projected(action) ==
+    action /\ UNCHANGED <<checkpoint, checkpointPending, checkpointConflicts>>
+           /\ projection' = ReplayCheckpoint(checkpoint, log')
+Checkpointed(action) == action /\ projection' = ReplayCheckpoint(checkpoint', log')
 Record(source, id, request, ops) ==
     Append(source, [id |-> id, previous |-> IF source = <<>> THEN 0 ELSE Last(source).id,
                     request |-> request, ops |-> ops])
@@ -180,6 +194,9 @@ Init ==
     /\ worker = [g \in Groups |-> "waiting"]
     /\ intents = [c \in Claims |-> "none"]
     /\ handled = {} /\ authorized = {} /\ effects = <<>> /\ completed = {}
+    /\ checkpoint = [prefix |-> <<>>, state |-> Empty]
+    /\ checkpointPending = [phase |-> "idle", base |-> 0, source |-> <<>>]
+    /\ checkpointConflicts = 0
     /\ projection = Replay(log)
 AppendOps(ops) == /\ log' = Record(log, head + 1, 0, ops) /\ head' = head + 1
 Prepare(g) ==
@@ -283,6 +300,37 @@ RawNext ==
     \/ \E e \in Resources : \E status \in ResourceStatuses(e) : Observe(e, status)
 Next == Projected(RawNext)
 Spec == Init /\ [][Next]_vars
+PrepareCheckpoint ==
+    /\ checkpointPending.phase = "idle"
+    /\ checkpointPending' = [phase |-> "prepared", base |-> head, source |-> log]
+    /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized,
+                   effects, completed, projection, checkpoint, checkpointConflicts>>
+PublishCheckpoint ==
+    /\ checkpointPending.phase = "prepared"
+    /\ checkpointPending.base = head /\ checkpointPending.source = log
+    /\ AppendOps(<<Op("Checkpoint", 0, 0, 0)>>)
+    /\ checkpoint' = [prefix |-> log', state |-> Replay(log')]
+    /\ checkpointPending' = [checkpointPending EXCEPT !.phase = "done"]
+    /\ UNCHANGED <<pending, worker, intents, handled, authorized,
+                   effects, completed, checkpointConflicts>>
+RetryCheckpoint ==
+    /\ checkpointPending.phase = "prepared"
+    /\ checkpointPending.base # head
+    /\ checkpointPending' = [checkpointPending EXCEPT !.base = head, !.source = log]
+    /\ checkpointConflicts' = checkpointConflicts + 1
+    /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized,
+                   effects, completed, projection, checkpoint>>
+CheckpointNext ==
+    Projected(\E g \in Groups : Prepare(g) \/ Push(g) \/ Retry(g))
+    \/ PrepareCheckpoint \/ RetryCheckpoint \/ Checkpointed(PublishCheckpoint)
+CheckpointSpec ==
+    Init /\ [][CheckpointNext]_vars
+         /\ WF_vars(PrepareCheckpoint)
+         /\ WF_vars(RetryCheckpoint)
+         /\ WF_vars(Checkpointed(PublishCheckpoint))
+CheckpointProgress ==
+    (checkpointPending.phase = "prepared") ~> (checkpointPending.phase = "done")
+CheckpointRace == checkpointConflicts = 0
 Bound == Len(log) <= MaxLog
 OneObservationPerResource == \A e \in Resources : State.reads[e] <= 1
 CausalChain ==
@@ -371,6 +419,8 @@ TypeOK ==
     /\ State.results \subseteq Works
     /\ State.external \in [1..2 -> {"unknown", "waiting", "ready", "failed"}]
     /\ State.reads \in [1..2 -> 0..2]
+    /\ checkpointPending.phase \in {"idle", "prepared", "done"}
+    /\ checkpointConflicts \in Nat
 Ownership ==
     /\ \A w \in Works :
          Cardinality({c \in OpenClaims(State) : WorkOf(c) = w}) <= 1
@@ -491,6 +541,7 @@ BrokenExternalSpec == Init /\ [][Projected(Next \/ \E g \in Groups, w \in Works 
 BrokenPRSpec == Init /\ [][Projected(Next \/ BrokenPRObservation)]_vars
 BrokenProjection ==
     /\ projection' = [projection EXCEPT !.ws[1] = "completed"]
-    /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized, effects, completed>>
+    /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized, effects,
+                   completed, checkpoint, checkpointPending, checkpointConflicts>>
 BrokenProjectionSpec == Init /\ [][Next \/ BrokenProjection]_vars
 =================================================================

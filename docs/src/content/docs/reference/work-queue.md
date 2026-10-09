@@ -1,6 +1,6 @@
 ---
 title: Work queues
-description: Git-backed work queue roles, Claim-scoped effects, operator commands and checked keyboard actions.
+description: Git-backed work queue roles, Claim-scoped effects, checkpoints, maintenance compaction and checked operator commands.
 ---
 
 Work queues can be Git-backed or issue-backed. Native `tools.work-queue` uses
@@ -304,7 +304,7 @@ initialize Policy over an invalid log.
 | `explain --pool POOL [--work-id ID]` | Evaluate scheduler selection or inspect a dependency path without changing scheduling counters. |
 | `explain --request-id ID` or `explain --claim-id ID` | Reconstruct an exact historical grant from the authoritative log up to that point. |
 | `trace --request-id ID` or `trace --claim-id ID` | Read causal events within size limits, without exposing payloads or receipt contents. `--offset` and `--limit` control pagination. |
-| `compact` | Normalize and deduplicate complete commits without dropping history, resetting fairness accounting, or changing FIFO positions. |
+| `compact` | Replace the current log prefix with a version-3 checkpoint of deterministic replay state. The checkpoint names the prior Git commit and preserves fairness accounting, ownership, delivery barriers, and request identities. |
 | `policy --file policy.json --epoch EPOCH` | Install an authorized Policy for future work only when the queue is quiescent. |
 | `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed producer permissions. |
 | `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. |

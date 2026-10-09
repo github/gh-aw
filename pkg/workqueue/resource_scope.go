@@ -3,6 +3,7 @@ package workqueue
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"strings"
 	"unicode/utf8"
 )
@@ -170,21 +171,38 @@ func assertWorkTarget(work *WorkState, target EffectResource) error {
 	return nil
 }
 
-// Requests retain the causal commits, including duplicate immutable Work
-// submissions. Walking backwards preserves the original creator, not a retry.
+// WorkCreators retains the first actor for each immutable Work across checkpoints.
 func immutableWorkCreators(state Projection) (map[string]Actor, error) {
-	commits := make(map[string]QueueCommit, len(state.Requests))
-	for _, commit := range state.Requests {
-		commits[commit.ID] = commit
+	creators := make(map[string]Actor, len(state.WorkCreators))
+	maps.Copy(creators, state.WorkCreators)
+	derived := map[string]Actor{}
+	checkpointPriorTips := map[string]string{}
+	commitsByID := make(map[string]QueueCommit, len(state.Requests))
+	for _, receipt := range state.CheckpointReceipts {
+		if receipt.Kind == "checkpoint" {
+			checkpointPriorTips[receipt.ID] = receipt.PriorTip
+		}
+		for _, operation := range receipt.Events {
+			var event TraceEvent
+			if err := json.Unmarshal(operation, &event); err != nil {
+				return nil, queueError("claim_scope_invalid", "immutable Work origin cannot be decoded")
+			}
+			if event.Kind == "Work" {
+				if event.WorkID == "" {
+					return nil, queueError("claim_scope_invalid", "immutable Work origin cannot be decoded")
+				}
+				if _, exists := derived[event.WorkID]; !exists {
+					derived[event.WorkID] = receipt.Actor
+				}
+			}
+		}
 	}
-	creators := map[string]Actor{}
-	visited := identitySet{}
-	for id := state.Tip; id != ""; {
-		commit, ok := commits[id]
-		if !ok || visited.contains(id) {
+	for _, id := range state.RequestOrder {
+		commit, ok := state.Requests[id]
+		if !ok {
 			return nil, queueError("claim_scope_invalid", "immutable Work origin history is missing or cyclic")
 		}
-		visited.add(id)
+		commitsByID[commit.ID] = commit
 		for _, operation := range commit.Operations {
 			kind, err := operationKind(operation)
 			if err != nil {
@@ -197,12 +215,49 @@ func immutableWorkCreators(state Projection) (map[string]Actor, error) {
 			if err := json.Unmarshal(operation, &work); err != nil || work.WorkID == "" {
 				return nil, queueError("claim_scope_invalid", "immutable Work origin cannot be decoded")
 			}
-			creators[work.WorkID] = commit.Actor
+			if _, exists := derived[work.WorkID]; !exists {
+				derived[work.WorkID] = commit.Actor
+			}
 		}
-		if commit.Previous == nil {
+	}
+	if len(creators) != len(state.Works) || len(derived) != len(creators) {
+		return nil, queueError("claim_scope_invalid", "immutable Work origin history is incomplete")
+	}
+	for id, actor := range creators {
+		if expected, ok := derived[id]; !ok || !sameJSON(actor, expected) {
+			return nil, queueError("claim_scope_invalid", "immutable Work origin history is inconsistent")
+		}
+	}
+	visited := identitySet{}
+	for id := state.Tip; id != ""; {
+		commit, ok := commitsByID[id]
+		if !ok || visited.contains(id) {
+			return nil, queueError("claim_scope_invalid", "immutable Work origin history is missing or cyclic")
+		}
+		visited.add(id)
+		if commit.Request.Kind == "checkpoint" {
+			priorTip := checkpointPriorTips[commit.ID]
+			if isCheckpoint(commit) {
+				var checkpoint CheckpointOperation
+				if json.Unmarshal(commit.Operations[0], &checkpoint) != nil {
+					return nil, queueError("claim_scope_invalid", "immutable Work origin history is malformed")
+				}
+				if checkpoint.PriorTip != "" {
+					priorTip = checkpoint.PriorTip
+				}
+			}
+			if priorTip == "" {
+				return nil, queueError("claim_scope_invalid", "immutable Work origin history omits a checkpoint predecessor")
+			}
+			id = priorTip
+		} else if commit.Previous == nil {
+			if commit.Request.Kind != "policy" {
+				return nil, queueError("claim_scope_invalid", "immutable Work origin history has an invalid root")
+			}
 			break
+		} else {
+			id = *commit.Previous
 		}
-		id = *commit.Previous
 	}
 	return creators, nil
 }

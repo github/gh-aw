@@ -3,7 +3,7 @@
 
 const { canonical, parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
 const { replayTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
-const { validateBranch } = require("./work_queue_store.cjs");
+const { validateBranch, verifyCheckpointGitHistory } = require("./work_queue_store.cjs");
 
 const MAX_BYTES = 80 * 1024 * 1024;
 const JOURNAL_PATH = /^\.gh-aw\/issue-projection\/[a-f0-9]{64}\.json$/;
@@ -72,6 +72,9 @@ async function readCheckedQueue({ githubClient, owner, repo, branch = "work-queu
   const text = await checkedBlobText(githubClient, owner, repo, repository.log, entry.oid, MAX_BYTES);
   const state = replayTransactionLog(text);
   if (state.transactions.some(transaction => transaction.actor.repository.toLowerCase() !== repository.nameWithOwner.toLowerCase())) throw queueError("actor_unauthorized", "ledger contains a foreign repository");
+  if (state.transactions[0]?.operations[0]?.kind === "Checkpoint") {
+    await verifyCheckpointGitHistory({ githubClient, owner, repo, branch, repository: { full_name: repository.nameWithOwner } }, commit.oid, state.transactions[0]);
+  }
   const journal = new Map();
   const directory = entries.find(entry => entry.name === ".gh-aw")?.object?.entries?.find(entry => entry.name === "issue-projection")?.object?.entries || [];
   for (const [index, path] of paths.entries()) {
