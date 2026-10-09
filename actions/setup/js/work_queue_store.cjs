@@ -104,6 +104,12 @@ async function readRef(githubClient, owner, repo, branch) {
   } catch (error) {
     log.failure("ref.read.failed", error);
     if (httpStatus(error) === 404) return null;
+    if (httpStatus(error) === 409) {
+      // GitHub returns 409 rather than 404 for refs in a branchless repository.
+      // A generic conflict is not proof of absence: confirm the native state.
+      const response = await githubClient.graphql("query WorkQueueEmptyRepository($owner:String!,$repo:String!) { repository(owner:$owner,name:$repo) { nameWithOwner isEmpty } }", { owner, repo });
+      if (response?.repository?.nameWithOwner?.toLowerCase() === `${owner}/${repo}`.toLowerCase() && response.repository.isEmpty === true) return null;
+    }
     throw error;
   }
 }

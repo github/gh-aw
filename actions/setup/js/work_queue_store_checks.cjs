@@ -54,6 +54,7 @@ function fakeGitHub(initial = []) {
     return head ? parseTransactionLog(blobs.get(trees.get(commits.get(head).tree))) : [];
   };
   const githubClient = {
+    graphql: async () => ({ repository: { nameWithOwner: "owner/repo", isEmpty: state.emptyRepository && !refs.has("main") } }),
     rest: {
       repos: {
         get: async () => {
@@ -93,11 +94,15 @@ function fakeGitHub(initial = []) {
         getRef: async ({ ref }) => {
           state.calls.push(`getRef:${ref}`);
           if (ref === "heads/main") {
-            if (!state.defaultRevision || (state.emptyRepository && !refs.has("main"))) throw missing();
+            if (state.emptyRepository && !refs.has("main")) throw Object.assign(new Error("Git Repository is empty"), { status: 409 });
+            if (!state.defaultRevision) throw missing();
             return { data: { object: { sha: state.defaultRevision } } };
           }
           const sha = refs.get(ref.slice("heads/".length));
-          if (!sha) throw missing();
+          if (!sha) {
+            if (state.emptyRepository && !refs.has("main")) throw Object.assign(new Error("Git Repository is empty"), { status: 409 });
+            throw missing();
+          }
           return { data: { object: { sha } } };
         },
         getCommit: async ({ commit_sha }) => {
@@ -971,6 +976,14 @@ function registerTests({ describe, it }) {
       await assert.rejects(publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy })), /branch_invalid/);
       assert.equal(fake.state.bootstrapWrites, 0);
       assert.equal(fake.refs.has("work-queue"), false);
+    });
+    it("does not mistake a generic Git conflict for an absent queue branch", async () => {
+      const fake = fakeGitHub();
+      fake.githubClient.rest.git.getRef = async () => {
+        throw Object.assign(new Error("Conflict"), { status: 409 });
+      };
+      await assert.rejects(readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" }), { status: 409 });
+      assert.equal(fake.state.bootstrapWrites, 0);
     });
     it("installs mandatory defaults only on genuine genesis and does not overlay authoritative installed Policy", async () => {
       const fake = fakeGitHub();
