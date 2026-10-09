@@ -180,6 +180,20 @@ type CapabilityProvider interface {
 	GetCapabilities() EngineCapabilities
 }
 
+// HostedWebCapabilities describes hosted-web support that can depend on the
+// workflow's selected inference provider.
+type HostedWebCapabilities struct {
+	Supported         bool
+	SupportsMaxUses   bool
+	UnsupportedReason string
+}
+
+// HostedWebCapabilityProvider reports whether an engine supports hosted web
+// search for the current workflow.
+type HostedWebCapabilityProvider interface {
+	GetHostedWebCapabilities(workflowData *WorkflowData) HostedWebCapabilities
+}
+
 func dynamicWorkflowsEnabled(engine CapabilityProvider, config *EngineConfig) bool {
 	return engine != nil && engine.GetCapabilities().DynamicWorkflows && config.DynamicWorkflowsEnabled()
 }
