@@ -652,6 +652,22 @@ func TestDispatchWorkflowCrossRepoInHandlerConfig(t *testing.T) {
 	assert.Contains(t, allowedRefs, "refs/heads/release/*", "allowed_refs should contain the ref glob")
 }
 
+func TestWorkflowCallDispatchRepoFallsBackWhenActivationOutputMissing(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		On: "on:\n  workflow_call:\n",
+		SafeOutputs: &SafeOutputsConfig{
+			DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"worker"}},
+		},
+	}
+
+	var steps []string
+	compiler.addHandlerManagerConfigEnvVar(&steps, data)
+	config := extractHandlerConfig(t, strings.Join(steps, ""))
+	assert.Equal(t, "${{ needs.activation.outputs.target_repo || github.repository }}",
+		config["dispatch_workflow"]["target-repo"])
+}
+
 // TestHandlerManagerStepPerOutputTokenInHandlerConfig verifies that per-output tokens
 // (e.g., add-comment.github-token) are wired into the handler config JSON (GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG)
 // but NOT used as the step-level with.github-token. The step-level token follows the same

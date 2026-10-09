@@ -37,7 +37,7 @@ func inferSingleCheckoutRepositoryForGitHubAppOwner(data *WorkflowData) string {
 
 	if repository == "" && hasWorkflowCallTrigger(data.On) {
 		githubAppOwnerDerivationLog.Print("No explicit checkout.repository found for workflow_call; using needs.activation.outputs.target_repo as owner source")
-		return "${{ needs.activation.outputs.target_repo }}"
+		return "${{ needs.activation.outputs.target_repo || github.repository }}"
 	}
 
 	if repository == "" {

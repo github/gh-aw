@@ -822,7 +822,7 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 			outputs["app_token_minting_failed"] = "${{ steps.safe-outputs-app-token.outcome == 'failure' }}"
 			var appTokenFallbackRepo string
 			if hasWorkflowCallTrigger(data.On) {
-				appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+				appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name || github.event.repository.name }}"
 			}
 			preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepForRepository(
 				"safe_outputs",

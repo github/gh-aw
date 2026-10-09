@@ -53,7 +53,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 		permissions := ComputePermissionsForSafeOutputs(data.SafeOutputs)
 		var appTokenFallbackRepo string
 		if hasWorkflowCallTrigger(data.On) {
-			appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+			appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name || github.event.repository.name }}"
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(
 			"conclusion",
