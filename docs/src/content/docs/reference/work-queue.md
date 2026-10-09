@@ -1,6 +1,6 @@
 ---
 title: Work queues
-description: Git-backed work queue roles, Claim-scoped effects, operator commands and checked keyboard actions.
+description: Git-backed work queue roles, Claim-scoped effects, checkpoints, maintenance compaction and checked operator commands.
 ---
 
 Work queues can be Git-backed or issue-backed. Native `tools.work-queue` uses
