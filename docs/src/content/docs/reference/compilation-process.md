@@ -265,6 +265,13 @@ Observed-inventory refresh and collection warnings are also reported: they fail
 the dry-run gate even when cached observations remain available. Ordinary
 `--models` compilation reports them as warnings instead.
 
+To acknowledge experimental-feature notices explicitly, add `--allow-experimental`
+to `--dry-run`. Notices remain visible and the JSON dry-run summary records
+`accepted_experimental_warnings`. This accepts only the compiler's built-in
+experimental-feature notices, not arbitrary warning text. Security, safe-update,
+schedule, model-inventory and other warnings, validation errors, and scanner
+failures still block the gate. Required checks and staging remain enabled.
+
 Docker-based scanners and `--validate-images` remain opt-in. Docker unavailability
 does not block the dry-run gate; install native `shellcheck` for required run-step
 linting without Docker. When Docker is available, running `gh aw validate my-workflow`

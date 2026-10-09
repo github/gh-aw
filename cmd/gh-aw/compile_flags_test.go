@@ -121,6 +121,23 @@ func TestCompileOptionsPropagateForceRefreshContainerPins(t *testing.T) {
 	}
 }
 
+func TestCompileOptionsPropagateAllowExperimental(t *testing.T) {
+	t.Parallel()
+	flag := compileCmd.Flags().Lookup("allow-experimental")
+	if flag == nil || flag.DefValue != "false" {
+		t.Fatal("expected --allow-experimental to default to false")
+	}
+	cmd := &cobra.Command{}
+	cmd.Flags().Bool("allow-experimental", false, "")
+	if err := cmd.ParseFlags([]string{"--allow-experimental"}); err != nil {
+		t.Fatal(err)
+	}
+	opts := getCompileCmdOptions(cmd)
+	if !opts.toCompileConfig(nil).AllowExperimental {
+		t.Fatal("expected experimental opt-in to reach CompileConfig")
+	}
+}
+
 func TestCompileOptionsPropagateModels(t *testing.T) {
 	t.Parallel()
 
