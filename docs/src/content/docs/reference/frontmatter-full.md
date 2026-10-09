@@ -60,6 +60,21 @@ work-queue-policy:
     {}
 
   # (optional)
+  projectors: []
+    # Array items:
+      principal: "example-value"
+
+      workflow: "example-value"
+
+      ref: "example-value"
+
+      pools: []
+        # Array of strings
+
+      repositories: []
+        # Array of strings
+
+  # (optional)
   dependencies:
     # (optional)
     repositories: []
@@ -4535,6 +4550,24 @@ tools:
     # claims.
     # (optional)
     worker: true
+
+    # Mirror only this run's admitted Work and original authenticated Claims to GitHub
+    # Issues. Git remains authoritative; requires installed projector rules.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: boolean
+    issues: true
+
+    # Format 2: object
+    issues:
+      # (optional)
+      label: "example-value"
+
+      # Pre-provisioned native organization single-select field. Omit for comment-only
+      # status.
+      # (optional)
+      status-field: "example-value"
 
     # Declare one schema-validated JSON memory snapshot per Claim. The compiler
     # supplies credential-free preparation and protected immutable git-tree delivery.

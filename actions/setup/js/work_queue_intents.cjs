@@ -114,7 +114,7 @@ function normalizeSubmitParameters(parameters, policy, at, state) {
   integer(at, 0, Number.MAX_SAFE_INTEGER, "submission timestamp");
   return {
     nodes: parameters.nodes.map(node => {
-      closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "depends_on", "subject", "replacement_of"], "submitted Work");
+      closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "depends_on", "subject", "backing_issue", "replacement_of"], "submitted Work");
       const graphId = Object.hasOwn(node, "graph_id") ? identity(node.graph_id, "graph ID") : digest(node.payload);
       const nodeKey = Object.hasOwn(node, "node_key") ? identity(node.node_key, "node key") : "root";
       const poolName = node.pool === undefined ? "default" : node.pool;
@@ -138,6 +138,7 @@ function normalizeSubmitParameters(parameters, policy, at, state) {
         depends_on: node.depends_on === undefined ? [] : node.depends_on,
         enqueued: state?.works.get(workId)?.enqueued ?? at,
         ...(node.subject === undefined ? {} : { subject: node.subject }),
+        ...(node.backing_issue === undefined ? {} : { backing_issue: node.backing_issue }),
         ...(node.replacement_of === undefined ? {} : { replacement_of: node.replacement_of }),
       };
     }),
