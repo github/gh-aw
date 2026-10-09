@@ -50,6 +50,8 @@ type LogsData struct {
 type ModelRoutingLogsSummary struct {
 	Routes                 []ModelRoutingRouteSummary `json:"routes,omitempty" console:"title:Model Routing Mix,omitempty"`
 	ClassifierAIC          float64                    `json:"classifier_aic,omitempty" console:"header:Classifier AIC"`
+	MainAgentCost          ModelRoutingCost           `json:"main_agent_cost,omitzero" console:"-"`
+	SubagentCosts          []ModelRoutingAgentCost    `json:"subagent_costs,omitempty" console:"-"`
 	TotalRequests          int                        `json:"total_requests,omitempty" console:"header:Routing Requests"`
 	DeviatedRequests       int                        `json:"deviated_requests,omitempty" console:"header:Deviated Requests"`
 	DeviatedTrafficShare   float64                    `json:"deviated_traffic_share,omitempty" console:"header:Deviated Traffic Share"`
