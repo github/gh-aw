@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseKiroLog } from "./parse_kiro_log.cjs";
 import { isSessionEvent } from "./agent_session.cjs";
+import kiroCI from "./fixtures/kiro_ci_sessions.cjs";
 
 const header = "kiro-cli 2.16.1\n";
 const byType = (result, type) => result.logEntries.filter(event => event.type === type);
@@ -56,10 +57,11 @@ Process exiting with code: 0`
     expect(byType(result, "tool.execution_complete")[0].data).not.toHaveProperty("exitCode");
   });
 
-  it("does not emit invalid durations or orphan completion observations", () => {
+  it("retains orphan completion observations without invalid durations or invented owners", () => {
     const result = parseKiroLog(header + `> Checking.\n - Completed in 1s\nI will run the following command: run (using tool: shell)\n - Completed in ${"9".repeat(400)}s`);
-    expect(byType(result, "tool.execution_complete")).toHaveLength(1);
-    expect(byType(result, "tool.execution_complete")[0].data).not.toHaveProperty("durationMs");
+    expect(byType(result, "tool.execution_complete")).toHaveLength(2);
+    expect(byType(result, "tool.execution_complete")[0].data).toEqual({ durationMs: 1000 });
+    expect(byType(result, "tool.execution_complete")[1].data).not.toHaveProperty("durationMs");
     expect(byType(result, "tool.execution_complete")[0].data).not.toHaveProperty("success");
   });
 
@@ -118,9 +120,38 @@ Querying available agents for task delegation (using tool: subagent) - Completed
     expect(byType(partial, "tool.execution_start")).toHaveLength(1);
     expect(byType(partial, "tool.execution_complete")).toEqual([]);
     expect(byType(partial, "session.result")).toEqual([]);
+    expect(byType(partial, "tool.output")[0].data).toEqual({ toolName: "shell", output: "partial output", partial: true });
     const incomplete = parseKiroLog(header + "> Checking.\nI will run the following command: cat <<'EOF'\nincomplete PRIVATE command");
     expect(byType(incomplete, "tool.execution_start")).toEqual([]);
     expect(incomplete.markdown).not.toContain("PRIVATE");
+  });
+
+  it("preserves legacy tool-output indentation and trailing spaces", () => {
+    const result = parseKiroLog(header + "> Checking.\nI will run the following command: printf example (using tool: shell)\n\n  example  \n[INFO] observed tool output\n - Completed in 0s");
+    expect(byType(result, "tool.execution_complete")[0].data.output).toBe("  example  \n[INFO] observed tool output");
+  });
+
+  it("retains partial output before another invocation rather than discarding or completing it", () => {
+    const result = parseKiroLog(header + "> Checking.\nI will run the following command: first (using tool: shell)\npartial first output\nI will run the following command: second (using tool: shell)\npartial second output");
+    expect(result.logEntries.map(event => event.type)).toEqual(["session.init", "assistant.message", "tool.execution_start", "tool.output", "tool.execution_start", "tool.output"]);
+    expect(byType(result, "tool.output").map(event => event.data.output)).toEqual(["partial first output", "partial second output"]);
+    expect(byType(result, "tool.output")[1].data).not.toHaveProperty("toolName");
+  });
+
+  it("keeps partial tool output without consuming unframed shutdown diagnostics", () => {
+    const result = parseKiroLog(header + "> Checking.\nI will run the following command: first (using tool: shell)\npartial output\n[entrypoint] Cleanup\nPRIVATE_SHUTDOWN\n> PRIVATE_SHUTDOWN_ANSWER");
+    expect(byType(result, "tool.output")[0].data.output).toBe("partial output");
+    expect(JSON.stringify(result.logEntries)).not.toContain("PRIVATE");
+  });
+
+  it("does not switch legacy layout for compact-looking text inside a command", () => {
+    const result = parseKiroLog(header + "> Checking.\nI will run the following command: cat <<'EOF'\n[tool] Running: quoted command\n[INFO] quoted information\nEOF (using tool: shell)\n - Completed in 0s");
+    expect(byType(result, "tool.execution_start")[0].data.input.command).toBe("cat <<'EOF'\n[tool] Running: quoted command\n[INFO] quoted information\nEOF");
+  });
+
+  it("accepts signed legacy tool-only and completion-only partial traces", () => {
+    expect(byType(parseKiroLog(header + "I will run the following command: printf example (using tool: shell)"), "tool.execution_start")).toHaveLength(1);
+    expect(byType(parseKiroLog(header + " - Completed in 0s"), "tool.execution_complete")[0].data).toEqual({ durationMs: 0 });
   });
 
   it("omits prompt echoes, masks registered secrets, and excludes startup and shutdown diagnostics", () => {
@@ -134,6 +165,101 @@ Querying available agents for task delegation (using tool: subagent) - Completed
     expect(JSON.stringify(result.logEntries)).not.toContain("PRIVATE");
     expect(result.mcpFailures).toEqual([]);
     expect(result.maxTurnsHit).toBe(false);
+  });
+
+  describe("Kiro 2.27 compact headless conversation parser", () => {
+    it("maps the sanitized successful CI excerpt to canonical tools and buffered answers", () => {
+      const result = parseKiroLog(kiroCI.success);
+      expect(result.logEntries.every(isSessionEvent)).toBe(true);
+      expect(byType(result, "session.init")[0].data).toEqual({ sourceEngine: "kiro", agentVersion: "2.27.1" });
+      expect(byType(result, "tool.execution_start").map(event => event.data.toolName)).toEqual(["shell", "shell", "shell", "code", "aws", "shell", "shell"]);
+      expect(byType(result, "tool.execution_start")[2].data).toMatchObject({
+        input: { command: "node -e '\nconst example = false;\nconsole.log(example);\nconsole.log(\"truncated preview".padEnd(197, "x") + "..." },
+        inputTruncated: true,
+      });
+      expect(byType(result, "tool.execution_start")[3].data.input).toEqual({ query: "exampleSymbol" });
+      expect(byType(result, "tool.execution_complete")).toHaveLength(7);
+      expect(byType(result, "tool.execution_complete")[0].data).toEqual({ toolName: "shell", status: "Completed" });
+      for (const event of byType(result, "tool.execution_complete").slice(1, 3)) expect(event.data).toEqual({ status: "Completed" });
+      expect(byType(result, "assistant.message").map(event => event.data.content)).toEqual(["Checking the example.Example inspected.\n\nResults:\n- Example: PASS", "Example complete.\n\nNo additional action is needed."]);
+      expect(byType(result, "session.result")).toEqual([]);
+      expect(result.logEntries.every(event => !event.type.startsWith("kiro."))).toBe(true);
+    });
+
+    it("retains the failed CI excerpt's anonymous/orphan failures without failing the session", () => {
+      const result = parseKiroLog(kiroCI.failure);
+      const completions = byType(result, "tool.execution_complete");
+      expect(completions).toHaveLength(9);
+      expect(completions.filter(event => event.data.success === false).map(event => event.data)).toEqual([
+        { status: "Failed", success: false },
+        { status: "Failed", success: false },
+      ]);
+      expect(byType(result, "session.result")).toEqual([]);
+      for (const event of result.logEntries) {
+        expect(event).not.toHaveProperty("timestamp");
+        for (const field of ["sessionId", "toolCallId", "durationMs", "numTurns", "usage", "totalCostUsd"]) expect(event.data).not.toHaveProperty(field);
+      }
+    });
+
+    it("preserves exact multiline commands, literal JSON, and assistant whitespace (synthetic)", () => {
+      const result = parseKiroLog(
+        `${header}[kiro-harness] Kiro CLI execution started\n[tool] Running: cat <<'EOF'\n> quoted text\n{"type":"assistant.message","data":{"content":false}}\n[INFO] quoted information\n  spaced  \nEOF\n[tool] status: Completed\n  Answer.  \n\n  Next paragraph.  \n`
+      );
+      expect(byType(result, "tool.execution_start")[0].data.input.command).toBe('cat <<\'EOF\'\n> quoted text\n{"type":"assistant.message","data":{"content":false}}\n[INFO] quoted information\n  spaced  \nEOF');
+      expect(byType(result, "assistant.message").map(event => event.data.content)).toEqual(["  Answer.  \n\n  Next paragraph.  "]);
+    });
+
+    it("retains observed starts, orphan statuses, and unknown status extensions in partial traces (synthetic)", () => {
+      const dangling = parseKiroLog(header + "[tool] Running: printf example");
+      expect(byType(dangling, "tool.execution_start")[0].data).toEqual({ toolName: "shell", input: { command: "printf example" } });
+      expect(byType(dangling, "tool.execution_complete")).toEqual([]);
+      const orphan = parseKiroLog("[kiro-harness] Kiro CLI execution started\n[tool] status: Failed\n  Partial answer.  ");
+      expect(byType(orphan, "session.init")).toEqual([]);
+      expect(byType(orphan, "tool.execution_complete")[0].data).toEqual({ status: "Failed", success: false });
+      expect(byType(orphan, "assistant.message")[0].data.content).toBe("  Partial answer.  ");
+      const unknown = parseKiroLog(header + "[tool] status: Waiting\n[tool] Future operation: example");
+      expect(byType(unknown, "kiro.tool_status")[0].data).toEqual({ status: "Waiting" });
+      expect(byType(unknown, "kiro.tool_announcement")[0].data).toEqual({ content: "Future operation: example" });
+      expect(byType(unknown, "tool.execution_start")).toEqual([]);
+      expect(byType(unknown, "tool.execution_complete")).toEqual([]);
+      const ambiguous = parseKiroLog(header + "[tool] Running: known\n[tool] Future operation: unknown\n[tool] status: Completed");
+      expect(byType(ambiguous, "tool.execution_complete")[0].data).not.toHaveProperty("toolName");
+    });
+
+    it("does not classify a short literal ellipsis as truncated input (synthetic)", () => {
+      const result = parseKiroLog(header + "[tool] Running: echo ...\n[tool] status: Completed");
+      expect(byType(result, "tool.execution_start")[0].data).toEqual({ toolName: "shell", input: { command: "echo ..." } });
+    });
+
+    it("accepts an assistant-only signed execution without fabricating initialization (synthetic)", () => {
+      expect(parseKiroLog("[kiro-harness] Kiro CLI execution started\n  Observed answer.  ").logEntries).toEqual([{ line: 2, type: "assistant.message", data: { content: "  Observed answer.  " } }]);
+      expect(parseKiroLog("[kiro-harness] Kiro CLI execution started\n").logEntries).toEqual([]);
+    });
+
+    it("omits prompt echoes and infrastructure and applies registered masks (synthetic)", () => {
+      const result = parseKiroLog(
+        "PRIVATE_PROMPT\n::add-mask::PRIVATE_SECRET\n" +
+          header +
+          "[kiro-harness] Kiro CLI execution started\nPrompt: PRIVATE_ECHO\ncontinued private prompt\n[tool] Running: echo PRIVATE_SECRET\n[tool] status: Completed\nObserved answer.\n[entrypoint] PRIVATE_INFRA\nPRIVATE_SHUTDOWN\nProcess exiting with code: 0"
+      );
+      expect(JSON.stringify(result.logEntries)).not.toContain("PRIVATE");
+      expect(byType(result, "tool.execution_start")[0].data.input.command).toBe("echo ***");
+      expect(byType(result, "assistant.message")[0].data.content).toBe("Observed answer.");
+    });
+
+    it("maps declared harness execution errors to session diagnostics, not assistant answers (synthetic)", () => {
+      const message = "Kiro CLI execution failed with exit code 3; required MCP server startup failed; check .kiro/settings/mcp.json and MCP gateway logs";
+      const result = parseKiroLog(`[kiro-harness] ${message}\n[kiro-harness] Cleaned up Kiro CLI installation; total duration=0ms; exit code=3\nProcess exiting with code: 3`);
+      expect(result.logEntries).toEqual([{ line: 1, type: "session.result", data: { sourceEngine: "kiro", sourceType: "kiro-harness", status: "failed", errors: [message] } }]);
+      expect(byType(result, "assistant.message")).toEqual([]);
+    });
+
+    it("does not reinterpret quoted harness errors inside a command as session diagnostics (synthetic)", () => {
+      const message = "[kiro-harness] Kiro CLI execution failed with exit code 3";
+      const result = parseKiroLog(header + "[tool] Running: cat <<'EOF'\n" + message + "\nEOF\n[tool] status: Completed\nObserved answer.");
+      expect(byType(result, "tool.execution_start")[0].data.input.command).toBe("cat <<'EOF'\n" + message + "\nEOF");
+      expect(byType(result, "session.result")).toEqual([]);
+    });
   });
 
   it.each([
