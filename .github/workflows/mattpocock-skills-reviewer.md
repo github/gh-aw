@@ -109,6 +109,10 @@ A successful review:
 - approves only when no actionable issue remains
 - uses `noop` instead of generic praise when there is nothing useful to say
 
+## Investigation Budget
+
+Treat the pre-fetched diff, `pr-triage` output, and the skill guidance below as your primary source of truth. Large, cross-cutting diffs can tempt open-ended tracing through the codebase to build architectural context — bound that exploration to roughly 20 tool calls beyond Steps 1-3. If you reach that budget without a clear picture, stop investigating and submit the best review supported by the evidence gathered so far (call out remaining uncertainty in the review body) rather than continuing to chase every reference; this is what previously caused engine-step timeouts on large diffs (#66819).
+
 ### Step 1: Load Pre-fetched PR Data
 
 > **⚠️ Do NOT call any GitHub MCP tools for PR data.** All PR information is pre-fetched: use `/tmp/gh-aw/agent/pr-meta.json`, `/tmp/gh-aw/agent/pr-diff.patch`, and `/tmp/gh-aw/agent/pr-review-comments.json` exclusively.
