@@ -104,22 +104,37 @@ function normalizeEngineLogEntries(entries, engine) {
   return events;
 }
 
+/** @type {Map<string, (entries: any[]) => boolean>} */
+const declaredFirstParserPolicies = new Map([
+  ["aider", () => true],
+  // Older Crush definitions relied on terminal extraction; canonical producers own framing.
+  ["crush", entries => entries.every(isSessionEvent)],
+]);
+
+/**
+ * @param {string} content
+ * @param {string} engine
+ * @param {(content: string) => any} parse
+ * @param {(entries: any[]) => boolean} [accepts]
+ * @returns {any | undefined}
+ */
+function parseDeclaredLog(content, engine, parse, accepts = () => true) {
+  const parsed = parse(content);
+  const entries = Array.isArray(parsed?.logEntries) ? parsed.logEntries : [];
+  if (!accepts(entries)) return undefined;
+  return { ...parsed, logEntries: normalizeEngineLogEntries(entries, engine) };
+}
+
 /** @param {string} content @param {string} engine @returns {any | undefined} */
 function parseBehaviorLog(content, engine) {
   if (engine === "kiro" && /^kiro-cli \d+\.\d+\.\d+/m.test(content) && /^\[(?:kiro-harness|tool)\]/m.test(content)) {
     return require("./parse_kiro_log.cjs").parseKiroLog(content);
   }
   const parse = loadEngineLogParser(engine);
-  if (engine === "aider" && parse) {
-    const parsed = parse(content);
-    return { ...parsed, logEntries: normalizeEngineLogEntries(parsed?.logEntries ?? [], engine) };
-  }
-  if (engine === "crush" && parse) {
-    const parsed = parse(content);
-    // Older definitions relied on terminal extraction; canonical producers own framing.
-    if ((parsed?.logEntries ?? []).every(isSessionEvent)) {
-      return { ...parsed, logEntries: normalizeEngineLogEntries(parsed?.logEntries ?? [], engine) };
-    }
+  const declaredFirstPolicy = declaredFirstParserPolicies.get(engine);
+  if (parse && declaredFirstPolicy) {
+    const parsed = parseDeclaredLog(content, engine, parse, declaredFirstPolicy);
+    if (parsed) return parsed;
   }
   const records = require("./log_parser_shared.cjs").parseLogEntries(content) ?? [];
   if (records.some(record => (isSessionEvent(record) && record.type !== "agent.execution") || (["assistant", "user"].includes(record?.type) && normalizeEngineLogEntries([record], engine).length > 0))) {
@@ -143,9 +158,8 @@ function parseBehaviorLog(content, engine) {
       else console.error(message);
     }
   }
-  const parsed = parse(lines.join("\n"));
-  const entries = Array.isArray(parsed?.logEntries) ? parsed.logEntries : [];
-  const events = normalizeEngineLogEntries(entries, engine);
+  const parsed = parseDeclaredLog(lines.join("\n"), engine, parse);
+  const events = parsed.logEntries;
   const logEntries = terminal
     ? [
         ...events.filter(event => event.type !== "session.result" || Object.entries(event.data).some(([key, value]) => value !== undefined && key !== "numTurns" && (key !== "usage" || Object.keys(value ?? {}).length > 0))),
