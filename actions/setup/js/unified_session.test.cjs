@@ -8,6 +8,7 @@ import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 
 const req = require;
 const { writeDetectionUsageResult } = req("./generate_usage_activity_summary.cjs");
+const { parseCustomLog } = req("./parse_custom_log.cjs");
 const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
 const claudeFixtures = req("./fixtures/claude_ci_sessions.cjs");
 const { dynamicWorkflow } = req("./fixtures/claude_dynamic_workflow.cjs");
@@ -208,10 +209,19 @@ describe("Unified conclusion session", () => {
   });
 
   it("recovers declared-engine stdout when persisted evidence contains only execution", () => {
+    const source = "Assistant: recovered answer\n";
+    const expectedEvents = parseCustomLog(source, "cursor").logEntries;
+    const expectedAssistantEvents = expectedEvents.filter(event => event.type === "assistant.message");
+    expect(expectedAssistantEvents).toHaveLength(1);
     write("agent-session.jsonl", [{ type: "agent.execution", data: { categories: ["agentic_engine_timeout"], errorCodes: [], errorTypes: [], exitCode: 1 } }]);
-    write("agent-stdio.log", "Assistant: recovered answer\n");
+    write("agent-stdio.log", source);
     const { events } = collectUnifiedSession({ rootDir: root, engine: "cursor" });
-    expect(events.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "Assistant: recovered answer" }, provenance: { path: "agent-stdio.log" } }]);
+    expect(events.filter(event => event.type === "assistant.message")).toEqual(
+      expectedAssistantEvents.map(event => ({
+        ...normalizeUnifiedSessionEvent(event, "agent"),
+        provenance: { component: "agent", phase: "agent", path: "agent-stdio.log", index: expectedEvents.indexOf(event) },
+      }))
+    );
     expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: ["agentic_engine_timeout"], exitCode: 1 } }]);
   });
 
