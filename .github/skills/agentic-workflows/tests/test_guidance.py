@@ -49,7 +49,9 @@ class GuidanceTests(unittest.TestCase):
                 self.assertEqual(positions, sorted(positions))
                 for required in (
                     "/responses", "/chat/completions", "whole session",
-                    "sub-agents", "67460", "5103",
+                    "sub-agents", "67460", "5103", "/reflect",
+                    "supported_endpoints", "Model endpoint mismatch:",
+                    "engine.copilot-sdk: true",
                     "Cannot translate Copilot request feature",
                     "Unsupported Responses custom tool", "model_policy_violation",
                     "not accessible via the … endpoint",
@@ -58,6 +60,19 @@ class GuidanceTests(unittest.TestCase):
                     "requested_model", "awf_version", "aw_info.json", "gh aw audit RUN_ID",
                 ):
                     self.assertIn(required, text)
+                silent_case = FIXTURES["silent_subagent_fallback"]
+                for required in (
+                    silent_case["awf_version"], silent_case["error"],
+                    silent_case["event"], silent_case["event_file"],
+                    silent_case["audit_finding"], silent_case["request_status"],
+                ):
+                    self.assertIn(required, text)
+                self.assertLess(
+                    text.index("supported_endpoints"),
+                    text.index("For the normal Copilot harness path")
+                    if "For the normal Copilot harness path" in text
+                    else text.index("normal CLI wire-API precedence"),
+                )
 
     def test_misplaced_version_fields(self):
         case = FIXTURES["misplaced_versions"]
@@ -78,7 +93,13 @@ class GuidanceTests(unittest.TestCase):
     def test_routing_and_evidence_links(self):
         routing = SKILL.joinpath("SKILL.md").read_text()
         line = next(line for line in routing.splitlines() if ANCHOR in line)
-        for symptom in ("AWF 400s", "model: auto", "install-step 404s", "version fields"):
+        for symptom in (
+            "AWF model/endpoint 400s",
+            "silent cross-family sub-agent failures",
+            "model: auto",
+            "install-step 404s",
+            "version fields",
+        ):
             self.assertIn(symptom, line)
         self.assertTrue((SKILL / "../../aw/debug-agentic-workflow.md").resolve().is_file())
         full = GUIDES[0].read_text()

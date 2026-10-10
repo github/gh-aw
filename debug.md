@@ -87,8 +87,8 @@ gh aw compile <workflow-name>
 
 ## Model and engine misconfiguration
 
-For AWF model/endpoint 400s, `model: auto` failures, install-step 404s after a
-version pin, or questions about version fields, use the
+For AWF model/endpoint 400s, silent cross-family sub-agent failures, `model: auto`
+failures, install-step 404s after a version pin, or questions about version fields, use the
 [full checklist](.github/aw/debug-agentic-workflow.md#model-and-engine-misconfiguration):
 
 1. **Check the compiler first.** Read `compiler_version` from the lock file's
@@ -101,25 +101,39 @@ version pin, or questions about version fields, use the
    ([#64177](https://github.com/github/gh-aw/pull/64177)); v0.91.7 was the reported
    newest prerelease, not a permanent latest tag.
 2. **Check model/endpoint compatibility.** The harness resolves `auto` to a
-   concrete model. Wire-API precedence is explicit `engine.env` override →
+   concrete model. With `engine.model-routing`, AWF's per-model endpoint metadata
+   (`/reflect` `supported_endpoints`) takes precedence and is checked at startup;
+   a mismatch fails with `Model endpoint mismatch: … Pin a compatible model,
+   remove the COPILOT_PROVIDER_WIRE_API override, or upgrade gh-aw.` Otherwise,
+   the normal CLI wire-API precedence is explicit `engine.env` override →
    catalog `wire_api` → `-utility` base-model catalog fallback → `gpt-5+` name rule
    → CLI default `/chat/completions`. `COPILOT_PROVIDER_WIRE_API=responses` uses
-   `/responses`; `completions` uses `/chat/completions`. One wire API applies to the
-   whole session, including sub-agents; replace an incompatible sub-agent with a
-   model supporting the main session's endpoint. For `engine.model-routing`, inspect AWF's
-   selected endpoint too. `Cannot translate Copilot request feature`,
-   `Unsupported Responses custom tool`, `model_policy_violation`, and
-   `not accessible via the … endpoint` warrant model/endpoint or model-policy
-   investigation, not transient retries or prompt tuning. For
+   `/responses`; `completions` uses `/chat/completions`. In default CLI mode one
+   wire API applies to the whole session, including sub-agents; use a sub-agent
+   model supporting the main session's endpoint. When available,
+   `engine.copilot-sdk: true` uses a provider per model, allowing a Claude
+   sub-agent under a GPT main. `Cannot translate Copilot request feature`,
+   `Unsupported Responses custom tool`, `model_policy_violation`,
+   `not accessible via the … endpoint`, and
+   `Routing model "<model>" to /chat/completions is incompatible` warrant
+   model/endpoint or model-policy investigation, not transient retries or prompt
+   tuning. For
    `model_policy_violation`, check the model allowlist/denylist and rejected model;
    policy rejection alone does not establish an endpoint mismatch.
+   Cross-family sub-agent failures can be silent: on AWF v0.28.50, a sub-agent can
+   receive this 400 while the main model retries its work and the run succeeds.
+   Look for `subagent.failed` in `usage/aw_session.jsonl`, plus the **Sub-agent Failed**
+   finding and `deviated` requests in `gh aw audit RUN_ID`.
 3. **Apply fixes in this order:**
    1. **Upgrade gh-aw and recompile.**
    2. **Pin a model that supports the required endpoint.**
    3. **Remove a conflicting `COPILOT_PROVIDER_WIRE_API` override.**
-   4. **Use sub-agent models from the main model's family.** Verify endpoint
-      compatibility; see [github/gh-aw#67460](https://github.com/github/gh-aw/issues/67460)
-      and [github/copilot-cli#5103](https://github.com/github/copilot-cli/issues/5103).
+   4. **Use sub-agent models from the main model's family in default CLI mode.**
+      Verify endpoint compatibility; see
+      [github/gh-aw#67460](https://github.com/github/gh-aw/issues/67460) and
+      [github/copilot-cli#5103](https://github.com/github/copilot-cli/issues/5103).
+      When available, SDK mode (`engine.copilot-sdk: true`) supports per-model
+      providers and different model families.
    **Switching to an older model is a last resort** if these fail: leading with
    `model: gpt-4.1` trades capability for a workaround and leaves the
    underlying misconfiguration in place.
