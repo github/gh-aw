@@ -193,21 +193,6 @@ A custom grader MUST define `script`.
 - `script` MUST be non-empty.
 - `script` MUST NOT exceed 4096 characters.
 
-### 6.3 Forbidden Patterns
-
-Inline scripts MUST be rejected if they contain any forbidden pattern, including:
-
-- `require(`
-- `import(`
-- `import `
-- `fetch(`
-- `eval(`
-- `process.exit`
-- `child_process`
-- `execSync`
-- `spawnSync`
-- `Function(`
-
 ---
 
 ## 7. Operational Value Grader
@@ -288,7 +273,9 @@ semantic task correctness. The normative readiness, decision, and JSON contracts
 ## 10. Security and Isolation
 
 - Grading MUST operate on local run artifacts and MUST NOT require outbound network access for built-ins.
-- Custom inline graders MUST execute in a restricted context with blocked dangerous primitives.
+- Custom inline graders MUST execute in a separate Node.js process with the permission model enabled and a minimal environment.
+- Grader inputs MUST be reconstructed inside the JavaScript context; host-created objects and functions MUST NOT be exposed to the grader.
+- `process`, `require`, and other host capabilities MUST NOT be available in the grader context. Source-pattern blocklists MUST NOT be relied on as a security boundary.
 - Operational-value graders MAY access declared repository evidence using `GH_TOKEN`; implementations MUST NOT add agent-job permission scopes on behalf of the evaluator, and evaluators MUST NOT receive workflow secrets.
 - Implementations SHOULD enforce bounded execution time for inline scripts.
 - Implementations SHOULD redact grader outputs when custom scripts are enabled to reduce secret leakage risk.
@@ -364,5 +351,5 @@ semantic task correctness. The normative readiness, decision, and JSON contracts
 
 - Initial draft for gh-aw graders.
 - Defines `graders` configuration semantics and built-in grader set.
-- Defines custom inline grader constraints and forbidden patterns.
+- Defines custom inline grader constraints.
 - Defines grader artifact output contract and experiment metric references.

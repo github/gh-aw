@@ -75,6 +75,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
 	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
 	"github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded"
+	unchecked_deferredclose "github.com/github/gh-aw/pkg/linters/unchecked-deferred-close"
 	uncheckedsliceindex "github.com/github/gh-aw/pkg/linters/unchecked-slice-index"
 	"github.com/github/gh-aw/pkg/linters/uncheckedflushreturn"
 	"github.com/github/gh-aw/pkg/linters/uncheckedtypeassertion"
@@ -166,6 +167,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	typeassertionnil.Analyzer,
 	typeassertionokdiscarded.Analyzer,
 	uncheckedsliceindex.Analyzer,
+	unchecked_deferredclose.Analyzer,
 	uncheckedtypeassertion.Analyzer,
 	uncheckedflushreturn.Analyzer,
 	walkfuncerrshadow.Analyzer,

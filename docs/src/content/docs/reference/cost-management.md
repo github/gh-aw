@@ -69,16 +69,20 @@ Each run under `.runs[]` includes `duration`, `token_usage`, `aic`, `workflow_na
 
 `gh aw logs --json` emits three views of the same data: `.runs[]` for individual workflow runs, `.episodes[]` for related runs grouped into one logical execution, and `.edges[]` for inferred parent-child lineage. Use `.runs[]` to find which run was resource-heavy and `.episodes[]` to answer "what did this job use end-to-end?". For non-orchestrated workflows, an episode collapses to a single run.
 
+When propagated context includes `episode_id`, the rollup preserves that ID, matching OpenTelemetry correlation, even when intermediate runs are absent. Older context falls back to call IDs and inferred lineage. Totals cover only the runs included in the report; high confidence indicates lineage evidence, not complete episode coverage. Edges connect distinct GitHub run IDs, so reusable workflow hops sharing one run do not produce separate run edges.
+
+Default JSON omits episode and edge details when every episode contains a single run, while retaining summary counts. Use `--verbose --json` to retain those details. `total_duration` sums execution durations rather than measuring wall-clock time between the first and last hop.
+
 For usage analysis, focus on `total_runs`, `total_tokens`, `total_aic`, `total_duration`, `primary_workflow`, `resource_heavy_node_count`, and `blocked_request_count`. For Claude, Codex, and Copilot runs, `total_aic` is the preferred cost metric because it maps to provider billing in AI Credits (1 AIC = $0.01 USD).
 
 ```bash
 # Top 10 costliest logical executions over the past 30 days by AIC
-gh aw logs --start-date -30d --json | \
+gh aw logs --start-date -30d --verbose --json | \
   jq '[.episodes[] | {episode: .episode_id, workflow: .primary_workflow, runs: .total_runs, aic: (.total_aic // 0)}]
       | sort_by(.aic) | reverse | .[:10]'
 
 # Top 10 heaviest Copilot executions by AIC
-gh aw logs --start-date -30d --engine copilot --json | \
+gh aw logs --start-date -30d --engine copilot --verbose --json | \
   jq '[.episodes[] | {episode: .episode_id, workflow: .primary_workflow, runs: .total_runs, aic: (.total_aic // 0)}]
       | sort_by(.aic) | reverse | .[:10]'
 ```
