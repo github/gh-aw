@@ -124,7 +124,7 @@ The MCP server exposes these workflow-management tools:
 | `fix` | Apply automatic codemod-style fixes. | `workflows`, `write`, `list_codemods` | Dry-run or written fixes. |
 
 > [!NOTE]
-> The `actionlint`, `zizmor`, `poutine`, and `grant` scanners used by `compile` pull Docker images on first use. If you see a "Docker images are being downloaded" message, wait 15–30 seconds and retry.
+> The `actionlint`, `zizmor`, and `poutine` scanners used by `compile` prefer compatible local binaries on `PATH` (actionlint ≥ 1.7.12, zizmor ≥ 1.30.1, poutine ≥ 1.1.6), falling back to Docker otherwise. Docker-based scanners, including `grant`, pull images on first use. If you see a "Docker images are being downloaded" message, wait 15–30 seconds and retry.
 
 For `audit`, each run identifier may be a numeric run ID, a run URL, a job URL, or a job URL with a step anchor such as `https://github.com/owner/repo/actions/runs/123/job/456#step:7:1`.
 

@@ -190,7 +190,9 @@ Returns JSON array with validation results for each workflow:
 					if localScannerPath(ctx, "poutine") == "" {
 						args.Poutine = false
 					}
-					args.Actionlint = false
+					if localScannerPath(ctx, "actionlint") == "" {
+						args.Actionlint = false
+					}
 					args.RunnerGuard = false
 					args.Syft = false
 					args.Grype = false

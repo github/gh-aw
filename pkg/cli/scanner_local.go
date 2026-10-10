@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	minZizmorVersion  = "1.30.1"
-	minPoutineVersion = "1.1.6"
+	minZizmorVersion     = "1.30.1"
+	minPoutineVersion    = "1.1.6"
+	minActionlintVersion = "1.7.12"
 )
 
 var scannerVersionPattern = regexp.MustCompile(`(?i)\bv?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9a-z.-]+)?\b`)
@@ -27,6 +28,8 @@ func localScannerPath(ctx context.Context, name string) string {
 		minimum = minZizmorVersion
 	case "poutine":
 		minimum = minPoutineVersion
+	case "actionlint":
+		minimum = minActionlintVersion
 	default:
 		return ""
 	}

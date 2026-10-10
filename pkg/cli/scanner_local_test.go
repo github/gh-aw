@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,6 +21,7 @@ func installTestScanner(t *testing.T, dir, name, version string) string {
 		"case \"${0##*/}\" in\n" +
 		"  zizmor) [ \"$#\" -eq 1 ] && [ \"$1\" = \"--version\" ] || exit 2 ;;\n" +
 		"  poutine) [ \"$#\" -eq 2 ] && [ \"$1\" = \"version\" ] && [ \"$2\" = \"--disable-version-check\" ] || exit 2 ;;\n" +
+		"  actionlint) [ \"$#\" -eq 1 ] && [ \"$1\" = \"--version\" ] || exit 2 ;;\n" +
 		"esac\n" +
 		"printf '%s\\n' '" + version + "'\n"
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
@@ -48,6 +50,11 @@ func TestLocalScannerPathVersionSelection(t *testing.T) {
 		{"poutine", "poutine version v1.1.6", true},
 		{"poutine", "poutine 1.2.0", true},
 		{"poutine", "poutine 1.1.5", false},
+		{"actionlint", "1.7.12\ninstalled by building from source\nbuilt with go1.25", true},
+		{"actionlint", "1.8.0", true},
+		{"actionlint", "1.7.11", false},
+		{"actionlint", "1.7.12-rc.1", false},
+		{"actionlint", "unknown", false},
 	} {
 		t.Run(tt.name+" "+tt.version, func(t *testing.T) {
 			dir := t.TempDir()
@@ -67,6 +74,9 @@ func TestLocalScannerMinimumVersionsMatchDockerImages(t *testing.T) {
 	}
 	if !strings.Contains(PoutineImage, ":"+minPoutineVersion+"@") {
 		t.Fatalf("poutine minimum %s does not match pinned image", minPoutineVersion)
+	}
+	if !strings.Contains(ActionlintImage, ":"+minActionlintVersion+"@") {
+		t.Fatalf("actionlint minimum %s does not match pinned image", minActionlintVersion)
 	}
 }
 
@@ -130,7 +140,7 @@ func TestPrepareDockerImagesUsesLocalScanners(t *testing.T) {
 	dir := t.TempDir()
 	installTestScanner(t, dir, "zizmor", "zizmor 1.30.1")
 	installTestScanner(t, dir, "poutine", "poutine 1.1.6")
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", dir)
 	ResetDockerPullState()
 	t.Cleanup(ResetDockerPullState)
 	SetMockDockerAvailable(false)
@@ -139,6 +149,71 @@ func TestPrepareDockerImagesUsesLocalScanners(t *testing.T) {
 		t.Fatalf("compatible local scanners should not require Docker: %v", err)
 	}
 	if err := CheckAndPrepareDockerImages(context.Background(), DockerImagesOptions{Zizmor: true, Poutine: true, Actionlint: true}); err == nil {
-		t.Fatal("actionlint still requires Docker")
+		t.Fatal("missing actionlint requires Docker")
+	}
+	installTestScanner(t, dir, "actionlint", "1.7.11")
+	if err := CheckAndPrepareDockerImages(context.Background(), DockerImagesOptions{Actionlint: true}); err == nil {
+		t.Fatal("outdated actionlint requires Docker")
+	}
+	installTestScanner(t, dir, "actionlint", "1.7.12")
+	if err := CheckAndPrepareDockerImages(context.Background(), DockerImagesOptions{Zizmor: true, Poutine: true, Actionlint: true}); err != nil {
+		t.Fatalf("compatible local actionlint should not require Docker: %v", err)
+	}
+	if err := CheckAndPrepareDockerImages(context.Background(), DockerImagesOptions{Actionlint: true, Grant: true}); err == nil {
+		t.Fatal("Docker-only scanners still require Docker")
+	}
+}
+
+func TestLocalActionlintCommandAndDockerFallback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test binaries use a POSIX shell")
+	}
+	dir := t.TempDir()
+	actionlint := installTestScanner(t, dir, "actionlint", "1.7.12")
+	installTestScanner(t, dir, "docker", "docker")
+	docker := filepath.Join(dir, "docker")
+	t.Setenv("PATH", dir)
+	root := t.TempDir()
+	files := []string{".github/workflows/a.lock.yml", ".github/workflows/b space.lock.yml"}
+	options := actionlintRunOptions{IgnorePatterns: []string{"foo bar", "baz"}}
+	cmd := buildActionlintCommand(context.Background(), root, files, options)
+	if cmd.Path != actionlint || cmd.Dir != root {
+		t.Fatalf("local actionlint command: %v", cmd)
+	}
+	wantArgs := append([]string{"-format", "{{json .}}", "-shellcheck=", "-pyflakes=", "-ignore", "foo bar", "-ignore", "baz"}, files...)
+	if got := cmd.Args[1:]; !slices.Equal(got, wantArgs) {
+		t.Fatalf("local actionlint args = %q, want %q", got, wantArgs)
+	}
+
+	if hint := formatActionlintCommand(cmd.Args); strings.Contains(hint, "docker") || !strings.Contains(hint, `"foo bar"`) {
+		t.Fatalf("unexpected local command hint: %s", hint)
+	}
+	for _, version := range []string{"1.7.11", "unknown", ""} {
+		if err := os.Remove(actionlint); err != nil {
+			t.Fatal(err)
+		}
+		if version != "" {
+			installTestScanner(t, dir, "actionlint", version)
+		}
+		cmd = buildActionlintCommand(context.Background(), root, files, options)
+		if cmd.Path != docker || strings.Join(cmd.Args[1:], " ") != strings.Join(buildActionlintDockerArgs(root, files, options), " ") {
+			t.Fatalf("actionlint %q must fall back to Docker: %v", version, cmd)
+		}
+	}
+}
+
+func TestLocalActionlintVersion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test binaries use a POSIX shell")
+	}
+	dir := t.TempDir()
+	installTestScanner(t, dir, "actionlint", "1.7.12\ninstalled by building from source")
+	t.Setenv("PATH", dir)
+	original := actionlintVersion
+	actionlintVersion = ""
+	t.Cleanup(func() { actionlintVersion = original })
+	version, err := getActionlintVersion(context.Background())
+	if err != nil || version != "1.7.12" {
+		t.Fatalf("local actionlint version = %q, %v", version, err)
 	}
 }

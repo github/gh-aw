@@ -250,6 +250,12 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 > [!NOTE]
 > The `--actions-repo` flag overrides the default `github/gh-aw-actions` repository used when `--action-mode action` is set. Use it together with `--action-tag` to compile against a branch or fork during development.
 
+The optional `--actionlint`, `--zizmor`, and `--poutine` scanners prefer local
+binaries on `PATH` when their versions meet the pinned Docker image versions
+(actionlint ≥ 1.7.12, zizmor ≥ 1.30.1, poutine ≥ 1.1.6). Missing, older, or
+unrecognized versions fall back to Docker. Local actionlint uses shellcheck and
+pyflakes from `PATH` when those integrations are enabled; it does not install them.
+
 ### Development Testing Mode
 
 `--dry-run` enables `--strict`, `--staged`, `--validate`, `--shellcheck`,
