@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import childProcess from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -239,18 +240,90 @@ describe("memory_custom_validation", () => {
     expect(runCustomMemoryValidation({ jsonSchemas: declaration, memoryDir: tempDir, kind: "repo" }).stderr).toContain("line 1");
   });
 
-  it("streams JSONL records and rejects lossy numbers used with numeric enums", () => {
+  it("streams JSONL records and checks exactness only at numeric enum locations", () => {
     const file = path.join(tempDir, "events.jsonl");
     fs.writeFileSync(file, `${'{"status":"open"}\n'.repeat(10000)}`);
     const declaration = [{ file: "events.jsonl", format: "jsonl", schema: { type: "object", properties: { status: { enum: ["open", "closed"] } } } }];
     expect(runCustomMemoryValidation({ jsonSchemas: declaration, memoryDir: tempDir, kind: "repo" }).ok).toBe(true);
 
-    fs.writeFileSync(file, '{"count":1.0000000000000001}\n');
-    const numericEnum = [{ file: "events.jsonl", format: "jsonl", schema: { type: "object", properties: { count: { enum: [1] } } } }];
+    const numericEnum = [
+      {
+        file: "events.jsonl",
+        format: "jsonl",
+        schema: { type: "object", properties: { version: { enum: [1] }, measurement: { type: "number" } } },
+      },
+    ];
+    fs.writeFileSync(file, '{"version":1,"measurement":1.0000000000000001}\n');
+    expect(runCustomMemoryValidation({ jsonSchemas: numericEnum, memoryDir: tempDir, kind: "repo" }).ok).toBe(true);
+
+    fs.writeFileSync(file, '{"version":1.0000000000000001,"measurement":0.1}\n');
     const result = runCustomMemoryValidation({ jsonSchemas: numericEnum, memoryDir: tempDir, kind: "repo" });
     expect(result.ok).toBe(false);
     expect(result.stderr).toContain("line 1");
     expect(result.stderr).toContain("cannot be represented exactly");
+  });
+
+  it("does not apply numeric enum exactness checks to unrelated JSON values", () => {
+    fs.writeFileSync(path.join(tempDir, "state.json"), '{"version":1,"measurement":1.0000000000000001}');
+    const result = runCustomMemoryValidation({
+      jsonSchemas: [
+        {
+          file: "state.json",
+          schema: { type: "object", properties: { version: { enum: [1] }, measurement: { type: "number" } } },
+        },
+      ],
+      memoryDir: tempDir,
+      kind: "repo",
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    ["JSONL", "events.jsonl", "jsonl", Buffer.concat([Buffer.from('{"value":"ok"}\n{"value":"'), Buffer.from([0xff]), Buffer.from('"}\n')])],
+    ["JSON", "state.json", "json", Buffer.concat([Buffer.from('{"value":"'), Buffer.from([0xff]), Buffer.from('"}')])],
+  ])("rejects malformed UTF-8 in %s with file diagnostics", (_formatName, file, format, contents) => {
+    fs.writeFileSync(path.join(tempDir, file), contents);
+    const result = runCustomMemoryValidation({
+      jsonSchemas: [{ file, format, schema: { type: "object" } }],
+      memoryDir: tempDir,
+      kind: "repo",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain(file);
+    expect(result.stderr).toContain("invalid UTF-8");
+    if (format === "jsonl") expect(result.stderr).toContain("line 2");
+  });
+
+  it("applies the configured timeout to declarative schema validation", () => {
+    fs.writeFileSync(path.join(tempDir, "state.json"), "{}");
+    const timeoutError = Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
+    const spawnSync = vi.spyOn(childProcess, "spawnSync").mockReturnValue({
+      pid: 123,
+      output: [],
+      stdout: "",
+      stderr: "",
+      status: null,
+      signal: "SIGTERM",
+      error: timeoutError,
+    });
+
+    try {
+      const result = runCustomMemoryValidation({
+        jsonSchemas: [{ file: "state.json", schema: { type: "object" } }],
+        memoryDir: tempDir,
+        kind: "repo",
+        timeoutSeconds: 1,
+      });
+
+      expect(spawnSync).toHaveBeenCalledWith(process.execPath, expect.any(Array), expect.objectContaining({ timeout: 1000 }));
+      expect(result.ok).toBe(false);
+      expect(result.timedOut).toBe(true);
+      expect(result.stderr).toContain("timed out");
+    } finally {
+      spawnSync.mockRestore();
+    }
   });
 
   it("fails closed for missing, malformed, unsupported, or escaping schema targets", () => {

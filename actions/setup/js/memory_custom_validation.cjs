@@ -312,56 +312,135 @@ function findMemorySchemaFiles(memoryDir, pattern) {
 }
 
 /**
- * @param {Record<string, any>} schema
- * @returns {boolean}
+ * @param {string} text
+ * @returns {Map<string, string>}
  */
-function schemaContainsNumericEnum(schema) {
-  for (const [key, value] of Object.entries(schema)) {
-    if (key === "enum" && Array.isArray(value) && value.some(item => typeof item === "number")) return true;
-    if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
-      if (Object.values(value).some(child => schemaContainsNumericEnum(child))) return true;
+function collectRawJSONNumbers(text) {
+  const tokens = new Map();
+  const numberPattern = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+  let index = 0;
+  const skipWhitespace = () => {
+    while (/\s/.test(text[index] || "")) index++;
+  };
+  const parseString = () => {
+    const start = index++;
+    let escaped = false;
+    while (index < text.length) {
+      const character = text[index++];
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') return JSON.parse(text.slice(start, index));
     }
-    if (key === "items" && value && typeof value === "object" && schemaContainsNumericEnum(value)) return true;
-    if ((key === "oneOf" || key === "anyOf") && Array.isArray(value)) {
-      if (value.some(child => schemaContainsNumericEnum(child))) return true;
+    return "";
+  };
+  /** @param {(string | number)[]} path */
+  const parseValue = path => {
+    skipWhitespace();
+    const character = text[index];
+    if (character === "{") {
+      index++;
+      skipWhitespace();
+      while (text[index] !== "}") {
+        skipWhitespace();
+        const key = parseString();
+        skipWhitespace();
+        index++;
+        parseValue([...path, key]);
+        skipWhitespace();
+        if (text[index] !== ",") break;
+        index++;
+      }
+      index++;
+    } else if (character === "[") {
+      index++;
+      skipWhitespace();
+      let itemIndex = 0;
+      while (text[index] !== "]") {
+        parseValue([...path, itemIndex++]);
+        skipWhitespace();
+        if (text[index] !== ",") break;
+        index++;
+      }
+      index++;
+    } else if (character === '"') {
+      parseString();
+    } else if (character === "t" || character === "f" || character === "n") {
+      index += character === "t" ? 4 : character === "f" ? 5 : 4;
+    } else {
+      numberPattern.lastIndex = index;
+      const match = numberPattern.exec(text);
+      if (!match) return;
+      tokens.set(JSON.stringify(path), match[0]);
+      index = numberPattern.lastIndex;
     }
-  }
-  return false;
+  };
+  parseValue([]);
+  return tokens;
 }
 
 /**
- * Reject JSON numeric tokens that JavaScript would round before enum comparison.
- * @param {string} text
+ * Reject numeric tokens that JavaScript would round before numeric enum comparison.
+ * @param {string} token
  */
-function assertJSONNumbersExactlyRepresentable(text) {
-  const numberPattern = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
-  let inString = false;
-  let escaped = false;
-  for (let index = 0; index < text.length; index++) {
-    const character = text[index];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (character === "\\") escaped = true;
-      else if (character === '"') inString = false;
-      continue;
-    }
-    if (character === '"') {
-      inString = true;
-      continue;
-    }
-    if (character !== "-" && (character < "0" || character > "9")) continue;
-    numberPattern.lastIndex = index;
-    const match = numberPattern.exec(text);
-    if (!match) continue;
-    if (match[0].length > 256) {
-      throw new TypeError("contains a JSON number that cannot be represented exactly for numeric enum validation");
-    }
-    const number = Number(match[0]);
-    if (!Number.isFinite(number) || canonicalDecimal(match[0]) !== canonicalDecimal(String(number))) {
-      throw new TypeError("contains a JSON number that cannot be represented exactly for numeric enum validation");
-    }
-    index = numberPattern.lastIndex - 1;
+function assertJSONNumberExactlyRepresentable(token) {
+  if (token.length > 256) {
+    throw new TypeError("contains a JSON number that cannot be represented exactly for numeric enum validation");
   }
+  const number = Number(token);
+  if (!Number.isFinite(number) || canonicalDecimal(token) !== canonicalDecimal(String(number))) {
+    throw new TypeError("contains a JSON number that cannot be represented exactly for numeric enum validation");
+  }
+}
+
+/**
+ * @param {string} text
+ * @param {any} value
+ * @param {Record<string, any>} schema
+ */
+function assertSchemaNumericEnumValuesExactlyRepresentable(text, value, schema) {
+  const tokens = collectRawJSONNumbers(text);
+  /**
+   * @param {any} currentValue
+   * @param {Record<string, any>} currentSchema
+   * @param {(string | number)[]} currentPath
+   */
+  const visit = (currentValue, currentSchema, currentPath) => {
+    if (Array.isArray(currentSchema.enum) && currentSchema.enum.some(item => typeof item === "number") && typeof currentValue === "number") {
+      const token = tokens.get(JSON.stringify(currentPath));
+      if (token !== undefined) assertJSONNumberExactlyRepresentable(token);
+    }
+    if (currentValue && typeof currentValue === "object" && !Array.isArray(currentValue) && currentSchema.properties && typeof currentSchema.properties === "object" && !Array.isArray(currentSchema.properties)) {
+      for (const [key, childSchema] of Object.entries(currentSchema.properties)) {
+        if (Object.hasOwn(currentValue, key) && childSchema && typeof childSchema === "object") {
+          visit(currentValue[key], childSchema, [...currentPath, key]);
+        }
+      }
+    }
+    if (Array.isArray(currentValue) && currentSchema.items && typeof currentSchema.items === "object") {
+      currentValue.forEach((item, itemIndex) => visit(item, currentSchema.items, [...currentPath, itemIndex]));
+    }
+    for (const keyword of ["oneOf", "anyOf"]) {
+      const alternatives = currentSchema[keyword];
+      if (Array.isArray(alternatives)) {
+        for (const alternative of alternatives) {
+          if (alternative && typeof alternative === "object") visit(currentValue, alternative, currentPath);
+        }
+      }
+    }
+  };
+  visit(value, schema, []);
+}
+
+/**
+ * @param {Buffer} bytes
+ * @returns {string}
+ */
+function decodeUTF8(bytes) {
+  const text = bytes.toString("utf8");
+  if (!Buffer.from(text, "utf8").equals(bytes)) {
+    throw new TypeError("contains invalid UTF-8");
+  }
+  return text;
 }
 
 /**
@@ -396,18 +475,26 @@ function validateJSONLFile(filePath, file, schema) {
   let recordParts = [];
   let recordBytes = 0;
   let line = 1;
-  const needsExactNumbers = schemaContainsNumericEnum(schema);
   const validateRecord = () => {
     let record = Buffer.concat(recordParts, recordBytes);
     if (record.length > 0 && record[record.length - 1] === 0x0d) record = record.subarray(0, record.length - 1);
-    const text = record.toString("utf8");
+    let text;
+    try {
+      text = decodeUTF8(record);
+    } catch (error) {
+      throw new Error(`file '${file}' line ${line} contains invalid UTF-8`, { cause: error });
+    }
     if (!text.trim()) throw new Error(`file '${file}' line ${line} is a blank JSONL record`);
-    if (needsExactNumbers) assertJSONNumbersExactlyRepresentable(text);
     let value;
     try {
       value = JSON.parse(text);
     } catch (error) {
       throw new Error(`file '${file}' line ${line} contains malformed JSON: ${getErrorMessage(error)}`, { cause: error });
+    }
+    try {
+      assertSchemaNumericEnumValuesExactlyRepresentable(text, value, schema);
+    } catch (error) {
+      throw new Error(`file '${file}' line ${line} ${getErrorMessage(error)}`, { cause: error });
     }
     const validationError = validateValueAgainstSchema(value, schema);
     if (validationError) {
@@ -440,11 +527,6 @@ function validateJSONLFile(filePath, file, schema) {
       }
     }
     if (recordBytes > 0) validateRecord();
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes("cannot be represented exactly")) {
-      throw new Error(`file '${file}' line ${line} ${error.message}`, { cause: error });
-    }
-    throw error;
   } finally {
     fs.closeSync(descriptor);
   }
@@ -535,24 +617,25 @@ function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
   }
   let contents;
   try {
-    contents = fs.readFileSync(resolvedFile, "utf8");
+    contents = decodeUTF8(fs.readFileSync(resolvedFile));
   } catch (error) {
+    if (error instanceof TypeError && error.message.includes("invalid UTF-8")) {
+      throw new Error(`file '${file}' contains invalid UTF-8`, { cause: error });
+    }
     throw new Error(`file '${file}' is unreadable: ${getErrorMessage(error)}`, { cause: error });
   }
   if (format === "json") {
     if (!contents.trim()) throw new Error(`file '${file}' contains empty JSON`);
-    if (schemaContainsNumericEnum(declaration.schema)) {
-      try {
-        assertJSONNumbersExactlyRepresentable(contents);
-      } catch (error) {
-        throw new Error(`file '${file}' ${getErrorMessage(error)}`, { cause: error });
-      }
-    }
     let value;
     try {
       value = JSON.parse(contents);
     } catch (error) {
       throw new Error(`file '${file}' contains malformed JSON: ${getErrorMessage(error)}`, { cause: error });
+    }
+    try {
+      assertSchemaNumericEnumValuesExactlyRepresentable(contents, value, declaration.schema);
+    } catch (error) {
+      throw new Error(`file '${file}' ${getErrorMessage(error)}`, { cause: error });
     }
     const validationError = validateValueAgainstSchema(value, declaration.schema);
     if (validationError) {
@@ -560,6 +643,52 @@ function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
     }
     return;
   }
+}
+
+/**
+ * @param {string} memoryDir
+ * @param {Array<{file: string, format?: string, schema: Record<string, any>}>} schemas
+ * @param {string} kind
+ * @param {string} memoryId
+ * @param {number} timeoutMs
+ */
+function runDeclarativeMemoryValidation(memoryDir, schemas, kind, memoryId, timeoutMs) {
+  const worker = `const fs = require("fs");
+const { validateMemoryJSONSchemas } = require(${JSON.stringify(__filename)});
+try {
+  const input = JSON.parse(fs.readFileSync(0, "utf8"));
+  process.stdout.write(validateMemoryJSONSchemas(input.memoryDir, input.schemas, input.kind, input.memoryId));
+} catch (error) {
+  console.error(error && error.message ? error.message : String(error));
+  process.exitCode = 1;
+}`;
+  let result;
+  try {
+    result = childProcess.spawnSync(process.execPath, ["-e", worker], {
+      input: JSON.stringify({ memoryDir, schemas, kind, memoryId }),
+      encoding: "utf8",
+      env: sanitizedValidationEnv(process.env),
+      timeout: timeoutMs,
+      maxBuffer: MAX_VALIDATION_OUTPUT_BYTES * 2,
+      windowsHide: true,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      exitCode: null,
+      timedOut: false,
+      stdout: "",
+      stderr: getErrorMessage(error),
+    };
+  }
+  const timedOut = result.error && Reflect.get(result.error, "code") === "ETIMEDOUT";
+  return {
+    ok: result.status === 0 && !result.error,
+    exitCode: result.status,
+    timedOut,
+    stdout: boundedOutput(result.stdout),
+    stderr: timedOut ? `Declarative schema validation timed out after ${Math.ceil(timeoutMs / 1000)} second(s)` : boundedOutput(result.stderr || (result.error ? getErrorMessage(result.error) : "")),
+  };
 }
 
 /**
@@ -600,27 +729,37 @@ function runCustomMemoryValidation(options) {
     };
   }
 
+  const rawTimeoutSeconds = options.timeoutSeconds;
+  const timeoutSeconds = typeof rawTimeoutSeconds === "number" && Number.isFinite(rawTimeoutSeconds) && rawTimeoutSeconds > 0 ? Math.max(1, Math.floor(rawTimeoutSeconds)) : DEFAULT_VALIDATION_TIMEOUT_SECONDS;
+  const timeoutMs = timeoutSeconds * 1000;
+  const deadline = Date.now() + timeoutMs;
+  const memoryId = options.memoryId || "default";
   if (Array.isArray(jsonSchemas) && jsonSchemas.length > 0) {
-    try {
-      const message = validateMemoryJSONSchemas(options.memoryDir, jsonSchemas, options.kind, options.memoryId || "default");
-      if (!script.trim()) {
-        return { ok: true, exitCode: 0, timedOut: false, stdout: message, stderr: "" };
-      }
-    } catch (error) {
+    const schemaResult = runDeclarativeMemoryValidation(options.memoryDir, jsonSchemas, options.kind, memoryId, timeoutMs);
+    if (!schemaResult.ok) {
       return {
         ok: false,
-        exitCode: 1,
-        timedOut: false,
+        exitCode: schemaResult.exitCode,
+        timedOut: schemaResult.timedOut,
         stdout: "",
-        stderr: `Declarative ${options.kind}-memory schema validation failed for '${options.memoryId || "default"}': ${getErrorMessage(error)}`,
+        stderr: `Declarative ${options.kind}-memory schema validation failed for '${memoryId}': ${schemaResult.stderr}`,
       };
+    }
+    if (!script.trim()) {
+      return schemaResult;
     }
   }
 
-  const rawTimeoutSeconds = options.timeoutSeconds;
-  const timeoutSeconds = typeof rawTimeoutSeconds === "number" && Number.isFinite(rawTimeoutSeconds) && rawTimeoutSeconds > 0 ? Math.floor(rawTimeoutSeconds) : DEFAULT_VALIDATION_TIMEOUT_SECONDS;
-  const timeoutMs = timeoutSeconds * 1000;
-  const memoryId = options.memoryId || "default";
+  const remainingTimeoutMs = deadline - Date.now();
+  if (remainingTimeoutMs <= 0) {
+    return {
+      ok: false,
+      exitCode: null,
+      timedOut: true,
+      stdout: "",
+      stderr: `Memory validation timed out after ${timeoutSeconds} second(s)`,
+    };
+  }
   const validationDir = makeTempDirectory();
   const validationMemoryDir = path.join(validationDir, "memory");
   const scriptPath = path.join(validationDir, "validator.cjs");
@@ -694,7 +833,7 @@ ${script}
       cwd: validationMemoryDir,
       encoding: "utf8",
       env: sanitizedValidationEnv(process.env),
-      timeout: timeoutMs,
+      timeout: remainingTimeoutMs,
       maxBuffer: MAX_VALIDATION_OUTPUT_BYTES * 2,
       windowsHide: true,
     });
