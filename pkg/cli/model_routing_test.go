@@ -135,7 +135,7 @@ func TestAnalyzeModelRoutingFromSessionWithoutRawFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(
-		`{"type":"workflow.info","data":{"modelRouting":{"status":"selected","wireModel":"claude-sonnet-5","model":"claude-sonnet-5","effort":"medium"}},"provenance":{"component":"workflow","phase":"agent"}}`+"\n",
+		`{"type":"workflow.info","data":{"modelRouting":{"status":"selected","wireModel":"claude-sonnet-5","model":"claude-sonnet-5","effort":"medium"}},"provenance":{"component":"workflow","phase":"conclusion","path":"usage/aw_info.json"}}`+"\n",
 	), 0o600); err != nil {
 		t.Fatal(err)
 	}
