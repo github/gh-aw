@@ -177,28 +177,27 @@ function normalizeOutcome(result, detail) {
     .trim();
 
   const signals = {
-    completed: ["accepted", "strong"],
-    closed_not_planned: ["rejected", "strong"],
-    lifecycle: ["lifecycle", "medium"],
-    lifecycle_close: ["lifecycle_close", "medium"],
-    acted_on: ["accepted", "medium"],
-    closed_without_merge: ["rejected", "strong"],
-    reopened: ["rejected", "strong"],
-    closed_by_merge: ["rejected", "strong"],
-    state_retained: ["accepted", "medium"],
-    state_reverted: ["rejected", "strong"],
-    state_replaced: ["rejected", "strong"],
-    missing_reference: ["unknown", "none"],
-    unsupported_evaluator: ["unknown", "none"],
-    workflow_success: ["accepted", "strong"],
-    workflow_failed: ["rejected", "strong"],
-    workflow_no_effect: ["ignored", "medium"],
-    workflow_pending: ["pending", "medium"],
-    missing_run_id: ["pending", "none"],
+    completed: "strong",
+    closed_not_planned: "strong",
+    lifecycle: "medium",
+    lifecycle_close: "medium",
+    acted_on: "medium",
+    closed_without_merge: "strong",
+    reopened: "strong",
+    closed_by_merge: "strong",
+    state_retained: "medium",
+    state_reverted: "strong",
+    state_replaced: "strong",
+    missing_reference: "none",
+    unsupported_evaluator: "none",
+    workflow_success: "strong",
+    workflow_failed: "strong",
+    workflow_no_effect: "medium",
+    workflow_pending: "medium",
+    missing_run_id: "none",
   };
   if (normalizedDetail in signals) {
-    const [, strength] = signals[normalizedDetail];
-    return { outcome_status: result, evidence_strength: strength, signal: normalizedDetail };
+    return { outcome_status: result, evidence_strength: signals[normalizedDetail], signal: normalizedDetail };
   }
   if (normalizedDetail === "no action-specific evaluator") {
     return { outcome_status: "unknown", evidence_strength: "none", signal: "unsupported_evaluator" };
@@ -593,4 +592,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, evaluateItem, normalizeOutcome, readJSONL, secondsBetween, isoToEpoch };
+module.exports = { main, evaluateItem, normalizeOutcome, readJSONL, secondsBetween, isoToEpoch, ghAPI };

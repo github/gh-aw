@@ -56,7 +56,17 @@ function actor(user) {
   if (!login) return "unknown";
   return String(user.type || "").toLowerCase() === "bot" || login.endsWith("[bot]") || ["github-actions", "copilot-swe-agent"].includes(login) ? "bot" : "human";
 }
-const labelNames = values => values.map(value => (typeof value === "object" ? value.name : value));
+const labelNames = values =>
+  values.map(value =>
+    String(typeof value === "object" ? value.name : value)
+      .trim()
+      .toLowerCase()
+  );
+function executionID(raw) {
+  if (typeof raw === "string" && !/^\d+$/.test(raw.trim())) return null;
+  const value = typeof raw === "number" || typeof raw === "string" ? Number(raw) : null;
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
 
 // This adapter projects raw inputs, never expected classifications, into facts.
 function project(fixture) {
@@ -123,13 +133,7 @@ function project(fixture) {
     facts.humanActivity =
       facts.engaged ||
       (Array.isArray(reviews) && reviews.some(review => review.state !== "PENDING" && actor(review.user) === "human" && after(review.submitted_at, item.timestamp))) ||
-      (Array.isArray(commits) &&
-        commits.some(
-          commit =>
-            actor(commit.author) === "human" &&
-            String(commit.author.login).toLowerCase() !== String(object.user?.login || "").toLowerCase() &&
-            (after(commit.commit?.committer?.date, item.timestamp) || after(commit.commit?.author?.date, item.timestamp))
-        ));
+      (Array.isArray(commits) && commits.some(commit => actor(commit.author) === "human" && (after(commit.commit?.committer?.date, item.timestamp) || after(commit.commit?.author?.date, item.timestamp))));
   }
   if (["labels", "replace"].includes(kind)) {
     const before = item.before_state?.labels ?? item.labelsBefore;
@@ -172,7 +176,7 @@ function project(fixture) {
   if (kind === "update") {
     facts.execution = item.before_state && item.after_state ? "present" : "missing";
     const normalize = (field, value) =>
-      ["labels", "assignees"].includes(field) ? (value || []).map(entry => (typeof entry === "object" ? entry.name || entry.login : entry)).sort() : typeof value === "string" ? value.trim() : (value ?? "");
+      field === "labels" ? labelNames(value || []).sort() : field === "assignees" ? (value || []).map(entry => (typeof entry === "object" ? entry.login : entry)).sort() : typeof value === "string" ? value.trim() : (value ?? "");
     const equal = (field, a, b) => JSON.stringify(normalize(field, a)) === JSON.stringify(normalize(field, b));
     const current = {
       ...object,
@@ -192,8 +196,9 @@ function project(fixture) {
     facts.mutation = changed.every(field => equal(field, current[field], item.after_state[field])) ? "retained" : changed.every(field => equal(field, current[field], item.before_state?.[field])) ? "reverted" : "replaced";
   }
   if (kind === "milestone") {
-    facts.execution = Number.isSafeInteger(item.metadata?.milestone_number) && item.metadata.milestone_number > 0 ? "present" : "missing";
-    facts.mutation = object.milestone?.number === item.metadata?.milestone_number ? "retained" : "replaced";
+    const expected = executionID(item.metadata?.milestone_number);
+    facts.execution = expected !== null ? "present" : "missing";
+    facts.mutation = object.milestone?.number === expected ? "retained" : "replaced";
   }
   if (kind === "ready") {
     const reviews = Array.isArray(object) ? object : [];
@@ -251,7 +256,7 @@ function project(fixture) {
       facts.mutation =
         (requested?.users || []).some(user => users.includes(String(user.login || "").toLowerCase())) || (requested?.teams || []).some(team => teams.includes(String(team.slug || team.name || "").toLowerCase())) ? "pending" : "open";
     } else {
-      const review = submitted.find(review => Number(review.id) === Number(item.metadata?.review_id));
+      const review = submitted.find(review => Number(review.id) === executionID(item.metadata?.review_id));
       facts.execution = review ? "present" : "missing";
       facts.state = state(review);
       facts.mutation = object.merged ? "merged" : object.state === "closed" ? "closed" : "open";

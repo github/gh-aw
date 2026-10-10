@@ -1,7 +1,7 @@
 # ADR-67519: Unify Outcome Evidence Semantics Across the Go and JavaScript Runtimes
 
 **Date**: 2026-10-10
-**Status**: Draft
+**Status**: Proposed
 **Deciders**: pelikhan (PR author); gh-aw maintainers (review pending)
 
 ---
@@ -23,18 +23,25 @@ degrade to `unknown`/`error`, never to `accepted`.
 We will define one conservative, action-specific evidence contract and enforce it in both runtimes from a
 shared fixture set. Acceptance now requires attributable execution evidence — label changes, milestone
 assignments, submitted reviews, pushed commits, agent-linked PRs — rather than target existence; open issues
-and PRs stay `pending`; existence-only and unsupported evaluations become `unknown`
-(`unsupported_evaluator`, `EvidenceNone`). Primary-object deletion is distinguished from supplementary API
-failure: a 404 on the primary object is `rejected`/`strong`/`deleted`, while any other failure is
-`error`/`weak`/`evaluation_error`. Zero-touch acceptance requires complete comment, review, and commit
-evidence instead of inferring it from absent data. Every outcome carries a normalized
+and PRs stay `pending`; existence-only evaluations become `unknown`/`weak` with
+`target_exists_only`, while unsupported evaluations become `unknown`/`none` with
+`unsupported_evaluator`. Primary-object deletion is distinguished from supplementary API
+failure: a primary issue, PR, or comment 404 is `rejected`/`strong`/`deleted`; other
+evaluation failures are `error`/`weak`/`evaluation_error`. Optional PR-effort failures
+preserve the authoritative classification but prevent zero-touch acceptance.
+Zero-touch requires complete comment, review, and commit evidence and no post-action
+non-bot activity, including commits from the PR author. Label identity is compared
+case-insensitively, and execution IDs must be positive, integral, in-range values
+without malformed numeric prefixes. Every outcome carries a normalized
 `(outcome_status, evidence_strength, signal)` triple through collector reports, telemetry, and the audit and
 JSONL schemas. To stop re-drift, the monolithic evaluator is split into focused modules
 (`outcome_evidence.cjs`, `outcome_action_evaluators.cjs`, `outcome_review_evaluators.cjs`, plus Go helpers in
-`outcome_eval_evidence.go`), and 63 shared conformance cases in `pkg/cli/testdata/outcome_conformance.json`
+`outcome_eval_evidence.go`), and the shared conformance cases in `pkg/cli/testdata/outcome_conformance.json`
 are executed by both `pkg/cli/outcome_conformance_test.go` and
-`actions/setup/js/outcome_conformance.test.cjs`. A TLA+ model (`specs/outcomes/`) encodes the state machine
-the implementations must satisfy.
+`actions/setup/js/outcome_conformance.test.cjs`. A TLA+ model (`specs/outcomes/`)
+checks the bounded evidence and typed-reporting contract, with fixture projections
+and deliberately defective negative controls. It is not an unbounded proof or a
+refinement proof of native code.
 
 ### Alternatives Considered
 
@@ -50,14 +57,15 @@ consumed downstream would again mix two definitions of `accepted`.
 Deleting one implementation removes parity concerns entirely. It was rejected because both call sites are
 genuinely needed — the CLI must evaluate outcomes locally without a workflow run, and the scheduled collector
 runs inside Actions where invoking the Go binary is not the established path. Unifying the *semantics* via a
-shared conformance corpus preserves both entry points at a much lower migration cost; this was a close call
-and remains the obvious follow-up if the parity suite becomes a maintenance burden.
+shared conformance corpus preserves both entry points without a runtime migration.
+A single implementation remains a possible future architecture; this PR does not
+require or attempt that migration.
 
 #### Alternative 3: Share semantics through prose specification only
 
 The repository already had `specs/safe-output-outcome-evaluation.md`. Strengthening the prose and relying on
 review discipline was considered and rejected: prose cannot fail a build. The spec was instead rewritten
-(+170/−283) to describe the contract, with the conformance JSON and TLA+ model as the enforceable artifacts.
+to describe the contract, with the conformance JSON and bounded TLA+ model as executable artifacts.
 
 ### Consequences
 
@@ -66,7 +74,7 @@ review discipline was considered and rejected: prose cannot fail a build. The sp
   telemetry and reports are comparable across sources.
 - Acceptance claims are backed by attributable execution evidence, so `accepted` counts are no longer
   inflated by existence checks, unrelated activity, or elapsed time.
-- Cross-runtime regressions are caught by 63 shared conformance cases rather than by reviewers, and the TLA+
+- Cross-runtime regressions are covered by shared conformance cases rather than only by reviewers, and the TLA+
   model documents the intended state machine precisely.
 - Splitting the 1800-line evaluator into focused modules makes individual action evaluators reviewable and
   testable in isolation.
@@ -91,4 +99,5 @@ review discipline was considered and rejected: prose cannot fail a build. The sp
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+The proposal is complete for maintainer review. Acceptance of the architectural
+decision remains a maintainer responsibility.

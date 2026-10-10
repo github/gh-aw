@@ -176,7 +176,7 @@ not complete those features.
 | `state == "open"` | `pending` |
 
 **Extra signals:**
-- `human_edits`: historical field name; count actor-visible non-bot commits pushed by users other than the PR author after creation
+- `human_edits`: historical field name; count all actor-visible non-bot commits after the action, including commits by the PR author
 - `human_comments`: historical field name; count actor-visible non-bot comments on the PR
 - `zero_touch`: accepted with complete supplementary evidence and no post-action visible non-bot comments, submitted reviews, or edits
 - `time_to_outcome_hours`: `merged_at - created_at` or `closed_at - created_at`
@@ -799,7 +799,7 @@ safe-output type; status and evidence strength are separate attributes.
 
 ### Sync Follow-ups: Safe-Output Section-to-Test Mapping
 
-The shared 63-case fixture corpus is
+The shared 77-case fixture corpus is
 `pkg/cli/testdata/outcome_conformance.json`. Go executes it through
 `pkg/cli/outcome_conformance_test.go`; JavaScript executes the same inputs through
 `actions/setup/js/outcome_conformance.test.cjs`. The executable TLA+ checker
@@ -913,7 +913,7 @@ current cross-runtime evidence contract.
 | `P11` OTel-Graceful-Degradation | `TestFormalOTelGracefulDegradation` | OTLP failure still writes audit log; outcome not discarded |
 | `P12` Conformance-Class-Coverage | `TestFormalConformanceClassCoverage` | Class A/C test existence invariant structure |
 | `P14` API-Error-Not-Terminal | `TestFormalAPIErrorNotTerminal` | An authoritative PR fetch error produces `error`, never a terminal outcome |
-| `P15` Zero-Touch-Requires-No-Reviews | `TestFormalZeroTouchRequiresNoReviews` | Requires complete evidence and no post-action non-bot comments, submitted reviews, or non-author edits |
+| `P15` Zero-Touch-Requires-No-Reviews | `TestFormalZeroTouchRequiresNoReviews` | Requires complete evidence and no post-action non-bot comments, submitted reviews, or edits |
 
 `P13` covers the worker's configurable evaluation delay and is intentionally outside this in-process evaluator suite.
 

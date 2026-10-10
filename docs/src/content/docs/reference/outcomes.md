@@ -40,7 +40,8 @@ evaluators return `unknown` with no evidence. Summary counts include unknown,
 error, and lifecycle outcomes so all evaluated items reconcile.
 
 `zero_touch` is only true for an accepted PR when comments, submitted reviews,
-and commits are available and show no visible non-bot follow-up after the action.
+and commits are available and show no visible non-bot follow-up after the action,
+including commits by the PR author.
 Missing actor or commit evidence cannot establish zero-touch acceptance.
 
 ## Accepted Outcomes

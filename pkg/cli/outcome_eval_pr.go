@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -63,7 +62,7 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 		return report
 	}
 
-	enrichPullRequestEffort(ctx, item, data, &report)
+	enrichPullRequestEffort(ctx, item, &report)
 
 	return report
 }
@@ -81,7 +80,7 @@ func outcomeActivityKnown(activity []map[string]any, timestampKey string, skipPe
 	return true
 }
 
-func enrichPullRequestEffort(ctx context.Context, item CreatedItemReport, data map[string]any, report *OutcomeReport) {
+func enrichPullRequestEffort(ctx context.Context, item CreatedItemReport, report *OutcomeReport) {
 	num, repo := report.ObjectNumber, report.Repo
 	comments, err := outcomeEvalPRGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", num), repo)
 	if err == nil {
@@ -117,7 +116,7 @@ func enrichPullRequestEffort(ctx context.Context, item CreatedItemReport, data m
 			if outcomeNestedString(commit["author"], "login") == "" || committerErr != nil && authorErr != nil {
 				commitsKnown = false
 			}
-			if isNonBotActor(commit["author"]) && !strings.EqualFold(outcomeNestedString(commit["author"], "login"), outcomeNestedString(data["user"], "login")) &&
+			if isNonBotActor(commit["author"]) &&
 				(outcomeAfter(outcomeNestedString(commitData["committer"], "date"), item.Timestamp) || outcomeAfter(outcomeNestedString(commitData["author"], "date"), item.Timestamp)) {
 				report.HumanEdits++
 			}

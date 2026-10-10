@@ -162,7 +162,7 @@ List concrete actions the team should take based on the data directly under the 
 2. **Stuck pending items** — List any items pending >48 hours or any workflow classified as 🔴 stuck. These need human review or the workflow needs a timeout.
 3. **Underdefined workflows** — Any workflow classified as ⚪ underdefined needs clearer acceptance/rejection criteria or a dedicated evaluator. The outcome model for that workflow is not yet mature.
 4. **Low zero-touch workflows** — Workflows where accepted items always need human edits indicate the agent's output quality needs improvement.
-5. **High ignored rate** — If ignored items exceed 30% of total outcomes, the workflow may be producing outputs that nobody engages with; consider refining targeting or output type.
+5. **High ignored rate** — If ignored items exceed 30% of total outcomes, inspect actions that completed without their expected effect (for example neutral/skipped dispatch conclusions or ready-for-review actions closed without a qualifying review). Recommend fixing those action-specific paths, not inferring lack of engagement.
 6. **Data quality: fallback evaluations** — If `fallback_exists_only_count` > 20% of total outcomes, many items have only generic existence evidence and remain unknown. Note this coverage gap; do not count them as accepted.
 
 **Lifecycle health classification** — assign one label per workflow based on its outcome history:

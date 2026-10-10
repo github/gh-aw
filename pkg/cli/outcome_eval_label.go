@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -30,8 +31,8 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 		return report
 	}
 
-	beforeLabels := mutableStringSlice(item.BeforeState["labels"])
-	afterLabels := mutableStringSlice(item.AfterState["labels"])
+	beforeLabels := outcomeLabelNames(item.BeforeState["labels"])
+	afterLabels := outcomeLabelNames(item.AfterState["labels"])
 
 	// Compute the replacement delta: labels added and labels removed.
 	added := labelSetDiff(afterLabels, beforeLabels)
@@ -49,7 +50,7 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 		report.EvalError = err.Error()
 		return report
 	}
-	currentLabels := mutableStringSlice(currentState["labels"])
+	currentLabels := outcomeLabelNames(currentState["labels"])
 
 	// The replacement is retained when all added labels are still present and
 	// all removed labels are still absent, regardless of any other label changes.
@@ -77,7 +78,7 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 }
 
 // labelSetDiff returns the elements of a that are not in b.
-// Both slices must be sorted (as produced by mutableStringSlice).
+// Both slices must be sorted (as produced by outcomeLabelNames).
 // Uses binary search for O(n log m) performance.
 func labelSetDiff(a, b []string) []string {
 	var out []string
@@ -144,7 +145,7 @@ func evalAddLabels(ctx context.Context, item CreatedItemReport, repoOverride str
 		report.Detail = "missing execution state"
 		return report
 	}
-	delta := labelSetDiff(mutableStringSlice(added), mutableStringSlice(before))
+	delta := labelSetDiff(outcomeLabelNames(added), outcomeLabelNames(before))
 	if len(delta) == 0 {
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "no_state_delta")
 		report.Detail = "no persisted state delta"
@@ -162,7 +163,7 @@ func evalAddLabels(ctx context.Context, item CreatedItemReport, repoOverride str
 	for _, label := range labels {
 		current = append(current, outcomeString(label["name"]))
 	}
-	if labelSetContainsAll(mutableStringSlice(current), delta) {
+	if labelSetContainsAll(outcomeLabelNames(current), delta) {
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "state_retained")
 		report.Detail = "label addition retained"
 	} else {
@@ -172,4 +173,13 @@ func evalAddLabels(ctx context.Context, item CreatedItemReport, repoOverride str
 
 	outcomeEvalLabelLog.Printf("Label evaluation result: result=%s, label_count=%d", report.OutcomeStatus, len(labels))
 	return report
+}
+
+func outcomeLabelNames(raw any) []string {
+	labels := mutableStringSlice(raw)
+	for i := range labels {
+		labels[i] = strings.ToLower(labels[i])
+	}
+	slices.Sort(labels)
+	return labels
 }

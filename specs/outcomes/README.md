@@ -75,8 +75,8 @@ run-level evidence; generated artifacts are not source files.
 
 TLC 2.19 (official v1.7.4 distribution) exhaustively checked the baseline:
 **18,984 generated states, 16,272 distinct states, depth 5, zero queued states**.
-The fixture model checked **all 63 shared cases**:
-**371 generated states, 318 distinct states, zero queued states**. Equal projected
+The fixture model checked **all 77 shared cases**:
+**420 generated states, 360 distinct states, zero queued states**. Equal projected
 records collapse into the same initial state, explaining the smaller state count.
 These results are reproducible bounds, not a proof over arbitrary inputs.
 

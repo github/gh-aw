@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -90,18 +88,5 @@ func outcomeAfter(candidate, threshold string) bool {
 }
 
 func outcomeCloseActor(ctx context.Context, number int, repo string) (bool, error) {
-	events, err := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/events", number), repo)
-	if err != nil {
-		return false, err
-	}
-	var actor map[string]any
-	for _, event := range events {
-		if outcomeString(event["event"]) == "closed" {
-			actor = outcomeValue[map[string]any](event["actor"])
-		}
-	}
-	if outcomeString(actor["login"]) == "" {
-		return false, errors.New("latest close actor is unavailable")
-	}
-	return !isNonBotActor(actor), nil
+	return isLatestCloseByBot(ctx, number, repo, outcomeEvidenceGHAPIGetArray)
 }

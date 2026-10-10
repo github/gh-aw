@@ -5,6 +5,64 @@ import crypto from "crypto";
 const req = createRequire(import.meta.url);
 const { evaluateItem, normalizeOutcome } = req("./evaluate_outcomes.cjs");
 
+describe("outcome GitHub API transport", () => {
+  function withTransport(implementation, check) {
+    const childProcess = req("child_process");
+    const modulePath = req.resolve("./evaluate_outcomes.cjs");
+    const cached = req.cache[modulePath];
+    const mock = vi.spyOn(childProcess, "execFileSync").mockImplementation(implementation);
+    delete req.cache[modulePath];
+    try {
+      check(req("./evaluate_outcomes.cjs").ghAPI, mock);
+    } finally {
+      mock.mockRestore();
+      req.cache[modulePath] = cached;
+    }
+  }
+
+  it("flattens all array pages and preserves a single object response", () => {
+    withTransport(
+      () => '[[{"id":1}],[{"id":2}]]',
+      (api, mock) => {
+        expect(api("repos/acme/repo/issues")).toEqual([{ id: 1 }, { id: 2 }]);
+        expect(mock).toHaveBeenCalledWith("gh", ["api", "repos/acme/repo/issues", "--paginate", "--slurp"], expect.objectContaining({ encoding: "utf8" }));
+        mock.mockReturnValue('[{"state":"open"}]');
+        expect(api("repos/acme/repo/issues/1")).toEqual({ state: "open" });
+        mock.mockReturnValue("[[]]");
+        expect(api("repos/acme/repo/issues")).toEqual([]);
+      }
+    );
+  });
+
+  it("preserves parsed HTTP status and distinguishes non-HTTP failures", () => {
+    withTransport(
+      () => {
+        throw Object.assign(new Error("gh failed"), { stderr: "gh: Not Found (HTTP 404)" });
+      },
+      (api, mock) => {
+        expect(() => api("repos/acme/repo/issues/1")).toThrow(expect.objectContaining({ status: 404 }));
+        mock.mockImplementation(() => {
+          throw Object.assign(new Error("gh failed"), { stderr: "connection reset" });
+        });
+        expect(() => api("repos/acme/repo/issues/1")).toThrow(expect.objectContaining({ status: null }));
+      }
+    );
+  });
+
+  it("rejects malformed and missing page envelopes", () => {
+    withTransport(
+      () => "[]",
+      (api, mock) => {
+        expect(() => api("repos/acme/repo/issues")).toThrow("Invalid GitHub outcome response");
+        mock.mockReturnValue('{"state":"open"}');
+        expect(() => api("repos/acme/repo/issues/1")).toThrow("Invalid GitHub outcome response");
+        mock.mockReturnValue("not json");
+        expect(() => api("repos/acme/repo/issues")).toThrow(SyntaxError);
+      }
+    );
+  });
+});
+
 function hashBody(body) {
   return crypto
     .createHash("sha256")

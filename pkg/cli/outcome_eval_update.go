@@ -132,7 +132,9 @@ func mutableTrackedFields(itemType string) []string {
 
 func mutableStateEqual(field string, left any, right any) bool {
 	switch field {
-	case "labels", "assignees":
+	case "labels":
+		return slices.Equal(outcomeLabelNames(left), outcomeLabelNames(right))
+	case "assignees":
 		return slices.Equal(mutableStringSlice(left), mutableStringSlice(right))
 	case "draft":
 		return mutableBool(left) == mutableBool(right)

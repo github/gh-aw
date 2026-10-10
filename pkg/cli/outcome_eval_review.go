@@ -3,7 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -111,24 +113,34 @@ func metadataStringSlice(metadata map[string]any, key string) []string {
 }
 
 func metadataInt(metadata map[string]any, key string) int {
-	if metadata == nil {
-		return 0
-	}
+	var parsed int64
 	switch value := metadata[key].(type) {
 	case int:
-		return value
+		parsed = int64(value)
 	case int64:
-		return int(value)
+		parsed = value
 	case float64:
-		return int(value)
-	case string:
-		var parsed int
-		if n, err := fmt.Sscanf(value, "%d", &parsed); err != nil || n != 1 {
+		if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value || value <= 0 || value > 9007199254740991 {
 			return 0
 		}
-		return parsed
+		parsed = int64(value)
+	case string:
+		var err error
+		value = strings.TrimSpace(value)
+		if strings.HasPrefix(value, "+") {
+			return 0
+		}
+		parsed, err = strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return 0
+		}
+	default:
+		return 0
 	}
-	return 0
+	if parsed <= 0 || parsed > 9007199254740991 || parsed > int64(math.MaxInt) {
+		return 0
+	}
+	return int(parsed)
 }
 
 func outcomeString(raw any) string {

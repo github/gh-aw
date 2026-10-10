@@ -37,14 +37,14 @@ function evaluateAction(item, repo, api, nowMs, normalize) {
   const number = itemNumber(item);
   const type = item.type || "";
   let out = result("unknown", "none", "missing_reference");
-  let failedEndpoint = "";
-  const get = (/** @type {string} */ endpoint) => {
+  let failedPrimary = false;
+  const get = (/** @type {string} */ endpoint, primary = false) => {
     try {
       const value = api(`repos/${repo}/${endpoint}`);
       if (value == null) throw new Error(`GitHub outcome API failed: ${endpoint}`);
       return value;
     } catch (error) {
-      failedEndpoint = endpoint;
+      failedPrimary = primary;
       throw error;
     }
   };
@@ -80,8 +80,8 @@ function evaluateAction(item, repo, api, nowMs, normalize) {
         out = evaluatePush(item, number, get);
         break;
       case "assign_milestone": {
-        const expected = item.metadata?.milestone_number;
-        if (!Number.isSafeInteger(expected) || expected <= 0) return result("unknown", "none", "missing_execution_state");
+        const expected = reviews.getMetadataNumber(item, "milestone_number");
+        if (expected === null) return result("unknown", "none", "missing_execution_state");
         const issue = get(`issues/${number}`);
         out = issue.milestone?.number === expected ? result("accepted", "medium", "milestone_assigned") : result("rejected", "medium", "milestone_removed");
         break;
@@ -121,18 +121,16 @@ function evaluateAction(item, repo, api, nowMs, normalize) {
     }
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error ? error.status : null;
-    const persistent =
-      (type === "create_issue" && failedEndpoint === `issues/${number}`) || (type === "create_pull_request" && failedEndpoint === `pulls/${number}`) || (type === "add_comment" && /^issues\/comments\/\d+$/.test(failedEndpoint));
-    out = status === 404 && persistent ? result("rejected", "strong", "deleted", "deleted or inaccessible") : result("error", "weak", "evaluation_error", String(error));
+    out = status === 404 && failedPrimary ? result("rejected", "strong", "deleted", "deleted or inaccessible") : result("error", "weak", "evaluation_error", String(error));
   }
   const age = secondsBetween(item.timestamp, new Date(nowMs).toISOString());
   if (out.outcome_status === "pending" && age !== null) out.pending_age_sec = age;
   return out;
 }
 
-/** @param {any} item @param {number} number @param {(endpoint: string) => any} get */
+/** @param {any} item @param {number} number @param {(endpoint: string, primary?: boolean) => any} get */
 function evaluateIssue(item, number, get) {
-  const issue = get(`issues/${number}`);
+  const issue = get(`issues/${number}`, true);
   if (issue.state === "closed") {
     if (issue.state_reason === "completed") {
       return { ...result("accepted", "strong", "completed"), resolution_sec: secondsBetween(item.timestamp, issue.closed_at) };
@@ -148,9 +146,9 @@ function evaluateIssue(item, number, get) {
   return { ...result("pending", "medium", comments ? "acted_on" : "open"), human_comments: comments };
 }
 
-/** @param {any} item @param {number} number @param {(endpoint: string) => any} get */
+/** @param {any} item @param {number} number @param {(endpoint: string, primary?: boolean) => any} get */
 function evaluatePR(item, number, get) {
-  const pr = get(`pulls/${number}`);
+  const pr = get(`pulls/${number}`, true);
   const out =
     pr.merged === true
       ? result("accepted", "strong", "merged")
@@ -174,13 +172,7 @@ function evaluatePR(item, number, get) {
   const commits = optional(`pulls/${number}/commits`);
   if (Array.isArray(comments)) out.human_comments = nonBotCommentsAfter(comments, item.timestamp);
   if (Array.isArray(submitted)) out.human_reviews = submitted.filter(review => review.state !== "PENDING" && isNonBotActor(review.user) && after(review.submitted_at, item.timestamp)).length;
-  if (Array.isArray(commits))
-    out.human_edits = commits.filter(
-      commit =>
-        isNonBotActor(commit.author) &&
-        String(commit.author.login).toLowerCase() !== String(pr.user?.login || "").toLowerCase() &&
-        (after(commit.commit?.committer?.date, item.timestamp) || after(commit.commit?.author?.date, item.timestamp))
-    ).length;
+  if (Array.isArray(commits)) out.human_edits = commits.filter(commit => isNonBotActor(commit.author) && (after(commit.commit?.committer?.date, item.timestamp) || after(commit.commit?.author?.date, item.timestamp))).length;
   out.zero_touch =
     out.result === "accepted" &&
     Number.isFinite(Date.parse(item.timestamp)) &&
@@ -196,11 +188,11 @@ function evaluatePR(item, number, get) {
   return out;
 }
 
-/** @param {any} item @param {number} number @param {(endpoint: string) => any} get */
+/** @param {any} item @param {number} number @param {(endpoint: string, primary?: boolean) => any} get */
 function evaluateComment(item, number, get) {
   const match = String(item.url || "").match(/(?:#issuecomment-|\/comments\/)(\d+)/);
   if (!match) return result("unknown", "none", "missing_reference");
-  const comment = get(`issues/comments/${match[1]}`);
+  const comment = get(`issues/comments/${match[1]}`, true);
   const reactions = Number(comment.reactions?.total_count || 0);
   let replies = 0;
   try {
@@ -230,7 +222,15 @@ function evaluateClose(type, number, get) {
 
 /** @param {any} value @returns {string[]} */
 function labels(value) {
-  return Array.isArray(value) ? value.map(label => String(typeof label === "object" ? label.name : label).trim()).sort() : [];
+  return Array.isArray(value)
+    ? value
+        .map(label =>
+          String(typeof label === "object" ? label.name : label)
+            .trim()
+            .toLowerCase()
+        )
+        .sort()
+    : [];
 }
 
 /** @param {any} item @param {number} number @param {(endpoint: string) => any} get */

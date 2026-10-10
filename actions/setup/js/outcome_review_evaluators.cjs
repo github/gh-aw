@@ -44,10 +44,10 @@ function getMetadataStringArray(item, key) {
  */
 function getMetadataNumber(item, key) {
   const raw = item?.metadata?.[key];
-  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-  if (typeof raw === "string" && raw.trim() !== "") {
+  if (typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0) return raw;
+  if (typeof raw === "string" && /^\d+$/.test(raw.trim())) {
     const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : null;
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
   }
   return null;
 }
@@ -61,7 +61,13 @@ function normalizeStateValue(key, value) {
   if (key === "labels" || key === "assignees") {
     if (!Array.isArray(value)) return [];
     return value
-      .map(entry => String(entry || "").trim())
+      .map(entry =>
+        key === "labels"
+          ? String(entry || "")
+              .trim()
+              .toLowerCase()
+          : String(entry || "").trim()
+      )
       .filter(Boolean)
       .sort();
   }
@@ -530,4 +536,4 @@ function evaluateSubmitPullRequestReview(item, defaultRepo, api) {
   return out;
 }
 
-module.exports = { evaluateAddReviewer, evaluateUpdateIssue, evaluateUpdatePullRequest, evaluateSubmitPullRequestReview };
+module.exports = { evaluateAddReviewer, evaluateUpdateIssue, evaluateUpdatePullRequest, evaluateSubmitPullRequestReview, getMetadataNumber };

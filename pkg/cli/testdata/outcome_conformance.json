@@ -336,5 +336,98 @@
     "responses": { "issues/1": { "state": "closed", "state_reason": "completed" }, "issues/1/timeline": [] },
     "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
   },
-  { "name": "milestone without expected identity", "item": { "type": "assign_milestone", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" } }
+  { "name": "milestone without expected identity", "item": { "type": "assign_milestone", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" } },
+  {
+    "name": "PR author post-action commit prevents zero touch",
+    "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": {
+      "pulls/1": { "merged": true, "user": { "login": "alice" } },
+      "issues/1/comments": [],
+      "pulls/1/reviews": [],
+      "pulls/1/commits": [{ "author": { "login": "alice" }, "commit": { "committer": { "date": "2026-01-02T00:00:00Z" } } }]
+    },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" },
+    "zero_touch": false
+  },
+  {
+    "name": "retained labels use canonical case",
+    "item": { "type": "add_labels", "number": 1, "before_state": { "labels": ["OLD"] }, "labelsAdded": ["bug"] },
+    "responses": { "issues/1/labels": [{ "name": "old" }, { "name": "Bug" }] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "state_retained" }
+  },
+  {
+    "name": "label casing alone is no execution delta",
+    "item": { "type": "add_labels", "number": 1, "before_state": { "labels": ["Bug"] }, "labelsAdded": ["bug"] },
+    "responses": {},
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "no_state_delta" }
+  },
+  {
+    "name": "replacement labels use canonical case",
+    "item": { "type": "replace_label", "number": 1, "before_state": { "labels": ["OLD"] }, "after_state": { "labels": ["new"] } },
+    "responses": { "issues/1": { "labels": [{ "name": "New" }] } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "state_retained" }
+  },
+  {
+    "name": "issue update labels use canonical case",
+    "item": { "type": "update_issue", "number": 1, "before_state": { "labels": ["old"] }, "after_state": { "labels": ["bug"] } },
+    "responses": { "issues/1": { "labels": [{ "name": "Bug" }] } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "state_retained" }
+  },
+  {
+    "name": "malformed review ID cannot borrow matching prefix",
+    "item": { "type": "submit_pull_request_review", "number": 1, "metadata": { "review_id": "4junk" } },
+    "responses": { "pulls/1": { "state": "closed", "merged": true }, "pulls/1/reviews": [{ "id": 4, "state": "APPROVED", "submitted_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "review_missing" }
+  },
+  {
+    "name": "fractional review ID cannot borrow integral identity",
+    "item": { "type": "submit_pull_request_review", "number": 1, "metadata": { "review_id": 4.5 } },
+    "responses": { "pulls/1": { "state": "closed", "merged": true }, "pulls/1/reviews": [{ "id": 4, "state": "APPROVED", "submitted_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "review_missing" }
+  },
+  {
+    "name": "numeric string review ID preserves valid identity",
+    "item": { "type": "submit_pull_request_review", "number": 1, "metadata": { "review_id": "4" } },
+    "responses": { "pulls/1": { "state": "closed", "merged": true }, "pulls/1/reviews": [{ "id": 4, "state": "APPROVED", "submitted_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "review_approved" }
+  },
+  {
+    "name": "fractional milestone ID cannot borrow integral identity",
+    "item": { "type": "assign_milestone", "number": 1, "metadata": { "milestone_number": 2.5 } },
+    "responses": { "issues/1": { "milestone": { "number": 2 } } },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
+  },
+  {
+    "name": "primary comment 404 is deletion",
+    "item": { "type": "add_comment", "url": "https://github.com/acme/repo/issues/1#issuecomment-7" },
+    "responses": {},
+    "errors": { "issues/comments/7": 404 },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "deleted" }
+  },
+  {
+    "name": "supplementary comment 404 is not deletion",
+    "item": { "type": "add_comment", "url": "https://github.com/acme/repo/issues/1#issuecomment-7" },
+    "responses": { "issues/comments/7": { "id": 7 } },
+    "errors": { "issues/1/comments": 404 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "PR primary 404 is deletion",
+    "item": { "type": "create_pull_request", "number": 1 },
+    "responses": {},
+    "errors": { "pulls/1": 404 },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "deleted" }
+  },
+  {
+    "name": "numeric string milestone ID preserves valid identity",
+    "item": { "type": "assign_milestone", "number": 1, "metadata": { "milestone_number": "2" } },
+    "responses": { "issues/1": { "milestone": { "number": 2 } } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "milestone_assigned" }
+  },
+  {
+    "name": "malformed milestone ID cannot borrow matching prefix",
+    "item": { "type": "assign_milestone", "number": 1, "metadata": { "milestone_number": "2junk" } },
+    "responses": { "issues/1": { "milestone": { "number": 2 } } },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
+  }
 ]
