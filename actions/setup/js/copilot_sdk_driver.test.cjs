@@ -87,11 +87,11 @@ describe("copilot_sdk_driver.cjs", () => {
           workingDirectory: workspace,
           skipCustomInstructions: true,
           customAgents: expect.arrayContaining([
-            { name: "researcher", description: "Research across providers", tools: ["read", "grep"], prompt: "Research carefully.", model: `${agentProvider}/${agentModel}` },
-            { name: "workflow-agent", tools: ["read", "grep"], prompt: "Workflow prompt.", model: `${sessionProvider}/${sessionModel}` },
-            { name: "unknown-agent", prompt: "Keep this agent.", model: `${sessionProvider}/${sessionModel}` },
-            { name: "small", prompt: "Alias prompt.", model: `${sessionProvider}/${sessionModel}` },
-            { name: "large", prompt: "Alias prompt.", model: `${sessionProvider}/${sessionModel}` },
+            { name: "researcher", displayName: "researcher", description: "Research across providers", tools: ["read", "grep"], prompt: "Research carefully.", model: `${agentProvider}/${agentModel}` },
+            { name: "workflow-agent", displayName: "workflow-agent", tools: ["read", "grep"], prompt: "Workflow prompt.", model: `${sessionProvider}/${sessionModel}` },
+            { name: "unknown-agent", displayName: "unknown-agent", prompt: "Keep this agent.", model: `${sessionProvider}/${sessionModel}` },
+            { name: "small", displayName: "small", prompt: "Alias prompt.", model: `${sessionProvider}/${sessionModel}` },
+            { name: "large", displayName: "large", prompt: "Alias prompt.", model: `${sessionProvider}/${sessionModel}` },
           ]),
         })
       );

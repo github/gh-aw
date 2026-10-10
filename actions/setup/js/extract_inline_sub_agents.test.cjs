@@ -33,8 +33,8 @@ describe("loadCopilotSDKCustomAgents", () => {
       fs.writeFileSync(path.join(workspace, ".github/agents/broken.agent.md"), "---\ntools: {invalid: true}\n---\nInvalid tools.");
       const warnings = [];
       expect(loadCopilotSDKCustomAgents(workspace, workflow, message => warnings.push(message))).toEqual([
-        { name: "helper", description: "First line\nSecond line\n", tools: [], model: "small", prompt: "Workflow version." },
-        { name: "plain", prompt: "Prompt without frontmatter." },
+        { name: "helper", displayName: "helper", description: "First line\nSecond line\n", tools: [], model: "small", prompt: "Workflow version." },
+        { name: "plain", displayName: "plain", prompt: "Prompt without frontmatter." },
       ]);
       expect(warnings).toEqual([expect.stringContaining("agent tools must be a list")]);
     } finally {

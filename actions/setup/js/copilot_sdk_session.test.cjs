@@ -57,7 +57,7 @@ describe("copilot_sdk_session runtime configuration", () => {
       sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
     });
     expect(result.exitCode).toBe(0);
-    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-5.4", customAgents: [{ name: "researcher", prompt: "Research carefully.", model: "claude-sonnet-4.6" }] }));
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-5.4", customAgents: [{ name: "researcher", displayName: "researcher", prompt: "Research carefully.", model: "claude-sonnet-4.6" }] }));
     expect(logger.mock.calls.flat().some(message => message.includes("warning: custom agent"))).toBe(false);
   });
 
@@ -81,6 +81,49 @@ describe("copilot_sdk_session runtime configuration", () => {
     expect(result.output).toMatch(/Cannot qualify session model "unavailable-session-model"/);
     expect(logger).toHaveBeenCalledWith(expect.stringMatching(/error: Cannot qualify session model/));
     expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it("attributes SDK lifecycle and metrics to declared names instead of task display names", async () => {
+    let handler;
+    const events = [
+      { type: "subagent.started", data: { invocationId: "child", agentName: "file-summarizer", agentDisplayName: "readme-summarizer" } },
+      { type: "subagent.completed", data: { invocationId: "child", agentName: "file-summarizer", agentDisplayName: "summarize-readme" } },
+      { type: "session.shutdown", data: { agentMetrics: { child: { agentName: "file-summarizer", agentDisplayName: "readme-summarizer" }, main: { totalNanoAiu: 1 } } } },
+    ];
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = async () => ({
+        sessionId: "declared-names",
+        on: callback => {
+          handler = callback;
+        },
+        sendAndWait: async () => {
+          events.forEach(event => handler(event));
+          return { data: { content: "done" } };
+        },
+        disconnect: async () => {},
+      });
+    }
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger: () => {},
+      agentsBaseDir: base,
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    });
+    expect(result.exitCode).toBe(0);
+    const captured = fs
+      .readFileSync(path.join(base, "declared-names/events.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    expect(captured[0].data.agentDisplayName).toBe("file-summarizer");
+    expect(captured[1].data.agentDisplayName).toBe("file-summarizer");
+    expect(captured[2].data.agentMetrics.child.agentDisplayName).toBe("file-summarizer");
+    expect(captured[2].data.agentMetrics.main).toEqual({ totalNanoAiu: 1 });
+    expect(events[0].data.agentDisplayName).toBe("readme-summarizer");
+    expect(events[2].data.agentMetrics.child.agentDisplayName).toBe("readme-summarizer");
   });
 
   it.each(["routing", "environment", "fallback", "reflect"])("qualifies the %s model before createSession", async source => {

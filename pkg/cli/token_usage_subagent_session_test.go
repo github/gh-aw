@@ -100,6 +100,41 @@ func TestSubagentSessionStart(t *testing.T) {
 	}
 }
 
+func TestSessionSubagentSDKCancelledCompletion(t *testing.T) {
+	t.Parallel()
+	for _, terminal := range []string{"subagent.completed", "subagent.failed", ""} {
+		t.Run(terminal, func(t *testing.T) {
+			t.Parallel()
+			content := subagentSessionHeader +
+				subagentSessionRecord(`{"type":"subagent.started","data":{"invocationId":"child","agentName":"file-summarizer","model":"copilot-completions/claude-haiku-4.5"}}`)
+			if terminal != "" {
+				content += subagentSessionRecord(`{"type":"` + terminal + `","data":{"invocationId":"child","agentName":"file-summarizer"}}`)
+			}
+			content += subagentSessionRecord(`{"type":"subagent.completed","data":{"invocationId":"child","agentName":"file-summarizer","cancelled":true}}`)
+			requests, _, usage, found, err := parseSessionSubagentModelsDetailed(strings.NewReader(content), true)
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Len(t, requests, 1)
+			require.Len(t, usage, 1)
+			assert.Equal(t, 1, requests[0].InvocationCount)
+			assert.Equal(t, 1, usage[0].InstanceCount)
+			assert.Zero(t, requests[0].IncompleteCount)
+			assert.Zero(t, usage[0].IncompleteCount)
+			if terminal == "subagent.failed" {
+				assert.Equal(t, 1, requests[0].FailedCount)
+				assert.Equal(t, 1, usage[0].FailedCount)
+				assert.Zero(t, requests[0].CompletedCount)
+				assert.Zero(t, usage[0].CompletedCount)
+			} else {
+				assert.Equal(t, 1, requests[0].CompletedCount)
+				assert.Equal(t, 1, usage[0].CompletedCount)
+				assert.Zero(t, requests[0].FailedCount)
+				assert.Zero(t, usage[0].FailedCount)
+			}
+		})
+	}
+}
+
 func TestSessionSubagentModels(t *testing.T) {
 	start := `{"type":"subagent.started","agentId":"research","data":{"agentName":"research","agentDisplayName":"routing-research","model":"opus","executionMode":"background"}}`
 	config := `{"type":"subagent.configured","agentId":"research","data":{"model":"sonnet","reasoningEffort":"low"}}`

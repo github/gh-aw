@@ -374,6 +374,7 @@ function loadCopilotSDKCustomAgents(workspaceDir, agentsBaseDir, logger) {
         if (tools !== undefined && tools !== null && (!Array.isArray(tools) || !tools.every(tool => typeof tool === "string"))) throw new Error("agent tools must be a list of names or a comma-separated string");
         agents.set(name, {
           name,
+          displayName: name,
           prompt: markdown.trim(),
           ...(typeof frontmatter.description === "string" ? { description: frontmatter.description } : {}),
           ...(typeof frontmatter.model === "string" ? { model: frontmatter.model.trim() } : {}),

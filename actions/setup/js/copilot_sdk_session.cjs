@@ -410,6 +410,10 @@ async function runWithCopilotSDK({
     session.on(event => {
       if (event.ephemeral && !CAPTURED_EPHEMERAL_EVENTS.has(event.type)) return;
       const data = { ...event.data };
+      if (event.type.startsWith("subagent.") && data.agentName && data.agentDisplayName) data.agentDisplayName = data.agentName;
+      if (data.agentMetrics) {
+        data.agentMetrics = Object.fromEntries(Object.entries(data.agentMetrics).map(([id, metric]) => [id, metric.agentName ? { ...metric, agentDisplayName: metric.agentName } : metric]));
+      }
       const context = copilotSessionContext(event);
       const scope = JSON.stringify([context.agentId, context.parentToolUseId]);
       const toolKey = JSON.stringify([scope, data.toolCallId]);
