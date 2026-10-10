@@ -154,7 +154,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
     })
     .join("\n");
   // Extract denied commands without copying harness configuration or transcript data.
-  const rawSourceEngine = process.env.GH_AW_ENGINE_ID === "aider" || events.some(event => event.type === "workflow.info" && event.data.engineId === "aider") ? "aider" : undefined;
+  const rawSourceEngine = process.env.GH_AW_ENGINE_ID === "aider" || events.some(event => event.type === "workflow.info" && event.provenance.component === "workflow" && event.data.engineId === "aider") ? "aider" : undefined;
   const attributedDiagnostics = agentErrorDiagnosticText(safeStdio, rawSourceEngine);
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
   const engineSummary = agentErrorSummaryText(safeStdio, rawSourceEngine);

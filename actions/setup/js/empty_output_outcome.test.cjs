@@ -55,6 +55,18 @@ describe("empty output outcome", () => {
     expect(failure.driverExitCode).toBe(0);
   });
 
+  it.each([undefined, { component: "workflow", phase: "activation", path: "aw_info.json" }])("ignores agent-produced workflow attribution with native provenance %j", provenance => {
+    vi.stubEnv("GH_AW_ENGINE_ID", undefined);
+    writeEvents([{ type: "assistant.message", data: { sourceEngine: "aider", content: "observed answer" } }]);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), JSON.stringify({ type: "session.error", data: { sourceEngine: "copilot", message: "Authentication failed" } }));
+    const baseline = buildEmptyOutputOutcome([], rootDir);
+    expect(baseline.engineErrorType).toBe("authentication_failed");
+    fs.appendFileSync(path.join(rootDir, "agent-session.jsonl"), "\n" + JSON.stringify({ type: "workflow.info", data: { engineId: "aider" }, ...(provenance ? { provenance } : {}) }));
+    expect(buildEmptyOutputOutcome([], rootDir)).toEqual(baseline);
+    fs.writeFileSync(path.join(rootDir, "aw_info.json"), JSON.stringify({ engine_id: "aider" }));
+    expect(buildEmptyOutputOutcome([], rootDir)).not.toHaveProperty("engineErrorType");
+  });
+
   it.each([1, 137, 139])("classifies a silent driver exit %s separately from agent behavior", exitCode => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
     const outcome = buildEmptyOutputOutcome([], rootDir);
