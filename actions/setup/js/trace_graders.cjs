@@ -880,13 +880,18 @@ function executeCustomGraderInSubprocess(id, script, trace, meta) {
     timeoutMs: SCRIPT_TIMEOUT_MS,
   };
   const safeEnv = {};
-  for (const key of ["PATH", "HOME", "TMPDIR", "TEMP", "TMP", "SystemRoot", "ComSpec"]) {
+  for (const key of ["SystemRoot"]) {
     if (process.env[key]) {
       safeEnv[key] = process.env[key];
     }
   }
   const timeoutMs = SCRIPT_TIMEOUT_MS + SCRIPT_WORKER_OVERHEAD_MS;
-  const proc = cp.spawnSync(process.execPath, [SCRIPT_WORKER_PATH], {
+  const permissionFlag = process.allowedNodeEnvironmentFlags.has("--permission") ? "--permission" : process.allowedNodeEnvironmentFlags.has("--experimental-permission") ? "--experimental-permission" : null;
+  if (!permissionFlag) {
+    throw new Error("Node.js permission support is required to run custom graders; install Node.js 20 or newer");
+  }
+  const workerPath = fs.realpathSync(SCRIPT_WORKER_PATH);
+  const proc = cp.spawnSync(process.execPath, [permissionFlag, `--allow-fs-read=${workerPath}`, workerPath], {
     input: JSON.stringify(payload),
     encoding: "utf-8",
     timeout: timeoutMs,

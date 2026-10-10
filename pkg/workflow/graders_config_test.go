@@ -404,27 +404,24 @@ func TestParseGradersFromFrontmatter_InvalidType(t *testing.T) {
 	}
 }
 
-// TestParseGradersFromFrontmatter_ForbiddenScript verifies forbidden patterns in scripts.
-func TestParseGradersFromFrontmatter_ForbiddenScript(t *testing.T) {
+// TestParseGradersFromFrontmatter_CustomGraderDoesNotUseSourceBlocklist verifies scripts are not filtered by source substrings.
+func TestParseGradersFromFrontmatter_CustomGraderDoesNotUseSourceBlocklist(t *testing.T) {
 	var c Compiler
-	forbidden := []string{
-		"require('fs')",
-		"import('os')",
-		"fetch('http://evil.com')",
-		"eval('bad')",
-		"process.exit(1)",
+	scripts := []string{
+		"return typeof require",
+		"return typeof process",
+		"return 'fetch('",
+		"return 'child_process execSync spawnSync'",
+		"return 'import('",
 	}
-	for _, script := range forbidden {
+	for _, script := range scripts {
 		_, err := c.parseGradersFromFrontmatter(map[string]any{
 			"graders": map[string]any{
-				"bad-grader": map[string]any{"script": script},
+				"custom-grader": map[string]any{"script": script},
 			},
 		})
-		if err == nil {
-			t.Fatalf("expected error for forbidden script: %s", script)
-		}
-		if !strings.Contains(err.Error(), "forbidden pattern") {
-			t.Fatalf("expected forbidden pattern error, got: %v", err)
+		if err != nil {
+			t.Errorf("unexpected error for %q: %v", script, err)
 		}
 	}
 }

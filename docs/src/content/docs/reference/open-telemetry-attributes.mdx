@@ -191,6 +191,8 @@ Routing spans do not include ranked choices, selected IDs, conversation hashes, 
 
 These attributes are emitted when a run participates in an episode or nested workflow-call structure.
 
+The episode ID stays fixed across hops. Each child records its immediate caller's hop ID as its parent, not the caller's parent. Workflow references distinguish reusable workflow hops that share a GitHub run ID; the logs rollup remains run-level and does not emit edges between hops within that shared run.
+
 <table>
   <thead>
     <tr>
@@ -202,9 +204,9 @@ These attributes are emitted when a run participates in an episode or nested wor
     <tr><td><code>gh-aw.episode.id</code></td><td>Episode identifier used to roll up related runs.</td></tr>
     <tr><td><code>gh-aw.episode.kind</code></td><td>Episode kind such as <code>run</code> or <code>workflow_call</code>.</td></tr>
     <tr><td><code>gh-aw.hop.id</code></td><td>Current hop identifier within an episode.</td></tr>
-    <tr><td><code>gh-aw.hop.parent_id</code></td><td>Parent hop identifier when nested.</td></tr>
+    <tr><td><code>gh-aw.hop.parent_id</code></td><td>Immediate caller's hop identifier when nested; omitted for root hops.</td></tr>
     <tr><td><code>gh-aw.workflow_call.id</code></td><td>Current workflow-call hop identifier.</td></tr>
-    <tr><td><code>gh-aw.workflow_call.parent_id</code></td><td>Parent workflow-call hop identifier.</td></tr>
+    <tr><td><code>gh-aw.workflow_call.parent_id</code></td><td>Legacy alias of <code>gh-aw.hop.parent_id</code>.</td></tr>
     <tr><td><code>gh-aw.origin.event</code></td><td>Original triggering event for the root execution.</td></tr>
     <tr><td><code>gh-aw.root.repo</code></td><td>Root repository for the episode.</td></tr>
     <tr><td><code>gh-aw.root.workflow_id</code></td><td>Root workflow identifier.</td></tr>

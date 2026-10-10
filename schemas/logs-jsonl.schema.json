@@ -1882,6 +1882,27 @@
                 "workflow_call_id": {
                   "type": "string"
                 },
+                "episode_id": {
+                  "type": "string"
+                },
+                "hop_id": {
+                  "type": "string"
+                },
+                "parent_hop_id": {
+                  "type": "string"
+                },
+                "origin_event": {
+                  "type": "string"
+                },
+                "root_repo": {
+                  "type": "string"
+                },
+                "root_workflow_id": {
+                  "type": "string"
+                },
+                "root_run_id": {
+                  "type": "string"
+                },
                 "time": {
                   "type": "string"
                 },
@@ -3183,6 +3204,27 @@
                           "type": "string"
                         },
                         "workflow_call_id": {
+                          "type": "string"
+                        },
+                        "episode_id": {
+                          "type": "string"
+                        },
+                        "hop_id": {
+                          "type": "string"
+                        },
+                        "parent_hop_id": {
+                          "type": "string"
+                        },
+                        "origin_event": {
+                          "type": "string"
+                        },
+                        "root_repo": {
+                          "type": "string"
+                        },
+                        "root_workflow_id": {
+                          "type": "string"
+                        },
+                        "root_run_id": {
                           "type": "string"
                         },
                         "time": {
@@ -7893,6 +7935,27 @@
                       "type": "string"
                     },
                     "workflow_call_id": {
+                      "type": "string"
+                    },
+                    "episode_id": {
+                      "type": "string"
+                    },
+                    "hop_id": {
+                      "type": "string"
+                    },
+                    "parent_hop_id": {
+                      "type": "string"
+                    },
+                    "origin_event": {
+                      "type": "string"
+                    },
+                    "root_repo": {
+                      "type": "string"
+                    },
+                    "root_workflow_id": {
+                      "type": "string"
+                    },
+                    "root_run_id": {
                       "type": "string"
                     },
                     "time": {

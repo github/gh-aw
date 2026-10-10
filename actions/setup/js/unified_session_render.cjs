@@ -175,7 +175,11 @@ function eventDetail(event) {
     case "detection.result":
       return fields(data, ["jobResult", "conclusion", "reason", "promptInjection", "secretLeak", "maliciousPatch"]);
     case "workflow.info":
-      return fields(data, ["engineId", "model", "requestedModel", "modelRouting", "triggerType", "cliVersion", "awfVersion", "mcpgVersion", "agentVersion", "workflow", "repository", "runId"]);
+      return (
+        fields(data, ["engineId", "model", "requestedModel", "modelRouting", "triggerType", "cliVersion", "awfVersion", "mcpgVersion", "agentVersion", "workflow", "repository", "runId"]) +
+        " " +
+        fields(data.episode, ["episodeId", "hopId", "parentHopId", "originEvent", "rootRepo", "rootWorkflowId", "rootRunId"])
+      );
     case "session.collection_warning":
       return fields(data, ["path", "line", "code"]);
     case "session.collection":

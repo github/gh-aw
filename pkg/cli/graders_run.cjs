@@ -54,47 +54,74 @@ function deepFreeze(value) {
 }
 
 function runInline(grader, trace) {
-  const sandbox = {
-    trace: deepFreeze(structuredClone(trace)),
-    run: deepFreeze({ graderCount: 1 }),
-    workflow: deepFreeze({}),
-    config: deepFreeze(structuredClone(grader.config || {})),
+  const sandbox = Object.assign(Object.create(null), {
+    __payload: JSON.stringify({
+      trace,
+      run: { graderCount: 1 },
+      workflow: {},
+      config: grader.config || {},
+    }),
     Date: undefined,
     fetch: undefined,
     require: undefined,
     process: undefined,
     global: undefined,
-    globalThis: undefined,
     Function: undefined,
     eval: undefined,
-  };
+  });
   const context = vm.createContext(sandbox, { codeGeneration: { strings: false, wasm: false } });
-  const safeMath = vm.runInContext(
+  vm.runInContext(
     `(() => {
-      const value = {};
-      Object.defineProperties(value, Object.getOwnPropertyDescriptors(Math));
-      Object.defineProperty(value, "random", { value: undefined });
-      return Object.freeze(value);
+      const root = globalThis;
+      const deepFreeze = value => {
+        if (value === null || typeof value !== "object") return value;
+        Object.freeze(value);
+        for (const key of Object.getOwnPropertyNames(value)) {
+          if (value[key] !== null && typeof value[key] === "object" && !Object.isFrozen(value[key])) deepFreeze(value[key]);
+        }
+        return value;
+      };
+      const input = JSON.parse(__payload);
+      for (const [key, value] of Object.entries(input)) {
+        Object.defineProperty(root, key, { value: deepFreeze(value), writable: false, enumerable: true, configurable: false });
+      }
+      const math = {};
+      Object.defineProperties(math, Object.getOwnPropertyDescriptors(Math));
+      Object.defineProperty(math, "random", { value: undefined });
+      const safeMath = Object.freeze(math);
+      Object.defineProperty(root, "__math", { value: safeMath, writable: false, configurable: false });
+      Object.defineProperty(root, "helpers", {
+        value: Object.freeze({
+          clamp: (value, low, high) => safeMath.max(low, safeMath.min(high, value)),
+          ratio: (numerator, denominator) => (denominator === 0 ? 0 : numerator / denominator),
+          sum: values => values.reduce((sum, value) => sum + value, 0),
+        }),
+        writable: false,
+        enumerable: true,
+        configurable: false,
+      });
+      delete root.__payload;
+      Object.defineProperty(root, "globalThis", { value: undefined, writable: false, configurable: false });
     })()`,
     context,
     { timeout: 1000 }
   );
-  const helpers = deepFreeze({
-    clamp: (value, low, high) => Math.max(low, Math.min(high, value)),
-    ratio: (numerator, denominator) => (denominator === 0 ? 0 : numerator / denominator),
-    sum: values => values.reduce((sum, value) => sum + value, 0),
-  });
   const fn = vm.compileFunction(`"use strict";\n${grader.script}`, ["trace", "run", "workflow", "config", "helpers", "Math"], {
     parsingContext: context,
     filename: `grader:${grader.id}`,
   });
   context.__grader = fn;
-  context.__helpers = helpers;
-  context.__math = safeMath;
-  return vm.runInContext("__grader(trace, run, workflow, config, __helpers, __math)", context, {
-    timeout: 5000,
-    filename: `grader:${grader.id}:invoke`,
-  });
+  const result = vm.runInContext(
+    `(() => {
+      const raw = __grader(trace, run, workflow, config, helpers, __math);
+      const value = raw !== null && typeof raw === "object" && Object.hasOwn(raw, "value") ? raw.value : raw;
+      return JSON.stringify(typeof value === "number" && !Number.isFinite(value) ? { nonFinite: String(value) } : { raw });
+    })()`,
+    context,
+    { timeout: 5000, filename: `grader:${grader.id}:invoke` }
+  );
+  const parsed = JSON.parse(result);
+  return Object.hasOwn(parsed, "nonFinite") ? Number(parsed.nonFinite) : parsed.raw;
 }
 
 function normalize(grader, raw) {
