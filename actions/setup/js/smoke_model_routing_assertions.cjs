@@ -145,8 +145,6 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   const allowedList = [...new Set((expectations.allowedModels ?? []).map(servedModel).filter(Boolean))];
   const allowed = new Set(allowedList);
   const subAgents = expectations.subAgents ?? [];
-  const subAgentModels = new Set(subAgents.map(agent => servedModel(agent.model)));
-
   if (expectations.executionOutcome !== undefined) {
     if (expectations.executionOutcome === "success") pass("E1", "agent execution outcome is success");
     else fail("E1", `agent execution outcome is ${expectations.executionOutcome || "<empty>"}, expected success`);
@@ -176,8 +174,11 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   if (classifierRequests.length === 1) pass("R2", `one routing_classification request: ${describeRequest(classifierRequests[0])}`);
   else fail("R2", `expected exactly 1 routing_classification request, observed ${classifierRequests.length}: ${describeRequests(classifierRequests)}`);
 
-  // R3: agent traffic on the selected model and a supported endpoint.
-  const agentRequests = requests.filter(request => !isClassifierRequest(request));
+  // Main-agent checks only consider requests explicitly attributed to the agent.
+  const agentRequests = requests.filter(request => request.purpose === "agent");
+  const subagentRequests = requests.filter(request => request.purpose === "subagent");
+
+  // R3: main-agent traffic on the selected model and a supported endpoint.
   if (!selectedModel) {
     fail("R3", `no selected model to verify; observed agent requests: ${describeRequests(agentRequests)}`);
   } else {
@@ -187,31 +188,27 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
       fail("R3", `no supported-endpoint metadata for ${selectedModel} in the routing selection or /reflect; observed: ${describeRequests(onModel.length ? onModel : agentRequests)}`);
     } else {
       const ok = onModel.find(request => Number(request.status) === 200 && endpoints.has(requestEndpoint(request)));
-      if (ok) pass("R3", `agent request on selected model: ${describeRequest(ok)}`);
+      if (ok) pass("R3", `main-agent request on selected model: ${describeRequest(ok)}`);
       else
         fail(
           "R3",
-          `no 200 request for ${selectedModel} on a supported endpoint (${[...endpoints].join(", ")}); observed: ${onModel.length ? describeRequests(onModel) : `no ${selectedModel} requests; other requests: ${describeRequests(agentRequests)}`}`
+          `no 200 request for ${selectedModel} on a supported endpoint (${[...endpoints].join(", ")}); observed: ${onModel.length ? describeRequests(onModel) : `no ${selectedModel} requests; other main-agent requests: ${describeRequests(agentRequests)}`}`
         );
     }
   }
 
-  // R4: no out-of-policy models.
-  const permitted = new Set([...allowed, ...subAgentModels]);
-  const outOfPolicy = agentRequests.filter(request => !permitted.has(servedModel(request.model)));
-  if (outOfPolicy.length)
-    fail("R4", `request(s) on models outside allowed-models [${allowedList.join(", ")}]${subAgentModels.size ? ` and declared sub-agent models [${[...subAgentModels].join(", ")}]` : ""}: ${describeRequests(outOfPolicy)}`);
-  else pass("R4", `all ${agentRequests.length} agent request(s) used permitted models`);
+  // R4: main-agent requests must use allowed-models; sub-agent models are scoped
+  // to their own checks and cannot widen the main agent's model policy.
+  const outOfPolicy = agentRequests.filter(request => !allowed.has(servedModel(request.model)));
+  if (outOfPolicy.length) fail("R4", `main-agent request(s) on models outside allowed-models [${allowedList.join(", ")}]: ${describeRequests(outOfPolicy)}`);
+  else pass("R4", `all ${agentRequests.length} main-agent request(s) used allowed models`);
 
   // M1: main-agent requests use the expected endpoint.
   if (expectations.mainEndpoint) {
     const expected = normalizeEndpoint(expectations.mainEndpoint);
-    const mainRequests = agentRequests.filter(request => {
-      const model = servedModel(request.model);
-      return allowed.has(model) && !subAgentModels.has(model);
-    });
+    const mainRequests = agentRequests;
     const wrong = mainRequests.filter(request => requestEndpoint(request) !== expected);
-    if (!mainRequests.length) fail("M1", `no main-agent requests on allowed models to check for ${expected}; observed: ${describeRequests(agentRequests)}`);
+    if (!mainRequests.length) fail("M1", `no main-agent requests to check for ${expected}`);
     else if (wrong.length) fail("M1", `main-agent request(s) not on ${expected}; observed: ${describeRequests(wrong)}`);
     else pass("M1", `all ${mainRequests.length} main-agent request(s) used ${expected}`);
   }
@@ -239,8 +236,23 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
     else if (!completed.length || failed.length) fail("S2", `${label}: completed=${completed.length} failed=${failed.length}; observed events: ${describeEvents(activity)}`);
     else pass("S2", `${label} completed`);
 
-    // S3: status 200 on the declared model and endpoint; recorded models match.
-    const onModel = requests.filter(request => !isClassifierRequest(request) && servedModel(request.model) === model);
+    // S3: sub-agent traffic on the declared model and endpoint; correlate request
+    // IDs when both the lifecycle events and proxy records expose them.
+    const eventRequestIds = new Set(
+      activity
+        .map(event => event?.data?.requestId ?? event?.data?.request_id ?? event?.requestId ?? event?.request_id)
+        .filter(value => value !== undefined && value !== null && value !== "")
+        .map(String)
+    );
+    const proxyRequestIds = new Set(
+      subagentRequests
+        .map(request => request?.requestId ?? request?.request_id)
+        .filter(value => value !== undefined && value !== null && value !== "")
+        .map(String)
+    );
+    const correlatedRequestIds = new Set([...eventRequestIds].filter(requestId => proxyRequestIds.has(requestId)));
+    const relatedSubagentRequests = correlatedRequestIds.size ? subagentRequests.filter(request => correlatedRequestIds.has(String(request.requestId ?? request.request_id))) : subagentRequests;
+    const onModel = relatedSubagentRequests.filter(request => servedModel(request.model) === model);
     const ok = onModel.find(request => Number(request.status) === 200 && endpoints.includes(requestEndpoint(request)));
     const recorded = activity.flatMap(event => [event.data?.model, event.data?.selectedModel, event.data?.resolvedModel, event.data?.firstDispatchedModel]).filter(value => typeof value === "string" && value !== "");
     const mismatched = [...new Set(recorded.filter(value => servedModel(value) !== model))];
@@ -248,7 +260,9 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
     if (!ok) s3Problems.push(`no 200 request for ${model} on ${endpoints.join(" or ")}`);
     if (mismatched.length) s3Problems.push(`recorded model(s) [${mismatched.join(", ")}] differ from declared ${model}`);
     if (s3Problems.length) {
-      const observed = onModel.length ? onModel.map(request => `${requestEndpoint(request) || "<no endpoint>"} ${request.status ?? "<no status>"}`).join(", ") : `no ${model} requests; other requests: ${describeRequests(agentRequests)}`;
+      const observed = onModel.length
+        ? onModel.map(request => `${requestEndpoint(request) || "<no endpoint>"} ${request.status ?? "<no status>"}`).join(", ")
+        : `no ${model} requests; other sub-agent requests: ${describeRequests(relatedSubagentRequests)}`;
       fail("S3", `${label}: ${s3Problems.join("; ")}; observed: ${observed}`);
     } else {
       pass("S3", `${label} request ${describeRequest(ok)}`);

@@ -29,7 +29,15 @@ const subagent = (type, agentName, invocationId, extra = {}) => ({
   provenance: { component: "agent", phase: "agent", path: "agent-session.jsonl", index: 0 },
 });
 const classifier = (model = "gpt-5.4-mini") => ({ event: "token_usage", model, path: "/responses", status: 200, purpose: "routing_classification" });
-const request = (model, endpoint, status = 200) => ({ event: "token_usage", model, path: endpoint, status, x_initiator: "agent" });
+const request = (model, endpoint, status = 200, purpose = "agent", request_id) => ({
+  event: "token_usage",
+  model,
+  path: endpoint,
+  status,
+  purpose,
+  x_initiator: "agent",
+  ...(request_id ? { request_id } : {}),
+});
 const reflect = {
   endpoints: [
     {
@@ -100,14 +108,14 @@ describe("smoke_model_routing_assertions", () => {
     subagent("subagent.request", "mini-whoami", "legacy:pi:mini-whoami:1", { model: "gpt-5.4-mini" }),
     subagent(overrides.miniFailed ? "subagent.failed" : "subagent.completed", "mini-whoami", "legacy:pi:mini-whoami:1", { outcome: overrides.miniFailed ? "failed" : "completed" }),
   ];
-  const piRequests = () => [classifier(), request("claude-haiku-4.5", "/v1/messages?beta=true"), request("claude-haiku-4-5-20251001", "/v1/messages?beta=true"), request("gpt-5.4-mini", "/responses")];
+  const piRequests = () => [classifier(), request("claude-haiku-4.5", "/v1/messages?beta=true"), request("claude-haiku-4-5-20251001", "/v1/messages?beta=true", 200, "subagent"), request("gpt-5.4-mini", "/responses", 200, "subagent")];
   const sdkSession = (agentName = "haiku-whoami") => [
     workflowInfo(),
     selection(),
     subagent("subagent.started", agentName, "call-1", { model: "copilot-completions/claude-haiku-4.5", resolvedModel: "claude-haiku-4-5-20251001" }),
     subagent("subagent.completed", agentName, "call-1", { outcome: "completed" }),
   ];
-  const sdkRequests = (haiku = request("claude-haiku-4-5-20251001", "/chat/completions")) => [classifier(), request("gpt-5.6-luna", "/responses"), haiku, request("gpt-5.6-luna", "/responses")];
+  const sdkRequests = (haiku = request("claude-haiku-4-5-20251001", "/chat/completions", 200, "subagent")) => [classifier(), request("gpt-5.6-luna", "/responses"), haiku, request("gpt-5.6-luna", "/responses")];
 
   describe("normalization", () => {
     it.each([
@@ -168,11 +176,11 @@ describe("smoke_model_routing_assertions", () => {
     it("fails S3 when a sub-agent runs on a model other than its declared model", () => {
       fixture({
         session: piSession({ haikuModel: "gpt-5.4-mini" }),
-        requests: [classifier(), request("gpt-5.4-mini", "/responses"), request("gpt-5.4-mini", "/responses")],
+        requests: [classifier(), request("claude-haiku-4.5", "/v1/messages"), request("gpt-5.4-mini", "/responses", 200, "subagent"), request("gpt-5.4-mini", "/responses", 200, "subagent")],
       });
       const { failures } = check(piExpectations);
       expect(failures).toContainEqual(
-        "FAIL S3 sub-agent haiku-whoami: no 200 request for claude-haiku-4.5 on /v1/messages; recorded model(s) [gpt-5.4-mini] differ from declared claude-haiku-4.5; observed: no claude-haiku-4.5 requests; other requests: gpt-5.4-mini /responses 200, gpt-5.4-mini /responses 200"
+        "FAIL S3 sub-agent haiku-whoami: no 200 request for claude-haiku-4.5 on /v1/messages; recorded model(s) [gpt-5.4-mini] differ from declared claude-haiku-4.5; observed: no claude-haiku-4.5 requests; other sub-agent requests: gpt-5.4-mini /responses 200, gpt-5.4-mini /responses 200"
       );
     });
 
@@ -180,13 +188,21 @@ describe("smoke_model_routing_assertions", () => {
       const evidence = copilotPass();
       evidence.requests.push(request("gpt-5.5", "/responses"));
       fixture(evidence);
-      expect(check(copilotExpectations).failures).toEqual(["FAIL R4 request(s) on models outside allowed-models [gpt-5.4-mini, gpt-5.6-luna, claude-haiku-4.5]: gpt-5.5 /responses 200"]);
+      expect(check(copilotExpectations).failures).toEqual(["FAIL R4 main-agent request(s) on models outside allowed-models [gpt-5.4-mini, gpt-5.6-luna, claude-haiku-4.5]: gpt-5.5 /responses 200"]);
+    });
+
+    it("fails R4 when a main-agent request uses a model declared only for a sub-agent", () => {
+      fixture({
+        session: sdkSession(),
+        requests: [...sdkRequests(), request("claude-haiku-4.5", "/chat/completions")],
+      });
+      expect(check({ ...sdkExpectations, mainEndpoint: undefined }).failures).toContain("FAIL R4 main-agent request(s) on models outside allowed-models [gpt-5.6-luna]: claude-haiku-4.5 /chat/completions 200");
     });
   });
 
   describe("wrong endpoint", () => {
     it("fails S3 and names the sub-agent, model and endpoint when the SDK sub-agent only hit /responses with 400", () => {
-      fixture({ session: sdkSession(), requests: sdkRequests(request("claude-haiku-4.5", "/responses", 400)) });
+      fixture({ session: sdkSession(), requests: sdkRequests(request("claude-haiku-4.5", "/responses", 400, "subagent")) });
       const { failures } = check(sdkExpectations);
       expect(failures).toContain("FAIL S3 sub-agent haiku-whoami: no 200 request for claude-haiku-4.5 on /chat/completions; observed: /responses 400");
     });
@@ -200,6 +216,33 @@ describe("smoke_model_routing_assertions", () => {
       fixture({ session: [workflowInfo(), selection()], requests: [classifier(), request("gpt-5.6-luna", "/v1/messages")] });
       expect(check(copilotExpectations).failures).toEqual(["FAIL R3 no 200 request for gpt-5.6-luna on a supported endpoint (/chat/completions, /responses); observed: gpt-5.6-luna /v1/messages 200"]);
     });
+
+    it("does not let sub-agent-only or unknown-purpose traffic satisfy R3", () => {
+      const unknownPurposeRequest = { ...request("gpt-5.6-luna", "/responses"), purpose: undefined };
+      fixture({
+        session: [workflowInfo(), selection()],
+        requests: [classifier(), request("gpt-5.6-luna", "/responses", 200, "subagent"), unknownPurposeRequest],
+      });
+      expect(check(copilotExpectations).failures).toContainEqual("FAIL R3 no 200 request for gpt-5.6-luna on a supported endpoint (/chat/completions, /responses); observed: no gpt-5.6-luna requests; other main-agent requests: none");
+    });
+
+    it("does not let a main-agent request satisfy S3", () => {
+      fixture({
+        session: sdkSession(),
+        requests: [classifier(), request("gpt-5.6-luna", "/responses"), request("claude-haiku-4.5", "/chat/completions")],
+      });
+      expect(check(sdkExpectations).failures).toContain("FAIL S3 sub-agent haiku-whoami: no 200 request for claude-haiku-4.5 on /chat/completions; observed: no claude-haiku-4.5 requests; other sub-agent requests: none");
+    });
+
+    it("correlates sub-agent proxy requests with lifecycle request IDs when available", () => {
+      const session = sdkSession();
+      session[2].data.requestId = "expected-request";
+      fixture({
+        session,
+        requests: [classifier(), request("gpt-5.6-luna", "/responses"), request("gpt-5.5", "/responses", 500, "subagent", "expected-request"), request("claude-haiku-4.5", "/chat/completions", 200, "subagent", "other-request")],
+      });
+      expect(check(sdkExpectations).failures).toContain("FAIL S3 sub-agent haiku-whoami: no 200 request for claude-haiku-4.5 on /chat/completions; observed: no claude-haiku-4.5 requests; other sub-agent requests: gpt-5.5 /responses 500");
+    });
   });
 
   describe("non-200 status", () => {
@@ -209,13 +252,9 @@ describe("smoke_model_routing_assertions", () => {
     });
 
     it("fails S3 when the pi sub-agent request returned 400", () => {
-      const requests = [classifier(), request("claude-haiku-4.5", "/v1/messages", 400), request("gpt-5.4-mini", "/responses")];
+      const requests = [classifier(), request("claude-haiku-4.5", "/v1/messages"), request("claude-haiku-4.5", "/v1/messages", 400, "subagent"), request("gpt-5.4-mini", "/responses", 200, "subagent")];
       fixture({ session: piSession(), requests });
-      expect(check(piExpectations).failures).toEqual([
-        // The fixture's main agent was also routed to claude-haiku-4.5, so R3 fails too.
-        "FAIL R3 no 200 request for claude-haiku-4.5 on a supported endpoint (/chat/completions, /v1/messages); observed: claude-haiku-4.5 /v1/messages 400",
-        "FAIL S3 sub-agent haiku-whoami: no 200 request for claude-haiku-4.5 on /v1/messages; observed: /v1/messages 400",
-      ]);
+      expect(check(piExpectations).failures).toEqual(["FAIL S3 sub-agent haiku-whoami: no 200 request for claude-haiku-4.5 on /v1/messages; observed: /v1/messages 400"]);
     });
   });
 
