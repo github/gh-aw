@@ -3694,6 +3694,7 @@ func TestGetParsedSchemaDocReturnsObject(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getParsedSchemaDoc(%s) returned error: %v", name, err)
 		}
+
 		if len(doc) == 0 {
 			t.Errorf("getParsedSchemaDoc(%s) returned empty document", name)
 		}
@@ -3705,5 +3706,49 @@ func TestGetParsedSchemaDocReturnsObject(t *testing.T) {
 
 	if _, err := getParsedSchemaDoc(`null`); err == nil {
 		t.Error("getParsedSchemaDoc() should return an error for a null schema")
+	}
+}
+
+func TestValidateMainWorkflowFrontmatterAcceptsDeclarativeMemorySchemas(t *testing.T) {
+	frontmatter := map[string]any{
+		"on": "workflow_dispatch",
+		"tools": map[string]any{
+			"repo-memory": map[string]any{
+				"allowed-extensions": []any{".json", ".jsonl"},
+				"validation": map[string]any{
+					"json-schemas": []any{
+						map[string]any{
+							"file":   "state.json",
+							"format": "json",
+							"schema": map[string]any{
+								"type":                 "object",
+								"required":             []any{"version", "items"},
+								"additionalProperties": false,
+								"properties": map[string]any{
+									"version": map[string]any{"enum": []any{1}},
+									"items":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+								},
+							},
+						},
+						map[string]any{
+							"file":   "archive/events.jsonl",
+							"format": "jsonl",
+							"schema": map[string]any{
+								"type":                 "object",
+								"required":             []any{"id", "status"},
+								"additionalProperties": false,
+								"properties": map[string]any{
+									"id":     map[string]any{"type": "integer"},
+									"status": map[string]any{"enum": []any{"open", "closed"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "memory-schema-example.md"); err != nil {
+		t.Fatalf("expected declarative memory schema frontmatter to validate, got: %v", err)
 	}
 }

@@ -129,10 +129,7 @@ func generateDriveMemoryValidation(builder *strings.Builder, data *WorkflowData)
 		fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", driveMemoryDirFor(drive.ID))
 		fmt.Fprintf(builder, "          MEMORY_ID: %s\n", drive.ID)
 		fmt.Fprintf(builder, "          ALLOWED_EXTENSIONS: '%s'\n", allowedExtensions)
-		if drive.Validation != nil {
-			fmt.Fprintf(builder, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(drive.Validation))
-			fmt.Fprintf(builder, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(drive.Validation))
-		}
+		appendMemoryValidationEnvironment(builder, drive.Validation)
 		builder.WriteString("        with:\n")
 		builder.WriteString("          script: |\n")
 		builder.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
@@ -344,10 +341,7 @@ func buildDriveMemoryUpdateValidationStep(data *WorkflowData, drive DriveMemoryE
 	fmt.Fprintf(&step, "          MEMORY_DIR: ${{ github.workspace }}/%s\n", mountPath)
 	fmt.Fprintf(&step, "          MEMORY_ID: %s\n", drive.ID)
 	fmt.Fprintf(&step, "          ALLOWED_EXTENSIONS: '%s'\n", allowedExtensions)
-	if drive.Validation != nil {
-		fmt.Fprintf(&step, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(drive.Validation))
-		fmt.Fprintf(&step, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(drive.Validation))
-	}
+	appendMemoryValidationEnvironment(&step, drive.Validation)
 	step.WriteString("        with:\n")
 	step.WriteString("          script: |\n")
 	step.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")

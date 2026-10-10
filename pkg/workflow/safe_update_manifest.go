@@ -49,8 +49,9 @@ type GHAWManifestResolutionFailure struct {
 // GHAWManifestMemoryValidationScript represents a custom memory validation
 // script without storing its potentially sensitive source in the lock file.
 type GHAWManifestMemoryValidationScript struct {
-	Memory string `json:"memory"`
-	SHA256 string `json:"sha256"`
+	Memory            string `json:"memory"`
+	SHA256            string `json:"sha256,omitempty"`
+	JSONSchemasSHA256 string `json:"json_schemas_sha256,omitempty"`
 }
 
 // GHAWManifestMCPServer represents an MCP server exposed to the agent and the
@@ -206,14 +207,22 @@ func detectPullRequestEvents(onField any) (hasPR bool, hasPRTarget bool) {
 func collectMemoryValidationScripts(data *WorkflowData) []GHAWManifestMemoryValidationScript {
 	var scripts []GHAWManifestMemoryValidationScript
 	add := func(kind, id string, validation *MemoryValidationConfig) {
-		if validation == nil || validation.Script == "" {
+		if validation == nil || (validation.Script == "" && len(validation.JSONSchemas) == 0) {
 			return
 		}
-		hash := sha256.Sum256([]byte(validation.Script))
-		scripts = append(scripts, GHAWManifestMemoryValidationScript{
+		entry := GHAWManifestMemoryValidationScript{
 			Memory: kind + ":" + id,
-			SHA256: hex.EncodeToString(hash[:]),
-		})
+		}
+		if validation.Script != "" {
+			hash := sha256.Sum256([]byte(validation.Script))
+			entry.SHA256 = hex.EncodeToString(hash[:])
+		}
+		if len(validation.JSONSchemas) > 0 {
+			encoded, _ := json.Marshal(validation.JSONSchemas) //nolint:jsonmarshalignoredeerror // parsed schemas contain JSON-compatible values
+			hash := sha256.Sum256(encoded)
+			entry.JSONSchemasSHA256 = hex.EncodeToString(hash[:])
+		}
+		scripts = append(scripts, entry)
 	}
 	if data.RepoMemoryConfig != nil {
 		for _, memory := range data.RepoMemoryConfig.Memories {
