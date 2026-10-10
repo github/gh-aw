@@ -213,7 +213,22 @@ describe("OpenCode JSON session parser", () => {
     expect(result.logEntries[1].data.error).toBe("AI_RetryError: Failed after 3 attempts. Last error: Too Many Requests");
     expect(result.logEntries.some(event => event.type === "assistant.message" || event.type === "session.result")).toBe(false);
     const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: result.logEntries }]);
-    expect(unified[0].data).toEqual(result.logEntries[0].data);
+    expect(unified[0].data).toEqual({ error: "AI_APICallError: Too Many Requests", message: "stream error", sessionId: "ses_ee1e84b56ffeap38OrBZh2U7qY" });
+    expect(result.logEntries[0].data).toEqual({
+      timestamp: "2026-10-09T00:37:13.776Z",
+      level: "ERROR",
+      run: "ab01f139",
+      message: "stream error",
+      providerID: "awf-proxy",
+      modelID: "auto",
+      "session.id": "ses_ee1e84b56ffeap38OrBZh2U7qY",
+      small: "false",
+      agent: "build",
+      mode: "primary",
+      "error.error": "AI_APICallError: Too Many Requests",
+      sessionId: "ses_ee1e84b56ffeap38OrBZh2U7qY",
+      error: "AI_APICallError: Too Many Requests",
+    });
     expect(unified[0].provenance.timestampMs).toBe(1791506233776);
     expect(parseEngineSession(opencodeCiStreamErrors.join("\n"), "opencode").filter(event => event.type !== "agent.execution")).toEqual(result.logEntries);
     expect(parseOpenCodeLog(jsonl(result.logEntries)).logEntries).toEqual(result.logEntries);
