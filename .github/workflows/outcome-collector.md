@@ -97,12 +97,15 @@ The summary JSON produced by the pre-agent step includes:
 | `total_outcomes` | int | Actionable items evaluated (excludes noops) |
 | `accepted` | int | Items kept/merged/resolved |
 | `rejected` | int | Items undone/dismissed/removed |
-| `ignored` | int | Items with no observable follow-up within the window |
+| `ignored` | int | Actions that reached a state without the expected effect |
 | `pending` | int | Items not yet at a terminal state |
+| `unknown` | int | Missing execution evidence, unsupported evaluators, or existence-only checks |
+| `errors` | int | API or evaluation failures |
+| `lifecycle` | int | Bot lifecycle closures, including retained close actions |
 | `noop` | int | Non-actionable items (noops, missing_tool, etc.) |
 | `accepted_strong` | int | Accepted with strong evidence (merged, completed, approved) |
 | `accepted_medium` | int | Accepted with medium evidence (engagement, retention) |
-| `accepted_weak` | int | Accepted with weak evidence (object still exists) |
+| `accepted_weak` | int | Legacy weak acceptance; existence-only checks now count as unknown |
 | `fallback_exists_only_count` | int | Items evaluated using only the generic existence fallback — a data quality signal |
 | `acceptance_rate` | float | `accepted / (accepted + rejected)` |
 | `waste_rate` | float | `rejected / total_outcomes` |
@@ -159,8 +162,8 @@ List concrete actions the team should take based on the data directly under the 
 2. **Stuck pending items** — List any items pending >48 hours or any workflow classified as 🔴 stuck. These need human review or the workflow needs a timeout.
 3. **Underdefined workflows** — Any workflow classified as ⚪ underdefined needs clearer acceptance/rejection criteria or a dedicated evaluator. The outcome model for that workflow is not yet mature.
 4. **Low zero-touch workflows** — Workflows where accepted items always need human edits indicate the agent's output quality needs improvement.
-5. **High ignored rate** — If ignored items exceed 30% of total outcomes, the workflow may be producing outputs that nobody engages with; consider refining targeting or output type.
-6. **Data quality: fallback evaluations** — If `fallback_exists_only_count` > 20% of total outcomes, many items were evaluated with only a generic existence check (weak signal). This means the acceptance numbers may be overstated; note this in the report.
+5. **High ignored rate** — If ignored items exceed 30% of total outcomes, inspect actions that completed without their expected effect (for example neutral/skipped dispatch conclusions or ready-for-review actions closed without a qualifying review). Recommend fixing those action-specific paths, not inferring lack of engagement.
+6. **Data quality: fallback evaluations** — If `fallback_exists_only_count` > 20% of total outcomes, many items have only generic existence evidence and remain unknown. Note this coverage gap; do not count them as accepted.
 
 **Lifecycle health classification** — assign one label per workflow based on its outcome history:
 
@@ -193,19 +196,22 @@ Place all detailed metrics, numeric breakdowns, evidence quality, and trends ins
 | Accepted | {accepted} / {total_outcomes} | — |
 | — strong evidence | {accepted_strong} | merged, completed, approved |
 | — medium evidence | {accepted_medium} | engaged, retained |
-| — weak evidence | {accepted_weak} | existence only |
+| — weak evidence | {accepted_weak} | legacy weak acceptance |
 | Rejected | {rejected} | — |
-| Ignored | {ignored} | no observable follow-up |
+| Ignored | {ignored} | expected effect not observed |
 | Zero-touch | {zero_touch} / {accepted} | — |
 | Pending | {pending} | — |
+| Unknown | {unknown} | insufficient evidence |
+| Evaluation errors | {errors} | verification failed |
+| Lifecycle | {lifecycle} | bot closures, not rejection |
 | Runs checked | {runs_checked} | — |
 
 ### Per-Workflow Breakdown
 
 For each workflow with outcomes, show a mini-scorecard:
 
-| Workflow | Accepted | Rejected | Ignored | Pending | Acceptance | Zero-touch |
-|----------|----------|----------|---------|---------|------------|------------|
+| Workflow | Accepted | Rejected | Ignored | Pending | Unknown | Errors | Lifecycle | Acceptance | Zero-touch |
+|----------|----------|----------|---------|---------|---------|--------|-----------|------------|------------|
 
 Sort by waste rate descending (worst first).
 
@@ -213,7 +219,7 @@ Sort by waste rate descending (worst first).
 
 If `fallback_exists_only_count` > 0, include this note:
 
-> ⚠️ **{fallback_exists_only_count} item(s)** were evaluated using only a generic existence check (signal: `target_exists_only`). These contribute to `accepted_weak` and may overstate acceptance. Dedicated evaluators for `add_reviewer`, `submit_pull_request_review`, `update_issue`, `update_pull_request`, and other types provide stronger evidence.
+> ⚠️ **{fallback_exists_only_count} item(s)** have only generic existence evidence (signal: `target_exists_only`). They count as `unknown`, not accepted. Dedicated action-specific evaluators require execution evidence and provide stronger attribution.
 
 ### Trend Signal
 

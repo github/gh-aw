@@ -124,6 +124,20 @@ update-wasm-golden:
 	@echo "Updating wasm golden test files..."
 	go test -v -timeout=5m -run='^TestWasmGolden_' ./pkg/workflow -update
 
+# Run model-routing golden tests without downloading source runs
+.PHONY: verify-model-routing-golden
+verify-model-routing-golden:
+	python3 scripts/test_model_routing_golden.py
+	go test ./pkg/cli -run '^TestModelRoutingGolden' -count=1
+
+# Update model-routing golden files from the committed fixtures
+.PHONY: update-model-routing-golden
+update-model-routing-golden:
+	@echo "Updating model-routing golden files..."
+	UPDATE_MODEL_ROUTING_GOLDEN=1 go test ./pkg/cli -run '^TestModelRoutingGolden' -count=1
+	@echo "Review changed model-routing golden files:"
+	@git status --short --untracked-files=all pkg/cli/testdata/model_routing_golden
+
 # Build wasm and run Node.js golden comparison test
 .PHONY: test-wasm
 test-wasm: build-wasm
@@ -1441,6 +1455,8 @@ help:
 	@echo "  test-wasm-golden - Run wasm golden tests (Go string API path)"
 	@echo "  test-wasm        - Build wasm and run Node.js golden comparison test"
 	@echo "  update-wasm-golden - Regenerate wasm golden files from current compiler output"
+	@echo "  verify-model-routing-golden - Verify model-routing fixtures against expected outputs"
+	@echo "  update-model-routing-golden - Regenerate model-routing golden files from fixtures"
 	@echo "  test-coverage    - Run tests with coverage report"
 	@echo "  bench            - Run benchmarks for performance testing"
 	@echo "  bench-compare    - Run benchmarks with more iterations (for benchstat comparison)"

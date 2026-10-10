@@ -3,7 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,111 +50,8 @@ func evalAddReviewer(ctx context.Context, item CreatedItemReport, repoOverride s
 		return report
 	}
 
-	outcomeReviewLog.Printf("Fetched %d reviews for PR #%d (requested reviewers=%d, teams=%d)", len(reviews), num, len(requestedReviewers), len(requestedTeams))
-	requestedReviewerSet := make(map[string]struct{}, len(requestedReviewers))
-	for _, reviewer := range requestedReviewers {
-		requestedReviewerSet[strings.ToLower(reviewer)] = struct{}{}
-	}
+	return classifyRequestedReview(item, requestedReviewers, requestedTeams, reviews, requested, report)
 
-	latestByReviewer := make(map[string]map[string]any, len(requestedReviewerSet))
-	for _, review := range reviews {
-		login := strings.ToLower(outcomeNestedString(review["user"], "login"))
-		if _, ok := requestedReviewerSet[login]; !ok {
-			continue
-		}
-		state := strings.ToUpper(outcomeString(review["state"]))
-		submittedAt := outcomeString(review["submitted_at"])
-		if state == "" || state == "PENDING" || submittedAt == "" { //nolint:tolowerequalfold
-			continue
-		}
-		if !timestampOnOrAfter(submittedAt, item.Timestamp) {
-			continue
-		}
-		prev, ok := latestByReviewer[login]
-		if !ok || timestampOnOrAfter(submittedAt, outcomeString(prev["submitted_at"])) {
-			latestByReviewer[login] = review
-		}
-	}
-
-	var approvedReviewer string
-	var submittedReviewer string
-	for login, review := range latestByReviewer {
-		if strings.EqualFold(outcomeString(review["state"]), "APPROVED") {
-			approvedReviewer = login
-			break
-		}
-		if submittedReviewer == "" {
-			submittedReviewer = login
-		}
-	}
-
-	switch {
-	case approvedReviewer != "":
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = fmt.Sprintf("requested reviewer %s approved", approvedReviewer)
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "review_approved",
-		}
-		return report
-	case submittedReviewer != "":
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = fmt.Sprintf("requested reviewer %s submitted a review", submittedReviewer)
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "review_submitted",
-		}
-		return report
-	}
-
-	// We cannot cheaply verify team membership for each reviewer from this endpoint,
-	// so any submitted post-request review counts as medium-evidence team activity.
-	if len(requestedTeams) > 0 && hasReviewAfterTimestamp(reviews, item.Timestamp) {
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = "team review request received a review"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "review_submitted",
-		}
-		return report
-	}
-
-	currentUsers := extractLogins(requested["users"])
-	currentTeams := extractTeamSlugs(requested["teams"])
-	stillPending := intersectsFold(requestedReviewers, currentUsers) || intersectsFold(requestedTeams, currentTeams)
-	if stillPending {
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "review request still pending"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusPending,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "awaiting_review",
-		}
-		return report
-	}
-
-	if len(requestedReviewers) > 0 || len(requestedTeams) > 0 {
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "review request removed without submitted review"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusRejected,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "review_request_removed",
-		}
-		return report
-	}
-
-	report.OutcomeStatus = OutcomeStatusUnknown
-	report.Detail = "no persisted reviewer request metadata"
-	report.OutcomeEvaluation = OutcomeEvaluation{
-		OutcomeStatus:    OutcomeStatusUnknown,
-		EvidenceStrength: EvidenceWeak,
-		Signal:           "unknown",
-	}
-	return report
 }
 
 func evalSubmitPullRequestReview(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
@@ -184,90 +83,8 @@ func evalSubmitPullRequestReview(ctx context.Context, item CreatedItemReport, re
 		return report
 	}
 
-	reviewID := metadataInt(item.Metadata, "review_id")
-	review := findReviewByID(reviews, reviewID)
-	if review == nil {
-		review = latestReviewAfterTimestamp(reviews, item.Timestamp)
-	}
-	if review == nil {
-		outcomeReviewLog.Printf("Submitted review not found for PR #%d (reviewID=%d, reviews=%d)", num, reviewID, len(reviews))
-		report.OutcomeStatus = OutcomeStatusUnknown
-		report.Detail = "submitted review not found"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceWeak,
-			Signal:           "review_missing",
-		}
-		return report
-	}
+	return classifySubmittedReview(ctx, item, pr, reviews, report)
 
-	reviewState := strings.ToUpper(outcomeString(review["state"]))
-	reviewSubmittedAt := outcomeString(review["submitted_at"])
-	prMerged, _ := pr["merged"].(bool)
-	prState, _ := pr["state"].(string)
-
-	switch {
-	case reviewState == "DISMISSED": //nolint:tolowerequalfold
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "review dismissed by repo admin"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusRejected,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "review_dismissed",
-		}
-		return report
-	case prMerged && reviewState == "APPROVED": //nolint:tolowerequalfold
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = "approved review followed by merge"
-		report.TimeToOutcomeHours = timeBetween(item.Timestamp, outcomeString(pr["merged_at"]))
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "review_approved",
-		}
-		return report
-	case prMerged && reviewState == "CHANGES_REQUESTED": //nolint:tolowerequalfold
-		commits, err := outcomeReviewGHAPIGetArray(ctx, fmt.Sprintf("pulls/%d/commits", num), repo)
-		if err == nil && hasCommitAfterTimestamp(commits, reviewSubmittedAt) {
-			report.OutcomeStatus = OutcomeStatusAccepted
-			report.Detail = "changes requested, updated, and merged"
-			report.TimeToOutcomeHours = timeBetween(item.Timestamp, outcomeString(pr["merged_at"]))
-			report.OutcomeEvaluation = OutcomeEvaluation{
-				OutcomeStatus:    OutcomeStatusAccepted,
-				EvidenceStrength: EvidenceMedium,
-				Signal:           "changes_requested_addressed",
-			}
-			return report
-		}
-	case prState == "closed" && !prMerged:
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "PR closed without merge after review submission"
-		report.TimeToOutcomeHours = timeBetween(item.Timestamp, outcomeString(pr["closed_at"]))
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusRejected,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "closed_without_merge_after_review",
-		}
-		return report
-	case prState == "open" && isLatestReview(reviews, review):
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "review is latest review on open PR"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusPending,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "latest_review_pending",
-		}
-		return report
-	}
-
-	report.OutcomeStatus = OutcomeStatusUnknown
-	report.Detail = "review outcome could not be determined"
-	report.OutcomeEvaluation = OutcomeEvaluation{
-		OutcomeStatus:    OutcomeStatusUnknown,
-		EvidenceStrength: EvidenceWeak,
-		Signal:           "unknown",
-	}
-	return report
 }
 
 func metadataStringSlice(metadata map[string]any, key string) []string {
@@ -296,40 +113,52 @@ func metadataStringSlice(metadata map[string]any, key string) []string {
 }
 
 func metadataInt(metadata map[string]any, key string) int {
-	if metadata == nil {
-		return 0
-	}
+	var parsed int64
 	switch value := metadata[key].(type) {
 	case int:
-		return value
+		parsed = int64(value)
 	case int64:
-		return int(value)
+		parsed = value
 	case float64:
-		return int(value)
+		if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value || value <= 0 || value > 9007199254740991 {
+			return 0
+		}
+		parsed = int64(value)
 	case string:
-		var parsed int
-		_, _ = fmt.Sscanf(value, "%d", &parsed)
-		return parsed
+		var err error
+		value = strings.TrimSpace(value)
+		if strings.HasPrefix(value, "+") {
+			return 0
+		}
+		parsed, err = strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return 0
+		}
+	default:
+		return 0
 	}
-	return 0
+	if parsed <= 0 || parsed > 9007199254740991 || parsed > int64(math.MaxInt) {
+		return 0
+	}
+	return int(parsed)
 }
 
 func outcomeString(raw any) string {
-	s, _ := raw.(string)
+	s := outcomeValue[string](raw)
 	return s
 }
 
 func outcomeNestedString(raw any, nestedKey string) string {
-	obj, _ := raw.(map[string]any)
+	obj := outcomeValue[map[string]any](raw)
 	if obj == nil {
 		return ""
 	}
-	value, _ := obj[nestedKey].(string)
+	value := outcomeValue[string](obj[nestedKey])
 	return value
 }
 
 func extractLogins(raw any) []string {
-	items, _ := raw.([]any)
+	items := outcomeValue[[]any](raw)
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		if login := outcomeNestedString(item, "login"); login != "" {
@@ -340,7 +169,7 @@ func extractLogins(raw any) []string {
 }
 
 func extractTeamSlugs(raw any) []string {
-	items, _ := raw.([]any)
+	items := outcomeValue[[]any](raw)
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		slug := outcomeNestedString(item, "slug")
@@ -433,10 +262,146 @@ func isLatestReview(reviews []map[string]any, review map[string]any) bool {
 
 func hasCommitAfterTimestamp(commits []map[string]any, threshold string) bool {
 	for _, commit := range commits {
-		commitObj, _ := commit["commit"].(map[string]any)
+		commitObj := outcomeValue[map[string]any](commit["commit"])
 		if timestampOnOrAfter(outcomeNestedString(commitObj["committer"], "date"), threshold) || timestampOnOrAfter(outcomeNestedString(commitObj["author"], "date"), threshold) {
 			return true
 		}
 	}
 	return false
+}
+
+func classifySubmittedReview(ctx context.Context, item CreatedItemReport, pr map[string]any, reviews []map[string]any, report OutcomeReport) OutcomeReport {
+	num, repo := report.ObjectNumber, report.Repo
+	reviewID := metadataInt(item.Metadata, "review_id")
+	review := findReviewByID(reviews, reviewID)
+	if review == nil {
+		outcomeReviewLog.Printf("Submitted review not found for PR #%d (reviewID=%d, reviews=%d)", num, reviewID, len(reviews))
+		report.Detail = "submitted review not found"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "review_missing")
+		return report
+	}
+
+	reviewState := strings.ToUpper(outcomeString(review["state"]))
+	reviewSubmittedAt := outcomeString(review["submitted_at"])
+	prMerged := outcomeValue[bool](pr["merged"])
+	prState := outcomeValue[string](pr["state"])
+
+	switch {
+	case reviewState == "DISMISSED": //nolint:tolowerequalfold
+		report.Detail = "review dismissed by repo admin"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "review_dismissed")
+		return report
+	case prMerged && reviewState == "APPROVED": //nolint:tolowerequalfold
+		report.OutcomeStatus = OutcomeStatusAccepted
+		report.Detail = "approved review followed by merge"
+		report.TimeToOutcomeHours = timeBetween(item.Timestamp, outcomeString(pr["merged_at"]))
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "review_approved")
+		return report
+	case prMerged && reviewState == "CHANGES_REQUESTED": //nolint:tolowerequalfold
+		commits, err := outcomeReviewGHAPIGetArray(ctx, fmt.Sprintf("pulls/%d/commits", num), repo)
+		if err == nil && hasCommitAfterTimestamp(commits, reviewSubmittedAt) {
+			report.OutcomeStatus = OutcomeStatusAccepted
+			report.Detail = "changes requested, updated, and merged"
+			report.TimeToOutcomeHours = timeBetween(item.Timestamp, outcomeString(pr["merged_at"]))
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "changes_requested_addressed")
+			return report
+		}
+	case prState == "closed" && !prMerged:
+		report.OutcomeStatus = OutcomeStatusRejected
+		report.Detail = "PR closed without merge after review submission"
+		report.TimeToOutcomeHours = timeBetween(item.Timestamp, outcomeString(pr["closed_at"]))
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceMedium, "closed_without_merge_after_review")
+		return report
+	case prState == "open" && isLatestReview(reviews, review):
+		report.Detail = "review is latest review on open PR"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "latest_review_pending")
+		return report
+	}
+	report.Detail = "review outcome could not be determined"
+
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "unknown")
+	return report
+}
+
+func classifyRequestedReview(item CreatedItemReport, requestedReviewers, requestedTeams []string, reviews []map[string]any, requested map[string]any, report OutcomeReport) OutcomeReport {
+	outcomeReviewLog.Printf("Fetched %d reviews for PR #%d (requested reviewers=%d, teams=%d)", len(reviews), report.ObjectNumber, len(requestedReviewers), len(requestedTeams))
+	latestByReviewer := requestedReviewsAfter(reviews, requestedReviewers, item.Timestamp)
+
+	var approvedReviewer string
+	var submittedReviewer string
+	for login, review := range latestByReviewer {
+		if strings.EqualFold(outcomeString(review["state"]), "APPROVED") {
+			approvedReviewer = login
+			break
+		}
+		if submittedReviewer == "" {
+			submittedReviewer = login
+		}
+	}
+
+	switch {
+	case approvedReviewer != "":
+		report.Detail = fmt.Sprintf("requested reviewer %s approved", approvedReviewer)
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "review_approved")
+		return report
+	case submittedReviewer != "":
+		report.Detail = fmt.Sprintf("requested reviewer %s submitted a review", submittedReviewer)
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "review_submitted")
+		return report
+	}
+
+	// A submitted review does not establish membership in the requested team.
+	if len(requestedTeams) > 0 && hasReviewAfterTimestamp(reviews, item.Timestamp) {
+		report.Detail = "team reviewer membership is unverified"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "team_membership_unverified")
+		return report
+	}
+
+	currentUsers := extractLogins(requested["users"])
+	currentTeams := extractTeamSlugs(requested["teams"])
+	stillPending := intersectsFold(requestedReviewers, currentUsers) || intersectsFold(requestedTeams, currentTeams)
+	if stillPending {
+		report.Detail = "review request still pending"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "awaiting_review")
+		return report
+	}
+
+	if len(requestedReviewers) > 0 || len(requestedTeams) > 0 {
+		report.Detail = "review request removed without submitted review"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "review_request_removed")
+		return report
+	}
+	report.Detail = "no persisted reviewer request metadata"
+
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "unknown")
+	return report
+}
+
+func requestedReviewsAfter(reviews []map[string]any, requestedReviewers []string, timestamp string) map[string]map[string]any {
+	requestedReviewerSet := make(map[string]struct{}, len(requestedReviewers))
+	for _, reviewer := range requestedReviewers {
+		requestedReviewerSet[strings.ToLower(reviewer)] = struct{}{}
+	}
+
+	latestByReviewer := make(map[string]map[string]any, len(requestedReviewerSet))
+	for _, review := range reviews {
+		login := strings.ToLower(outcomeNestedString(review["user"], "login"))
+		if _, ok := requestedReviewerSet[login]; !ok {
+			continue
+		}
+		state := strings.ToUpper(outcomeString(review["state"]))
+		submittedAt := outcomeString(review["submitted_at"])
+		if state == "" || state == "PENDING" || submittedAt == "" { //nolint:tolowerequalfold
+			continue
+		}
+		if !timestampOnOrAfter(submittedAt, timestamp) {
+			continue
+		}
+		prev, ok := latestByReviewer[login]
+		if !ok || timestampOnOrAfter(submittedAt, outcomeString(prev["submitted_at"])) {
+			latestByReviewer[login] = review
+		}
+	}
+
+	return latestByReviewer
 }

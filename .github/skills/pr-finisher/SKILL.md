@@ -157,6 +157,18 @@ make update-wasm-golden
 
 Then re-run the affected tests.
 
+If model-routing golden tests fail after an intentional audit-output change:
+
+```bash
+make verify-model-routing-golden
+make update-model-routing-golden
+```
+
+Review the fixture and every regenerated `expected*.json` diff before accepting
+the change. For a new run, follow `.github/skills/model-routing-golden/SKILL.md`
+and require the capture tool's full-download versus minimized-fixture comparison
+to pass.
+
 **Prior CI failures** — for each failure captured during triage, pull logs and fix the root cause:
 
 ```bash

@@ -397,6 +397,10 @@ jobs:
     - name: Build gh-aw binary for integration tests
       run: make build
 
+    - name: Test model-routing golden capture tooling
+      if: ${{ matrix.test-group.name == 'CLI Audit Logs & Firewall' }}
+      run: python3 scripts/test_model_routing_golden.py
+
     - name: Run integration tests - ${{ matrix.test-group.name }}
       id: run-tests
       env:

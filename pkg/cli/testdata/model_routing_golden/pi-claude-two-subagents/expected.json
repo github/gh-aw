@@ -1,0 +1,175 @@
+{
+  "firewall_token_usage": {
+    "total_input_tokens": 36226,
+    "total_output_tokens": 1149,
+    "total_cache_read_tokens": 36503,
+    "total_cache_write_tokens": 17120,
+    "total_requests": 9,
+    "total_duration_ms": 29727,
+    "total_response_bytes": 740560,
+    "cache_efficiency": 0,
+    "total_aic": 2.812022,
+    "by_model": {
+      "claude-haiku-4-5-20251001": {
+        "provider": "copilot",
+        "input_tokens": 18,
+        "output_tokens": 330,
+        "cache_read_tokens": 12137,
+        "cache_write_tokens": 17120,
+        "requests": 4,
+        "duration_ms": 9967,
+        "response_bytes": 21991,
+        "aic": 2.42817
+      },
+      "gpt-5.6-luna": {
+        "provider": "copilot",
+        "input_tokens": 36208,
+        "output_tokens": 819,
+        "cache_read_tokens": 24366,
+        "cache_write_tokens": 0,
+        "requests": 5,
+        "duration_ms": 19760,
+        "response_bytes": 718569,
+        "aic": 0.383852
+      }
+    },
+    "subagent_model_requests": [
+      {
+        "agent_name": "file-summarizer",
+        "requested_model": "claude-haiku-4.5",
+        "resolved_model": "claude-haiku-4.5",
+        "served_models": ["claude-haiku-4-5-20251001"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "claude-haiku-4.5"
+      },
+      {
+        "agent_name": "quick-checker",
+        "requested_model": "small",
+        "resolved_model": "claude-haiku-4.5",
+        "served_models": ["claude-haiku-4-5-20251001"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "claude-haiku-4.5"
+      }
+    ],
+    "declared_subagent_models": [
+      {
+        "agent_name": "file-summarizer",
+        "requested_model": "claude-haiku-4.5",
+        "resolved_model": "claude-haiku-4.5",
+        "served_models": ["claude-haiku-4-5-20251001", "claude-haiku-4.5"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "claude-haiku-4.5"
+      },
+      {
+        "agent_name": "quick-checker",
+        "requested_model": "small",
+        "resolved_model": "claude-haiku-4.5",
+        "served_models": ["claude-haiku-4-5-20251001", "claude-haiku-4.5"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "claude-haiku-4.5"
+      }
+    ],
+    "subagent_model_actuals": [
+      {
+        "model": "claude-haiku-4.5",
+        "requests": 4,
+        "resolved_model": "claude-haiku-4.5",
+        "served_models": ["claude-haiku-4-5-20251001"],
+        "input_tokens": 18,
+        "output_tokens": 330,
+        "cache_read_tokens": 12137,
+        "cache_write_tokens": 17120
+      }
+    ],
+    "agent_usage": [
+      {
+        "agent_name": "file-summarizer",
+        "agent_type": "subagent",
+        "source_engine": "pi",
+        "instance_count": 1,
+        "completed_count": 1,
+        "requested_models": ["claude-haiku-4.5"],
+        "resolved_models": ["claude-haiku-4.5"],
+        "served_models": ["claude-haiku-4-5-20251001"],
+        "requests": 2,
+        "input_tokens": 9,
+        "output_tokens": 192,
+        "cache_read_tokens": 6066,
+        "cache_write_tokens": 10062,
+        "aic": 1.41531,
+        "total_api_duration_ms": 5468,
+        "models": [
+          {
+            "model": "claude-haiku-4.5",
+            "resolved_model": "claude-haiku-4.5",
+            "requests": 2,
+            "input_tokens": 9,
+            "output_tokens": 192,
+            "cache_read_tokens": 6066,
+            "cache_write_tokens": 10062,
+            "aic": 1.41531
+          }
+        ]
+      },
+      {
+        "agent_name": "main",
+        "agent_type": "main",
+        "source_engine": "pi",
+        "instance_count": 1,
+        "served_models": ["gpt-5.6-luna"],
+        "requests": 5,
+        "input_tokens": 36208,
+        "output_tokens": 819,
+        "cache_read_tokens": 24366,
+        "cache_write_tokens": 0,
+        "aic": 0.383852,
+        "total_api_duration_ms": 19760,
+        "models": [
+          {
+            "model": "gpt-5.6-luna",
+            "resolved_model": "gpt-5.6-luna",
+            "requests": 5,
+            "input_tokens": 36208,
+            "output_tokens": 819,
+            "cache_read_tokens": 24366,
+            "cache_write_tokens": 0,
+            "aic": 0.383852
+          }
+        ]
+      },
+      {
+        "agent_name": "quick-checker",
+        "agent_type": "subagent",
+        "source_engine": "pi",
+        "instance_count": 1,
+        "completed_count": 1,
+        "requested_models": ["small"],
+        "resolved_models": ["claude-haiku-4.5"],
+        "served_models": ["claude-haiku-4-5-20251001"],
+        "requests": 2,
+        "input_tokens": 9,
+        "output_tokens": 138,
+        "cache_read_tokens": 6071,
+        "cache_write_tokens": 7058,
+        "aic": 1.01286,
+        "total_api_duration_ms": 4499,
+        "models": [
+          {
+            "model": "claude-haiku-4.5",
+            "resolved_model": "claude-haiku-4.5",
+            "requests": 2,
+            "input_tokens": 9,
+            "output_tokens": 138,
+            "cache_read_tokens": 6071,
+            "cache_write_tokens": 7058,
+            "aic": 1.01286
+          }
+        ]
+      }
+    ]
+  }
+}
