@@ -284,7 +284,7 @@ describe("prospective drain-free worker evolution", () => {
     }
   });
 
-  it("trusted compiler updates verify each local route without globally granting unrelated targets or revoking frozen launch/reconciliation", async () => {
+  it("ignores caller-proposed revisions while verifying the current route without revoking frozen launch/reconciliation", async () => {
     const f = fixture();
     f.append("dispatch_next", { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 48000 }, f.dispatcher);
     const assignment = assignmentOnly([...f.state.dispatches.values()][0]);
@@ -305,7 +305,9 @@ describe("prospective drain-free worker evolution", () => {
     };
     const trusted = { ...f.dispatcher, authenticated: true, roles: ["dispatcher"] };
     await synchronizeDeployments(options, trusted);
-    expect(f.state.deployments.get("default").get("default").revisions[NEW_REF].available).toBe(false);
+    expect(f.state.deployments.get("default").get("default").current_ref).toBe(REF);
+    expect(f.state.deployments.get("default").get("default").revisions[NEW_REF]).toBeUndefined();
+    expect(f.state.deployments.get("default").get("default").revisions[REF].available).toBe(false);
     expect(f.state.deployments.get("default").get("other").current_ref).toBe(REF);
     expect(f.state.dispatches.get(assignment.dispatch_id).profile.ref).toBe(REF);
     const post = vi.fn().mockResolvedValue({ status: 200, data: { workflow_run_id: "42", run_url: "https://api.github.com/repos/owner/repo/actions/runs/42", html_url: "https://github.com/owner/repo/actions/runs/42" } });
@@ -319,8 +321,8 @@ describe("prospective drain-free worker evolution", () => {
     const launch = await launchAssignment({ ...options, config: {}, dispatchClient: f.githubClient, validateDispatchCredential: f.validateDispatchCredential, now: f.at, sleepFn: async () => {} }, assignment);
     expect(launch.state).toBe("bound");
     expect(post.mock.calls[0][0].ref).toBe(REF);
-    expect(getContent).toHaveBeenCalledTimes(2);
-    expect(f.state.deployments.get("default").get("default").current_ref).toBe(NEW_REF);
+    expect(getContent).toHaveBeenCalledTimes(1);
+    expect(f.state.deployments.get("default").get("default").current_ref).toBe(REF);
     expect(f.state.deployments.get("default").get("default").revisions[REF].available).toBe(false);
     expect(f.state.dispatches.get(assignment.dispatch_id).run.principal).toBe("22");
   });

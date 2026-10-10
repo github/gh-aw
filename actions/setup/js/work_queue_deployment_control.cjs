@@ -30,7 +30,7 @@ async function synchronizeDeployments(options, context) {
       const worker = latest.projection.deployments.get(pool).get(name);
       const profile = proposed ?? worker.revisions[worker.current_ref].profile;
       if (!profile.logical_contract) return;
-      let available = !!proposed;
+      let available = true;
       if (available) {
         try {
           await verifyWorkerRoute({ githubClient: options.githubClient, owner: options.context.repo.owner, repo: options.context.repo.repo, profile });
@@ -66,8 +66,7 @@ async function synchronizeDeployments(options, context) {
     const approved = new Set(approvedWorkerProfiles(latest.projection, pool, options.config ?? {}));
     for (const [name] of workers) {
       if (!approved.has(name)) continue;
-      const proposed = proposal.pools[pool]?.profiles[name];
-      await updateRoute(pool, name, proposed);
+      await updateRoute(pool, name, undefined);
       const worker = latest.projection.deployments.get(pool).get(name);
       const pinned = new Set(
         [...latest.projection.works.values()]
