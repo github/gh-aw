@@ -7,8 +7,6 @@ func FormatInfoMessageStderr(message string) string     { return FormatInfoMessa
 func FormatWarningMessageStderr(message string) string  { return FormatWarningMessage(message) }
 func FormatCommandMessageStderr(command string) string  { return FormatCommandMessage(command) }
 func FormatProgressMessageStderr(message string) string { return FormatProgressMessage(message) }
-func FormatPromptMessageStderr(message string) string   { return FormatPromptMessage(message) }
-func FormatVerboseMessageStderr(message string) string  { return FormatVerboseMessage(message) }
 func FormatListItemStderr(item string) string           { return FormatListItem(item) }
 func FormatSectionHeaderStderr(header string) string    { return FormatSectionHeader(header) }
 func RenderTableStderr(config TableConfig) string       { return RenderTable(config) }

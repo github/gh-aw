@@ -668,9 +668,11 @@ spelling; negative zero and zero are the same numeric value.
 Native error type identifiers retain their original spelling.
 Multiple retries, repeated source records,
 canonical events, and detector observations MUST NOT produce duplicate entries.
-Tool failures and errors quoted in user/assistant messages or tool outputs MUST
+Tool failures and errors quoted in user/assistant messages or tool completion
+`output`, `result`, or `error` payloads, including nested structured values, MUST
 NOT become agent execution errors. Diagnostics emitted in child-agent context
-(an observed caller `agentId` or nonempty parent-tool identity) MUST NOT supply
+(an observed caller `agentId` or nonempty parent-tool identity, including
+`parentToolCallId` on a diagnostic) MUST NOT supply
 main-agent classifications; subagent lifecycle target IDs alone do not establish
 the emitting caller's context. Original native and canonical error events
 remain available; the aggregate is not a replacement for their evidence.
@@ -961,12 +963,13 @@ redaction, escaping, and byte limits.
 | Supported `item.started` / `item.updated` / `item.completed` with `item.type: "agent_message"` or `"reasoning"` | Message/reasoning observations; distinguish partial text from full snapshots to avoid duplication. |
 | Same item envelope with `item.type: "mcp_tool_call"` | Start/completion according to observed lifecycle; preserve item/call ID, `server`, `tool`, `arguments`, `result`, `error`, `status`. |
 | Same item envelope with `item.type: "command_execution"` | Preserve ID, command, `aggregated_output`, status, and `exit_code`; nonzero exit is failure. |
+| Recognized patch, web-search, or collaboration items | Standard tool observations with supplied inputs, outputs, identities, and lifecycle. Summary-only file changes supply an orphan `apply_patch` completion, not invented patch arguments or a start. |
 | `turn.completed` with `usage` | Accumulate `input_tokens`, `output_tokens`, `cached_input_tokens` → `cache_read_input_tokens`, and `cache_write_input_tokens` → `cache_creation_input_tokens`; count distinct completed turns. |
 | Supported `turn.failed`, top-level `error`, or completed error item | Session/provider errors in `session.result.errors`, retaining supplied error structure and metadata. |
 | Legacy `thinking`, recognized tool/exec call and outcome lines | Exact payload text and independently observed tool lifecycle; no source ID if none is exposed. |
 | Legacy `ERROR:` / recognized reconnect diagnostics | Session errors, separately from successful tool activity. |
 
-An item carrying a complete invocation and result can expand to a start and completion at that item position. An unfinished item or a legacy call lacking an outcome does not supply a successful completion. Recognized model headers and harness spawn metadata can supply a model, but arbitrary text does not establish a Codex session.
+An item carrying a complete invocation and result can expand to a start and completion at that item position. An unfinished item or a legacy call lacking an outcome does not supply a successful completion. Declined commands are failures and retain a reported unavailable exit code as `null`. Repeated or revised accounting snapshots reconcile before subsequent turn reports; overflow remains unavailable until a valid authoritative replacement. Recognized model headers and harness spawn metadata can supply a model, but arbitrary text does not establish a Codex session.
 
 ### 7.4 Gemini
 
@@ -1018,16 +1021,6 @@ repeated anonymous text does not establish snapshot coverage.
 
 **T-UAS-040 — Pi adapter.** The Pi adapter MUST support both recognized flat JSONL and v3 streaming records. It MUST preserve observed streaming content, execution events, IDs, source metadata, and provider errors even without a finalized message. It MUST accumulate distinct finalized-turn usage and MUST emit canonical `session.result`, not append bare legacy `result` for telemetry.
 
-> [!NOTE]
-> The following rows define the required canonical mappings, not a claim of full
-> implementation conformance. Pi's tool-update, provider-error, and lifecycle
-> mappings are pending in [#67393](https://github.com/github/gh-aw/pull/67393).
-> Until that change lands, the adapter retains `pi.message_update`,
-> `pi.tool_execution_update`, `pi.error`, and `pi.*` lifecycle observations;
-> finalized-message `errorMessage` remains native metadata rather than a separate
-> canonical session error. Those observations do not yet satisfy the corresponding
-> standard-event rows below.
-
 | Source signature | Canonical mapping |
 | --- | --- |
 | Flat `init`, `assistant`, `tool_use`, `tool_result` | Initialization, assistant content/deltas, starts, and completions, preserving native fields. |
@@ -1041,6 +1034,27 @@ repeated anonymous text does not establish snapshot coverage.
 | Finalized message `errorMessage` or top-level `error` | `session.error` and `session.result.errors`, even when content is empty; repeated message snapshots retain one diagnostic observation. |
 | Recognized `agent_end` or other terminal accounting | Reconcile any supplied session snapshot; do not add it again to per-turn totals. |
 | `agent_start`, `agent_settled`, retry, compaction, queue, entry, and reasoning-effort observations | Engine-independent `session.*` lifecycle extensions retaining the supplied payload. |
+
+Known historical `pi.*` observations in saved Pi sessions are normalized without
+replaying them as new conversation or inference usage. The engine dispatcher
+invokes the Pi adapter's saved-observation normalization hook; shared collection
+and CLI code do not import Pi-specific migration logic.
+
+| Historical observation | Normalized mapping |
+| --- | --- |
+| `pi.message_snapshot` | `session.info` with `sourceType: "message_snapshot"`, role/model/correlation metadata, and `usageSnapshot`. |
+| Argument `pi.message_update` | `tool.execution_update` retaining the native update subtype, argument fragments or finalized input, correlation, and optional `usageSnapshot`. |
+| Other `pi.message_update` | `assistant.message_update`, retaining the supplied boundary or update payload without inventing text. |
+| `pi.tool_execution_update` | `tool.execution_update` with partial output and the observed input and identities. |
+| `pi.error` | `session.error`. |
+| Recognized Pi lifecycle or subagent wrappers | The corresponding engine-independent `session.*` or `subagent.*` events. |
+
+`usageSnapshot` is repeated observation metadata, not additive accounting.
+Existing final messages, tool outcomes, and `session.result` accounting remain
+authoritative. Missing content in a compact historical snapshot is not recovered
+from model/usage metadata. Unknown `pi.*` extensions remain opaque. The session
+download command applies this normalization to published JSONL only when trusted
+run metadata identifies Pi; it does not rewrite stored Actions artifacts.
 
 The adapter can discover a reported model from a finalized turn without inventing an earlier model observation. Presentation aliases such as `bash` → `Bash` do not change canonical tool names. Sources lacking duration or cost do not supply zero duration or zero cost.
 
@@ -1057,6 +1071,10 @@ DeepSeek Harness, Kiro, and Pydantic AI. These adapters use engine-specific
 framing, not an arbitrary raw-log fallback. They retain observed assistant text
 and tool evidence, omit prompts and recognized wrapper diagnostics, and leave
 unavailable native tool arguments, results, and accounting absent.
+Catalogued canonical-producing adapters own their complete mixed stdout before
+generic record extraction. Exact quiet output does not supply initialization,
+tool executions, terminal success, or accounting merely because text exists.
+Attributable startup errors remain `session.error`, not assistant answers.
 
 When no supported signature is present, the existing custom “unrecognized format” result and empty trace are returned. A raw preview is not a normalized event and is subject to the privacy boundary in Section 8.
 
@@ -1116,6 +1134,27 @@ snapshot, never another per-turn contribution. Cache counts are included in the
 reported input count (`input_tokens_include_cache: true`).
 Synthetic protocol and collection coverage lives in `parse_goose_log.test.cjs`;
 it does not alone establish conformance for every Goose version.
+
+### 7.9 Cursor sample
+
+The Cursor sample uses `--output-format stream-json` and a dedicated parser shared
+by Actions and local reconstruction, following the
+[Cursor output-format reference](https://cursor.com/docs/cli/reference/output-format).
+Recognized initialization, user/assistant
+text, reasoning, structured refusals, tool lifecycles, errors, and terminal
+results use the standard `session.*`, message, tool, and usage vocabulary.
+Supplied identities, exact text, structured payloads, partial markers, and
+zero/false/null values survive; repeated partial/final snapshots reconcile
+without duplicate answers or tool executions. Native canonical extensions remain
+opaque.
+
+Historical `text` output supplies only the captured final answer, not a full
+conversation. Its blank lines and final newlines remain exact. CLI version
+verification and infrastructure output are not assistant messages; prose does
+not establish tools, turn counts, outcomes, or token accounting. The sampled
+historical runs verify this text path, whereas stream-json mappings are
+documentation-derived synthetic coverage, not evidence that the new invocation
+succeeded in a deployed run.
 
 ## 8. Renderers and Bootstrap Telemetry (Normative)
 
@@ -1337,10 +1376,13 @@ payloads with harmless examples.
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
-| Pi | [Smoke success](https://github.com/github/gh-aw/actions/runs/37789661712) and [failed workflow](https://github.com/github/gh-aw/actions/runs/37865831889) | `pi-streaming.jsonl`, `agent-session.jsonl`, and `usage/aw_session.jsonl` | Complete downloaded traces replayed locally; historical custom wrappers are replaced prospectively, not rewritten in published artifacts. |
+| Pi | [Smoke success](https://github.com/github/gh-aw/actions/runs/37789661712) and [failed workflow](https://github.com/github/gh-aw/actions/runs/37865831889) | `pi-streaming.jsonl`, `agent-session.jsonl`, and `usage/aw_session.jsonl` | Complete native and saved traces replayed locally. Historical migration replaces 475/9,036 custom observations in each saved representation without changing conversation, tool outcomes, accounting, or provenance; the CLI normalizes downloaded copies, not stored artifacts. |
 | Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
 | AGY | [Smoke](https://github.com/github/gh-aw/actions/runs/37848575608) and [authentication check](https://github.com/github/gh-aw/actions/runs/37732637929) | Smoke `agent-stdio.log`, `agent-session.jsonl`, and `usage/aw_session.jsonl`; authentication receipt only, not a native transcript | `fixtures/agy_ci_sessions.cjs`, `parse_agy_log_conformance.test.cjs` |
-| Aider | [Smoke success](https://github.com/github/gh-aw/actions/runs/37863370348), [downstream failure](https://github.com/github/gh-aw/actions/runs/37976723705), and [rate-limit failure](https://github.com/github/gh-aw/actions/runs/37080828156) | Modern native, canonical, and unified artifacts; rate-limit run predates structured capture | Native-hook regressions distinguish captured message evidence from synthetic reasoning/refusal/accounting-hook coverage. |
+| Aider | [Smoke success](https://github.com/github/gh-aw/actions/runs/37863370348), [downstream failure](https://github.com/github/gh-aw/actions/runs/37976723705), and [rate-limit failure](https://github.com/github/gh-aw/actions/runs/37080828156) | Each modern native/canonical agent trace has six records; the historical run has startup-framed rate-limit errors but no conversation capture | Repository-relative `pkg/workflow/testdata/aider_session/`; native-hook reasoning/refusal/partial/accounting cases are synthetic. |
+| Cursor | [Smoke success](https://github.com/github/gh-aw/actions/runs/37866957846) and [failed workflow](https://github.com/github/gh-aw/actions/runs/37142216516) | `agent-stdio.log`, historical `agent-session.jsonl`, and `usage/aw_session.jsonl`; both Cursor processes exit zero | `parse_cursor_log.test.cjs`; historical answers preserve 297/268 UTF-8 bytes. Stream-json protocol cases are synthetic. |
+| Kiro | [Smoke success](https://github.com/github/gh-aw/actions/runs/37862725262) and [failed workflow](https://github.com/github/gh-aw/actions/runs/37549851664) | CLI 2.27.1 compact `[tool]` framing and buffered final answers in `agent-stdio.log`; historical unified files did not recognize the engine | `parse_kiro_log.test.cjs`; native tool starts/completions are 11/11 and 9/11, including two anonymous orphan failures. |
+| Crush | [Executed timeout](https://github.com/github/gh-aw/actions/runs/37866184524) and [Agent-skipped success](https://github.com/github/gh-aw/actions/runs/37553337234) | Executed native output contains infrastructure only; an appended zero-turn compatibility trailer is not native conversation evidence | `crush_session.test.cjs`; core-message/tool/refusal/accounting cases are synthetic, not live-run coverage. |
 
 The AGY smoke workflow failed its checker after successful inference. Its v1.3.1
 native stream exposes `conversation_id` and `step_index`, not string tool-call
@@ -1351,6 +1393,24 @@ Usage observations retain their available `sessionId` and `stepIndex` without
 fabricated request IDs.
 Its `input_tokens` excludes cache-read tokens. An authentication receipt is not
 evidence of successfully parsed inference content.
+
+The two modern Aider traces reconcile exactly through native output, the declared
+parser, canonical persistence, and unified projection. The older rate-limit run
+supplies nine startup diagnostic blocks, not reconstructed messages or exact
+accounting from rounded token/cost prose. Pinned v0.86.2 response hooks cover the
+nonstreaming profile; a normal `main()` return of `None` does not supply terminal
+success. Native reasoning, refusals, and tool-exception hook cases were absent
+from the inspected traces.
+
+Cursor's failed workflow failed its token-usage assertion, and Kiro's failed
+workflow failed secret redaction; neither establishes a failed inference
+process. Sampled Kiro stdout exposes no native prompts, reasoning, refusals,
+tool outputs, token usage, IDs, or timestamps. Crush's job timeout conflicts with
+its persisted exit code zero and execution state `started`; parsers retain those
+observations without inventing a terminal outcome. No successful executed Crush
+conversation was inspected. Pydantic AI and the generic-custom audit sessions
+were archived before a completed handoff; this audit does not establish their
+conformance.
 
 Paths in the corpus column are relative to `actions/setup/js/`. Supplemental cases
 cover features absent from the samples: Claude streaming wrappers, Codex terminal

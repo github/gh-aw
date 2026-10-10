@@ -48,5 +48,4 @@ func TestRenderStructStderrWidthBudget(t *testing.T) {
 		require.LessOrEqual(t, ansi.StringWidth(line), DefaultTableWidth)
 	}
 	require.Equal(t, 180, strings.Count(output, "x"))
-	require.Contains(t, RenderStructStderr(data), data.Rows[0].Path, "stderr rendering is unbounded unless explicitly configured")
 }

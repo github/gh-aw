@@ -6,6 +6,44 @@ const vm = require("vm");
 const { isSessionEvent, normalizeAgentSession } = require("./agent_session.cjs");
 const { ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 
+const sessionParsers = {
+  agy: ["parse_agy_log.cjs", "parseAgyLog"],
+  claude: ["parse_claude_log.cjs", "parseClaudeLog"],
+  copilot: ["parse_copilot_log.cjs", "parseCopilotLog"],
+  codex: ["parse_codex_log.cjs", "parseCodexLog"],
+  gemini: ["parse_gemini_log.cjs", "parseGeminiLog"],
+  pi: ["parse_pi_log.cjs", "parsePiLog"],
+  kiro: ["parse_kiro_log.cjs", "parseKiroLog"],
+  "deepseek-harness": ["parse_deepseek_log.cjs", "parseDeepSeekLog"],
+  "pydantic-ai": ["parse_pydantic_log.cjs", "parsePydanticLog"],
+  opencode: ["parse_opencode_log.cjs", "parseOpenCodeLog"],
+  goose: ["parse_goose_log.cjs", "parseGooseLog"],
+  custom: ["parse_custom_log.cjs", "parseCustomLog"],
+};
+
+/** @param {string} content @param {string} engine @returns {any} */
+function parseEngineLog(content, engine) {
+  const known = Object.hasOwn(sessionParsers, engine);
+  const [moduleName, functionName] = known ? sessionParsers[engine] : sessionParsers.custom;
+  const parse = require(`./${moduleName}`)[functionName];
+  return known ? parse(content) : parse(content, engine);
+}
+
+/**
+ * Apply an engine adapter's saved-observation migration, if it owns one.
+ * Unchanged observations remain unprojected; the callback handles only migrations.
+ * @param {any[]} entries
+ * @param {string} engine
+ * @param {(event: import("./types/agent_session").SessionEvent) => import("./types/agent_session").SessionEvent} [mapEvent]
+ * @returns {any[]}
+ */
+function normalizeEngineSessionEvents(entries, engine, mapEvent) {
+  if (!Object.hasOwn(sessionParsers, engine)) return entries;
+  const [moduleName] = sessionParsers[engine];
+  const normalize = require(`./${moduleName}`).normalizeSessionEvents;
+  return typeof normalize === "function" ? normalize(entries, mapEvent) : entries;
+}
+
 /** @param {string} filename @returns {string} */
 function readEngineParserDefinition(filename) {
   try {
@@ -81,6 +119,7 @@ function loadEngineLogParser(engine) {
  * @returns {import("./types/agent_session").SessionEvent[]}
  */
 function normalizeEngineLogEntries(entries, engine) {
+  entries = normalizeEngineSessionEvents(entries, engine);
   const events = [];
   const tools = new Map();
   for (const entry of entries) {
@@ -169,4 +208,4 @@ function parseBehaviorLog(content, engine) {
   return { ...parsed, logEntries };
 }
 
-module.exports = { loadEngineLogParser, normalizeEngineLogEntries, parseBehaviorLog };
+module.exports = { loadEngineLogParser, normalizeEngineLogEntries, normalizeEngineSessionEvents, parseEngineLog, parseBehaviorLog };

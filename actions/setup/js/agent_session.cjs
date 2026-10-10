@@ -572,7 +572,12 @@ function observedSessionModel(events, { includeNested = false } = {}) {
   let model;
   for (const event of events) {
     if (!includeNested && sessionContext(event).parentToolUseId) continue;
-    const value = event?.type === "system" && event.subtype === "init" ? event.model : ["session.init", "session.start", "pi.message_snapshot"].includes(event?.type) ? event.data?.model : undefined;
+    const value =
+      event?.type === "system" && event.subtype === "init"
+        ? event.model
+        : ["session.init", "session.start", "pi.message_snapshot"].includes(event?.type) || (event?.type === "session.info" && event.data?.sourceType === "message_snapshot")
+          ? event.data?.model
+          : undefined;
     if (typeof value === "string" && value.length) model = value;
   }
   return model;

@@ -114,6 +114,101 @@ func TestSessionsDownloadUsageFirst(t *testing.T) {
 	require.NotContains(t, string(commands), "--name agent")
 }
 
+func TestSessionsDownloadNormalizesPublishedPiObservations(t *testing.T) {
+	for _, format := range []string{"jsonl", "markdown"} {
+		t.Run(format, func(t *testing.T) {
+			requireSessionTestNode(t)
+			content := sessionTestHeader +
+				`{"type":"pi.message_snapshot","data":{"sourceEngine":"p\u0069","role":"assistant","model":"reported","usage":{"input":0,"output":2}},"id":"snapshot","timestamp":0,"provenance":{"component":"agent","phase":"agent","path":"agent-session.jsonl","index":0}}` + "\n" +
+				sessionTestAgentEvent +
+				`{"type":"pi.tool_execution_update","data":{"toolCallId":"call","input":false,"partialResult":0},"provenance":{"component":"agent","phase":"agent","path":"agent-session.jsonl","index":2}}` + "\n" +
+				`{"type":"pi.agent_settled","data":{},"provenance":{"component":"agent","phase":"agent","path":"agent-session.jsonl","index":3}}` + "\n" +
+				`{"type":"session.result","data":{"numTurns":1,"usage":{"inputTokens":0,"outputTokens":2}},"provenance":{"component":"agent","phase":"agent","path":"agent-session.jsonl","index":4}}` + "\n" +
+				`{"type":"pi.future_extension","data":{"opaque":[false,0,null]},"provenance":{"component":"agent","phase":"agent","path":"agent-session.jsonl","index":5}}` + "\n"
+			calls := installSessionTestGH(t, map[string]map[string]string{
+				"usage": {"aw_session.jsonl": content},
+				"info":  {"aw_info.json": `{"engine_id":"pi"}`},
+				"agent": {"agent-session.jsonl": "must not be read"},
+			})
+			output, err := executeSessionTestCommand(t, "123", "--repo", "owner/repo", "--format", format)
+			require.NoError(t, err)
+			require.NotContains(t, output, "pi.message_snapshot")
+			require.NotContains(t, output, "pi.tool_execution_update")
+			require.NotContains(t, output, "pi.agent_settled")
+			require.Contains(t, output, "session.info")
+			require.Contains(t, output, "tool.execution_update")
+			require.Contains(t, output, "session.idle")
+			require.Contains(t, output, "pi.future_extension")
+			if format == "jsonl" {
+				require.Equal(t, 1, strings.Count(output, "Session download works."))
+				require.NoError(t, validateSessionJSONL([]byte(output)))
+				require.Contains(t, output, `"usageSnapshot":{"input":0,"output":2}`)
+				require.Contains(t, output, `"input":false,"output":0`)
+				require.Contains(t, output, `"id":"snapshot","timestamp":0`)
+				require.Contains(t, output, `"numTurns":1`)
+			} else {
+				// The existing renderer includes both the conversation and timeline.
+				require.Equal(t, 2, strings.Count(output, "Session download works."))
+			}
+			commands, err := os.ReadFile(calls)
+			require.NoError(t, err)
+			require.Contains(t, string(commands), "--name info")
+			require.NotContains(t, string(commands), "--name agent")
+		})
+	}
+}
+
+func TestSessionsDownloadOpaquePiObservationsDoNotRequireNode(t *testing.T) {
+	for _, event := range []string{
+		`{"type":"pi.future_extension","data":{"opaque":[false,0,null]},"provenance":{"component":"agent"}}`,
+		`{"type":"pi.message_snapshot","data":{"sourceEngine":"copilot","role":"assistant"},"provenance":{"component":"agent"}}`,
+		`{"type":"pi.message_snapshot","data":{"sourceEngine":null,"role":"assistant"},"provenance":{"component":"agent"}}`,
+		`{"type":"pi.message_snapshot","data":{"sourceEngine":["pi"],"role":"assistant"},"provenance":{"component":"agent"}}`,
+	} {
+		content := sessionTestHeader + event + "\n"
+		calls := installSessionTestGH(t, map[string]map[string]string{
+			"usage": {"aw_session.jsonl": content},
+			"info":  {"aw_info.json": `{"engine_id":"pi"}`},
+		})
+		require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(calls), "node"), []byte("#!/bin/sh\nexit 1\n"), constants.FilePermExecutable))
+		output, err := executeSessionTestCommand(t, "123", "--repo", "owner/repo")
+		require.NoError(t, err)
+		require.Equal(t, content, output)
+		commands, err := os.ReadFile(calls)
+		require.NoError(t, err)
+		require.NotContains(t, string(commands), "--name info")
+	}
+}
+
+func TestSessionsDownloadPiNormalizationRequiresTrustedMetadata(t *testing.T) {
+	for _, engine := range []string{"copilot", "aider", ""} {
+		t.Run(engine, func(t *testing.T) {
+			content := sessionTestHeader + `{"type":"pi.message_snapshot","data":{"role":"assistant","model":"untrusted","sourceEngine":"pi"},"provenance":{"component":"agent"}}` + "\n"
+			artifacts := map[string]map[string]string{"usage": {"aw_session.jsonl": content}}
+			if engine != "" {
+				artifacts["info"] = map[string]string{"aw_info.json": `{"engine_id":"` + engine + `"}`}
+			}
+			calls := installSessionTestGH(t, artifacts)
+			require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(calls), "node"), []byte("#!/bin/sh\nexit 1\n"), constants.FilePermExecutable))
+			output, err := executeSessionTestCommand(t, "123", "--repo", "owner/repo")
+			require.NoError(t, err)
+			require.Equal(t, content, output)
+		})
+	}
+}
+
+func TestSessionsDownloadReportsPiNormalizerFailure(t *testing.T) {
+	content := sessionTestHeader + `{"type":"pi.message_snapshot","data":{"role":"assistant"},"provenance":{"component":"agent"}}` + "\n"
+	calls := installSessionTestGH(t, map[string]map[string]string{
+		"usage": {"aw_session.jsonl": content},
+		"info":  {"aw_info.json": `{"engine_id":"pi"}`},
+	})
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(calls), "node"), []byte("#!/bin/sh\necho 'normalizer unavailable' >&2\nexit 1\n"), constants.FilePermExecutable))
+	_, err := executeSessionTestCommand(t, "123", "--repo", "owner/repo")
+	require.ErrorContains(t, err, `failed to normalize published session for engine "pi"`)
+	require.ErrorContains(t, err, "normalizer unavailable")
+}
+
 func TestSessionsDownloadReconstructs(t *testing.T) {
 	for _, usagePresent := range []bool{true, false} {
 		for _, format := range []string{"jsonl", "markdown"} {

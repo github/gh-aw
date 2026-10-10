@@ -95,6 +95,10 @@ function getValidationMarkerPath(kind, memoryId) {
   return path.join(os.tmpdir(), "gh-aw", "memory-validation", `${sanitizeID(kind)}-${sanitizeID(memoryId)}.ok`);
 }
 
+function getRepoMemoryBaselinePath(memoryId) {
+  return path.join(os.tmpdir(), "gh-aw", "memory-validation", `repo-baseline-${sanitizeID(memoryId)}.json`);
+}
+
 /**
  * @param {string} kind
  * @param {string} memoryId
@@ -213,6 +217,7 @@ function memoryTreeDigest(dirPath) {
       const fullPath = path.join(currentDir, entry.name);
       const relativePath = path.relative(dirPath, fullPath).replace(/\\/g, "/");
       if (entry.isDirectory()) {
+        if (relativePath === ".git") continue;
         hash.update(`directory\0${relativePath}\0`);
         visit(fullPath);
       } else if (entry.isFile()) {
@@ -719,6 +724,7 @@ module.exports = {
   DEFAULT_VALIDATION_TIMEOUT_SECONDS,
   clearValidationMarker,
   formatJSONFiles,
+  getRepoMemoryBaselinePath,
   getValidationMarkerPath,
   memoryTreeDigest,
   validateMemoryJSONSchemas,

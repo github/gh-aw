@@ -30,7 +30,9 @@ Reconstructed sessions include only evidence present in the downloaded artifacts
 
 Writes JSONL to standard output by default. Use --format markdown for a
 privacy-preserving summary, or --output to write the text to a file.
-Node.js is required for reconstruction and Markdown rendering.`,
+Known historical Pi observations are normalized when trusted run metadata identifies
+the Pi engine. Unknown extensions and other-engine sessions remain unchanged.
+Node.js is required for reconstruction, Pi normalization, and Markdown rendering.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` sessions download 1234567890
   ` + string(constants.CLIExtensionPrefix) + ` sessions download 1234567890 --repo owner/repo --format markdown
   ` + string(constants.CLIExtensionPrefix) + ` sessions download https://github.com/owner/repo/actions/runs/1234567890 -o session.jsonl`,
