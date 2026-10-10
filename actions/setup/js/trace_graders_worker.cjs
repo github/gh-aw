@@ -27,7 +27,7 @@ async function main() {
   try {
     const script = String(payload.script || "");
 
-    const sandbox = {
+    const sandbox = Object.assign(Object.create(null), {
       __payload: JSON.stringify({
         trace: payload.trace || {},
         run: { graderCount: Number(payload.graderCount) || 0 },
@@ -44,13 +44,14 @@ async function main() {
       undefined,
       NaN,
       Infinity,
-    };
+    });
     const context = vm.createContext(sandbox, { codeGeneration: { strings: false, wasm: false } });
     const timeoutMs = Number(payload.timeoutMs) || 5000;
 
     vm.runInContext(
       `
         "use strict";
+        (() => {
         const root = globalThis;
         const deepFreeze = value => {
           if (value === null || typeof value !== "object") return value;
@@ -108,6 +109,7 @@ async function main() {
           enumerable: false,
           configurable: false
         });
+        })();
       `,
       context,
       { timeout: 1000, filename: "grader:bootstrap" }

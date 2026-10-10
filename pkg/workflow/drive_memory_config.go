@@ -139,6 +139,9 @@ func parseDriveMemoryEntry(raw map[string]any, defaultID string) (DriveMemoryEnt
 	if len(entry.AllowedExtensions) == 0 {
 		entry.AllowedExtensions = constants.DefaultAllowedMemoryExtensions
 	}
+	if err := validateMemorySchemaTargets(entry.Validation, entry.AllowedExtensions, nil, "tools.drive-memory.validation"); err != nil {
+		return entry, err
+	}
 	return entry, nil
 }
 

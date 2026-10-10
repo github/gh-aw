@@ -555,9 +555,45 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
   describe("runCustomGrader sandbox", () => {
     const meta = { name: "test", unit: "", direction: "", source: "inline" };
 
+    it("selects the supported permission flag", () => {
+      const cp = require("child_process");
+      const originalFlags = process.allowedNodeEnvironmentFlags;
+      for (const flag of ["--permission", "--experimental-permission"]) {
+        process.allowedNodeEnvironmentFlags = new Set([flag]);
+        const spawn = vi.spyOn(cp, "spawnSync").mockReturnValue({ status: 0, stdout: '{"ok":true,"value":1}' });
+        try {
+          expect(runCustomGrader("test", "return 1", makeTrace(), meta).value).toBe(1);
+          expect(spawn.mock.calls[0][1][0]).toBe(flag);
+          expect(spawn.mock.calls[0][1][1]).toBe(`--allow-fs-read=${spawn.mock.calls[0][1][2]}`);
+        } finally {
+          process.allowedNodeEnvironmentFlags = originalFlags;
+          spawn.mockRestore();
+        }
+      }
+    });
+
+    it("fails closed when the permission model is unavailable", () => {
+      const originalFlags = process.allowedNodeEnvironmentFlags;
+      process.allowedNodeEnvironmentFlags = new Set();
+      try {
+        const result = runCustomGrader("test", "return 1", makeTrace(), meta);
+        expect(result.status).toBe("error");
+        expect(result.value).toBeNull();
+        expect(result.error).toContain("install Node.js 20 or newer");
+      } finally {
+        process.allowedNodeEnvironmentFlags = originalFlags;
+      }
+    });
+
     it("cannot access process or require", () => {
       const result = runCustomGrader("test", "return typeof process === 'undefined' && typeof require === 'undefined' ? 1 : 0", makeTrace(), meta);
       expect(result.value).toBe(1);
+      expect(result.status).toBe("pass");
+    });
+
+    it("does not expose the bootstrap global's host constructor", () => {
+      const result = runCustomGrader("test", 'try { return typeof root.constructor.constructor("return process")() === "object" ? 1 : 0; } catch { return 0; }', makeTrace(), meta);
+      expect(result.value).toBe(0);
       expect(result.status).toBe("pass");
     });
 

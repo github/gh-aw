@@ -312,10 +312,17 @@ func addPushRepoMemoryConfig(safeOutputsConfig map[string]any, repoMemoryConfig 
 			memoryConfig["format_json"] = true
 		}
 		if memory.Validation != nil {
-			memoryConfig["validation"] = map[string]any{
-				"script":  memory.Validation.Script,
-				"timeout": memoryValidationTimeoutSeconds(memory.Validation),
+			validationConfig := map[string]any{}
+			if memory.Validation.Script != "" {
+				validationConfig["script"] = memory.Validation.Script
+				validationConfig["script_required"] = true
 			}
+			if len(memory.Validation.JSONSchemas) > 0 {
+				validationConfig["json_schemas"] = memory.Validation.JSONSchemas
+				validationConfig["json_schemas_required"] = true
+			}
+			validationConfig["timeout"] = memoryValidationTimeoutSeconds(memory.Validation)
+			memoryConfig["validation"] = validationConfig
 		}
 		memories = append(memories, memoryConfig)
 	}

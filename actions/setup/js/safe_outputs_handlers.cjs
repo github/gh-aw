@@ -1877,13 +1877,37 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const allowedExtensions = Array.isArray(memoryConf.allowed_extensions) ? memoryConf.allowed_extensions : [];
     const fileGlobFilter = typeof memoryConf.file_glob === "string" ? memoryConf.file_glob : "";
     const validationConfig = memoryConf.validation || null;
-    const validationScript = validationConfig && typeof validationConfig.script === "string" ? validationConfig.script : "";
+    const hasValidationScript = validationConfig && Object.prototype.hasOwnProperty.call(validationConfig, "script");
+    const hasJSONSchemas = validationConfig && Object.prototype.hasOwnProperty.call(validationConfig, "json_schemas");
+    const scriptRequired = validationConfig?.script_required === true;
+    const schemasRequired = validationConfig?.json_schemas_required === true;
+    const validationScript = hasValidationScript && typeof validationConfig.script === "string" ? validationConfig.script : "";
+    const jsonSchemas = hasJSONSchemas ? validationConfig.json_schemas : undefined;
     const validationTimeoutSeconds = validationConfig && Number.isFinite(validationConfig.timeout) ? validationConfig.timeout : undefined;
     // The effective limit is max_patch_size × 1.2, matching the push gate in push_repo_memory.cjs.
     // This catches cases where total memory content is close to or exceeds the push diff limit.
     const effectiveMaxPatchSize = Math.floor(maxPatchSize * 1.2);
 
+    if (validationConfig && (typeof validationConfig !== "object" || Array.isArray(validationConfig))) {
+      return buildIntentErrorResponse(`Repo-memory validation configuration for '${memoryId}' is malformed.`);
+    }
+    if (hasValidationScript && (typeof validationConfig.script !== "string" || !validationConfig.script)) {
+      return buildIntentErrorResponse(`Repo-memory validation script configuration for '${memoryId}' is malformed.`);
+    }
+    if (scriptRequired && !hasValidationScript) {
+      return buildIntentErrorResponse(`Repo-memory validation script configuration for '${memoryId}' is missing.`);
+    }
     if (!fs.existsSync(memoryDir)) {
+      if (hasJSONSchemas || schemasRequired) {
+        const missingFileValidation = runCustomMemoryValidation({
+          jsonSchemas,
+          requireJSONSchemas: true,
+          memoryDir,
+          memoryId,
+          kind: "repo",
+        });
+        return buildIntentErrorResponse(`Repo-memory schema validation failed for '${memoryId}': ${missingFileValidation.stderr}`);
+      }
       return {
         content: [
           {
@@ -2077,6 +2101,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       try {
         customValidation = runCustomMemoryValidation({
           script: validationScript,
+          jsonSchemas,
+          requireJSONSchemas: Boolean(hasJSONSchemas || schemasRequired),
           memoryDir: validationDir,
           memoryId,
           kind: "repo",
@@ -2097,7 +2123,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
               type: "text",
               text: JSON.stringify({
                 result: "error",
-                error: `Custom repo-memory validation failed for '${memoryId}': ${reason}.`,
+                error: `Repo-memory validation failed for '${memoryId}': ${reason}.`,
                 storage_validation: {
                   result: "success",
                   message: `Storage validation passed: ${files.length} file(s), ${totalSizeKb} KB total content, ${patchSizeKb} KB patch diff (${patchSizeBytes} bytes).`,

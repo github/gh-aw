@@ -54,7 +54,7 @@ function deepFreeze(value) {
 }
 
 function runInline(grader, trace) {
-  const sandbox = {
+  const sandbox = Object.assign(Object.create(null), {
     __payload: JSON.stringify({
       trace,
       run: { graderCount: 1 },
@@ -68,7 +68,7 @@ function runInline(grader, trace) {
     global: undefined,
     Function: undefined,
     eval: undefined,
-  };
+  });
   const context = vm.createContext(sandbox, { codeGeneration: { strings: false, wasm: false } });
   vm.runInContext(
     `(() => {
@@ -111,11 +111,17 @@ function runInline(grader, trace) {
     filename: `grader:${grader.id}`,
   });
   context.__grader = fn;
-  const result = vm.runInContext("JSON.stringify({ raw: __grader(trace, run, workflow, config, helpers, __math) })", context, {
-    timeout: 5000,
-    filename: `grader:${grader.id}:invoke`,
-  });
-  return JSON.parse(result).raw;
+  const result = vm.runInContext(
+    `(() => {
+      const raw = __grader(trace, run, workflow, config, helpers, __math);
+      const value = raw !== null && typeof raw === "object" && Object.hasOwn(raw, "value") ? raw.value : raw;
+      return JSON.stringify(typeof value === "number" && !Number.isFinite(value) ? { nonFinite: String(value) } : { raw });
+    })()`,
+    context,
+    { timeout: 5000, filename: `grader:${grader.id}:invoke` }
+  );
+  const parsed = JSON.parse(result);
+  return Object.hasOwn(parsed, "nonFinite") ? Number(parsed.nonFinite) : parsed.raw;
 }
 
 function normalize(grader, raw) {

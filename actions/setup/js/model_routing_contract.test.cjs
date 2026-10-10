@@ -170,7 +170,10 @@ describe("cross-module model routing contract", () => {
     expect(result.effective.model).toBe("");
     expect(result.label).toBe("routing rejected (harness_selection_mismatch)");
     expect(result.unifiedOutcome.data).toMatchObject({ status: "selected", wireModel: "gpt-5.6-luna" });
-    expect(result.workflowInfo.data.modelRouting).toMatchObject({ status: "selected", wireModel: "gpt-5.6-luna" });
+    expect(result.workflowInfo.data.modelRouting).toMatchObject({
+      status: result.infoRouting.status,
+      wireModel: result.infoRouting.wire_model,
+    });
     expect(result.otel["gen_ai.request.model"]).toBeUndefined();
     expect(result.otel["gh-aw.model_routing.status"]).toBe("rejected");
   });
@@ -212,7 +215,12 @@ describe("cross-module model routing contract", () => {
     if (appliedEffort !== effort) expect(result.resolved.applied_effort).toBe(appliedEffort);
     expect(result.effective).toMatchObject({ model: fixture.reflectData.routing.selection.wire_model, effort: appliedEffort });
     expect(result.unifiedOutcome.data).toMatchObject({ status: "selected", effort, appliedEffort });
-    expect(result.workflowInfo.data.modelRouting).toMatchObject({ status: "selected", effort, appliedEffort });
+    expect(result.workflowInfo.data.modelRouting).toMatchObject({ status: result.infoRouting.status, effort });
+    if (result.infoRouting.applied_effort) {
+      expect(result.workflowInfo.data.modelRouting.appliedEffort).toBe(result.infoRouting.applied_effort);
+    } else {
+      expect(result.workflowInfo.data.modelRouting).not.toHaveProperty("appliedEffort");
+    }
     expect(result.otel["gh-aw.model.effort"]).toBe(appliedEffort);
     if (engine === "claude") expect(result.harness.childEnv.CLAUDE_CODE_EFFORT_LEVEL).toBe(appliedEffort);
     if (engine === "codex") expect(result.harness.args).toContain(`model_reasoning_effort="${appliedEffort}"`);

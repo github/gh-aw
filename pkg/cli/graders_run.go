@@ -203,6 +203,10 @@ func runJavaScriptGrader(ctx context.Context, grader graderRunDefinition, payloa
 	if err != nil {
 		return errors.New("node is required to run graders")
 	}
+	permissionFlag, err := graderNodePermissionFlag(ctx, nodePath)
+	if err != nil {
+		return err
+	}
 	script, err := os.CreateTemp("", "gh-aw-grader-run-*.cjs")
 	if err != nil {
 		return fmt.Errorf("failed to stage grader runtime: %w", err)
@@ -220,6 +224,10 @@ func runJavaScriptGrader(ctx context.Context, grader graderRunDefinition, payloa
 	if err := script.Close(); err != nil {
 		return fmt.Errorf("failed to stage grader runtime: %w", err)
 	}
+	scriptPath, err = filepath.EvalSymlinks(scriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve grader runtime path: %w", err)
+	}
 	input, err := json.Marshal(struct {
 		Grader  graderRunDefinition `json:"grader"`
 		Payload json.RawMessage     `json:"payload"`
@@ -229,7 +237,7 @@ func runJavaScriptGrader(ctx context.Context, grader graderRunDefinition, payloa
 	}
 	commandCtx, cancel := context.WithTimeout(ctx, graderJSTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(commandCtx, nodePath, "--permission", scriptPath)
+	cmd := exec.CommandContext(commandCtx, nodePath, permissionFlag, "--allow-fs-read="+scriptPath, scriptPath)
 	cmd.Env = []string{}
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stdout = output
@@ -245,6 +253,28 @@ func runJavaScriptGrader(ctx context.Context, grader graderRunDefinition, payloa
 		return fmt.Errorf("grader failed: %w", err)
 	}
 	return nil
+}
+
+func graderNodePermissionFlag(ctx context.Context, nodePath string) (string, error) {
+	probeCtx, cancel := context.WithTimeout(ctx, graderJSTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(probeCtx, nodePath, "--print",
+		`process.allowedNodeEnvironmentFlags.has("--permission") ? "--permission" : process.allowedNodeEnvironmentFlags.has("--experimental-permission") ? "--experimental-permission" : ""`)
+	cmd.Env = []string{}
+	stdout := &boundedCommandBuffer{limit: 1024}
+	stderr := &boundedCommandBuffer{limit: 1024}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to detect Node.js permission support: %w: %s", err, bytes.TrimSpace(stderr.Bytes()))
+	}
+	flag := strings.TrimSpace(stdout.String())
+	switch flag {
+	case "--permission", "--experimental-permission":
+		return flag, nil
+	default:
+		return "", errors.New("node permission support is required to run graders; install Node.js 20 or newer")
+	}
 }
 
 func runOperationalValuePayload(ctx context.Context, workflowArg string, grader graderRunDefinition, payload json.RawMessage, output io.Writer, evaluatorHost string) error {

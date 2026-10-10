@@ -1,0 +1,47 @@
+[
+  {
+    "name": "nested supported constraints",
+    "valid": true,
+    "schema": {
+      "type": "object",
+      "required": ["items"],
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": ["string", "null"],
+            "enum": ["open", "closed", null]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "supported alternatives",
+    "valid": true,
+    "schema": {
+      "anyOf": [{ "type": "string" }, { "type": "integer" }]
+    }
+  },
+  {
+    "name": "unsupported format keyword",
+    "valid": false,
+    "schema": { "type": "string", "format": "email" }
+  },
+  {
+    "name": "numeric enum integer outside JavaScript's exact range",
+    "valid": false,
+    "schema": { "enum": [9007199254740992] }
+  },
+  {
+    "name": "alternatives with sibling constraints",
+    "valid": false,
+    "schema": { "oneOf": [{ "type": "string" }], "type": "object" }
+  },
+  {
+    "name": "unsupported additional properties",
+    "valid": false,
+    "schema": { "type": "object", "additionalProperties": true }
+  }
+]
