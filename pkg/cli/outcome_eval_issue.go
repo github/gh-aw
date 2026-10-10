@@ -34,13 +34,17 @@ func evalCreateIssue(ctx context.Context, item CreatedItemReport, repoOverride s
 		return report
 	}
 
-	state, _ := data["state"].(string)
-	stateReason, _ := data["state_reason"].(string)
-	closedAt, _ := data["closed_at"].(string)
+	return classifyCreatedIssue(ctx, item, data, report)
+}
+
+func classifyCreatedIssue(ctx context.Context, item CreatedItemReport, data map[string]any, report OutcomeReport) OutcomeReport {
+	num, repo := report.ObjectNumber, report.Repo
+	state := outcomeValue[string](data["state"])
+	stateReason := outcomeValue[string](data["state_reason"])
+	closedAt := outcomeValue[string](data["closed_at"])
 
 	switch {
 	case state == "closed" && stateReason == "completed":
-		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = "completed"
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "completed")
 		if closedAt != "" && item.Timestamp != "" {
@@ -56,11 +60,9 @@ func evalCreateIssue(ctx context.Context, item CreatedItemReport, repoOverride s
 		}
 		outcomeEvalIssueLog.Printf("Issue #%d closed as not_planned, closed_by_bot=%v", num, closedByBot)
 		if closedByBot {
-			report.OutcomeStatus = OutcomeStatusLifecycle
 			report.Detail = "closed by bot (lifecycle)"
 			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusLifecycle, EvidenceMedium, "lifecycle")
 		} else {
-			report.OutcomeStatus = OutcomeStatusRejected
 			report.Detail = "closed as not planned"
 			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "closed_not_planned")
 		}

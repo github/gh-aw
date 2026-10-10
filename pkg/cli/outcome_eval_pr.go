@@ -37,10 +37,10 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 		return report
 	}
 
-	merged, _ := data["merged"].(bool)
-	state, _ := data["state"].(string)
-	mergedAt, _ := data["merged_at"].(string)
-	closedAt, _ := data["closed_at"].(string)
+	merged := outcomeValue[bool](data["merged"])
+	state := outcomeValue[string](data["state"])
+	mergedAt := outcomeValue[string](data["merged_at"])
+	closedAt := outcomeValue[string](data["closed_at"])
 
 	switch {
 	case merged:
@@ -63,6 +63,26 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 		return report
 	}
 
+	enrichPullRequestEffort(ctx, item, data, &report)
+
+	return report
+}
+
+func outcomeActivityKnown(activity []map[string]any, timestampKey string, skipPending bool) bool {
+	for _, entry := range activity {
+		if skipPending && outcomeString(entry["state"]) == "PENDING" {
+			continue
+		}
+		_, err := time.Parse(time.RFC3339, outcomeString(entry[timestampKey]))
+		if outcomeNestedString(entry["user"], "login") == "" || err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func enrichPullRequestEffort(ctx context.Context, item CreatedItemReport, data map[string]any, report *OutcomeReport) {
+	num, repo := report.ObjectNumber, report.Repo
 	comments, err := outcomeEvalPRGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", num), repo)
 	if err == nil {
 		report.HumanComments = nonBotCommentsAfter(comments, item.Timestamp)
@@ -91,7 +111,7 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 	}
 	if commitsKnown {
 		for _, commit := range commits {
-			commitData, _ := commit["commit"].(map[string]any)
+			commitData := outcomeValue[map[string]any](commit["commit"])
 			_, committerErr := time.Parse(time.RFC3339, outcomeNestedString(commitData["committer"], "date"))
 			_, authorErr := time.Parse(time.RFC3339, outcomeNestedString(commitData["author"], "date"))
 			if outcomeNestedString(commit["author"], "login") == "" || committerErr != nil && authorErr != nil {
@@ -109,18 +129,4 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 		report.ZeroTouch = timestampErr == nil && commentsKnown && reviewsKnown && commitsKnown && report.HumanComments == 0 && report.HumanReviews == 0 && report.HumanEdits == 0
 	}
 
-	return report
-}
-
-func outcomeActivityKnown(activity []map[string]any, timestampKey string, skipPending bool) bool {
-	for _, entry := range activity {
-		if skipPending && outcomeString(entry["state"]) == "PENDING" {
-			continue
-		}
-		_, err := time.Parse(time.RFC3339, outcomeString(entry[timestampKey]))
-		if outcomeNestedString(entry["user"], "login") == "" || err != nil {
-			return false
-		}
-	}
-	return true
 }

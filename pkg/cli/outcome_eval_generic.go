@@ -40,8 +40,8 @@ func evalCloseSticky(ctx context.Context, item CreatedItemReport, repoOverride s
 		return report
 	}
 
-	state, _ := data["state"].(string)
-	merged, _ := data["merged"].(bool)
+	state := outcomeValue[string](data["state"])
+	merged := outcomeValue[bool](data["merged"])
 	if state != "closed" {
 		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = "reopened"
@@ -121,13 +121,11 @@ func evalAssignMilestone(ctx context.Context, item CreatedItemReport, repoOverri
 		return report
 	}
 
-	milestone, _ := data["milestone"].(map[string]any)
+	milestone := outcomeValue[map[string]any](data["milestone"])
 	if metadataInt(milestone, "number") == expected {
-		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = "milestone still assigned"
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "milestone_assigned")
 	} else {
-		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = "milestone removed"
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceMedium, "milestone_removed")
 	}
@@ -175,13 +173,12 @@ func evalMarkReady(ctx context.Context, item CreatedItemReport, repoOverride str
 		}
 	}
 	if reviewed {
-		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = fmt.Sprintf("%d reviews submitted", len(reviews))
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "reviewed")
 	} else {
 		data, derr := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("pulls/%d", num), repo)
 		if derr == nil {
-			state, _ := data["state"].(string)
+			state := outcomeValue[string](data["state"])
 			if state == "open" {
 				report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "awaiting_review")
 				report.Detail = "awaiting review"
@@ -220,41 +217,13 @@ func evalPushToPRBranch(ctx context.Context, item CreatedItemReport, repoOverrid
 		return report
 	}
 
-	merged, _ := data["merged"].(bool)
-	state, _ := data["state"].(string)
+	merged := outcomeValue[bool](data["merged"])
+	state := outcomeValue[string](data["state"])
 	outcomeEvalGenericLog.Printf("push_to_pr_branch PR #%d state: merged=%t, state=%s", num, merged, state)
 
 	switch {
 	case merged:
-		shas := metadataStringSlice(item.Metadata, "pushed_commit_shas")
-		if sha := outcomeString(item.Metadata["commit_sha"]); sha != "" {
-			shas = append(shas, sha)
-		}
-		if len(shas) == 0 {
-			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
-			report.Detail = "missing pushed commit evidence"
-			return report
-		}
-		base := outcomeString(data["merge_commit_sha"])
-		for _, sha := range shas {
-			if !validOutcomeSHA(sha) || !validOutcomeSHA(base) {
-				report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
-				return report
-			}
-			compare, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("compare/%s...%s", sha, base), repo)
-			if err != nil {
-				outcomeAPIError(&report, err, false)
-				return report
-			}
-			status := outcomeString(compare["status"])
-			if status != "ahead" && status != "identical" {
-				report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "commit_retention_unknown")
-				report.Detail = "pushed commits not verified in merged history"
-				return report
-			}
-		}
-		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "merged")
-		report.Detail = "pushed commits merged"
+		return verifyPushedCommitRetention(ctx, item, data, report)
 	case state == "closed":
 		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = "PR closed without merge"
@@ -262,6 +231,39 @@ func evalPushToPRBranch(ctx context.Context, item CreatedItemReport, repoOverrid
 		report.OutcomeStatus = OutcomeStatusPending
 		report.Detail = "open"
 	}
+	return report
+}
+
+func verifyPushedCommitRetention(ctx context.Context, item CreatedItemReport, data map[string]any, report OutcomeReport) OutcomeReport {
+	shas := metadataStringSlice(item.Metadata, "pushed_commit_shas")
+	if sha := outcomeString(item.Metadata["commit_sha"]); sha != "" {
+		shas = append(shas, sha)
+	}
+	if len(shas) == 0 {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+		report.Detail = "missing pushed commit evidence"
+		return report
+	}
+	base := outcomeString(data["merge_commit_sha"])
+	for _, sha := range shas {
+		if !validOutcomeSHA(sha) || !validOutcomeSHA(base) {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+			return report
+		}
+		compare, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("compare/%s...%s", sha, base), report.Repo)
+		if err != nil {
+			outcomeAPIError(&report, err, false)
+			return report
+		}
+		status := outcomeString(compare["status"])
+		if status != "ahead" && status != "identical" {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "commit_retention_unknown")
+			report.Detail = "pushed commits not verified in merged history"
+			return report
+		}
+	}
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "merged")
+	report.Detail = "pushed commits merged"
 	return report
 }
 
@@ -288,13 +290,8 @@ func evalGenericSticky(ctx context.Context, item CreatedItemReport, repoOverride
 		report.EvalError = err.Error()
 		return report
 	}
-
-	report.OutcomeStatus = OutcomeStatusUnknown
 	report.Detail = "object still exists"
-	report.OutcomeEvaluation = OutcomeEvaluation{
-		OutcomeStatus:    OutcomeStatusUnknown,
-		EvidenceStrength: EvidenceWeak,
-		Signal:           "target_exists_only",
-	}
+
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "target_exists_only")
 	return report
 }

@@ -29,12 +29,61 @@ func evalDispatchWorkflow(ctx context.Context, item CreatedItemReport, repoOverr
 		Repo:      repo,
 	}
 
+	runID := dispatchOutcomeRunID(item.Metadata)
+
+	if runID <= 0 {
+		// No run ID available — workflow may not have been dispatched or ID not captured
+		report.Detail = "no run ID available; dispatch may still be queued"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceNone, "missing_run_id")
+		return report
+	}
+
+	data, err := workflowOutcomeGHAPIGet(ctx, fmt.Sprintf("actions/runs/%d", runID), repo)
+	if err != nil {
+		report.OutcomeStatus = OutcomeStatusError
+		report.EvalError = err.Error()
+		return report
+	}
+
+	status := outcomeValue[string](data["status"])
+	conclusion := outcomeValue[string](data["conclusion"])
+	outcomeEvalWorkflowLog.Printf("dispatch_workflow run %d: status=%s, conclusion=%s", runID, status, conclusion)
+
+	switch {
+	case status == "completed" && conclusion == "success":
+		report.Detail = "workflow run completed with success"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "workflow_success")
+	case status == "completed" && (conclusion == "failure" || conclusion == "timed_out" || conclusion == "cancelled" || conclusion == "action_required"):
+		// action_required means the run is blocked and requires manual intervention;
+		// treat it as rejected rather than ignored since it does not self-resolve.
+		report.Detail = "workflow run completed with " + conclusion
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "workflow_failed")
+	case status == "completed":
+		// neutral and skipped indicate the run did not contribute meaningful output.
+		report.Detail = "workflow run completed with " + conclusion
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusIgnored, EvidenceMedium, "workflow_no_effect")
+	default:
+		report.Detail = "workflow run status: " + status
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "workflow_pending")
+	}
+	return report
+}
+
+// evalUpdateDiscussion checks whether a discussion edit stuck.
+// Full evaluation requires GraphQL (same pattern as evalCloseDiscussion).
+// Until implemented, absence of an evaluator is unknown, not lack of engagement.
+// Spec: specs/safe-output-outcome-evaluation.md §12
+func evalUpdateDiscussion(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
+	return unsupportedOutcome(item, repoOverride)
+}
+
+func dispatchOutcomeRunID(metadata map[string]any) int64 {
 	// Extract run_id from metadata if available.
 	// JSON numbers unmarshal as float64; convert carefully to int64 to avoid
 	// precision loss for large GitHub run IDs (which can exceed 2^32).
 	var runID int64
-	if item.Metadata != nil {
-		if v, ok := item.Metadata["run_id"]; ok {
+	if metadata != nil {
+		if v, ok := metadata["run_id"]; ok {
 			switch id := v.(type) {
 			case float64:
 				// Guard against float64 values that cannot round-trip to int64.
@@ -51,53 +100,5 @@ func evalDispatchWorkflow(ctx context.Context, item CreatedItemReport, repoOverr
 		}
 	}
 
-	if runID <= 0 {
-		// No run ID available — workflow may not have been dispatched or ID not captured
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "no run ID available; dispatch may still be queued"
-		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceNone, "missing_run_id")
-		return report
-	}
-
-	data, err := workflowOutcomeGHAPIGet(ctx, fmt.Sprintf("actions/runs/%d", runID), repo)
-	if err != nil {
-		report.OutcomeStatus = OutcomeStatusError
-		report.EvalError = err.Error()
-		return report
-	}
-
-	status, _ := data["status"].(string)
-	conclusion, _ := data["conclusion"].(string)
-	outcomeEvalWorkflowLog.Printf("dispatch_workflow run %d: status=%s, conclusion=%s", runID, status, conclusion)
-
-	switch {
-	case status == "completed" && conclusion == "success":
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = "workflow run completed with success"
-		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "workflow_success")
-	case status == "completed" && (conclusion == "failure" || conclusion == "timed_out" || conclusion == "cancelled" || conclusion == "action_required"):
-		// action_required means the run is blocked and requires manual intervention;
-		// treat it as rejected rather than ignored since it does not self-resolve.
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "workflow run completed with " + conclusion
-		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "workflow_failed")
-	case status == "completed":
-		// neutral and skipped indicate the run did not contribute meaningful output.
-		report.OutcomeStatus = OutcomeStatusIgnored
-		report.Detail = "workflow run completed with " + conclusion
-		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusIgnored, EvidenceMedium, "workflow_no_effect")
-	default:
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "workflow run status: " + status
-		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "workflow_pending")
-	}
-	return report
-}
-
-// evalUpdateDiscussion checks whether a discussion edit stuck.
-// Full evaluation requires GraphQL (same pattern as evalCloseDiscussion).
-// Until implemented, absence of an evaluator is unknown, not lack of engagement.
-// Spec: specs/safe-output-outcome-evaluation.md §12
-func evalUpdateDiscussion(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
-	return unsupportedOutcome(item, repoOverride)
+	return runID
 }

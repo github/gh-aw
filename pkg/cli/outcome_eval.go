@@ -151,38 +151,7 @@ func ComputeOutcomeSummary(reports []OutcomeReport, mapping *github.ObjectiveMap
 	var times []float64
 	for _, r := range reports {
 		eval := normalizeOutcomeEvaluation(r)
-		switch eval.OutcomeStatus {
-		case OutcomeStatusAccepted:
-			s.Accepted++
-			switch eval.EvidenceStrength {
-			case EvidenceStrong:
-				s.AcceptedStrong++
-			case EvidenceMedium:
-				s.AcceptedMedium++
-			case EvidenceWeak:
-				s.AcceptedWeak++
-			}
-			if r.ZeroTouch {
-				s.ZeroTouch++
-			}
-		case OutcomeStatusRejected:
-			s.Rejected++
-		case OutcomeStatusIgnored:
-			s.Ignored++
-		case OutcomeStatusPending:
-			s.Pending++
-		case OutcomeStatusUnknown:
-			s.Unknown++
-		}
-		if eval.Signal == "target_exists_only" {
-			s.FallbackExistsOnlyCount++
-		}
-		switch eval.OutcomeStatus {
-		case OutcomeStatusLifecycle, OutcomeStatusLifecycleClose:
-			s.Lifecycle++
-		case OutcomeStatusError:
-			s.Errors++
-		}
+		s.countOutcome(r, eval)
 		if r.TimeToOutcomeHours > 0 {
 			times = append(times, r.TimeToOutcomeHours)
 		}
@@ -221,9 +190,9 @@ func ComputeOutcomeSummary(reports []OutcomeReport, mapping *github.ObjectiveMap
 // escapeOwnerRepo URL-path-encodes each component of an "owner/repo" string to
 // prevent path traversal when the value is interpolated into an API URL.
 func escapeOwnerRepo(ownerRepo string) string {
-	parts := strings.SplitN(ownerRepo, "/", 2)
-	if len(parts) == 2 {
-		return url.PathEscape(parts[0]) + "/" + url.PathEscape(parts[1])
+	owner, repo, found := strings.Cut(ownerRepo, "/")
+	if found {
+		return strings.Join([]string{url.PathEscape(owner), url.PathEscape(repo)}, "/")
 	}
 	return url.PathEscape(ownerRepo)
 }
@@ -385,9 +354,10 @@ func parseRepoFromURL(url string) string {
 	if !found {
 		return ""
 	}
-	parts := strings.SplitN(rest, "/", 3)
-	if len(parts) >= 2 {
-		return parts[0] + "/" + parts[1]
+	owner, tail, found := strings.Cut(rest, "/")
+	if found {
+		repo, _, _ := strings.Cut(tail, "/")
+		return strings.Join([]string{owner, repo}, "/")
 	}
 	return ""
 }
@@ -544,15 +514,15 @@ func loadPullRequestIntentData(ctx context.Context, report OutcomeReport, repo s
 	if err != nil {
 		return intent.PullRequestData{}, err
 	}
-	data, _ := result["data"].(map[string]any)
-	repository, _ := data["repository"].(map[string]any)
-	pullRequest, _ := repository["pullRequest"].(map[string]any)
+	data := outcomeValue[map[string]any](result["data"])
+	repository := outcomeValue[map[string]any](data["repository"])
+	pullRequest := outcomeValue[map[string]any](repository["pullRequest"])
 	prData := intent.PullRequestData{URL: report.ObjectURL}
 	if nodeID, ok := pullRequest["id"].(string); ok {
 		prData.NodeID = nodeID
 	}
-	closingRefs, _ := pullRequest["closingIssuesReferences"].(map[string]any)
-	nodes, _ := closingRefs["nodes"].([]any)
+	closingRefs := outcomeValue[map[string]any](pullRequest["closingIssuesReferences"])
+	nodes := outcomeValue[[]any](closingRefs["nodes"])
 	if len(nodes) == 0 {
 		labels, labelErr := objectiveMappingGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/labels", report.ObjectNumber), repo)
 		if labelErr != nil {
@@ -562,30 +532,14 @@ func loadPullRequestIntentData(ctx context.Context, report OutcomeReport, repo s
 		return prData, nil
 	}
 
-	prData.ClosingIssues = make([]intent.RootReference, 0, len(nodes))
-	for _, node := range nodes {
-		rootNode, _ := node.(map[string]any)
-		root := intent.RootReference{Type: "issue"}
-		if nodeID, ok := rootNode["id"].(string); ok {
-			root.NodeID = nodeID
-		}
-		if url, ok := rootNode["url"].(string); ok {
-			root.URL = url
-		}
-		if labels, ok := rootNode["labels"].(map[string]any); ok {
-			if labelNodes, ok := labels["nodes"].([]any); ok {
-				root.Labels = labelsToStringsFromNodes(labelNodes)
-			}
-		}
-		prData.ClosingIssues = append(prData.ClosingIssues, root)
-	}
+	prData.ClosingIssues = outcomeClosingIssueReferences(nodes)
 
 	return prData, nil
 }
 
 func labelsToStringsFromNodes(nodes []any) []string {
 	return collectLabelNames(nodes, func(node any) (string, bool) {
-		labelMap, _ := node.(map[string]any)
+		labelMap := outcomeValue[map[string]any](node)
 		name, ok := labelMap["name"].(string)
 		return name, ok
 	})
@@ -610,4 +564,63 @@ func collectLabelNames[T any](labels []T, nameOf func(T) (string, bool)) []strin
 		}
 	}
 	return result
+}
+
+func (s *OutcomeSummary) countOutcome(r OutcomeReport, eval OutcomeEvaluation) {
+	switch eval.OutcomeStatus {
+	case OutcomeStatusAccepted:
+		s.Accepted++
+		switch eval.EvidenceStrength {
+		case EvidenceStrong:
+			s.AcceptedStrong++
+		case EvidenceMedium:
+			s.AcceptedMedium++
+		case EvidenceWeak:
+			s.AcceptedWeak++
+		}
+		if r.ZeroTouch {
+			s.ZeroTouch++
+		}
+	case OutcomeStatusRejected:
+		s.Rejected++
+	case OutcomeStatusIgnored:
+		s.Ignored++
+	case OutcomeStatusPending:
+		s.Pending++
+	case OutcomeStatusUnknown:
+		s.Unknown++
+	}
+	if eval.Signal == "target_exists_only" {
+		s.FallbackExistsOnlyCount++
+	}
+	switch eval.OutcomeStatus {
+	case OutcomeStatusLifecycle, OutcomeStatusLifecycleClose:
+		s.Lifecycle++
+	case OutcomeStatusError:
+		s.Errors++
+	}
+
+}
+
+func outcomeClosingIssueReferences(nodes []any) []intent.RootReference {
+	var prData intent.PullRequestData
+	prData.ClosingIssues = make([]intent.RootReference, 0, len(nodes))
+	for _, node := range nodes {
+		rootNode := outcomeValue[map[string]any](node)
+		root := intent.RootReference{Type: "issue"}
+		if nodeID, ok := rootNode["id"].(string); ok {
+			root.NodeID = nodeID
+		}
+		if url, ok := rootNode["url"].(string); ok {
+			root.URL = url
+		}
+		if labels, ok := rootNode["labels"].(map[string]any); ok {
+			if labelNodes, ok := labels["nodes"].([]any); ok {
+				root.Labels = labelsToStringsFromNodes(labelNodes)
+			}
+		}
+		prData.ClosingIssues = append(prData.ClosingIssues, root)
+	}
+
+	return prData.ClosingIssues
 }

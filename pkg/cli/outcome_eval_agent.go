@@ -33,8 +33,8 @@ func evalAssignToAgent(ctx context.Context, item CreatedItemReport, repoOverride
 		if !outcomeAfter(at, item.Timestamp) {
 			continue
 		}
-		source, _ := event["source"].(map[string]any)
-		issue, _ := source["issue"].(map[string]any)
+		source := outcomeValue[map[string]any](event["source"])
+		issue := outcomeValue[map[string]any](source["issue"])
 		if issue["pull_request"] == nil {
 			continue
 		}
@@ -51,7 +51,7 @@ func evalAssignToAgent(ctx context.Context, item CreatedItemReport, repoOverride
 			outcomeAPIError(&report, err, false)
 			return report
 		}
-		if merged, _ := pr["merged"].(bool); merged {
+		if outcomeValue[bool](pr["merged"]) {
 			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "merged")
 		} else if outcomeString(pr["state"]) == "closed" {
 			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "closed_without_merge")

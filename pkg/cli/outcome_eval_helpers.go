@@ -22,7 +22,7 @@ func countHumanComments(comments []map[string]any) int {
 func countHumanCommentsAfter(comments []map[string]any, createdAt string) int {
 	count := 0
 	for _, comment := range comments {
-		commentCreatedAt, _ := comment["created_at"].(string)
+		commentCreatedAt := outcomeValue[string](comment["created_at"])
 		if commentCreatedAt > createdAt && isHumanComment(comment) {
 			count++
 		}
@@ -39,13 +39,13 @@ func isLatestCloseByBot(ctx context.Context, number int, repo string, getEvents 
 	if err != nil {
 		return false, err
 	}
-	for i := range slices.Backward(events) {
-		event, _ := events[i]["event"].(string)
+	for _, entry := range slices.Backward(events) {
+		event := outcomeValue[string](entry["event"])
 		if event != "closed" {
 			continue
 		}
-		actor, _ := events[i]["actor"].(map[string]any)
-		login, _ := actor["login"].(string)
+		actor := outcomeValue[map[string]any](entry["actor"])
+		login := outcomeValue[string](actor["login"])
 		if login == "" {
 			return false, errors.New("latest close actor is unavailable")
 		}

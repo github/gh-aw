@@ -13,6 +13,14 @@ import (
 var outcomeEvidenceGHAPIGet = ghAPIGet
 var outcomeEvidenceGHAPIGetArray = ghAPIGetArray
 
+func outcomeValue[T any](raw any) T {
+	if value, ok := raw.(T); ok {
+		return value
+	}
+	var zero T
+	return zero
+}
+
 func outcomeEvidence(status OutcomeStatus, strength EvidenceStrength, signal string) OutcomeEvaluation {
 	return OutcomeEvaluation{OutcomeStatus: status, EvidenceStrength: strength, Signal: signal}
 }
@@ -89,7 +97,7 @@ func outcomeCloseActor(ctx context.Context, number int, repo string) (bool, erro
 	var actor map[string]any
 	for _, event := range events {
 		if outcomeString(event["event"]) == "closed" {
-			actor, _ = event["actor"].(map[string]any)
+			actor = outcomeValue[map[string]any](event["actor"])
 		}
 	}
 	if outcomeString(actor["login"]) == "" {

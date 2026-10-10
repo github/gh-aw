@@ -25,13 +25,8 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 		Repo:         repo,
 	}
 	if num == 0 || repo == "" || item.BeforeState == nil || item.AfterState == nil {
-		report.OutcomeStatus = OutcomeStatusUnknown
 		report.Detail = "missing execution state"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceNone,
-			Signal:           "missing_execution_state",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
 		return report
 	}
 
@@ -43,13 +38,8 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 	removed := labelSetDiff(beforeLabels, afterLabels)
 
 	if len(added) == 0 && len(removed) == 0 {
-		report.OutcomeStatus = OutcomeStatusUnknown
 		report.Detail = "no label delta"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceNone,
-			Signal:           "no_state_delta",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "no_state_delta")
 		return report
 	}
 
@@ -67,13 +57,8 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 	removedStillAbsent := !labelSetContainsAny(currentLabels, removed)
 
 	if addedRetained && removedStillAbsent {
-		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = "label replacement retained"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "state_retained",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "state_retained")
 		return report
 	}
 
@@ -81,23 +66,13 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 	addedReverted := !labelSetContainsAny(currentLabels, added)
 	removedBack := labelSetContainsAll(currentLabels, removed)
 	if addedReverted && removedBack {
-		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = "label replacement reverted"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusRejected,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "state_reverted",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_reverted")
 		return report
 	}
-
-	report.OutcomeStatus = OutcomeStatusRejected
 	report.Detail = "label replacement replaced"
-	report.OutcomeEvaluation = OutcomeEvaluation{
-		OutcomeStatus:    OutcomeStatusRejected,
-		EvidenceStrength: EvidenceStrong,
-		Signal:           "state_replaced",
-	}
+
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_replaced")
 	return report
 }
 

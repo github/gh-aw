@@ -40,8 +40,41 @@ func evalAddComment(ctx context.Context, item CreatedItemReport, repoOverride st
 		return report
 	}
 
+	return classifyComment(ctx, item, data, report, issueNumber)
+}
+
+// extractCommentID extracts the numeric comment ID from a GitHub comment URL.
+// Handles formats like:
+//
+//	https://github.com/owner/repo/issues/123#issuecomment-456789
+//	https://github.com/owner/repo/pull/123#issuecomment-456789
+func extractCommentID(url string) string {
+	if _, after, found := strings.Cut(url, "#issuecomment-"); found {
+		return after
+	}
+	// Fallback: look for /comments/ID pattern
+	const commentsPrefix = "/comments/"
+	if idx := strings.LastIndex(url, commentsPrefix); idx >= 0 {
+		rest := url[idx+len(commentsPrefix):]
+		// Take only digits
+		end := len(rest)
+		for i, digit := range rest {
+			if digit < '0' || digit > '9' {
+				end = i
+				break
+			}
+		}
+		if end > 0 {
+			return rest[:end]
+		}
+	}
+	return ""
+}
+
+func classifyComment(ctx context.Context, item CreatedItemReport, data map[string]any, report OutcomeReport, issueNumber int) OutcomeReport {
+	repo := report.Repo
 	// Check reactions
-	reactions, _ := data["reactions"].(map[string]any)
+	reactions := outcomeValue[map[string]any](data["reactions"])
 	totalReactions := 0
 	if reactions != nil {
 		if tc, ok := reactions["total_count"].(float64); ok {
@@ -59,7 +92,7 @@ func evalAddComment(ctx context.Context, item CreatedItemReport, repoOverride st
 	if issueNumber > 0 {
 		commentList, cerr := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", issueNumber), repo)
 		if cerr == nil {
-			createdAt, _ := data["created_at"].(string)
+			createdAt := outcomeValue[string](data["created_at"])
 			replyCount = nonBotCommentsAfter(commentList, createdAt)
 		} else if totalReactions == 0 {
 			outcomeAPIError(&report, cerr, false)
@@ -73,39 +106,12 @@ func evalAddComment(ctx context.Context, item CreatedItemReport, repoOverride st
 
 	switch {
 	case totalReactions > 0 || replyCount > 0:
-		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = fmt.Sprintf("%d reactions, %d replies", totalReactions, replyCount)
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "acted_on")
 	default:
-		report.OutcomeStatus = OutcomeStatusPending
 		report.Detail = "no follow-up"
 		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "pending")
 	}
 
 	return report
-}
-
-// extractCommentID extracts the numeric comment ID from a GitHub comment URL.
-// Handles formats like:
-//
-//	https://github.com/owner/repo/issues/123#issuecomment-456789
-//	https://github.com/owner/repo/pull/123#issuecomment-456789
-func extractCommentID(url string) string {
-	if _, after, found := strings.Cut(url, "#issuecomment-"); found {
-		return after
-	}
-	// Fallback: look for /comments/ID pattern
-	const commentsPrefix = "/comments/"
-	if idx := strings.LastIndex(url, commentsPrefix); idx >= 0 {
-		rest := url[idx+len(commentsPrefix):]
-		// Take only digits
-		end := 0
-		for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
-			end++
-		}
-		if end > 0 {
-			return rest[:end]
-		}
-	}
-	return ""
 }
