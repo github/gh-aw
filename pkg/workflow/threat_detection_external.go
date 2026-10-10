@@ -136,6 +136,9 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 			},
 		},
 	}
+	if isOTLPEnabled(data) {
+		detectionData.ExcludedEnv = append(detectionData.ExcludedEnv, otlpSandboxExcludedEnvVarNames...)
+	}
 	delete(detectionData.SandboxConfig.Agent.Images, awfImageRoleRouter)
 	if ResolveEngineID(data) == engineID {
 		detectionData.ModelMappings = data.ModelMappings
