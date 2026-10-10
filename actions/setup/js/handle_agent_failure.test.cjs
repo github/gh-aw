@@ -508,7 +508,7 @@ describe("handle_agent_failure", () => {
       { flag: "isTimedOut", expected: "[aw] Test Workflow timed out" },
       { flag: "hasToolDenialsExceeded", expected: "[aw] Test Workflow exceeded tool denial limit" },
       { flag: "hasCacheMissMisconfiguration", expected: "[aw] Test Workflow has cache-memory miss misconfiguration" },
-      { flag: "hasReportIncomplete", expected: "[aw] Test Workflow reported incomplete result (report_incomplete)" },
+      { flag: "hasReportIncomplete", expected: "[aw] Test Workflow reported incomplete result" },
       { flag: "hasMissingSafeOutputs", expected: "[aw] Test Workflow produced no safe outputs" },
       { flag: "hasMissingTool", expected: "[aw] Test Workflow is missing required tool" },
       { flag: "hasMissingData", expected: "[aw] Test Workflow is missing required data" },
@@ -537,7 +537,7 @@ describe("handle_agent_failure", () => {
     it.each([
       ["engine_outage", "[aw] Test Workflow experienced an engine outage"],
       ["request_rejection", "[aw] Test Workflow had a request rejected"],
-      ["prompt_exhaustion", "[aw] Test Workflow reported incomplete result (report_incomplete)"],
+      ["prompt_exhaustion", "[aw] Test Workflow reported incomplete result"],
     ])("uses the classified terminal-output cause %s in the issue title", (terminalOutputFailureCause, title) => {
       expect(buildFailureIssueTitle({ ...baseOptions, terminalOutputFailureCause })).toBe(title);
     });
@@ -550,7 +550,7 @@ describe("handle_agent_failure", () => {
           emptyOutputCause: "missing_terminal_safe_output",
           terminalOutputFailureCause: "prompt_exhaustion",
         })
-      ).toBe("[aw] Test Workflow reported incomplete result (report_incomplete)");
+      ).toBe("[aw] Test Workflow reported incomplete result");
     });
 
     it("prefers unknownModelAICredits over isTimedOut when both are true", () => {
@@ -1681,7 +1681,7 @@ describe("handle_agent_failure", () => {
 
       expect(createIssueMock).toHaveBeenCalledOnce();
       const createCall = createIssueMock.mock.calls[0][0];
-      expect(createCall.title).toBe("[aw] Test Workflow reported incomplete result (report_incomplete)");
+      expect(createCall.title).toBe("[aw] Test Workflow reported incomplete result");
     });
 
     it.each([
@@ -5811,7 +5811,7 @@ describe("handle_agent_failure", () => {
       };
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
-      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Test Workflow reported incomplete result (report_incomplete)" }));
+      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Test Workflow reported incomplete result" }));
       const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
       expect(categories).toContain("report_incomplete");
       expect(categories).not.toContain(reason);

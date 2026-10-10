@@ -425,7 +425,7 @@ function buildFailureIssueTitle(options) {
   if (terminalOutputFailureTitle) return `[aw] ${workflowName} ${terminalOutputFailureTitle}`;
   const emptyOutputCauseTitle = typeof options.emptyOutputCause === "string" && Object.prototype.hasOwnProperty.call(EMPTY_OUTPUT_CAUSES, options.emptyOutputCause) ? EMPTY_OUTPUT_CAUSES[options.emptyOutputCause] : "";
   if (emptyOutputCauseTitle) return `[aw] ${workflowName} ${emptyOutputCauseTitle}`;
-  if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result (report_incomplete)`;
+  if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result`;
   if (options.hasMissingSafeOutputs) return `[aw] ${workflowName} produced no safe outputs`;
   if (options.hasMissingTool) return `[aw] ${workflowName} is missing required tool`;
   if (options.hasMissingData) return `[aw] ${workflowName} is missing required data`;
