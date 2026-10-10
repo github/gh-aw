@@ -99,6 +99,55 @@ func TestKiroSmokeExercisesNativeMCPAndGoBuild(t *testing.T) {
 	}
 }
 
+func TestKiroWorkflowLogParser(t *testing.T) {
+	definition := loadKiroWorkflowDefinition(t)
+	engine, err := NewBehaviorDefinedEngine(&definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if engine.GetLogParserScriptId() != "kiro_log_parser" {
+		t.Fatal("Kiro must use its canonical log parser")
+	}
+	for _, expected := range []string{"Write Kiro log parser", "Parse agent logs for step summary", "kiro_log_parser.cjs"} {
+		lock, err := os.ReadFile("../../.github/workflows/smoke-kiro.lock.yml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(lock), expected) {
+			t.Errorf("compiled Kiro workflow must contain %q", expected)
+		}
+	}
+	script := definition.Behaviors.LogParser + `
+const fs = require("fs");
+console.log(JSON.stringify(parseLog(fs.readFileSync(0, "utf8"))));
+`
+	cmd := exec.Command("node", "-e", script)
+	cmd.Dir = "../../actions/setup/js"
+	cmd.Stdin = strings.NewReader("kiro-cli 2.27.1\n[tool] Running: printf example\n[tool] status: Completed\nExample complete.")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Kiro log parser failed: %v\n%s", err, output)
+	}
+	var result struct {
+		LogEntries []struct {
+			Type string         `json:"type"`
+			Data map[string]any `json:"data"`
+		} `json:"logEntries"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"session.init", "tool.execution_start", "tool.execution_complete", "assistant.message"}
+	if len(result.LogEntries) != len(want) {
+		t.Fatalf("expected canonical Kiro observations, got %s", output)
+	}
+	for index, event := range result.LogEntries {
+		if event.Type != want[index] || event.Data == nil {
+			t.Errorf("event %d = %v, want %s with data", index, event, want[index])
+		}
+	}
+}
+
 func TestKiroMCPAdapter(t *testing.T) {
 	adapter := loadKiroWorkflowDefinition(t).Behaviors.MCP.ConfigAdapter
 	t.Run("native config and secret-safe logging", func(t *testing.T) {
