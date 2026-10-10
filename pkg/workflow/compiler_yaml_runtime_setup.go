@@ -71,7 +71,7 @@ func (c *Compiler) generateRuntimeAndWorkspaceSetupSteps(yaml *strings.Builder, 
 	// Add repo-memory clone steps before custom steps so that user steps: code can read
 	// /tmp/gh-aw/repo-memory/<name>/ without an LLM turn.
 	compilerYamlLog.Printf("Generating repo-memory steps for workflow")
-	generateRepoMemorySteps(yaml, data)
+	generateRepoMemoryStepsForAgent(yaml, data)
 
 	c.emitCustomSteps(yaml, data, customStepsContainCheckout, runtimeSetupSteps)
 

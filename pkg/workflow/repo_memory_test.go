@@ -380,7 +380,7 @@ func TestRepoMemoryFilterStepGatesUpload(t *testing.T) {
 	assert.Greater(t, filterIDPos, filterNamePos, "Filter step id must appear after its name")
 
 	validationSection := output[validationNamePos:uploadNamePos]
-	assert.Contains(t, validationSection, "if: always() && steps."+filterStepID+".outcome == 'success'",
+	assert.Contains(t, validationSection, "steps."+filterStepID+".outcome == 'success'",
 		"Validation step must be gated on the filter step's success")
 
 	uploadSection := output[uploadNamePos:]
@@ -399,7 +399,7 @@ func TestRepoMemoryFilterStepEmptyBothFieldsSkipsFilter(t *testing.T) {
 		ID:                "default",
 		AllowedExtensions: []string{},
 		FileGlob:          []string{},
-	}, "/tmp/gh-aw/repo-memory/default", "repo-memory")
+	}, "/tmp/gh-aw/repo-memory/default", "repo-memory", "")
 
 	assert.Empty(t, stepID, "No filter step id should be returned when both fields are empty slices")
 	assert.Empty(t, builder.String(), "No filter step should be emitted when both fields are empty slices")
@@ -1604,7 +1604,8 @@ func TestRepoMemoryFormatJSONPushStepEnvVar(t *testing.T) {
 func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	toolsMap := map[string]any{
 		"repo-memory": map[string]any{
-			"branch-name": "memory/notes",
+			"branch-name":        "memory/notes",
+			"allowed-extensions": []any{".json"},
 			"validation": map[string]any{
 				"script":          "if (!fs.existsSync(path.join(memoryRoot, 'state.json'))) throw new Error('missing state');",
 				"timeout-minutes": 1,
@@ -1625,6 +1626,15 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	assert.Contains(t, config.Memories[0].Validation.Script, "missing state")
 
 	data := &WorkflowData{RepoMemoryConfig: config}
+	var restore strings.Builder
+	generateRepoMemorySteps(&restore, data)
+	assert.NotContains(t, restore.String(), "Validate repo-memory baseline (default)")
+	generateRepoMemoryBaselineValidationSteps(&restore, data)
+	restoreYAML := restore.String()
+	assert.Less(t, strings.Index(restoreYAML, "Clone repo-memory branch (default)"), strings.Index(restoreYAML, "Validate repo-memory baseline (default)"))
+	assert.Contains(t, restoreYAML, "validateRepoMemoryBaseline(core)")
+	assert.NotContains(t, restoreYAML, "continue-on-error")
+
 	var upload strings.Builder
 	generateRepoMemoryArtifactUpload(&upload, data, getActionPin)
 	uploadYAML := upload.String()
@@ -1632,6 +1642,9 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	assert.Contains(t, uploadYAML, "VALIDATION_SCRIPT_B64:")
 	assert.Contains(t, uploadYAML, "validate_memory_step.cjs")
 	assert.Contains(t, uploadYAML, "steps."+repoMemoryValidationStepID("default")+".outcome == 'success'")
+	skipCondition := "steps." + memoryValidationStepID("check_repo_memory_baseline", "default") + ".outputs.skip != 'true'"
+	assert.Contains(t, uploadYAML, "checkRepoMemoryBaseline(core)")
+	assert.Equal(t, 4, strings.Count(uploadYAML, skipCondition), "unchanged invalid memory must skip sanitize, filter, validation, and upload")
 
 	pushJob, err := compiler.buildPushRepoMemoryJob(data, false)
 	require.NoError(t, err)
