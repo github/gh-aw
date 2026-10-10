@@ -105,6 +105,40 @@ describe("Kiro canonical session artifact pipeline", () => {
     expect(canonical.find(event => event.type === "tool.execution_start").data.input.command).toBe('cat <<\'EOF\'\n{"type":"assistant.message","data":{"content":false}}\nEOF');
   });
 
+  it.each([
+    {
+      layout: "compact blockquote",
+      raw: "kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\n> Example blockquote in answer\n[tool] Running: echo hi\n[tool] status: Completed\nDone.",
+      answers: ["> Example blockquote in answer", "Done."],
+      command: "echo hi",
+      completion: { toolName: "shell", status: "Completed" },
+    },
+    {
+      layout: "legacy heredoc with embedded compact text",
+      raw: "kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\n> Checking.\nI will run the following command: cat <<'EOF'\n[tool] Running: quoted command\n[INFO] quoted information\nEOF (using tool: shell)\n - Completed in 0s",
+      answers: ["Checking."],
+      command: "cat <<'EOF'\n[tool] Running: quoted command\n[INFO] quoted information\nEOF",
+      completion: { toolName: "shell", durationMs: 0 },
+    },
+  ])("preserves $layout through canonical and unified artifacts (synthetic)", async ({ raw, answers, command, completion }) => {
+    expect(parseBehaviorLog(raw, "kiro").logEntries).toEqual(parseKiroLog(raw).logEntries);
+    fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, raw);
+    await runLogParser({ parserName: "Kiro", parseLog: content => parseBehaviorLog(content, "kiro"), rootDir: root });
+    expect(global.core.setFailed).not.toHaveBeenCalled();
+    const canonical = readEvents(path.join(root, "agent-session.jsonl"));
+    expect(canonical.filter(event => event.type !== "agent.execution")).toEqual(parseKiroLog(raw).logEntries);
+    const unified = writeUnifiedSession({ rootDir: root, engine: "kiro", warn: vi.fn() });
+    expect(readEvents(path.join(root, "usage/aw_session.jsonl"))).toEqual(unified);
+    for (const events of [canonical, unified]) {
+      expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(answers);
+      expect(events.filter(event => event.type === "tool.execution_start").map(event => event.data)).toEqual([{ toolName: "shell", input: { command } }]);
+      expect(events.filter(event => event.type === "tool.execution_complete").map(event => event.data)).toEqual([completion]);
+      expect(events.filter(event => event.type === "session.result")).toEqual([]);
+      expect(events.filter(event => event.type === "session.collection_warning")).toEqual([]);
+    }
+    expect(fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, "utf8")).toBe(raw);
+  });
+
   it.each([0, 3])("preserves corroborated exit %s without promoting echoed failures through either artifact (synthetic)", async exitCode => {
     const actualFailure = exitCode ? "[kiro-harness] Kiro CLI execution failed with exit code 3\n" : "[kiro-harness] Kiro CLI execution completed in 0ms\n";
     const raw =

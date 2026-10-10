@@ -144,9 +144,11 @@ Querying available agents for task delegation (using tool: subagent) - Completed
     expect(JSON.stringify(result.logEntries)).not.toContain("PRIVATE");
   });
 
-  it("does not switch legacy layout for compact-looking text inside a command", () => {
-    const result = parseKiroLog(header + "> Checking.\nI will run the following command: cat <<'EOF'\n[tool] Running: quoted command\n[INFO] quoted information\nEOF (using tool: shell)\n - Completed in 0s");
+  it.each(["", "[kiro-harness] Kiro CLI execution started\n"])("does not switch legacy layout for compact-looking text inside a command (harness: %j)", harness => {
+    const result = parseKiroLog(header + harness + "> Checking.\nI will run the following command: cat <<'EOF'\n[tool] Running: quoted command\n[INFO] quoted information\nEOF (using tool: shell)\n - Completed in 0s");
     expect(byType(result, "tool.execution_start")[0].data.input.command).toBe("cat <<'EOF'\n[tool] Running: quoted command\n[INFO] quoted information\nEOF");
+    expect(byType(result, "assistant.message").map(event => event.data.content)).toEqual(["Checking."]);
+    expect(byType(result, "tool.execution_complete")[0].data).toEqual({ toolName: "shell", durationMs: 0 });
   });
 
   it("accepts signed legacy tool-only and completion-only partial traces", () => {
@@ -168,6 +170,26 @@ Querying available agents for task delegation (using tool: subagent) - Completed
   });
 
   describe("Kiro 2.27 compact headless conversation parser", () => {
+    it("keeps a leading blockquote as compact answer text instead of swallowing subsequent tools (synthetic)", () => {
+      const result = parseKiroLog("kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\n> Example blockquote in answer\n[tool] Running: echo hi\n[tool] status: Completed\nDone.");
+      expect(result.logEntries).toEqual([
+        { line: 1, type: "session.init", data: { sourceEngine: "kiro", agentVersion: "2.27.1" } },
+        { line: 3, type: "assistant.message", data: { content: "> Example blockquote in answer" } },
+        { line: 4, type: "tool.execution_start", data: { toolName: "shell", input: { command: "echo hi" } } },
+        { line: 5, type: "tool.execution_complete", data: { toolName: "shell", status: "Completed" } },
+        { line: 6, type: "assistant.message", data: { content: "Done." } },
+      ]);
+      expect(result.markdown).not.toContain("[tool]");
+    });
+
+    it("preserves blockquotes and whitespace in a harness-framed assistant-only answer (synthetic)", () => {
+      const result = parseKiroLog("kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\n>   Quoted answer.  \n>\n> Continued quote.");
+      expect(byType(result, "assistant.message").map(event => event.data.content)).toEqual([">   Quoted answer.  \n>\n> Continued quote."]);
+      expect(byType(result, "tool.execution_start")).toEqual([]);
+      expect(byType(result, "tool.execution_complete")).toEqual([]);
+      expect(byType(result, "session.result")).toEqual([]);
+    });
+
     it("maps the sanitized successful CI excerpt to canonical tools and buffered answers", () => {
       const result = parseKiroLog(kiroCI.success);
       expect(result.logEntries.every(isSessionEvent)).toBe(true);

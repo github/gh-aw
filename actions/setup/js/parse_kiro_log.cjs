@@ -10,6 +10,8 @@ const main = createEngineLogParser({ parserName: "Kiro", parseFunction: parseKir
 /**
  * Supported Kiro headless stdout uses either "> " assistant paragraphs and
  * timed tools, or 2.27's "[tool]" records and buffered unprefixed answers.
+ * Harness-framed blockquotes are prose unless a legacy tool signature selects
+ * the older layout before any compact tool record.
  * Completion timing alone does not establish success. Overlapping calls have
  * anonymous completions because stdout does not identify their result owners.
  * @param {string} content
@@ -25,8 +27,9 @@ function parseKiroLog(content) {
   const harnessFailure = findKiroHarnessFailure(lines);
   const executionStart = lines.findIndex(line => line === "[kiro-harness] Kiro CLI execution started");
   const compactStart = executionStart !== -1 ? executionStart : banner;
-  const isLegacyObservation = line => isAssistantLine(line) || /^(?:I will run the following command: |Searching for symbols matching: |Querying available agents for task delegation|\s*- Completed in \d)/.test(line);
-  const firstSignature = compactStart !== -1 ? lines.slice(compactStart + 1).find(line => /^\[tool\] /.test(line) || isLegacyObservation(line)) : undefined;
+  const isLegacyToolObservation = line => /^(?:I will run the following command: |Searching for symbols matching: |Querying available agents for task delegation|\s*- Completed in \d)/.test(line);
+  const isLegacyObservation = line => isAssistantLine(line) || isLegacyToolObservation(line);
+  const firstSignature = compactStart !== -1 ? lines.slice(compactStart + 1).find(line => /^\[tool\] /.test(line) || (executionStart !== -1 ? isLegacyToolObservation(line) : isLegacyObservation(line))) : undefined;
   const compact = compactStart !== -1 && (firstSignature?.startsWith("[tool] ") || (executionStart !== -1 && firstSignature === undefined));
   if (compact) entries.push(...parseCompactKiroLog(lines, compactStart, banner, commandLines, harnessFailure));
   else if (banner !== -1 && lines.slice(banner + 1).some(isLegacyObservation)) {
