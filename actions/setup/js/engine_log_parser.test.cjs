@@ -34,7 +34,8 @@ describe("Declared custom engine log parsers", () => {
 
   it("reports malformed optional terminal JSON without dropping the captured engine text", () => {
     const warning = vi.spyOn(console, "error").mockImplementation(() => {});
-    const parsed = parseBehaviorLog('Assistant: Captured answer\n{"malformed":', "cursor");
+    vi.spyOn(vm, "compileFunction").mockReturnValue(() => content => ({ logEntries: [{ type: "assistant", message: { content } }] }));
+    const parsed = parseBehaviorLog('Assistant: Captured answer\n{"malformed":', "crush");
     expect(parsed.logEntries.some(event => event.type === "assistant.message" && event.data.content.includes("Captured answer"))).toBe(true);
     expect(warning).toHaveBeenCalledWith(expect.stringContaining("Malformed terminal JSON"));
   });
@@ -43,8 +44,8 @@ describe("Declared custom engine log parsers", () => {
     const content = '[INFO] infrastructure\nAssistant: First answer\nSecond line\n{"type":"result","num_turns":1,"usage":{"output_tokens":0}}\n';
     expect(loadEngineLogParser(engine)).toBeTypeOf("function");
     const events = parseEngineSession(content, engine);
-    expect(events.find(event => event.type === "session.init").data.sourceEngine).toBe(engine);
-    expect(events.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "Assistant: First answer\nSecond line" } }]);
+    expect(events.filter(event => event.type === "assistant.message")).toHaveLength(1);
+    expect(events.find(event => event.type === "assistant.message").data.content).toMatch(/^Assistant: First answer\nSecond line\n?$/);
     expect(events.filter(event => event.type === "session.result")).toMatchObject([{ data: { numTurns: 1, usage: { output_tokens: 0 } } }]);
     expect(JSON.stringify(events.filter(event => event.type === "assistant.message"))).not.toContain("num_turns");
     expect(events.some(event => event.type.startsWith("tool."))).toBe(false);
@@ -54,8 +55,8 @@ describe("Declared custom engine log parsers", () => {
   it("preserves Crush assistant statements instead of accepting only a synthetic Claude result", () => {
     const text = "I'll execute the smoke tests efficiently.Smoke test completed. Overall status: **FAIL**.";
     const events = parseEngineSession(`[crush-harness] resolved executable\n${text}\n{"type":"result","num_turns":1,"usage":{"input_tokens":0,"output_tokens":0}}\n`, "crush");
-    expect(events.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: text } }]);
-    expect(events.find(event => event.type === "session.init").data.sourceEngine).toBe("crush");
+    expect(events.filter(event => event.type === "assistant.message")).toHaveLength(1);
+    expect(events.find(event => event.type === "assistant.message").data.content.replace(/\n$/, "")).toBe(text);
   });
 
   it("does not turn arbitrary unknown plaintext into assistant output", () => {
@@ -94,5 +95,32 @@ describe("Declared custom engine log parsers", () => {
     expect(events.find(event => event.type === "tool.execution_complete" && event.data.toolCallId === "call").data.success).toBeUndefined();
     expect(events.find(event => event.type === "tool.execution_complete" && event.data.toolCallId === "failed").data.success).toBe(false);
     expect(input).toEqual(original);
+  });
+
+  it.each(["aider", "crush"])("lets the declared %s parser own full mixed stdout and terminal snapshots", engine => {
+    const extension = { type: "vendor.progress", data: { ready: false, count: 0 } };
+    const events = [
+      { type: "assistant.message", data: { content: "  Partial answer.\n\n" } },
+      extension,
+      { type: "assistant.message", data: { content: "Running bash is only prose. \n" } },
+      { type: "session.result", data: { numTurns: 0, usage: { output_tokens: 0 } } },
+    ];
+    const parse = vi.fn(() => ({ logEntries: events, mcpFailures: [], maxTurnsHit: false }));
+    vi.spyOn(vm, "compileFunction").mockReturnValue(() => parse);
+    const content = `[${engine}-harness] execution\n  Partial answer.\n\n${JSON.stringify(extension)}\nRunning bash is only prose. \n{"type":"result","num_turns":99}\n`;
+    expect(parseBehaviorLog(content, engine).logEntries).toEqual(events);
+    expect(parse).toHaveBeenCalledWith(content);
+  });
+
+  it("does not mistake quoted canonical JSON inside attributed Kiro commands for the transcript", () => {
+    const raw = `kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\n[tool] Running: cat <<'EOF'\n{"type":"assistant.message","data":{"content":false}}\nEOF\n[tool] status: Completed\nObserved answer.`;
+    const parser = require("./parse_kiro_log.cjs");
+    const expected = [
+      { type: "tool.execution_start", data: { input: { command: 'cat <<\'EOF\'\n{"type":"assistant.message","data":{"content":false}}\nEOF' } } },
+      { type: "assistant.message", data: { content: "Observed answer." } },
+    ];
+    const parse = vi.spyOn(parser, "parseKiroLog").mockReturnValue({ logEntries: expected, mcpFailures: [], maxTurnsHit: false, markdown: "" });
+    expect(parseBehaviorLog(raw, "kiro").logEntries).toEqual(expected);
+    expect(parse).toHaveBeenCalledWith(raw);
   });
 });

@@ -106,20 +106,36 @@ function normalizeEngineLogEntries(entries, engine) {
 
 /** @param {string} content @param {string} engine @returns {any | undefined} */
 function parseBehaviorLog(content, engine) {
+  if (engine === "kiro" && /^kiro-cli \d+\.\d+\.\d+/m.test(content) && /^\[(?:kiro-harness|tool)\]/m.test(content)) {
+    return require("./parse_kiro_log.cjs").parseKiroLog(content);
+  }
+  const parse = loadEngineLogParser(engine);
+  if (engine === "aider" && parse) {
+    const parsed = parse(content);
+    return { ...parsed, logEntries: normalizeEngineLogEntries(parsed?.logEntries ?? [], engine) };
+  }
+  if (engine === "crush" && parse) {
+    const parsed = parse(content);
+    // Older definitions relied on terminal extraction; canonical producers own framing.
+    if ((parsed?.logEntries ?? []).every(isSessionEvent)) {
+      return { ...parsed, logEntries: normalizeEngineLogEntries(parsed?.logEntries ?? [], engine) };
+    }
+  }
   const records = require("./log_parser_shared.cjs").parseLogEntries(content) ?? [];
   if (records.some(record => (isSessionEvent(record) && record.type !== "agent.execution") || (["assistant", "user"].includes(record?.type) && normalizeEngineLogEntries([record], engine).length > 0))) {
     return { logEntries: normalizeEngineLogEntries(records, engine), mcpFailures: [], maxTurnsHit: false };
   }
-  const parse = loadEngineLogParser(engine);
   if (!parse) return undefined;
-  const lines = content.trimEnd().split("\n");
+  const lines = content.split("\n");
+  let terminalIndex = lines.length - 1;
+  while (terminalIndex >= 0 && !lines[terminalIndex].trim()) terminalIndex--;
   let terminal;
-  if ((lines.at(-1) ?? "").trimStart().startsWith("{")) {
+  if ((lines[terminalIndex] ?? "").trimStart().startsWith("{")) {
     try {
-      const record = JSON.parse(lines.at(-1) ?? "");
+      const record = JSON.parse(lines[terminalIndex] ?? "");
       if (record.type === "result" && (Object.hasOwn(record, "num_turns") || Object.hasOwn(record, "usage"))) {
         terminal = record;
-        lines.pop();
+        lines.splice(terminalIndex);
       }
     } catch {
       const message = `${ERR_PARSE}: Malformed terminal JSON for ${engine}; retaining the original engine output`;
