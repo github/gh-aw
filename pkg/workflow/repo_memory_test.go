@@ -1604,7 +1604,8 @@ func TestRepoMemoryFormatJSONPushStepEnvVar(t *testing.T) {
 func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	toolsMap := map[string]any{
 		"repo-memory": map[string]any{
-			"branch-name": "memory/notes",
+			"branch-name":        "memory/notes",
+			"allowed-extensions": []any{".json"},
 			"validation": map[string]any{
 				"script":          "if (!fs.existsSync(path.join(memoryRoot, 'state.json'))) throw new Error('missing state');",
 				"timeout-minutes": 1,
@@ -1627,6 +1628,8 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	data := &WorkflowData{RepoMemoryConfig: config}
 	var restore strings.Builder
 	generateRepoMemorySteps(&restore, data)
+	assert.NotContains(t, restore.String(), "Validate repo-memory baseline (default)")
+	generateRepoMemoryBaselineValidationSteps(&restore, data)
 	restoreYAML := restore.String()
 	assert.Less(t, strings.Index(restoreYAML, "Clone repo-memory branch (default)"), strings.Index(restoreYAML, "Validate repo-memory baseline (default)"))
 	assert.Contains(t, restoreYAML, "validateRepoMemoryBaseline(core)")
@@ -1641,7 +1644,7 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	assert.Contains(t, uploadYAML, "steps."+repoMemoryValidationStepID("default")+".outcome == 'success'")
 	skipCondition := "steps." + memoryValidationStepID("check_repo_memory_baseline", "default") + ".outputs.skip != 'true'"
 	assert.Contains(t, uploadYAML, "checkRepoMemoryBaseline(core)")
-	assert.Equal(t, 3, strings.Count(uploadYAML, skipCondition), "unchanged invalid memory must skip sanitize, validation, and upload")
+	assert.Equal(t, 4, strings.Count(uploadYAML, skipCondition), "unchanged invalid memory must skip sanitize, filter, validation, and upload")
 
 	pushJob, err := compiler.buildPushRepoMemoryJob(data, false)
 	require.NoError(t, err)
