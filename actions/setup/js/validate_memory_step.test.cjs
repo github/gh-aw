@@ -81,6 +81,22 @@ describe("validateMemoryStep", () => {
     expect(warnings.join("\n")).toContain("must not modify memory files");
   });
 
+  it("validates schema-only repo-memory baselines", () => {
+    process.env.MEMORY_ID = path.basename(tempDir);
+    delete process.env.VALIDATION_SCRIPT_B64;
+    process.env.MEMORY_JSON_SCHEMAS_REQUIRED = "true";
+    process.env.MEMORY_JSON_SCHEMAS_B64 = Buffer.from(JSON.stringify([{ schema: { type: "object", properties: { ok: { type: "boolean" } } } }])).toString("base64");
+    fs.writeFileSync(path.join(tempDir, "state.json"), '{"ok":"invalid"}');
+    const warnings = [];
+
+    validateRepoMemoryBaseline({ info: () => {}, warning: message => warnings.push(message) });
+
+    const baseline = JSON.parse(fs.readFileSync(getRepoMemoryBaselinePath(process.env.MEMORY_ID), "utf8"));
+    expect(baseline.ok).toBe(false);
+    expect(baseline.stderr).toContain("state.json");
+    expect(warnings.join("\n")).toContain("state.json");
+  });
+
   it("keeps large diagnostics in private temporary files with bounded prompt excerpts", () => {
     process.env.MEMORY_ID = path.basename(tempDir);
     process.env.VALIDATION_SCRIPT_B64 = Buffer.from('console.error("x".repeat(6000)); process.exitCode = 1;').toString("base64");

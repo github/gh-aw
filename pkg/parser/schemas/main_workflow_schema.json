@@ -5497,10 +5497,10 @@
                           "format": { "type": "string", "enum": ["json", "jsonl"] },
                           "schema": { "type": "object", "additionalProperties": true }
                         },
-                        "required": ["file", "schema"],
+                        "required": ["schema"],
                         "additionalProperties": false
                       },
-                      "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
+                      "description": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted"
                     }
                   },
                   "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
@@ -5584,10 +5584,10 @@
                             "format": { "type": "string", "enum": ["json", "jsonl"] },
                             "schema": { "type": "object", "additionalProperties": true }
                           },
-                          "required": ["file", "schema"],
+                          "required": ["schema"],
                           "additionalProperties": false
                         },
-                        "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
+                        "description": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted"
                       }
                     },
                     "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
@@ -5700,10 +5700,10 @@
                           "format": { "type": "string", "enum": ["json", "jsonl"] },
                           "schema": { "type": "object", "additionalProperties": true }
                         },
-                        "required": ["file", "schema"],
+                        "required": ["schema"],
                         "additionalProperties": false
                       },
-                      "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
+                      "description": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted"
                     }
                   },
                   "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
@@ -5776,10 +5776,10 @@
                             "format": { "type": "string", "enum": ["json", "jsonl"] },
                             "schema": { "type": "object", "additionalProperties": true }
                           },
-                          "required": ["file", "schema"],
+                          "required": ["schema"],
                           "additionalProperties": false
                         },
-                        "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
+                        "description": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted"
                       }
                     },
                     "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
@@ -6093,10 +6093,10 @@
                           "format": { "type": "string", "enum": ["json", "jsonl"] },
                           "schema": { "type": "object", "additionalProperties": true }
                         },
-                        "required": ["file", "schema"],
+                        "required": ["schema"],
                         "additionalProperties": false
                       },
-                      "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
+                      "description": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted"
                     }
                   },
                   "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
@@ -6225,10 +6225,10 @@
                             "format": { "type": "string", "enum": ["json", "jsonl"] },
                             "schema": { "type": "object", "additionalProperties": true }
                           },
-                          "required": ["file", "schema"],
+                          "required": ["schema"],
                           "additionalProperties": false
                         },
-                        "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
+                        "description": "Inline schemas enforced for selected memory files or all eligible JSON and JSONL files when file is omitted"
                       }
                     },
                     "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],

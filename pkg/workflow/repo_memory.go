@@ -656,10 +656,9 @@ func generateRepoMemoryBaselineValidationSteps(builder *strings.Builder, data *W
 		fmt.Fprintf(builder, "      - name: Validate repo-memory baseline (%s)\n", memory.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		fmt.Fprintf(builder, "        uses: %s\n", getActionPin("actions/github-script"))     //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		builder.WriteString("        env:\n")
-		fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)                                                         //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-		fmt.Fprintf(builder, "          MEMORY_ID: %s\n", memory.ID)                                                          //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-		fmt.Fprintf(builder, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(memory.Validation))        //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-		fmt.Fprintf(builder, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(memory.Validation)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		fmt.Fprintf(builder, "          MEMORY_ID: %s\n", memory.ID)  //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+		appendMemoryValidationEnvironment(builder, memory.Validation)
 		builder.WriteString("        with:\n")
 		builder.WriteString("          script: |\n")
 		builder.WriteString("            const { validateRepoMemoryBaseline } = require('${{ runner.temp }}/gh-aw/actions/validate_memory_step.cjs');\n")

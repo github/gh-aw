@@ -46,6 +46,8 @@ tools:
                 type: integer
               status:
                 enum: [open, closed]
+        - schema:
+            type: object
   cache-memory:
     allowed-extensions: [".json"]
     validation:
@@ -178,6 +180,30 @@ func TestParseMemoryJSONSchemasAcceptsInferredFormats(t *testing.T) {
 	}
 }
 
+func TestParseMemoryJSONSchemasAcceptsOmittedFile(t *testing.T) {
+	schemas, err := parseMemoryJSONSchemas([]any{
+		map[string]any{"schema": map[string]any{"type": "object"}},
+	}, "validation.json-schemas")
+	require.NoError(t, err)
+	require.Len(t, schemas, 1)
+	assert.Empty(t, schemas[0].File)
+	assert.Empty(t, schemas[0].Format)
+	encoded, err := json.Marshal(schemas)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), `"file"`)
+
+	_, err = parseMemoryJSONSchemas([]any{
+		map[string]any{"format": "json", "schema": map[string]any{"type": "object"}},
+	}, "validation.json-schemas")
+	require.ErrorContains(t, err, "format cannot be set when file is omitted")
+
+	_, err = parseMemoryJSONSchemas([]any{
+		map[string]any{"schema": map[string]any{"type": "object"}},
+		map[string]any{"schema": map[string]any{"type": "object"}},
+	}, "validation.json-schemas")
+	require.ErrorContains(t, err, "duplicate file target")
+}
+
 func TestParseMemoryValidationConfigRejectsUnknownFieldsAndMissingValidation(t *testing.T) {
 	_, err := parseMemoryValidationConfig(map[string]any{
 		"validation": map[string]any{"script": "true", "unknown": true},
@@ -198,6 +224,9 @@ func TestValidateMemorySchemaTargetsHonorsFilePolicies(t *testing.T) {
 
 	globConfig := &MemoryValidationConfig{JSONSchemas: []MemoryJSONSchemaConfig{{File: "data/**/*.json", Format: "json", Schema: map[string]any{}}}}
 	require.NoError(t, validateMemorySchemaTargets(globConfig, []string{".json"}, []string{"data/**"}, "tools.repo-memory.validation"))
+
+	allJSONConfig := &MemoryValidationConfig{JSONSchemas: []MemoryJSONSchemaConfig{{Schema: map[string]any{}}}}
+	require.NoError(t, validateMemorySchemaTargets(allJSONConfig, []string{".json", ".jsonl"}, []string{"data/**"}, "tools.repo-memory.validation"))
 }
 
 func TestMemorySchemaFileMatchesGlob(t *testing.T) {

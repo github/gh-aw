@@ -27,7 +27,7 @@ type MemoryValidationConfig struct {
 }
 
 type MemoryJSONSchemaConfig struct {
-	File   string         `yaml:"file" json:"file"`
+	File   string         `yaml:"file,omitempty" json:"file,omitempty"`
 	Format string         `yaml:"format,omitempty" json:"format,omitempty"`
 	Schema map[string]any `yaml:"schema" json:"schema"`
 }
@@ -194,9 +194,14 @@ func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig
 				return nil, fmt.Errorf("%s has unknown property %q (only file, format, and schema are supported)", entryPath, key)
 			}
 		}
-		file, ok := entry["file"].(string)
-		if !ok || !validMemorySchemaFilePath(file) {
-			return nil, fmt.Errorf("%s.file must be a non-empty relative file path or glob without traversal", entryPath)
+		var file string
+		if rawFile, exists := entry["file"]; exists {
+			file, ok = rawFile.(string)
+			if !ok || !validMemorySchemaFilePath(file) {
+				return nil, fmt.Errorf("%s.file must be a non-empty relative file path or glob without traversal", entryPath)
+			}
+		} else if _, exists := entry["format"]; exists {
+			return nil, fmt.Errorf("%s.format cannot be set when file is omitted; the format is inferred for each JSON or JSONL file", entryPath)
 		}
 		if _, exists := seenFiles[file]; exists {
 			return nil, fmt.Errorf("%s contains duplicate file target %q", fieldPath, file)
@@ -401,6 +406,9 @@ func validateMemorySchemaTargets(config *MemoryValidationConfig, allowedExtensio
 		return nil
 	}
 	for _, declaration := range config.JSONSchemas {
+		if declaration.File == "" {
+			continue
+		}
 		if len(allowedExtensions) > 0 {
 			allowed := false
 			for _, extension := range allowedExtensions {

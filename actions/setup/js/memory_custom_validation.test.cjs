@@ -161,6 +161,43 @@ describe("memory_custom_validation", () => {
     expect(result.stderr).toContain("ok");
   });
 
+  it("validates every owned JSON and JSONL file when file is omitted", () => {
+    fs.mkdirSync(path.join(tempDir, "nested"));
+    fs.mkdirSync(path.join(tempDir, ".git"));
+    fs.writeFileSync(path.join(tempDir, "state.JSON"), '{"ok":true}');
+    fs.writeFileSync(path.join(tempDir, "nested", "events.JSONL"), '{"ok":true}\n{"ok":false}\n');
+    fs.writeFileSync(path.join(tempDir, "ignored.md"), "not JSON");
+    fs.writeFileSync(path.join(tempDir, ".git", "internal.json"), "not JSON");
+    const jsonSchemas = [{ schema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } } }];
+    expect(runCustomMemoryValidation({ jsonSchemas, memoryDir: tempDir, kind: "repo" }).ok).toBe(true);
+
+    fs.writeFileSync(path.join(tempDir, "nested", "events.JSONL"), '{"ok":true}\n{"ok":"bad"}\n');
+    const result = runCustomMemoryValidation({ jsonSchemas, memoryDir: tempDir, kind: "repo" });
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("nested/events.JSONL");
+    expect(result.stderr).toContain("line 2");
+  });
+
+  it("allows omitted file when no owned JSON or JSONL files exist", () => {
+    fs.writeFileSync(path.join(tempDir, "notes.md"), "not JSON");
+    const result = runCustomMemoryValidation({
+      jsonSchemas: [{ schema: { type: "object" } }],
+      memoryDir: tempDir,
+      kind: "repo",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects format when file is omitted", () => {
+    const result = runCustomMemoryValidation({
+      jsonSchemas: [{ format: "json", schema: { type: "object" } }],
+      memoryDir: tempDir,
+      kind: "repo",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("format cannot be set when file is omitted");
+  });
+
   it.each(["state.json", "events.jsonl"])("infers the format of an exact %s target", file => {
     fs.writeFileSync(path.join(tempDir, file), file.endsWith(".jsonl") ? "{}\n{}\n" : "{}");
     const result = runCustomMemoryValidation({

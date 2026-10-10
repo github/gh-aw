@@ -236,7 +236,7 @@ function memoryTreeDigest(dirPath) {
 }
 
 /**
- * @param {string} file
+ * @param {unknown} file
  */
 function validateSchemaFilePath(file) {
   if (
@@ -280,10 +280,11 @@ function memorySchemaFileMatchesGlob(file, pattern) {
 
 /**
  * @param {string} memoryDir
- * @param {string} pattern
+ * @param {string | undefined} pattern
  * @returns {string[]}
  */
 function findMemorySchemaFiles(memoryDir, pattern) {
+  const selectAllJSON = pattern === undefined;
   /** @type {string[]} */
   const matches = [];
   /**
@@ -301,8 +302,8 @@ function findMemorySchemaFiles(memoryDir, pattern) {
       const relativePath = relativeDirectory ? `${relativeDirectory}/${entry.name}` : entry.name;
       const fullPath = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        visit(fullPath, relativePath);
-      } else if ((entry.isFile() || entry.isSymbolicLink()) && memorySchemaFileMatchesGlob(relativePath, pattern)) {
+        if (!selectAllJSON || entry.name !== ".git") visit(fullPath, relativePath);
+      } else if ((entry.isFile() || entry.isSymbolicLink()) && (selectAllJSON ? [".json", ".jsonl"].includes(path.extname(entry.name).toLowerCase()) : memorySchemaFileMatchesGlob(relativePath, pattern))) {
         matches.push(relativePath);
       }
     }
@@ -534,7 +535,7 @@ function validateJSONLFile(filePath, file, schema) {
 
 /**
  * @param {string} memoryDir
- * @param {Array<{file: string, format?: string, schema: Record<string, any>}>} schemas
+ * @param {Array<{file?: string, format?: string, schema: Record<string, any>}>} schemas
  * @param {string} kind
  * @param {string} memoryId
  */
@@ -551,18 +552,27 @@ function validateMemoryJSONSchemas(memoryDir, schemas, kind, memoryId) {
     if (keys.some(key => !["file", "format", "schema"].includes(key))) {
       throw new TypeError(`json-schemas entry for '${String(declaration.file)}' has unknown fields`);
     }
-    validateSchemaFilePath(declaration.file);
-    if (seen.has(declaration.file)) {
-      throw new TypeError(`json-schemas contains duplicate file target '${declaration.file}'`);
+    const hasFile = Object.hasOwn(declaration, "file");
+    const configuredFile = declaration.file;
+    if (hasFile) {
+      validateSchemaFilePath(configuredFile);
+    } else if (Object.hasOwn(declaration, "format")) {
+      throw new TypeError("format cannot be set when file is omitted; the format is inferred for each JSON or JSONL file");
     }
-    seen.add(declaration.file);
+    const filePattern = typeof configuredFile === "string" ? configuredFile : "";
+    const target = filePattern || "";
+    if (seen.has(target)) {
+      throw new TypeError(`json-schemas contains duplicate file target '${target || "(all JSON and JSONL files)"}'`);
+    }
+    seen.add(target);
     if (Object.hasOwn(declaration, "format") && declaration.format !== "json" && declaration.format !== "jsonl") {
-      throw new TypeError(`file '${declaration.file}' has unsupported format`);
+      throw new TypeError(`file '${filePattern}' has unsupported format`);
     }
     validateSchemaContract(declaration.schema, "Memory");
-    const matchedFiles = declaration.file.includes("*") ? findMemorySchemaFiles(memoryDir, declaration.file) : [declaration.file];
-    if (matchedFiles.length === 0) {
-      throw new Error(`file pattern '${declaration.file}' matched no files`);
+    /** @type {string[]} */
+    const matchedFiles = hasFile ? (filePattern.includes("*") ? findMemorySchemaFiles(memoryDir, filePattern) : [filePattern]) : findMemorySchemaFiles(memoryDir, undefined);
+    if (hasFile && matchedFiles.length === 0) {
+      throw new Error(`file pattern '${filePattern}' matched no files`);
     }
     for (const file of matchedFiles) {
       validateMemoryJSONSchemaFile(memoryDir, file, declaration);
@@ -574,7 +584,7 @@ function validateMemoryJSONSchemas(memoryDir, schemas, kind, memoryId) {
 /**
  * @param {string} memoryDir
  * @param {string} file
- * @param {{file: string, format?: string, schema: Record<string, any>}} declaration
+ * @param {{format?: string, schema: Record<string, any>}} declaration
  */
 function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
   const format = declaration.format ?? path.extname(file).slice(1).toLowerCase();
