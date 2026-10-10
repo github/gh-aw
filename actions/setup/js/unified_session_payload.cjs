@@ -198,6 +198,7 @@ const EVENT_FIELDS = {
     content: ["content"],
     code: ["code"],
     errorType: ["errorType"],
+    statusCode: ["statusCode"],
     model: ["model"],
     severity: ["severity"],
     status: ["status"],
