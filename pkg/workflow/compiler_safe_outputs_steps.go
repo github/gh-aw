@@ -240,7 +240,7 @@ func (c *Compiler) buildDispatchRepositoryAppTokenSteps(data *WorkflowData) []st
 	if mentions := data.SafeOutputs.Mentions; mentions != nil && mentions.GitHubApp != nil {
 		fallbackRepo := ""
 		if hasWorkflowCallTrigger(data.On) {
-			fallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+			fallbackRepo = activationTargetRepoNameExpr
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
 			"safe_outputs",
