@@ -15,17 +15,34 @@ function writeJSON(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function readFileDescriptor(fd) {
+function readFileDescriptor(fd, expectedPath) {
   const { size } = fs.fstatSync(fd);
-  if (size === 0) return "";
   const buffer = Buffer.alloc(size);
-  const bytesRead = fs.readSync(fd, buffer, 0, size, 0);
-  return buffer.subarray(0, bytesRead).toString("utf8");
+  let offset = 0;
+  while (offset < size) {
+    const bytesRead = fs.readSync(fd, buffer, offset, size - offset, offset);
+    if (bytesRead === 0) break;
+    offset += bytesRead;
+  }
+  if (expectedPath !== undefined) {
+    const original = fs.fstatSync(fd);
+    const current = fs.lstatSync(expectedPath);
+    if (!current.isFile() || current.dev !== original.dev || current.ino !== original.ino) {
+      throw new Error("TLC log path no longer identifies the opened evidence file");
+    }
+  }
+  return buffer.subarray(0, offset).toString("utf8");
 }
 
 function writeJSONToFileDescriptor(fd, value) {
+  const buffer = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
   fs.ftruncateSync(fd, 0);
-  fs.writeSync(fd, `${JSON.stringify(value, null, 2)}\n`, 0, "utf8");
+  let offset = 0;
+  while (offset < buffer.length) {
+    const bytesWritten = fs.writeSync(fd, buffer, offset, buffer.length - offset, offset);
+    if (bytesWritten === 0) throw new Error("Unable to make progress writing JSON evidence");
+    offset += bytesWritten;
+  }
 }
 
 function classify(exitCode, signal, timedOut, log) {
@@ -207,7 +224,7 @@ async function runVerification(options) {
   let log;
   let checkpoints;
   try {
-    log = readFileDescriptor(fd);
+    log = readFileDescriptor(fd, logPath);
     checkpoints = checkpointBundle(stateDir, bundleDir, options.checkpointMaxBytes ?? CHECKPOINT_MAX_BYTES, log.includes("Checkpointing completed"), env);
   } finally {
     try {
@@ -303,4 +320,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { TLC_SHA256, classify, inventory, checkpointBundle, runVerification };
+module.exports = { TLC_SHA256, classify, inventory, checkpointBundle, runVerification, readFileDescriptor, writeJSONToFileDescriptor };

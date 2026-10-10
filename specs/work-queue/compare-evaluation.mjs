@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { TLC_SHA256, classify } from "../../.github/scripts/work-queue-formal-check.cjs";
+import { TLC_SHA256, classify, readFileDescriptor, writeJSONToFileDescriptor } from "../../.github/scripts/work-queue-formal-check.cjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -16,13 +16,6 @@ const java = process.env.JAVA_BIN || "java";
 const jar = process.env.TLA2TOOLS_JAR;
 assert(jar && path.isAbsolute(jar), "TLA2TOOLS_JAR must be an absolute pinned jar path");
 const hash = value => crypto.createHash("sha256").update(value).digest("hex");
-const readFileDescriptor = fd => {
-  const { size } = fs.fstatSync(fd);
-  if (size === 0) return "";
-  const buffer = Buffer.alloc(size);
-  const bytesRead = fs.readSync(fd, buffer, 0, size, 0);
-  return buffer.subarray(0, bytesRead).toString("utf8");
-};
 assert.equal(hash(fs.readFileSync(jar)), TLC_SHA256, "unexpected TLC jar checksum");
 assert.notEqual(output, path.parse(output).root, "results must not be the filesystem root");
 fs.mkdirSync(output, { recursive: true });
@@ -127,8 +120,12 @@ WorkResubmissionNoOp == Original!WorkResubmissionNoOp /\\ Revised!WorkResubmissi
   const logPath = path.join(directory, "tlc.log");
   const fd = fs.openSync(logPath, "wx+", 0o600);
   const checked = spawnSync(java, command, { cwd: directory, timeout: 900_000, killSignal: "SIGINT", stdio: ["ignore", fd, fd] });
-  const log = readFileDescriptor(fd);
-  fs.closeSync(fd);
+  let log;
+  try {
+    log = readFileDescriptor(fd, logPath);
+  } finally {
+    fs.closeSync(fd);
+  }
   const diagnostic = mutation === "missing-transition" ? "Action property NextEquivalence is violated" : mutation === "changed-normalization" ? "Invariant ReplayEquivalence is violated" : null;
   const expectedExit = mutation === "missing-transition" ? 13 : mutation ? 12 : 0;
   const status = classify(checked.status, checked.signal, checked.error?.code === "ETIMEDOUT", log);
@@ -155,13 +152,7 @@ WorkResubmissionNoOp == Original!WorkResubmissionNoOp /\\ Revised!WorkResubmissi
   };
   comparisons.push(result);
   const complete = comparisons.length === cases.length;
-  fs.ftruncateSync(comparisonFd, 0);
-  fs.writeSync(
-    comparisonFd,
-    `${JSON.stringify({ complete, passed: complete && comparisons.every(c => c.passed), java_version: javaVersion.stderr, runner_sha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), comparisons }, null, 2)}\n`,
-    0,
-    "utf8"
-  );
+  writeJSONToFileDescriptor(comparisonFd, { complete, passed: complete && comparisons.every(c => c.passed), java_version: javaVersion.stderr, runner_sha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), comparisons });
   console.log(`${name}: ${result.passed ? "expected result" : "FAILED"} (${result.elapsed_seconds}s)`);
   assert(result.passed, `comparison failed; inspect ${logPath}`);
 }
