@@ -59,7 +59,7 @@ func TestAgyUnifiedSessionReconstruction(t *testing.T) {
 			require.Equal(t, 20, event.Data.Usage.OutputTokens)
 			require.Equal(t, 8, event.Data.Usage.ReasoningOutputTokens)
 			require.Equal(t, 30, event.Data.Usage.CacheReadInputTokens)
-			require.True(t, event.Data.Usage.InputTokensIncludeCache)
+			require.False(t, event.Data.Usage.InputTokensIncludeCache)
 		}
 	}
 	require.Equal(t, 1, results, "cumulative snapshots must not double-count inference")

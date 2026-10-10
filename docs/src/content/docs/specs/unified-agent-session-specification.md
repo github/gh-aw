@@ -1014,6 +1014,16 @@ repeated anonymous text does not establish snapshot coverage.
 
 **T-UAS-040 — Pi adapter.** The Pi adapter MUST support both recognized flat JSONL and v3 streaming records. It MUST preserve observed streaming content, execution events, IDs, source metadata, and provider errors even without a finalized message. It MUST accumulate distinct finalized-turn usage and MUST emit canonical `session.result`, not append bare legacy `result` for telemetry.
 
+> [!NOTE]
+> The following rows define the required canonical mappings, not a claim of full
+> implementation conformance. Pi's tool-update, provider-error, and lifecycle
+> mappings are pending in [#67393](https://github.com/github/gh-aw/pull/67393).
+> Until that change lands, the adapter retains `pi.message_update`,
+> `pi.tool_execution_update`, `pi.error`, and `pi.*` lifecycle observations;
+> finalized-message `errorMessage` remains native metadata rather than a separate
+> canonical session error. Those observations do not yet satisfy the corresponding
+> standard-event rows below.
+
 | Source signature | Canonical mapping |
 | --- | --- |
 | Flat `init`, `assistant`, `tool_use`, `tool_result` | Initialization, assistant content/deltas, starts, and completions, preserving native fields. |

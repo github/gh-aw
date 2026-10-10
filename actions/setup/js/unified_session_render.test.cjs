@@ -70,12 +70,12 @@ describe("unified session publication views", () => {
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  it("renders standard diagnostics and partial tool observations without dumping inputs or error context", () => {
+  it.each(['{"query":"PRIVATE_TOOL_ARGUMENT_DELTA"}', { query: "PRIVATE_TOOL_ARGUMENT_DELTA" }])("renders standard diagnostics without dumping tool delta %j, inputs or error context", delta => {
     const events = [
       header,
       event("session.error", { severity: "warning", message: "Temporary diagnostic", code: 0, error: { code: "provider_error", message: "Provider unavailable", context: "PRIVATE_ERROR_CONTEXT" }, stack: "PRIVATE_STACK" }, "agent", 0),
       event("session.info", { status: "retrying", message: "Retry scheduled" }, "agent", 1),
-      event("tool.execution_update", { toolName: "lookup", stepIndex: 0, partial: true, input: "PRIVATE_TOOL_INPUT", output: "PRIVATE_TOOL_OUTPUT" }, "agent", 2),
+      event("tool.execution_update", { toolName: "lookup", stepIndex: 0, partial: true, delta, input: "PRIVATE_TOOL_INPUT", output: "PRIVATE_TOOL_OUTPUT" }, "agent", 2),
       event("mcp.event", { event: "extension_start_failure", serverName: "github", status: "error" }, "mcp", 0),
     ];
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
@@ -88,6 +88,7 @@ describe("unified session publication views", () => {
       expect(output).not.toContain("PRIVATE_");
       expect(output).not.toContain("[extension payload omitted]");
     }
+    expect(events[3].data.delta).toEqual(delta);
   });
 
   it("renders every known message in both sinks without dumping prompts or opaque payloads", () => {
