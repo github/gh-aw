@@ -6,6 +6,9 @@ import { parseGooseLog } from "./parse_goose_log.cjs";
 import { parseEngineSession, collectUnifiedSession } from "./unified_session.cjs";
 import { parseCustomLog } from "./parse_custom_log.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
+import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
+import { success, failedTool, terminalFailure, startupFailure } from "./fixtures/goose_ci_sessions.cjs";
+import { validateSession } from "./scripts/validate_session.cjs";
 
 const jsonl = events => events.map(event => JSON.stringify(event)).join("\n");
 const message = (id, role, content) => ({ type: "message", message: { id, role, created: 1791174000, content, metadata: { inference: { requestedModel: "gpt-5.4" } } } });
@@ -111,6 +114,263 @@ describe("Goose unified session parser", () => {
     const toolResult = { status: "success", value: { structuredContent: { answer: 42 } } };
     const result = parseGooseLog(jsonl([fixture[0], message("user-1", "user", [{ ...response, toolResult }])]));
     expect(result.logEntries.find(event => event.type === "tool.execution_complete").data).toMatchObject({ success: true, output: { answer: 42 } });
+  });
+
+  it("maps CI MCP identity and observed shell outcomes into essential unified fields", () => {
+    for (const events of [success, failedTool]) {
+      const parsed = parseGooseLog(jsonl(events));
+      const starts = parsed.logEntries.filter(event => event.type === "tool.execution_start");
+      expect(starts.every(event => typeof event.data.mcpServerName === "string")).toBe(true);
+      const shell = parsed.logEntries.find(event => event.type === "tool.execution_complete" && event.data.toolName === "shell");
+      const native = events.flatMap(event => event.message?.content ?? []).find(item => item.type === "toolResponse" && item.id === shell.data.toolCallId).toolResult.value;
+      expect(shell.data).toMatchObject({ mcpServerName: "developer", success: !native.isError, isError: native.isError, structuredContent: native.structuredContent, output: native.content, exitCode: native.structuredContent.exit_code });
+      expect(normalizeUnifiedSessionEvent(shell).data).toEqual({
+        toolCallId: shell.data.toolCallId,
+        toolName: "shell",
+        mcpServerName: "developer",
+        success: !native.isError,
+        isError: native.isError,
+        output: native.content,
+        exitCode: native.structuredContent.exit_code,
+      });
+      expect(parsed.logEntries.at(-1).data.status).toBe("completed");
+      expect(parsed.logEntries.at(-1).data.totalCostUsd).toBe(0);
+      expect(parsed.logEntries.at(-1).data.usage.cache_creation_input_tokens).toBe(0);
+      expect(parseGooseLog(jsonl(parsed.logEntries)).logEntries).toEqual(parsed.logEntries);
+    }
+  });
+
+  it("retains CI terminal failure without fabricating usage or confusing credit limits with turn limits", () => {
+    const parsed = parseGooseLog(jsonl(terminalFailure));
+    expect(parsed.logEntries.find(event => event.type === "session.error").data.error).toBe(terminalFailure.at(-1).error);
+    expect(parsed.logEntries.at(-1).data).toEqual({ status: "error", errors: [terminalFailure.at(-1).error], numTurns: 1 });
+    expect(parsed.maxTurnsHit).toBe(false);
+  });
+
+  it("uses standard diagnostic events and retains flags on canonical round trips", () => {
+    const parsed = parseGooseLog(`${startupFailure}\n${jsonl([{ type: "error", error: "Maximum turns reached" }])}`);
+    expect(parsed.logEntries.some(event => event.type.startsWith("goose."))).toBe(false);
+    expect(parsed.logEntries.filter(event => event.type === "mcp.event").map(event => event.data)).toEqual([
+      { event: "extension_start_failure", serverName: "github", status: "error" },
+      { event: "extension_start_failure", serverName: "safeoutputs", status: "error" },
+    ]);
+    expect(parsed.logEntries.find(event => event.type === "session.error").data).toEqual({ error: "Maximum turns reached" });
+    const reparsed = parseGooseLog(jsonl(parsed.logEntries));
+    expect(reparsed.logEntries).toEqual(parsed.logEntries);
+    expect(reparsed.mcpFailures).toEqual(["github", "safeoutputs"]);
+    expect(reparsed.maxTurnsHit).toBe(true);
+  });
+
+  it.each([null, false, 0, "", {}, []])("preserves explicit tool arguments %j instead of replacing them with defaults", input => {
+    const events = [message("assistant-1", "assistant", [{ ...request, toolCall: { status: "success", value: { name: "tool", arguments: input } } }])];
+    expect(parseGooseLog(jsonl(events)).logEntries.find(event => event.type === "tool.execution_start").data.input).toEqual(input);
+  });
+
+  it("does not invent arguments for a request without them", () => {
+    const events = [message("assistant-1", "assistant", [{ ...request, toolCall: { status: "success", value: { name: "tool" } } }])];
+    expect(parseGooseLog(jsonl(events)).logEntries.find(event => event.type === "tool.execution_start").data).not.toHaveProperty("input");
+  });
+
+  it("retains explicit envelope metadata rather than overwriting it with message defaults", () => {
+    const native = { ...message("message-id", "assistant", [{ type: "text", text: "" }]), id: "envelope-id", timestamp: 0, parentId: null, vendor: { enabled: false } };
+    const events = parseGooseLog(jsonl([native])).logEntries;
+    expect(events.every(event => event.id === "envelope-id" && event.timestamp === 0 && event.parentId === null)).toBe(true);
+    expect(events.find(event => event.type === "assistant.message")).toMatchObject({ vendor: { enabled: false }, data: { content: "" }, message: { id: "message-id" } });
+  });
+
+  it.each([null, false, 0, {}, []])("falls back from invalid envelope IDs %j to the native message identity", id => {
+    const native = { ...message("message-id", "assistant", [{ type: "text", text: "Retained." }]), id };
+    const events = parseGooseLog(jsonl([native])).logEntries;
+    expect(events.every(event => event.id === "message-id")).toBe(true);
+    expect(events.find(event => event.type === "session.collection_warning").data).toEqual({ code: "invalid_source_metadata", field: "id" });
+    expect(validateSession(serializeSessionArtifact(events), "agent")).toBe(events.length);
+  });
+
+  it.each([null, false, {}, []])("falls back from invalid envelope timestamps %j to source seconds", timestamp => {
+    const native = { ...message("message-id", "assistant", [{ type: "text", text: "Retained." }]), timestamp };
+    const events = parseGooseLog(jsonl([native])).logEntries;
+    expect(events.every(event => event.timestamp === "2026-10-05T04:20:00.000Z")).toBe(true);
+    expect(events.find(event => event.type === "session.collection_warning").data).toEqual({ code: "invalid_source_metadata", field: "timestamp" });
+    expect(validateSession(serializeSessionArtifact(events), "agent")).toBe(events.length);
+  });
+
+  it("omits invalid terminal metadata when no valid fallback exists", () => {
+    const result = parseGooseLog(jsonl([{ type: "error", error: "Interrupted", id: null, timestamp: null, parentId: false }]));
+    for (const event of result.logEntries) {
+      expect(event).not.toHaveProperty("id");
+      expect(event).not.toHaveProperty("timestamp");
+      expect(event).not.toHaveProperty("parentId");
+    }
+    expect(result.logEntries.filter(event => event.type === "session.collection_warning").map(event => event.data.field)).toEqual(["id", "timestamp", "parentId"]);
+    expect(validateSession(serializeSessionArtifact(result.logEntries), "agent")).toBe(result.logEntries.length);
+  });
+
+  it.each([undefined, false, true])("lets a nonzero structured exit control the outcome while retaining isError=%j", isError => {
+    const toolResult = { status: "success", value: { content: [], structuredContent: { exit_code: 1 }, ...(isError === undefined ? {} : { isError }) } };
+    const events = [message("assistant-1", "assistant", [request]), message("user-1", "user", [{ ...response, toolResult }])];
+    const completion = parseGooseLog(jsonl(events)).logEntries.find(event => event.type === "tool.execution_complete");
+    expect(completion.data).toMatchObject({ toolName: "github__pull_request_read", success: false, exitCode: 1 });
+    if (isError === undefined) expect(completion.data).not.toHaveProperty("isError");
+    else expect(completion.data.isError).toBe(isError);
+    expect(normalizeUnifiedSessionEvent(completion).data).toMatchObject({ success: false, exitCode: 1 });
+  });
+
+  it("retains structured exit codes for orphan completions without inventing tool identity", () => {
+    const toolResult = { status: "success", value: { content: [], structuredContent: { exit_code: 0 }, isError: false } };
+    const completion = parseGooseLog(jsonl([message("user-1", "user", [{ ...response, toolResult }])])).logEntries.find(event => event.type === "tool.execution_complete");
+    expect(completion.data).toMatchObject({ success: true, exitCode: 0, isError: false });
+    expect(completion.data).not.toHaveProperty("toolName");
+  });
+
+  it.each([null, "1", 1.5])("does not infer failure or an exit code from invalid structured exit %j", exit_code => {
+    const toolResult = { status: "success", value: { content: [], structuredContent: { exit_code }, isError: false } };
+    const completion = parseGooseLog(jsonl([message("user-1", "user", [{ ...response, toolResult }])])).logEntries.find(event => event.type === "tool.execution_complete");
+    expect(completion.data.success).toBe(true);
+    expect(completion.data).not.toHaveProperty("exitCode");
+    expect(completion.data.structuredContent).toEqual({ exit_code });
+  });
+
+  it("preserves canonical extensions, refusals and their metadata without guessing refusals from text", () => {
+    const events = [
+      { type: "vendor.progress", data: { enabled: false, count: 0, detail: null }, id: "extension-id", parentId: null, timestamp: 0, extra: [] },
+      { type: "assistant.refusal", data: { reason: "content_filter", content: "", partial: false, policyCategory: null } },
+    ];
+    const parsed = parseGooseLog(jsonl([...events, message("text-id", "assistant", [{ type: "text", text: "I cannot do that." }])]));
+    expect(parsed.logEntries.slice(0, 2)).toEqual(events);
+    expect(parsed.logEntries.filter(event => event.type === "assistant.refusal")).toHaveLength(1);
+    expect(parsed.logEntries.find(event => event.type === "assistant.message").data.content).toBe("I cannot do that.");
+  });
+
+  it("reconciles cumulative snapshots and retains accounting when a later terminal error is observed", () => {
+    const events = [complete, { type: "complete", input_tokens: 110 }, { type: "error", error: "Interrupted" }];
+    const result = parseGooseLog(jsonl(events));
+    expect(result.logEntries.filter(event => event.type === "session.result")).toHaveLength(1);
+    expect(result.logEntries.at(-1).data).toEqual({
+      status: "error",
+      errors: ["Interrupted"],
+      totalCostUsd: 0.01,
+      usage: { input_tokens: 110, output_tokens: 20, total_tokens: 120, cache_read_input_tokens: 30, cache_creation_input_tokens: 4, input_tokens_include_cache: true },
+    });
+  });
+
+  it("does not move text across an intervening reasoning or tool observation", () => {
+    const result = parseGooseLog(
+      jsonl([
+        message("assistant-1", "assistant", [{ type: "text", text: "Before." }, request]),
+        message("assistant-1", "assistant", [
+          { type: "thinking", thinking: "Check." },
+          { type: "text", text: "After." },
+        ]),
+      ])
+    );
+    expect(result.logEntries.filter(event => event.type !== "session.init").map(event => [event.type, event.data.content])).toEqual([
+      ["assistant.message", "Before."],
+      ["tool.execution_start", undefined],
+      ["assistant.reasoning", "Check."],
+      ["assistant.message", "After."],
+    ]);
+  });
+
+  it("retains changing streaming metadata instead of combining distinct observations", () => {
+    const first = message("assistant-1", "assistant", [{ type: "text", text: "First", annotations: { priority: 0 } }]);
+    const second = message("assistant-1", "assistant", [{ type: "text", text: "Second", annotations: { priority: 1 } }]);
+    const third = { ...second, message: { ...second.message, metadata: { ...second.message.metadata, agentVisible: false } } };
+    const events = parseGooseLog(jsonl([first, second, third])).logEntries.filter(event => event.type === "assistant.message");
+    expect(events.map(event => event.data.content)).toEqual(["First", "Second", "Second"]);
+    expect(events.map(event => event.message)).toEqual([first.message, second.message, third.message]);
+  });
+
+  it("merges equivalent streaming metadata regardless of object key ordering", () => {
+    const first = { ...message("assistant-1", "assistant", [{ type: "text", text: "First", annotations: { priority: 0, audience: ["assistant"] } }]), vendor: { enabled: false, count: 0 } };
+    const second = { ...message("assistant-1", "assistant", [{ annotations: { audience: ["assistant"], priority: 0 }, text: "Second", type: "text" }]), vendor: { count: 0, enabled: false } };
+    second.message.metadata = { inference: { requestedModel: "gpt-5.4" } };
+    const events = parseGooseLog(jsonl([first, second])).logEntries.filter(event => event.type === "assistant.message");
+    expect(events).toHaveLength(1);
+    expect(events[0].data.content).toBe("FirstSecond");
+    expect(events[0].vendor).toEqual({ enabled: false, count: 0 });
+  });
+
+  it("keeps changing unknown extension metadata as distinct streaming observations", () => {
+    const first = { ...message("assistant-1", "assistant", [{ type: "text", text: "First" }]), vendor: { enabled: false } };
+    const second = { ...message("assistant-1", "assistant", [{ type: "text", text: "Second" }]), vendor: { enabled: true } };
+    const events = parseGooseLog(jsonl([first, second])).logEntries.filter(event => event.type === "assistant.message");
+    expect(events.map(event => event.data.content)).toEqual(["First", "Second"]);
+    expect(events.map(event => event.vendor.enabled)).toEqual([false, true]);
+  });
+
+  it("does not fabricate lifecycle events for malformed error requests or lose an observed empty model", () => {
+    const native = message("assistant-1", "assistant", [{ ...request, toolCall: { status: "error" } }]);
+    native.message.metadata.inference.requestedModel = "";
+    const result = parseGooseLog(jsonl([native]));
+    expect(result.logEntries.find(event => event.type === "session.init").data.model).toBe("");
+    expect(result.logEntries.filter(event => event.type === "session.collection_warning").map(event => event.data.code)).toEqual(["malformed_tool_request"]);
+    expect(result.logEntries.some(event => event.type.startsWith("tool.") || event.type === "session.error")).toBe(false);
+  });
+
+  it("reports missing native correlation IDs rather than silently dropping tool observations", () => {
+    const result = parseGooseLog(
+      jsonl([
+        message("assistant-1", "assistant", [
+          { ...request, id: null },
+          { ...response, id: 0 },
+        ]),
+      ])
+    );
+    expect(result.logEntries.filter(event => event.type === "session.collection_warning").map(event => event.data)).toEqual([{ code: "malformed_tool_request" }, { code: "malformed_tool_response" }]);
+    expect(result.logEntries.some(event => event.type.startsWith("tool."))).toBe(false);
+  });
+
+  it("retains old canonical Goose diagnostics without emitting new vendor wrappers", () => {
+    const events = [
+      { type: "goose.max_turns", data: { error: "Maximum turns reached" } },
+      { type: "goose.mcp_failure", data: { serverName: "github" } },
+    ];
+    const result = parseGooseLog(jsonl(events));
+    expect(result.logEntries).toEqual(events);
+    expect(result.maxTurnsHit).toBe(true);
+    expect(result.mcpFailures).toEqual(["github"]);
+  });
+
+  it.each([false, true])("preserves CI tool outcomes through canonical serialization and collection with canonical=%s", canonical => {
+    for (const fixture of [success, failedTool, terminalFailure]) {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-goose-ci-"));
+      roots.push(root);
+      const native = jsonl(fixture);
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), native);
+      const parsed = parseGooseLog(native).logEntries;
+      const artifact = serializeSessionArtifact(parsed);
+      expect(validateSession(artifact, "agent")).toBe(parsed.length);
+      if (canonical) fs.writeFileSync(path.join(root, "agent-session.jsonl"), artifact);
+      const collected = collectUnifiedSession({ rootDir: root, engine: "goose" });
+      expect(validateSession(serializeSessionArtifact(collected.events), "unified")).toBe(collected.events.length);
+      const unified = collected.events.filter(event => event.type === "tool.execution_complete");
+      expect(unified.map(event => event.data)).toEqual(parsed.filter(event => event.type === "tool.execution_complete").map(event => normalizeUnifiedSessionEvent(event).data));
+      const nativeText = fixture
+        .flatMap(event => event.message?.content ?? [])
+        .filter(item => item.type === "text")
+        .map(item => item.text)
+        .join("");
+      expect(
+        collected.events
+          .filter(event => event.type === "assistant.message")
+          .map(event => event.data.content)
+          .join("")
+      ).toBe(nativeText);
+      expect(collected.events.find(event => event.type === "session.result").data.status).toBe(fixture === terminalFailure ? "error" : "completed");
+    }
+  });
+
+  it.each([false, true])("preserves CI startup extension names through collection with canonical=%s", canonical => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-goose-startup-"));
+    roots.push(root);
+    fs.writeFileSync(path.join(root, "agent-stdio.log"), startupFailure);
+    const parsed = parseGooseLog(startupFailure).logEntries;
+    if (canonical) fs.writeFileSync(path.join(root, "agent-session.jsonl"), serializeSessionArtifact(parsed));
+    const collected = collectUnifiedSession({ rootDir: root, engine: "goose" });
+    const failures = collected.events.filter(event => event.type === "mcp.event");
+    expect(failures.map(event => event.data)).toEqual(parsed.map(event => event.data));
+    expect(validateSession(serializeSessionArtifact(collected.events), "unified")).toBe(collected.events.length);
+    expect(parseGooseLog(jsonl(failures)).mcpFailures).toEqual(["github", "safeoutputs"]);
   });
 
   it.each([false, true])("collects Goose session events with canonical artifact present=%s", canonical => {

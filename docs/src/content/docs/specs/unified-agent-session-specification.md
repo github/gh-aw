@@ -743,6 +743,14 @@ An implementation can preserve native delta extension events and emit one corres
 
 **T-UAS-022 — Tool identity.** Supplied native tool IDs MUST be retained exactly on both mapped starts and completions. Pairing MUST use an available exact ID before any compatibility fallback. Conflicting supplied IDs MUST NOT be paired by tool name. A fallback for missing IDs MAY associate an unambiguous source-proven pair, but MUST NOT invent a canonical source ID or pair ambiguous concurrent calls.
 
+A source-proven numeric step key can map to `stepIndex`, scoped by `sessionId`,
+without fabricating a string `toolCallId`. Display-only compatibility views may
+allocate IDs for these pairs; stored traces retain the native step identity.
+An observed `inputTruncated` flag remains on a tool start when the source exposes
+only a command preview; it is not a claim that the full command was captured.
+An explicitly supplied `exitCode: null` remains null, indicating that the source
+did not report an exit code, rather than success or failure.
+
 **T-UAS-023 — Dangling calls.** A start without an observed completion MUST remain a dangling start. Parsers and readers MUST NOT synthesize a successful completion, successful output, or failed completion merely because input ended. Session-level errors MUST NOT be converted into completions of otherwise unresolved tools.
 
 **T-UAS-024 — Orphan completions.** An orphan completion MUST remain available with its original ID, outcome, output, and metadata. A compatibility renderer MAY create a display-only placeholder for the missing invocation, but MUST NOT replace a supplied completion ID, invent executed arguments or commands, or append that placeholder to the canonical trace.
@@ -828,6 +836,8 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Same user envelope with `tool_result` blocks | `tool.execution_complete`; `tool_use_id`, `content`, `is_error`, `duration_ms` mapped. |
 | Direct `type: "message", role: "assistant"` or `"user"` envelopes | The same content-block mappings as SDK assistant/user envelopes; only assistant usage contributes to session accounting. |
 | `type: "result"` with recognized accounting/diagnostic fields | `session.result`; preserve source result metadata, expose `sourceType: "result"` and the terminal subtype as `status`. Explicit `is_error` or an error subtype takes precedence and maps to `status: "error"`. |
+| `system/permission_denied` | `session.result.permissionDenials`; no inferred tool completion. Later terminal denial snapshots reconcile by observed tool and caller identity. |
+| `assistant.error`, `system/api_retry`, or Messages API error | `session.result.errors`; native diagnostic/retry metadata remains on the canonical event, without a duplicate Claude-specific envelope. |
 | `system/task_started` with `task_type: "local_agent"` | `subagent.started`; task ID identifies the target agent, with launcher tool, agent type, execution mode, and observed spawn depth. |
 | Agent launch tool result with `agentId` and `resolvedModel` | Retain the tool completion and emit `subagent.configured` for the observed target model. |
 | `system/task_notification` for an observed local agent | `subagent.completed` or `subagent.failed`; retain observed token/tool/duration counters, and mark stopped tasks as cancelled. Other local-agent statuses remain native observations rather than dynamic-workflow events. |
@@ -848,6 +858,10 @@ than concatenating it. User, assistant, and reasoning messages retain available
 attribution in the unified projection; user prompts remain omitted from default
 summaries. Structured tool-result content stays structured, and an absent tool
 outcome remains unknown.
+
+Mapped stream envelopes and finalized snapshots remain metadata on the core
+observations they describe; they do not introduce duplicated engine-specific
+message events. Unknown controls and native extensions remain opaque.
 
 Nested SDK sessions can share the root `session_id`. Available `sessionId`,
 `parentToolUseId`, and caller `agentId` remain on messages, tools, initialization,
@@ -898,6 +912,13 @@ effort. `session.shutdown.data.agentMetrics` is exposed unchanged in
 `session.result.data.agentMetrics`, including per-agent model request counts,
 token counts, and nano-AIU credits. This is an authoritative snapshot, not an
 additional contribution to session usage.
+
+The unified projection compacts `session.shutdown` to observed lifecycle and
+request counters; accounting details remain in `session.result`.
+`session.task_complete` retains its supplied success flag without duplicating a
+textual summary already mapped to `assistant.message`. Nontext summaries remain
+available as supplied data. Refusals retain the same request and caller identity
+fields as assistant messages.
 
 Pi dispatches, resolved models, per-request token usage, terminal outcomes, and
 invocation IDs are projected into the shared `subagent.*` lifecycle vocabulary.
@@ -956,7 +977,8 @@ An item carrying a complete invocation and result can expand to a start and comp
 | `type: "tool_use"` with `tool_name`, `tool_id`, `parameters` | Start with native name, ID, and arguments. |
 | `type: "tool_result"` with `tool_id`, `status`, `output` | Completion with native output type and outcome; preserve explicit error fields. |
 | `type: "result"` with recognized `stats`/error metadata | `session.result`; map supplied `input_tokens`, `output_tokens`, `cached` → cache-read tokens, and `duration_ms`. |
-| `type: "error"` with a message/error payload | Retain `gemini.error`; severity `error` or an unspecified severity also exposes a separate `session.result.errors` observation. A warning remains a warning, not an inferred session failure. |
+| `type: "error"` with a message/error payload | Retain the diagnostic in `session.error`; severity `error` or an unspecified severity also exposes a separate `session.result.errors` observation. A warning remains a warning, not an inferred session failure. |
+| Recognized non-init system status | `session.info`, preserving status text and source metadata without inventing an assistant answer. |
 
 Native tool-call counts and other statistics remain compatible extension data. Turn count, USD cost, and cache-creation usage remain absent unless a supported source field actually supplies them.
 
@@ -972,19 +994,19 @@ separate from tool errors.
 Adjacent deltas coalesce only when their metadata envelopes are identical.
 Differing native IDs, timestamps, channels, or additions retain separate core
 fragments. Supplemental compatible inputs with an explicit `message_id`,
-`messageId`, or legacy `message.id` can identify a full-message snapshot:
-`gemini.message_snapshot` retains its native payload. An unchanged snapshot adds
-no core content; an append-only snapshot adds only its unreported suffix. A
-rewritten or shortened snapshot retires the matching message/channel/block's
-earlier core fragments to opaque `gemini.message_observation` events, retaining
-exact original source envelopes in `data.observations`, and emits the full
-authoritative core content at the snapshot position. Tool observations and
+`messageId`, or legacy `message.id` can identify a full-message snapshot.
+An unchanged snapshot adds no core content; an append-only snapshot adds only
+its unreported suffix. A rewritten or shortened snapshot retires the matching
+message/channel/block's earlier core fragments, retaining exact original source
+envelopes in the authoritative core event's `data.observations`, and emits the
+full authoritative core content at the snapshot position. These recognized
+snapshots do not introduce Gemini-specific message wrappers. Tool observations and
 unrelated identities remain in place, without duplicate or stale answers.
 For a full legacy content-array snapshot, a rewrite, removal, reordering,
 insertion before existing content, or extension before an unchanged sibling
 replaces all visible text/reasoning fragments of that message; supplied blocks
 are emitted in their authoritative array order.
-An empty final array retains the snapshot but emits no fabricated text.
+An empty final array remains structured core `content: []`, not fabricated text.
 Gemini's flat stream has no native message identity; a record's event `id` or
 repeated anonymous text does not establish snapshot coverage.
 
@@ -999,9 +1021,12 @@ repeated anonymous text does not establish snapshot coverage.
 | v3 `session` with numeric source `version` and native `id` | Initialization with `sessionId` from the source ID, retaining timestamp/cwd/version as source metadata. |
 | Recognized `message_start`, `message_update`, `message_end` / `turn_end.message.content` | Text, thinking, and `toolCall` observations; finalized content is a snapshot, not another copy of streaming text. |
 | `tool_execution_start` / `tool_execution_end` | Independent start/completion using `toolCallId`, tool name/arguments, `result`, and `isError`; keep orphan ends and dangling starts. |
+| `toolcall_start` / `toolcall_delta` / `toolcall_end` message updates | One `tool.execution_start`, reconciled with partial argument text and finalized arguments. An orphan argument delta remains a partial `tool.execution_update`; boundary-only updates and repeated snapshots do not introduce message wrappers. |
+| `tool_execution_update` | `tool.execution_update` with canonical `input`, partial `output`, correlation IDs, and `partial: true`, not a Pi-specific message. |
 | Distinct `turn_end.message.usage` | Sum supplied `input`/`output`; map supplied `cacheRead`/`cacheWrite` to cache-read/cache-creation fields. Preserve other usage/cost data when exposed. |
-| `turn_end.message.errorMessage` | Session/provider error, even when content is empty. |
+| Finalized message `errorMessage` or top-level `error` | `session.error` and `session.result.errors`, even when content is empty; repeated message snapshots retain one diagnostic observation. |
 | Recognized `agent_end` or other terminal accounting | Reconcile any supplied session snapshot; do not add it again to per-turn totals. |
+| `agent_start`, `agent_settled`, retry, compaction, queue, entry, and reasoning-effort observations | Engine-independent `session.*` lifecycle extensions retaining the supplied payload. |
 
 The adapter can discover a reported model from a finalized turn without inventing an earlier model observation. Presentation aliases such as `bash` → `Bash` do not change canonical tool names. Sources lacking duration or cost do not supply zero duration or zero cost.
 
@@ -1064,8 +1089,8 @@ unified collection, custom delegation, and local reconstruction.
 | `toolRequest` with string `id` and structured `toolCall` | Start with native call ID, successful call's name and arguments; malformed requests produce coverage warnings rather than fabricated executions. |
 | `toolResponse` with string `id` and valid success/error `toolResult` | Completion with native call ID, matched name, exact content or structured-only result, and explicit outcome; absent starts do not create invented starts. |
 | `complete` with observed token fields | One cumulative `session.result` snapshot; map input/output/total/cache-read counts and cache-write → cache-creation, preserving valid zero counts and exposed `cost_usd`. |
-| `error` with string error | Preserve `session.error` and terminal `session.result.errors`; recognized maximum-turn diagnostics also emit `goose.max_turns` and set `maxTurnsHit`. |
-| Recognized extension-start warning or canonical `goose.mcp_failure` | Preserve the server name and report `mcpFailures`, not arbitrary quoted error prose. |
+| `error` with string error | Preserve `session.error` and terminal `session.result.errors`; recognized maximum-turn diagnostics retain their code on `session.error` and set `maxTurnsHit`. |
+| Recognized extension-start warning or canonical `goose.mcp_failure` | Map the observed startup failure to `mcp.event` with `event: "extension_start_failure"`, `serverName`, and `status: "error"`; report `mcpFailures`, not arbitrary quoted error prose. Existing native extension records remain readable. |
 
 `Message.created` uses Unix seconds. The parser retains the original envelope
 and derives an ISO timestamp from valid source seconds for timeline ordering;
@@ -1298,7 +1323,20 @@ payloads with harmless examples.
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
+| Pi | [Smoke success](https://github.com/github/gh-aw/actions/runs/37789661712) and [failed workflow](https://github.com/github/gh-aw/actions/runs/37865831889) | `pi-streaming.jsonl`, `agent-session.jsonl`, and `usage/aw_session.jsonl` | Complete downloaded traces replayed locally; historical custom wrappers are replaced prospectively, not rewritten in published artifacts. |
 | Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
+| AGY | [Smoke](https://github.com/github/gh-aw/actions/runs/37848575608) and [authentication check](https://github.com/github/gh-aw/actions/runs/37732637929) | Smoke `agent-stdio.log`, `agent-session.jsonl`, and `usage/aw_session.jsonl`; authentication receipt only, not a native transcript | `fixtures/agy_ci_sessions.cjs`, `parse_agy_log_conformance.test.cjs` |
+| Aider | [Smoke success](https://github.com/github/gh-aw/actions/runs/37863370348), [downstream failure](https://github.com/github/gh-aw/actions/runs/37976723705), and [rate-limit failure](https://github.com/github/gh-aw/actions/runs/37080828156) | Modern native, canonical, and unified artifacts; rate-limit run predates structured capture | Native-hook regressions distinguish captured message evidence from synthetic reasoning/refusal/accounting-hook coverage. |
+
+The AGY smoke workflow failed its checker after successful inference. Its v1.3.1
+native stream exposes `conversation_id` and `step_index`, not string tool-call
+IDs. These map to scoped `sessionId` and `stepIndex`; `user_input` and
+`agent_response` map to messages, outputless `DONE` tools still map to completions,
+and per-step/checkpoint usage remains separate `usage.report` evidence.
+Usage observations retain their available `sessionId` and `stepIndex` without
+fabricated request IDs.
+Its `input_tokens` excludes cache-read tokens. An authentication receipt is not
+evidence of successfully parsed inference content.
 
 Paths in the corpus column are relative to `actions/setup/js/`. Supplemental cases
 cover features absent from the samples: Claude streaming wrappers, Codex terminal

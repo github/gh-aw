@@ -160,6 +160,29 @@ engine:
 
 Workflow authors can still override it with `safe-outputs.threat-detection.engine`, or disable AI analysis with `safe-outputs.threat-detection.engine: false`.
 
+## OpenCode session evidence
+
+The repository sample uses `run --format json`. Its parser maps native text,
+reasoning, and tool parts to the standard session events, preserving exact
+whitespace, structured inputs/results, supplied partiality, and native metadata.
+Changed snapshots of the same message or tool part update one canonical parser
+observation and retain the native revisions in `nativeSnapshots`. Distinct model
+steps contribute accounting once; updated reports replace their supplied fields
+without erasing independently known fields. Unsafe token sums are marked
+unavailable, and overflowing cost totals are omitted rather than published as
+partial subtotals.
+
+OpenCode can emit a provider `stream error` only in its stderr logfmt diagnostics.
+The parser retains these as `session.error`, including their native timestamps,
+session identity, and error text. A retried stream error does not establish a
+terminal outcome, successful response, or zero usage. Explicit structured
+refusals map to `assistant.refusal`; natural-language disclaimers do not.
+Native streams that omit user messages, reasoning, or accounting remain partial.
+
+The sanitized regression corpus in
+[`fixtures/opencode_ci_sessions.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/fixtures/opencode_ci_sessions.cjs)
+preserves native session evidence from existing OpenCode artifacts.
+
 ## Recompile after workflow edits
 
 Engine settings live in workflow frontmatter. Recompile whenever you change the import reference, the engine version, or any other frontmatter field:

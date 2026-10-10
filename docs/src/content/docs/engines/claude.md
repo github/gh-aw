@@ -93,6 +93,16 @@ GH_AW_CLAUDE_TEST_CLI=/absolute/path/to/claude npm run test:js -- claude_cli_liv
 
 The suite uses synthetic prompts, an isolated home directory, and a loopback Anthropic-compatible server. It does not use real credentials or external inference.
 
+## Session trace mapping
+
+The Claude adapter maps native messages, thinking, tool calls/results, policy refusals, provider errors, and permission denials into the [unified agent session vocabulary](/gh-aw/specs/unified-agent-session-specification/). Images, documents, and opaque redacted thinking retain their structured content. Explicit tool failure or interruption signals take precedence over contradictory success fields; missing outcomes, duration, and exit codes remain unknown.
+
+Provider failures and API retries appear once as `session.result.errors`, with their native diagnostic metadata retained on the canonical event. Permission notices appear as `session.result.permissionDenials`, not assistant answers or inferred tool completions. Matching terminal denial snapshots reconcile with earlier observations by supplied tool and session identity; distinct notices and explicitly empty snapshots remain available.
+
+Mapped streaming envelopes and finalized SDK snapshots remain attached to canonical events rather than becoming duplicate `claude.*` records. The first finalized snapshot is retained even when block starts are missing or refusal is first identified in that snapshot. Streamed images, documents, and redacted thinking are enriched by finalized snapshots without emitting the same block again. Streamed refusal observations retain their partial flag until a finalized snapshot or message stop arrives. Unknown transport controls, estimated thinking-token notifications, and native dot-namespaced extensions remain separate evidence; estimated tokens do not become session accounting.
+
+The parser trace is persisted as `agent-session.jsonl`; conclusion projects essential payloads into `usage/aw_session.jsonl`. Older artifacts may contain only `agent-stdio.log`. The sampled successful and failed CI transcripts exercise native CLI shapes; streaming and structured-content regressions also use synthetic SDK/API records and do not establish live coverage for those features.
+
 ## Guided workflow authoring with Claude Code
 
 Claude Code users can initialize the repository and author agentic workflows with interactive guidance — no Copilot subscription required.

@@ -160,7 +160,8 @@ describe("Unified conclusion session", () => {
       provenance: { component: "execution", phase: "agent", path: "agent-errors.jsonl" },
     });
     expect(executions[0]).not.toHaveProperty("timestamp");
-    expect(events.filter(event => event.type === "claude.assistant_error")).toHaveLength(1);
+    expect(events.filter(event => event.type === "claude.assistant_error")).toHaveLength(0);
+    expect(events.filter(event => event.type === "session.result" && event.data.errors?.some(error => error?.error === "server_error"))).toHaveLength(1);
     expect(writeUnifiedSession({ rootDir: root, engine: "claude" })).toEqual(events);
   });
 
@@ -658,7 +659,8 @@ describe("Unified conclusion session", () => {
     expect(answers.map(event => event.data.content)).toEqual([summary]);
     expect(answers[0].id).toBe("complete");
     expect(answers[0].provenance.path).toBe("agent-session.jsonl");
-    expect(events.find(event => event.type === "session.task_complete").data.sourceDetail).toBe("observed metadata");
+    expect(events.find(event => event.type === "session.task_complete").data).not.toHaveProperty("sourceDetail");
+    expect(events.find(event => event.type === "session.task_complete").data).not.toHaveProperty("summary");
     const markdown = require("./session_cli.cjs").sessionCLI(["markdown", write("usage/aw_session.jsonl", events)]);
     expect(markdown).toContain("Observed historical final answer");
     expect(markdown).toContain("Second paragraph.");

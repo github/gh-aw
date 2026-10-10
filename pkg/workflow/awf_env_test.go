@@ -291,6 +291,44 @@ func TestComputeAWFExcludeEnvVarNames(t *testing.T) {
 	}
 }
 
+func TestOTLPEnvExcludedFromAWFSandboxes(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		env  string
+		want bool
+	}{
+		{name: "configured endpoint", env: "env:\n  OTEL_EXPORTER_OTLP_ENDPOINT: https://traces.example.com\n", want: true},
+		{name: "no endpoint", env: "env:\n  OTHER: value\n", want: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{
+				Env:          tt.env,
+				EngineConfig: &EngineConfig{ID: "copilot"},
+			}
+			for _, phase := range []struct {
+				name string
+				data *WorkflowData
+			}{
+				{name: "agent", data: data},
+				{name: "detection", data: buildThreatDetectionWorkflowData(data, "copilot")},
+			} {
+				t.Run(phase.name, func(t *testing.T) {
+					excluded := ComputeAWFExcludeEnvVarNames(phase.data, []string{"COPILOT_GITHUB_TOKEN"})
+					args := BuildAWFArgs(AWFCommandConfig{WorkflowData: phase.data, ExcludeEnvVarNames: excluded})
+					assert.Contains(t, args, "--env-all")
+					for _, name := range otlpSandboxExcludedEnvVarNames {
+						if tt.want {
+							assert.Equal(t, 1, strings.Count(strings.Join(args, " "), "--exclude-env "+name))
+						} else {
+							assert.NotContains(t, strings.Join(args, " "), "--exclude-env "+name)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestComputeAWFExcludeEnvVarNamesDetectsSecretExpressionsAcrossSources(t *testing.T) {
 	expressions := []struct {
 		name  string
