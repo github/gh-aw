@@ -54,7 +54,6 @@ The package is designed to adapt to the execution environment. Native builds det
 | `FormatProgressMessage` | `func FormatProgressMessage(message string) string` | Formats a progress/activity message with a `▸` prefix. |
 | `FormatProgressMessageStderr` | `func FormatProgressMessageStderr(message string) string` | Formats a progress/activity message for stderr styling. |
 | `FormatPromptMessage` | `func FormatPromptMessage(message string) string` | Formats a prompt message with a `?` prefix. |
-| `FormatPromptMessageStderr` | `func FormatPromptMessageStderr(message string) string` | Formats a prompt for stderr styling. |
 | `FormatSectionHeader` | `func FormatSectionHeader(header string) string` | Formats a section header. |
 | `FormatSectionHeaderStderr` | `func FormatSectionHeaderStderr(header string) string` | Formats a section header for stderr styling. |
 | `FormatSuccessMessage` | `func FormatSuccessMessage(message string) string` | Formats a success message with a checkmark prefix. |
@@ -62,7 +61,6 @@ The package is designed to adapt to the execution environment. Native builds det
 | `FormatTableHeaderStderr` | `func FormatTableHeaderStderr(text string) string` | Formats table-header text for stderr output. |
 | `FormatTokens` | `func FormatTokens(tokens int) string` | Formats token counts into readable grouped text. |
 | `FormatVerboseMessage` | `func FormatVerboseMessage(message string) string` | Formats verbose output with a `»` prefix. |
-| `FormatVerboseMessageStderr` | `func FormatVerboseMessageStderr(message string) string` | Formats verbose output for stderr styling. |
 | `FormatWarningMessage` | `func FormatWarningMessage(message string) string` | Formats a warning message with a warning prefix. |
 | `FormatWarningMessageStderr` | `func FormatWarningMessageStderr(message string) string` | Formats a warning message for stderr styling. |
 | `(*SpinnerWrapper).IsEnabled` | `func (s *SpinnerWrapper) IsEnabled() bool` | WASM-only helper that reports spinner availability; always returns `false` in WASM builds. |
