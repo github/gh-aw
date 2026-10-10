@@ -40,6 +40,16 @@ CONTENT_KEYS = {
     "task",
     "text",
 }
+TOOL_IDENTIFIER_KEYS = {
+    "agent",
+    "agentid",
+    "agentname",
+    "invocationid",
+    "model",
+    "requestedmodel",
+    "resolvedmodel",
+    "toolcallid",
+}
 SESSION_TYPES = (
     "workflow.info",
     "model_routing.outcome",
@@ -138,6 +148,13 @@ def redact_string(value, key, identities):
 
 
 def redact(value, identities, key="", parent_key=""):
+    if key.lower() in {"input", "arguments"} and isinstance(value, dict):
+        return {
+            child_key: redact(child, identities, child_key)
+            if re.sub(r"[^a-z]", "", child_key.lower()) in TOOL_IDENTIFIER_KEYS
+            else "[redacted]"
+            for child_key, child in value.items()
+        }
     if sensitive_key(key):
         return "[redacted]"
     if isinstance(value, dict):

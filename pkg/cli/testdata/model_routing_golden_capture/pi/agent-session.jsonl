@@ -1,0 +1,4 @@
+{"type":"session.init","data":{"sourceEngine":"pi","cwd":"/home/private-user/private-repo"}}
+{"type":"tool.execution_start","data":{"toolName":"subagent","toolCallId":"pi-call-1","input":{"agent":"file-summarizer","task":"PRIVATE_TASK_TEXT","prompt":"PRIVATE_PROMPT_TEXT","text":"PRIVATE_INPUT_TEXT","query":"PRIVATE_QUERY_TEXT"},"arguments":{"agent":"file-summarizer","task":"PRIVATE_ARGUMENT_TASK"}}}
+{"type":"pi.subagent_event","data":{"agent":"file-summarizer","event":{"message":{"model":"claude-haiku-4-5-20251001","content":"PRIVATE_MESSAGE_TEXT","usage":{"input":10,"output":2}}}}}
+{"type":"tool.execution_complete","data":{"toolName":"subagent","toolCallId":"pi-call-1","success":true,"output":"PRIVATE_TOOL_OUTPUT"}}

@@ -15,6 +15,44 @@ SOURCE = ROOT / "pkg/cli/testdata/model_routing_golden_capture"
 
 
 class ModelRoutingGoldenCaptureTest(unittest.TestCase):
+    def test_pi_capture_preserves_subagent_identifiers(self):
+        for session_path in ("usage/aw_session.jsonl", "agent-session.jsonl"):
+            with self.subTest(session_path=session_path), tempfile.TemporaryDirectory(prefix="pi-capture-test-") as temporary:
+                source = Path(temporary) / "download"
+                source.mkdir()
+                (source / "aw_info.json").write_bytes((SOURCE / "pi/aw_info.json").read_bytes())
+                session = source / session_path
+                session.parent.mkdir(parents=True, exist_ok=True)
+                session.write_bytes((SOURCE / "pi" / session_path).read_bytes())
+                output_root = Path(temporary) / "fixtures"
+                subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--source-dir",
+                        str(source),
+                        "--case",
+                        "pi-capture",
+                        "--output-root",
+                        str(output_root),
+                    ],
+                    cwd=ROOT,
+                    check=True,
+                )
+                fixture = output_root / "pi-capture"
+                records = [json.loads(line) for line in (fixture / session_path).read_text(encoding="utf-8").splitlines()]
+                tool_input = records[1]["data"]["input"]
+                self.assertEqual(tool_input["agent"], "file-summarizer")
+                for key in ("task", "prompt", "text", "query"):
+                    self.assertEqual(tool_input[key], "[redacted]")
+                self.assertEqual(
+                    records[1]["data"]["arguments"],
+                    {"agent": "file-summarizer", "task": "[redacted]"},
+                )
+                all_content = "\n".join(path.read_text(encoding="utf-8") for path in fixture.rglob("*") if path.is_file())
+                for secret in ("PRIVATE_", "private-org", "private-repo", "private-user", "/home/"):
+                    self.assertNotIn(secret, all_content)
+
     def test_capture_redacts_and_preserves_analysis_inputs(self):
         with tempfile.TemporaryDirectory(prefix="model-routing-capture-test-") as temporary:
             output_root = Path(temporary) / "fixtures"
