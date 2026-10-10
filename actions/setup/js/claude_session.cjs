@@ -132,6 +132,7 @@ function normalizeClaudeSession(records) {
       if (!partial) delete state.refusalEvent.data.partial;
     } else {
       state.refusalEvent = emit(source, "assistant.refusal", data);
+      if (!partial) retainSnapshot(state.refusalEvent, source);
     }
     if (state.textEvents.length) {
       (state.refusalEvent.data.observedTextEvents ??= []).push(...structuredClone(state.textEvents));
@@ -172,7 +173,7 @@ function normalizeClaudeSession(records) {
       const start = block.tool_use_id !== undefined ? tools.get(toolKey(source, block.tool_use_id)) : undefined;
       const result = source.tool_use_result;
       const failed = block.is_error === true || block.isError === true || block.success === false || block.error != null || result?.is_error === true || result?.isError === true || result?.error != null || result?.interrupted === true;
-      const success = failed ? false : block.is_error === false ? true : typeof block.success === "boolean" ? block.success : undefined;
+      const success = failed ? false : block.is_error === false || block.isError === false ? true : typeof block.success === "boolean" ? block.success : undefined;
       const workflow = source.tool_use_result?.taskType === "local_workflow" ? source.tool_use_result : undefined;
       const agent = typeof source.tool_use_result?.agentId === "string" ? source.tool_use_result : undefined;
       const event = emit(source, "tool.execution_complete", {
@@ -337,6 +338,7 @@ function normalizeClaudeSession(records) {
         if (!observed || observed.type !== block?.type) {
           const event = emitBlock(source, block, { contentIndex: index });
           if (streamed && event) {
+            retainSnapshot(event, source);
             streamed.blocks.set(index, { type: block.type, text: block.type === "thinking" ? (block.thinking ?? "") : (block.text ?? ""), argumentText: "", event });
             if (event.type === "assistant.message") streamed.textEvents.push(event);
           }
@@ -354,6 +356,8 @@ function normalizeClaudeSession(records) {
           }
         } else if (block.type === "tool_use" && observed.type === "tool_use" && observed.event?.data.toolCallId === block.id) {
           if (Object.hasOwn(block, "input")) observed.event.data.input = structuredClone(block.input);
+        } else if (["redacted_thinking", "image", "document"].includes(block.type) && observed.event) {
+          Object.assign(observed.event.data, structuredClone(block), { content: structuredClone(block) });
         } else {
           emitBlock(source, block, { contentIndex: index });
         }

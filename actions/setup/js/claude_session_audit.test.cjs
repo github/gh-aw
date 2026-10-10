@@ -122,8 +122,63 @@ describe("Claude observed partials and structured payloads", () => {
     expect(projectSessionResult(events)).toBeUndefined();
   });
 
+  it.each([
+    ["assistant.reasoning", { type: "redacted_thinking", data: "opaque-sanitized-thinking" }],
+    ["assistant.message", { type: "image", source: { type: "base64", media_type: "image/png", data: "sanitized-image" } }],
+    ["assistant.message", { type: "document", source: { type: "text", media_type: "text/plain", data: " exact\n" } }],
+  ])("retains a streamed atomic %s block once with every finalized snapshot", (type, block) => {
+    const start = { ...stream({ type: "content_block_start", index: 0, content_block: block }), id: "atomic-start", parentId: null, timestamp: 0 };
+    const snapshot = {
+      type: "assistant",
+      session_id: "audit-session",
+      parent_tool_use_id: null,
+      uuid: "atomic-snapshot",
+      message: { id: "atomic", model: "fixture-model", content: [block] },
+    };
+    const repeated = { ...snapshot, uuid: "repeated-atomic-snapshot" };
+    const records = [stream({ type: "message_start", message: { id: "atomic", model: "fixture-model" } }), start, snapshot, repeated];
+    const original = structuredClone(records);
+    const events = parse(records);
+    const blocks = events.filter(event => event.type === type);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ id: "atomic-start", parentId: null, timestamp: 0, data: { contentIndex: 0, messageId: "atomic", model: "fixture-model", content: block } });
+    expect(blocks[0].event).toEqual(start.event);
+    expect(blocks[0].data.snapshots).toEqual([snapshot, repeated]);
+    const persisted = JSON.parse(JSON.stringify(events));
+    expect(normalizeClaudeSession(persisted)).toEqual(persisted);
+    const unified = project(persisted).filter(event => event.type === type);
+    expect(unified).toHaveLength(1);
+    expect(unified[0].data.content).toEqual(block);
+    expect(records).toEqual(original);
+  });
+
+  it("enriches an atomic block from its final snapshot without discarding the original observation", () => {
+    const observed = { type: "redacted_thinking", data: "observed-opaque-thinking" };
+    const finalized = { type: "redacted_thinking", data: "final-opaque-thinking", signature: "native-signature" };
+    const snapshot = { type: "assistant", session_id: "audit-session", parent_tool_use_id: null, message: { id: "atomic-update", content: [finalized] } };
+    const events = parse([stream({ type: "message_start", message: { id: "atomic-update" } }), stream({ type: "content_block_start", index: 0, content_block: observed }), snapshot]);
+    const reasoning = events.filter(event => event.type === "assistant.reasoning");
+    expect(reasoning).toHaveLength(1);
+    expect(reasoning[0].data).toMatchObject({ content: finalized, signature: "native-signature", snapshots: [snapshot] });
+    expect(reasoning[0].event.content_block).toEqual(observed);
+    expect(project(events).find(event => event.type === "assistant.reasoning").data.content).toEqual(finalized);
+  });
+
+  it("keeps an explicit camelCase tool success through normalization and unified projection", () => {
+    const events = parse([{ type: "user", id: "tool-result", message: { content: [{ type: "tool_result", tool_use_id: "orphan", content: "", isError: false }] } }]);
+    expect(events[0]).toMatchObject({ type: "tool.execution_complete", data: { toolCallId: "orphan", output: "", success: true, isError: false } });
+    expect(project(events)[0].data).toMatchObject({ toolCallId: "orphan", output: "", success: true, isError: false });
+    expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));
+  });
+
   it.each([{ is_error: true }, { isError: true }, { success: false }])("preserves a failure %j over a contradictory success signal", failureSignal => {
     const events = parse([{ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "orphan", content: { exact: false }, is_error: false, success: true, ...failureSignal }] } }]);
+    expect(events[0].data.success).toBe(false);
+    expect(project(events)[0].data.success).toBe(false);
+  });
+
+  it.each([{ is_error: true }, { success: false }, { error: { code: "failed" } }])("keeps failure %j authoritative over isError: false", failureSignal => {
+    const events = parse([{ type: "user", message: { content: [{ type: "tool_result", content: false, isError: false, ...failureSignal }] } }]);
     expect(events[0].data.success).toBe(false);
     expect(project(events)[0].data.success).toBe(false);
   });
@@ -174,7 +229,18 @@ describe("Claude observed partials and structured payloads", () => {
     const snapshot = { type: "assistant", session_id: "audit-session", parent_tool_use_id: null, message: { id: "snapshot-only", content: [{ type: "text", text: " exact\n" }] } };
     const events = parse([stream({ type: "message_start", message: { id: "snapshot-only" } }), snapshot, snapshot]);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual([" exact\n"]);
-    expect(events.find(event => event.type === "assistant.message").data.snapshots).toHaveLength(1);
+    expect(events.find(event => event.type === "assistant.message").data.snapshots).toEqual([snapshot, snapshot]);
+  });
+
+  it("retains the first and only finalized snapshot after a message start", () => {
+    const snapshot = { type: "assistant", session_id: "audit-session", parent_tool_use_id: null, id: "only-snapshot", timestamp: 0, message: { id: "one-snapshot", content: [{ type: "text", text: " exact\n" }] } };
+    const events = parse([stream({ type: "message_start", message: { id: "one-snapshot" } }), snapshot]);
+    const messages = events.filter(event => event.type === "assistant.message");
+    expect(messages).toHaveLength(1);
+    expect(messages[0].data.snapshots).toEqual([snapshot]);
+    const persisted = JSON.parse(JSON.stringify(events));
+    expect(normalizeClaudeSession(persisted)).toEqual(persisted);
+    expect(project(persisted).find(event => event.type === "assistant.message")).toMatchObject({ id: "only-snapshot", timestamp: 0, data: { content: " exact\n" } });
   });
 });
 
@@ -207,14 +273,21 @@ describe("Claude refusal snapshot boundaries", () => {
   });
 
   it("reclassifies earlier text when refusal is first supplied by the finalized SDK snapshot", () => {
-    const events = parse([
-      stream({ type: "message_start", message: { id: "late-refusal" } }),
-      stream({ type: "content_block_start", index: 0, content_block: { type: "text", text: "Not an answer." } }),
-      { type: "assistant", session_id: "audit-session", parent_tool_use_id: null, message: { id: "late-refusal", stop_reason: "refusal", content: null } },
-    ]);
+    const snapshot = {
+      type: "assistant",
+      session_id: "audit-session",
+      parent_tool_use_id: null,
+      uuid: "late-refusal-snapshot",
+      message: { id: "late-refusal", stop_reason: "refusal", stop_details: { category: "example", explanation: null }, content: null },
+    };
+    const events = parse([stream({ type: "message_start", message: { id: "late-refusal" } }), stream({ type: "content_block_start", index: 0, content_block: { type: "text", text: "Not an answer." } }), snapshot]);
     expect(events.filter(event => event.type === "assistant.refusal")).toHaveLength(1);
     expect(events.some(event => event.type === "assistant.message")).toBe(false);
     expect(events.find(event => event.type === "assistant.refusal").data.observedTextEvents).toHaveLength(1);
+    expect(events.find(event => event.type === "assistant.refusal").data.snapshots).toEqual([snapshot]);
+    const persisted = JSON.parse(JSON.stringify(events));
+    expect(normalizeClaudeSession(persisted)).toEqual(persisted);
+    expect(project(persisted).find(event => event.type === "assistant.refusal").data).toMatchObject({ reason: "refusal", policyCategory: "example", explanation: null });
   });
 
   it("reclassifies snapshot suffixes and corrected text rather than leaving a duplicate answer", () => {
