@@ -111,7 +111,7 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(source).toContain("will atomically bootstrap the branch with its compiler-approved Policy and Work.");
     expect(source).toContain("Safe-output processing uses only the compiler-approved Policy proposal; never");
     expect(source).toContain("no administrator seed is required.");
-    expect(source).toContain("Agentic Workflows authenticates participants at the trusted boundary.");
+    expect(source).not.toContain("authenticates participants");
     expect(source).not.toMatch(/branch protection|queue-branch protections/i);
   });
 

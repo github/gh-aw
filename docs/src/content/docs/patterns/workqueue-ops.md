@@ -48,7 +48,7 @@ These declarations are only part of deployment. Configure approved worker routes
 producer permissions and capacity limits using the
 [work-queue deployment guide](/gh-aw/guides/deploy-work-queue/). Frontmatter alone
 does not install Policy; the first trusted producer submit automatically
-bootstraps Policy and Work. Agentic Workflows authenticates participants.
+bootstraps Policy and Work.
 
 ```mermaid
 flowchart LR

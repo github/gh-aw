@@ -40,9 +40,8 @@ Dispatchers need `tools.work-queue: true`, a worker allowlist and bounded
 immutable SHA, principal, trust domain and effect scope; moving `target-ref` is
 ignored.
 
-Configure producer entitlements; Agentic Workflows authenticates participants
-at its trusted publication boundary. First submit automatically installs compiled
-Policy and Work without administrator seeding or separate participant enrollment.
+Configure producer entitlements. First submit automatically installs compiled
+Policy and Work without administrator seeding.
 Later Policy changes are admin-only. Admin
 status grants no producer entitlement. Never expose queue-write credentials to
 agents/snapshot MCP. Repository access rules are GitHub's responsibility, not

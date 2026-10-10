@@ -59,8 +59,8 @@ Activation reports a missing queue branch as `queue_state: "uninitialized"`
 without writing to it. The dispatcher can continue as a producer: its first
 `work_queue_submit` safe output atomically creates the branch with the compiled
 Policy and admitted Work. A dispatch-only request cannot bootstrap the queue.
-No administrator seed or separate participant enrollment is
-required. Do not substitute an ordinary workflow dispatch for a queue assignment.
+No administrator seed is required. Do not substitute an ordinary workflow
+dispatch for a queue assignment.
 
 For optional administrator-managed seeding, the checked-in policy generator
 provides three immutable worker profiles, singleton assignments, three native
@@ -569,7 +569,7 @@ warnings without changing committed ownership, charging, or launch fencing.
 | Reuse one handle or aggregate all output allowances across a batch | Use each member's original handle and enforce per-Claim counts; original membership never shrinks |
 | Treat monster's clean flag as proof of zero diagnostics | ESLint exit zero includes warning-only results. Installation/build/tool failure is not a clean scan |
 | Treat prompt quality requirements as ledger guarantees | Rule quality, nonduplicate findings, and the monster's three-total-remediation-assignments instruction are prompt obligations, not a global runtime quota or proof of successful remediation |
-| Treat bootstrap as exclusive ownership of the repository | Agentic Workflows authenticates participants and keeps queue-write credentials out of agents; GitHub enforces repository access rules independently |
+| Treat bootstrap as exclusive ownership of the repository | Queue-write credentials remain outside agents; GitHub enforces repository access rules independently |
 
 See the [queue specification](/gh-aw/specs/work-queue-specification/#91-implementation-coverage-and-remaining-requirements)
 for coverage and remaining deployment/host requirements, and the

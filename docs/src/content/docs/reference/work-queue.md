@@ -322,8 +322,8 @@ not proof of launch.
 A Policy update requires a quiescent queue: no nonterminal (unfinished) Work,
 outstanding reservations, or unresolved delivery barriers for completed Work.
 GitHub enforces repository access rules independently of the queue protocol.
-Agentic Workflows authenticates participants; queue use needs no separate
-enrollment or repository-administration access. A trusted workflow producer can publish only the exact
+Queue use needs no repository-administration access.
+A trusted workflow producer can publish only the exact
 compiler-approved proposal with its first Work on an absent branch; the agent
 cannot choose or update Policy or receive queue-write credentials.
 Direct repository writers can alter or delete the queue; malformed

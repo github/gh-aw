@@ -509,10 +509,8 @@ malformed logs, and unsupported histories MUST fail closed rather than being
 overwritten. Later Policy epochs remain administrator-only and require a drained
 queue.
 
-Automatic first-use bootstrap MUST NOT require repository-administration access,
-administrator seeding or separate participant
-enrollment. The trusted Agentic Workflows runtime supplies authenticated
-participant context. GitHub enforces repository access rules independently;
+Automatic first-use bootstrap MUST NOT require repository-administration access
+or administrator seeding. GitHub enforces repository access rules independently;
 an actual Git write denial remains an error.
 
 Ref conflicts MUST NOT establish absence unless an independent native observation
@@ -944,12 +942,14 @@ cause. A ledger or authorization failure is an error, not a no-grant success.
 
 Every queue MUST refuse unscheduled new Claims and old writers. There is no legacy mode in which the old direct-claim path remains valid. An explicit Work selector cannot bypass the scheduler. Preserve single-winner ownership and terminal safety as invariants of the new protocol, not by retaining an unscheduled compatibility path.
 
-#### Authenticated writers
+#### Runtime identity and queue authorization
 
-The trusted Agentic Workflows runtime MUST authenticate participant context and
-keep publication credentials out of agent jobs and untrusted workflow code.
-Queue use MUST NOT require separate enrollment or repository-administration
-permission. Publishers MUST use checked append-only publication with
+Authentication is provided by AW, outside the work-queue protocol. The queue
+consumes runtime-supplied identity to enforce Policy entitlements, operation
+roles and Claim ownership; it defines no authentication or enrollment mechanism.
+Publication credentials remain outside agent jobs and untrusted workflow code.
+Queue use MUST NOT require repository-administration permission.
+Publishers MUST use checked append-only publication with
 `force: false`; an authorized operator uses the same checked publisher.
 
 GitHub owns repository access rules, independently of the queue protocol.

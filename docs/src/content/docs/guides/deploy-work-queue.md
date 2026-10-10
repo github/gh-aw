@@ -14,8 +14,7 @@ Before you begin, prepare a trusted producer identity, an approved worker, and
 a compiler-approved Policy proposal (the queue's scheduling and authorization
 rules). The first accepted producer submission installs that proposal with its
 Work when the branch is absent, without administrator seeding.
-Agentic Workflows authenticates participants at its trusted runtime
-boundary; workflow frontmatter alone does not install Policy.
+Workflow frontmatter alone does not install Policy.
 
 ## Publish the worker and dispatcher
 
@@ -128,9 +127,7 @@ producers permission to use each additional key.
 
 ## Automatic first-use bootstrap
 
-Do not create the queue branch, seed Policy or enroll participants separately
-before using the queue. Agentic Workflows supplies
-the authenticated participant context to its trusted publisher. The first
+Do not create the queue branch or seed Policy before using the queue. The first
 accepted producer submission creates `work-queue` with Policy and Work together.
 Normal repository contents-write permission is sufficient for queue publication;
 repository-administration permission is not required.

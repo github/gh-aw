@@ -51,9 +51,8 @@ invocation can resubmit the same immutable request. The model's `deferred` phase
 records this failed attempt, not automatic polling or a runtime retry loop.
 Repeating an already-published request recovers its receipt without another commit.
 
-Bootstrap has no administrator-enrollment prerequisite;
-Agentic Workflows supplies the trusted participant context. The model assumes
-checked append-only publishers. Direct replacement or deletion by other
+Bootstrap needs no administrator seed. The model assumes checked append-only
+publishers using runtime-supplied identity. Direct replacement or deletion by other
 repository writers is outside its guarantees. GitHub enforces repository access
 rules independently.
 
