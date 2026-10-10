@@ -53,6 +53,7 @@ tools:
   bash:
   - git
   - cat
+  - cut
   - find
   - ls
   - sed
@@ -99,7 +100,7 @@ Never add version-history rows or dated audit entries to the specification file,
 
 ## Tooling Constraint
 
-This workflow uses a restricted Copilot SDK shell allowlist. For repository inspection, use the approved shell commands above (`git`, `cat`, `find`, `ls`, `sed`, `awk`, `grep`, `head`, `pwd`, `go`) instead of built-in file read/view tools, and avoid requesting commands outside that set.
+This workflow uses a restricted Copilot SDK shell allowlist. For repository inspection, use the approved shell commands above (`git`, `cat`, `cut`, `find`, `ls`, `sed`, `awk`, `grep`, `head`, `pwd`, `go`) instead of built-in file read/view tools, and avoid requesting commands outside that set. If a command is denied, preserve the full denied command in the failure report and name the exact `tools.bash` entry required; do not broaden the allowlist.
 
 This workflow simulates a team of experts in:
 - GitHub Actions compilation
