@@ -104,13 +104,43 @@ class ModelRoutingGoldenCaptureTest(unittest.TestCase):
 
     def test_capture_redacts_and_preserves_analysis_inputs(self):
         with tempfile.TemporaryDirectory(prefix="model-routing-capture-test-") as temporary:
+            source = Path(temporary) / "download"
+            for path in SOURCE.rglob("*"):
+                if path.is_file() and "pi" not in path.relative_to(SOURCE).parts:
+                    copied = source / path.relative_to(SOURCE)
+                    copied.parent.mkdir(parents=True, exist_ok=True)
+                    copied.write_bytes(path.read_bytes())
+            identifiers = {"agent_type": "research", "name": "subagent-research", "mode": "background"}
+            for session_path in ("usage/aw_session.jsonl", "agent-session.jsonl"):
+                with (source / session_path).open("a", encoding="utf-8") as session:
+                    for record in (
+                        {"type": "tool.execution_start", "data": {
+                            "toolName": "task", "arguments": {
+                                **identifiers, "description": "PRIVATE_TASK_DESCRIPTION",
+                                "prompt": "gh-aw-router",
+                            },
+                        }},
+                        {"type": "subagent.started", "data": {
+                            "agentType": "research", "agentName": "research",
+                            "agentDisplayName": "subagent-research", "executionMode": "background",
+                            "agentDescription": "PRIVATE_AGENT_DESCRIPTION",
+                        }},
+                        {"type": "session.shutdown", "data": {
+                            "codeChanges": {"filesModified": ["/tmp/PRIVATE_WORKSPACE.py"]},
+                        }},
+                    ):
+                        session.write(json.dumps(record) + "\n")
+            routing = source / "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl"
+            records = [json.loads(line) for line in routing.read_text(encoding="utf-8").splitlines()]
+            records[0]["router"] = {"name": "gh-aw-router"}
+            routing.write_text("".join(json.dumps(record) + "\n" for record in records), encoding="utf-8")
             output_root = Path(temporary) / "fixtures"
             subprocess.run(
                 [
                     sys.executable,
                     str(SCRIPT),
                     "--source-dir",
-                    str(SOURCE),
+                    str(source),
                     "--case",
                     "capture-smoke",
                     "--output-root",
@@ -157,6 +187,34 @@ class ModelRoutingGoldenCaptureTest(unittest.TestCase):
                 for line in (fixture / "agent-session.jsonl").read_text(encoding="utf-8").splitlines()
             ]
             self.assertIn("tool.execution_start", {record["type"] for record in agent_session})
+            for records in (session, agent_session):
+                task = next(record for record in records if record.get("data", {}).get("toolName") == "task")
+                self.assertEqual(task["data"]["arguments"], {
+                    **identifiers, "description": "[redacted]", "prompt": "[redacted]",
+                })
+                subagent = next(record for record in records if "agentDescription" in record.get("data", {}))
+                self.assertEqual(subagent["data"]["agentDescription"], "[redacted]")
+                self.assertEqual(subagent["data"]["agentDisplayName"], identifiers["name"])
+                shutdown = next(record for record in records if record["type"] == "session.shutdown")
+                self.assertEqual(shutdown["data"]["codeChanges"]["filesModified"], ["[redacted]"])
+
+            spec = importlib.util.spec_from_file_location("model_routing_golden", SCRIPT)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            for key, leaked in (
+                ("agentDescription", "PRIVATE_AGENT_DESCRIPTION"),
+                ("arguments", {"name": identifiers["name"], "description": "PRIVATE_TASK_DESCRIPTION"}),
+                ("codeChanges", {"filesModified": ["/tmp/PRIVATE_WORKSPACE.py"]}),
+                ("message", "gh-aw-router"),
+            ):
+                with self.subTest(leaked_key=key):
+                    path = fixture / "usage/aw_session.jsonl"
+                    clean = path.read_text(encoding="utf-8")
+                    with path.open("a", encoding="utf-8") as output:
+                        output.write(json.dumps({"type": "agent.execution", "data": {key: leaked}}) + "\n")
+                    with self.assertRaisesRegex(ValueError, "fixture contains unredacted content"):
+                        module.verify_sensitive_content_redacted(source, fixture)
+                    path.write_text(clean, encoding="utf-8")
 
 
 if __name__ == "__main__":
