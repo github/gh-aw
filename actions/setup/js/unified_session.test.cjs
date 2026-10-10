@@ -566,7 +566,10 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "session.init").data).toMatchObject({ sourceEngine: "copilot", model: "fixture-model" });
     expect(events.find(event => event.type === "assistant.message").data.content).toBe("Recovered response.");
     expect(events.find(event => event.type === "tool.execution_complete").data).toMatchObject({ toolName: "bash", success: true, exitCode: 0 });
-    expect(events.filter(event => event.type === "session.result").map(event => event.data)).toEqual([{ durationMs: 5000, usage: { inputTokens: 10, outputTokens: 4 } }, { numTurns: 1 }]);
+    expect(events.filter(event => event.type === "session.result").map(event => event.data)).toEqual([
+      { sourceEngine: "copilot", sessionId: "native", durationMs: 5000, usage: { inputTokens: 10, outputTokens: 4 } },
+      { sourceEngine: "copilot", sessionId: "native", numTurns: 1 },
+    ]);
     expect(events.filter(event => event.provenance.component === "agent").every(event => event.provenance.path === nativePath)).toBe(true);
     const { generatePlainTextSummary } = require("./log_parser_shared.cjs");
     const summary = generatePlainTextSummary(events);
@@ -576,20 +579,23 @@ describe("Unified conclusion session", () => {
     expect(summary).toContain("Tools: 1/1 succeeded");
   });
 
-  it.each([
-    [`{"type":"session.start","data":{"sessionId":"native"}}\n`],
-    [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`],
-    [`{"type":"assistant.message","data":{"content":"partial native"}}\n{"type":"assistant.message",`],
-  ])("falls back to stdio when native Copilot events are incomplete", nativeContent => {
-    const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
-    write(nativePath, nativeContent);
-    write("agent-stdio.log", JSON.stringify({ type: "assistant.message", data: { content: "recovered stdio" } }));
-    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
-    const agentEvents = events.filter(event => event.provenance.component === "agent");
-    expect(agentEvents).toEqual([expect.objectContaining({ type: "assistant.message", data: { content: "recovered stdio" }, provenance: expect.objectContaining({ path: "agent-stdio.log" }) })]);
-    expect(events.some(event => event.type === "session.collection_warning" && event.data.path === nativePath)).toBe(true);
-    expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: nativePath, events: 0 }));
-  });
+  it.each([[`{"type":"session.start","data":{"sessionId":"native"}}\n`], [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`]])(
+    "falls back to stdio when native Copilot events are incomplete",
+    nativeContent => {
+      const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
+      write(nativePath, nativeContent);
+      write("agent-stdio.log", JSON.stringify({ type: "assistant.message", data: { content: "recovered stdio" } }));
+      const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+      const agentEvents = events.filter(event => event.provenance.component === "agent");
+      expect(agentEvents).toEqual([
+        expect.objectContaining({ type: "session.start", provenance: expect.objectContaining({ path: nativePath }) }),
+        expect.objectContaining({ type: "session.init", provenance: expect.objectContaining({ path: nativePath }) }),
+        expect.objectContaining({ type: "assistant.message", data: { content: "recovered stdio" }, provenance: expect.objectContaining({ path: "agent-stdio.log" }) }),
+      ]);
+      expect(events.some(event => event.type === "session.collection_warning" && event.data.path === nativePath)).toBe(true);
+      expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: nativePath, events: 2 }));
+    }
+  );
 
   it("prefers persisted canonical events over raw logs and avoids replicated firewall accounting", () => {
     write("agent-session.jsonl", [{ type: "vendor.extension", data: { preserved: true } }]);

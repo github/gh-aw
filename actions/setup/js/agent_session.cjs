@@ -42,7 +42,17 @@ function sessionContext(event) {
   const data = event?.data ?? {};
   const sessionId = data.sessionId !== undefined ? data.sessionId : event?.sessionId !== undefined ? event.sessionId : event?.session_id !== undefined ? event.session_id : data.session_id;
   const parentToolUseId =
-    data.parentToolUseId !== undefined ? data.parentToolUseId : event?.parentToolUseId !== undefined ? event.parentToolUseId : event?.parent_tool_use_id !== undefined ? event.parent_tool_use_id : data.parent_tool_use_id;
+    data.parentToolUseId !== undefined
+      ? data.parentToolUseId
+      : event?.parentToolUseId !== undefined
+        ? event.parentToolUseId
+        : event?.parent_tool_use_id !== undefined
+          ? event.parent_tool_use_id
+          : data.parent_tool_use_id !== undefined
+            ? data.parent_tool_use_id
+            : data.parentToolCallId !== undefined
+              ? data.parentToolCallId
+              : event?.parentToolCallId;
   const agentId = data.agentId ?? (typeof event?.type === "string" && event.type.startsWith("subagent.") ? undefined : event?.agentId);
   return {
     ...(typeof sessionId === "string" || sessionId === null ? { sessionId } : {}),
@@ -401,7 +411,8 @@ function selectSessionResult(events, { includeNested = false } = {}) {
   let result;
   for (const event of normalized) {
     if (event.type !== "session.result") continue;
-    if (!includeNested && event.data.sourceEngine === "claude" && sessionContext(event).parentToolUseId) continue;
+    const context = sessionContext(event);
+    if (!includeNested && (context.parentToolUseId || context.agentId !== undefined)) continue;
     result ??= {};
     const data = event.data;
     for (const [key, value] of Object.entries(data)) {

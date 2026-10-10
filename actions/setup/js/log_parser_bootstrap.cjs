@@ -6,7 +6,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
-const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
+const { projectSessionResult, isTokenCount, observedSessionModel, sessionContext } = require("./agent_session.cjs");
+const { isDeepStrictEqual } = require("node:util");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
@@ -327,7 +328,7 @@ async function runLogParser(options) {
       const isNativeCopilotSession = parserName === "Copilot" && path.basename(candidate.source) === "events.jsonl";
       const hasParseErrors = isNativeCopilotSession && hasMalformedJsonl(content);
       const hasUsableConversation = Array.isArray(result?.logEntries) && hasCopilotConversation(result.logEntries);
-      if (parserName !== "Copilot" || (hasUsableConversation && !hasParseErrors)) {
+      if (parserName !== "Copilot" || hasUsableConversation) {
         if (parserName === "Copilot") core.info(`Using Copilot session log from: ${candidate.source}`);
         break;
       }
@@ -337,7 +338,10 @@ async function runLogParser(options) {
       }
     }
     const finalSession = copilotSessions.at(-1);
-    const retainedSessions = copilotSessions.filter(session => hasCopilotConversation(session.events) && !hasMalformedJsonl(session.content));
+    const retainedSessions = copilotSessions.filter(session => session.events.length);
+    for (const session of retainedSessions) {
+      if (hasMalformedJsonl(session.content)) core.warning(`Copilot session log from ${session.source} is partially malformed; retaining supported observations without claiming the missing records were recovered`);
+    }
     const redactPublication = text => applyAddMaskRedaction(redactStepSummaryContent(text), [...publicationMasks]);
 
     // Handle result that may be a simple string or an object with metadata
@@ -355,10 +359,22 @@ async function runLogParser(options) {
       maxTurnsHit = result.maxTurnsHit || false;
       logEntries = result.logEntries || null;
     }
+    const scopedObservations = entries => {
+      let activeSessionId;
+      return entries.map(event => {
+        const context = sessionContext(event);
+        if (["session.start", "session.init"].includes(event.type) && context.sessionId !== undefined && context.agentId === undefined && !context.parentToolUseId) activeSessionId = context.sessionId;
+        return { event, sessionId: context.sessionId !== undefined ? context.sessionId : activeSessionId };
+      });
+    };
+    const retainedObservations = retainedSessions.flatMap(session => scopedObservations(session.events));
+    const supplementalEvents = scopedObservations(logEntries ?? [])
+      .filter(({ event, sessionId }) => event.id === undefined || !retainedObservations.some(previous => previous.sessionId === sessionId && isDeepStrictEqual(previous.event, event)))
+      .map(({ event }) => event);
     const conversationEntries = retainedSessions.length
       ? [
           ...retainedSessions.flatMap(session =>
-            session.events.map((event, index) => ({
+            [...session.events, ...(hasMalformedJsonl(session.content) ? [{ type: "session.collection_warning", data: { path: session.source, code: "malformed_jsonl" } }] : [])].map((event, index) => ({
               ...event,
               provenance: {
                 component: "agent",
@@ -369,7 +385,7 @@ async function runLogParser(options) {
               },
             }))
           ),
-          ...(selectedSource === finalSession?.source ? [] : (logEntries ?? [])),
+          ...(selectedSource === finalSession?.source ? [] : supplementalEvents),
         ]
       : logEntries;
 

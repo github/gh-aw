@@ -189,14 +189,19 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       throw new Error(`${ERR_SYSTEM}: Failed to read unified session source ${path.relative(rootDir, file)}: ${getErrorMessage(error)}`, { cause: error });
     }
   };
+  const recordCache = new Map();
   const records = file => {
+    if (recordCache.has(file)) return recordCache.get(file);
     const content = read(file);
     if (file.endsWith(".json")) {
       try {
         const value = JSON.parse(content);
-        return Array.isArray(value) ? value : [value];
+        const values = Array.isArray(value) ? value : [value];
+        recordCache.set(file, values);
+        return values;
       } catch {
         report(file, "malformed_json", undefined);
+        recordCache.set(file, []);
         return [];
       }
     }
@@ -210,6 +215,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
         report(file, "malformed_jsonl", index + 1);
       }
     }
+    recordCache.set(file, values);
     return values;
   };
   /**
@@ -382,9 +388,8 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const events = normalizeCopilotSession(snapshot.records);
     const source = { component: "agent", phase: "agent", path: path.relative(rootDir, snapshot.file), events };
     sources.push(source);
-    if (incompleteSources.has(snapshot.file) || !hasCopilotConversation(events)) {
+    if (!hasCopilotConversation(events)) {
       if (!incompleteSources.has(snapshot.file)) report(snapshot.file, "native_session_unusable", undefined);
-      source.events = [];
       continue;
     }
     copilotSources.set(source, { id, start: snapshot.start });
@@ -401,11 +406,10 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       const source = sources.at(-1);
       if (source?.path === path.relative(rootDir, file)) {
         source.events = normalizeCopilotSession(source.events);
-        if (!incompleteSources.has(file) && hasCopilotConversation(source.events)) {
+        if (hasCopilotConversation(source.events)) {
           agentEvents += source.events.length;
         } else {
           if (!incompleteSources.has(file)) report(file, "native_session_unusable", undefined);
-          source.events = [];
         }
       }
     }
@@ -532,7 +536,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     type: "session.collection",
     data: {
       sources: sources.map(({ events, ...source }) => ({ ...source, events: events.length })),
-      warnings: warnings.length,
+      warnings: warnings.length + sources.reduce((total, source) => total + source.events.filter(event => event.type === "session.collection_warning").length, 0),
       untimedEvents: sources.reduce((total, source) => total + source.events.filter(event => sessionTimestamp(event, source.timestampUnit) === undefined).length, 0),
       absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval", "workflow"].filter(component => !sources.some(source => source.component === component)),
     },

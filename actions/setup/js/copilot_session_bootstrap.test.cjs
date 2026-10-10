@@ -196,6 +196,20 @@ describe("Copilot retry session bootstrap", () => {
     expect(core.setFailed).not.toHaveBeenCalled();
   });
 
+  it("retains initialization-only evidence without duplicating identified fallback snapshots", async () => {
+    const start = { type: "session.start", id: "same-start", timestamp: "2026-10-03T18:23:23Z", data: { sessionId: "partial" } };
+    writeSession("partial", [start]);
+    fs.writeFileSync(path.join(root, "agent-stdio.log"), serialize([start, { type: "assistant.message", id: "recovered", data: { content: "Recovered observed response." } }]));
+
+    await run();
+
+    const canonical = readEvents(path.join(root, "agent-session.jsonl"));
+    expect(canonical.filter(event => event.type === "session.start")).toHaveLength(1);
+    expect(canonical.filter(event => event.type === "session.init")).toHaveLength(1);
+    expect(canonical.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Recovered observed response."]);
+    expect(core.setFailed).not.toHaveBeenCalled();
+  });
+
   it("surfaces directory enumeration failures with context and the original cause", () => {
     const failure = new Error("Permission denied");
     const readdir = fs.readdirSync;
