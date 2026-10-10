@@ -141,14 +141,22 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 	return nil, false
 }
 
-// Guardrail pricing must match the provider and model, not a related model's prefix.
+// Guardrail pricing must match the provider and base model, not a related model's
+// prefix. Separator-equivalent spellings follow the same normalization as validation.
 func findExactModelPricing(provider, model string) (map[string]float64, bool) {
 	initModelPrices()
 
 	normalizedProvider := modelsdev.NormalizeProvider(provider)
 	normalizedModel := strings.ToLower(strings.TrimSpace(model))
+	normalizedModel, _, _ = strings.Cut(normalizedModel, "?")
 	for _, record := range modelPriceRecords {
 		if record.provider == normalizedProvider && record.model == normalizedModel && len(record.pricing) > 0 {
+			return record.pricing, true
+		}
+	}
+	comparableModel := modelsdev.NormalizeComparableModelID(normalizedModel)
+	for _, record := range modelPriceRecords {
+		if record.provider == normalizedProvider && modelsdev.NormalizeComparableModelID(record.model) == comparableModel && len(record.pricing) > 0 {
 			return record.pricing, true
 		}
 	}

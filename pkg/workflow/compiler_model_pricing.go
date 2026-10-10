@@ -87,7 +87,7 @@ func normalizeProviderForPricing(provider string) string {
 
 func resolveProviderAndModelForPricing(workflowData *WorkflowData) (string, string, bool) {
 	provider := resolveEngineProviderForPricing(workflowData.EngineConfig)
-	model := strings.TrimSpace(workflowData.Model)
+	model, _, _ := strings.Cut(strings.TrimSpace(workflowData.Model), "?")
 	if model == "" {
 		return "", "", false
 	}
