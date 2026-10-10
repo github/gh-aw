@@ -508,7 +508,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const exitCode = observedExit ?? nativeExit?.exitCode ?? nativeExit?.exit_code;
   const execution = collectAgentExecution({
     content: stdioContent,
-    ...(engine === "aider" || canonicalSource?.events.some(event => event.data.sourceEngine === "aider") ? { rawSourceEngine: "aider" } : {}),
+    ...(engine === "aider" ? { rawSourceEngine: "aider" } : {}),
     events: executionAgentSources.flatMap(source => source.events),
     observations: executionObservations,
     ...(exists(exitFile) ? { exitCode: parseAgentExitCode(read(exitFile)) } : exitCode !== undefined ? { exitCode: validateAgentExitCode(exitCode) } : {}),
