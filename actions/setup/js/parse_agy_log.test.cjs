@@ -21,13 +21,14 @@ const fixture = [
 describe("native Agy session parser", () => {
   it("merges deltas, pairs tools and retains only the latest cumulative usage", () => {
     const parsed = parseAgyLog(jsonl([...fixture, fixture.at(-1)]));
-    expect(parsed.logEntries.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "agy", model: init.init.model });
+    expect(parsed.logEntries.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "agy", model: init.init.model, sessionId: init.conversation_id });
     expect(parsed.logEntries.filter(event => event.type === "assistant.message")).toHaveLength(1);
     expect(parsed.logEntries.find(event => event.type === "assistant.message").data.content).toBe("Conformance passed.");
     const start = parsed.logEntries.find(event => event.type === "tool.execution_start");
     const completion = parsed.logEntries.find(event => event.type === "tool.execution_complete");
-    expect(start.data).toMatchObject({ toolCallId: "conversation-1:1", toolName: "run_command", input: { command: "node probe.cjs" } });
-    expect(completion.data).toMatchObject({ toolCallId: start.data.toolCallId, success: true, output: "receipt" });
+    expect(start.data).toMatchObject({ stepIndex: 1, sessionId: "conversation-1", toolName: "run_command", input: { command: "node probe.cjs" } });
+    expect(start.data).not.toHaveProperty("toolCallId");
+    expect(completion.data).toMatchObject({ stepIndex: start.data.stepIndex, sessionId: start.data.sessionId, success: true, output: "receipt" });
     expect(parsed.logEntries.filter(event => event.type === "session.result")).toHaveLength(1);
     expect(parsed.logEntries.at(-1).data).toMatchObject({ status: "completed", numTurns: 2, usage: { input_tokens: 110, output_tokens: 25, total_tokens: 135, reasoning_output_tokens: 8, cache_read_input_tokens: 30 } });
     expect(parsed.markdown).toContain("Conformance passed.");
@@ -59,7 +60,7 @@ describe("native Agy session parser", () => {
     expect(parsed.markdown).not.toContain("PRIVATE_SECRET");
     expect(parseAgyLog("PRIVATE_PROMPT").markdown).not.toContain("PRIVATE_PROMPT");
     const metrics = parseAgyLog(jsonl([result({ usage: { input_tokens: 0, output_tokens: -1, cache_read_tokens: "30" } })]));
-    expect(metrics.logEntries.at(-1).data.usage).toEqual({ input_tokens: 0, input_tokens_include_cache: true });
+    expect(metrics.logEntries.at(-1).data.usage).toEqual({ input_tokens: 0, input_tokens_include_cache: false });
     expect(metrics.logEntries.at(-1).data).not.toHaveProperty("numTurns");
   });
 
