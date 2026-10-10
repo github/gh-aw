@@ -871,6 +871,11 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 		LogsPath:                   "/previous/run-42",
 		Classification:             "normal",
 		IntentionalFailure:         true,
+		AwContext: &AwContext{
+			Repo: "org/repo", RunID: "41", WorkflowID: "caller",
+			EpisodeID: "root-episode", HopID: "41-1:caller", ParentHopID: "40-1:root",
+			RootRepo: "org/repo", RootRunID: "40", RootWorkflowID: "root", OriginEvent: "issues",
+		},
 	}
 
 	outputDir := t.TempDir()
@@ -895,6 +900,9 @@ func TestBuildLogsDataPreservesCachedRunRecord(t *testing.T) {
 	assert.Equal(t, 2, data.Summary.TotalChainedFollowupActions)
 	assert.Equal(t, map[string]int{"copilot": 1}, data.Summary.EngineCounts)
 	assert.Equal(t, 1, data.Summary.IntentionalFailureRuns)
+	require.Len(t, data.Episodes, 1)
+	assert.Equal(t, cached.AwContext.EpisodeID, data.Episodes[0].EpisodeID)
+	assert.Equal(t, cached.AwContext, data.Runs[0].AwContext)
 }
 
 func TestHydrateProcessedRunWithCachedAuditLedger(t *testing.T) {

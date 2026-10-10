@@ -358,6 +358,61 @@ describe("essential unified session payloads", () => {
     expect(normalizeUnifiedSessionEvent(metadata)).toEqual(metadata);
   });
 
+  it("projects only recorded episode lineage from workflow context and round trips canonical fields", () => {
+    const source = {
+      type: "workflow.info",
+      data: {
+        run_id: "300",
+        context: {
+          episode_id: "100-1:root",
+          hop_id: "200-1:caller",
+          parent_hop_id: "100-1:root",
+          origin_event: "issues",
+          root_repo: "org/repo",
+          root_workflow_id: "org/repo/.github/workflows/root.yml@refs/heads/main",
+          root_run_id: "100",
+          token: "PRIVATE_TOKEN",
+          otel_trace_id: "PRIVATE_TRACE",
+          work_queue_assignment: { payload: "PRIVATE_ASSIGNMENT" },
+        },
+      },
+    };
+    const original = structuredClone(source);
+    const compact = normalizeUnifiedSessionEvent(source);
+    expect(compact.data).toEqual({
+      runId: "300",
+      episode: {
+        episodeId: "100-1:root",
+        hopId: "200-1:caller",
+        parentHopId: "100-1:root",
+        originEvent: "issues",
+        rootRepo: "org/repo",
+        rootWorkflowId: "org/repo/.github/workflows/root.yml@refs/heads/main",
+        rootRunId: "100",
+      },
+    });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+    expect(JSON.stringify(compact)).not.toContain("PRIVATE_");
+    expect(source).toEqual(original);
+  });
+
+  it("preserves explicit canonical episode values and does not infer missing lineage", () => {
+    const event = {
+      type: "workflow.info",
+      data: {
+        episode: { episodeId: "", episode_id: "wrong", parentHopId: null, parent_hop_id: "wrong", rootRunId: "00100", private: "omit" },
+        context: { episode_id: "wrong" },
+      },
+    };
+    const compact = normalizeUnifiedSessionEvent(event);
+    expect(compact.data).toEqual({ episode: { episodeId: "", parentHopId: null, rootRunId: "00100" } });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+    expect(normalizeUnifiedSessionEvent({ type: "workflow.info", data: { episode: null, context: { episode_id: "wrong" } } }).data).toEqual({ episode: null });
+    for (const context of [undefined, null, {}, [], { workflow_call_id: "legacy", run_id: "100", workflow_id: "caller" }]) {
+      expect(normalizeUnifiedSessionEvent({ type: "workflow.info", data: { run_id: "200", context } }).data).toEqual({ runId: "200" });
+    }
+  });
+
   it("uses one accounting shape without losing zero values or adding overlapping totals", () => {
     const data = {
       provider: "copilot",

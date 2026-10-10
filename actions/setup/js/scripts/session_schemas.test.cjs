@@ -90,6 +90,24 @@ describe("Generated session schemas", () => {
     expect(validateSession(jsonl([header, unified({ type: "vendor.progress", data: { arbitrary: { body: false } } })]))).toBe(2);
   });
 
+  it("validates optional episode lineage without accepting arbitrary caller context", () => {
+    const canonical = {
+      type: "workflow.info",
+      data: {
+        run_id: "300",
+        context: { episode_id: "100-1:root", hop_id: "200-1:caller", parent_hop_id: "", origin_event: "issues", root_repo: "org/repo", root_workflow_id: "root.yml", root_run_id: "100", private: "omit" },
+      },
+    };
+    const compact = normalizeUnifiedSessionEvent(canonical);
+    expect(validateSession(jsonl([header, unified(compact)]))).toBe(2);
+    expect(validateSession(jsonl([header, unified({ type: "workflow.info", data: {} })]))).toBe(2);
+    expect(validateSession(jsonl([header, unified({ type: "workflow.info", data: { episode: null } })]))).toBe(2);
+    for (const episode of [{ episode_id: "legacy-key" }, { episodeId: "root", private: "omit" }, "root", []]) {
+      expect(() => validateSession(jsonl([header, unified({ type: "workflow.info", data: { episode } })]))).toThrow("Invalid session event");
+    }
+    expect(() => validateSession(jsonl([header, unified(canonical)]))).toThrow("Invalid session event");
+  });
+
   it.each(["claude", "copilot", "codex", "gemini", "pi", "custom", "opencode", "goose"])("validates the %s parser's native passthrough and unified collection", engine => {
     const root = tempRoot();
     const input = jsonl([

@@ -454,6 +454,20 @@
       },
       "additionalProperties": false
     },
+    "EpisodeLineageData": {
+      "type": "object",
+      "properties": {
+        "episodeId": { "$ref": "#/definitions/JsonValue" },
+        "hopId": { "$ref": "#/definitions/JsonValue" },
+        "parentHopId": { "$ref": "#/definitions/JsonValue" },
+        "originEvent": { "$ref": "#/definitions/JsonValue" },
+        "rootRepo": { "$ref": "#/definitions/JsonValue" },
+        "rootWorkflowId": { "$ref": "#/definitions/JsonValue" },
+        "rootRunId": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false,
+      "description": "Observed lineage from aw_info.context; hopId identifies the recorded caller."
+    },
     "EvalResultData": {
       "type": "object",
       "properties": { "id": { "$ref": "#/definitions/JsonValue" }, "answer": { "$ref": "#/definitions/JsonValue" }, "model": { "$ref": "#/definitions/JsonValue" }, "error": { "$ref": "#/definitions/JsonValue" } },
@@ -804,7 +818,8 @@
         "dryRun": { "$ref": "#/definitions/JsonValue" },
         "workflow": { "$ref": "#/definitions/JsonValue" },
         "repository": { "$ref": "#/definitions/JsonValue" },
-        "runId": { "$ref": "#/definitions/JsonValue" }
+        "runId": { "$ref": "#/definitions/JsonValue" },
+        "episode": { "anyOf": [{ "$ref": "#/definitions/EpisodeLineageData" }, { "type": "null" }] }
       },
       "additionalProperties": false
     }

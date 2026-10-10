@@ -670,6 +670,11 @@ executes either Bash embedded in `graders.operational-value.script` or a Bash
 file referenced by `graders.operational-value.run`; operational-value graders
 require standard input because historical replay is not supported.
 
+Built-in and custom JavaScript graders require Node.js 20 or newer with the
+permission model available. The CLI selects `--permission` or
+`--experimental-permission` according to runtime support and never runs a
+JavaScript grader without permissions enabled.
+
 ```bash wrap
 gh aw graders run weekly-research loops 123456789
 cat payload.json | gh aw graders run weekly-research loops

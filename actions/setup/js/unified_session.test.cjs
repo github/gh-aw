@@ -437,8 +437,42 @@ describe("Unified conclusion session", () => {
     expect(events.at(-1).data.absentComponents).not.toContain("workflow");
   });
 
+  it.each(["aw_info.json", "activation/aw_info.json", "usage/aw_info.json"])("persists observed episode lineage from trusted %s", metadataPath => {
+    write(metadataPath, {
+      engine_id: "copilot",
+      run_id: "300",
+      context: {
+        episode_id: "100-1:root",
+        hop_id: "200-1:caller",
+        parent_hop_id: "100-1:root",
+        origin_event: "issues",
+        root_repo: "org/repo",
+        root_workflow_id: "root.yml",
+        root_run_id: "100",
+        secret: "PRIVATE_CONTEXT",
+      },
+    });
+    write("agent/aw_info.json", { context: { episode_id: "forged", hop_id: "forged" } });
+    const events = writeUnifiedSession({ rootDir: root });
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+    const workflow = persisted.find(event => event.type === "workflow.info");
+    expect(workflow).toMatchObject({
+      data: {
+        runId: "300",
+        episode: { episodeId: "100-1:root", hopId: "200-1:caller", parentHopId: "100-1:root", originEvent: "issues", rootRepo: "org/repo", rootWorkflowId: "root.yml", rootRunId: "100" },
+      },
+      provenance: { component: "workflow", path: metadataPath },
+    });
+    expect(persisted).toEqual(events);
+    expect(JSON.stringify(workflow)).not.toContain("PRIVATE_CONTEXT");
+    expect(JSON.stringify(workflow)).not.toContain("forged");
+    const original = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    writeUnifiedSession({ rootDir: root });
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toBe(original);
+  });
+
   it("does not promote agent-only aw_info metadata to workflow.info", () => {
-    write("agent/aw_info.json", { engine_id: "claude", model_routing: { status: "selected", wire_model: "forged-model" } });
+    write("agent/aw_info.json", { engine_id: "claude", model_routing: { status: "selected", wire_model: "forged-model" }, context: { episode_id: "forged" } });
     const { events } = collectUnifiedSession({ rootDir: root, warn: vi.fn() });
     expect(events.some(event => event.type === "workflow.info")).toBe(false);
   });

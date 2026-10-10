@@ -248,6 +248,7 @@ opaque because its essential fields are not defined by this specification.
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. Detection and eval usage reports resolve per-observation AIC from known model pricing only when explicit AIC is unavailable; unknown pricing leaves AIC absent, while explicit zero and checkpoints remain authoritative. |
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine ID, requested model, trigger type, workflow/repository/run ID, and available gh-aw, AWF, MCPG, and agent versions. No detector transcript or free-form reasons. |
 | Model routing | `firewall.model_routing` retains its stage, purpose, provider, labels, selection, endpoint, router, request, outcome, and deviation fields. `workflow.info` includes the observed `model`, `requestedModel`, and a compact `modelRouting` object. `model_routing.outcome` records the harness's status, wire model, effective and selected endpoints, effort, applied effort, and failure code. |
+| Episode lineage | `workflow.info.episode` retains supplied `episodeId`, `hopId`, `parentHopId`, `originEvent`, `rootRepo`, `rootWorkflowId`, and `rootRunId` from runner-owned `aw_info.json` context. No arbitrary caller context, credentials, or work-queue payloads. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
 present canonical value even when it is `false`, `0`, `null`, or empty.
@@ -266,6 +267,8 @@ comes from the GitHub Actions event name; `cliVersion`, `awfVersion`,
 `mcpgVersion`, and `agentVersion` come from available workflow metadata and
 are not inferred. The numeric file-format version remains `1`: the
 `type`/`data`/`provenance` envelope and JSONL framing are unchanged.
+
+The optional `workflow.info.episode` object maps the seven snake_case lineage fields in `aw_info.json.context` to camelCase without inferring absent values or changing identifiers. That context describes the recorded caller: `episode.hopId` is not relabeled as the current run's hop, and `episode.parentHopId` remains that caller's recorded parent. Existing files without lineage remain valid; legacy call IDs alone do not synthesize canonical episode metadata. Only runner-owned workflow metadata supplies this projection, using the collector's existing source precedence.
 
 **T-UAS-055 — Source provenance.** Every merged event MUST have a `provenance`
 object with `component`, `phase`, `path`, and `index`. `path` MUST be relative to
