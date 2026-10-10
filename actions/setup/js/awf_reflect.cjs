@@ -1023,6 +1023,10 @@ function resolveMultiProviderFromReflect(options) {
         const matchesConfigured = configuredModel === modelId || configuredModel === `copilot/${modelId}` || ["responses", "completions"].some(api => configuredModel === `copilot-${api}${suffix}/${modelId}`);
         if (!configuredModelMapped && matchesConfigured) {
           configuredModelMapped = true;
+          const qualifiedWireApi = wireApis.find(api => configuredModel === `copilot-${api}${suffix}/${modelId}`);
+          if (qualifiedWireApi && (!Array.isArray(supported) || supported.includes(qualifiedWireApi === "responses" ? "/responses" : "/chat/completions"))) {
+            wireApi = qualifiedWireApi;
+          }
           if (configuredWireApi === "responses" || configuredWireApi === "completions") wireApi = configuredWireApi;
           mappedConfiguredModel = `copilot-${wireApi}${suffix}/${modelId}`;
         }

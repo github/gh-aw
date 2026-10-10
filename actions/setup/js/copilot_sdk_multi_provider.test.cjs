@@ -18,13 +18,12 @@ describe("qualifyModelForMultiProvider", () => {
     ["copilot/claude-haiku-4.5", "copilot-completions-1/claude-haiku-4.5"],
     ["copilot-completions-1/claude-haiku-4.5", "copilot-completions-1/claude-haiku-4.5"],
     ["org/model", "openai/org/model"],
-    ["copilot/org/model", "openai/org/model"],
     ["openai/org/model", "openai/org/model"],
   ])("qualifies %s", (model, expected) => {
     expect(qualifyModelForMultiProvider(model, config)).toBe(expected);
   });
 
-  it.each(["small", "medium", "large", "", "unknown", "orphan", "other/gpt-5.6-luna", undefined])("does not guess %s", model => {
+  it.each(["small", "medium", "large", "", "unknown", "orphan", "other/gpt-5.6-luna", "copilot/org/model", undefined])("does not guess %s", model => {
     expect(qualifyModelForMultiProvider(model, config)).toBeNull();
   });
 

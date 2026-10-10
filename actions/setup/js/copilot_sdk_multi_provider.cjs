@@ -73,7 +73,7 @@ function qualifyModelForMultiProvider(model, config) {
   if (qualified) return value;
   const legacy = value.startsWith("copilot/");
   const id = legacy ? value.slice("copilot/".length) : value;
-  const match = models.find(entry => entry.id === id);
+  const match = models.find(entry => entry.id === id && (!legacy || /^(?:copilot(?:-(?:responses|completions))?|github-copilot|github)(?:-\d+)?$/.test(entry.provider)));
   return match ? `${match.provider}/${match.id}` : null;
 }
 

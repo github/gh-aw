@@ -62,6 +62,12 @@ describe("Copilot sub-agent smoke evidence", () => {
     await expect(assertEvidence(data)).rejects.toThrow("changed or fell back");
   });
 
+  test("rejects selection of a different model", async () => {
+    const data = evidence();
+    data.events.push({ type: "subagent.selected", data: { invocationId: "haiku-whoami", selectedModel: "copilot-responses/gpt-5-mini" } });
+    await expect(assertEvidence(data)).rejects.toThrow("changed or fell back");
+  });
+
   test("rejects requests using the wrong wire API", async () => {
     const data = evidence();
     data.requests[0].path = "/responses";

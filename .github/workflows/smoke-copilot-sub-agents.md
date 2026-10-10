@@ -105,7 +105,7 @@ post-steps:
           assert.ok(activity.some(event => event.type === "subagent.completed"), `${agentName} did not complete`);
           assert.ok(!activity.some(event => event.type === "subagent.failed"), `${agentName} failed`);
           const models = activity.flatMap(event => [
-            event.data.model, event.data.resolvedModel, event.data.firstDispatchedModel,
+            event.data.model, event.data.selectedModel, event.data.resolvedModel, event.data.firstDispatchedModel,
           ]).filter(Boolean);
           assert.ok(models.length > 0, `${agentName} has no recorded model`);
           assert.ok(models.every(value => servedModel(value) === model), `${agentName} changed or fell back from ${model}`);

@@ -360,7 +360,7 @@ async function runWithCopilotSDK({
     const customAgents = loadCopilotSDKCustomAgents(workingDirectory, agentsBaseDir, log).map(agent => {
       const requested = agent.model;
       const alias = !requested || ["small", "medium", "large"].includes(requested.toLowerCase());
-      const qualified = alias ? sessionModel : qualifyModelForMultiProvider(requested, providerConfig);
+      const qualified = alias ? sessionModel : providerConfig ? qualifyModelForMultiProvider(requested, providerConfig) : requested;
       if (!alias && !qualified) log(`warning: custom agent "${agent.name}" model "${requested}" is not in the configured provider models; using session model "${sessionModel || "(none)"}"`);
       return { ...agent, model: qualified || sessionModel || undefined };
     });

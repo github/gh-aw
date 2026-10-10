@@ -31,8 +31,8 @@ describe("copilot_sdk_driver.cjs", () => {
 
   describe("runWithCopilotSDK", () => {
     it.each([
-      ["gpt-5.4", "claude-sonnet-4.6", "openai", "anthropic"],
-      ["claude-sonnet-4.6", "gpt-5.4", "anthropic", "openai"],
+      ["gpt-5.4", "claude-sonnet-4.6", "copilot-responses", "copilot-completions"],
+      ["claude-sonnet-4.6", "gpt-5.4", "copilot-completions", "copilot-responses"],
     ])("qualifies %s session and cross-provider %s custom agents at runtime", async (sessionModel, agentModel, sessionProvider, agentProvider) => {
       const workspace = path.join(testSessionStateDir, `${sessionProvider}-workspace`);
       const workflow = path.join(testSessionStateDir, `${sessionProvider}-workflow`);
@@ -70,8 +70,8 @@ describe("copilot_sdk_driver.cjs", () => {
           { id: agentModel, provider: agentProvider },
         ],
         providers: [
-          { name: "openai", type: "openai", baseUrl: "http://api-proxy:10002" },
-          { name: "anthropic", type: "anthropic", baseUrl: "http://api-proxy:10002" },
+          { name: "copilot-responses", type: "openai", baseUrl: "http://api-proxy:10002", wireApi: "responses" },
+          { name: "copilot-completions", type: "openai", baseUrl: "http://api-proxy:10002", wireApi: "completions" },
         ],
         workingDirectory: workspace,
         agentsBaseDir: workflow,

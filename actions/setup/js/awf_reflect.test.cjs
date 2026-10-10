@@ -1006,6 +1006,13 @@ describe("awf_reflect.cjs", () => {
       expect(result.model).toBe("copilot-completions/gpt-5.6-luna");
     });
 
+    it("preserves a qualified API preference for a both-supported model instead of selecting the first model", () => {
+      const reflectData = { endpoints: [splitEndpoint] };
+      expect(resolveMultiProviderFromReflect({ reflectData, model: "copilot-responses/gpt-4o" }).model).toBe("copilot-responses/gpt-4o");
+      expect(resolveMultiProviderFromReflect({ reflectData, model: "copilot-completions/gpt-5-mini" }).model).toBe("copilot-completions/gpt-5-mini");
+      expect(resolveMultiProviderFromReflect({ reflectData, model: "copilot-responses/gpt-4o", wireApi: "completions" }).model).toBe("copilot-completions/gpt-4o");
+    });
+
     it("qualifies a fallback and preserves valid endpoint-qualified selections", () => {
       const reflectData = { endpoints: [splitEndpoint, { ...splitEndpoint, port: 10003 }] };
       expect(resolveMultiProviderFromReflect({ reflectData, model: "unknown" }).model).toBe("copilot-completions/claude-haiku-4.5");
