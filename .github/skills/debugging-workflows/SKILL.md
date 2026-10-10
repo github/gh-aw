@@ -38,6 +38,11 @@ owns the required live-effect authorization. Follow the shared
 [branch-testing path](../../aw/debug-agentic-workflow.md#test-workflow-changes-from-a-branch).
 A branch or PR does not isolate secrets, queue state or outputs, and cannot
 bypass a security gate, dispatch denial or explicit no-dispatch context.
+Queue-branch protection is optional, not a first-use or live-dispatch gate.
+Agentic Workflows authenticates participants, and the first accepted producer
+submit automatically installs Policy and Work; no administrator seed, separate
+enrollment or protection inventory is required. Follow the
+[queue protocol](../../aw/work-queue.md).
 
 Always provide separate short user-visible result sentences for each security
 review and dry-run attempt, including failed, blocked, or unavailable outcomes.

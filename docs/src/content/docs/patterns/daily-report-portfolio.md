@@ -18,9 +18,10 @@ Completion and verified delivery share that transaction log.
 > [!IMPORTANT]
 > The sources are an orchestration example, not an already provisioned live
 > deployment. Configure the complete compiler-approved Policy proposal,
-> verified immutable worker bindings, and queue-branch protections before
-> enabling a producer. Its first submission atomically bootstraps Policy and
-> Work; compiling a workflow alone does not protect the branch or launch workers.
+> and verified immutable worker bindings before enabling a producer. Its first
+> submission atomically bootstraps Policy and Work without branch protection or
+> administrator seeding. Branch protection is optional hardening; compiling a
+> workflow alone does not protect the branch or launch workers.
 
 ## Thirteen reports, one dispatcher
 

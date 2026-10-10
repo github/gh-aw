@@ -40,12 +40,14 @@ Dispatchers need `tools.work-queue: true`, a worker allowlist and bounded
 immutable SHA, principal, trust domain and effect scope; moving `target-ref` is
 ignored.
 
-Configure producer entitlements and branch protections before enabling
-producers; rulesets must match before branch creation. First submit installs
-compiled Policy; later changes are admin-only. Admin status grants no producer
-entitlement. Never expose queue-write credentials to agents/snapshot MCP. See
-[deployment](../../docs/src/content/docs/guides/deploy-work-queue.md);
-writer-restriction automation remains deferred.
+Configure producer entitlements; Agentic Workflows authenticates participants
+at its trusted publication boundary. First submit automatically installs compiled
+Policy and Work without administrator seeding, separate participant enrollment,
+branch protection or ruleset checks. Later Policy changes are admin-only. Admin
+status grants no producer entitlement. Never expose queue-write credentials to
+agents/snapshot MCP. Branch protections are optional operator hardening, not a
+bootstrap or dispatch gate. Do not provision, inspect or remove them as part of
+queue use. See [deployment](../../docs/src/content/docs/guides/deploy-work-queue.md).
 
 ## Mirror admitted Work with Issues
 

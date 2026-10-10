@@ -928,6 +928,38 @@ function registerTests({ describe, it }) {
       await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
       assert.equal(fake.log().length, 1);
     });
+    it("automatically bootstraps for workflow participants without protection checks or administrator APIs", async () => {
+      for (const participant of [producer, dispatcher]) {
+        const fake = fakeGitHub();
+        const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
+        const originalGraphql = fake.githubClient.graphql;
+        fake.githubClient.graphql = async (query = "") => {
+          assert.doesNotMatch(query, /branchProtectionRules|rulesets/);
+          return originalGraphql();
+        };
+        const originalRepos = fake.githubClient.rest.repos;
+        fake.githubClient.rest.repos = new Proxy(originalRepos, {
+          get(target, name, receiver) {
+            if (typeof name === "string" && /ruleset|protection|collaborator/i.test(name)) throw new Error(`unexpected administration API: ${name}`);
+            return Reflect.get(target, name, receiver);
+          },
+        });
+        const nodes = [newWork({ task: "automatic first use" }, `first-use-${participant.role}`, "root", "default", policy, 100)];
+        const request = newRequest(`unprotected-bootstrap-${participant.role}`, "submit", participant, { nodes });
+        const published = await publishWorkQueueRequest(options(fake, request, participant, { policyProposal: policy, maxRetries: 0 }));
+        assert.equal(published.publishedNow, true);
+        assert.equal(fake.refs.get("work-queue"), published.sha);
+        assert.equal(published.commit.actor.role, participant.role);
+        assert.deepEqual(
+          published.commit.operations.map(operation => operation.kind),
+          ["Policy", "Work"]
+        );
+        assert.equal(fake.log().length, 1);
+        const replayed = await publishWorkQueueRequest(options(fake, request, participant, { policyProposal: policy, maxRetries: 0 }));
+        assert.equal(replayed.publishedNow, false);
+        assert.equal(fake.log().length, 1);
+      }
+    });
     it("initializes a branchless repository only after validating the first Policy and Work", async () => {
       for (const ambiguous of [false, true]) {
         const fake = fakeGitHub();
