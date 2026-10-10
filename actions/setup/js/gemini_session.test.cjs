@@ -45,30 +45,9 @@ describe("Gemini CI-backed provider failures", () => {
 // Supplemental cases below are synthetic protocol/compatibility fixtures, not CI observations.
 describe("Gemini non-init system subtype regressions", () => {
   it.each([
-    [
-      "status text",
-      "Refreshing credentials\n",
-      [
-        ["gemini.system", undefined],
-        ["assistant.message", "Refreshing credentials\n"],
-      ],
-    ],
-    [
-      "empty status text",
-      "",
-      [
-        ["gemini.system", undefined],
-        ["assistant.message", ""],
-      ],
-    ],
-    [
-      "whitespace status text",
-      " \r\n",
-      [
-        ["gemini.system", undefined],
-        ["assistant.message", " \r\n"],
-      ],
-    ],
+    ["status text", "Refreshing credentials\n", [["session.info", "Refreshing credentials\n"]]],
+    ["empty status text", "", [["session.info", ""]]],
+    ["whitespace status text", " \r\n", [["session.info", " \r\n"]]],
     [
       "legacy content blocks",
       {
@@ -79,10 +58,14 @@ describe("Gemini non-init system subtype regressions", () => {
         ],
       },
       [
-        ["gemini.system", undefined],
-        ["assistant.reasoning", "Checking credentials"],
-        ["assistant.message", "Credentials refreshed\n"],
-        ["assistant.message", ""],
+        [
+          "session.info",
+          [
+            { type: "thinking", thinking: "Checking credentials", nativeBlock: { retained: false } },
+            { type: "text", text: "Credentials refreshed\n" },
+            { type: "text", text: "" },
+          ],
+        ],
       ],
     ],
   ])("delegates %s while retaining the system observation and source envelope", (_label, message, expected) => {
@@ -91,18 +74,15 @@ describe("Gemini non-init system subtype regressions", () => {
     const original = json(records);
     const events = normalizeGeminiSession(records);
     expect(events.map(event => [event.type, event.data.content])).toEqual(expected);
-    expect(events[0]).toEqual({ ...records[0], type: "gemini.system", data: { ...envelope, message, nativePayload: { phase: "credentials" } } });
+    expect(events[0]).toEqual({ ...records[0], type: "session.info", data: { ...envelope, message, sourceType: "system", content: typeof message === "object" ? message.content : message, nativePayload: { phase: "credentials" } } });
     for (const event of events) expect(event).toMatchObject({ ...envelope, message, data: { ...envelope, message, nativePayload: { phase: "credentials" } } });
-    if (typeof message === "object") {
-      for (const [index, block] of message.content.entries()) expect(events[index + 1].data).toMatchObject(block);
-    }
     expect(parseGeminiLog(jsonl(records)).logEntries).toEqual(events);
     expect(normalizeGeminiSession(records)).toEqual(events);
     expect(normalizeGeminiSession(events)).toEqual(events);
     expect(normalizeGeminiSession(freeze(json(events)))).toEqual(json(events));
     events[0].native.nested.push("output-copy");
-    events[1].data.nativePayload.phase = "output-copy";
-    if (typeof message === "object") events[1].data.nativeBlock.retained = true;
+    events[0].data.nativePayload.phase = "output-copy";
+    if (typeof message === "object") events[0].data.content[0].nativeBlock.retained = true;
     expect(records).toEqual(original);
   });
 
@@ -110,7 +90,7 @@ describe("Gemini non-init system subtype regressions", () => {
     const envelope = { subtype: "checkpoint", id: "checkpoint-record", parentId: "session-record", timestamp: "2026-09-29T12:00:00Z", native: { nested: [0, false, null] } };
     const records = freeze([{ type: "system", ...envelope, data: { nativePayload: { ready: false } } }]);
     const original = json(records);
-    const expected = [{ type: "gemini.system", ...envelope, data: { ...envelope, nativePayload: { ready: false } } }];
+    const expected = [{ type: "session.info", ...envelope, data: { ...envelope, sourceType: "system", nativePayload: { ready: false } } }];
     const events = normalizeGeminiSession(records);
     expect(events).toEqual(expected);
     expect(parseGeminiLog(jsonl(records)).logEntries).toEqual(expected);
@@ -130,12 +110,12 @@ describe("Gemini non-init system subtype regressions", () => {
     const original = json(records);
     const payload = { ...envelope, message, error, nativePayload: { attempt: 0 } };
     const expected = [
-      { ...records[0], type: "gemini.system", data: payload },
-      { ...records[0], type: "session.result", data: { ...payload, errors: [{ code: "provider_unavailable", message: "Provider unavailable", details: { retryable: false } }], permissionDenials: undefined } },
+      { ...records[0], type: "session.error", data: { ...payload, sourceType: "system" } },
+      { ...records[0], type: "session.result", data: { ...payload, sourceType: "system", errors: [{ code: "provider_unavailable", message: "Provider unavailable", details: { retryable: false } }], permissionDenials: undefined } },
     ];
     const events = normalizeGeminiSession(records);
     expect(events).toEqual(expected);
-    expect(events.map(event => event.type)).toEqual(["gemini.system", "session.result"]);
+    expect(events.map(event => event.type)).toEqual(["session.error", "session.result"]);
     expect(parseGeminiLog(jsonl(records)).logEntries).toEqual(expected);
     expect(selectSessionResult(events).errors).toEqual([{ code: "provider_unavailable", message: "Provider unavailable", details: { retryable: false } }]);
     for (const key of ["content", "usage", "numTurns", "durationMs", "totalCostUsd"]) expect(events[1].data).not.toHaveProperty(key);
@@ -267,23 +247,10 @@ describe("Gemini synthetic unified-session regressions", () => {
       { type: "message", role: "assistant", message_id: "b", content: "Hello world!\n" },
     ]);
     const events = normalizeGeminiSession(records);
-    expect(events.map(event => event.type)).toEqual([
-      "gemini.message_observation",
-      "tool.execution_start",
-      "gemini.message_snapshot",
-      "gemini.message_observation",
-      "gemini.message_snapshot",
-      "gemini.message_snapshot",
-      "assistant.message",
-      "assistant.message",
-    ]);
-    expect(events[0].data.content).toBe("Hello world");
-    expect(events[0].data.observations).toEqual(records.slice(0, 2));
+    expect(events.map(event => event.type)).toEqual(["tool.execution_start", "assistant.message", "assistant.message"]);
+    expect(events[1]).toMatchObject({ timestamp: "correction", data: { content: "corrected text" } });
+    expect(events[1].data.observations).toEqual([records[0], records[1], records[3], records[4], records[5]]);
     expect(events[2].data.content).toBe("Hello world!\n");
-    expect(events[3]).toMatchObject({ timestamp: "final", data: { content: "!\n", observations: [records[3]] } });
-    expect(events[5].data.content).toBe("corrected text");
-    expect(events[6]).toMatchObject({ type: "assistant.message", timestamp: "correction", data: { content: "corrected text" } });
-    expect(events[7].data.content).toBe("Hello world!\n");
   });
 
   it.each([
@@ -303,9 +270,8 @@ describe("Gemini synthetic unified-session regressions", () => {
     const parsed = parseGeminiLog(jsonl(records));
     const events = normalizeGeminiSession(records);
     expect(parsed.logEntries).toEqual(events);
-    expect(events.map(event => event.type)).toEqual(["gemini.message_observation", "tool.execution_start", "gemini.message_snapshot", "assistant.message", "tool.execution_complete", "gemini.message_snapshot"]);
-    expect(events[0]).toMatchObject({ id: "delta", timestamp: 1, native: records[0].native, data: { content: streamed, delta: true, observations: [records[0]] } });
-    expect(events[3]).toMatchObject({ id: "final", timestamp: 2, native: records[2].native, data: { content: final } });
+    expect(events.map(event => event.type)).toEqual(["tool.execution_start", "assistant.message", "tool.execution_complete"]);
+    expect(events[1]).toMatchObject({ id: "final", timestamp: 2, native: records[2].native, data: { content: final, observations: [records[0], records[2], records[4]] } });
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual([final]);
     for (const summary of [parsed.markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       if (final) expect(summary).toContain(final.trim());
@@ -314,8 +280,8 @@ describe("Gemini synthetic unified-session regressions", () => {
     expect(normalizeGeminiSession(records)).toEqual(events);
     expect(normalizeGeminiSession(events)).toEqual(events);
     expect(normalizeGeminiSession(json(events))).toEqual(json(events));
-    events[0].data.observations[0].native.nested.push("output-copy");
-    events[3].data.native.corrected = false;
+    events[1].data.observations[0].native.nested.push("output-copy");
+    events[1].data.native.corrected = false;
     expect(records).toEqual(original);
   });
 
@@ -334,8 +300,8 @@ describe("Gemini synthetic unified-session regressions", () => {
     ]);
     const events = normalizeGeminiSession(records);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Goodbye"]);
-    expect(events.filter(event => event.type === "gemini.message_observation").map(event => event.data.observations)).toEqual([records.slice(0, 2), [records[2]], [records[4]], [records[6]]]);
-    expect(events.filter(event => event.type === "gemini.message_snapshot").map(event => event.timestamp)).toEqual(["spelling", "repeat-spelling", "suffix", "shorter", "repeat-shorter", "rewrite", "final"]);
+    expect(events.map(event => event.type)).toEqual(["tool.execution_start", "assistant.message"]);
+    expect(events[1].data.observations).toEqual(records.filter(record => record.type === "message"));
     expect(events.findIndex(event => event.type === "tool.execution_start")).toBeLessThan(events.findIndex(event => event.type === "assistant.message"));
     for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       expect(summary).toContain("Goodbye");
@@ -354,10 +320,10 @@ describe("Gemini synthetic unified-session regressions", () => {
       { type: "message", role: "assistant", message_id: "same", channel: "final", content: "right" },
     ]);
     const events = normalizeGeminiSession(records);
-    expect(events.map(event => event.type)).toEqual(["assistant.message", "gemini.message_observation", "assistant.message", "assistant.reasoning", "tool.execution_start", "gemini.message_snapshot", "assistant.message"]);
+    expect(events.map(event => event.type)).toEqual(["assistant.message", "assistant.message", "assistant.reasoning", "tool.execution_start", "assistant.message"]);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["analysis content", "other answer", "right"]);
-    expect(events[1].data.observations).toEqual([records[1]]);
-    expect(events[3].data.content).toBe("independent reasoning");
+    expect(events[4].data.observations).toEqual([records[1], records[5]]);
+    expect(events[2].data.content).toBe("independent reasoning");
   });
 
   it("corrects legacy text and reasoning blocks independently without hiding mixed native blocks", () => {
@@ -395,27 +361,13 @@ describe("Gemini synthetic unified-session regressions", () => {
       },
     ]);
     const events = normalizeGeminiSession(records);
-    expect(events.map(event => event.type)).toEqual([
-      "gemini.message_observation",
-      "gemini.message_snapshot",
-      "assistant.message",
-      "gemini.message_observation",
-      "gemini.message_observation",
-      "tool.execution_start",
-      "gemini.content_block",
-      "gemini.message_observation",
-      "gemini.message_snapshot",
-      "assistant.reasoning",
-      "assistant.message",
-      "tool.execution_complete",
-      "gemini.content_block",
-      "assistant.message",
-    ]);
+    expect(events.map(event => event.type)).toEqual(["assistant.message", "tool.execution_start", "gemini.content_block", "assistant.reasoning", "assistant.message", "tool.execution_complete", "gemini.content_block", "assistant.message"]);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello", "final first", "unchanged second"]);
     expect(events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content)).toEqual(["final reasoning"]);
-    expect(events.filter(event => event.type === "gemini.message_observation").map(event => event.data.observations)).toEqual([[records[0]], [records[2]], [records[2]], [records[2]]]);
-    expect(events[11].data).toMatchObject({ toolCallId: "call", toolName: "lookup", output: false, success: true });
-    expect(events[12].data.json).toEqual({ count: 1 });
+    expect(events[0].data.observations).toEqual([records[0], records[1]]);
+    expect(events[3].data.observations).toContainEqual(records[2]);
+    expect(events[5].data).toMatchObject({ toolCallId: "call", toolName: "lookup", output: false, success: true });
+    expect(events[6].data.json).toEqual({ count: 1 });
     for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       expect(summary).toContain("final first");
       expect(summary).toContain("unchanged second");
@@ -457,18 +409,17 @@ describe("Gemini synthetic unified-session regressions", () => {
     const original = json(records);
     const events = normalizeGeminiSession(records);
     const answer = events.filter(event => event.type === "assistant.message" && event.data.message?.id === "answer");
-    expect(answer.map(event => event.data.content)).toEqual(finalText);
+    expect(answer.map(event => event.data.content)).toEqual(finalText.length ? finalText : [[]]);
     expect(answer.every(event => event.id === "final" && event.timestamp === 2)).toBe(true);
-    const retired = events.filter(event => event.type === "gemini.message_observation");
-    expect(retired).toHaveLength(2);
-    for (const event of retired) expect(event).toMatchObject({ id: "stream", timestamp: 1, native: { retained: false }, data: { observations: [records[0]] } });
-    expect(events.filter(event => event.type === "gemini.message_snapshot").map(event => event.id)).toEqual(["final", "repeat"]);
+    expect(answer[0].data.observations).toContainEqual(records[0]);
+    for (const event of answer) expect(event.data.observations).toContainEqual(records[5]);
+    expect(events.some(event => event.type.startsWith("gemini.message_"))).toBe(false);
     expect(events.filter(event => event.type === "assistant.message" && event.data.message_id === "other").map(event => event.data.content)).toEqual(["other answer"]);
     expect(events.filter(event => event.type.startsWith("tool.")).map(event => event.type)).toEqual(["tool.execution_start", "tool.execution_complete"]);
     const snapshotPosition = events.findIndex(event => event.id === "final");
     const toolPositions = events.flatMap((event, index) => (event.type.startsWith("tool.") ? [index] : []));
     expect(toolPositions[0]).toBeLessThan(snapshotPosition);
-    expect(toolPositions[1]).toBeGreaterThan(snapshotPosition + answer.length);
+    expect(toolPositions[1]).toBeGreaterThan(snapshotPosition + answer.length - 1);
     for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       for (const stale of ["Hellp", "world"].filter(text => !finalText.includes(text))) expect(summary).not.toContain(stale);
       const positions = finalText.map(text => summary.indexOf(text));
@@ -477,7 +428,7 @@ describe("Gemini synthetic unified-session regressions", () => {
     }
     expect(normalizeGeminiSession(events)).toEqual(events);
     expect(normalizeGeminiSession(json(events))).toEqual(json(events));
-    retired[0].data.observations[0].message.content[0].text = "output-copy";
+    answer[0].data.observations[0].message.content[0].text = "output-copy";
     expect(records).toEqual(original);
   });
 
@@ -528,8 +479,9 @@ describe("Gemini synthetic unified-session regressions", () => {
     ]);
     const events = normalizeGeminiSession(records);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["first", "second", "!", "third"]);
-    expect(events.filter(event => event.type === "gemini.message_snapshot")).toHaveLength(3);
-    expect(events.filter(event => event.type === "gemini.message_observation")).toEqual([]);
+    expect(events).toHaveLength(4);
+    expect(events[0].data.observations).toEqual([records[0], records[1], records[2], records[3]]);
+    expect(events[2].data.delta).toBe(true);
   });
 
   it("replaces an earlier-block append-only snapshot in authoritative order without repeated core content", () => {
@@ -569,9 +521,10 @@ describe("Gemini synthetic unified-session regressions", () => {
       },
     ]);
     const events = normalizeGeminiSession(records);
-    expect(events.map(event => event.type)).toEqual(["gemini.message_observation", "gemini.message_observation", "gemini.message_snapshot", "assistant.message", "assistant.message", "gemini.message_snapshot"]);
+    expect(events.map(event => event.type)).toEqual(["assistant.message", "assistant.message"]);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["one!", "two"]);
-    expect(events.filter(event => event.type === "gemini.message_observation").map(event => event.data.observations)).toEqual([[records[0]], [records[0]]]);
+    expect(events[0].data.observations).toContainEqual(records[0]);
+    for (const event of events) expect(event.data.observations).toContainEqual(records[2]);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.id)).toEqual(["final", "final"]);
     for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       expect(summary.indexOf("one!")).toBeLessThan(summary.indexOf("two"));
@@ -590,7 +543,7 @@ describe("Gemini synthetic unified-session regressions", () => {
         { type: "message", role: "assistant", message_id: "answer", content: "onetwo!" },
       ])
     );
-    expect(events.map(event => event.type)).toEqual(["assistant.message", "gemini.message_snapshot", "assistant.message", "gemini.message_snapshot"]);
+    expect(events.map(event => event.type)).toEqual(["assistant.message", "assistant.message"]);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["onetwo", "!"]);
   });
 
@@ -621,9 +574,9 @@ describe("Gemini synthetic unified-session regressions", () => {
       },
     ]);
     const events = normalizeGeminiSession(records);
-    expect(events.map(event => event.type)).toEqual(["gemini.message_observation", "tool.execution_start", "gemini.message_observation", "gemini.message_snapshot", "assistant.reasoning", "assistant.message", "assistant.message"]);
-    expect(events.slice(4).map(event => event.data.content)).toEqual(["thinking", "inserted", "answer"]);
-    expect(events[1].data).toMatchObject({ toolCallId: "call", toolName: "lookup", input: null });
+    expect(events.map(event => event.type)).toEqual(["tool.execution_start", "assistant.reasoning", "assistant.message", "assistant.message"]);
+    expect(events.slice(1).map(event => event.data.content)).toEqual(["thinking", "inserted", "answer"]);
+    expect(events[0].data).toMatchObject({ toolCallId: "call", toolName: "lookup", input: null });
   });
 
   it("does not assume an event ID or anonymous full message is a final snapshot", () => {
@@ -662,18 +615,7 @@ describe("Gemini synthetic unified-session regressions", () => {
         },
       },
     ]);
-    expect(events.map(event => event.type)).toEqual([
-      "assistant.message",
-      "gemini.message_snapshot",
-      "assistant.message",
-      "gemini.message_observation",
-      "gemini.message_observation",
-      "gemini.message_observation",
-      "gemini.message_snapshot",
-      "assistant.reasoning",
-      "assistant.message",
-      "assistant.message",
-    ]);
+    expect(events.map(event => event.type)).toEqual(["assistant.message", "assistant.message", "assistant.reasoning", "assistant.message", "assistant.message"]);
     expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello", "\n", "one!", "two"]);
     expect(events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content)).toEqual([" think\n"]);
   });
@@ -750,12 +692,12 @@ describe("Gemini synthetic unified-session regressions", () => {
     const events = normalizeGeminiSession(records);
     expect(events.map(event => event.type)).toEqual([
       "tool.execution_complete",
-      "gemini.error",
-      "gemini.error",
+      "session.error",
+      "session.error",
       "session.result",
-      "gemini.error",
+      "session.error",
       "session.result",
-      "gemini.message_error",
+      "session.error",
       "session.result",
       "session.result",
       "vendor.after_result",
