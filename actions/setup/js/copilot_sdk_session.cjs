@@ -34,7 +34,7 @@ const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.
 const { buildCopilotSDKToolCallBudget } = require("./copilot_sdk_tool_budget.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
-const { sessionContext } = require("./agent_session.cjs");
+const { copilotSessionContext } = require("./copilot_session.cjs");
 
 const CAPTURED_EPHEMERAL_EVENTS = new Set([...COPILOT_WORKFLOW_EVENT_TYPES, "assistant.usage", "assistant.message_delta", "assistant.reasoning_delta", "model.call_failure"]);
 
@@ -373,7 +373,7 @@ async function runWithCopilotSDK({
     session.on(event => {
       if (event.ephemeral && !CAPTURED_EPHEMERAL_EVENTS.has(event.type)) return;
       const data = { ...event.data };
-      const context = sessionContext(event);
+      const context = copilotSessionContext(event);
       const scope = JSON.stringify([context.agentId, context.parentToolUseId]);
       const toolKey = JSON.stringify([scope, data.toolCallId]);
 
@@ -478,7 +478,7 @@ async function runWithCopilotSDK({
     // as a fallback in case the on() handler missed it.
     if (result && !hasOutput) {
       if (!assistantEvents.some(event => isDeepStrictEqual(event, result))) writeEvent("assistant.message", result.data, result.timestamp, result);
-      const context = sessionContext(result);
+      const context = copilotSessionContext(result);
       const content = result.data?.content;
       if (typeof content === "string" && content && context.agentId === undefined && !context.parentToolUseId) {
         output = content;

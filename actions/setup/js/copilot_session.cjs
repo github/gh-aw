@@ -44,6 +44,45 @@ function hasMalformedJsonl(content) {
   });
 }
 
+/** @param {any} event @returns {ReturnType<typeof sessionContext>} */
+function copilotSessionContext(event) {
+  const context = sessionContext(event);
+  const data = event?.data ?? {};
+  if ([data.parentToolUseId, event?.parentToolUseId, event?.parent_tool_use_id, data.parent_tool_use_id].some(value => value !== undefined)) return context;
+  const parentToolCallId = data.parentToolCallId !== undefined ? data.parentToolCallId : event?.parentToolCallId;
+  return typeof parentToolCallId === "string" || parentToolCallId === null ? { ...context, parentToolUseId: parentToolCallId } : context;
+}
+
+/**
+ * Remove only complete identified copies in the same observed session.
+ * Conflicting/reused IDs and unidentified observations remain independent evidence.
+ * @param {SessionEvent[]} fallback
+ * @param {SessionEvent[][]} retained
+ * @returns {SessionEvent[]}
+ */
+function deduplicateCopilotFallback(fallback, retained) {
+  const scoped = entries => {
+    let activeSessionId;
+    const childSessions = new Map();
+    return entries.map(event => {
+      const context = copilotSessionContext(event);
+      const childKey = JSON.stringify([context.agentId, context.parentToolUseId]);
+      if (["session.start", "session.init"].includes(event.type) && context.sessionId !== undefined) {
+        if (context.agentId !== undefined || context.parentToolUseId) childSessions.set(childKey, context.sessionId);
+        else {
+          if (activeSessionId !== context.sessionId) childSessions.clear();
+          activeSessionId = context.sessionId;
+        }
+      }
+      return { event, sessionId: context.sessionId !== undefined ? context.sessionId : childSessions.has(childKey) ? childSessions.get(childKey) : activeSessionId };
+    });
+  };
+  const observations = retained.flatMap(scoped);
+  return scoped(fallback)
+    .filter(({ event, sessionId }) => typeof event.id !== "string" || !event.id || !observations.some(previous => previous.sessionId === sessionId && isDeepStrictEqual(previous.event, event)))
+    .map(({ event }) => event);
+}
+
 /**
  * Copilot persists lifecycle events but emits assistant.usage only on the live
  * transport. Keep those observations and project their accounting separately.
@@ -53,6 +92,8 @@ function hasMalformedJsonl(content) {
 function normalizeCopilotSession(entries) {
   const source = normalizeAgentSession(entries, { sourceEngine: "copilot" });
   for (const [index, event] of source.entries()) {
+    const context = copilotSessionContext(event);
+    if (context.parentToolUseId !== undefined && sessionContext(event).parentToolUseId === undefined) event.data.parentToolUseId = context.parentToolUseId;
     if (event.type !== "assistant.message") continue;
     const refusal = getMessageRefusal(event.data, typeof event.data.finishReason === "string" ? event.data.finishReason : undefined);
     if (refusal) source[index] = createSessionEvent(event, "assistant.refusal", refusal);
@@ -339,4 +380,4 @@ function copilotUsage(data) {
   return usage;
 }
 
-module.exports = { hasCopilotConversation, hasMalformedJsonl, normalizeCopilotSession };
+module.exports = { hasCopilotConversation, hasMalformedJsonl, copilotSessionContext, deduplicateCopilotFallback, normalizeCopilotSession };

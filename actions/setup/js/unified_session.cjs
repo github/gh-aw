@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { isSessionEvent } = require("./agent_session.cjs");
-const { hasCopilotConversation, normalizeCopilotSession } = require("./copilot_session.cjs");
+const { hasCopilotConversation, deduplicateCopilotFallback, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -418,8 +418,15 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const file = choose(["pi-streaming.jsonl", "agent-stdio.log"]);
     if (file) {
       const content = read(file);
-      const events = parseEngineSession(content, engine ?? (file.endsWith("pi-streaming.jsonl") ? "pi" : "custom"));
-      if (!events.length && content.trim()) report(file, "unrecognized_engine_log", undefined);
+      const parsed = parseEngineSession(content, engine ?? (file.endsWith("pi-streaming.jsonl") ? "pi" : "custom"));
+      const events =
+        engine === "copilot" || native.length
+          ? deduplicateCopilotFallback(
+              parsed,
+              sources.filter(source => source.component === "agent").map(source => source.events)
+            )
+          : parsed;
+      if (!parsed.length && content.trim()) report(file, "unrecognized_engine_log", undefined);
       sources.push({ component: "agent", phase: "agent", path: path.relative(rootDir, file), events });
     }
   }
@@ -531,12 +538,19 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     }
     sources.push({ component: "guardrail", phase: "activation", path: "usage/aw_session.jsonl", events: [{ type: "guardrail.daily_aic", data }] });
   }
+  const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
+  const coverageWarnings = [...warnings];
+  for (const event of persistedWarnings) {
+    const data = event.data;
+    const matching = warnings.filter(warning => warning.data.path === data.path && warning.data.code === data.code);
+    if (!matching.some(warning => data.line === undefined || warning.data.line === data.line)) coverageWarnings.push(event);
+  }
   /** @type {SessionEvent} */
   const summary = {
     type: "session.collection",
     data: {
       sources: sources.map(({ events, ...source }) => ({ ...source, events: events.length })),
-      warnings: warnings.length + sources.reduce((total, source) => total + source.events.filter(event => event.type === "session.collection_warning").length, 0),
+      warnings: coverageWarnings.length,
       untimedEvents: sources.reduce((total, source) => total + source.events.filter(event => sessionTimestamp(event, source.timestampUnit) === undefined).length, 0),
       absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval", "workflow"].filter(component => !sources.some(source => source.component === component)),
     },

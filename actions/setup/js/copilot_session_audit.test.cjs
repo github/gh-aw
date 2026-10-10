@@ -6,7 +6,7 @@ import path from "node:path";
 
 const require = createRequire(import.meta.url);
 const native = require("./fixtures/copilot_ci_audit.cjs");
-const { normalizeCopilotSession, hasCopilotConversation } = require("./copilot_session.cjs");
+const { normalizeCopilotSession, hasCopilotConversation, copilotSessionContext, deduplicateCopilotFallback } = require("./copilot_session.cjs");
 const { parseCopilotLog } = require("./parse_copilot_log.cjs");
 const { projectSessionResult, sessionContext, sessionToolSuccess } = require("./agent_session.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -61,6 +61,42 @@ describe("Copilot run-backed accounting and publication", () => {
 // Supplemental child, retry, streaming and SDK cases use installed SDK signatures.
 // The sampled CI runs use the native CLI and do not establish SDK-driver coverage.
 describe("Copilot scoped partial and snapshot evidence (synthetic)", () => {
+  it.each(["data", "envelope"])("translates Copilot parent context without changing native SDK evidence (%s)", location => {
+    const source = { type: "session.result", data: { usage: { input_tokens: 200 } } };
+    if (location === "data") source.data.parentToolCallId = "launch";
+    else source.parentToolCallId = "launch";
+    const original = structuredClone(source);
+    expect(sessionContext(source)).toEqual({});
+    expect(copilotSessionContext(source)).toEqual({ parentToolUseId: "launch" });
+    const normalized = normalizeCopilotSession([source]);
+    expect(normalized[0].data.parentToolUseId).toBe("launch");
+    expect(projectSessionResult(normalized)).toBeUndefined();
+    expect(projectSessionResult(normalized, { includeNested: true }).usage.input_tokens).toBe(200);
+    expect(normalizeCopilotSession(normalized)).toEqual(normalized);
+    expect(source).toEqual(original);
+    expect(copilotSessionContext({ ...source, data: { ...source.data, parentToolUseId: null } })).toEqual({ parentToolUseId: null });
+  });
+
+  it("deduplicates fallback copies only within the same observed session and complete identity", () => {
+    const start = id => ({ type: "session.start", id: "reused-start", data: { sessionId: id } });
+    const observed = { type: "vendor.progress", id: "reused", data: { value: false } };
+    const changed = { ...observed, data: { value: 0 } };
+    const anonymous = { type: "vendor.progress", data: { value: false } };
+    const retained = [[start("first"), observed, anonymous]];
+    const fallback = [start("first"), structuredClone(observed), changed, anonymous, start("second"), structuredClone(observed)];
+    expect(deduplicateCopilotFallback(fallback, retained)).toEqual([changed, anonymous, start("second"), observed]);
+    expect(retained).toEqual([[start("first"), observed, anonymous]]);
+  });
+
+  it("preserves fallback evidence when child session IDs or null native IDs cannot establish duplicate identity", () => {
+    const root = { type: "session.start", id: "root", data: { sessionId: "root" } };
+    const child = id => ({ type: "session.init", id: "child", agentId: "reused-child", data: { sessionId: id } });
+    const message = { type: "assistant.message", id: "reused-message", agentId: "reused-child", data: { content: "same text\n" } };
+    const anonymous = { type: "vendor.progress", id: null, data: { value: 0 } };
+    expect(deduplicateCopilotFallback([root, child("second"), message, anonymous], [[root, child("first"), message, anonymous]])).toEqual([child("second"), message, anonymous]);
+    expect(deduplicateCopilotFallback([root, child("first"), message], [[root, child("first"), message]])).toEqual([]);
+  });
+
   it("retains error-only native histories in collection rather than requiring a conversation", () => {
     const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-error-audit-"));
     const events = [
@@ -345,6 +381,15 @@ describe("Copilot SDK evidence capture (synthetic)", () => {
     expect(saved[3].data).toMatchObject({ toolName: "child", success: false, output: 0 });
     expect(saved[4].data).toEqual({ toolCallId: "orphan" });
     expect(sessionToolSuccess(normalizeCopilotSession(saved)[2].data)).toBe(false);
+  });
+
+  it("keeps parentToolCallId-only child SDK output separate without adding canonical fields to native capture", async () => {
+    const child = { type: "assistant.message", data: { content: "  child output\n", parentToolCallId: "launch" } };
+    const { result, saved } = await capture([{ type: "assistant.message", data: { content: "  root output\n" } }, child]);
+    expect(result).toMatchObject({ exitCode: 0, output: "  root output\n", hasOutput: true });
+    expect(saved[1]).toEqual(child);
+    expect(saved[1].data).not.toHaveProperty("parentToolUseId");
+    expect(normalizeCopilotSession(saved)[1].data.parentToolUseId).toBe("launch");
   });
 
   it("persists an observed SDK send failure as a session error without completing a dangling call", async () => {

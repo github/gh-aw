@@ -6,13 +6,12 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
-const { projectSessionResult, isTokenCount, observedSessionModel, sessionContext } = require("./agent_session.cjs");
-const { isDeepStrictEqual } = require("node:util");
+const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const { collectAgentExecution, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
-const { hasCopilotConversation, hasMalformedJsonl } = require("./copilot_session.cjs");
+const { hasCopilotConversation, hasMalformedJsonl, deduplicateCopilotFallback } = require("./copilot_session.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -365,18 +364,10 @@ async function runLogParser(options) {
       maxTurnsHit = result.maxTurnsHit || false;
       logEntries = result.logEntries || null;
     }
-    const scopedObservations = entries => {
-      let activeSessionId;
-      return entries.map(event => {
-        const context = sessionContext(event);
-        if (["session.start", "session.init"].includes(event.type) && context.sessionId !== undefined && context.agentId === undefined && !context.parentToolUseId) activeSessionId = context.sessionId;
-        return { event, sessionId: context.sessionId !== undefined ? context.sessionId : activeSessionId };
-      });
-    };
-    const retainedObservations = retainedSessions.flatMap(session => scopedObservations(session.events));
-    const supplementalEvents = scopedObservations(logEntries ?? [])
-      .filter(({ event, sessionId }) => event.id === undefined || !retainedObservations.some(previous => previous.sessionId === sessionId && isDeepStrictEqual(previous.event, event)))
-      .map(({ event }) => event);
+    const supplementalEvents = deduplicateCopilotFallback(
+      logEntries ?? [],
+      retainedSessions.map(session => session.events)
+    );
     const conversationEntries = retainedSessions.length
       ? [
           ...retainedSessions.flatMap(session =>

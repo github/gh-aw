@@ -619,6 +619,41 @@ describe("Unified conclusion session", () => {
     expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", events: 0 }));
   });
 
+  it.each([false, true])("deduplicates identified stdio snapshots against retained initialization-only native evidence (answer: %s)", hasAnswer => {
+    const nativePath = "sandbox/agent/logs/copilot-session-state/partial/events.jsonl";
+    const start = { type: "session.start", id: "same-start", data: { sessionId: "partial" } };
+    write(nativePath, [start]);
+    write("agent-stdio.log", [start, ...(hasAnswer ? [{ type: "assistant.message", id: "answer", data: { content: "  recovered answer\n" } }] : [])]);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+    expect(events.filter(event => event.type === "session.start")).toHaveLength(1);
+    expect(events.filter(event => event.type === "session.init")).toHaveLength(1);
+    expect(events.find(event => event.type === "session.start").provenance.path).toBe(nativePath);
+    expect(events.filter(event => event.type === "assistant.message")).toEqual(
+      hasAnswer ? [{ type: "assistant.message", id: "answer", data: { content: "  recovered answer\n" }, provenance: { component: "agent", phase: "agent", path: "agent-stdio.log", index: 0 } }] : []
+    );
+    expect(events.some(event => event.type === "session.collection_warning" && event.data.code === "unrecognized_engine_log")).toBe(false);
+  });
+
+  it.each([undefined, 3, 4])("reconciles persisted malformed-source warnings with collector copies (line: %s)", line => {
+    const nativePath = "sandbox/agent/logs/copilot-session-state/partial/events.jsonl";
+    const start = { type: "session.start", id: "start", data: { sessionId: "partial" } };
+    const answer = { type: "assistant.message", id: "answer", data: { content: "valid adjacent text\n" } };
+    const persisted = [
+      { ...start, provenance: { path: nativePath, index: 0 } },
+      { ...answer, provenance: { path: nativePath, index: 1 } },
+      { type: "session.collection_warning", data: { path: nativePath, code: "malformed_jsonl", ...(line !== undefined ? { line } : {}) } },
+      { type: "session.collection_warning", data: { path: "unrelated.jsonl", code: "malformed_jsonl", line: 3 } },
+      { type: "session.collection_warning", data: { path: nativePath, code: "unrelated_problem", line: 3 } },
+    ];
+    write("agent-session.jsonl", persisted);
+    write(nativePath, `${JSON.stringify(start)}\n${JSON.stringify(answer)}\nINVALID_LINE_THREE\n`);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot", warn: () => {} });
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["valid adjacent text\n"]);
+    expect(events.filter(event => event.type === "session.collection_warning")).toHaveLength(4);
+    expect(events.at(-1).data.warnings).toBe(line === 4 ? 4 : 3);
+    expect(events.at(-1).data.warnings).toBe(collectUnifiedSession({ rootDir: root, engine: "copilot", warn: () => {} }).events.at(-1).data.warnings);
+  });
+
   it("preserves canonical native source groups without needing raw snapshots", () => {
     const nativePath = id => `sandbox/agent/logs/copilot-session-state/${id}/events.jsonl`;
     write(
