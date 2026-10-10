@@ -22,6 +22,20 @@ fixture_spec.loader.exec_module(fixtures)
 
 
 class IndependentDriverTests(unittest.TestCase):
+    def test_native_adapter_rejects_oversized_ledger_from_open_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            with ledger.open("wb") as stream:
+                stream.truncate(80 * 1024 * 1024 + 1)
+            result = subprocess.run(
+                ["node", str(Path(__file__).with_name("native_probe.cjs"))],
+                input=json.dumps({"action": "benchmark", "ledger_file": str(ledger)}) + "\n",
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            self.assertEqual(json.loads(result.stdout)["error"], "resource_limit: adapter input exceeds 80 MiB")
+
     def test_conformance_refuses_missing_positive_before_native_execution(self):
         path = verify.ROOT / "actions/setup/js/work_queue_worker_child_fixtures.json"
         original = path.read_bytes()

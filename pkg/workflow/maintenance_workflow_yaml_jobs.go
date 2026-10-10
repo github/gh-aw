@@ -651,9 +651,8 @@ func writeMaintenanceCompileWorkflowsTokenStep(b *strings.Builder, opts buildMai
         uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + `
 `)
 	if opts.compileGitHubToken != "" {
-		b.WriteString(`        env:
-          GH_AW_MAINTENANCE_GITHUB_TOKEN: ` + opts.compileGitHubToken + `
-`)
+		b.WriteString("        env:\n")
+		writeYAMLEnv(b, "          ", "GH_AW_MAINTENANCE_GITHUB_TOKEN", opts.compileGitHubToken)
 	}
 	b.WriteString(`        with:
 `)

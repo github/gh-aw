@@ -47,6 +47,12 @@ if (mode === "passed") {
 } else if (mode === "violation") {
   console.error("Error: Invariant Safety is violated.");
   process.exit(12);
+} else if (mode === "replace_log") {
+  const config = process.argv[process.argv.indexOf("-config") + 1];
+  const logPath = path.join(path.dirname(config), "tlc.log");
+  fs.unlinkSync(logPath);
+  fs.symlinkSync(process.env.FORMAL_TEST_REPLACEMENT_FILE, logPath);
+  process.stdout.write(${JSON.stringify(SUCCESS)});
 } else if (mode === "invariant_false") {
   process.stderr.write(${JSON.stringify(INVARIANT_FALSE)});
   process.exit(151);
@@ -105,6 +111,18 @@ test("only natural exit plus exhaustion is a pass", () => {
   assert.equal(classify(151, null, false, "The invariant of DAGValidity could not be evaluated.\n"), "tool_error");
   assert.equal(classify(150, null, false, INVARIANT_FALSE), "tool_error");
   assert.equal(classify(150, null, false, "Error: Parsing failed."), "tool_error");
+});
+
+test("log collection reads the opened file if its path is replaced", async t => {
+  const options = fixture(t);
+  const replacement = path.join(path.dirname(options.javaBin), "replacement.log");
+  fs.writeFileSync(replacement, "replacement content");
+  options.env.FORMAL_TEST_MODE = "replace_log";
+  options.env.FORMAL_TEST_REPLACEMENT_FILE = replacement;
+
+  const result = await runVerification(options);
+
+  assert.equal(result.status, "passed");
 });
 
 for (const { config, moduleName } of CONFIGS) {

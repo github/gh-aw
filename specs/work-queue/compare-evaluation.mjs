@@ -16,10 +16,17 @@ const java = process.env.JAVA_BIN || "java";
 const jar = process.env.TLA2TOOLS_JAR;
 assert(jar && path.isAbsolute(jar), "TLA2TOOLS_JAR must be an absolute pinned jar path");
 const hash = value => crypto.createHash("sha256").update(value).digest("hex");
+const readFileDescriptor = fd => {
+  const { size } = fs.fstatSync(fd);
+  if (size === 0) return "";
+  const buffer = Buffer.alloc(size);
+  const bytesRead = fs.readSync(fd, buffer, 0, size, 0);
+  return buffer.subarray(0, bytesRead).toString("utf8");
+};
 assert.equal(hash(fs.readFileSync(jar)), TLC_SHA256, "unexpected TLC jar checksum");
 assert.notEqual(output, path.parse(output).root, "results must not be the filesystem root");
 fs.mkdirSync(output, { recursive: true });
-assert(!fs.existsSync(path.join(output, "comparison.json")), "do not overwrite previous comparison evidence");
+const comparisonFd = fs.openSync(path.join(output, "comparison.json"), "wx", 0o600);
 const cases = [
   ["WorkQueue", "Recovery"],
   ["FairWorkQueue", "FairBatch"],
@@ -118,10 +125,10 @@ WorkResubmissionNoOp == Original!WorkResubmissionNoOp /\\ Revised!WorkResubmissi
   const command = ["-XX:+UseParallelGC", "-Xmx1g", "-cp", jar, "tlc2.TLC", "-workers", "2", "-seed", "1", "-fp", "0", "-config", "Comparison.cfg", "-metadir", "state", "Comparison.tla"];
   const started = Date.now();
   const logPath = path.join(directory, "tlc.log");
-  const fd = fs.openSync(logPath, "w");
+  const fd = fs.openSync(logPath, "wx+", 0o600);
   const checked = spawnSync(java, command, { cwd: directory, timeout: 900_000, killSignal: "SIGINT", stdio: ["ignore", fd, fd] });
+  const log = readFileDescriptor(fd);
   fs.closeSync(fd);
-  const log = fs.readFileSync(logPath, "utf8");
   const diagnostic = mutation === "missing-transition" ? "Action property NextEquivalence is violated" : mutation === "changed-normalization" ? "Invariant ReplayEquivalence is violated" : null;
   const expectedExit = mutation === "missing-transition" ? 13 : mutation ? 12 : 0;
   const status = classify(checked.status, checked.signal, checked.error?.code === "ETIMEDOUT", log);
@@ -148,10 +155,14 @@ WorkResubmissionNoOp == Original!WorkResubmissionNoOp /\\ Revised!WorkResubmissi
   };
   comparisons.push(result);
   const complete = comparisons.length === cases.length;
-  fs.writeFileSync(
-    path.join(output, "comparison.json"),
-    `${JSON.stringify({ complete, passed: complete && comparisons.every(c => c.passed), java_version: javaVersion.stderr, runner_sha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), comparisons }, null, 2)}\n`
+  fs.ftruncateSync(comparisonFd, 0);
+  fs.writeSync(
+    comparisonFd,
+    `${JSON.stringify({ complete, passed: complete && comparisons.every(c => c.passed), java_version: javaVersion.stderr, runner_sha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), comparisons }, null, 2)}\n`,
+    0,
+    "utf8"
   );
   console.log(`${name}: ${result.passed ? "expected result" : "FAILED"} (${result.elapsed_seconds}s)`);
   assert(result.passed, `comparison failed; inspect ${logPath}`);
 }
+fs.closeSync(comparisonFd);

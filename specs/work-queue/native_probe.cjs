@@ -63,8 +63,13 @@ function execute(input) {
   }
   let data = input.data;
   if (input.ledger_file) {
-    if (fs.statSync(input.ledger_file).size > 80 * 1024 * 1024) throw new Error("resource_limit: adapter input exceeds 80 MiB");
-    data = fs.readFileSync(input.ledger_file, "utf8");
+    const fd = fs.openSync(input.ledger_file, "r");
+    try {
+      if (fs.fstatSync(fd).size > 80 * 1024 * 1024) throw new Error("resource_limit: adapter input exceeds 80 MiB");
+      data = fs.readFileSync(fd, "utf8");
+    } finally {
+      fs.closeSync(fd);
+    }
   }
   let start = performance.now();
   const commits = queue.parseTransactionLog(data);

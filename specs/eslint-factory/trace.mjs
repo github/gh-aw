@@ -193,9 +193,14 @@ export function validateTrace(trace, entry) {
 
 export function readableTrace(trace, entry) {
   const lines = [`# ${entry.name}`, "", `Expected TLC diagnostic: \`${entry.expected}\`.`, "", "| State | Transition | Original | Phase | Proposed / applied | Readback | Scan / flag | Quality |", "|---|---|---|---|---|---|---|---|"];
-  for (const { number, action, state: s } of trace)
-    lines.push(
-      `| ${number} | ${action.replace(/\|/g, "\\|")} | ${s.original.join(",") || "none"} | ${s.phase.join(", ")} | ${s.proposed.join(",")} / ${s.applied.join(",")} | ${s.verified.join(",")} | ${s.scan} / ${s.lintClean} | ${s.quality} |`
-    );
+  const escapeCell = value =>
+    String(value)
+      .replaceAll("\\", "\\\\")
+      .replaceAll("|", "\\|")
+      .replace(/\r\n|\n|\r/g, "<br>");
+  for (const { number, action, state: s } of trace) {
+    const cells = [number, action, s.original.join(",") || "none", s.phase.join(", "), `${s.proposed.join(",")} / ${s.applied.join(",")}`, s.verified.join(","), `${s.scan} / ${s.lintClean}`, s.quality];
+    lines.push(`| ${cells.map(escapeCell).join(" | ")} |`);
+  }
   return lines.join("\n") + "\n";
 }
