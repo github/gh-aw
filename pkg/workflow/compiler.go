@@ -104,7 +104,13 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 	if err := validateReservedWorkflowInputs(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := c.applyRepositoryWorkQueueOptions(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	if err := validateWorkQueueConfiguration(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+	if err := c.configureAWWorkQueue(workflowData, markdownPath); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	if err := c.validateWorkQueueTargets(workflowData, markdownPath); err != nil {

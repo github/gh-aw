@@ -158,8 +158,14 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 	if err := state.validateSubmissionEntitlement(commit.Actor, node); err != nil {
 		return err
 	}
-	profile, ok := pool.Profiles[node.WorkerProfile]
-	if !ok || profile.TrustDomain != node.BatchTrustDomain ||
+	if existing := state.Works[node.WorkID]; existing != nil {
+		if !sameJSON(existing.WorkDefinition, node) {
+			return queueError("work_conflict", "immutable node %s differs", node.WorkID)
+		}
+		return nil
+	}
+	profile, profileErr := state.admissionProfile(node)
+	if profileErr != nil || profile.TrustDomain != node.BatchTrustDomain ||
 		node.WorkID != NodeID(node.GraphID, node.NodeKey) || !validKey(node.FairnessKey) {
 		return queueError("work_invalid", "node identity/profile/trust/account mismatch")
 	}
@@ -174,12 +180,6 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 	}
 	if err := state.validateBackingIssueAdmission(node, pool); err != nil {
 		return err
-	}
-	if existing := state.Works[node.WorkID]; existing != nil {
-		if !sameJSON(existing.WorkDefinition, node) {
-			return queueError("work_conflict", "immutable node %s differs", node.WorkID)
-		}
-		return nil
 	}
 	if state.AdmissionPaused {
 		return queueError("admission_paused", "new Work admission is paused")
@@ -197,7 +197,7 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 		}
 	}
 	state.Works[node.WorkID] = &WorkState{
-		WorkDefinition: node, State: "available", Position: position, Barrier: "none", admissionRequestID: commit.Request.ID,
+		WorkDefinition: node, AdmissionContract: profile.LogicalContract, State: "available", Position: position, Barrier: "none", admissionRequestID: commit.Request.ID,
 	}
 	return state.validateWorkAssignmentSize(node, commit, payload)
 }

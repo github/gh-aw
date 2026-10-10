@@ -1,8 +1,7 @@
 // @ts-check
 "use strict";
 
-const { DEFAULT_LIMITS } = require("./work_queue_limits.cjs");
-const { validatePolicy } = require("./work_queue_policy.cjs");
+const { buildAWPolicy } = require("./work_queue_settings.cjs");
 const { validateDeliveryContract } = require("./work_queue_delivery.cjs");
 
 const DAILY_REPORTS = Object.freeze([
@@ -88,42 +87,17 @@ function buildDailyReportPlan({ date, repository, repositoryId }) {
   };
 }
 
-/** @param {{repository: string, ref: string, producerPrincipal: string, workerPrincipal: string}} options */
-function buildDailyReportPolicy({ repository, ref, producerPrincipal, workerPrincipal }) {
+/** @param {{repository: string, ref: string, settings?: object}} options */
+function buildDailyReportPolicy({ repository, ref, settings }) {
   assertRepository(repository);
-  const policy = {
-    mode: "weighted-priority",
-    class_weights: [8, 4, 2, 1, 1],
-    accounting_weights: Object.fromEntries([["", 1], ...REPORT_PROFILES.map(profile => [profile, 1])]),
-    producers: { [producerPrincipal]: { pools: [REPORT_POOL], priorities: [3], fairness_keys: [...REPORT_PROFILES] } },
-    pools: {
-      [REPORT_POOL]: {
-        default_profile: DAILY_REPORTS[0],
-        profiles: Object.fromEntries(
-          REPORT_PROFILES.map(profile => [
-            profile,
-            { workflow: `.github/workflows/${profile}.lock.yml`, ref, principal: workerPrincipal, trust_domain: profile, credential_scope: "repository", effect_scope: repository, max_claims: 1, share_keys: false },
-          ])
-        ),
-        logical_limit: REPORTS_PER_DAY,
-        native_limit: REPORTS_PER_DAY,
-        per_account_limit: 1,
-        allowed_repositories: [repository],
-        max_observation_age_ms: 60000,
-        retry: { max_attempts: 1, backoff_ms: 1000 },
-        reconciliation: { max_attempts: 5, deadline_ms: 300000 },
-      },
-    },
-    limits: { ...DEFAULT_LIMITS, graph_nodes: REPORTS_PER_DAY, pending_nodes: 30, operations: 32, payload_bytes: 8192 },
-  };
-  validatePolicy(policy);
-  return policy;
+  return buildAWPolicy({ repository, ref, workflows: [...REPORT_PROFILES], settings });
 }
 
 module.exports = { DAILY_REPORTS, FIXED_DAILY_REPORTS, WEEKLY_REPORTS, REPORT_PROFILES, REPORTS_PER_DAY, REPORT_POOL, reportsForDay, buildDailyReportPlan, buildDailyReportPolicy };
 
 if (require.main === module) {
-  const [command, repository, ref, producerPrincipal, workerPrincipal, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository || !ref || !producerPrincipal || !workerPrincipal) throw new Error("Usage: node daily_report_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID");
-  process.stdout.write(JSON.stringify(buildDailyReportPolicy({ repository, ref, producerPrincipal, workerPrincipal }), null, 2) + "\n");
+  const [command, repository, ref, ...extra] = process.argv.slice(2);
+  if (command !== "policy" || extra.length || !repository || !ref) throw new Error("Usage: node daily_report_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA");
+  const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
+  process.stdout.write(JSON.stringify(buildDailyReportPolicy({ repository, ref, settings: readPortfolioSettings() }), null, 2) + "\n");
 }

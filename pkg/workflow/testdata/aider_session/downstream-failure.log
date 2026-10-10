@@ -1,0 +1,10 @@
+{"type":"session.init","timestamp":1791572415061,"data":{"sourceEngine":"aider","sessionId":"sanitized-debt-session","model":"openai/auto"}}
+{"type":"user.message","timestamp":1791572415061,"data":{"sourceEngine":"aider","sessionId":"sanitized-debt-session","content":"[sanitized workflow prompt]"}}
+Aider v0.86.2
+{"type":"assistant.message","timestamp":1791572418378,"data":{"sourceEngine":"aider","sessionId":"sanitized-debt-session","content":"```bash\ngrep -rn \"TODO\\|FIXME\" --include=\"*.go\" --exclude-dir=vendor --exclude-dir=.git . | grep -v \"_test.go\" | head -20\n```"}}
+Tokens: 5.7k sent, 44 received.
+{"type":"tool.execution_start","timestamp":1791572418379,"data":{"sourceEngine":"aider","sessionId":"sanitized-debt-session","toolCallId":"sanitized-debt-command","toolName":"bash","input":{"command":"grep -rn \"TODO\\|FIXME\" --include=\"*.go\" --exclude-dir=vendor --exclude-dir=.git . | grep -v \"_test.go\" | head -20"}}}
+{"type":"tool.execution_complete","timestamp":1791572418439,"data":{"sourceEngine":"aider","sessionId":"sanitized-debt-session","toolCallId":"sanitized-debt-command","toolName":"bash","success":true,"exitCode":0,"output":"[sanitized repository TODO search results]\n","durationMs":60}}
+{"type":"session.result","timestamp":1791572418440,"data":{"sourceEngine":"aider","sessionId":"sanitized-debt-session","numTurns":1,"durationMs":3378,"errors":[]}}
+Process exiting with code: 0
+{"type":"result","num_turns":1}

@@ -86,6 +86,12 @@ func ValidatePolicy(policy Policy) error {
 }
 
 func validatePolicy(policy Policy) error {
+	if policy.Authorization != "" && policy.Authorization != "aw" {
+		return queueError("policy_invalid", "authorization must be aw or absent for historical policies")
+	}
+	if policy.Authorization == "aw" && len(policy.Producers) != 0 {
+		return queueError("policy_invalid", "AW-managed authorization does not use producer entitlements")
+	}
 	if err := validateProjectors(policy); err != nil {
 		return err
 	}
@@ -110,7 +116,7 @@ func validatePolicy(policy Policy) error {
 		}
 	}
 	for _, pool := range policy.Pools {
-		if err := validatePoolPolicy(pool, policy.Limits); err != nil {
+		if err := validatePoolPolicy(pool, policy.Limits, policy.Authorization); err != nil {
 			return err
 		}
 	}
@@ -120,13 +126,20 @@ func validatePolicy(policy Policy) error {
 	return validatePolicyLimits(policy.Limits)
 }
 
-func validatePoolPolicy(pool PoolPolicy, limits Limits) error {
+func validatePoolPolicy(pool PoolPolicy, limits Limits, authorization string) error {
 	if _, ok := pool.Profiles[pool.DefaultProfile]; !ok || len(pool.Profiles) > 256 {
 		return queueError("policy_invalid", "pool default profile must be approved")
 	}
 	for _, profile := range pool.Profiles {
-		if !decimalIdentity(profile.Principal) {
+		if profile.LogicalContract != "" && !checkpointDigestPattern.MatchString(profile.LogicalContract) {
+			return queueError("policy_invalid", "logical contract must be a lowercase SHA256 digest")
+		}
+		if (authorization != "aw" || profile.Principal != "") && !decimalIdentity(profile.Principal) {
 			return queueError("policy_invalid", "worker principal must be an immutable positive GitHub actor ID")
+		}
+		if authorization == "aw" && (profile.TrustDomain != "default" ||
+			profile.CredentialScope != "repository" || !repoPattern.MatchString(profile.EffectScope)) {
+			return queueError("policy_invalid", "AW-managed worker routing requires derived repository scopes and default trust domain")
 		}
 		if profile.MaxClaims < 1 || profile.MaxClaims > MaxClaimsPerDispatch ||
 			!revisionPattern.MatchString(profile.Ref) ||
@@ -227,6 +240,8 @@ func permitted(role, kind string) bool {
 		return role == "administrator" || role == "producer" || role == "dispatcher"
 	case "Control", "Checkpoint":
 		return role == "administrator"
+	case "Deployment":
+		return role == "administrator" || role == "producer" || role == "dispatcher"
 	case "Work":
 		return role == "producer" || role == "dispatcher" || role == "worker" || role == "administrator"
 	case "Claim":
@@ -260,7 +275,7 @@ func validateRequest(commit QueueCommit) error {
 		return err
 	}
 	kinds := map[string][]string{
-		"policy": {"Policy"}, "control": {"Control", "WorkPriority"}, "submit": {"Policy", "Work"},
+		"policy": {"Policy"}, "deployment": {"Deployment"}, "control": {"Control", "WorkPriority"}, "submit": {"Policy", "Work"},
 		"dispatch_next": {"Observation", "Claim"}, "finish": {"Completion", "ClaimCancellation", "WorkCancellation"},
 		"observe": {"Observation"}, "dispatch": {"Dispatch"}, "release": {"ClaimCancellation", "WorkCancellation", "Release"},
 		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"},
@@ -319,8 +334,8 @@ func validateRequestIntent(commit QueueCommit, parameterCount int) error {
 		if err := validateDispatchParameters(params); err != nil {
 			return err
 		}
-		if parameterCount != 4 {
-			return queueError("request_invalid", "dispatch_next requires exactly pool/max_claims/max_dispatches/max_bytes")
+		if parameterCount != 4 && (parameterCount != 5 || params.WorkerProfiles == nil) {
+			return queueError("request_invalid", "dispatch_next requires budgets and an optional trusted worker allowlist")
 		}
 	case "finish":
 		var params FinishParameters
@@ -384,6 +399,11 @@ func validateSubmitIntent(commit QueueCommit) error {
 }
 
 func (state Projection) allowedProducer(actor Actor, node WorkDefinition) bool {
+	if state.Policy.Authorization == "aw" && actor.Role != "worker" {
+		_, pool := state.Policy.Pools[node.Pool]
+		_, key := state.Policy.AccountingWeights[node.FairnessKey]
+		return pool && key && node.Priority >= 1 && node.Priority <= 5
+	}
 	rule, ok := state.Policy.Producers[actor.Principal]
 	return ok && slices.Contains(rule.Pools, node.Pool) &&
 		slices.Contains(rule.Priorities, node.Priority) && slices.Contains(rule.FairnessKeys, node.FairnessKey)
@@ -406,10 +426,20 @@ func (state Projection) validateSubmissionEntitlement(actor Actor, node WorkDefi
 		}
 		return nil
 	}
+
 	if !state.allowedProducer(actor, node) {
 		return queueError("admission_unauthorized", "principal has no pool/priority/account entitlement")
 	}
 	return nil
+}
+
+// DispatchPrincipal is frozen at launch from the selected AW credential, not
+// from the publisher or an unverified native run.
+func DispatchPrincipal(dispatch *DispatchState) string {
+	if dispatch.Profile.Principal != "" {
+		return dispatch.Profile.Principal
+	}
+	return dispatch.CredentialPrincipal
 }
 
 func NewWork(payload []byte, graphID, nodeKey, pool string, policy Policy, at int64) (WorkDefinition, error) {
@@ -431,7 +461,8 @@ func NewWork(payload []byte, graphID, nodeKey, pool string, policy Policy, at in
 		Kind: "Work", WorkID: NodeID(graphID, nodeKey), GraphID: graphID, NodeKey: nodeKey,
 		Pool: pool, Priority: 3, FairnessKey: "", WorkerProfile: poolPolicy.DefaultProfile,
 		BatchTrustDomain: profile.TrustDomain, Payload: canonical,
-		DependsOn: []Dependency{}, Enqueued: at,
+		LogicalContract: profile.LogicalContract,
+		DependsOn:       []Dependency{}, Enqueued: at,
 	}, nil
 }
 

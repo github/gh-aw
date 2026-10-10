@@ -50,10 +50,12 @@ import (
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/workqueue"
 )
 
 var repoConfigLog = logger.New("workflow:repo_config")
 var repoConfigSecretNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+var errWorkQueueConfig = errors.New("invalid global work_queue configuration")
 
 // RepoConfigFileName is the path of the repository-level configuration file
 // relative to the git root.
@@ -152,6 +154,9 @@ func (m *MaintenanceConfig) IsJobDisabled(jobName string) bool {
 
 // RepoConfig is the parsed representation of aw.json.
 type RepoConfig struct {
+	// WorkQueue holds optional scheduling overrides, never identities or credentials.
+	WorkQueue json.RawMessage
+
 	// Strict enforces strict mode for every workflow compiled in the repository.
 	// The schema only permits true when this field is present.
 	Strict bool
@@ -259,9 +264,13 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 		ActionPins               map[string]string             `json:"action_pins,omitempty"`
 		ActionPinPrefixes        map[string]string             `json:"action_pin_prefixes,omitempty"`
 		ContainerPins            map[string]ContainerPinTarget `json:"container_pins,omitempty"`
+		WorkQueue                json.RawMessage               `json:"work_queue,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
+	}
+	if _, err := workqueue.ParseSettings(raw.WorkQueue); err != nil {
+		return fmt.Errorf("%w: %w", errWorkQueueConfig, err)
 	}
 
 	r.Strict = raw.Strict
@@ -273,6 +282,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	r.ActionPins = raw.ActionPins
 	r.ActionPinPrefixes = raw.ActionPinPrefixes
 	r.ContainerPins = raw.ContainerPins
+	r.WorkQueue = raw.WorkQueue
 
 	// Parse polymorphic auto_upgrade: boolean or { "cron": "..." } object.
 	if len(raw.AutoUpgrade) > 0 && string(raw.AutoUpgrade) != "null" {
@@ -350,6 +360,15 @@ func LoadRepoConfig(gitRoot string) (*RepoConfig, error) {
 			return &RepoConfig{}, nil
 		}
 		return nil, fmt.Errorf("could not read %s: %w. Check that the file exists and is readable", RepoConfigFileName, err)
+	}
+
+	var sections map[string]json.RawMessage
+	if json.Unmarshal(data, &sections) == nil {
+		if settings, configured := sections["work_queue"]; configured {
+			if _, err := workqueue.ParseSettings(settings); err != nil {
+				return nil, fmt.Errorf("%s: %w: %w", RepoConfigFileName, errWorkQueueConfig, err)
+			}
+		}
 	}
 
 	// Validate against the embedded JSON schema before deserialising.

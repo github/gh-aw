@@ -7,9 +7,9 @@ const { tickScale } = require("./work_queue_scheduler.cjs");
 
 const ROLES = new Set(["administrator", "producer", "dispatcher", "worker", "reconciler", "projector"]);
 const ROLE_KINDS = {
-  administrator: ["policy", "control", "submit", "dispatch_next", "observe", "cancel_work", "checkpoint"],
-  producer: ["submit", "cancel_work"],
-  dispatcher: ["submit", "dispatch_next", "observe", "dispatch"],
+  administrator: ["policy", "deployment", "control", "submit", "dispatch_next", "observe", "cancel_work", "checkpoint"],
+  producer: ["deployment", "submit", "cancel_work"],
+  dispatcher: ["deployment", "submit", "dispatch_next", "observe", "dispatch"],
   worker: ["submit", "dispatch_next", "observe", "finish", "dispatch"],
   reconciler: ["observe", "dispatch", "release", "result", "delivery_failure", "cancel_claim", "cancel_work"],
   projector: ["issue_link"],
@@ -75,9 +75,14 @@ function validateTrustedContext(context, actor) {
   return normalizeTrustedContext(context);
 }
 
-function validateProfile(profile) {
-  closed(profile, ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"], [], "worker profile");
-  decimal(profile.principal, "worker principal", "policy_invalid");
+/** @param {any} profile @param {string | undefined} [authorization] */
+function validateProfile(profile, authorization = undefined) {
+  closed(profile, ["workflow", "ref", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"], ["principal", "logical_contract"], "worker profile");
+  if (Object.hasOwn(profile, "logical_contract") && !/^[a-f0-9]{64}$/.test(profile.logical_contract)) throw queueError("policy_invalid", "logical contract must be a lowercase SHA256 digest");
+  // Standalone route verification is principal-neutral; legacy Policy is not.
+  if (Object.hasOwn(profile, "principal") || authorization === "") decimal(profile.principal, "worker principal", "policy_invalid");
+  if (authorization === "aw" && (profile.trust_domain !== "default" || profile.credential_scope !== "repository" || !/^[^/\s]+\/[^/\s]+$/.test(profile.effect_scope)))
+    throw queueError("policy_invalid", "AW-managed worker routing requires derived repository scopes and default trust domain");
   for (const field of ["workflow", "ref", "trust_domain", "credential_scope", "effect_scope"]) identity(profile[field], field);
   if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(profile.ref) || !profile.workflow.startsWith(".github/workflows/") || !profile.workflow.endsWith(".lock.yml") || profile.workflow.includes(".."))
     throw queueError("policy_invalid", "profiles require immutable revisions and approved workflow paths");
@@ -86,7 +91,8 @@ function validateProfile(profile) {
 }
 
 function validatePolicy(policy) {
-  closed(policy, ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"], ["projectors"], "policy");
+  closed(policy, ["mode", "class_weights", "accounting_weights", "producers", "pools", "limits"], ["projectors", "authorization"], "policy");
+  if (Object.hasOwn(policy, "authorization") && policy.authorization !== "aw") throw queueError("policy_invalid", "authorization must be aw or absent for historical policies");
   if (Object.hasOwn(policy, "projectors")) {
     if (!Array.isArray(policy.projectors) || !policy.projectors.length || policy.projectors.length > 256) throw queueError("policy_invalid", "projectors require 1..256 installed rules");
     for (const rule of policy.projectors) {
@@ -124,6 +130,7 @@ function validatePolicy(policy) {
     if (!policy[field] || typeof policy[field] !== "object" || Array.isArray(policy[field]) || Object.keys(policy[field]).length > 1024) throw queueError("policy_invalid", `invalid ${field}`);
   }
   if (!Object.keys(policy.pools).length || Object.keys(policy.pools).length > 64) throw queueError("policy_invalid", "policy must approve 1..64 pools");
+  if (policy.authorization === "aw" && Object.keys(policy.producers).length) throw queueError("policy_invalid", "AW-managed authorization does not use producer entitlements");
   for (const [name, pool] of Object.entries(policy.pools)) {
     identity(name, "pool");
     closed(pool, ["default_profile", "profiles", "logical_limit", "native_limit", "allowed_repositories", "max_observation_age_ms", "retry", "reconciliation"], ["per_account_limit"], "pool");
@@ -132,7 +139,7 @@ function validatePolicy(policy) {
       throw queueError("policy_invalid", "default profile must be approved");
     for (const [profileName, profile] of Object.entries(pool.profiles)) {
       identity(profileName, "profile");
-      validateProfile(profile);
+      validateProfile(profile, policy.authorization ?? "");
       if (policy.limits?.operations < 2 * profile.max_claims + 1) throw queueError("policy_invalid", "operation budget cannot hold bounded worst-case assignment closure");
     }
     for (const field of ["logical_limit", "native_limit", "per_account_limit"]) if (Object.hasOwn(pool, field)) integer(pool[field], 1, 4096, field);
@@ -213,8 +220,18 @@ function validateSubmissionEntitlement(state, node, actor) {
     if (node.pool !== parent.pool || node.priority !== parent.priority || node.fairness_key !== parent.fairness_key) throw queueError("child_entitlement", "children preserve trusted parent priority and accounting scope");
     return;
   }
+  if (state.policy.authorization === "aw") {
+    poolPolicy(state, node.pool);
+    integer(node.priority, 1, 5, "priority");
+    if (!Object.hasOwn(state.policy.accounting_weights, node.fairness_key)) throw queueError("admission_unauthorized", "unregistered scheduling accounting key");
+    return;
+  }
   const rule = state.policy.producers[actor.principal];
   if (!rule || !rule.pools.includes(node.pool) || !rule.priorities.includes(node.priority) || !rule.fairness_keys.includes(node.fairness_key)) throw queueError("admission_unauthorized", "producer lacks immutable submission entitlement");
+}
+
+function dispatchPrincipal(dispatch) {
+  return dispatch.profile.principal ?? dispatch.credential_principal;
 }
 
 function freshClocks(policy) {
@@ -253,6 +270,7 @@ module.exports = {
   claimAuthority,
   decimal,
   defaultPolicy,
+  dispatchPrincipal,
   freshClocks,
   normalizeTrustedContext,
   policyScales,

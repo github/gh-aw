@@ -235,6 +235,7 @@ opaque because its essential fields are not defined by this specification.
 | --- | --- |
 | Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
+| Agent session errors | Observed diagnostic fields, including `errorType`, `code`, and `statusCode`; absent status codes remain absent, and unrelated native error context is omitted. |
 | Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
 | Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
@@ -668,7 +669,10 @@ Native error type identifiers retain their original spelling.
 Multiple retries, repeated source records,
 canonical events, and detector observations MUST NOT produce duplicate entries.
 Tool failures and errors quoted in user/assistant messages or tool outputs MUST
-NOT become agent execution errors. Original native and canonical error events
+NOT become agent execution errors. Diagnostics emitted in child-agent context
+(an observed caller `agentId` or nonempty parent-tool identity) MUST NOT supply
+main-agent classifications; subagent lifecycle target IDs alone do not establish
+the emitting caller's context. Original native and canonical error events
 remain available; the aggregate is not a replacement for their evidence.
 Errors from earlier attempts MAY coexist with a final `exitCode: 0`; neither
 the entry nor a nonempty error array asserts that the final execution failed.

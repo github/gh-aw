@@ -63,6 +63,9 @@
     "DispatchOperation": {
       "additionalProperties": false,
       "properties": {
+        "credential_principal": {
+          "$ref": "#/$defs/Decimal"
+        },
         "dispatch_id": {
           "$ref": "#/$defs/Identity"
         },

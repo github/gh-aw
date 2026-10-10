@@ -27,6 +27,7 @@ type WorkQueuePolicyConfig struct {
 	Policy                 workqueue.Policy
 	ForeignReadCredentials map[string]string
 	IssuesJSON             string
+	WorkerContract         string
 }
 
 func validateWorkQueueConfiguration(data *WorkflowData) error {
@@ -480,6 +481,9 @@ func bindWorkQueuePolicyValidationTemplates(policy workqueue.Policy) workqueue.P
 			}
 		}
 		for name, profile := range pool.Profiles {
+			if profile.Ref == "${{ github.sha }}" {
+				profile.Ref = strings.Repeat("a", 40)
+			}
 			if profile.Principal == "${{ github.actor_id }}" {
 				profile.Principal = principal
 			}
@@ -555,7 +559,7 @@ func (c *Compiler) validateWorkQueueTargets(data *WorkflowData, markdownPath str
 	if err := validateApprovedWorkQueueTargets(data, markdownPath); err != nil {
 		return err
 	}
-	if !hasExplicitWorkQueueProfiles(data) {
+	if data.WorkQueuePolicy.Policy.Authorization != "aw" && !hasExplicitWorkQueueProfiles(data) {
 		if err := populateDefaultWorkQueueProfiles(data, markdownPath); err != nil {
 			return err
 		}
@@ -663,16 +667,19 @@ func workQueuePolicyEnvironment(data *WorkflowData) []string {
 		"          GH_AW_WORK_QUEUE_ROLE: " + fmt.Sprintf("%q", workQueueRuntimeRole(data)) + "\n",
 	}
 	lines = append(lines, workQueueIssuesEnvironment(data)...)
+	if data.WorkQueuePolicy.WorkerContract != "" {
+		lines = append(lines, "          GH_AW_WORK_QUEUE_CONTRACT: "+fmt.Sprintf("%q", data.WorkQueuePolicy.WorkerContract)+"\n")
+	}
 	if !isWorkQueueParticipant(data) {
 		return lines
 	}
 	// Runtime-derived defaults are not assertions about the installed global Policy.
-	if hasWorkQueuePolicyProposal(data) && hasExplicitWorkQueueProfiles(data) && hasExplicitWorkQueueProducers(data) {
+	if data.WorkQueuePolicy.Policy.Authorization == "aw" && !isWorkQueueWorker(data) || hasWorkQueuePolicyProposal(data) && hasExplicitWorkQueueProfiles(data) && hasExplicitWorkQueueProducers(data) {
 		encoded, err := json.Marshal(data.WorkQueuePolicy.Policy)
 		if err != nil {
 			return nil
 		}
-		lines = append(lines, "          GH_AW_WORK_QUEUE_POLICY: "+fmt.Sprintf("%q", string(encoded))+"\n")
+		lines = append(lines, workQueuePolicyJSONEnvironment(string(encoded))...)
 	}
 	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
 		budget := "1"

@@ -19,6 +19,14 @@
         },
         "pool": {
           "$ref": "#/$defs/Identity"
+        },
+        "worker_profiles": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "maxItems": 256,
+          "type": "array",
+          "uniqueItems": true
         }
       },
       "required": ["pool", "max_claims", "max_dispatches", "max_bytes"],

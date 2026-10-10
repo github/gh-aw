@@ -30,9 +30,10 @@ ledgers.
 | [Refiner](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-refiner.md) | Identify false positives, missing edge cases, or weak diagnostics | Up to three issues, a discussion, and one immutable memory snapshot per Claim |
 | [Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-monster.md) | Group actionable diagnostics and arrange remediation | Issue updates, Copilot assignments, and a discussion; cancel write-capable Work after a clean scan |
 
-Configure producer entitlements, worker profiles, immutable workflow revisions,
-resource scopes, and a matching protected-branch ruleset before enabling the
-factory. The compiler embeds the validated Policy proposal. The first trusted
+Declare AW workers and approved dispatch targets before enabling the factory.
+Scheduling overrides live in the shared `.github/workflows/aw.json` `work_queue`
+section; AW supplies authorization and immutable worker routes.
+The compiler embeds the resolved Policy proposal. The first trusted
 producer submit installs that Policy with its Work and creates the queue branch;
 no administrator needs to seed the queue. An authorized producer explicitly
 admits Work with its output contract. The
@@ -47,8 +48,8 @@ reruns on the same date reuse the same graph/node identities and immutable
 payloads; they do not admit another copy. A new UTC day admits a new cohort.
 Older eligible work can still run before the new cohort.
 
-Producer entitlement is required for the dispatcher's authenticated principal,
-pool `default`, priority `3`, and empty accounting key (`""`). Installing Policy
+AW authorizes the dispatcher; the queue validates pool `default`, priority `3`,
+and empty accounting key (`""`) against installed scheduling. Installing Policy
 does not itself admit any Work. Workers still require authenticated assignments;
 they do not seed tasks. The separate `daily-report-dispatcher` uses the
 `daily-reports` pool and is not this factory's producer.
@@ -59,29 +60,18 @@ Activation reports a missing queue branch as `queue_state: "uninitialized"`
 without writing to it. The dispatcher can continue as a producer: its first
 `work_queue_submit` safe output atomically creates the branch with the compiled
 Policy and admitted Work. A dispatch-only request cannot bootstrap the queue.
-Protect the `work-queue` branch name with a ruleset pattern before enabling the
-dispatcher; do not substitute an ordinary workflow dispatch for a queue
-assignment.
+No administrator seed is required. Do not substitute an ordinary workflow
+dispatch for a queue assignment.
 
-The checked-in policy generator provides three immutable worker profiles,
-singleton assignments, three native slots, and a 30-pending-task limit:
-
-```bash
-node actions/setup/js/eslint_factory_portfolio.cjs policy \
-  github/gh-aw IMMUTABLE_WORKER_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID \
-  > eslint-factory-policy.json
-./gh-aw work-queue --repo github/gh-aw policy \
-  --file eslint-factory-policy.json --epoch eslint-factory-v1
-```
-
-Generation does not authenticate principals, protect the queue branch, or launch
-workers. The generated policy must be represented by the dispatcher's
-compiler-validated work-queue configuration for safe-output bootstrap. Use
-verified positive decimal principal IDs from trusted producer and dispatch
-credential flows, not display names or assumed `github.actor` values. Follow the
-[deployment guide](/gh-aw/guides/deploy-work-queue/) to configure branch rules.
-An administrator may still install Policy explicitly; later policy changes
-require a drained queue. If the queue already serves other pools, retain their
+The shared `aw.json` sets concurrency three and a 30-pending-task limit, with
+three attempts and 30-second backoff. Workers use singleton assignments.
+No producer IDs, worker principals, trust domains or credential scopes are
+authored in queue configuration. The first accepted submission publishes
+Policy and Work together. Standalone administrator seeding is unsupported.
+Follow the
+[deployment guide](/gh-aw/guides/deploy-work-queue/) for first-use bootstrap.
+GitHub enforces repository rules without queue-specific setup. Later Policy
+updates require an existing, drained queue. If it already serves other pools, retain their
 configuration rather than replacing it with this single-pool template.
 
 Prepared payloads freeze the repository's verified numeric identity and
@@ -90,7 +80,7 @@ requires one memory snapshot and bounds issues/discussions; the monster bounds
 issue changes, assignments, and its discussion. If no rule or remediation is
 needed, cancel the write-capable task rather than claiming a verified Result from
 `noop`. Only explicitly no-write Work permits a completed no-write Result. Producer
-permission does not authorize the agent to broaden these scopes or install Policy.
+permission does not authorize the agent to broaden these scopes or choose Policy.
 
 The dispatcher requests
 `work_queue_dispatch_next({"pool":"default","max_claims":3,"max_dispatches":3})`.
@@ -118,9 +108,8 @@ creates the branch only when it atomically commits its first Policy and Work.
 The agent's `work_queue_read` snapshot reports
 `queue_state: "uninitialized"`. Continue with the trusted producer plan and
 `work_queue_submit`; do not claim a successful empty-queue `noop`. Missing
-compiler Policy, invalid producer entitlements, or a denied Git read still block
-publication. Do not invent worker principal IDs or bypass queue-branch writer
-protections.
+compiler Policy, invalid scheduling settings, or a denied Git read still block
+publication. Do not bypass GitHub access denials.
 
 Hosted activation can fail at **Snapshot work queue state**, before the agent
 starts. Diagnose that boundary separately from the agent's queue tools.
@@ -326,7 +315,6 @@ not authoritative records.
 
 ```mermaid
 sequenceDiagram
-    participant O as Authenticated operator
     participant P as Authorized producer
     participant D as Trusted dispatcher
     participant L as work-queue.jsonl
@@ -334,8 +322,8 @@ sequenceDiagram
     participant T as Trusted reconciliation and delivery
     participant G as GitHub resources
 
-    O->>L: Policy with profiles, entitlements, and resource scopes
-    P->>L: Work admission with immutable contract
+    P->>L: CAS first Policy and Work with immutable contract
+    Note over P,L: Later submissions admit Work under installed Policy
     D->>L: Replay current head and request fair prefix
     D->>L: CAS Claim operations and immutable assignment
     Note over D,L: Each durable Claim is charged once with no refunds
@@ -569,7 +557,7 @@ warnings without changing committed ownership, charging, or launch fencing.
 | Reuse one handle or aggregate all output allowances across a batch | Use each member's original handle and enforce per-Claim counts; original membership never shrinks |
 | Treat monster's clean flag as proof of zero diagnostics | ESLint exit zero includes warning-only results. Installation/build/tool failure is not a clean scan |
 | Treat prompt quality requirements as ledger guarantees | Rule quality, nonduplicate findings, and the monster's three-total-remediation-assignments instruction are prompt obligations, not a global runtime quota or proof of successful remediation |
-| Assume this example installs deployment security | This example does not provision queue-branch writer restrictions; protected credentials and writer enforcement must be installed independently |
+| Treat bootstrap as exclusive ownership of the repository | Queue-write credentials remain outside agents; GitHub enforces repository access rules independently |
 
 See the [queue specification](/gh-aw/specs/work-queue-specification/#91-implementation-coverage-and-remaining-requirements)
 for coverage and remaining deployment/host requirements, and the

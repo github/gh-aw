@@ -10,6 +10,10 @@
       "minimum": 1,
       "type": "integer"
     },
+    "Digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
     "Identity": {
       "maxLength": 256,
       "minLength": 1,
@@ -104,6 +108,9 @@
         "effect_scope": {
           "$ref": "#/$defs/Identity"
         },
+        "logical_contract": {
+          "$ref": "#/$defs/Digest"
+        },
         "max_claims": {
           "$ref": "#/$defs/ClaimBound"
         },
@@ -123,7 +130,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
+      "required": ["workflow", "ref", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
       "type": "object"
     }
   },

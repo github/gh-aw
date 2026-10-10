@@ -4,7 +4,7 @@ const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const fs = require("fs");
 const path = require("path");
 const { serializeTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
-const { actorFromContext } = require("./work_queue_policy.cjs");
+const { actorFromContext, dispatchPrincipal } = require("./work_queue_policy.cjs");
 const { MAX_SNAPSHOT_PARSE_BYTES, canonical } = require("./work_queue_codec.cjs");
 const { readInboundWorkQueueAssignment, resolveWorkQueueRuntime } = require("./aw_context.cjs");
 const { authenticatePublisher, validateNativeRun } = require("./work_queue_native.cjs");
@@ -50,7 +50,10 @@ async function main(options = {}) {
     latest = await loadQueue(readConfiguration);
   } else {
     trustedContext = await authenticatePublisher({ ...configuration, role: worker ? "worker" : runtime.role === "observer" ? "producer" : "dispatcher", ...(worker ? { dispatch_id: worker.dispatch_id } : {}) });
-    if (worker) validateNativeRun(trustedContext.native_run, expectedWorkerRun(worker, latest.projection.dispatches.get(worker.dispatch_id).profile, configuration.context, trustedContext.repository));
+    if (worker) {
+      const dispatch = latest.projection.dispatches.get(worker.dispatch_id);
+      validateNativeRun(trustedContext.native_run, expectedWorkerRun(worker, dispatch.profile, configuration.context, trustedContext.repository, dispatchPrincipal(dispatch)));
+    }
     latest = await loadQueue(readConfiguration);
   }
   if (process.env.GH_AW_WORK_QUEUE_ISSUES !== undefined) {
