@@ -56,3 +56,12 @@ func expandBotNames(bots []string) []string {
 	botAliasesLog.Printf("Expanded bot names: input=%d, output=%d", len(bots), len(result))
 	return result
 }
+
+func hasCopilotBotName(bots []string) bool {
+	for _, bot := range bots {
+		if setutil.Contains(copilotBotSet, bot) {
+			return true
+		}
+	}
+	return false
+}
