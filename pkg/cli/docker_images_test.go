@@ -742,8 +742,10 @@ func TestIsDockerAvailable_MockFalse(t *testing.T) {
 }
 
 func TestCheckAndPrepareDockerImages_DockerUnavailable_ReturnsTypedError(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
 	// Reset state before test
 	ResetDockerPullState()
+	t.Cleanup(ResetDockerPullState)
 	SetMockDockerAvailable(false)
 
 	err := CheckAndPrepareDockerImages(context.Background(), DockerImagesOptions{Actionlint: true})

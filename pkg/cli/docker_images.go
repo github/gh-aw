@@ -273,6 +273,9 @@ func CheckAndPrepareDockerImages(ctx context.Context, opts DockerImagesOptions) 
 	if opts.Poutine && localScannerPath(ctxutil.OrBackground(ctx), "poutine") != "" {
 		opts.Poutine = false
 	}
+	if opts.Actionlint && localScannerPath(ctxutil.OrBackground(ctx), "actionlint") != "" {
+		opts.Actionlint = false
+	}
 	if !opts.Zizmor && !opts.Poutine && !opts.Actionlint && !opts.RunnerGuard && !opts.Syft && !opts.Grype && !opts.Grant && !opts.Yamllint {
 		return nil
 	}

@@ -70,7 +70,7 @@ func GenerateDependencyReport(ctx context.Context, verbose bool) (*DependencyRep
 	outdated, err := CheckOutdatedDependencies(ctx, verbose)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: could not check outdated dependencies: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("could not check outdated dependencies: %v", err)))
 		}
 		outdated = []OutdatedDependency{}
 	}
@@ -79,7 +79,7 @@ func GenerateDependencyReport(ctx context.Context, verbose bool) (*DependencyRep
 	advisories, err := CheckSecurityAdvisories(ctx, verbose)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: could not check security advisories: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("could not check security advisories: %v", err)))
 		}
 		advisories = []SecurityAdvisory{}
 	}
@@ -138,7 +138,7 @@ func DisplayDependencyReport(report *DependencyReport) {
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Security Status"))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("---------------"))
 	if len(report.Advisories) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✅ No known vulnerabilities"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("No known vulnerabilities"))
 	} else {
 		DisplaySecurityAdvisories(report.Advisories)
 	}

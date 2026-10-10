@@ -18,6 +18,7 @@ func installExperimentFetchFakeGH(t *testing.T, workflowContent, state string) {
 	binDir := t.TempDir()
 	script := fmt.Sprintf(`#!/bin/sh
 case "$*" in
+  *"/branches "*) echo '["experiments/ci-coach"]' ;;
   *"/branches/experiments%%2Fci-coach"*) echo "experiments/ci-coach" ;;
   *"contents/.github/workflows"*) echo '["ci-coach.md"]' ;;
   *"ci-coach.md"*) echo %q ;;

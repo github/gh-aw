@@ -416,7 +416,7 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 			rows = append(rows, []string{resource.URI, resource.Name, description, mimeType})
 		}
 
-		fmt.Fprint(os.Stdout, console.RenderTable(console.TableConfig{
+		fmt.Fprint(os.Stdout, console.RenderTableStdout(console.TableConfig{
 			Headers: headers,
 			Rows:    rows,
 		}))
@@ -447,7 +447,7 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 			})
 		}
 
-		fmt.Fprint(os.Stdout, console.RenderTable(console.TableConfig{
+		fmt.Fprint(os.Stdout, console.RenderTableStdout(console.TableConfig{
 			Headers: headers,
 			Rows:    rows,
 		}))
@@ -468,7 +468,7 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 			rows = append(rows, []string{root.URI, root.Name})
 		}
 
-		fmt.Fprint(os.Stdout, console.RenderTable(console.TableConfig{
+		fmt.Fprint(os.Stdout, console.RenderTableStdout(console.TableConfig{
 			Headers: headers,
 			Rows:    rows,
 		}))

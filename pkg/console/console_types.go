@@ -23,10 +23,17 @@ type TableConfig struct {
 	Title     string
 	ShowTotal bool
 	TotalRow  []string
-	// TTYFunc overrides the default stdout TTY check used to determine whether
-	// to apply styling. Set this when the rendered string will be written to a
-	// file descriptor other than stdout (e.g. tty.IsStderrTerminal for stderr).
+	// MaxWidth bounds native table output in display columns. Zero keeps the
+	// existing unbounded layout; positive values below two use two columns.
+	MaxWidth int
+	// TTYFunc overrides the renderer's default destination TTY check.
 	TTYFunc func() bool
+}
+
+// RenderOptions configures the destination and width of reflected console output.
+type RenderOptions struct {
+	Stderr   bool
+	MaxWidth int
 }
 
 // TreeNode represents a node in a hierarchical tree structure

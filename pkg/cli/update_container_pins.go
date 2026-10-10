@@ -86,7 +86,7 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		containerPinsLog.Printf("Failed to collect images from lock files: %v", err)
 		// Non-fatal — just skip
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to collect container images: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to collect container images: %v", err)))
 		}
 		return false, nil
 	}

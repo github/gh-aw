@@ -22,8 +22,9 @@ The package is designed to adapt to the execution environment. Native builds det
 | `PromptForm` | struct | Wraps a `huh.Form` (embedded) so completed questions are cleared from the terminal before the caller prints the decision result; created by `NewForm`, `NewInputForm`, `NewSelectForm`, and `NewConfirmForm`. Native builds only. |
 | `SelectOption` | struct | Label/value pair used by select-oriented APIs. |
 | `SpinnerWrapper` | struct | Spinner controller with lifecycle methods `Start`, `Stop`, `StopWithMessage`, and `UpdateMessage`. |
-| `TableConfig` | struct | Table-rendering configuration including headers, rows, optional title/total row, and optional TTY override. |
+| `TableConfig` | struct | Table-rendering configuration including headers, rows, optional title/total row, TTY override, and optional native display-column budget (`MaxWidth`). Zero leaves the width unbounded; positive values below two use two columns. |
 | `TreeNode` | struct | Tree node with a display value and child nodes; rendered by `RenderTree` in WASM builds. |
+| `RenderOptions` | struct | Explicit reflected-output destination (`Stderr`) and opt-in display-width budget (`MaxWidth`). |
 
 ### Functions
 
@@ -53,6 +54,7 @@ The package is designed to adapt to the execution environment. Native builds det
 | `FormatProgressMessage` | `func FormatProgressMessage(message string) string` | Formats a progress/activity message with a `▸` prefix. |
 | `FormatProgressMessageStderr` | `func FormatProgressMessageStderr(message string) string` | Formats a progress/activity message for stderr styling. |
 | `FormatPromptMessage` | `func FormatPromptMessage(message string) string` | Formats a prompt message with a `?` prefix. |
+| `FormatPromptMessageStderr` | `func FormatPromptMessageStderr(message string) string` | Formats a prompt for stderr styling. |
 | `FormatSectionHeader` | `func FormatSectionHeader(header string) string` | Formats a section header. |
 | `FormatSectionHeaderStderr` | `func FormatSectionHeaderStderr(header string) string` | Formats a section header for stderr styling. |
 | `FormatSuccessMessage` | `func FormatSuccessMessage(message string) string` | Formats a success message with a checkmark prefix. |
@@ -60,6 +62,7 @@ The package is designed to adapt to the execution environment. Native builds det
 | `FormatTableHeaderStderr` | `func FormatTableHeaderStderr(text string) string` | Formats table-header text for stderr output. |
 | `FormatTokens` | `func FormatTokens(tokens int) string` | Formats token counts into readable grouped text. |
 | `FormatVerboseMessage` | `func FormatVerboseMessage(message string) string` | Formats verbose output with a `»` prefix. |
+| `FormatVerboseMessageStderr` | `func FormatVerboseMessageStderr(message string) string` | Formats verbose output for stderr styling. |
 | `FormatWarningMessage` | `func FormatWarningMessage(message string) string` | Formats a warning message with a warning prefix. |
 | `FormatWarningMessageStderr` | `func FormatWarningMessageStderr(message string) string` | Formats a warning message for stderr styling. |
 | `(*SpinnerWrapper).IsEnabled` | `func (s *SpinnerWrapper) IsEnabled() bool` | WASM-only helper that reports spinner availability; always returns `false` in WASM builds. |
@@ -96,7 +99,10 @@ The package is designed to adapt to the execution environment. Native builds det
 | `RenderErrorBox` | `func RenderErrorBox(title string) []string` | Renders an error-emphasis box, with TTY and plain-text variants. |
 | `RenderInfoSection` | `func RenderInfoSection(content string) []string` | Renders an informational section with left-border emphasis or plain indentation. |
 | `RenderStruct` | `func RenderStruct(v any) string` | Reflectively renders structs, slices, arrays, and maps into structured console output. |
+| `RenderStructStderr` | `func RenderStructStderr(v any) string` | Renders reflected data and nested tables using stderr styling, preserving unbounded layout. |
+| `RenderStructWithOptions` | `func RenderStructWithOptions(v any, options RenderOptions) string` | Propagates an explicit destination and width budget through reflected output and nested tables. |
 | `RenderTable` | `func RenderTable(config TableConfig) string` | Renders a table from `TableConfig`, optionally including a title and total row. |
+| `RenderTableStderr` | `func RenderTableStderr(config TableConfig) string` | Uses stderr TTY/color detection with the caller's explicit width budget. WASM retains tab-separated output. |
 | `RenderTitleBox` | `func RenderTitleBox(title string, width int) []string` | Renders a titled box suitable for section headings. |
 | `RenderTree` | `func RenderTree(root TreeNode) string` | Renders a `TreeNode` hierarchy in WASM builds. |
 | `ResetTimeLocation` | `func ResetTimeLocation()` | Clears the configured `time.Time` display location override. |
@@ -110,9 +116,30 @@ The package is designed to adapt to the execution environment. Native builds det
 
 | Constant | Type | Value | Description |
 |----------|------|-------|-------------|
-| *(none)* | — | — | `pkg/console` exposes no exported constants in current source. |
+| `DefaultTableWidth` | `int` | `80` | Recommended opt-in display-width budget for human-facing tables. |
 
 ## Usage Examples
+
+Use `Print*` or the existing unsuffixed message formatters for diagnostics:
+`FormatError`, `FormatSuccessMessage`, `FormatInfoMessage`, `FormatWarningMessage`,
+`FormatCommandMessage`, `FormatProgressMessage`, `FormatPromptMessage`,
+`FormatVerboseMessage`, `FormatListItem`, and `FormatSectionHeader` now consult
+stderr without changing their signatures. Existing `*Stderr` variants remain
+compatible aliases. Pass message text without a duplicate semantic icon.
+`RenderStruct` and `RenderTable` also default to stderr, including nested tables.
+Intentional stdout output must use the corresponding `*Stdout` variants, such as
+`FormatInfoMessageStdout`, `RenderTableStdout`, and `RenderStructStdout`. These
+preserve the former stdout terminal/color behavior. `RenderStructWithOptions`
+keeps its explicit contract: `Stderr: true` selects stderr; false or omitted
+selects stdout. These functions return strings and do not redirect any writes.
+Scanner findings, pin-resolution callbacks and bootstrap TODO messages also use
+the diagnostic defaults; their higher-level regressions cover differing stdout
+and stderr terminal states, including `NO_COLOR`.
+`TableConfig.MaxWidth` wraps native table content without dropping values; when
+columns cannot fit, rendering falls back to labeled rows. Width limits are
+opt-in: experiment human reports use 80 columns, not a universal truncation
+policy. Machine-readable JSON,
+TSV, completion and compact-log paths retain their existing output contracts.
 
 ### Formatting and printing diagnostic output
 

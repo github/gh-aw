@@ -15,6 +15,8 @@ The cost of running an agentic workflow is the sum of two components: **GitHub A
 
 AIC is shown in the `gh aw logs` output table under the **AIC** column, in audit reports alongside raw token counts, and as `{ai_credits_suffix}` in workflow footer templates. For structured output, each run under `.runs[]` includes an `aic` field and each episode under `.episodes[]` includes `total_aic`.
 
+For a concrete model present in gh-aw's embedded pricing catalog, `gh aw compile` includes its provider-specific rates in the firewall configuration. Model parameters such as `?effort=high` are removed for pricing lookup and configuration keys. This keeps AI-credit limits working even when the firewall's built-in pricing table does not yet include the model. Frontmatter `models.providers` pricing takes precedence; compilation does not fetch pricing or infer rates from a related model.
+
 > [!NOTE]
 > AIC values are computed on a best-effort basis using pricing data sourced from the [models.dev](https://models.dev/) catalog and may not exactly match your provider's actual billing. Always verify charges in your provider's billing dashboard.
 

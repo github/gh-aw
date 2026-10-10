@@ -256,6 +256,14 @@ describe("assign_agent_helpers.cjs", () => {
       await expect(findAgent("owner", "repo", "copilot", 123)).rejects.toThrow("Bad credentials");
     });
 
+    it("rethrows HTTP 401 without probing other aliases even when the message is unfamiliar", async () => {
+      const authError = Object.assign(new Error("Unauthorized"), { status: 401 });
+      mockGithub.request.mockRejectedValue(authError);
+      await expect(findAgent("owner", "repo", "copilot", 123)).rejects.toBe(authError);
+      expect(mockGithub.request).toHaveBeenCalledTimes(1);
+      expect(mockGithub.rest.issues.listAssignees).not.toHaveBeenCalled();
+    });
+
     it("should return null for non-auth errors", async () => {
       const err = new Error("Something unexpected");
       mockGithub.request.mockRejectedValueOnce(err);

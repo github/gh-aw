@@ -3,10 +3,16 @@
 package cli
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/stretchr/testify/require"
 )
 
 func hasModelPricingResolver(compiler *workflow.Compiler) bool {
@@ -15,11 +21,106 @@ func hasModelPricingResolver(compiler *workflow.Compiler) bool {
 	return !reflect.ValueOf(compiler).Elem().FieldByName("modelPricingResolver").IsNil()
 }
 
-func TestCreateAndConfigureCompiler_DoesNotRegisterModelPricingResolverByDefault(t *testing.T) {
+func TestCreateAndConfigureCompiler_RegistersModelPricingResolverByDefault(t *testing.T) {
 	t.Parallel()
 	compiler := createAndConfigureCompiler(CompileConfig{})
-	if hasModelPricingResolver(compiler) {
-		t.Fatal("expected model pricing resolver to be nil by default")
+	if !hasModelPricingResolver(compiler) {
+		t.Fatal("expected local model pricing resolver to be registered")
+	}
+}
+
+func TestCreateAndConfigureCompiler_GPT61SolFirewallPricing(t *testing.T) {
+	t.Parallel()
+	pricingOverlay := func(provider string) string {
+		return fmt.Sprintf(`
+models:
+  providers:
+    %s:
+      models:
+        gpt-6.1-sol:
+          cost:
+            input: "3e-06"
+            output: "1e-05"
+            cache_read: "1e-07"
+            cache_write: "2.5e-06"
+`, provider)
+	}
+	for _, tt := range []struct {
+		engine, model, provider, overlay, input string
+	}{
+		{"codex", "gpt-6.1-sol", "openai", "", "2e-06"},
+		{"codex", "gpt-6-1-sol", "openai", "", "2e-06"},
+		{"codex", "openai/gpt-6.1-sol", "openai", "", "2e-06"},
+		{"copilot", "copilot/gpt-6.1-sol", "github-copilot", "", "2e-06"},
+		{"codex", "gpt-6.1-sol?effort=high", "openai", "", "2e-06"},
+		{"codex", "openai/gpt-6.1-sol?effort=high&temperature=0.2", "openai", "", "2e-06"},
+		{"copilot", "gpt-6.1-sol?temperature=0.2", "github-copilot", "", "2e-06"},
+		{"copilot", "copilot/gpt-6.1-sol?effort=high", "github-copilot", "", "2e-06"},
+		{"copilot", "copilot/gpt-6-1-sol?effort=high", "github-copilot", "", "2e-06"},
+		{"copilot", "github-copilot/gpt-6.1-sol?effort=high", "github-copilot", "", "2e-06"},
+		{"codex", "GPT_6_1_SOL", "openai", "", "2e-06"},
+		{"copilot", "copilot/GPT_6.1_SOL?effort=high", "github-copilot", "", "2e-06"},
+		{"codex", "openai/gpt_6.1_sol_unknown?effort=high", "openai", "", ""},
+		{"copilot", "copilot/auto?effort=high", "github-copilot", "", ""},
+		{"codex", "gpt-6.1-sol?effort=high", "openai", pricingOverlay("openai"), "3e-06"},
+		{"codex", "openai/gpt-6.1-sol?effort=high", "openai", pricingOverlay("openai"), "3e-06"},
+		{"copilot", "gpt-6.1-sol?effort=high", "github-copilot", pricingOverlay("github-copilot"), "3e-06"},
+		{"copilot", "copilot/gpt-6.1-sol?effort=high", "github-copilot", pricingOverlay("github-copilot"), "3e-06"},
+		{"codex", "openai/gpt-6.1-sol", "openai", pricingOverlay("openai"), "3e-06"},
+	} {
+		t.Run(tt.engine+"/"+tt.model+"/"+tt.input, func(t *testing.T) {
+			t.Parallel()
+			workflowPath := filepath.Join(t.TempDir(), "priced-model.md")
+			content := fmt.Sprintf(`---
+on: workflow_dispatch
+engine: %s
+model: %s
+max-ai-credits: 1500
+%s
+---
+Check model pricing.
+`, tt.engine, tt.model, tt.overlay)
+			require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o600))
+			data, err := createAndConfigureCompiler(CompileConfig{}).ParseWorkflowFile(workflowPath)
+			require.NoError(t, err)
+			configJSON, err := workflow.BuildAWFConfigJSON(workflow.AWFCommandConfig{
+				EngineName: tt.engine, WorkflowData: data,
+			})
+			require.NoError(t, err)
+			var config struct {
+				APIProxy struct {
+					MaxAiCredits            int                              `json:"maxAiCredits"`
+					Providers               map[string]modelsCatalogProvider `json:"providers"`
+					DefaultAiCreditsPricing any                              `json:"defaultAiCreditsPricing"`
+				} `json:"apiProxy"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+			modelCostsJSON, err := json.Marshal(data.ModelCosts)
+			require.NoError(t, err)
+			var modelCosts modelsCatalogData
+			require.NoError(t, json.Unmarshal(modelCostsJSON, &modelCosts))
+			require.Equal(t, modelCosts.Providers, config.APIProxy.Providers, "info metadata and firewall must receive the same pricing")
+			require.Equal(t, 1500, config.APIProxy.MaxAiCredits)
+			require.Nil(t, config.APIProxy.DefaultAiCreditsPricing, "catalog lookup must not synthesize fallback pricing")
+			if tt.input == "" {
+				require.Empty(t, config.APIProxy.Providers)
+				return
+			}
+			base, _, _ := strings.Cut(tt.model, "?")
+			if _, model, qualified := strings.Cut(base, "/"); qualified {
+				base = model
+			}
+			base = strings.ToLower(base)
+			models := config.APIProxy.Providers[tt.provider].Models
+			require.Len(t, models, 1)
+			require.Equal(t, map[string]string{
+				"input": tt.input, "output": "1e-05",
+				"cache_read": "1e-07", "cache_write": "2.5e-06",
+			}, models[base].Cost)
+			for model := range models {
+				require.NotContains(t, model, "?")
+			}
+		})
 	}
 }
 

@@ -257,7 +257,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			} else {
 				logMdPath := filepath.Join(result.LogsPath, "log.md")
 				if fileutil.FileExists(logMdPath) {
-					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
+					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
 				}
 			}
 			if err := parseFirewallLogs(result.LogsPath, opts.Verbose); err != nil {
@@ -265,7 +265,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			} else {
 				firewallMdPath := filepath.Join(result.LogsPath, "firewall.md")
 				if fileutil.FileExists(firewallMdPath) {
-					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
+					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
 				}
 			}
 		}
