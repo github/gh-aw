@@ -124,7 +124,8 @@ async function main() {
       `(() => {
         try {
           const value = __grader(trace, run, workflow, config, helpers, __math);
-          if (typeof value === "number" && !Number.isFinite(value)) {
+          const metricValue = value !== null && typeof value === "object" && Object.hasOwn(value, "value") ? value.value : value;
+          if (typeof metricValue === "number" && !Number.isFinite(metricValue)) {
             throw new Error("custom grader returned non-finite numeric value");
           }
           return JSON.stringify({ ok: true, value });

@@ -549,6 +549,13 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
       expect(result.value).toBeNull();
       expect(result.error).toContain("non-finite");
     });
+
+    it("rejects non-finite values in object results", () => {
+      const result = runCustomGrader("test", "return { value: NaN }", makeTrace(), { name: "test", unit: "", direction: "", source: "inline" });
+      expect(result.value).toBeNull();
+      expect(result.status).toBe("error");
+      expect(result.error).toContain("non-finite");
+    });
   });
 
   // --- runCustomGrader node:vm sandbox ---
