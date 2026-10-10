@@ -51,7 +51,8 @@ function isAgentExecutionEvent(event) {
 function recordErrors(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return [];
   const { agentId, parentToolUseId } = sessionContext(record);
-  if (agentId || parentToolUseId) return [];
+  const parentToolCallId = record.data?.parentToolCallId !== undefined ? record.data.parentToolCallId : record.parentToolCallId;
+  if (agentId || parentToolUseId || (typeof parentToolCallId === "string" && parentToolCallId.length > 0)) return [];
   const data = record.data ?? record;
   if (["error", "session.error"].includes(record.type) && ["warning", "info"].includes(data.severity)) return [];
   if (["session.error", "claude.assistant_error", "claude.api_retry", "error", "turn.failed"].includes(record.type)) return [data];
@@ -111,16 +112,21 @@ function collectAgentErrorEvidence(content, events = []) {
   const conversationLines = new Set();
   const conversationTexts = new Set();
   const conversationDocuments = new Set();
-  for (const event of conversationEvents) {
-    const value = ["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message"].includes(event?.type)
-      ? event?.data?.content
-      : ["tool.execution_complete", "tool.execution_update"].includes(event?.type)
-        ? event?.data?.output
-        : undefined;
+  /** @param {unknown} value @returns {void} */
+  const attributeConversationValue = value => {
     if (typeof value === "string") {
       conversationTexts.add(conversationKey(value));
       for (const line of value.split(/\r?\n/)) conversationLines.add(conversationKey(line));
-    } else if (value && typeof value === "object") conversationDocuments.add(conversationDocumentKey(value));
+    } else if (value && typeof value === "object") {
+      conversationDocuments.add(conversationDocumentKey(value));
+      for (const item of Object.values(value)) attributeConversationValue(item);
+    }
+  };
+  for (const event of conversationEvents) {
+    if (["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message"].includes(event?.type)) attributeConversationValue(event.data?.content);
+    else if (["tool.execution_complete", "tool.execution_update"].includes(event?.type)) {
+      for (const field of ["output", "result", "error"]) attributeConversationValue(event.data?.[field]);
+    }
   }
   if (conversationTexts.has(conversationKey(content))) return { diagnostics, errors };
   /** @param {unknown} record */

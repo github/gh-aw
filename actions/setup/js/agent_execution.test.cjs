@@ -107,30 +107,49 @@ describe("unique agent execution observation", () => {
     expect(agentErrorDiagnosticText(JSON.stringify(event))).toBe("");
   });
 
-  it.each([{ agentId: "child" }, { data: { agentId: "child" } }, { parentToolUseId: "parent-tool" }, { parent_tool_use_id: "parent-tool" }, { data: { parentToolUseId: "parent-tool" } }, { data: { parent_tool_use_id: "parent-tool" } }])(
-    "excludes child-emitted diagnostics from the main execution: %j",
-    scope => {
-      const error = { code: 503, errorType: "child_provider", message: "CAPIError: 503 Service Unavailable" };
-      const events = [
-        { type: "session.error", ...scope, data: { ...error, ...scope.data } },
-        { type: "session.result", ...scope, data: { status: "failed", errors: [error], ...scope.data } },
-        { type: "error", ...error, ...scope },
-        { type: "result", is_error: true, error, ...scope },
-      ];
-      expect(collectAgentExecution({ events, content: events.map(JSON.stringify).join("\n") })).toBeUndefined();
-      expect(collectAgentExecution({ content: JSON.stringify(events, null, 2) })).toBeUndefined();
-      expect(agentErrorDiagnosticText(events.map(JSON.stringify).join("\n"))).toBe("");
-      expect(events[0].data.message).toBe(error.message);
-      const rootError = { type: "session.error", data: { code: 400, errorType: "root_provider", message: "Synthetic main-agent failure", parentToolUseId: null } };
-      const mixed = [...events, rootError];
-      expect(collectAgentExecution({ events: mixed, content: mixed.map(JSON.stringify).join("\n"), exitCode: 0 }).data).toEqual({
+  it.each([
+    { agentId: "child" },
+    { data: { agentId: "child" } },
+    { parentToolUseId: "parent-tool" },
+    { parent_tool_use_id: "parent-tool" },
+    { data: { parentToolUseId: "parent-tool" } },
+    { data: { parent_tool_use_id: "parent-tool" } },
+    { parentToolCallId: "parent-tool" },
+    { data: { parentToolCallId: "parent-tool" } },
+  ])("excludes child-emitted diagnostics from the main execution: %j", scope => {
+    const error = { code: 503, errorType: "child_provider", message: "CAPIError: 503 Service Unavailable" };
+    const events = [
+      { type: "session.error", ...scope, data: { ...error, ...scope.data } },
+      { type: "session.result", ...scope, data: { status: "failed", errors: [error], ...scope.data } },
+      { type: "error", ...error, ...scope },
+      { type: "result", is_error: true, error, ...scope },
+    ];
+    expect(collectAgentExecution({ events, content: events.map(JSON.stringify).join("\n") })).toBeUndefined();
+    expect(collectAgentExecution({ content: JSON.stringify(events, null, 2) })).toBeUndefined();
+    expect(agentErrorDiagnosticText(events.map(JSON.stringify).join("\n"))).toBe("");
+    expect(events[0].data.message).toBe(error.message);
+    const rootError = { type: "session.error", data: { code: 400, errorType: "root_provider", message: "Synthetic main-agent failure", parentToolUseId: null } };
+    const mixed = [...events, rootError];
+    expect(collectAgentExecution({ events: mixed, content: mixed.map(JSON.stringify).join("\n"), exitCode: 0 }).data).toEqual({
+      categories: [],
+      errorCodes: [400],
+      errorTypes: ["root_provider"],
+      exitCode: 0,
+    });
+  });
+
+  it.each([null, "", 0, false])("keeps explicit root diagnostics with an unavailable parent call identity: %j", parentToolCallId => {
+    for (const event of [
+      { type: "session.error", parentToolCallId, data: { code: 429, errorType: "root_provider" } },
+      { type: "session.error", parentToolCallId: "stale-parent", data: { parentToolCallId, code: 429, errorType: "root_provider" } },
+    ]) {
+      expect(collectAgentExecution({ events: [event], content: JSON.stringify(event) }).data).toEqual({
         categories: [],
-        errorCodes: [400],
+        errorCodes: [429],
         errorTypes: ["root_provider"],
-        exitCode: 0,
       });
     }
-  );
+  });
 
   it("keeps main diagnostics beside target-only subagent lifecycle IDs", () => {
     const events = [
@@ -191,6 +210,37 @@ describe("unique agent execution observation", () => {
     const redacted = { ...payload, data: { ...payload.data, message: "Synthetic quoted ***" } };
     expect(collectAgentExecution({ content: `::add-mask::fixture-secret\n${JSON.stringify(payload)}`, events: [{ type, data: { [field]: redacted } }] })).toBeUndefined();
     expect(events[0].data[field]).toEqual(payload);
+  });
+
+  it.each(["output", "result", "error"])("attributes all observed tool completion %s payloads without creating root failures", field => {
+    const diagnostic = { type: "session.error", data: { code: 429, errorType: "provider", message: "CAPIError: 429 Too Many Requests: fixture-secret" } };
+    for (const type of ["tool.execution_complete", "tool.execution_update"]) {
+      for (const payload of [diagnostic.data.message, diagnostic, { items: [{ stderr: diagnostic.data.message, nested: diagnostic }] }]) {
+        const events = [{ type, data: { [field]: payload, success: false } }];
+        const original = structuredClone(events);
+        const contents = typeof payload === "string" ? [payload, JSON.stringify(payload)] : [diagnostic.data.message, JSON.stringify(diagnostic), JSON.stringify(payload)];
+        for (const content of contents) {
+          expect(collectAgentExecution({ content, events })).toBeUndefined();
+          expect(agentErrorDiagnosticText(content, events)).toBe("");
+          expect(collectAgentExecution({ content, events: [...events, diagnostic] }).data.errorCodes).toEqual([429]);
+          expect(agentErrorDiagnosticText(content, [...events, diagnostic])).toContain(diagnostic.data.message);
+        }
+        expect(events).toEqual(original);
+      }
+    }
+  });
+
+  it("keeps Pi tool nesting independent from root provider diagnostics", () => {
+    const toolFailure = "CAPIError: 429 Too Many Requests";
+    const source = [
+      { type: "tool_execution_start", toolCallId: "nested", parentToolCallId: "outer", toolName: "lookup", args: {} },
+      { type: "tool_execution_end", toolCallId: "nested", parentToolCallId: "outer", toolName: "lookup", result: { error: toolFailure }, isError: true },
+      { type: "message_end", message: { role: "assistant", content: [], errorMessage: { code: 503, errorType: "root_provider", message: "Synthetic root failure" } } },
+    ];
+    const content = `${source.map(JSON.stringify).join("\n")}\n${toolFailure}`;
+    const events = parseEngineSession(content, "pi");
+    expect(events.filter(event => event.type.startsWith("tool.execution_")).map(event => event.data.parentToolCallId)).toEqual(["outer", "outer"]);
+    expect(collectAgentExecution({ content, events }).data).toEqual({ categories: [], errorCodes: [503], errorTypes: ["root_provider"] });
   });
 
   it.each(["Assistant:", "Tool output:", "```json"])("retains lexical attribution after an observed partial marker: %s", marker => {
