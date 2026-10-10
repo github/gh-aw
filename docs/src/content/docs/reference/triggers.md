@@ -500,7 +500,9 @@ on:
 
 The `[bot]` suffix is optional — `github-actions` matches `github-actions[bot]` automatically.
 
-Allowlisted bots must be installed on the repository, which is verified through the repository collaborator API. GitHub App identities are not collaborators, so that lookup finds nothing for them. On `repository_dispatch` the check is therefore relaxed: the lookup is still performed, and an allowlisted App is authorized when it conclusively reports that the actor is not a collaborator, because sending the event already requires `contents: write` access to the repository. A lookup that fails (for example during an API outage or when rate limited) is still denied. This is how an App-triggered `repository_dispatch` is admitted — `on.roles:` is matched against repository collaborator roles and never matches an App sender.
+Allowlisted bots must be installed on the repository, which is verified through the repository collaborator API. The built-in Copilot coding agent identities (`Copilot` and `copilot-swe-agent`, including `copilot-swe-agent[bot]`) are an exception: when explicitly allowlisted, they do not require a collaborator lookup. Other GitHub App identities are not collaborators, so that lookup finds nothing for them. On `repository_dispatch` the check is therefore relaxed: the lookup is still performed, and an allowlisted App is authorized when it conclusively reports that the actor is not a collaborator, because sending the event already requires `contents: write` access to the repository. A lookup that fails (for example during an API outage or when rate limited) is still denied. This is how an App-triggered `repository_dispatch` is admitted — `on.roles:` is matched against repository collaborator roles and never matches an App sender.
+
+For PR branch checkout after an `issue_comment` or `pull_request_review_comment`, an allowlisted Bot sender may bypass the collaborator check only when it authored the comment and the PR head and base are both in the workflow repository. Fork PRs and other actors still require write-or-higher collaborator permission.
 
 ### Filtering by Author Associations (`on.skip-author-associations`)
 

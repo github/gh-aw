@@ -86,3 +86,8 @@ func TestExpandBotNames(t *testing.T) {
 		})
 	}
 }
+
+func TestHasCopilotBotName(t *testing.T) {
+	assert.True(t, hasCopilotBotName([]string{"dependabot[bot]", "copilot-swe-agent", "renovate[bot]"}))
+	assert.False(t, hasCopilotBotName([]string{"dependabot[bot]", "renovate[bot]"}))
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -144,8 +145,8 @@ func generateRestoreBaseGitHubFoldersStep(yaml *strings.Builder, folders, files 
 		yaml.WriteString("        if: steps.checkout-pr.outcome == 'success'\n")
 	}
 	yaml.WriteString("        env:\n")
-	fmt.Fprintf(yaml, "          GH_AW_AGENT_FOLDERS: \"%s\"\n", strings.Join(folders, " "))
-	fmt.Fprintf(yaml, "          GH_AW_AGENT_FILES: \"%s\"\n", strings.Join(files, " "))
+	yaml.WriteString("          GH_AW_AGENT_FOLDERS: \"" + strings.Join(folders, " ") + "\"\n")
+	yaml.WriteString("          GH_AW_AGENT_FILES: \"" + strings.Join(files, " ") + "\"\n")
 	if afterPRCheckout {
 		yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh\"\n")
 	} else {
@@ -192,7 +193,7 @@ func (c *Compiler) generatePRReadyForReviewCheckout(yaml *strings.Builder, data 
 
 func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowData, useRequire bool) {
 	// Use actions/github-script instead of shell script
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	yaml.WriteString("        uses: " + getCachedActionPin("actions/github-script", data) + "\n")
 
 	// Add env section with GH_TOKEN for gh CLI
 	// Use safe-outputs github-token if available, otherwise default token
@@ -203,12 +204,15 @@ func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowDa
 	resolvedToken := resolveGitHubToken(safeOutputsToken)
 	prLog.Print("PR checkout step configured with GitHub token")
 	yaml.WriteString("        env:\n")
-	fmt.Fprintf(yaml, "          GH_TOKEN: %s\n", resolvedToken)
+	yaml.WriteString("          GH_TOKEN: " + resolvedToken + "\n")
+	if len(data.Bots) > 0 {
+		yaml.WriteString("          GH_AW_ALLOWED_BOTS: " + strconv.Quote(strings.Join(data.Bots, ",")) + "\n")
+	}
 
 	yaml.WriteString("        with:\n")
 
 	// Add github-token to make it available to the GitHub API client
-	fmt.Fprintf(yaml, "          github-token: %s\n", resolvedToken)
+	yaml.WriteString("          github-token: " + resolvedToken + "\n")
 
 	yaml.WriteString("          script: |\n")
 

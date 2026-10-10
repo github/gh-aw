@@ -232,7 +232,7 @@ func TestInferSingleCheckoutRepositoryForGitHubAppOwner(t *testing.T) {
 				{Path: "default"},
 			},
 		}
-		assert.Equal(t, "${{ needs.activation.outputs.target_repo }}", inferSingleCheckoutRepositoryForGitHubAppOwner(data), "workflow_call should infer activation target repository when no explicit checkout repository is set")
+		assert.Equal(t, "${{ needs.activation.outputs.target_repo || github.repository }}", inferSingleCheckoutRepositoryForGitHubAppOwner(data), "workflow_call should infer activation target repository when no explicit checkout repository is set")
 	})
 }
 
@@ -273,5 +273,5 @@ func TestWorkflowCallSafeOutputsAppTokenUsesRepositoryOwnerSource(t *testing.T) 
 	assert.Contains(t, safeOutputsSteps, "id: safe-outputs-app-token-owner", "safe outputs app token should include owner helper for expression repository")
 	assert.Contains(t, safeOutputsSteps, "owner: ${{ steps.safe-outputs-app-token-owner.outputs.owner }}", "safe outputs app token should consume derived owner output")
 	assert.Contains(t, safeOutputsSteps, "GH_AW_TARGET_REPOSITORY: ${{ inputs.target_repository }}", "safe outputs owner helper should target explicit checkout repository expression")
-	assert.Contains(t, safeOutputsSteps, "repositories: ${{ needs.activation.outputs.target_repo_name }}", "workflow_call safe outputs app token should default repositories to target_repo_name")
+	assert.Contains(t, safeOutputsSteps, "repositories: ${{ needs.activation.outputs.target_repo_name || github.event.repository.name }}", "workflow_call safe outputs app token should default repositories to target_repo_name")
 }
