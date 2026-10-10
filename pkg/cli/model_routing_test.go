@@ -479,6 +479,7 @@ func TestHarnessOutcomeSurvivesMissingOrCorruptUnifiedSession(t *testing.T) {
 	}{
 		{name: "missing"},
 		{name: "corrupt", data: `{"type":`},
+		{name: "no outcome", data: `{"type":"session.start","data":{}}`},
 	} {
 		t.Run(session.name, func(t *testing.T) {
 			runDir := t.TempDir()
@@ -506,6 +507,22 @@ func TestHarnessOutcomeSurvivesMissingOrCorruptUnifiedSession(t *testing.T) {
 				config.HarnessOutcome.WireModel != "harness-model" ||
 				config.HarnessOutcome.EffectiveEndpoint != "/responses" {
 				t.Fatalf("harness outcome missing without a usable session: %+v", config)
+			}
+			if config.RoutingWarning != "" {
+				t.Fatalf("outcome without trusted routing produced a warning: %+v", config)
+			}
+
+			if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{"engine_id":"claude","model":"runner-model","model_routing":{"status":"selected","wire_model":"runner-model","endpoint":"/v1/messages"}}`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			config = extractEngineConfigWithInferredEngine(runDir, "claude")
+			if config == nil || config.Model != "runner-model" || config.HarnessOutcome == nil ||
+				config.HarnessOutcome.WireModel != "harness-model" || config.RoutingWarning == "" {
+				t.Fatalf("raw outcome disagreement with trusted routing was lost: %+v", config)
+			}
+			auditData := assembleAuditData(auditDataInputs{processedRun: ProcessedRun{Run: WorkflowRun{LogsPath: runDir}}})
+			if len(auditData.Warnings) != 1 || auditData.Warnings[0].Type != "model_routing_outcome_disagreement" {
+				t.Fatalf("raw outcome disagreement missing from audit warnings: %+v", auditData.Warnings)
 			}
 		})
 	}

@@ -281,7 +281,7 @@ func addHarnessRoutingOutcome(config *AuditEngineConfig, awInfo *AwInfo, logsPat
 			}
 		}
 	}
-	if sessionRouting != nil && sessionRouting.outcomeDisagreesWith(routing) {
+	if (&sessionModelRoutingAttribution{Outcome: outcome}).outcomeDisagreesWith(routing) {
 		config.RoutingWarning = "Harness routing outcome disagrees with runner-written model routing metadata."
 	}
 }
