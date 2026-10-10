@@ -29,6 +29,16 @@ for bounded in-scope debug iterations without repeated approval. Re-review every
 changed source/lock revision; any compiler security warning invalidates the grant
 and requires fresh authorization after resolution.
 
+For workflow updates, recommend publishing the reviewed Markdown and generated
+lock on a feature branch and opening a draft PR, then testing that explicit
+reviewed ref rather than requiring a merge or simply refusing because the
+changes are unpublished. Reuse an existing suitable branch or PR. The agent
+owns authorized preparation, compilation, publication and testing; the user
+owns the required live-effect authorization. Follow the shared
+[branch-testing path](../../aw/debug-agentic-workflow.md#test-workflow-changes-from-a-branch).
+A branch or PR does not isolate secrets, queue state or outputs, and cannot
+bypass a security gate, dispatch denial or explicit no-dispatch context.
+
 Always provide separate short user-visible result sentences for each security
 review and dry-run attempt, including failed, blocked, or unavailable outcomes.
 Name the artifact/scope, checks actually performed, and material findings or
@@ -40,7 +50,8 @@ When debugging is refused, follow the
 explain each concrete cause, link the reviewed source and lines, distinguish
 confirmed defects from incomplete evidence or authorization, and name the
 necessary resolution and its owner. Do not report disagreement alone as a code
-vulnerability.
+vulnerability. Include the branch/PR testing path when it resolves unpublished
+changes; explain any independent blocker that it cannot resolve.
 In dry-run mode, reject enabled `dangerously-*` entries in workflow Markdown
 configuration, including imported configuration,
 under the [strict security gate](../../aw/debug-security-review.md#dry-run-dangerous-features).
