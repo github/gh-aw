@@ -594,7 +594,7 @@ async function main(copilotSessionStateDir = getGhAwPath("sandbox/agent/logs/cop
   } catch (error) {
     core.setFailed(`${ERR_PARSE}: ${getErrorMessage(error)}`);
   } finally {
-    if (routedAttribution) persistAgentAwInfoCopy();
+    persistAgentAwInfoCopy();
   }
 }
 

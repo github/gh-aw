@@ -36,9 +36,10 @@ func TestFlattenDownloadedAgentRoutingArtifacts(t *testing.T) {
 			write(filepath.Join(artifactName, "agent", "awf-routing-outcome.json"), `{"status":"selected","endpoint":"/v1/messages"}`)
 
 			require.NoError(t, flattenDownloadedArtifacts(context.Background(), downloadArtifactsOptions{outputDir: runDir}))
-			assert.Equal(t, "claude-sonnet-5", readAwInfoModel(t, filepath.Join(runDir, "aw_info.json")))
+			assert.Equal(t, "agent", readAwInfoModel(t, filepath.Join(runDir, "aw_info.json")))
+			assert.Equal(t, "claude-sonnet-5", readAwInfoModel(t, filepath.Join(runDir, "agent", "aw_info.json")))
 			assert.JSONEq(t, `{"status":"selected","endpoint":"/v1/messages"}`, readFlattenTestFile(t, filepath.Join(runDir, "agent", "awf-routing-outcome.json")))
-			assert.Equal(t, filepath.Join(runDir, "agent", "aw_info.json"), findAwInfoPath(runDir))
+			assert.Equal(t, filepath.Join(runDir, "aw_info.json"), findAwInfoPath(runDir))
 			assert.FileExists(t, filepath.Join(runDir, "aw-prompts", "prompt.txt"))
 			assert.FileExists(t, filepath.Join(runDir, "usage", "aw_session.jsonl"))
 			assert.DirExists(t, filepath.Join(runDir, "agent"))
