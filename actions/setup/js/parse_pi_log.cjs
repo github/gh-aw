@@ -66,6 +66,7 @@ function parsePiLog(logContent) {
     const terminal = [...canonicalLogEntries].reverse().find(event => event.type === "session.result");
     const selected = selectSessionResult(canonicalLogEntries);
     const data = {
+      sourceEngine: selected?.sourceEngine ?? "pi",
       numTurns: stats.turns ?? selected?.numTurns,
       usage: reconcileSessionUsage(selected?.usage, stats.usage),
       totalCostUsd: stats.total_cost_usd ?? selected?.totalCostUsd,
