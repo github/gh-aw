@@ -342,5 +342,15 @@
    "Created 2026-10-07, very new"
   ],
   "blogged": false
+ },
+ "githubnext/gh-aw-test": {
+  "kind": "other",
+  "reviewed": "2026-10-10",
+  "score": 4,
+  "summary": "E2E test suite for gh-aw itself; useful internally, not a reusable ecosystem tool.",
+  "highlights": [
+   "README.md: e2e runner exercising issue/PR/comment-creating workflows"
+  ],
+  "blogged": false
  }
 }

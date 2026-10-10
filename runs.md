@@ -9,3 +9,4 @@
 2026-10-07: discovery run; reviewed bootc-dev/gh-agentic-workflows (7), gh-aw-threat-detection (7), gh-aw-router (6); no blog; backlog 2.
 2026-10-08: reviewed gh-aw-wizard (6), gh-aw-canvas (4); no blog; backlog 0.
 2026-10-09: discovery run; reviewed storyplan (6), agentic-workflow-observatory (6), cnotv/agentic-extension (5); no blog; backlog 0.
+2026-10-10: discovery run; reviewed gh-aw-test (4); no new candidates otherwise; no blog; backlog 0.
