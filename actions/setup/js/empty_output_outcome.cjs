@@ -21,6 +21,7 @@ const EMPTY_OUTPUT_FAILURE_CAUSES = Object.freeze({
   engine_outage: "experienced an engine outage",
   request_rejection: "had a request rejected",
   prompt_exhaustion: "exhausted its prompt",
+  unknown: "finished without a clear failure cause",
 });
 
 const PROMPT_EXHAUSTION_ERROR_CATEGORIES = new Set(["effective_tokens_limit_exceeded", "invocation_cap_exceeded"]);
@@ -166,7 +167,9 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));
   const isRequestRejection = ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) || executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) || errorCodes.some(code => code >= 400 && code < 500);
   const isEngineOutage = reason === "engine_driver_failure" || executionCategories.some(category => ["agentic_engine_timeout", "capi_server_error", "sandbox_runtime_crash"].includes(category)) || errorCodes.some(code => code >= 500);
-  const failureCause = isPromptExhaustion ? "prompt_exhaustion" : isRequestRejection ? "request_rejection" : isEngineOutage ? "engine_outage" : "prompt_exhaustion";
+  // Absence of evidence is not evidence of prompt exhaustion: without a matched category
+  // or status code, classify as "unknown" instead of guessing prompt_exhaustion.
+  const failureCause = isPromptExhaustion ? "prompt_exhaustion" : isRequestRejection ? "request_rejection" : isEngineOutage ? "engine_outage" : "unknown";
   const retryEvents = events.filter(event => event.type === "claude.api_retry" || (event.type === "system" && event.data.subtype === "api_retry"));
   const harnessRetryLines = stdio.split(/\r?\n/).filter(line => /^\[(?:copilot|claude|codex)-harness\].*\bretrying\b/i.test(line));
   const harnessRetryCount = harnessRetryLines.length;

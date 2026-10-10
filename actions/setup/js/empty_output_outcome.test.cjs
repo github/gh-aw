@@ -27,9 +27,9 @@ describe("empty output outcome", () => {
     expect(buildEmptyOutputOutcome([], rootDir)).toEqual({
       type: "report_incomplete",
       reason: "missing_terminal_safe_output",
-      failureCause: "prompt_exhaustion",
+      failureCause: "unknown",
       retryCount: 0,
-      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: prompt_exhaustion\nRetry attempts observed: 0",
+      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: unknown\nRetry attempts observed: 0",
     });
   });
 
