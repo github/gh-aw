@@ -32,7 +32,7 @@ const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
-const { isModelEndpointMismatchData } = require("./unified_session.cjs");
+const { collectUnifiedSession, isModelEndpointMismatchData } = require("./unified_session.cjs");
 const { validateSessionFileHeader } = require("./unified_session_render.cjs");
 const fs = require("fs");
 const https = require("https");
@@ -361,11 +361,21 @@ function readModelEndpointMismatch() {
   const root = process.env.GH_AW_AGENT_OUTPUT ? path.dirname(process.env.GH_AW_AGENT_OUTPUT) : "/tmp/gh-aw";
   const file = process.env.GH_AW_UNIFIED_SESSION || path.join(root, "usage/aw_session.jsonl");
   try {
-    const events = fs
-      .readFileSync(file, "utf8")
-      .split(/\r?\n/)
-      .filter(line => line.trim())
-      .map(line => JSON.parse(line));
+    /** @type {any[]} */
+    let events;
+    try {
+      events = fs
+        .readFileSync(file, "utf8")
+        .split(/\r?\n/)
+        .filter(line => line.trim())
+        .map(line => JSON.parse(line));
+    } catch (error) {
+      const missing = error && typeof error === "object" && "code" in error && error.code === "ENOENT";
+      if (process.env.GH_AW_UNIFIED_SESSION || !missing) throw error;
+      // The conclusion job reports failures before the usage artifact step writes the
+      // session file, so collect the downloaded agent artifacts in memory instead.
+      events = collectUnifiedSession({ rootDir: root, warn: () => {} }).events;
+    }
     validateSessionFileHeader(events);
     const matches = events.filter(
       event =>
@@ -3942,7 +3952,11 @@ async function main() {
     const { aiCredits, maxAICredits, aiCreditsRateLimitError: detectedAICreditsRateLimitError, maxAICreditsExceeded } = resolveAICreditsFailureState();
     const aiCreditsRateLimitError = agentConclusion === "failure" && detectedAICreditsRateLimitError;
     const inferenceAccessError = process.env.GH_AW_INFERENCE_ACCESS_ERROR === "true";
-    const modelEndpointMismatchError = process.env.GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR === "true";
+    const modelEndpointMismatchSignal = process.env.GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR === "true";
+    const signaledModelEndpointMismatch = modelEndpointMismatchSignal ? readModelEndpointMismatch() : undefined;
+    // A sub-agent that hit a mismatch and recovered does not fail a successful run;
+    // only a failed agent job or startup mismatch evidence is reported.
+    const modelEndpointMismatchError = modelEndpointMismatchSignal && (agentConclusion !== "success" || signaledModelEndpointMismatch?.phase === "startup");
     const copilotOrgBillingError = !maxAICreditsExceeded && detectCopilotOrgBillingErrorFromLog();
     const copilotAgentNotFound = detectCopilotAgentNotFoundFromLog();
     const mcpPolicyError = process.env.GH_AW_MCP_POLICY_ERROR === "true";
@@ -4392,11 +4406,19 @@ async function main() {
       }
     }
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
-    const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
-    const terminalOutputFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
-    const modelEndpointMismatch = readModelEndpointMismatch();
+    const modelEndpointMismatchCandidate = modelEndpointMismatchSignal ? signaledModelEndpointMismatch : readModelEndpointMismatch();
+    const modelEndpointMismatch = agentConclusion === "success" && modelEndpointMismatchCandidate?.phase !== "startup" ? undefined : modelEndpointMismatchCandidate;
     const hasModelEndpointMismatch = modelEndpointMismatchError || Boolean(modelEndpointMismatch);
     const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
+    // A model/endpoint mismatch explains the missing terminal output, so the collector's
+    // generic empty-output classification (e.g. engine_outage) must not override it.
+    const collectorEmptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
+    const emptyOutputCause = hasModelEndpointMismatch ? undefined : collectorEmptyOutputCause;
+    const terminalOutputFailureCause = hasModelEndpointMismatch || !agentOutputResult.success ? undefined : agentOutputResult.collectorFailureCause;
+    const reportItems = (Array.isArray(agentOutputResult.items) ? agentOutputResult.items : []).filter(
+      item => !(hasModelEndpointMismatch && collectorEmptyOutputCause && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause && typeof item.failureCause === "string")
+    );
+    const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
       hasModelEndpointMismatch,
@@ -4405,7 +4427,7 @@ async function main() {
       terminalOutputFailureCause,
       isTimedOut,
       hasMissingSafeOutputs,
-      hasReportIncomplete,
+      hasReportIncomplete: hasReportedIncomplete,
       hasMissingTool,
       hasMissingData,
       hasCacheMissMisconfiguration,
@@ -4441,7 +4463,7 @@ async function main() {
       hasRepoMemoryValidationErrors: repoMemoryValidationErrors.length > 0,
       hasPushRepoMemoryFailure,
       hasMissingSafeOutputs,
-      hasReportIncomplete,
+      hasReportIncomplete: hasReportedIncomplete,
       hasMissingTool,
       hasToolDenialsExceeded,
       hasMissingData,
@@ -4524,7 +4546,7 @@ async function main() {
       }
     }
 
-    const agentOutputItems = Array.isArray(agentOutputResult.items) ? agentOutputResult.items : [];
+    const agentOutputItems = reportItems;
     const needsFailureDiagnostics =
       failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || agentOutputItems.some(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
     const failingStep = needsFailureDiagnostics ? await getFailedAgentStep() : "";
@@ -4612,7 +4634,7 @@ async function main() {
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
         const permissionDeniedContext = hasToolDenialsExceeded ? "" : buildPermissionDeniedContext(agentOutputResult.items, workflowID);
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items);
+        const reportIncompleteContext = buildReportIncompleteContext(reportItems);
 
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
@@ -4638,7 +4660,14 @@ async function main() {
         // context is the more actionable signal.
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
-        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
+        const engineFailureContext = shouldBuildEngineFailureContext(
+          agentConclusion,
+          hasToolDenialsExceeded,
+          isTimedOut,
+          missingModelPricingError,
+          shellExpansionGuardRejected,
+          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext)
+        )
           ? buildEngineFailureContext({
               suppressEngineRateLimit429: maxAICreditsExceeded,
               maxCacheMissesExceeded,
@@ -4853,7 +4882,7 @@ async function main() {
         const missingToolContext = missingToolReportAsFailure && !hasToolDenialsExceeded ? buildMissingToolContext(agentOutputResult.items) : "";
 
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items);
+        const reportIncompleteContext = buildReportIncompleteContext(reportItems);
 
         // Build permission denied context (denied commands list + fix prompt).
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
@@ -4883,7 +4912,14 @@ async function main() {
         // context is the more actionable signal.
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
-        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
+        const engineFailureContext = shouldBuildEngineFailureContext(
+          agentConclusion,
+          hasToolDenialsExceeded,
+          isTimedOut,
+          missingModelPricingError,
+          shellExpansionGuardRejected,
+          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext)
+        )
           ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded })
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
