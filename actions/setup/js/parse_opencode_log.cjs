@@ -77,10 +77,22 @@ function openCodeRecords(content) {
   } catch {
     // Intentionally fall through: mixed stdout/stderr is not one JSON document.
   }
-  let fenced = false;
-  return content.split(/\r?\n/).flatMap(line => {
-    if (/^\s*(?:```|~~~)/.test(line)) fenced = !fenced;
-    const error = fenced ? undefined : parseOpenCodeStreamError(line);
+  const lines = content.split(/\r?\n/);
+  const fencedLines = new Set();
+  for (let index = 0; index < lines.length; index++) {
+    const opening = lines[index].match(/^\s*(`{3,}|~{3,})/);
+    if (!opening) continue;
+    const marker = opening[1];
+    const end = lines.findIndex((line, candidate) => {
+      const closing = line.match(/^\s*(`{3,}|~{3,})\s*$/);
+      return candidate > index && closing?.[1][0] === marker[0] && closing[1].length >= marker.length;
+    });
+    if (end === -1) continue;
+    for (let fencedIndex = index; fencedIndex <= end; fencedIndex++) fencedLines.add(fencedIndex);
+    index = end;
+  }
+  return lines.flatMap((line, index) => {
+    const error = fencedLines.has(index) ? undefined : parseOpenCodeStreamError(line);
     return error ? [error] : (parseLogEntries(line) ?? []);
   });
 }
@@ -94,7 +106,21 @@ function openCodeRecords(content) {
 function updatePartSnapshot(previous, raw, event) {
   const nativeSnapshots = [...(previous.snapshots ?? [structuredClone(previous.raw)]), structuredClone(raw)];
   previous.snapshots = nativeSnapshots;
-  Object.assign(previous.event, event, { nativeSnapshots });
+  Object.assign(previous.event, event, ...(previous.event.id !== undefined ? [{ id: previous.event.id }] : []), { nativeSnapshots });
+}
+
+/**
+ * Prefer OpenCode's message identity when a part is replayed with a fresh part ID.
+ * @param {string} sessionID
+ * @param {string} type
+ * @param {unknown} messageID
+ * @param {unknown} [partID]
+ * @returns {string | undefined}
+ */
+function openCodeMessageIdentity(sessionID, type, messageID, partID) {
+  if (typeof messageID === "string") return JSON.stringify([sessionID, type, "message", messageID]);
+  if (typeof partID === "string") return JSON.stringify([sessionID, type, "part", partID]);
+  return undefined;
 }
 
 /**
@@ -146,22 +172,24 @@ function parseOpenCodeLog(content) {
     }
     if (raw.type === "text" || raw.type === "reasoning") {
       if (typeof part.text === "string") {
-        const identity = typeof part.id === "string" ? JSON.stringify([raw.sessionID, raw.type, part.id]) : undefined;
+        const identity = openCodeMessageIdentity(raw.sessionID, raw.type, part.messageID, part.id);
         const previous = identity !== undefined ? messageParts.get(identity) : undefined;
-        const refusal = raw.type === "text" ? (getMessageRefusal({ ...part, content: part.text }) ?? (previous?.event.type === "assistant.refusal" ? { reason: previous.event.data.reason } : undefined)) : undefined;
+        const finishRefusalIdentity = raw.type === "text" && typeof part.messageID === "string" ? openCodeMessageIdentity(raw.sessionID, "text", part.messageID) : undefined;
+        const finishRefusal = finishRefusalIdentity !== undefined ? finishRefusals.get(finishRefusalIdentity) : undefined;
+        const existing = previous ?? finishRefusal;
+        const refusal = raw.type === "text" ? (getMessageRefusal({ ...part, content: part.text }) ?? (existing?.event.type === "assistant.refusal" ? { reason: existing.event.data.reason } : undefined)) : undefined;
         const data = {
           content: part.text,
           ...(Object.hasOwn(part, "partial") ? { partial: part.partial } : Object.hasOwn(raw, "partial") ? { partial: raw.partial } : {}),
           ...(refusal ?? {}),
         };
         const type = refusal ? "assistant.refusal" : raw.type === "text" ? "assistant.message" : "assistant.reasoning";
-        if (previous) {
-          // A part ID identifies a full-part snapshot, not another message.
-          updatePartSnapshot(previous, raw, createSessionEvent(sourceMetadata(raw), type, { ...previous.event.data, ...raw.data, ...data }));
+        if (existing) {
+          updatePartSnapshot(existing, raw, createSessionEvent(sourceMetadata(raw), type, { ...existing.event.data, ...raw.data, ...data }));
         } else {
           emit(type, data);
-          if (identity !== undefined) messageParts.set(identity, { event: logEntries.at(-1), raw });
         }
+        if (identity !== undefined) messageParts.set(identity, { event: existing?.event ?? logEntries.at(-1), raw });
       }
     } else if (raw.type === "tool_use") {
       const state = part.state;
@@ -175,7 +203,7 @@ function parseOpenCodeLog(content) {
         toolStarts.get(callIdentity).data.input = structuredClone(state.input);
       }
       if (state.status === "completed" || state.status === "error") {
-        const identity = typeof part.id === "string" ? JSON.stringify([raw.sessionID, part.id]) : callIdentity;
+        const identity = callIdentity;
         const previous = identity !== undefined ? toolCompletions.get(identity) : undefined;
         const start = state.time?.start;
         const end = state.time?.end;
@@ -191,7 +219,13 @@ function parseOpenCodeLog(content) {
           ...(isMetric(start) && isMetric(end) && end >= start ? { durationMs: end - start } : {}),
         };
         const success = previous?.event.data.success === false ? false : (sessionToolSuccess({ ...raw.data, ...state, ...completion }) ?? state.status === "completed");
-        const data = { ...previous?.event.data, ...raw.data, ...completion, status: success ? "completed" : "error", success };
+        const previousData = { ...previous?.event.data };
+        if (previous && state.error === undefined) delete previousData.error;
+        if (previous && state.metadata === undefined) {
+          delete previousData.metadata;
+          delete previousData.exitCode;
+        } else if (previous && !Number.isSafeInteger(state.metadata?.exit)) delete previousData.exitCode;
+        const data = { ...previousData, ...raw.data, ...completion, status: success ? "completed" : "error", success };
         if (previous) updatePartSnapshot(previous, raw, createSessionEvent(sourceMetadata(raw), "tool.execution_complete", data));
         else {
           emit("tool.execution_complete", data);
@@ -219,13 +253,15 @@ function parseOpenCodeLog(content) {
       stepReports.set(identity, report);
       if (part.reason === "content-filter" || part.reason === "refusal") {
         const reason = part.reason === "content-filter" ? "content_filter" : "refusal";
-        const messages = [...messageParts.values()].filter(previous => previous.raw.type === "text" && previous.raw.sessionID === raw.sessionID && typeof part.messageID === "string" && previous.raw.part.messageID === part.messageID);
+        const messageIdentity = openCodeMessageIdentity(raw.sessionID, "text", part.messageID);
+        const messages = messageIdentity !== undefined && messageParts.has(messageIdentity) ? [messageParts.get(messageIdentity)] : [];
+        const refusalIdentity = messageIdentity ?? (typeof part.id === "string" ? JSON.stringify([raw.sessionID, "finish", part.id]) : undefined);
         if (!messages.length) {
-          const previous = finishRefusals.get(identity);
+          const previous = refusalIdentity !== undefined ? finishRefusals.get(refusalIdentity) : undefined;
           if (previous) updatePartSnapshot(previous, raw, createSessionEvent(sourceMetadata(raw), "assistant.refusal", { reason }));
           else {
             emit("assistant.refusal", { reason });
-            finishRefusals.set(identity, { event: logEntries.at(-1), raw });
+            if (refusalIdentity !== undefined) finishRefusals.set(refusalIdentity, { event: logEntries.at(-1), raw });
           }
         }
         for (const previous of messages) {

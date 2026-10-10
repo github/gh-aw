@@ -181,28 +181,7 @@ Native streams that omit user messages, reasoning, or accounting remain partial.
 
 The sanitized regression corpus in
 [`fixtures/opencode_ci_sessions.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/fixtures/opencode_ci_sessions.cjs)
-comes from existing artifacts, not newly triggered runs:
-[October 5](https://github.com/github/gh-aw/actions/runs/37248124399) supplies JSON
-parts from a successful agent followed by failed detection, and
-[October 9](https://github.com/github/gh-aw/actions/runs/37865496743) supplies
-logfmt-only provider errors. The October 5 excerpt preserves two step reports,
-not the full run's twelve turns. Its original `agent-session.jsonl` and
-`usage/aw_session.jsonl` agree on the full run's reported accounting: 255,330 total
-tokens, 89,318 input, 764 output, 165,248 cache-read, zero reasoning/cache-write
-tokens, and zero cost. Supplemental snapshot, refusal, and overflow cases are
-synthetic; no native refusal or reasoning parts occurred in that sample.
-Its historical canonical trace marked only the MCP tool error as failed,
-despite two bash completions reporting exit code 2. The current parser already
-honors those exits; the run-shape regressions preserve that behavior.
-
-The latest successful
-[October 7 workflow](https://github.com/github/gh-aw/actions/runs/37552649918)
-skipped its agent. The older
-[September 1 agent success](https://github.com/github/gh-aw/actions/runs/33455480415)
-contains legacy prose/debug logs, not JSON parts or persisted normalized
-sessions. Neither establishes success-path conformance for the current JSON
-parser. Existing persisted artifacts are historical evidence; local parser fixes
-do not rewrite them.
+preserves native session evidence from existing OpenCode artifacts.
 
 ## Recompile after workflow edits
 
