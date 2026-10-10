@@ -774,75 +774,39 @@ These cover the majority of safe output usage. Add the rest incrementally.
 
 ### Conformance Test Table
 
-The table below specifies one conformance test row per safe-output type. Each row defines the expected OTel attribute value emitted by a correct evaluator, the pass condition (what must be true for `accepted`), and the fail condition (what signals `rejected`). Implementations **MUST** satisfy the pass condition and **MUST** not emit `accepted` when the fail condition is observed.
+The current runtime classifications below supersede existence-based acceptance
+conditions in the original design sections. `ghaw.outcome.type` preserves the
+safe-output type; status and evidence strength are separate attributes.
 
-| Output type | Expected `ghaw.outcome.type` OTel attribute | Pass condition | Fail condition |
-|---|---|---|---|
-| `create_pull_request` | `create_pull_request` | PR exists in open or merged state; was not closed-as-not-planned or reverted within the evaluation window | PR closed-as-not-planned, reverted, or deleted within the evaluation window |
-| `create_issue` | `create_issue` | Issue exists in open state, or was closed by a visible non-bot action (not bot policy) within the evaluation window | Issue closed-as-not-planned by a visible non-bot actor within the evaluation window, or deleted |
-| `add_comment` | `add_comment` | Comment exists on the target object at evaluation time | Comment was deleted or hidden by a visible non-bot actor within the evaluation window |
-| `add_labels` | `add_labels` | At least one of the bot-applied labels is still present on the target object at evaluation time | All bot-applied labels were removed by a visible non-bot actor within the evaluation window |
-| `add_reviewer` | `add_reviewer` | Requested reviewer is still listed as a requested reviewer, or has already submitted a review | Reviewer request was removed by a visible non-bot actor before any review was submitted |
-| `update_issue` | `update_issue` | Updated field(s) (title, body, assignee) match the values the bot submitted at evaluation time | Updated field(s) were reverted to pre-bot values by a visible non-bot actor within the evaluation window |
-| `update_pull_request` | `update_pull_request` | Updated field(s) (title, body, base branch) match the values the bot submitted at evaluation time | Updated field(s) were reverted to pre-bot values by a visible non-bot actor within the evaluation window |
-| `close_issue` | `close_issue` | Issue remains closed at evaluation time | Issue was reopened by a visible non-bot actor within the evaluation window |
-| `close_pull_request` | `close_pull_request` | PR remains closed (not merged) at evaluation time | PR was reopened or merged after the bot closed it within the evaluation window |
-| `close_discussion` | `close_discussion` | Discussion remains closed at evaluation time | Discussion was reopened by a visible non-bot actor within the evaluation window |
-| `create_discussion` | `create_discussion` | Discussion exists and has not been deleted or locked within the evaluation window | Discussion was deleted or permanently locked (preventing any responses) within the evaluation window |
-| `update_discussion` | `update_discussion` | Updated field(s) (title, body, category) match the values the bot submitted at evaluation time | Updated field(s) were reverted to pre-bot values by a visible non-bot actor within the evaluation window |
-| `create_pull_request_review_comment` | `create_pull_request_review_comment` | Review comment exists on the PR diff at evaluation time | Review comment was deleted by a visible non-bot actor within the evaluation window |
-| `submit_pull_request_review` | `submit_pull_request_review` | PR review record exists with the submitted state (APPROVED, CHANGES_REQUESTED, COMMENT) at evaluation time | Review was dismissed by a visible non-bot actor within the evaluation window |
-| `reply_to_pull_request_review_comment` | `reply_to_pull_request_review_comment` | Reply comment exists in the review thread at evaluation time | Reply comment was deleted by a visible non-bot actor within the evaluation window |
-| `resolve_pull_request_review_thread` | `resolve_pull_request_review_thread` | Review thread remains resolved at evaluation time | Thread was re-opened (un-resolved) by a visible non-bot actor within the evaluation window |
-| `push_to_pull_request_branch` | `push_to_pull_request_branch` | The pushed commit SHA is still present in the PR branch history at evaluation time | The commit was force-pushed out of the branch history by a visible non-bot actor within the evaluation window |
-| `mark_pull_request_as_ready_for_review` | `mark_pull_request_as_ready_for_review` | PR is no longer in draft state at evaluation time | PR was converted back to draft by a visible non-bot actor within the evaluation window |
-| `assign_to_agent` | `assign_to_agent` | Assignment record exists on the target issue/PR at evaluation time | Assignment was removed by a visible non-bot actor before the assigned agent acted on it |
-| `dispatch_workflow` | `dispatch_workflow` | The dispatched workflow run exists and reached a terminal state (success or failure) within the evaluation window | The dispatched workflow run was cancelled before reaching a terminal state; or no corresponding run record is found |
-| `autofix_code_scanning_alert` | `autofix_code_scanning_alert` | Code scanning alert is in a fixed or dismissed state at evaluation time | Alert was re-opened or the fix commit was reverted within the evaluation window |
-| `create_code_scanning_alert` | `create_code_scanning_alert` | Alert record exists in the repository's code scanning results at evaluation time | Alert was immediately dismissed (within the evaluation window) with no investigation action |
-| `link_sub_issue` | `link_sub_issue` | Sub-issue link exists on the parent issue at evaluation time | Sub-issue link was removed by a visible non-bot actor within the evaluation window |
-| `hide_comment` | `hide_comment` | Comment is minimized (hidden) at evaluation time | Comment was un-hidden by a visible non-bot actor within the evaluation window |
-| `assign_milestone` | `assign_milestone` | Milestone assignment is present on the target issue/PR at evaluation time | Milestone assignment was removed by a visible non-bot actor within the evaluation window |
-| `update_project` | `update_project` | Project item field(s) match the values the bot submitted at evaluation time | Project item field(s) were reverted to pre-bot values by a visible non-bot actor within the evaluation window |
-| `update_release` | `update_release` | Release field(s) (name, body, tag, draft status) match the values the bot submitted at evaluation time | Release field(s) were reverted by a visible non-bot actor, or the release was deleted within the evaluation window |
-| `noop` | `noop` | Evaluation is skipped; no outcome is computed | N/A — `noop` always results in `ignored` |
-| `missing_tool` | `missing_tool` | Evaluation is skipped; no outcome is computed | N/A — `missing_tool` always results in `ignored` |
-| `replace_label` | `replace_label` | `label_to_add` is present on the target item AND `label_to_remove` is absent at evaluation time | `label_to_add` is absent, or `label_to_remove` is still present, or the item was deleted within the evaluation window |
+| Output type | Acceptance evidence | Other classifications |
+|---|---|---|
+| `create_pull_request` | Merged PR | Open pending; closed unmerged rejected |
+| `create_issue` | Closed completed | Open pending, even with engagement; not-planned human close rejected, bot close lifecycle; missing close actor error |
+| `add_comment` | Reactions or post-comment visible non-bot follow-up | Otherwise pending; primary comment 404 rejected; supplementary failure cannot prove deletion |
+| `add_labels`, `replace_label` | Recorded delta retained | Missing snapshots unknown; delta reverted/replaced rejected |
+| `update_issue`, `update_pull_request` | All recorded changed fields retained; retained merged PR gives strong evidence | Missing execution state or no delta unknown; reverted/replaced rejected |
+| `close_issue`, `close_pull_request` | Retained close with visible non-bot close actor | Bot close lifecycle_close; reopened or PR merged rejected; missing actor error |
+| `add_reviewer` | Review attributable to a recorded requested user | Pending matched request pending; removed request rejected; team membership unverified unknown |
+| `submit_pull_request_review` | Exact recorded review approved and PR merged, or changes requested followed by commits and merge | Missing exact review unknown; dismissed rejected; latest open review pending |
+| `push_to_pull_request_branch` | Recorded pushed SHAs verified as ancestors of merge commit | Missing execution evidence unknown; unverified ancestry unknown; open pending; closed unmerged rejected |
+| `mark_pull_request_as_ready_for_review` | Visible non-bot submitted review strictly after action | Open pending; closed/merged without qualifying review ignored |
+| `assign_to_agent` | Post-action link to recognized agent-authored PR that merged | No attributable PR unknown; linked open PR pending; closed unmerged rejected |
+| `dispatch_workflow` | Recorded run completed successfully | Failed, timed-out, cancelled, or action-required rejected; nonterminal pending; other completion ignored |
+| `assign_milestone` | Current milestone matches recorded milestone number | Missing identity unknown; mismatch rejected |
+| Discussion actions, review-comment creation, review-thread resolution, `hide_comment` | No supported evaluator | Unknown with `unsupported_evaluator` |
+| `noop`, `missing_tool`, `missing_data`, `report_incomplete` | Not evaluated | Skipped |
+| Other generic fallback types | Target existence is not acceptance evidence | Unknown with `target_exists_only`; missing reference unknown; API failure error |
 
 ### Sync Follow-ups: Safe-Output Section-to-Test Mapping
 
-| Section | Output type | Compliance test file(s) | Coverage status |
-|---|---|---|---|
-| §1 | `create_pull_request` | `pkg/cli/outcome_eval_formal_test.go` | covered |
-| §2 | `create_issue` | `pkg/cli/outcome_eval_formal_test.go` | covered |
-| §3 | `add_comment` | `pkg/cli/outcome_eval_formal_test.go` | covered |
-| §4 | `add_labels` | `pkg/cli/outcome_eval_formal_test.go`, `pkg/cli/outcome_eval_test.go` | covered |
-| §5 | `add_reviewer` | `pkg/cli/outcome_eval_test.go` | covered |
-| §6 | `update_issue` | `pkg/cli/outcome_eval_update_test.go` | covered |
-| §7 | `update_pull_request` | `pkg/cli/outcome_eval_update_test.go` | covered |
-| §8 | `close_issue` | `pkg/cli/outcome_eval_formal_test.go` | covered |
-| §9 | `close_pull_request` | `pkg/cli/outcome_eval_formal_test.go` | covered |
-| §10 | `close_discussion` | not-started | not-started |
-| §11 | `create_discussion` | not-started | not-started |
-| §12 | `update_discussion` | `pkg/cli/outcome_eval_workflow_test.go` | covered |
-| §13 | `create_pull_request_review_comment` | not-started | not-started |
-| §14 | `submit_pull_request_review` | `pkg/cli/outcome_eval_test.go` | covered |
-| §15 | `reply_to_pull_request_review_comment` | not-started | not-started |
-| §16 | `resolve_pull_request_review_thread` | not-started | not-started |
-| §17 | `push_to_pull_request_branch` | not-started | not-started |
-| §18 | `mark_pull_request_as_ready_for_review` | not-started | not-started |
-| §19 | `assign_to_agent` | not-started | not-started |
-| §20 | `dispatch_workflow` | `pkg/cli/outcome_eval_workflow_test.go` | covered |
-| §21 | `autofix_code_scanning_alert` | not-started | not-started |
-| §22 | `create_code_scanning_alert` | not-started | not-started |
-| §23 | `link_sub_issue` | not-started | not-started |
-| §24 | `hide_comment` | not-started | not-started |
-| §25 | `assign_milestone` | not-started | not-started |
-| §26 | `update_project` | not-started | not-started |
-| §27 | `update_release` | not-started | not-started |
-| §28 | `noop` | `pkg/cli/outcome_eval_test.go` | covered |
-| §29 | `missing_tool` | `pkg/cli/outcome_eval_test.go` | covered |
-| §30 | `replace_label` | `pkg/cli/outcome_eval_update_test.go`, `pkg/workflow/replace_label_formal_test.go` | covered |
+The shared 63-case fixture corpus is
+`pkg/cli/testdata/outcome_conformance.json`. Go executes it through
+`pkg/cli/outcome_conformance_test.go`; JavaScript executes the same inputs through
+`actions/setup/js/outcome_conformance.test.cjs`. The executable TLA+ checker
+projects all cases into evidence facts and checks the same expected status,
+strength, signal, and zero-touch result. See [verification scope](outcomes/README.md)
+for the distinction between runtime tests, fixture agreement, and bounded model
+checking. Compiler tests for a safe-output type do not establish evaluator support.
 
 ### Structure: Safe-Output Section-to-Implementation Mapping
 
@@ -905,133 +869,40 @@ Every safe-output type **MUST** have at least one Class A test. Types that query
 
 ## Formal Model
 
-The outcome evaluation engine is encoded as a state machine with invariants using TLA+, F* pre/post contracts, and Z3/SMT-LIB arithmetic bounds.
+The executable specification is
+[`outcomes/OutcomeEvaluation.tla`](outcomes/OutcomeEvaluation.tla), with finite
+bounds in [`outcomes/OutcomeEvaluation.cfg`](outcomes/OutcomeEvaluation.cfg).
+[`outcomes/check.mjs`](outcomes/check.mjs) runs checksum-pinned TLC, shared fixture
+agreement, and deliberate negative controls. [Reproduction and verification
+scope](outcomes/README.md) documents the results and assumptions.
 
-**State space** (`OutcomeState`):
+The model observes one action's evidence snapshot, computes abstract Go and
+JavaScript results in either order, publishes typed results, and reconciles
+status counts. Safety invariants constrain acceptance evidence, execution
+attribution, review timing, primary-404 deletion, zero-touch completeness,
+runtime parity, typed export preservation, and summary reconciliation. Weak
+fairness establishes eventual publication within this abstract pipeline.
 
-```
-OutcomeState ≜ [
-  type       : SafeOutputType,
-  result     : OutcomeResult,
-  evalError  : String ∪ {nil},
-  detail     : String,
-  apiStatus  : Int ∪ {nil},
-  actor      : ActorIdentity,
-  checkTime  : Timestamp
-]
-```
-
-**TLA+ invariants** (one per state-machine guarantee):
-
-```tla
-OutcomeDomain ≜
-  ∀ s ∈ OutcomeState :
-    s.result ∈ {"accepted","rejected","ignored","pending","lifecycle","lifecycle_close"}
-    ∨ s.result ∈ {"unknown","error"}
-
-APIFailureNeverTerminal ≜
-  ∀ s ∈ OutcomeState :
-    (s.apiStatus ∈ {500,502,503,429} ∨ s.apiStatus = 403 ∧ RateLimited(s)) ⟹
-      s.result ≠ "accepted" ∧ s.result ≠ "rejected"
-
-NotFoundClassification ≜
-  ∀ s ∈ OutcomeState :
-    s.apiStatus = 404 ∧ persistent(s.type) ⟹ s.result = "rejected" ∧
-    s.apiStatus = 404 ∧ transient(s.type) ⟹ s.result = "ignored"
-
-BotActorProvenance ≜
-  ∀ actor : ActorIdentity :
-    isBotActor(actor) ↔ HasSuffix(actor.login, "[bot]") ∨ actor.login ∈ KnownBotLogins
-
-PRMergeAcceptance ≜
-  ∀ pr : PullRequest :
-    pr.merged = true                   ⟹ outcome = "accepted" ∧
-    pr.state = "closed" ∧ ¬pr.merged  ⟹ outcome = "rejected" ∧
-    pr.state = "open"                  ⟹ outcome = "pending"
-
-IssueBotCloseLifecycle ≜
-  ∀ issue : Issue :
-    issue.state = "closed" ∧ issue.stateReason = "not_planned" ∧ closedByBot  ⟹ result = "lifecycle" ∧
-    issue.state = "closed" ∧ issue.stateReason = "not_planned" ∧ ¬closedByBot ⟹ result = "rejected" ∧
-    issue.state = "closed" ∧ issue.stateReason = "completed"                   ⟹ result = "accepted"
-
-CloseStickyReopenRejection ≜
-  ∀ item : close_issue ∪ close_pull_request :
-    current.state = "closed" ⟹ result = "accepted" ∧
-    current.state = "open"   ⟹ result = "rejected"
-
-APIErrorNotTerminal ≜
-  ∀ pr : PullRequest, err : APIError :
-    fetch(pr) = err ⟹ outcome = "error"
-
-ZeroTouchRequiresNoReviews ≜
-  ∀ pr : PullRequest :
-    pr.zeroTouch ⟹ pr.outcome = "accepted" ∧
-      pr.humanComments = 0 ∧ pr.humanReviews = 0
-```
-
-**F* pre/post contracts** (selected):
-
-```fstar
-val evaluateWithAPIError :
-  item:CreatedItemReport → err:APIError →
-  Tot OutcomeReport
-  (requires err.status ∈ {500, 502, 503, 429} ∨ RateLimited err)
-  (ensures fun r → r.Result ≠ OutcomeAccepted ∧ r.Result ≠ OutcomeRejected)
-
-val labelRetentionMonotonicity :
-  before:list string → after:list string → current:list string →
-  Tot retainedStateComparison
-  (requires Subset before after)
-  (ensures fun c →
-    Subset after current ⟹ c.Retained ≠ [] ∧
-    ¬Subset after current ⟹ c.Reverted ≠ [] ∨ c.Replaced ≠ [])
-
-val compareUpdateSnapshot :
-  before:state → after:state → current:state → fields:list string →
-  Tot retainedStateComparison
-  (ensures fun c →
-    current = after  ⟹ c.Retained = c.Changed ∧
-    current = before ⟹ c.Reverted = c.Changed ∧
-    current ≠ before ∧ current ≠ after ⟹ c.Replaced = c.Changed)
-
-val evaluateOutcome :
-  item:CreatedItemReport → transportOK:bool →
-  Tot OutcomeReport
-  (requires True)
-  (ensures fun r →
-    r.Type ≠ "" ∧ r.Result ∈ KnownOutcomeResults ∧
-    normalizeOutcomeEvaluation(r).OutcomeStatus ≠ "" ∧
-    normalizeOutcomeEvaluation(r).EvidenceStrength ≠ "")
-```
-
-**Z3/SMT-LIB bounds** (derived metrics zero-safety):
-
-```smt2
-(declare-const accepted Int)
-(declare-const rejected Int)
-(declare-const total    Int)
-(assert (>= accepted 0))
-(assert (>= rejected 0))
-(assert (>= total (+ accepted rejected)))
-(assert (=> (> (+ accepted rejected) 0)
-            (= acceptance_rate (/ accepted (+ accepted rejected)))))
-(assert (=> (> total 0)
-            (= waste_rate (/ rejected total))))
-(assert (=> (= (+ accepted rejected) 0) (= acceptance_rate 0.0)))
-(assert (=> (= total 0) (= waste_rate 0.0)))
-(check-sat) ; sat — formulas are consistent and division-by-zero safe
-```
+This is bounded model checking, not an unbounded proof or verification of native
+Go/JavaScript execution. Fixture projection links the model to tested examples;
+actor recognition, timestamp parsing, GitHub API behavior, collection/revisit
+scheduling, OTLP transport, and AIC attribution remain outside the proof.
+Earlier F* and SMT-LIB examples were design sketches, not checked artifacts;
+no F*, Z3, or TLAPS proof is claimed.
 
 ---
 
-## Behavioral Coverage Map
+## Legacy Runtime Safeguard Tests
+
+The following named Go tests are runtime checks, not TLC invariants or generated
+formal proofs. The shared conformance corpus and executable TLA+ model are the
+current cross-runtime evidence contract.
 
 | Predicate / Invariant | Test Function | Description |
 |---|---|---|
-| `P1` OutcomeDomain | `TestFormalOutcomeDomainInvariant` | All OutcomeResult values are within the six defined strings |
+| `P1` OutcomeDomain | `TestFormalOutcomeDomainInvariant` | Checks the supported normalized status domain |
 | `P2` No-Terminal-Under-API-Failure | `TestFormalAPIFailurePending` | 5xx and rate-limit responses yield `pending`/`error`, never `accepted`/`rejected` |
-| `P3` 404-Terminal-Classification | `TestFormal404Classification` | 404 on persistent object → `rejected`; on transient → `ignored` |
+| `P3` 404-Terminal-Classification | `TestFormal404Classification` | Primary persistent-object 404 rejected; supplementary 404 cannot prove deletion |
 | `P4` Bot-Actor-Provenance | `TestFormalBotActorProvenance` | Bot identity → bot action; user identity → non-bot action |
 | `P5` PR-Merge-Acceptance | `TestFormalPRMergeAcceptance` | merged=true→accepted; closed+!merged→rejected; open→pending |
 | `P6` Issue-Bot-Close-Lifecycle | `TestFormalIssueBotCloseLifecycle` | Bot closes not_planned→lifecycle; human→rejected; completed→accepted |
@@ -1042,15 +913,15 @@ val evaluateOutcome :
 | `P11` OTel-Graceful-Degradation | `TestFormalOTelGracefulDegradation` | OTLP failure still writes audit log; outcome not discarded |
 | `P12` Conformance-Class-Coverage | `TestFormalConformanceClassCoverage` | Class A/C test existence invariant structure |
 | `P14` API-Error-Not-Terminal | `TestFormalAPIErrorNotTerminal` | An authoritative PR fetch error produces `error`, never a terminal outcome |
-| `P15` Zero-Touch-Requires-No-Reviews | `TestFormalZeroTouchRequiresNoReviews` | `zero_touch` requires zero non-bot comments and zero reviews |
+| `P15` Zero-Touch-Requires-No-Reviews | `TestFormalZeroTouchRequiresNoReviews` | Requires complete evidence and no post-action non-bot comments, submitted reviews, or non-author edits |
 
 `P13` covers the worker's configurable evaluation delay and is intentionally outside this in-process evaluator suite.
 
 ---
 
-## Generated Test Suite
+## Runtime Test Suite
 
-The 14 test functions above are implemented in
+The named test functions above are implemented in
 `pkg/cli/outcome_eval_formal_test.go` using the Go `testify` library.
 All tests carry the `//go:build !integration` tag so they run in the default
 unit-test suite without any special flags.
@@ -1067,16 +938,6 @@ Run the full formal suite:
 ```sh
 go test ./pkg/cli/ -run 'TestFormalOutcomeDomainInvariant|TestFormalAPIFailurePending|TestFormal404Classification|TestFormalBotActorProvenance|TestFormalPRMergeAcceptance|TestFormalIssueBotCloseLifecycle|TestFormalLabelStickiness|TestFormalUpdateSnapshotComparison|TestFormalCloseStickyReopenRejection|TestFormalDerivedMetricsConsistency|TestFormalOTelGracefulDegradation|TestFormalConformanceClassCoverage|TestFormalAPIErrorNotTerminal|TestFormalZeroTouchRequiresNoReviews' -v
 ```
-
-### Formal Notation Cross-References
-
-| Notation | Predicates | Purpose |
-|---|---|---|
-| TLA+ state-machine invariants | P1, P4, P5, P6, P9 | State transition correctness |
-| F* pre/post contracts | P2, P3, P7, P8, P11, P12 | Function-level contracts |
-| Z3/SMT-LIB arithmetic bounds | P10 | Division-by-zero safety for derived metrics |
-
----
 
 ## Change Log
 
