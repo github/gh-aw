@@ -76,6 +76,10 @@ def main():
         completion = Obj(choices=[], usage=None)
         coder.show_send_output(completion)
         return 0
+    if scenario == "io-warnings":
+        for message in (None, "", False, 0, [], {}):
+            io.assistant_output(message)
+        return 0
     content = None if scenario == "null" else "" if scenario == "zero" else "  exact reply\n\n"
     reasoning = "" if scenario == "zero" else "  exact reasoning\n"
     message = Payload(content=content, reasoning_content=reasoning, refusal=None, tool_calls=None)
@@ -132,6 +136,9 @@ def main():
 		require.NoError(t, err, "%s", output)
 	}
 	assert.NotContains(t, string(output), "DISPLAY REASONING")
+	if scenario == "io-warnings" {
+		assert.Equal(t, 6, strings.Count(string(output), "empty warning"), "all IO warnings still reach Aider")
+	}
 	var events []map[string]any
 	for line := range strings.SplitSeq(string(output), "\n") {
 		var event map[string]any
@@ -184,6 +191,41 @@ func TestAiderSessionCapturePreservesProviderPayloads(t *testing.T) {
 	assert.Empty(t, tools[0]["data"].(map[string]any)["output"])
 	assert.Equal(t, false, tools[1]["data"].(map[string]any)["success"])
 	assert.Equal(t, "  failed\n", tools[1]["data"].(map[string]any)["output"])
+}
+
+func TestAiderSessionCaptureIOWarningsDoNotCreateProviderObservations(t *testing.T) {
+	events := runAiderSessionCapture(t, "io-warnings")
+	assert.Empty(t, aiderEventsOfType(events, "assistant.message"))
+	results := aiderEventsOfType(events, "session.result")
+	require.Len(t, results, 1)
+	data := results[0]["data"].(map[string]any)
+	assert.Zero(t, data["numTurns"])
+	assert.NotContains(t, data, "usage")
+	assert.NotContains(t, data, "totalCostUsd")
+	assert.Equal(t, "completed", data["status"])
+	assert.Equal(t, "process.exit", data["sourceType"])
+	assert.Zero(t, data["exitCode"])
+}
+
+func TestAiderSessionCapturePreservesFalsyProviderContent(t *testing.T) {
+	for _, content := range []any{nil, "", false, 0, []any{}, map[string]any{}} {
+		t.Run(string(mustMarshalAiderTestJSON(t, content)), func(t *testing.T) {
+			events := runAiderSessionCaptureWithMessage(t, "normal", map[string]any{"content": content})
+			messages := aiderEventsOfType(events, "assistant.message")
+			require.Len(t, messages, 1)
+			data := messages[0]["data"].(map[string]any)
+			assert.Contains(t, data, "content")
+			assert.JSONEq(t, string(mustMarshalAiderTestJSON(t, content)), string(mustMarshalAiderTestJSON(t, data["content"])))
+			assert.InDelta(t, 1, aiderEventsOfType(events, "session.result")[0]["data"].(map[string]any)["numTurns"], 0)
+		})
+	}
+}
+
+func mustMarshalAiderTestJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	require.NoError(t, err)
+	return encoded
 }
 
 func TestAiderSessionCaptureAccountingAvailability(t *testing.T) {

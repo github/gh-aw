@@ -138,7 +138,7 @@ engine:
 
               def assistant_output(self, message, pretty=None):
                   global turns
-                  if not capturing_response:
+                  if not capturing_response and message:
                       turns += 1
                       emit("assistant.message", {"content": message})
                   # Keep empty-response warnings without duplicating rendered provider text.
@@ -396,19 +396,39 @@ engine:
       function parseLog(logContent) {
         const { parseLogEntries, generateCopilotCliStyleSummary } = require("./log_parser_shared.cjs");
         const { isSessionEvent } = require("./agent_session.cjs");
-        // Shell stdout can contain JSON; core evidence requires Aider attribution.
+        // Shell stdout can contain JSON; interpreted evidence requires Aider attribution.
         // Unknown native extensions stay opaque, including within core namespaces.
-        const coreTypes = new Set([
+        const interpretedTypes = new Set([
           "session.init", "session.start", "user.message",
           "assistant.message", "assistant.reasoning", "assistant.refusal",
           "tool.execution_start", "tool.execution_complete",
           "session.result", "session.error", "agent.execution",
           "detection.result", "session.format",
+          "session.collection", "session.collection_warning",
+          "prompt.system", "prompt.user",
+          "mcp.rpc.request", "mcp.rpc.response", "mcp.difc.filtered",
+          "mcp.guard.blocked", "mcp.tool_call", "mcp.event",
+          "firewall.http_access", "firewall.token_usage", "firewall.model_routing",
+          "firewall.steering", "firewall.event", "model_routing.outcome",
+          "safe_output.request", "safe_output.result", "safe_output.error",
+          "experiment.state", "experiment.assignment", "grader.manifest", "grader.result",
+          "eval.result", "github_api.rate_limit", "usage.report", "execution.result",
+          "guardrail.daily_aic", "guard.tool_denials_exceeded", "workflow.info",
+          "workflow.run_started", "workflow.run_updated", "workflow.run_settled",
+          "dynamicWorkflows.task_started", "dynamicWorkflows.task_progress",
+          "dynamicWorkflows.task_updated", "dynamicWorkflows.task_notification",
+          "dynamicWorkflows.background_tasks_changed",
+          "claude.assistant_error", "claude.api_retry", "turn.failed",
+          "claude.stream_event", "claude.assistant_snapshot", "gemini.message_snapshot",
         ]);
+        const isInterpreted = entry => interpretedTypes.has(entry.type) ||
+          entry.type.startsWith("subagent.") ||
+          (entry.type === "session.shutdown" && entry.data.agentMetrics !== null &&
+            typeof entry.data.agentMetrics === "object" && !Array.isArray(entry.data.agentMetrics));
         const logEntries = (parseLogEntries(logContent) || []).filter(
           entry => isSessionEvent(entry) && (
             entry.data.sourceEngine === "aider" ||
-            (entry.data.sourceEngine === undefined && !coreTypes.has(entry.type))
+            (entry.data.sourceEngine === undefined && !isInterpreted(entry))
           )
         );
         // Older Aider versions expose provider failures before any model reply.

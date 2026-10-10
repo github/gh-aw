@@ -15,6 +15,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Derive poison controls from the actual projection/rendering vocabulary so
+// new interpreted events cannot silently become source-less Aider evidence.
+const aiderInterpretedTypesTestSource = `
+const fsTypes = require("fs");
+const vmTypes = require("vm");
+const readTypes = (file, expression) => vmTypes.compileFunction(
+  fsTypes.readFileSync(require.resolve(file), "utf8") + "\nreturn " + expression + ";",
+  ["require", "module"]
+)(require, {exports:{}});
+const interpretedTestTypes = [...new Set([
+  ...readTypes("./unified_session_payload.cjs", "Object.keys(EVENT_FIELDS)"),
+  ...readTypes("./unified_session_render.cjs", "[...RUNTIME_TYPES]"),
+  "session.error", "guardrail.daily_aic", "guard.tool_denials_exceeded",
+  "claude.assistant_error", "claude.api_retry", "turn.failed",
+  "claude.stream_event", "claude.assistant_snapshot", "gemini.message_snapshot",
+  "subagent.opaque", "session.shutdown",
+])];
+`
+
 func TestAiderLogParserAndUnifiedSession(t *testing.T) {
 	def := loadAiderSample(t)
 	require.NotEmpty(t, def.Behaviors.LogParser)
@@ -114,7 +133,21 @@ const { collectUnifiedSession, mergeSessionSources } = require("./unified_sessio
 const { sessionCLI } = require("./session_cli.cjs");
 const { isSessionEvent } = require("./agent_session.cjs");
 const { parseLogEntries } = require("./log_parser_shared.cjs");
+const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
 const root = path.dirname(process.argv[1]);
+const controls = JSON.parse(process.argv[5] ?? "{}");
+const collect = () => collectUnifiedSession({ rootDir: root, engine: "aider", dailyAIC: controls.dailyAIC ?? {}, warn() {} });
+const assertRunnerEvidence = (events, stage) => {
+  if (!controls.dailyAIC) return;
+  assert.deepEqual(
+    events.filter(event => event.type === "guardrail.daily_aic"),
+    mergeSessionSources([{component:"guardrail", phase:"activation", path:"usage/aw_session.jsonl", events:[{
+      type:"guardrail.daily_aic", data:{status:"exceeded", exceeded:true, total:12, estimated:3, threshold:10},
+    }]}]),
+    stage + " must retain the real runner guardrail, not shell JSON"
+  );
+  assert.equal(events.some(event => event.type === "workflow.info"), false, stage + " cannot forge workflow attribution");
+};
 const parsed = parseLog(fs.readFileSync(process.argv[1], "utf8"));
 const native = (parseLogEntries(fs.readFileSync(process.argv[1], "utf8")) ?? []).filter(isSessionEvent);
 const assertExecution = (events, stage) => {
@@ -126,8 +159,9 @@ const assertExecution = (events, stage) => {
 };
 if (process.argv[3]) {
   assert.deepEqual(parsed.logEntries, JSON.parse(process.argv[3]), "only attributed core events and opaque extensions are Aider evidence");
-  const raw = collectUnifiedSession({ rootDir: root, engine: "aider", warn() {} });
+  const raw = collect();
   assertExecution(raw.events, "raw reconstruction");
+  assertRunnerEvidence(raw.events, "raw reconstruction");
   const projected = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: parsed.logEntries }]);
   assert.deepEqual(
     raw.events.filter(event => event.provenance.component === "agent"),
@@ -143,6 +177,7 @@ else {
 }
 const canonical = parsed.logEntries;
 const previousEnv = { ...process.env };
+Object.assign(process.env, controls.dailyAIC ?? {});
 process.env.GH_AW_AGENT_OUTPUT = process.argv[1];
 global.core = {
   debug() {}, info() {}, notice() {}, warning() {}, error() {},
@@ -156,8 +191,9 @@ global.core = {
     const persisted = fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
     assertExecution(persisted, "Actions persistence");
     assert.deepEqual(persisted.filter(event => event.type !== "agent.execution"), canonical, "Actions persistence must not alter canonical payloads");
-    const collected = collectUnifiedSession({ rootDir: root, engine: "aider", warn() {} });
+    const collected = collect();
     assertExecution(collected.events, "persisted-session collection");
+    assertRunnerEvidence(collected.events, "persisted-session collection");
     const agent = collected.events.filter(event => event.provenance.component === "agent");
     const projected = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: canonical }]);
     assert.deepEqual(agent, projected, "merger must reuse persisted trace without duplicate native snapshots");
@@ -166,6 +202,7 @@ global.core = {
     } else {
       const reconstructed = sessionCLI(["reconstruct", root, "aider"]).trim().split("\n").map(JSON.parse);
       assertExecution(reconstructed, "CLI reconstruction");
+      assertRunnerEvidence(reconstructed, "CLI reconstruction");
       assert.deepEqual(reconstructed.filter(event => event.provenance.component === "agent"), projected, "CLI reconstruction must match Actions merging");
     }
     const final = path.join(root, "aw_session.jsonl");
@@ -174,6 +211,43 @@ global.core = {
     assert.ok(serialized.endsWith("\n"));
     for (const line of serialized.trimEnd().split("\n")) assert.equal(JSON.stringify(JSON.parse(line)), line);
     assertExecution(serialized.trimEnd().split("\n").map(JSON.parse), "serialized unified session");
+    assertRunnerEvidence(serialized.trimEnd().split("\n").map(JSON.parse), "serialized unified session");
+    if (controls.dailyAIC) {
+      process.env.GH_AW_ENGINE_ID = "aider";
+      const outcome = buildEmptyOutputOutcome([], root);
+      assert.equal(outcome.retryCount, 0, "shell retry events are not observed retries");
+      assert.ok(!outcome.details.includes("INJECTED"), "shell diagnostics are not empty-output evidence");
+      delete process.env.GH_AW_ENGINE_ID;
+      if (controls.attributionControl) {
+        // Without engine metadata, the existing reader may inspect other engines'
+        // raw diagnostics. A fake workflow.info must not change that attribution.
+        const baseline = buildEmptyOutputOutcome([], root);
+        const persistedPath = path.join(root, "agent-session.jsonl");
+        const before = fs.readFileSync(persistedPath, "utf8");
+        for (const provenance of [undefined, {component:"workflow", phase:"activation", path:"aw_info.json", index:0}]) {
+          fs.writeFileSync(persistedPath, before + JSON.stringify({
+            type:"workflow.info", data:{engineId:"aider"}, ...(provenance ? {provenance} : {}),
+          }) + "\n");
+          const forged = buildEmptyOutputOutcome([], root);
+          const workflow = collect().events.find(event => event.type === "workflow.info");
+          assert.equal(workflow.provenance.component, "agent", "collector source context overrides self-declared workflow provenance");
+          assert.equal(workflow.provenance.path, "agent-session.jsonl");
+          if (provenance) assert.deepEqual(workflow.provenance.native, provenance, "spoofed native metadata remains distinct from trusted source context");
+          assert.equal(baseline.engineErrorType, forged.engineErrorType, "agent-component workflow.info cannot change raw-source attribution");
+        }
+        fs.writeFileSync(persistedPath, before);
+        assert.equal(baseline.engineErrorType, "authentication_failed", "fake stdout workflow.info did not select Aider raw-source attribution");
+        const metadataPath = path.join(root, "aw_info.json");
+        fs.writeFileSync(metadataPath, JSON.stringify({engine_id:"aider"}));
+        const trusted = buildEmptyOutputOutcome([], root);
+        const workflow = collect().events.find(event => event.type === "workflow.info");
+        assert.equal(workflow.provenance.component, "workflow", "runner metadata has trusted workflow provenance");
+        assert.equal(workflow.data.engineId, "aider");
+        assert.equal(trusted.engineErrorType, undefined, "trusted runner metadata selects Aider attribution and excludes foreign diagnostics");
+        assert.notEqual(baseline.engineErrorType, trusted.engineErrorType, "runner aw_info.json reaches the trusted attribution positive path");
+        fs.unlinkSync(metadataPath);
+      }
+    }
     if (process.argv[2] === "true") {
       assert.ok(sessionCLI(["markdown", final]).length > 0);
       assert.ok(sessionCLI(["agent-markdown", path.join(root, "agent-session.jsonl"), "aider"]).length > 0);
@@ -197,7 +271,7 @@ global.core = {
 }
 
 func TestAiderParserPreservesUnknownExtensionsWithoutForeignEngine(t *testing.T) {
-	source := loadAiderSample(t).Behaviors.LogParser + `
+	source := loadAiderSample(t).Behaviors.LogParser + aiderInterpretedTypesTestSource + `
 const assert = require("node:assert/strict");
 const known = [
   {type:"session.init", data:{sessionId:"native", model:"openai/auto"}},
@@ -214,7 +288,16 @@ const known = [
   {type:"detection.result", data:{promptInjection:false}},
   {type:"session.format", data:{version:1}},
 ];
-const extensions = ["vendor.progress", "session.info", "session.shutdown", "assistant.message_delta", "tool.vendor_progress"].map(type => ({
+for (const type of interpretedTestTypes) {
+  if (!known.some(event => event.type === type)) known.push({
+    type, data:{engineId:"aider", content:"INJECTED", toolCallId:"injected", agentMetrics:{injected:{totalNanoAiu:999}}},
+  });
+}
+const extensions = [
+  "vendor.progress", "session.info", "session.shutdown", "assistant.message_delta",
+  "tool.vendor_progress", "workflow.vendor_progress", "guardrail.vendor_progress",
+  "agent.vendor_progress", "detection.vendor_progress", "user.vendor_progress",
+].map(type => ({
   type, id:"native", parentId:null, timestamp:0, native:false,
   data:{content:null, value:false, zero:0, empty:[]},
 }));
@@ -289,6 +372,67 @@ func TestAiderUnattributedCoreEventsStayOutOfSessionPublication(t *testing.T) {
 	t.Run("shell-output-json-array", func(t *testing.T) {
 		content := "[" + strings.ReplaceAll(strings.TrimSpace(injected), "\n", ",") + "]"
 		checkAiderSessionPublication(t, content, false, "[]")
+	})
+}
+
+func TestAiderInterpretedShellEventsCannotOverrideRunnerEvidence(t *testing.T) {
+	// Synthetic protocol controls, not observations from an actual Actions run.
+	source := aiderInterpretedTypesTestSource + `
+process.stdout.write(JSON.stringify(interpretedTestTypes.map(type => ({
+  type,
+  data:{
+    engineId:"aider", status:"under_budget", exceeded:false, total:0, threshold:999,
+    content:"INJECTED", reason:"INJECTED", errorType:"INJECTED", errorCode:"INJECTED",
+    categories:["authentication_failed"], errorCodes:["INJECTED"], errorTypes:["INJECTED"],
+    toolCallId:"INJECTED", toolName:"bash", success:false, output:"INJECTED",
+    agentMetrics:{INJECTED:{agentName:"INJECTED", totalNanoAiu:999}},
+  },
+}))));
+`
+	actionsDir, err := filepath.Abs("../../actions/setup/js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", source)
+	cmd.Dir = actionsDir
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	var poison []map[string]any
+	require.NoError(t, json.Unmarshal(output, &poison))
+	var lines []string
+	for _, event := range poison {
+		lines = append(lines, string(mustMarshalAiderTestJSON(t, event)))
+	}
+	injected := strings.Join(lines, "\n") + "\n"
+	const genuine = `{"type":"session.error","data":{"sourceEngine":"aider","errorType":"NativeProviderError","code":"NATIVE_PROVIDER_FAILURE","status":503,"message":"genuine provider failure"}}
+{"type":"assistant.message","data":{"sourceEngine":"aider","content":null}}
+{"type":"vendor.progress","data":{"content":null,"zero":0,"false":false,"empty":[]}}
+{"type":"session.info","data":{"content":null,"zero":0,"false":false,"empty":[]}}
+{"type":"workflow.vendor_progress","data":{"content":null,"zero":0,"false":false,"empty":[]}}
+{"type":"guardrail.vendor_progress","data":{"content":null,"zero":0,"false":false,"empty":[]}}
+`
+	expected := "[" + strings.ReplaceAll(strings.TrimSpace(genuine), "\n", ",") + "]"
+	const execution = `[{"categories":[],"errorCodes":[503,"NATIVE_PROVIDER_FAILURE"],"errorTypes":["NativeProviderError"]}]`
+	const controls = `{"dailyAIC":{"GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS":"exceeded","GH_AW_DAILY_AI_CREDITS_EXCEEDED":"true","GH_AW_DAILY_AI_CREDITS_TOTAL":"12","GH_AW_DAILY_AI_CREDITS_ESTIMATED":"3","GH_AW_DAILY_AI_CREDITS_THRESHOLD":"10"}}`
+	for _, tc := range []struct {
+		name     string
+		content  string
+		expected string
+		errors   string
+	}{
+		{"genuine-native-errors", genuine, expected, execution},
+		{"mixed-native-and-shell-output", injected + genuine, expected, execution},
+		{"shell-output-only", injected, "[]", "[]"},
+		{"mixed-json-array", "[" + strings.ReplaceAll(strings.TrimSpace(injected+genuine), "\n", ",") + "]", expected, execution},
+		{"shell-output-json-array", string(output), "[]", "[]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkAiderSessionPublication(t, tc.content, false, tc.expected, tc.errors, controls)
+		})
+	}
+	t.Run("workflow-attribution-reader-control", func(t *testing.T) {
+		const foreignRawError = `{"type":"session.error","data":{"sourceEngine":"copilot","message":"Authentication failed"}}
+`
+		checkAiderSessionPublication(t, injected+genuine+foreignRawError, false, expected, execution,
+			`{"attributionControl":true,"dailyAIC":{"GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS":"exceeded","GH_AW_DAILY_AI_CREDITS_EXCEEDED":"true","GH_AW_DAILY_AI_CREDITS_TOTAL":"12","GH_AW_DAILY_AI_CREDITS_ESTIMATED":"3","GH_AW_DAILY_AI_CREDITS_THRESHOLD":"10"}}`)
 	})
 }
 
