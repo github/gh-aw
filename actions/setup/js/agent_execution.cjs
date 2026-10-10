@@ -48,7 +48,7 @@ function isAgentExecutionEvent(event) {
 function recordErrors(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return [];
   const data = record.data ?? record;
-  if (record.type === "error" && ["warning", "info"].includes(data.severity)) return [];
+  if (["error", "session.error"].includes(record.type) && ["warning", "info"].includes(data.severity)) return [];
   if (["session.error", "claude.assistant_error", "claude.api_retry", "error", "turn.failed"].includes(record.type)) return [data];
   if (record.type === "session.result") return [...(Array.isArray(data.errors) ? data.errors : []), ...(data.is_error === true || data.status === "failed" ? [data] : [])];
   if (record.type === "assistant" && record.is_api_error_message === true) return [record];

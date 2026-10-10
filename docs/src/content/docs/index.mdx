@@ -6,6 +6,7 @@ tableOfContents: false
 ---
 
 import LandingHero from '../../components/landing/LandingHero.astro';
+import HeroBackground from '../../components/landing/HeroBackground.astro';
 import HowItWorks from '../../components/landing/HowItWorks.astro';
 import WatchItRun from '../../components/landing/WatchItRun.astro';
 import Gallery from '../../components/landing/Gallery.astro';
@@ -17,6 +18,9 @@ import ClosingCta from '../../components/landing/ClosingCta.astro';
 
 <div data-slideshow-slides>
   <section class="aw-title-slide not-content" aria-label="Presentation title">
+    <div class="aw-title-slide-bg" aria-hidden="true">
+      <HeroBackground />
+    </div>
     <h1>GitHub Agentic Workflows</h1>
   </section>
   <LandingHero />

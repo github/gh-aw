@@ -21,6 +21,7 @@ engine:
   env:
     ENGINE_CONFORMANCE_SENTINEL: conformance-agy
 tools:
+  cli-proxy: false
   work-queue:
     worker: true
     require-assignment: true

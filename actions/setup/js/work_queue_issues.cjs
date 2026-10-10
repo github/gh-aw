@@ -447,7 +447,7 @@ function recordUncertainReceipt(result, batch, pending, reason) {
 async function main(options = {}) {
   const coreApi = options.core || core;
   const raw = Object.hasOwn(options, "issues") ? options.issues : process.env.GH_AW_WORK_QUEUE_ISSUES;
-  const config = issuesConfiguration(typeof raw === "string" ? parseStrictJSON(raw) : raw);
+  const config = issuesConfiguration(typeof raw === "string" && raw !== "" ? parseStrictJSON(raw) : raw === "" ? undefined : raw);
   if (!config) return { disabled: true };
   if (isStagedMode(options) || isStagedMode(options.config)) {
     coreApi.info("Work queue Issues: staged/trial mode; no live mutations");

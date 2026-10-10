@@ -284,7 +284,7 @@ type agyConformanceWorkflow struct {
 	Jobs        map[string]agyConformanceJob `yaml:"jobs"`
 }
 
-func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
+func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 	var caller agyConformanceWorkflow
 	parent, err := os.ReadFile("../../.github/workflows/credentials-check.yml")
 	require.NoError(t, err)
@@ -315,6 +315,11 @@ func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 			}
 			for name, config := range callee.Jobs {
 				allowedPermissions := binding.Permissions
+				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
+					allowedPermissions = map[string]string{
+						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
+					}
+				}
 				if entry.id == "engine-conformance-agy" {
 					switch name {
 					case "activation":
@@ -327,15 +332,13 @@ func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 						continue
 					}
 				}
-				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
-					allowedPermissions = map[string]string{
-						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
-					}
-				}
 				for permission, level := range config.Permissions {
 					expectedLevel, allowed := allowedPermissions[permission]
 					assert.True(t, allowed, "%s must not grant unscoped %s permission", name, permission)
 					assert.Equal(t, expectedLevel, level, "%s must use the scoped %s permission", name, permission)
+				}
+				if entry.id == "engine-conformance-agy" {
+					assert.Equal(t, allowedPermissions, config.Permissions, "%s must retain queue-worker permissions", name)
 				}
 			}
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
@@ -345,7 +348,7 @@ func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 			assert.Contains(t, string(lock), `GH_AW_SAFE_OUTPUTS_STAGED: "true"`)
 			assert.Contains(t, string(lock), `"threat_detection":{"mode":"disabled"}`)
 			assert.NotContains(t, callee.Jobs, "detection")
-			assertAgyConformanceProbes(t, callee, entry.id == "engine-conformance-agy")
+			assertAgyConformanceProbes(t, callee, false)
 		})
 	}
 }
@@ -356,11 +359,14 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 	assert.Equal(t, map[string]any{"workflow_dispatch": nil}, canonical["on"])
 	assert.Equal(t, []any{"shared/agy-conformance.md", "shared/engine-conformance-worker.md"}, canonical["imports"])
 	assert.Equal(t, map[string]any{
+		"cli-proxy":  false,
 		"work-queue": map[string]any{"worker": true, "require-assignment": true},
 	}, canonical["tools"])
 	canonical["imports"] = []any{"shared/agy-conformance.md"}
 	delete(canonical, "tools")
 	assert.EqualValues(t, 5, canonical["max-ai-credits"])
+	canonical["imports"] = []any{"shared/agy-conformance.md"}
+	delete(canonical, "tools")
 	delete(canonical, "name")
 	delete(canonical, "description")
 	delete(canonical, "on")
@@ -425,7 +431,7 @@ func TestAgySmokeLabelCommandIsCentrallyRouted(t *testing.T) {
 	assert.NotContains(t, string(lock), "remove_trigger_label")
 }
 
-func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, workQueueWorker bool) {
+func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, workQueueCLIServer bool) {
 	t.Helper()
 	steps, environment, commands := agyConformanceStepContent(compiled)
 	execution := steps["Execute experimental Agy CLI"]
@@ -455,8 +461,9 @@ func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, w
 	for _, expected := range []string{`"agy-native"`, `"native-challenge"`, "--exclude-env GEMINI_API_KEY"} {
 		assert.Contains(t, commands, expected, "compiled commands must retain %s", expected)
 	}
-	if workQueueWorker {
+	if workQueueCLIServer {
 		assert.Contains(t, commands, `export GH_AW_MCP_CLI_SERVERS='["agy-native","mcpscripts","safeoutputs","work-queue"]'`)
+		assert.Contains(t, environment, "Without a valid matching assignment, stop with an error; never run standalone.")
 	} else {
 		assert.NotContains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
 	}

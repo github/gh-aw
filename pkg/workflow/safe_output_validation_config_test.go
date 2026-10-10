@@ -643,6 +643,33 @@ func TestValidationConfigCoversToolInputSchemas(t *testing.T) {
 	}
 }
 
+func TestValidationConfigCoversInjectedToolProperties(t *testing.T) {
+	configs := map[string]*SafeOutputsConfig{
+		"omitted state-reason": {
+			CloseIssues: &CloseIssuesConfig{},
+		},
+		"list state-reason and allowed-events": {
+			CloseIssues: &CloseIssuesConfig{AllowedStateReason: []string{"completed", "duplicate"}},
+			SubmitPullRequestReview: &SubmitPullRequestReviewConfig{
+				AllowedEvents: []string{"APPROVE", "COMMENT"},
+			},
+		},
+	}
+
+	for name, safeOutputs := range configs {
+		t.Run(name, func(t *testing.T) {
+			injections := computePropertyInjections(safeOutputs)
+			for toolName, properties := range injections {
+				for propertyName := range properties {
+					if _, ok := ValidationConfig[toolName].Fields[propertyName]; !ok {
+						t.Errorf("%s injected property %q is missing from ValidationConfig", toolName, propertyName)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestCreateDiscussionBodyMinLength(t *testing.T) {
 	config, ok := ValidationConfig["create_discussion"]
 	if !ok {

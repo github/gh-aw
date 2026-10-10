@@ -49,6 +49,9 @@ func (c *Compiler) generateMembershipCheck(data *WorkflowData, steps []string) [
 	steps = append(steps, fmt.Sprintf("          GH_AW_REQUIRED_ROLES: %q\n", strings.Join(data.Roles, ",")))
 	if len(data.Bots) > 0 {
 		steps = append(steps, fmt.Sprintf("          GH_AW_ALLOWED_BOTS: %q\n", strings.Join(data.Bots, ",")))
+		if hasCopilotBotName(data.Bots) {
+			steps = append(steps, fmt.Sprintf("          GH_AW_COPILOT_BOT_NAMES: %q\n", strings.Join(constants.CopilotBotNames, ",")))
+		}
 	}
 	if data.AllowBotAuthoredTriggerComment {
 		steps = append(steps, "          GH_AW_ALLOW_BOT_AUTHORED_TRIGGER_COMMENT: \"true\"\n")

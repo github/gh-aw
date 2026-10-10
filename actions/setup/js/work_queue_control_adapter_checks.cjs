@@ -25,6 +25,11 @@ function resolverOptions(overrides = {}) {
 
 function registerTests({ describe, it }) {
   describe("compiler-bound independent dependency read clients", () => {
+    it("treats an empty credential setting as no bindings without accepting malformed JSON", () => {
+      assert.equal(credentialBindings("").size, 0);
+      assert.equal(credentialBindings(undefined).size, 0);
+      assert.throws(() => credentialBindings("{"));
+    });
     it("maps default-token, compiler-minted App and PAT identities independently from logical requester and START sender", async () => {
       for (const entry of [
         { descriptor: { kind: "github_token" }, principal: "41898282", login: "github-actions[bot]", type: "Bot" },
