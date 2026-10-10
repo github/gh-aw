@@ -316,20 +316,20 @@ func TestFormalZeroTouchRequiresNoReviews(t *testing.T) {
 		{
 			name: "human comment",
 			comments: []map[string]any{
-				{"user": map[string]any{"login": "octocat"}},
+				{"user": map[string]any{"login": "octocat"}, "created_at": "2026-01-02T00:00:00Z"},
 			},
 			wantZeroTouch: false,
 		},
 		{
 			name: "bot comment",
 			comments: []map[string]any{
-				{"user": map[string]any{"login": "github-actions[bot]"}},
+				{"user": map[string]any{"login": "github-actions[bot]"}, "created_at": "2026-01-02T00:00:00Z"},
 			},
 			wantZeroTouch: true,
 		},
 		{
 			name:          "review",
-			reviews:       []map[string]any{{"user": map[string]any{"login": "octocat"}}},
+			reviews:       []map[string]any{{"user": map[string]any{"login": "octocat"}, "submitted_at": "2026-01-02T00:00:00Z"}},
 			wantZeroTouch: false,
 		},
 	}
@@ -350,6 +350,8 @@ func TestFormalZeroTouchRequiresNoReviews(t *testing.T) {
 					return tc.comments, nil
 				case "pulls/1/reviews":
 					return tc.reviews, nil
+				case "pulls/1/commits":
+					return nil, nil
 				default:
 					t.Fatalf("unexpected endpoint %q", endpoint)
 					return nil, nil
@@ -357,7 +359,7 @@ func TestFormalZeroTouchRequiresNoReviews(t *testing.T) {
 			}
 
 			report := evalCreatePullRequest(context.Background(), CreatedItemReport{
-				Type: "create_pull_request", Number: 1, Repo: "owner/repo",
+				Type: "create_pull_request", Number: 1, Repo: "owner/repo", Timestamp: "2026-01-01T00:00:00Z",
 			}, "owner/repo")
 
 			assert.Equal(t, OutcomeStatusAccepted, report.OutcomeStatus, "P15: test PR must be accepted")
@@ -574,13 +576,13 @@ func TestFormalCloseStickyReopenRejection(t *testing.T) {
 			wantDetail: "closed by bot (lifecycle_close)",
 		},
 		{
-			name:  "human close → rejected",
+			name:  "human close retained → accepted",
 			state: "closed",
 			events: []map[string]any{
 				{"event": "closed", "actor": map[string]any{"login": "octocat"}},
 			},
-			wantResult: OutcomeStatusRejected,
-			wantDetail: "closed by non-bot",
+			wantResult: OutcomeStatusAccepted,
+			wantDetail: "closed",
 		},
 		{
 			name:       "reopened → rejected",

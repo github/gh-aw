@@ -3,50 +3,14 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/github/gh-aw/pkg/logger"
-	"github.com/github/gh-aw/pkg/workflow"
 )
 
 var outcomeEvalPRLog = logger.New("cli:outcome_eval_pr")
 var outcomeEvalPRGHAPIGet = ghAPIGet
 var outcomeEvalPRGHAPIGetArray = ghAPIGetArray
-
-// findPRByTimestamp searches for a PR created by github-actions[bot] around the given timestamp.
-// This is a fallback for when the manifest doesn't record the PR number.
-func findPRByTimestamp(repo string, timestamp string) int {
-	outcomeEvalPRLog.Printf("Searching for PR by timestamp: repo=%s, timestamp=%s", repo, timestamp)
-	ts, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		outcomeEvalPRLog.Printf("Failed to parse timestamp %q: %v", timestamp, err)
-		return 0
-	}
-	// Search in a 5-minute window around the timestamp
-	since := ts.Add(-2 * time.Minute).Format("2006-01-02T15:04:05Z")
-	until := ts.Add(5 * time.Minute).Format("2006-01-02T15:04:05Z")
-
-	// Use gh CLI to search for PRs
-	output, err := workflow.RunGH("Searching for PR...",
-		"pr", "list",
-		"--repo", repo,
-		"--state", "all",
-		"--author", "app/github-actions",
-		"--search", fmt.Sprintf("created:%s..%s", since, until),
-		"--limit", "1",
-		"--json", "number",
-		"--jq", ".[0].number")
-	if err != nil {
-		return 0
-	}
-	numStr := strings.TrimSpace(string(output))
-	var n int
-	if _, err := fmt.Sscanf(numStr, "%d", &n); err == nil {
-		return n
-	}
-	return 0
-}
 
 // evalCreatePullRequest checks whether a PR was merged, closed, or is still open.
 func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
@@ -60,16 +24,6 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 		Repo:         repo,
 	}
 
-	// If no PR number, try to find the PR by searching recent PRs from github-actions
-	if num == 0 && repo != "" {
-		found := findPRByTimestamp(repo, item.Timestamp)
-		if found > 0 {
-			outcomeEvalPRLog.Printf("Resolved missing PR number via timestamp search: num=%d", found)
-			num = found
-			report.ObjectNumber = num
-		}
-	}
-
 	if num == 0 || repo == "" {
 		report.OutcomeStatus = OutcomeStatusError
 		report.EvalError = "missing PR number or repo"
@@ -78,15 +32,14 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 
 	data, err := outcomeEvalPRGHAPIGet(ctx, fmt.Sprintf("pulls/%d", num), repo)
 	if err != nil {
-		report.OutcomeStatus = OutcomeStatusError
-		report.EvalError = err.Error()
+		outcomeAPIError(&report, err, true)
 		return report
 	}
 
-	merged, _ := data["merged"].(bool)
-	state, _ := data["state"].(string)
-	mergedAt, _ := data["merged_at"].(string)
-	closedAt, _ := data["closed_at"].(string)
+	merged := outcomeValue[bool](data["merged"])
+	state := outcomeValue[string](data["state"])
+	mergedAt := outcomeValue[string](data["merged_at"])
+	closedAt := outcomeValue[string](data["closed_at"])
 
 	switch {
 	case merged:
@@ -101,25 +54,78 @@ func evalCreatePullRequest(ctx context.Context, item CreatedItemReport, repoOver
 		if closedAt != "" && item.Timestamp != "" {
 			report.TimeToOutcomeHours = timeBetween(item.Timestamp, closedAt)
 		}
-	default:
+	case state == "open":
 		report.OutcomeStatus = OutcomeStatusPending
 		report.Detail = "open"
+	default:
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "unknown")
+		return report
 	}
 
+	enrichPullRequestEffort(ctx, item, &report)
+
+	return report
+}
+
+func outcomeActivityKnown(activity []map[string]any, timestampKey string, skipPending bool) bool {
+	for _, entry := range activity {
+		if skipPending && outcomeString(entry["state"]) == "PENDING" {
+			continue
+		}
+		_, err := time.Parse(time.RFC3339, outcomeString(entry[timestampKey]))
+		if outcomeNestedString(entry["user"], "login") == "" || err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func enrichPullRequestEffort(ctx context.Context, item CreatedItemReport, report *OutcomeReport) {
+	num, repo := report.ObjectNumber, report.Repo
 	comments, err := outcomeEvalPRGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", num), repo)
 	if err == nil {
-		report.HumanComments = countHumanComments(comments)
+		report.HumanComments = nonBotCommentsAfter(comments, item.Timestamp)
+	} else {
+		outcomeEvalPRLog.Printf("Comment evidence unavailable: %v", err)
 	}
+	commentsKnown := err == nil && outcomeActivityKnown(comments, "created_at", false)
 
 	// Count reviews (used for ZeroTouch, stored separately from edits to avoid conflation)
 	reviews, err := outcomeEvalPRGHAPIGetArray(ctx, fmt.Sprintf("pulls/%d/reviews", num), repo)
 	if err == nil {
-		report.HumanReviews = len(reviews)
+		for _, review := range reviews {
+			if outcomeString(review["state"]) != "PENDING" && isNonBotActor(review["user"]) && outcomeAfter(outcomeString(review["submitted_at"]), item.Timestamp) {
+				report.HumanReviews++
+			}
+		}
+	}
+	if err != nil {
+		outcomeEvalPRLog.Printf("Review evidence unavailable: %v", err)
+	}
+	reviewsKnown := err == nil && outcomeActivityKnown(reviews, "submitted_at", true)
+	commits, err := outcomeEvalPRGHAPIGetArray(ctx, fmt.Sprintf("pulls/%d/commits", num), repo)
+	commitsKnown := err == nil
+	if err != nil {
+		outcomeEvalPRLog.Printf("Commit evidence unavailable: %v", err)
+	}
+	if commitsKnown {
+		for _, commit := range commits {
+			commitData := outcomeValue[map[string]any](commit["commit"])
+			_, committerErr := time.Parse(time.RFC3339, outcomeNestedString(commitData["committer"], "date"))
+			_, authorErr := time.Parse(time.RFC3339, outcomeNestedString(commitData["author"], "date"))
+			if outcomeNestedString(commit["author"], "login") == "" || committerErr != nil && authorErr != nil {
+				commitsKnown = false
+			}
+			if isNonBotActor(commit["author"]) &&
+				(outcomeAfter(outcomeNestedString(commitData["committer"], "date"), item.Timestamp) || outcomeAfter(outcomeNestedString(commitData["author"], "date"), item.Timestamp)) {
+				report.HumanEdits++
+			}
+		}
 	}
 
 	if report.OutcomeStatus == OutcomeStatusAccepted {
-		report.ZeroTouch = report.HumanComments == 0 && report.HumanReviews == 0
+		_, timestampErr := time.Parse(time.RFC3339, item.Timestamp)
+		report.ZeroTouch = timestampErr == nil && commentsKnown && reviewsKnown && commitsKnown && report.HumanComments == 0 && report.HumanReviews == 0 && report.HumanEdits == 0
 	}
 
-	return report
 }
