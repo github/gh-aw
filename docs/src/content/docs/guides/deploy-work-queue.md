@@ -13,8 +13,8 @@ scheduling, Claim authority, or verified dependency graphs. Native version-3
 Before you begin, prepare a trusted producer identity, an approved worker, and
 a compiler-approved Policy proposal (the queue's scheduling and authorization
 rules). The first accepted producer submission installs that proposal with its
-Work when the branch is absent, without administrator seeding or branch
-protection. Agentic Workflows authenticates participants at its trusted runtime
+Work when the branch is absent, without administrator seeding.
+Agentic Workflows authenticates participants at its trusted runtime
 boundary; workflow frontmatter alone does not install Policy.
 
 ## Publish the worker and dispatcher
@@ -128,20 +128,18 @@ producers permission to use each additional key.
 
 ## Automatic first-use bootstrap
 
-Do not create the queue branch, seed Policy, enroll participants separately, or
-configure branch protections before using the queue. Agentic Workflows supplies
+Do not create the queue branch, seed Policy or enroll participants separately
+before using the queue. Agentic Workflows supplies
 the authenticated participant context to its trusted publisher. The first
 accepted producer submission creates `work-queue` with Policy and Work together.
 Normal repository contents-write permission is sufficient for queue publication;
 repository-administration permission is not required.
 
-Branch/ruleset protection is optional operator hardening, not a bootstrap or
-dispatch prerequisite. Queue use does not inspect, provision, modify or remove
-protection rules. Existing rules can still deny Git writes; report that denial
-rather than bypassing them.
+GitHub enforces repository access rules independently of the queue protocol.
+Report an actual Git write denial rather than bypassing it.
 
 > [!WARNING]
-> Without branch protection, other repository writers can alter or delete the
+> Direct Git writes by other repository writers can alter or delete the
 > ledger. The runtime validates existing history and rejects malformed or
 > mismatched ledgers, but cannot prevent direct Git writes or reconstruct a
 > deleted queue. A missing branch is treated as a fresh queue; deleting it can

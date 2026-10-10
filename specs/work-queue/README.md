@@ -10,7 +10,7 @@ The current design is the
 QueueCommit log, exact native Go/JavaScript scheduling conformance, immutable
 Claim arrays, verified Work Results and typed Issue/PR observations.
 Its [implementation coverage table](../../docs/src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements)
-tracks unfinished runtime/verification work and optional host writer hardening.
+tracks unfinished runtime/verification work.
 Do not infer protection against direct Git writes from functional tests.
 
 The original `WorkQueue.tla` is retained as historical model evidence for
@@ -51,11 +51,11 @@ invocation can resubmit the same immutable request. The model's `deferred` phase
 records this failed attempt, not automatic polling or a runtime retry loop.
 Repeating an already-published request recovers its receipt without another commit.
 
-Bootstrap has no branch-protection or administrator-enrollment prerequisite;
+Bootstrap has no administrator-enrollment prerequisite;
 Agentic Workflows supplies the trusted participant context. The model assumes
 checked append-only publishers. Direct replacement or deletion by other
-repository writers is outside its guarantees unless optional host controls
-prevent those writes.
+repository writers is outside its guarantees. GitHub enforces repository access
+rules independently.
 
 Run the focused checks using the official jar documented below:
 

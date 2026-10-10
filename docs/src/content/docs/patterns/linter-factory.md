@@ -31,8 +31,8 @@ ledgers.
 | [Monster](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-monster.md) | Group actionable diagnostics and arrange remediation | Issue updates, Copilot assignments, and a discussion; cancel write-capable Work after a clean scan |
 
 Configure producer entitlements, worker profiles, immutable workflow revisions,
-and resource scopes before enabling the factory. Queue-branch protections are
-optional hardening, not a prerequisite. The compiler embeds the validated Policy proposal. The first trusted
+and resource scopes before enabling the factory. The compiler embeds the validated
+Policy proposal. The first trusted
 producer submit installs that Policy with its Work and creates the queue branch;
 no administrator needs to seed the queue. An authorized producer explicitly
 admits Work with its output contract. The
@@ -59,7 +59,7 @@ Activation reports a missing queue branch as `queue_state: "uninitialized"`
 without writing to it. The dispatcher can continue as a producer: its first
 `work_queue_submit` safe output atomically creates the branch with the compiled
 Policy and admitted Work. A dispatch-only request cannot bootstrap the queue.
-No administrator seed, separate participant enrollment or branch protection is
+No administrator seed or separate participant enrollment is
 required. Do not substitute an ordinary workflow dispatch for a queue assignment.
 
 For optional administrator-managed seeding, the checked-in policy generator
@@ -74,7 +74,7 @@ node actions/setup/js/eslint_factory_portfolio.cjs policy \
   --file eslint-factory-policy.json --epoch eslint-factory-v1
 ```
 
-Generation does not authenticate principals, protect the queue branch, or launch
+Generation does not authenticate principals or launch
 workers. The generated policy must be represented by the dispatcher's
 compiler-validated work-queue configuration for safe-output bootstrap. Use
 verified positive decimal principal IDs from trusted producer and dispatch
@@ -569,7 +569,7 @@ warnings without changing committed ownership, charging, or launch fencing.
 | Reuse one handle or aggregate all output allowances across a batch | Use each member's original handle and enforce per-Claim counts; original membership never shrinks |
 | Treat monster's clean flag as proof of zero diagnostics | ESLint exit zero includes warning-only results. Installation/build/tool failure is not a clean scan |
 | Treat prompt quality requirements as ledger guarantees | Rule quality, nonduplicate findings, and the monster's three-total-remediation-assignments instruction are prompt obligations, not a global runtime quota or proof of successful remediation |
-| Assume bootstrap protects the queue from direct Git writes | Branch protections are optional and not provisioned by the factory; Agentic Workflows authenticates participants and keeps queue-write credentials out of agents, but other repository writers can alter an unprotected ledger |
+| Treat bootstrap as exclusive ownership of the repository | Agentic Workflows authenticates participants and keeps queue-write credentials out of agents; GitHub enforces repository access rules independently |
 
 See the [queue specification](/gh-aw/specs/work-queue-specification/#91-implementation-coverage-and-remaining-requirements)
 for coverage and remaining deployment/host requirements, and the

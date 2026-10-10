@@ -171,9 +171,8 @@ same approved worker principal; runtime authentication verifies it before any
 launch. There is no fallback to the unrelated `GITHUB_TOKEN` bot identity.
 Worker routes are pinned to the published revision above, not the current
 default branch. The first accepted submission automatically creates the queue
-with compiled Policy and Work; no administrator seed or branch protection is
-required. Agentic Workflows authenticates participants at the trusted boundary.
-Do not inspect, provision or remove queue-branch protections.
+with compiled Policy and Work; no administrator seed is required.
+Agentic Workflows authenticates participants at the trusted boundary.
 Changing identities or worker revisions after bootstrap requires a quiescent
 queue and an administrator Policy update; editing this proposal alone cannot
 replace installed Policy.

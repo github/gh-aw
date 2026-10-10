@@ -42,12 +42,11 @@ ignored.
 
 Configure producer entitlements; Agentic Workflows authenticates participants
 at its trusted publication boundary. First submit automatically installs compiled
-Policy and Work without administrator seeding, separate participant enrollment,
-branch protection or ruleset checks. Later Policy changes are admin-only. Admin
+Policy and Work without administrator seeding or separate participant enrollment.
+Later Policy changes are admin-only. Admin
 status grants no producer entitlement. Never expose queue-write credentials to
-agents/snapshot MCP. Branch protections are optional operator hardening, not a
-bootstrap or dispatch gate. Do not provision, inspect or remove them as part of
-queue use. See [deployment](../../docs/src/content/docs/guides/deploy-work-queue.md).
+agents/snapshot MCP. Repository access rules are GitHub's responsibility, not
+queue configuration. See [deployment](../../docs/src/content/docs/guides/deploy-work-queue.md).
 
 ## Mirror admitted Work with Issues
 

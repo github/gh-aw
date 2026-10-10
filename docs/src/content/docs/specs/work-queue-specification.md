@@ -509,11 +509,11 @@ malformed logs, and unsupported histories MUST fail closed rather than being
 overwritten. Later Policy epochs remain administrator-only and require a drained
 queue.
 
-Automatic first-use bootstrap MUST NOT require branch/ruleset protection,
-repository-administration access, administrator seeding or separate participant
+Automatic first-use bootstrap MUST NOT require repository-administration access,
+administrator seeding or separate participant
 enrollment. The trusted Agentic Workflows runtime supplies authenticated
-participant context. Optional branch protections MUST NOT become a metadata
-preflight gate; an actual Git write denial remains an error.
+participant context. GitHub enforces repository access rules independently;
+an actual Git write denial remains an error.
 
 Ref conflicts MUST NOT establish absence unless an independent native observation
 confirms the requested repository identity and `isEmpty = true`. In a branchless
@@ -952,12 +952,10 @@ Queue use MUST NOT require separate enrollment or repository-administration
 permission. Publishers MUST use checked append-only publication with
 `force: false`; an authorized operator uses the same checked publisher.
 
-Queue-branch writer restrictions and force-update/deletion protections are
-optional operator hardening, not protocol prerequisites. Bootstrap and dispatch
-MUST NOT inspect, provision, modify or remove branch protection or rulesets.
-Existing host rules still apply to Git writes; a denial MUST be surfaced, never
-bypassed. No scheduling or replay guarantee covers raw writes by other
-repository writers to an unprotected branch.
+GitHub owns repository access rules, independently of the queue protocol.
+Bootstrap and dispatch MUST NOT require repository-rule inventories or manage
+those rules. A Git write denial MUST be surfaced, never bypassed. No scheduling
+or replay guarantee covers raw writes by other repository writers.
 
 `actor` is provenance asserted by that trusted boundary, not authentication.
 Derive it from authenticated workflow/job/operator context and validate the
@@ -975,12 +973,11 @@ A malformed append must stop replay with `ledger_invalid`, preserve the
 offending tip, and alert the operator; never skip it or reset the queue.
 Administrator compromise, deliberate writes by a compromised trusted publisher,
 and direct Git writes by other repository writers are outside the scheduler's
-guarantee. Optional branch restrictions reduce that risk. Schema validation
+guarantee. Schema validation
 detects malformed existing history but cannot prevent its publication, detect
 every valid replacement history, or recover a deleted branch. A missing branch
 is fresh genesis; bootstrap can then lose earlier deduplication, reservations and
-delivery evidence. Do not claim protection against these effects without
-independently enforced host controls.
+delivery evidence.
 
 ### 7.8 Dispatch, capacity, and crash recovery
 
@@ -1178,8 +1175,7 @@ Pausing never releases a slot, revokes an existing Completion, or bypasses
 scheduling on resume. It permits cancellation, terminal evidence, Result/
 DeliveryFailure, and Release processing so the queue can drain. Resume requires
 valid current history, current protocol, and restored equivalent credentials;
-it does not silently reset uncertain groups. Optional branch protections are
-not a resume prerequisite.
+it does not silently reset uncertain groups.
 Check `grants_paused` in the CAS-validated prefix both when granting and when
 recording a new start marker. A marker already committed before pause may still
 lead to its one launch; pausing is not preemption or an atomic remote-POST fence.
@@ -2688,7 +2684,7 @@ and explicitly deferred deployment requirements.
 | `work_queue_mcp_server.cjs` and snapshots | Bounded read/explain plus staged submit/dispatch-next intents; explicit snapshot/staged provenance |
 | Queue policy initialization and submission defaults | Mandatory policy with one default class/key, no implicit producer grouping, and oldest-available default grants |
 | Worker finish/reconciliation and compiler integration | Automatic one-Claim / enforced explicit multi-Claim attribution on every safe-output type, bounded trust-compatible arrays, mixed outcomes, independent gates/Result or DeliveryFailure, actual run/attempt binding |
-| Operational control and writer deployment | Authenticated runtime roles, optional branch hardening, pause/resume, equivalent-scope credential cutover, retained-history/recovery budgets |
+| Operational control and writer deployment | Authenticated runtime roles, pause/resume, equivalent-scope credential cutover, retained-history/recovery budgets |
 | `pkg/workqueue/` and `pkg/cli/work_command.go` | Shared envelope/selection fixtures, current-only records, explain/trace views, no direct-claim bypass; preserve configured authority boundaries |
 | `pkg/cli/logs_work_queue*.go` and summaries | Bounded request/Claim receipts, stable statuses, current-protocol validation, escaped diagnostics |
 | `otlp.cjs`, `aw_context.cjs`, and trusted worker binder | Reuse phase spans/context; correlate request/commit/Claim/run without promising unsupported span-parent behavior |
@@ -2746,13 +2742,12 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Full JS typecheck/existing dependency-based tests | The earlier `create_project.cjs` SDK layout error is fixed in merge checkpoint `2dcce92c1c`, using validated literals and endpoint-derived request typing without unsafe casts. Genuine TypeScript 7.0.2 typecheck passes; 36 project tests include 12 layout/endpoint/invalid-input regressions. That merge's final component checks passed 2,122 setup-JavaScript tests in 52 files after correcting a stale workflow lock. The later `303b402810` merge ran 2,323 tests in 56 files: 2,322 passed and one real multi-repository fixture exceeded its 10-second deadline. A fixture-local 30-second deadline preserves all assertions and production retry behavior; all 109 repo-memory tests then passed. Impacted Go tests, build, typecheck, standard lint, schema freshness and JavaScript/shell lint passed. After committing the merge, change-scoped custom lint and full 328-workflow drift also passed; the initial custom-lint failures were confined to nine files byte-identical to main that the pre-merge base calculation included. Failed aggregate invocations remain failed records, not retrospectively green; global custom lint is not claimed clean. The approved feed does not supply pinned `@types/node` 26.6.4; existing 26.6.3 remains without changing pins. No dedicated hosted Actions run is claimed |
 | TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 45 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
 | Protected launch credentials, immutable effect targets and native delivery verification | Implemented with exact selected-client/profile proofs, immutable Work/profile/ancestor target intersection and private native readback. Both public and compiler control entry points reject missing/invalid protected launch metadata before client construction or queue publication, while previews and submit-only controls remain credential-independent. Local positive and refusal regressions pass; writer deployment automation is separate |
-| First-submit Policy bootstrap and live native-dispatch host compatibility | Safe-output first submit atomically creates the absent queue branch with its compiler-approved Policy and Work, without administrator seeding or protection checks; local authenticated tests cover unprotected genesis replay and ref creation. Hosted Git publication, immutable-SHA dispatch, and the pinned run-details response remain unverified live compatibility gates |
-| Queue-branch writer restrictions | Optional operator hardening, not a bootstrap or dispatch gate. Queue use does not inspect, provision, modify or remove protection rules |
+| First-submit Policy bootstrap and live native-dispatch host compatibility | Safe-output first submit atomically creates the absent queue branch with its compiler-approved Policy and Work, without administrator seeding or repository-rule inventories; local authenticated tests cover genesis replay and ref creation. Hosted Git publication, immutable-SHA dispatch, and the pinned run-details response remain unverified live compatibility gates |
 
 Authenticated ingestion, actual run/attempt binding, Claim/resource checks and
-credentials withheld from agent execution remain required. Optional host
-protections are not part of first-use readiness; without them, the protocol does
-not guarantee protection against direct Git replacement or deletion. Functional
+credentials withheld from agent execution remain required. GitHub owns repository
+access rules independently of the protocol. The protocol does not guarantee
+protection against direct Git replacement or deletion. Functional
 bootstrap evidence is not evidence that other repository writers cannot alter
 the queue.
 
@@ -2766,7 +2761,6 @@ flowchart LR
     Functional --> Release["Release requirements"]
     Hosts["Supported-host binding evidence"] --> Release
     Formal["Explicit formal verdicts"] --> Release
-    Deployment["Optional host writer hardening"] -.-> Hosts
 ```
 
 ## 10. Research limits and unresolved engineering questions

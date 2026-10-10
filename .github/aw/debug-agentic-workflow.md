@@ -74,10 +74,9 @@ reviewed dry-run lock when testing startup without compiler-managed mutations.
 Dry-run suppresses queue writes and worker launches, so it cannot verify live
 dispatch.
 
-Queue-branch protection is optional under the [work-queue protocol](work-queue.md),
-not a live-testing prerequisite. Agentic Workflows authenticates participants;
+Under the [work-queue protocol](work-queue.md), Agentic Workflows authenticates participants;
 the first accepted producer submit bootstraps Policy and Work automatically.
-Do not demand administrator enrollment or protection metadata for queue use.
+Do not demand administrator enrollment or repository-rule inventories for queue use.
 
 If another gate blocks execution, state the specific blocker and the smallest
 authorized resolution. Branch/PR preparation is still useful progress, but

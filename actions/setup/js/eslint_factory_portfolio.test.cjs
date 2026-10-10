@@ -110,9 +110,9 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(source.indexOf("Call `work_queue_submit` once")).toBeLessThan(source.indexOf("request the trusted scheduler"));
     expect(source).toContain("will atomically bootstrap the branch with its compiler-approved Policy and Work.");
     expect(source).toContain("Safe-output processing uses only the compiler-approved Policy proposal; never");
-    expect(source).toContain("no administrator seed or branch protection is");
+    expect(source).toContain("no administrator seed is required.");
     expect(source).toContain("Agentic Workflows authenticates participants at the trusted boundary.");
-    expect(source).not.toContain("Protect the queue branch before");
+    expect(source).not.toMatch(/branch protection|queue-branch protections/i);
   });
 
   it("embeds the complete factory bootstrap Policy in activation and trusted control processing", () => {
