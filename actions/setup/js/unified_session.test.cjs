@@ -658,7 +658,8 @@ describe("Unified conclusion session", () => {
     expect(answers.map(event => event.data.content)).toEqual([summary]);
     expect(answers[0].id).toBe("complete");
     expect(answers[0].provenance.path).toBe("agent-session.jsonl");
-    expect(events.find(event => event.type === "session.task_complete").data.sourceDetail).toBe("observed metadata");
+    expect(events.find(event => event.type === "session.task_complete").data).not.toHaveProperty("sourceDetail");
+    expect(events.find(event => event.type === "session.task_complete").data).not.toHaveProperty("summary");
     const markdown = require("./session_cli.cjs").sessionCLI(["markdown", write("usage/aw_session.jsonl", events)]);
     expect(markdown).toContain("Observed historical final answer");
     expect(markdown).toContain("Second paragraph.");

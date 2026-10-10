@@ -836,10 +836,11 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       case "tool.execution_start": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
         const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
-        const callKey = JSON.stringify([sessionScopeKey(entry), toolCallId]);
+        const correlation = toolCallId !== null ? ["id", toolCallId] : Number.isSafeInteger(data.stepIndex) && data.stepIndex >= 0 ? ["step", data.stepIndex] : null;
+        const callKey = JSON.stringify([sessionScopeKey(entry), correlation]);
         const nameKey = JSON.stringify([sessionScopeKey(entry), toolName]);
         const resolvedToolId = toolCallId === null ? displayToolId() : scopedDisplayId(callKey, toolCallId);
-        if (toolCallId !== null) {
+        if (correlation !== null) {
           pendingByToolCallId.set(callKey, { id: resolvedToolId, name: nameKey });
         }
         addPendingId(nameKey, resolvedToolId);
@@ -855,12 +856,13 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       case "tool.execution_complete": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
         const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
-        const callKey = JSON.stringify([sessionScopeKey(entry), toolCallId]);
+        const correlation = toolCallId !== null ? ["id", toolCallId] : Number.isSafeInteger(data.stepIndex) && data.stepIndex >= 0 ? ["step", data.stepIndex] : null;
+        const callKey = JSON.stringify([sessionScopeKey(entry), correlation]);
         const nameKey = JSON.stringify([sessionScopeKey(entry), toolName]);
         /** @type {any} */
         let resolvedToolId = null;
 
-        if (toolCallId !== null && pendingByToolCallId.has(callKey)) {
+        if (correlation !== null && pendingByToolCallId.has(callKey)) {
           const pending = pendingByToolCallId.get(callKey);
           resolvedToolId = pending.id;
           pendingByToolCallId.delete(callKey);
@@ -868,7 +870,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
             removePendingId(pending.name, resolvedToolId);
           }
         }
-        if (resolvedToolId === null && toolCallId === null && (pendingIdsByToolName.get(nameKey)?.length ?? 0) === 1) {
+        if (resolvedToolId === null && correlation === null && (pendingIdsByToolName.get(nameKey)?.length ?? 0) === 1) {
           resolvedToolId = shiftPendingId(nameKey);
         }
         if (resolvedToolId === null) {
