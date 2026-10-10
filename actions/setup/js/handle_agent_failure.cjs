@@ -32,7 +32,6 @@ const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
-const { spawnSync } = require("child_process");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -40,7 +39,6 @@ const path = require("path");
 
 const DEFAULT_ACTION_FAILURE_ISSUE_EXPIRES_HOURS = 24 * 7;
 const ALLOWED_AGENT_CONCLUSIONS = new Set(["success", "failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale"]);
-const MAX_JOB_LOG_ARCHIVE_SIZE = 64 * 1024 * 1024;
 /** Claude Code error emitted when a `--continue` resume finds no deferred tool marker. */
 const NO_DEFERRED_MARKER_LINE_RE = /No deferred tool marker found/i;
 /** Claude harness line reporting that the no-deferred-marker error was recovered by a fresh retry. */
@@ -1734,9 +1732,10 @@ function isTaskCompleteRegistrationIssue(item) {
  * This surfaces the agent's structured incompletion signal so maintainers can
  * distinguish an incomplete task from a confirmed task outcome.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
+ * @param {{includeAgentText?: boolean}} [options]
  * @returns {string} Formatted report_incomplete context
  */
-function buildReportIncompleteContext(items) {
+function buildReportIncompleteContext(items, { includeAgentText = true } = {}) {
   const messages = loadReportIncompleteMessages(items);
 
   if (messages.length === 0) {
@@ -1745,8 +1744,15 @@ function buildReportIncompleteContext(items) {
 
   core.info(`Found ${messages.length} report_incomplete signal(s)`);
 
-  let context = buildWarningAlertLine("Task Could Not Be Completed", "The workflow recorded a `report_incomplete` signal: the task was not completed or completion could not be confirmed. See the reported reason and diagnostics below.");
-  context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
+  let context = buildWarningAlertLine(
+    "Task Could Not Be Completed",
+    "The workflow recorded a `report_incomplete` signal: the task was not completed or completion could not be confirmed." + (includeAgentText ? " See the reported reason and diagnostics below." : "")
+  );
+  if (includeAgentText) {
+    context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
+  } else {
+    context += "\nAgent-provided reasons and details are omitted from generic failure diagnostics.\n\n";
+  }
   context +=
     "\nThis is a structured incompletion signal (`report_incomplete`), not confirmation of a completed task. Do not treat accompanying safe outputs (e.g., comments) as evidence that the requested review or action was completed.\n\n";
 
@@ -1754,58 +1760,8 @@ function buildReportIncompleteContext(items) {
 }
 
 /**
- * Decode an Actions job log response, including the ZIP archive returned by the REST API.
- * @param {unknown} data
- * @returns {string|null}
- */
-function decodeJobLogResponse(data) {
-  if (typeof data === "string") {
-    return data;
-  }
-  if (!(data instanceof ArrayBuffer) && !(data instanceof Uint8Array)) {
-    return null;
-  }
-
-  const bytes = data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)) : Buffer.from(data);
-  const signature = bytes.subarray(0, 4);
-  const isZip = signature.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) || signature.equals(Buffer.from([0x50, 0x4b, 0x05, 0x06])) || signature.equals(Buffer.from([0x50, 0x4b, 0x07, 0x08]));
-  if (!isZip) {
-    return bytes.toString("utf8");
-  }
-  if (bytes.length > MAX_JOB_LOG_ARCHIVE_SIZE) {
-    throw new Error("Actions job log archive exceeds the size limit");
-  }
-
-  let tempDir;
-  try {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-job-logs-"));
-  } catch (error) {
-    throw new Error("Unable to extract Actions job log archive", { cause: error });
-  }
-  const archivePath = path.join(tempDir, "logs.zip");
-  try {
-    try {
-      fs.writeFileSync(archivePath, bytes, { mode: 0o600 });
-    } catch (error) {
-      throw new Error("Unable to extract Actions job log archive", { cause: error });
-    }
-    const result = spawnSync("unzip", ["-p", archivePath], { maxBuffer: MAX_JOB_LOG_ARCHIVE_SIZE, timeout: 30_000 });
-    if (result.error || result.status !== 0) {
-      throw new Error("Unable to extract Actions job log archive");
-    }
-    return result.stdout.toString("utf8");
-  } finally {
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      core.debug("Unable to clean up the temporary Actions job log directory");
-    }
-  }
-}
-
-/**
- * Find the failed agent step and collect bounded diagnostics for generic failure reports.
- * @returns {Promise<{failingStep: string, agentConclusion?: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string}>}
+ * Find the failed agent step using Actions metadata only, never agent-generated log text.
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string}>}
  */
 async function getFailedAgentDiagnostics() {
   let jobs;
@@ -1851,56 +1807,15 @@ async function getFailedAgentDiagnostics() {
   if (!failingStep) {
     return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no valid failed step name." };
   }
-  const start = Date.parse(failedStep.started_at);
-  const end = Date.parse(failedStep.completed_at);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || !agentJob.id) {
-    return { failingStep, agentConclusion, logUnavailable: "The failed step's timestamps or job ID were unavailable." };
-  }
-  const nextStep = agentJob.steps.slice(agentJob.steps.indexOf(failedStep) + 1).find(step => step.started_at);
-  const nextStart = Date.parse(nextStep?.started_at);
-  const logEnd = Number.isFinite(nextStart) ? Math.min(end + 1000, nextStart) : end + 1000;
-  try {
-    const response = await github.request("GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs", {
-      ...context.repo,
-      job_id: agentJob.id,
-    });
-    const log = decodeJobLogResponse(response.data);
-    if (log === null) {
-      return { failingStep, agentConclusion, logUnavailable: "The Actions logs API returned an unsupported log format." };
-    }
-    const lines = log.split(/\r?\n/).filter(line => {
-      const timestamp = Date.parse(line.split(" ", 1)[0]);
-      // Actions step metadata has second precision, while log timestamps include fractions.
-      return Number.isFinite(timestamp) && Number.isFinite(start) && timestamp >= start && timestamp < logEnd && !isAddMaskCommandLine(line);
-    });
-    if (lines.length === 0) {
-      return { failingStep, agentConclusion, logUnavailable: "The job log contained no lines for the failed step's time range." };
-    }
-    const maskedValues = collectAddMaskedValues(log);
-    const normalized = redactAndBoundDiagnostics(lines.join("\n"), { maskedValues, maxLength: log.length });
-    const logExcerpt = redactAndBoundDiagnostics(normalized.split("\n").slice(-50).join("\n").slice(-8000), { maskedValues });
-    return { failingStep, agentConclusion, logExcerpt };
-  } catch (error) {
-    const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-    const reason =
-      status === 403
-        ? "The Actions logs API denied access; ensure the conclusion job grants actions: read."
-        : status === 404 || status === 410
-          ? "The Actions job log was unavailable or expired."
-          : error instanceof Error && error.message === "Unable to extract Actions job log archive"
-            ? "The Actions job log archive could not be extracted."
-            : "The Actions job log request failed.";
-    core.warning(reason);
-    return { failingStep, agentConclusion, logUnavailable: reason };
-  }
+  return { failingStep, agentConclusion };
 }
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string, engineFailureContext: string, items?: Array<any>}} options
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, engineFailureContext: string, items?: Array<any>}} options
  * @returns {string}
  */
-function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", logExcerpt = "", attributionUnavailable = "", logUnavailable = "", engineFailureContext, items = [] }) {
+function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", attributionUnavailable = "", engineFailureContext, items = [] }) {
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
   const isGenericFailure = failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || infrastructureMessages.length > 0;
   if (!isGenericFailure) {
@@ -1921,15 +1836,8 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
     const conclusion = ALLOWED_AGENT_CONCLUSIONS.has(rawConclusion) ? rawConclusion : "unknown";
     context += `**Job fallback:** \`agent\` reported ${renderSafeInlineCodeSpan(conclusion)} via workflow dependency results; the failing step could not be attributed.\n\n`;
   }
-  if (logExcerpt) {
-    context += `**Failing step log excerpt (tail):**${renderErrorDetails(logExcerpt)}`;
-  } else if (logUnavailable) {
-    context += `**Log excerpt unavailable:** ${logUnavailable}\n\n`;
-  }
-
-  const hasInfrastructureDetails = infrastructureMessages.some(item => typeof item.details === "string" && item.details.trim());
-  if (!engineFailureContext.trim() && !hasInfrastructureDetails) {
-    context += "No cause was captured from the agent report or engine logs.\n\n";
+  if (!engineFailureContext.trim()) {
+    context += "No root cause was captured from structured runtime metadata.\n\n";
   }
 
   return context;
@@ -3224,6 +3132,8 @@ function detectEngineRateLimit429Failure() {
  * First tries to match known error patterns (ERROR:, Error:, Fatal:, panic:, Reconnecting...).
  * Never copies arbitrary log tails into reports, since they can contain secrets.
  * The log file is available in the conclusion job after the agent artifact is downloaded.
+ * @param {{suppressEngineRateLimit429?: boolean, maxCacheMissesExceeded?: boolean, shellExpansionGuardRejected?: boolean, metadataOnly?: boolean}} [options]
+ * When metadataOnly is set, only the validated driver exit code is used, without reading engine logs.
  * @returns {string} Formatted context string, or empty string if no engine failure found
  */
 function buildEngineFailureContext(options = {}) {
@@ -3243,6 +3153,9 @@ function buildEngineFailureContext(options = {}) {
   try {
     const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
     const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : "";
+    if (options.metadataOnly === true) {
+      return exitDetails ? buildWarningAlertLine("Engine Failure", "The engine terminated with a nonzero driver exit code.") + "\n" + exitDetails : "";
+    }
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
         core.info("agent-stdio.log not found, but shell expansion guard rejection was detected — using dedicated context message");
@@ -4672,7 +4585,7 @@ async function main() {
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
         const permissionDeniedContext = hasToolDenialsExceeded ? "" : buildPermissionDeniedContext(agentOutputResult.items, workflowID);
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items);
+        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items, { includeAgentText: !needsFailureDiagnostics });
 
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
@@ -4702,6 +4615,7 @@ async function main() {
           ? buildEngineFailureContext({
               suppressEngineRateLimit429: maxAICreditsExceeded,
               maxCacheMissesExceeded,
+              metadataOnly: needsFailureDiagnostics,
             })
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
@@ -4912,7 +4826,7 @@ async function main() {
         const missingToolContext = missingToolReportAsFailure && !hasToolDenialsExceeded ? buildMissingToolContext(agentOutputResult.items) : "";
 
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items);
+        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items, { includeAgentText: !needsFailureDiagnostics });
 
         // Build permission denied context (denied commands list + fix prompt).
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
@@ -4943,7 +4857,7 @@ async function main() {
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
         const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
-          ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded })
+          ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded, metadataOnly: needsFailureDiagnostics })
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
           failureCategories,

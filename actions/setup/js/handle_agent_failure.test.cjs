@@ -2,9 +2,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { createRequire } from "module";
-import { execFileSync } from "node:child_process";
 import { syncRuntimePromptTemplates } from "./test_prompt_templates.js";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -337,7 +336,7 @@ describe("handle_agent_failure", () => {
       };
       global.context.runId = 123;
 
-      await expect(getFailedAgentDiagnostics()).resolves.toMatchObject({ failingStep: "Post Run agent", logUnavailable: expect.any(String) });
+      await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep: "Post Run agent", agentConclusion: "failure" });
     });
 
     it("explains when no failed agent job is found", async () => {
@@ -397,97 +396,23 @@ describe("handle_agent_failure", () => {
       global.context.runId = 123;
     }
 
-    it("renders the failed step's bounded log tail, excluding setup and cleanup", async () => {
-      const lines = Array.from({ length: 60 }, (_, i) => `2026-10-10T10:00:01.500Z failure line ${i}`);
-      mockFailedStepLog(["2026-10-10T10:00:00.000Z setup", ...lines, "2026-10-10T10:00:02.900Z final error", "2026-10-10T10:00:03.000Z cleanup"].join("\n"));
-
+    it("uses only Actions metadata without downloading agent-generated log text", async () => {
+      mockFailedStepLog("2026-10-10T10:00:01.500Z Error: agent-generated root cause");
       const diagnostics = await getFailedAgentDiagnostics();
-      const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_failure"], engineFailureContext: "" });
-      expect(global.github.request).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs", { owner: "owner", repo: "repo", job_id: 456 });
+      const rendered = buildFailureDiagnosticsContext({
+        ...diagnostics,
+        failureCategories: ["agent_failure"],
+        engineFailureContext: "",
+        logExcerpt: "agent-generated root cause",
+        items: [{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated root cause" }],
+      });
+      expect(global.github.request).not.toHaveBeenCalled();
       expect(global.github.paginate).toHaveBeenCalledWith(global.github.rest.actions.listJobsForWorkflowRun, expect.objectContaining({ run_id: 123, filter: "latest" }));
+      expect(diagnostics).toEqual({ failingStep: "Run agent", agentConclusion: "failure" });
       expect(rendered).toContain("Failing step:** `Run agent`");
-      expect(rendered).toContain("Failing step log excerpt (tail)");
-      expect(rendered).toContain("final error");
-      expect(rendered).not.toContain("failure line 10\n");
-      expect(rendered).not.toContain("setup");
-      expect(rendered).not.toContain("cleanup");
-      expect(diagnostics.logExcerpt.split("\n")).toHaveLength(50);
-    });
-
-    it.each(["private-diagnostic-value", "private-diagnostic&#45;value"])("redacts masks declared outside the failing step after normalization and prevents fence injection: %s", async secret => {
-      mockFailedStepLog(`2026-10-10T10:00:00.000Z ::add-mask::private-diagnostic-value\n2026-10-10T10:00:01.000Z ${secret}\n2026-10-10T10:00:02.000Z \`\`\`\``);
-      const diagnostics = await getFailedAgentDiagnostics();
-      const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_failure"], engineFailureContext: "" });
-      expect(rendered).not.toContain("private-diagnostic-value");
-      expect(rendered).not.toContain("::add-mask::");
-      expect(rendered).toContain("`````text");
-    });
-
-    it("excludes a following step even when it starts in the failure completion second", async () => {
-      const cleanupLines = Array.from({ length: 55 }, () => "2026-10-10T10:00:02.500Z cleanup output");
-      mockFailedStepLog(["2026-10-10T10:00:01.999Z actionable failure", ...cleanupLines].join("\n"));
-      const jobs = await global.github.paginate();
-      jobs[0].steps.push({ name: "Cleanup", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:03Z" });
-      const diagnostics = await getFailedAgentDiagnostics();
-      expect(diagnostics.logExcerpt).toContain("actionable failure");
-      expect(diagnostics.logExcerpt).not.toContain("cleanup output");
-    });
-
-    it("keeps the tail of long log lines within the diagnostic size limit", async () => {
-      mockFailedStepLog(`2026-10-10T10:00:01.000Z ${"x".repeat(10000)} final error`);
-      const diagnostics = await getFailedAgentDiagnostics();
-      expect(diagnostics.logExcerpt.length).toBeLessThanOrEqual(8000);
-      expect(diagnostics.logExcerpt).toContain("final error");
-    });
-
-    it("extracts ZIP job logs before redacting and selecting the failed step", async () => {
-      const tempDir = mkdtempSync(join(require("os").tmpdir(), "gh-aw-job-logs-test-"));
-      const archivePath = join(tempDir, "logs.zip");
-      try {
-        writeFileSync(join(tempDir, "1_Set up job.txt"), "2026-10-10T10:00:00.000Z ::add-mask::zip-private-value\n");
-        writeFileSync(join(tempDir, "2_Run agent.txt"), "2026-10-10T10:00:01.500Z failure zip-private-value\n");
-        writeFileSync(join(tempDir, "3_Cleanup.txt"), "2026-10-10T10:00:02.500Z cleanup output\n");
-        execFileSync("zip", ["-q", archivePath, "1_Set up job.txt", "2_Run agent.txt", "3_Cleanup.txt"], { cwd: tempDir });
-        mockFailedStepLog("");
-        const jobs = await global.github.paginate();
-        jobs[0].steps.push({ name: "Cleanup", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:03Z" });
-        global.github.request.mockResolvedValue({ data: readFileSync(archivePath) });
-
-        const diagnostics = await getFailedAgentDiagnostics();
-        expect(diagnostics.logExcerpt).toContain("failure");
-        expect(diagnostics.logExcerpt).not.toContain("zip-private-value");
-        expect(diagnostics.logExcerpt).not.toContain("cleanup output");
-      } finally {
-        rmSync(tempDir, { recursive: true, force: true });
-      }
-    });
-
-    it.each([Buffer.from("2026-10-10T10:00:01.000Z binary log"), new TextEncoder().encode("2026-10-10T10:00:01.000Z binary log").buffer])("accepts binary log responses", async data => {
-      mockFailedStepLog("");
-      global.github.request.mockResolvedValue({ data });
-      await expect(getFailedAgentDiagnostics()).resolves.toMatchObject({ logExcerpt: expect.stringContaining("binary log") });
-    });
-
-    it("explains unsupported log responses without rendering their contents", async () => {
-      mockFailedStepLog("");
-      global.github.request.mockResolvedValue({ data: { private: "private API response" } });
-      await expect(getFailedAgentDiagnostics()).resolves.toMatchObject({ failingStep: "Run agent", logUnavailable: "The Actions logs API returned an unsupported log format." });
-    });
-
-    it.each([403, 404, 410, 500])("retains the failing step when logs cannot be downloaded (HTTP %s)", async status => {
-      mockFailedStepLog("");
-      global.github.request.mockRejectedValue(Object.assign(new Error("private API response"), { status }));
-      const diagnostics = await getFailedAgentDiagnostics();
-      const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_failure"], engineFailureContext: "" });
-      expect(rendered).toContain("Failing step:** `Run agent`");
-      expect(rendered).toContain("Log excerpt unavailable:");
-      expect(rendered).not.toContain("private API response");
-      expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("private API response");
-    });
-
-    it("explains when no log lines match the failing step", async () => {
-      mockFailedStepLog("2026-10-10T10:00:03.000Z cleanup");
-      await expect(getFailedAgentDiagnostics()).resolves.toMatchObject({ failingStep: "Run agent", logUnavailable: expect.stringContaining("no lines") });
+      expect(rendered).not.toContain("agent-generated root cause");
+      expect(rendered).not.toContain("log excerpt");
+      expect(rendered).toContain("No root cause was captured from structured runtime metadata.");
     });
 
     it("uses dependency results as the job fallback when the jobs API returns nothing", async () => {
@@ -528,7 +453,7 @@ describe("handle_agent_failure", () => {
       expect(rendered).not.toContain("failing step could not be attributed");
     });
 
-    it("validates conclusions and safely renders agent-provided step names", async () => {
+    it("validates conclusions and safely renders Actions step names", async () => {
       mockFailedStepLog("");
       global.github.paginate.mockResolvedValue([
         {
@@ -560,8 +485,8 @@ describe("handle_agent_failure", () => {
     });
 
     it("renders diagnostics for driver failures without changing classified failure reports", () => {
-      const options = { failingStep: "Run agent", logExcerpt: "driver error", engineFailureContext: "" };
-      expect(buildFailureDiagnosticsContext({ ...options, failureCategories: ["engine_driver_failure"] })).toContain("driver error");
+      const options = { failingStep: "Run agent", engineFailureContext: "" };
+      expect(buildFailureDiagnosticsContext({ ...options, failureCategories: ["engine_driver_failure"] })).toContain("Failing step:** `Run agent`");
       expect(buildFailureDiagnosticsContext({ ...options, failureCategories: ["max_ai_credits_exceeded"] })).toBe("");
     });
 
@@ -569,11 +494,11 @@ describe("handle_agent_failure", () => {
       const result = buildFailureDiagnosticsContext({
         failureCategories: ["agent_failure"],
         failingStep: "Run agent",
-        engineFailureContext: "Driver exit code: 1\nLast error: engine failed",
+        engineFailureContext: "Driver exit code: 1",
       });
 
       expect(result).toContain("Failing step:** `Run agent`");
-      expect(result).not.toContain("No cause was captured");
+      expect(result).not.toContain("No root cause was captured");
     });
 
     it("states when no cause was captured", () => {
@@ -583,7 +508,7 @@ describe("handle_agent_failure", () => {
         engineFailureContext: "",
       });
 
-      expect(result).toContain("No cause was captured from the agent report or engine logs.");
+      expect(result).toContain("No root cause was captured from structured runtime metadata.");
     });
   });
 
@@ -1182,7 +1107,7 @@ describe("handle_agent_failure", () => {
       expect(createIssueMock).not.toHaveBeenCalled();
     });
 
-    it.each(["&amp;#38;#96;", "&\x00#96;", "&<!-- hidden -->#96;"])("keeps encoded diagnostics fenced in the final posted failure comment: %s", async entity => {
+    it.each(["&amp;#38;#96;", "&\x00#96;", "&<!-- hidden -->#96;"])("omits agent-generated diagnostics from the final posted failure comment: %s", async entity => {
       fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), "{report_incomplete_context}");
       const outputPath = path.join(tmpDir, "agent_output.json");
       const payload = `${entity.repeat(3)}\n# untrusted heading\n${entity.repeat(3)}`;
@@ -1208,12 +1133,10 @@ describe("handle_agent_failure", () => {
         await main();
         expect(createCommentMock).toHaveBeenCalledOnce();
         const body = createCommentMock.mock.calls[0][0].body;
-        const detail = body.match(/<details>\n<summary>Error details:<\/summary>\n\n(`+)text\n([\s\S]*?)\n\1\n\n<\/details>/);
-        expect(detail).not.toBeNull();
-        expect(detail[1].length).toBeGreaterThan(3);
-        expect(detail[2]).toContain("```");
-        expect(detail[2]).toContain("# untrusted heading");
-        expect(detail[2]).not.toContain(detail[1]);
+        expect(body).toContain("The workflow recorded a `report_incomplete` signal");
+        expect(body).not.toContain("# untrusted heading");
+        expect(body).not.toContain("infrastructure_error");
+        expect(body).not.toContain("<details>");
       } finally {
         vi.unstubAllEnvs();
       }
@@ -1343,10 +1266,23 @@ describe("handle_agent_failure", () => {
       expect(createIssueMock).not.toHaveBeenCalled();
     });
 
-    it.each([false, true])("posts generic failure diagnostics in the issue body (missing job data: %s)", async missingJobs => {
-      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{failure_diagnostics_context}");
+    it.each([
+      [false, false],
+      [false, true],
+      [true, false],
+      [true, true],
+    ])("posts metadata-only generic diagnostics (missing job data: %s, existing issue: %s)", async (missingJobs, existingIssue) => {
+      const template = "{failure_diagnostics_context}{report_incomplete_context}{engine_failure_context}";
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), template);
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), template);
+      const outputPath = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }] }));
+      fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), "Error: agent-generated diagnostic\n");
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "1");
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
       process.env.GH_AW_AGENT_CONCLUSION = "failure";
       const createIssueMock = vi.fn(async () => ({ data: { number: 99, html_url: "https://github.com/owner/repo/issues/99" } }));
+      const createCommentMock = vi.fn(async () => ({ data: { id: 1001 } }));
       global.github = {
         paginate: vi.fn().mockResolvedValue(
           missingJobs
@@ -1363,17 +1299,34 @@ describe("handle_agent_failure", () => {
         request: vi.fn().mockResolvedValue({ data: "2026-10-10T10:00:01.500Z actionable root cause" }),
         rest: {
           actions: { listJobsForWorkflowRun: vi.fn() },
-          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
-          issues: { create: createIssueMock, createComment: vi.fn() },
+          search: {
+            issuesAndPullRequests: vi.fn(async ({ q }) => ({
+              data: {
+                total_count: existingIssue && !q.includes("is:pr") ? 1 : 0,
+                items: existingIssue && !q.includes("is:pr") ? [{ number: 42, body: buildExistingIssueBody({ branch: "feature/current", categories: ["report_incomplete"] }) }] : [],
+              },
+            })),
+          },
+          issues: { create: createIssueMock, createComment: createCommentMock },
           pulls: { get: vi.fn() },
         },
         graphql: vi.fn(),
       };
 
-      await main();
+      try {
+        await main();
+      } finally {
+        vi.unstubAllEnvs();
+      }
 
-      expect(createIssueMock).toHaveBeenCalledOnce();
-      const body = createIssueMock.mock.calls[0][0].body;
+      const postMock = existingIssue ? createCommentMock : createIssueMock;
+      expect(postMock).toHaveBeenCalledOnce();
+      expect(existingIssue ? createIssueMock : createCommentMock).not.toHaveBeenCalled();
+      const body = postMock.mock.calls[0][0].body;
+      expect(body).toContain("Driver exit code: 1");
+      expect(body).toContain("The workflow recorded a `report_incomplete` signal");
+      expect(body).not.toContain("agent-generated diagnostic");
+      expect(body).not.toContain("infrastructure_error");
       if (missingJobs) {
         expect(body).toContain("Job attribution unavailable:");
         expect(body).toContain("The Actions jobs API returned no jobs for this run.");
@@ -1381,8 +1334,9 @@ describe("handle_agent_failure", () => {
         expect(global.github.request).not.toHaveBeenCalled();
       } else {
         expect(body).toContain("Failing step:** `Run agent`");
-        expect(body).toContain("Failing step log excerpt (tail)");
-        expect(body).toContain("actionable root cause");
+        expect(body).not.toContain("log excerpt");
+        expect(body).not.toContain("actionable root cause");
+        expect(global.github.request).not.toHaveBeenCalled();
       }
     });
 
@@ -3427,6 +3381,26 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("```text\nDriver exit code: 127\n```");
       expect(result).toContain("<details>\n<summary>Error details:</summary>");
       expect(result).toContain("terminated before producing output");
+    });
+
+    it.each(["1", "127", "255"])("uses only validated driver metadata in generic failures (exit %s)", exitCode => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), exitCode);
+      fs.writeFileSync(stdioLogPath, "Error: agent-generated diagnostic\n");
+      const readSpy = vi.spyOn(fs, "readFileSync");
+      try {
+        const result = buildEngineFailureContext({ metadataOnly: true });
+        expect(result).toContain(`Driver exit code: ${exitCode}`);
+        expect(result).not.toContain("agent-generated diagnostic");
+        expect(readSpy.mock.calls.some(([file]) => file === stdioLogPath)).toBe(false);
+      } finally {
+        readSpy.mockRestore();
+      }
+    });
+
+    it.each(["0", "256", "1\nagent-generated diagnostic", "Error: agent-generated diagnostic"])("omits invalid driver metadata without falling back to log text: %s", exitCode => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), exitCode);
+      fs.writeFileSync(stdioLogPath, "Error: agent-generated diagnostic\n");
+      expect(buildEngineFailureContext({ metadataOnly: true })).toBe("");
     });
 
     it("reports the driver exit alongside stderr captured in the stdio log", () => {
