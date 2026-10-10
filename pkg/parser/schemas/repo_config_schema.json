@@ -6,7 +6,47 @@
   "version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "workQueueRetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "backoff_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+      }
+    }
+  },
   "properties": {
+    "work_queue": {
+      "description": "Global scheduling and backing Issue/label overrides. AW supplies authorization and approved worker routes. Missing settings use one pool, concurrency 16, pending limit 4096 and three attempts with 30-second backoff.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "concurrency": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "pending_limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "retry": { "$ref": "#/definitions/workQueueRetry" },
+        "issues": {
+          "description": "Global backing Issue projection and label prefix for work-queue participants. Omitted or false disables projection; true uses work and work:<status> labels.",
+          "oneOf": [{ "type": "boolean" }, { "type": "object", "additionalProperties": false, "properties": { "label": { "type": "string", "minLength": 1, "maxLength": 33, "pattern": "^[^\\x00-\\x1f\\x7f]+$" } } }]
+        },
+        "mode": { "type": "string", "enum": ["weighted-priority", "strict-priority"] },
+        "class_weights": { "type": "array", "minItems": 5, "maxItems": 5, "items": { "type": "integer", "minimum": 1, "maximum": 1000 } },
+        "accounting_weights": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 1000 } },
+        "pools": {
+          "type": "object",
+          "maxProperties": 64,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "concurrency": { "type": "integer", "minimum": 1, "maximum": 4096 },
+              "per_account_limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
+              "retry": { "$ref": "#/definitions/workQueueRetry" }
+            }
+          }
+        }
+      }
+    },
     "artifact_retention_days": {
       "description": "Retention in days for all gh-aw workflow artifacts, overriding per-artifact settings. Accepts an integer from 1 to 400 or a GitHub Actions expression resolving to that range. When omitted, uses vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS, then the existing per-artifact retention. GitHub repository, organization, and enterprise retention limits still apply.",
       "oneOf": [

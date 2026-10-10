@@ -52,6 +52,38 @@ provisioning secrets, escalating credentials, or retrying dispatch.
 
 5. **Constrain credentials.** Recommend, not require, a protected test environment and rotated, restricted development credentials. Inspect environments; provision only with authorization and revoke replaced credentials at their issuer. Never copy/rotate production secrets. Authorized repository/organization/enterprise shared secrets remain job-scoped, not automatically OS-exported; test environments do not isolate them. Keep production/dispatch credentials out of harnesses.
 
+## Test Workflow Changes from a Branch
+
+When updated workflow files are unpublished, recommend a feature branch and
+draft PR instead of requiring a merge to the default branch or ending with a
+generic refusal. Reuse an existing suitable branch or PR. The agent prepares
+the patch, compiles and reviews the source and generated lock, then publishes
+them together when authorized. Use the PR for review; creating it is not live
+execution approval.
+
+After the live gates below are satisfied, dispatch the exact reviewed branch
+with `gh aw run WORKFLOW --ref REVIEWED_BRANCH`. Verify its remote commit before
+dispatch and the resulting run SHA afterward. Review imports, runtime/action
+pins and immutable worker profiles: selecting a branch does not automatically
+update dependencies or worker revisions pinned elsewhere.
+
+A branch is not an isolated test environment. Repository secrets, queue
+branches, memory, issues, PRs and other outputs can still be shared with
+production. Retain the approved effect scope and required protections; use a
+reviewed dry-run lock when testing startup without compiler-managed mutations.
+Dry-run suppresses queue writes and worker launches, so it cannot verify live
+dispatch.
+
+Under the [work-queue protocol](work-queue.md), the first accepted producer submit
+bootstraps Policy and Work automatically. Do not demand administrator seeding
+or repository-rule inventories for queue use.
+
+If another gate blocks execution, state the specific blocker and the smallest
+authorized resolution. Branch/PR preparation is still useful progress, but
+does not override no-dispatch contexts, credential denials, missing required
+protections or unresolved review findings. Do not switch refs, credentials or
+execution contexts to evade a failed gate.
+
 ## Live Debug Loop
 
 Before each upload/dispatch, require a completed [agentic security review](debug-security-review.md) for the current source/lock hashes and valid human authorization: source/lock hashes,

@@ -114,7 +114,13 @@ func (state Projection) eligibility(work *WorkState, at int64, logical int, acco
 	if state.GrantsPaused {
 		return "grants_paused"
 	}
+	if state.SchedulingProfiles != nil && !slices.Contains(state.SchedulingProfiles, work.WorkerProfile) {
+		return "worker_not_approved"
+	}
 	pool := state.Policy.Pools[work.Pool]
+	if _, reason := state.executionProfile(work); reason != "ready" {
+		return reason
+	}
 	if logical >= pool.LogicalLimit {
 		return "capacity_blocked"
 	}
@@ -268,12 +274,19 @@ func compatible(state Projection, assignment Assignment, work *WorkState) bool {
 	if assignment.Pool != work.Pool || assignment.WorkerProfile != work.WorkerProfile {
 		return false
 	}
-	profile := state.Policy.Pools[work.Pool].Profiles[work.WorkerProfile]
+	profile, reason := state.executionProfile(work)
+	if reason != "ready" {
+		return false
+	}
 	if len(assignment.Claims) >= profile.MaxClaims {
 		return false
 	}
 	for _, claim := range assignment.Claims {
 		member := state.Works[claim.WorkID]
+		memberProfile, memberReason := state.executionProfile(member)
+		if memberReason != "ready" || memberProfile != profile {
+			return false
+		}
 		if member.BatchTrustDomain != work.BatchTrustDomain ||
 			!profile.ShareKeys && member.FairnessKey != work.FairnessKey {
 			return false
@@ -293,8 +306,9 @@ func recordClaim(state *Projection, operation ClaimOperation, commit QueueCommit
 	work := state.Works[operation.WorkID]
 	dispatch := state.Dispatches[operation.DispatchID]
 	if dispatch == nil {
+		profile, _ := state.executionProfile(work)
 		dispatch = &DispatchState{
-			Profile: state.Policy.Pools[work.Pool].Profiles[work.WorkerProfile],
+			Profile: profile,
 			Assignment: Assignment{
 				Version: Version, DispatchID: operation.DispatchID, RequestID: commit.Request.ID,
 				CommitID: commit.ID, PolicyEpoch: commit.PolicyEpoch, Pool: work.Pool,
@@ -333,6 +347,7 @@ func planDispatch(state Projection, params DispatchParameters, requestID, commit
 		return decision, queueError("request_invalid", "preceding operations exceed installed operation limit")
 	}
 	working := cloneProjection(state)
+	working.SchedulingProfiles = params.WorkerProfiles
 	if operationBudget == 0 {
 		selection, _, err := planNext(working, params.Pool, at)
 		decision.Next, decision.Reason = selection, "operation_budget_blocked"

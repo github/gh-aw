@@ -61,12 +61,19 @@ func (state Projection) projectionAuthority(actor Actor, workID, ref, repository
 	if work == nil || actor.Role != "projector" || actor.Workflow == "" || actor.RunID == "" || actor.RunAttempt < 1 {
 		return queueError("projection_unauthorized", "projection requires an originating run")
 	}
+	awOwned := state.Policy.Authorization == "aw" && work.BackingIssue == nil &&
+		repository == state.Repository && actor.Repository == state.Repository
+	if awOwned && (!revisionPattern.MatchString(ref) ||
+		!strings.HasPrefix(actor.Workflow, workerWorkflowDirectory) ||
+		!strings.HasSuffix(actor.Workflow, ".lock.yml") || strings.Contains(actor.Workflow, "..")) {
+		return queueError("projection_unauthorized", "AW Issue projection requires an immutable compiled originating workflow")
+	}
 	installed := slices.ContainsFunc(state.Policy.Projectors, func(rule ProjectorRule) bool {
 		return rule.Principal == actor.Principal && rule.Workflow == actor.Workflow && rule.Ref == ref &&
 			slices.Contains(rule.Pools, work.Pool) && slices.Contains(rule.Repositories, repository) &&
 			(work.BackingIssue == nil || slices.Contains(rule.BackingIssues, *work.BackingIssue))
 	})
-	if !installed {
+	if !awOwned && !installed {
 		return queueError("projection_unauthorized", "no installed projector authority for this revision and target")
 	}
 	if claimID != "" {
@@ -89,7 +96,10 @@ func (state Projection) projectionAuthority(actor Actor, workID, ref, repository
 		}
 		return nil
 	}
-	origin := state.Requests[work.admissionRequestID].Actor
+	origin := state.WorkCreators[workID]
+	if awOwned && !slices.Contains([]string{"producer", "dispatcher", "worker"}, origin.Role) {
+		return queueError("projection_unauthorized", "AW Issue projection requires its own trusted producer or worker admission")
+	}
 	if origin.Principal == actor.Principal && origin.Repository == actor.Repository &&
 		origin.Workflow == actor.Workflow && origin.RunID == actor.RunID && origin.RunAttempt == actor.RunAttempt {
 		return nil

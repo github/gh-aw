@@ -6,14 +6,13 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { performance } = require("node:perf_hooks");
 const { Worker } = require("node:worker_threads");
-const { LocalGitHub, REPOSITORY, PRINCIPAL, PUBLISHER_WORKFLOW } = require("./work-queue-stress-git.cjs");
+const { LocalGitHub, REPOSITORY, PRINCIPAL } = require("./work-queue-stress-git.cjs");
 const { canonical, utf8Compare } = require("../../actions/setup/js/work_queue_codec.cjs");
 const { defaultPolicy } = require("../../actions/setup/js/work_queue_policy.cjs");
 const { nodeId } = require("../../actions/setup/js/work_queue_graph.cjs");
 const { DEFAULT_LIMITS } = require("../../actions/setup/js/work_queue_limits.cjs");
 const { compactTransactions, replayTransactions, serializeProjection, serializeTransactionLog } = require("../../actions/setup/js/work_queue_replay.cjs");
-const { authenticatePublisher } = require("../../actions/setup/js/work_queue_native.cjs");
-const { initializeWorkQueue, readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
+const { readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
 const { assignmentForDispatch, fifoCompare, planNext } = require("../../actions/setup/js/work_queue_scheduler.cjs");
 
 class Publishers {
@@ -297,7 +296,6 @@ async function runSimulator(input = {}) {
     await host.initialize();
     pool = new Publishers(host, options.workers, sample);
     const policy = policyFor(host, options.workers);
-    const admin = await authenticatePublisher({ githubClient: host.client, context: host.nativeContext(), role: "administrator", workflowRef: `${REPOSITORY}/${PUBLISHER_WORKFLOW}@${host.ref}` });
     const scenario = async () => {
       let start = 0;
       let verifiedReceipts = 0;
@@ -305,7 +303,6 @@ async function runSimulator(input = {}) {
         const branch = `stress-${options.seed}-${index}`;
         const graph = `${branch}-graph`;
         const count = options.mode === "lifecycle" ? Math.min(options.queueItems, options.items - start) : options.items;
-        await initializeWorkQueue({ githubClient: host.client, owner: "local", repo: "queue", branch, context: admin, policyProposal: policy, now: () => 1800000000000 });
         report.branch_count++;
         if (options.mode === "saturation") {
           let accepted = 0;
@@ -313,7 +310,9 @@ async function runSimulator(input = {}) {
           // Use actual production publication, not an oversized synthetic
           // transaction or a raised pending/recovery limit.
           while (accepted < options.items) {
-            const size = Math.min(256, options.items - accepted);
+            // Leave room for Policy in genesis while preserving the same
+            // 256-Work admission boundary before testing full-sized batches.
+            const size = Math.min(accepted < 256 ? 128 : 256, options.items - accepted);
             attempted += size;
             try {
               await pool.runAll([{ kind: "submit", id: `${branch}:submit:${accepted}`, branch, graph, start: accepted, count: size, policy }]);

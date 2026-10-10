@@ -93,6 +93,8 @@ type WorkDefinition struct {
 	Priority         int             `json:"priority"`
 	FairnessKey      string          `json:"fairness_key"`
 	WorkerProfile    string          `json:"worker_profile"`
+	LogicalContract  string          `json:"logical_contract,omitempty"`
+	ExecutionRef     string          `json:"execution_ref,omitempty"`
 	BatchTrustDomain string          `json:"batch_trust_domain"`
 	Payload          json.RawMessage `json:"payload"`
 	DependsOn        []Dependency    `json:"depends_on"`
@@ -103,6 +105,7 @@ type WorkDefinition struct {
 }
 
 type Policy struct {
+	Authorization     string                  `json:"authorization,omitempty"`
 	Mode              string                  `json:"mode"`
 	ClassWeights      []int                   `json:"class_weights"`
 	AccountingWeights map[string]int          `json:"accounting_weights"`
@@ -158,14 +161,39 @@ type PoolPolicy struct {
 }
 
 type WorkerProfile struct {
+	LogicalContract string `json:"logical_contract,omitempty"`
 	Workflow        string `json:"workflow"`
 	Ref             string `json:"ref"`
-	Principal       string `json:"principal"`
+	Principal       string `json:"principal,omitempty"`
 	TrustDomain     string `json:"trust_domain"`
 	CredentialScope string `json:"credential_scope"`
 	EffectScope     string `json:"effect_scope"`
 	MaxClaims       int    `json:"max_claims"`
 	ShareKeys       bool   `json:"share_keys"`
+}
+
+// Deployment changes execution routes, never the installed scheduling policy.
+type DeploymentOperation struct {
+	Kind             string        `json:"kind"`
+	Pool             string        `json:"pool"`
+	WorkerProfile    string        `json:"worker_profile"`
+	ExpectedRef      string        `json:"expected_ref"`
+	ExpectedContract string        `json:"expected_contract"`
+	Profile          WorkerProfile `json:"profile"`
+	Available        bool          `json:"available"`
+	Activate         *bool         `json:"activate,omitempty"`
+	Reason           string        `json:"reason"`
+}
+
+type WorkerRevision struct {
+	Profile   WorkerProfile `json:"profile"`
+	Available bool          `json:"available"`
+}
+
+type WorkerDeployment struct {
+	CurrentRef      string                    `json:"current_ref"`
+	CurrentContract string                    `json:"current_contract"`
+	Revisions       map[string]WorkerRevision `json:"revisions"`
 }
 
 type RetryPolicy struct {
@@ -258,10 +286,11 @@ type ResultReference struct {
 }
 
 type DispatchParameters struct {
-	Pool          string `json:"pool"`
-	MaxClaims     int    `json:"max_claims"`
-	MaxDispatches int    `json:"max_dispatches"`
-	MaxBytes      int64  `json:"max_bytes"`
+	WorkerProfiles []string `json:"worker_profiles,omitempty"`
+	Pool           string   `json:"pool"`
+	MaxClaims      int      `json:"max_claims"`
+	MaxDispatches  int      `json:"max_dispatches"`
+	MaxBytes       int64    `json:"max_bytes"`
 }
 
 type FinishParameters struct {
@@ -285,6 +314,7 @@ type Position struct {
 
 type WorkState struct {
 	WorkDefinition
+	AdmissionContract    string          `json:"admission_contract,omitempty"`
 	EffectivePriority    int             `json:"effective_priority,omitempty"`
 	State                string          `json:"state"`
 	Position             Position        `json:"position"`
@@ -326,13 +356,14 @@ type ClaimState struct {
 
 type DispatchState struct {
 	Assignment
-	Profile         WorkerProfile `json:"profile"`
-	State           string        `json:"state"`
-	Sender          *Actor        `json:"sender,omitempty"`
-	Run             *RunBinding   `json:"run,omitempty"`
-	Released        bool          `json:"released"`
-	Reason          string        `json:"reason,omitempty"`
-	LifecycleWrites int           `json:"lifecycle_writes"`
+	Profile             WorkerProfile `json:"profile"`
+	State               string        `json:"state"`
+	Sender              *Actor        `json:"sender,omitempty"`
+	CredentialPrincipal string        `json:"credential_principal,omitempty"`
+	Run                 *RunBinding   `json:"run,omitempty"`
+	Released            bool          `json:"released"`
+	Reason              string        `json:"reason,omitempty"`
+	LifecycleWrites     int           `json:"lifecycle_writes"`
 }
 
 type Observation struct {
@@ -375,31 +406,33 @@ type Stats struct {
 }
 
 type Projection struct {
-	Repository           string                      `json:"repository"`
-	Tip                  string                      `json:"tip"`
-	PolicyEpoch          string                      `json:"policy_epoch"`
-	Policy               *Policy                     `json:"policy"`
-	Works                map[string]*WorkState       `json:"works"`
-	Claims               map[string]*ClaimState      `json:"claims"`
-	Dispatches           map[string]*DispatchState   `json:"dispatches"`
-	Observations         map[string]*Observation     `json:"observations"`
-	Requests             map[string]QueueCommit      `json:"requests"`
-	Clocks               map[string]PoolClocks       `json:"clocks"`
-	AdmissionPaused      bool                        `json:"admission_paused"`
-	GrantsPaused         bool                        `json:"grants_paused"`
-	CredentialGeneration string                      `json:"credential_generation"`
-	Stats                Stats                       `json:"stats"`
-	LedgerBytes          int64                       `json:"ledger_bytes"`
-	ObservationWrites    map[string]int              `json:"observation_writes"`
-	RequestOrder         []string                    `json:"-"`
-	CheckpointReceipts   []checkpointReceipt         `json:"-"`
-	WorkCreators         map[string]Actor            `json:"-"`
-	ClaimExplanations    map[string]ClaimExplanation `json:"-"`
-	SeenEpochs           map[string]bool             `json:"-"`
-	SeenGenerations      map[string]bool             `json:"-"`
-	ObservationIDs       map[string]*Observation     `json:"-"`
-	TerminalBarriers     map[string]Operation        `json:"-"`
-	Cancellations        map[string]Operation        `json:"-"`
+	SchedulingProfiles   []string                                `json:"-"`
+	Repository           string                                  `json:"repository"`
+	Tip                  string                                  `json:"tip"`
+	PolicyEpoch          string                                  `json:"policy_epoch"`
+	Policy               *Policy                                 `json:"policy"`
+	Deployments          map[string]map[string]*WorkerDeployment `json:"deployments,omitempty"`
+	Works                map[string]*WorkState                   `json:"works"`
+	Claims               map[string]*ClaimState                  `json:"claims"`
+	Dispatches           map[string]*DispatchState               `json:"dispatches"`
+	Observations         map[string]*Observation                 `json:"observations"`
+	Requests             map[string]QueueCommit                  `json:"requests"`
+	Clocks               map[string]PoolClocks                   `json:"clocks"`
+	AdmissionPaused      bool                                    `json:"admission_paused"`
+	GrantsPaused         bool                                    `json:"grants_paused"`
+	CredentialGeneration string                                  `json:"credential_generation"`
+	Stats                Stats                                   `json:"stats"`
+	LedgerBytes          int64                                   `json:"ledger_bytes"`
+	ObservationWrites    map[string]int                          `json:"observation_writes"`
+	RequestOrder         []string                                `json:"-"`
+	CheckpointReceipts   []checkpointReceipt                     `json:"-"`
+	WorkCreators         map[string]Actor                        `json:"-"`
+	ClaimExplanations    map[string]ClaimExplanation             `json:"-"`
+	SeenEpochs           map[string]bool                         `json:"-"`
+	SeenGenerations      map[string]bool                         `json:"-"`
+	ObservationIDs       map[string]*Observation                 `json:"-"`
+	TerminalBarriers     map[string]Operation                    `json:"-"`
+	Cancellations        map[string]Operation                    `json:"-"`
 }
 
 type Selection struct {

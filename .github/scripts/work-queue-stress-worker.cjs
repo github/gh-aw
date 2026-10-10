@@ -34,7 +34,7 @@ async function trusted(role, runId = "100", extra = {}) {
   return authenticatePublisher({ githubClient, context, role, workflowRef: `${REPOSITORY}/${runId === "100" ? ".github/workflows/publisher.lock.yml" : WORKFLOW}@${context.sha}`, ...extra });
 }
 
-async function publish(branch, id, kind, parameters, context) {
+async function publish(branch, id, kind, parameters, context, policyProposal = undefined) {
   counters.publication_calls++;
   const result = await publishWorkQueueRequest({
     githubClient,
@@ -42,6 +42,7 @@ async function publish(branch, id, kind, parameters, context) {
     repo: "queue",
     branch,
     context,
+    policyProposal,
     request: newRequest(id, kind, actorFromContext(context), parameters),
     maxRetries: 10,
     now: () => AT,
@@ -177,7 +178,7 @@ async function execute(job) {
       node.fairness_key = index % 2 ? "beta" : "alpha";
       return node;
     });
-    const published = await publish(job.branch, job.id, "submit", { nodes }, context);
+    const published = await publish(job.branch, job.id, "submit", { nodes }, context, job.policy);
     return { submitted: nodes.length, recovered: published.recovered === true };
   }
   if (job.kind === "dispatch") {
