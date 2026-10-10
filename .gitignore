@@ -79,6 +79,8 @@ coverage.html
 logs/
 !pkg/cli/testdata/model_routing_golden/**/sandbox/firewall/logs/
 !pkg/cli/testdata/model_routing_golden/**/sandbox/firewall/logs/**
+!pkg/cli/testdata/model_routing_golden_capture/**/sandbox/firewall/logs/
+!pkg/cli/testdata/model_routing_golden_capture/**/sandbox/firewall/logs/**
 
 # Benchmark results
 bench_results.txt

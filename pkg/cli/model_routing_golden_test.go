@@ -197,6 +197,29 @@ func TestModelRoutingGoldenAudit(t *testing.T) {
 	})
 }
 
+func TestModelRoutingGoldenCaptureMatchesDownload(t *testing.T) {
+	fullDir := os.Getenv("MODEL_ROUTING_GOLDEN_FULL_DIR")
+	fixtureDir := os.Getenv("MODEL_ROUTING_GOLDEN_FIXTURE_DIR")
+	if fullDir == "" || fixtureDir == "" {
+		t.Skip("capture validation requires full download and fixture directories")
+	}
+
+	analyze := func(runDir string) []byte {
+		t.Helper()
+		routing := analyzeModelRouting(runDir)
+		usage, err := analyzeTokenUsage(runDir, false)
+		if err != nil {
+			t.Fatalf("analyze token usage in %s: %v", runDir, err)
+		}
+		return marshalModelRoutingGolden(t, projectModelRoutingGoldenAudit(routing, usage))
+	}
+	full := analyze(fullDir)
+	fixture := analyze(fixtureDir)
+	if !bytes.Equal(full, fixture) {
+		t.Fatalf("fixture analysis differs from full download:\nfull:\n%s\nfixture:\n%s", full, fixture)
+	}
+}
+
 func copyModelRoutingGoldenFixture(t *testing.T, source, destination string) {
 	t.Helper()
 	if err := filepath.WalkDir(source, func(path string, entry os.DirEntry, walkErr error) error {
@@ -373,6 +396,14 @@ func marshalModelRoutingGolden(t *testing.T, value any) []byte {
 
 func writeModelRoutingGolden(t *testing.T, path string, contents []byte) {
 	t.Helper()
+	if existing, err := os.ReadFile(path); err == nil {
+		var existingJSON, updatedJSON bytes.Buffer
+		if json.Compact(&existingJSON, existing) == nil &&
+			json.Compact(&updatedJSON, contents) == nil &&
+			bytes.Equal(existingJSON.Bytes(), updatedJSON.Bytes()) {
+			return
+		}
+	}
 	if err := os.WriteFile(path, contents, 0o600); err != nil {
 		t.Fatalf("write golden file %s: %v", path, err)
 	}
