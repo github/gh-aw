@@ -53,7 +53,7 @@ async function resolveDispatchCredentialPrincipal(client, supplied) {
  * @param {DispatchClient} client
  * @param {unknown} supplied
  * @param {unknown} [selectedToken]
- * @returns {(options: {assignment?: unknown, profile: Record<string, unknown> & {principal: string}}) => Promise<DispatchCredentialProof>}
+ * @returns {(options: {assignment?: unknown, profile: Record<string, unknown> & {principal?: string}}) => Promise<DispatchCredentialProof>}
  */
 function createDispatchCredentialValidator(client, supplied, selectedToken) {
   const credential = normalizeDispatchCredential(supplied);
@@ -67,16 +67,16 @@ function createDispatchCredentialValidator(client, supplied, selectedToken) {
       if (!authentication || typeof authentication !== "object" || !("type" in authentication) || !("token" in authentication) || authentication.type !== "token" || authentication.token !== selectedToken)
         throw new Error("work_queue_dispatch_credential_client_mismatch");
     }
-    const expected = nativeId(profile?.principal, "approved worker principal");
+    const expected = Object.hasOwn(profile, "principal") ? nativeId(profile.principal, "approved worker principal") : undefined;
     const actual = await resolveDispatchCredentialPrincipal(client, credential);
-    if (actual !== expected) throw new Error("work_queue_dispatch_credential_principal_mismatch");
+    if (expected !== undefined && actual !== expected) throw new Error("work_queue_dispatch_credential_principal_mismatch");
     const proof = Object.freeze({ principal: actual, kind: credential.kind });
     credentialProofs.set(proof, { client, profile: canonical(profile) });
     return proof;
   };
 }
 
-/** @param {unknown} proof @param {DispatchClient} client @param {Record<string, unknown> & {principal: string}} profile */
+/** @param {unknown} proof @param {DispatchClient} client @param {Record<string, unknown> & {principal?: string}} profile */
 function isDispatchCredentialProof(proof, client, profile) {
   const facts = proof !== null && typeof proof === "object" ? credentialProofs.get(proof) : undefined;
   return !!facts && facts.client === client && facts.profile === canonical(profile);

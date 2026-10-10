@@ -1,8 +1,7 @@
 // @ts-check
 "use strict";
 
-const { DEFAULT_LIMITS } = require("./work_queue_limits.cjs");
-const { validatePolicy } = require("./work_queue_policy.cjs");
+const { buildAWPolicy } = require("./work_queue_settings.cjs");
 const { validateDeliveryContract } = require("./work_queue_delivery.cjs");
 
 const ESLINT_WORKERS = Object.freeze(["eslint-miner", "eslint-refiner", "eslint-monster"]);
@@ -53,42 +52,17 @@ function buildESLintFactoryPlan({ date, repository, repositoryId }) {
   };
 }
 
-/** @param {{repository: string, ref: string, producerPrincipal: string, workerPrincipal: string}} options */
-function buildESLintFactoryPolicy({ repository, ref, producerPrincipal, workerPrincipal }) {
+/** @param {{repository: string, ref: string, settings?: object}} options */
+function buildESLintFactoryPolicy({ repository, ref, settings }) {
   assertRepository(repository);
-  const policy = {
-    mode: "weighted-priority",
-    class_weights: [8, 4, 2, 1, 1],
-    accounting_weights: { "": 1 },
-    producers: { [producerPrincipal]: { pools: ["default"], priorities: [3], fairness_keys: [""] } },
-    pools: {
-      default: {
-        default_profile: ESLINT_WORKERS[0],
-        profiles: Object.fromEntries(
-          ESLINT_WORKERS.map(profile => [
-            profile,
-            { workflow: `.github/workflows/${profile}.lock.yml`, ref, principal: workerPrincipal, trust_domain: profile, credential_scope: "repository", effect_scope: repository, max_claims: 1, share_keys: false },
-          ])
-        ),
-        logical_limit: 3,
-        native_limit: 3,
-        allowed_repositories: [repository],
-        max_observation_age_ms: 60000,
-        retry: { max_attempts: 1, backoff_ms: 1000 },
-        reconciliation: { max_attempts: 5, deadline_ms: 300000 },
-      },
-    },
-    limits: { ...DEFAULT_LIMITS, graph_nodes: 3, pending_nodes: 30, operations: 32, payload_bytes: 8192 },
-  };
-  validatePolicy(policy);
-  return policy;
+  return buildAWPolicy({ repository, ref, workflows: [...ESLINT_WORKERS], settings });
 }
 
 module.exports = { ESLINT_WORKERS, buildESLintFactoryPlan, buildESLintFactoryPolicy };
 
 if (require.main === module) {
-  const [command, repository, ref, producerPrincipal, workerPrincipal, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository || !ref || !producerPrincipal || !workerPrincipal)
-    throw new Error("Usage: node eslint_factory_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID");
-  process.stdout.write(JSON.stringify(buildESLintFactoryPolicy({ repository, ref, producerPrincipal, workerPrincipal }), null, 2) + "\n");
+  const [command, repository, ref, ...extra] = process.argv.slice(2);
+  if (command !== "policy" || extra.length || !repository || !ref) throw new Error("Usage: node eslint_factory_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA");
+  const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
+  process.stdout.write(JSON.stringify(buildESLintFactoryPolicy({ repository, ref, settings: readPortfolioSettings() }), null, 2) + "\n");
 }

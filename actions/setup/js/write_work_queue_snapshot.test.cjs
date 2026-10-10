@@ -106,23 +106,16 @@ describe("authenticated immutable activation snapshots", () => {
     expect(fake.state.updates).toBe(0);
   });
 
-  it("bootstraps only genuine absence with an explicit approved and natively authenticated administrator", async () => {
+  it("rejects obsolete administrator seeding without calling the initializer", async () => {
     const { fixture, options } = setup({ granted: false });
-    let log = { sha: null, transactions: [], state: newState() };
-    const initialize = vi.fn(async request => {
-      expect(request.context).toMatchObject({ role: "administrator", authenticated: true, roles: ["administrator"], principal: "11", run_id: "15" });
-      expect(request.policyProposal).toEqual(fixture.policy);
-      const transactions = fixture.transactions.slice(0, 1);
-      log = { sha: "checked-genesis", transactions, state: replayTransactions(transactions) };
-    });
+    const log = { sha: null, transactions: [], state: newState() };
+    const initialize = vi.fn();
     const approved = { role: "administrator", roles: ["administrator"], authenticated: true, principal: "11", repository: REPOSITORY };
     const configured = { ...options, policyProposal: fixture.policy, initializationContext: approved, initializeWorkQueue: initialize, readWorkQueueLog: async () => log };
-    const snapshot = await main(configured);
-    expect(snapshot.sha).toBe("checked-genesis");
-    expect(loadWorkQueueSnapshot(options.snapshotPath).projection.works.size).toBe(0);
-    expect(initialize).toHaveBeenCalledTimes(1);
-    await main({ ...configured, snapshotPath: path.join(path.dirname(options.snapshotPath), "again.json") });
-    expect(initialize).toHaveBeenCalledTimes(1);
+    await expect(main(configured)).rejects.toThrow(/standalone_seeding_unsupported/);
+    expect(initialize).not.toHaveBeenCalled();
+    expect(log.sha).toBeNull();
+    expect(fs.existsSync(options.snapshotPath)).toBe(false);
   });
 
   it("never treats an existing policyless or malformed ledger, a dispatcher, rerun, or preview as approved genesis", async () => {
@@ -130,14 +123,14 @@ describe("authenticated immutable activation snapshots", () => {
     const administrator = { role: "administrator", roles: ["administrator"], authenticated: true, principal: "11", repository: REPOSITORY };
     const initialize = vi.fn();
     const configured = { ...options, policyProposal: fixture.policy, initializationContext: administrator, initializeWorkQueue: initialize, readWorkQueueLog: async () => ({ sha: null, transactions: [], state: newState() }) };
-    await expect(main({ ...configured, initializationContext: { ...administrator, role: "dispatcher", roles: ["dispatcher"] } })).rejects.toThrow(/not_authorized/);
-    await expect(main({ ...configured, initializationContext: { ...administrator, principal: "12" } })).rejects.toThrow(/native_mismatch/);
-    await expect(main({ ...configured, staged: true })).rejects.toThrow(/policy_missing/);
-    await expect(main({ ...configured, readWorkQueueLog: async () => ({ sha: "existing", transactions: [], state: newState() }) })).rejects.toThrow(/genesis_not_absent/);
-    await expect(main({ ...configured, policyProposal: undefined })).rejects.toThrow(/proposal_required/);
+    await expect(main({ ...configured, initializationContext: { ...administrator, role: "dispatcher", roles: ["dispatcher"] } })).rejects.toThrow(/standalone_seeding_unsupported/);
+    await expect(main({ ...configured, initializationContext: { ...administrator, principal: "12" } })).rejects.toThrow(/standalone_seeding_unsupported/);
+    await expect(main({ ...configured, staged: true })).rejects.toThrow(/standalone_seeding_unsupported/);
+    await expect(main({ ...configured, readWorkQueueLog: async () => ({ sha: "existing", transactions: [], state: newState() }) })).rejects.toThrow(/standalone_seeding_unsupported/);
+    await expect(main({ ...configured, policyProposal: undefined })).rejects.toThrow(/standalone_seeding_unsupported/);
     const get = fixture.githubClient.rest.actions.getWorkflowRun;
     fixture.githubClient.rest.actions.getWorkflowRun = async parameters => ({ status: 200, data: { ...(await get(parameters)).data, run_attempt: 2 } });
-    await expect(main(configured)).rejects.toThrow(/rerun/);
+    await expect(main(configured)).rejects.toThrow(/standalone_seeding_unsupported/);
     expect(initialize).not.toHaveBeenCalled();
   });
 
@@ -149,21 +142,15 @@ describe("authenticated immutable activation snapshots", () => {
         policy.class_weights[0]++;
       },
     });
-    let log = { sha: null, transactions: [], state: newState() };
-    const initialize = vi.fn(async () => {
-      const transactions = winner.transactions.slice(0, 1);
-      log = { sha: "concurrent-winner", transactions, state: replayTransactions(transactions) };
-    });
+    const transactions = winner.transactions.slice(0, 1);
+    const log = { sha: "concurrent-winner", transactions, state: replayTransactions(transactions) };
     await expect(
       main({
         ...options,
         policyProposal: fixture.policy,
-        initializationContext: { role: "administrator", roles: ["administrator"], authenticated: true, principal: "11", repository: REPOSITORY },
-        initializeWorkQueue: initialize,
         readWorkQueueLog: async () => log,
       })
     ).rejects.toThrow(/proposal_mismatch/);
-    expect(initialize).toHaveBeenCalledTimes(1);
     expect(log.state.policy).toEqual(winner.policy);
     expect(fs.existsSync(options.snapshotPath)).toBe(false);
   });

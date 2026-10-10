@@ -4,11 +4,11 @@
 const { TextDecoder } = require("node:util");
 const { createHash } = require("node:crypto");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("store");
-const { canonical, digest, identity, integer, queueError } = require("./work_queue_codec.cjs");
-const { actorFromContext, defaultPolicy, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
+const { canonical, identity, integer, queueError } = require("./work_queue_codec.cjs");
+const { actorFromContext, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
 const { assignmentsForRequest } = require("./work_queue_scheduler.cjs");
 const { validateEffectResource } = require("./work_queue_resource_scope.cjs");
-const { verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
+const { verifyWorkerRoute, verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
 const { writeWorkQueueUpdateSummary } = require("./work_queue_summary_renderer.cjs");
 const {
   appendCommit,
@@ -81,16 +81,6 @@ async function verifyRepository(githubClient, owner, repo) {
   // Installation-token collaborator flags are not token scopes; Git reads establish contents access.
   log.debug("repository.verify.complete");
   return response.data;
-}
-
-async function initializationPolicy({ githubClient, owner, repo, actor, policyProposal }) {
-  if (policyProposal !== undefined) return validatePolicy(structuredClone(policyProposal));
-  const repository = await verifyRepository(githubClient, owner, repo);
-  if (typeof repository.default_branch !== "string") throw queueError("policy_missing", "default Policy requires the verified repository default revision or a trusted compiled proposal");
-  validateBranch(repository.default_branch);
-  const ref = await readRef(githubClient, owner, repo, repository.default_branch);
-  if (typeof ref !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(ref)) throw queueError("policy_missing", "default Policy requires an immutable verified repository default revision");
-  return defaultPolicy({ repository: actor.repository, principal: actor.principal, ref });
 }
 
 async function readRef(githubClient, owner, repo, branch) {
@@ -423,6 +413,7 @@ async function publishWorkQueueRequest({
   if (actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "authenticated context belongs to another repository");
   validateRequest(request, actor);
   validateRequestRole(actor, request.kind);
+  if (initializationContext !== undefined || initializeOnly) throw queueError("unsupported_protocol", "standalone Policy seeding is unsupported; submit Work with the approved Policy proposal");
   if (refreshObservations && (typeof refreshObservations !== "function" || request.kind !== "dispatch_next")) throw queueError("request_invalid", "observation refresh is only supported for stable dispatch_next requests");
   if (remediationVerifier !== undefined && typeof remediationVerifier !== "function") throw queueError("request_invalid", "remediation verification requires a trusted host capability");
   // Capture stable semantic data once. A generator receives a copy, not authority.
@@ -437,11 +428,10 @@ async function publishWorkQueueRequest({
     observedPrefix = current.transactions;
     const recovered = stableRequestResult(current, stable, stableActor);
     if (recovered) return recovered;
-    if (initializeOnly && current.sha) return { ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: false, rejected: [] };
     let bootstrapOperation;
     if (!current.sha) {
       if (stableActor.role === "worker") throw queueError("claim_scope_invalid", "a worker cannot have effective Claim authority in an uninitialized queue");
-      if (stable.kind === "submit" && ["producer", "dispatcher"].includes(stableActor.role) && initializationContext === undefined) {
+      if (stable.kind === "submit" && ["producer", "dispatcher"].includes(stableActor.role)) {
         if (policyProposal === undefined) throw queueError("policy_missing", "first producer submission requires a compiler-approved Policy proposal");
         const policy = validatePolicy(structuredClone(policyProposal));
         const seed = createHash("sha256").update(stable.id, "utf8").digest("hex");
@@ -450,22 +440,7 @@ async function publishWorkQueueRequest({
           ...current,
           state: { ...current.state, repository: stableActor.repository, policy, policy_epoch: bootstrapOperation.epoch },
         };
-      } else if (stable.kind !== "policy") {
-        log.debug("request.genesis.required");
-        // Genuine genesis only: separate explicit Policy request, never overlay an
-        // installed epoch with a compiled proposal after a publication conflict.
-        const genesisContext = initializationContext || (context.role === "administrator" ? context : null);
-        if (!genesisContext) throw queueError("policy_missing", "genuine genesis requires an explicit approved administrator context");
-        const genesisActor = actorFromContext(genesisContext);
-        if (genesisActor.role !== "administrator") throw queueError("actor_unauthorized", "trusted Policy initialization requires administrator credentials");
-        const installed = await initializationPolicy({ githubClient, owner, repo, actor: genesisActor, policyProposal });
-        const seed = createHash("sha256").update(stable.id, "utf8").digest("hex");
-        const policyOperation = { kind: "Policy", epoch: `epoch_${seed}`, policy: installed };
-        const initRequest = newRequest(`init_${seed}`, "policy", genesisActor, { operations: [policyOperation] });
-        await publishWorkQueueRequest({ githubClient, owner, repo, branch, request: initRequest, actor: genesisActor, context: genesisContext, initializeOnly: true, maxRetries, now, commitId, sleepFn, core: coreApi });
-        current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
-        observedPrefix = current.transactions;
-      }
+      } else throw queueError("queue_missing", "submit Work to bootstrap an absent queue; standalone Policy seeding is unsupported");
     }
     validateRequestContext(current.state, stable, stableActor);
     if (stableActor.role === "worker" && ["submit", "dispatch_next", "observe"].includes(stable.kind)) validateWorkerContinuation(current.state, context);
@@ -502,7 +477,19 @@ async function publishWorkQueueRequest({
     const checked = appendCommit(current.transactions, candidate);
     log.debug("request.candidate.checked", { operations: checked.commit.operations.length });
     if (bootstrapOperation) await prepareEmptyRepository(githubClient, owner, repo, branch);
-    if (policyOp) await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
+    if (policyOp) {
+      if (policyOp.policy.authorization === "aw") {
+        const verified = new Set();
+        for (const operation of checked.commit.operations) {
+          if (operation.kind !== "Work") continue;
+          const profile = policyOp.policy.pools[operation.pool].profiles[operation.worker_profile];
+          const route = `${profile.workflow}@${profile.ref}`;
+          if (verified.has(route)) continue;
+          await verifyWorkerRoute({ githubClient, owner, repo, profile });
+          verified.add(route);
+        }
+      } else await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
+    }
     let sha;
     try {
       sha = await writeCandidate({ githubClient, owner, repo, current, transactions: checked.transactions });
@@ -548,22 +535,9 @@ function applyAndPublishWorkQueueTransactions(options) {
   return publishWorkQueueRequest(options);
 }
 
-async function initializeWorkQueue(options) {
-  log.debug("queue.initialize.start");
-  const actor = actorFromContext(options.context);
-  if (actor.role !== "administrator") throw queueError("actor_unauthorized", "trusted Policy initialization requires administrator credentials");
-  const branch = options.branch || WORK_QUEUE_BRANCH;
-  const current = await readWorkQueueLog({ ...options, branch });
-  if (current.sha) {
-    const operation = { kind: "Policy", epoch: current.state.policy_epoch, policy: current.state.policy };
-    const request = newRequest(`init:${digest({ actor, branch, operation })}`, "policy", actor, { operations: [operation] });
-    const recovered = stableRequestResult(current, request, actor);
-    return recovered || { ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: false, rejected: [] };
-  }
-  const policy = await initializationPolicy({ ...options, actor });
-  const operation = { kind: "Policy", epoch: options.epoch || "initial", policy };
-  const request = newRequest(`init:${digest({ actor, branch, operation })}`, "policy", actor, { operations: [operation] });
-  return publishWorkQueueRequest({ ...options, actor, request, initializeOnly: true });
+/** @param {unknown} _options */
+async function initializeWorkQueue(_options) {
+  throw queueError("unsupported_protocol", "standalone Policy seeding is unsupported; submit Work with the approved Policy proposal");
 }
 
 module.exports = {

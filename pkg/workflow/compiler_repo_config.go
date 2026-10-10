@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -19,6 +20,10 @@ func (c *Compiler) loadRepoConfig() (*RepoConfig, error) {
 	c.repoConfigLoaded = true
 	if c.repoConfigErr != nil {
 		repoConfigLog.Printf("loadRepoConfig: failed to load repo config: %v", c.repoConfigErr)
+		if errors.Is(c.repoConfigErr, errWorkQueueConfig) {
+			fmt.Fprintln(os.Stderr, formatCompilerMessage(RepoConfigFileName, "error", fmt.Sprintf("invalid global work_queue configuration: %v", c.repoConfigErr)))
+			return c.repoConfig, c.repoConfigErr
+		}
 		fmt.Fprintln(
 			os.Stderr,
 			formatCompilerMessage(

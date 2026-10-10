@@ -44,7 +44,11 @@ tools:
     worker: true
 ```
 
-These declarations are only part of deployment. Configure approved worker routes, producer permissions, capacity limits, and queue-branch writer restrictions using the [work-queue deployment guide](/gh-aw/guides/deploy-work-queue/). Frontmatter alone does not install Policy or protect the queue branch; the first trusted producer submit bootstraps Policy, and automated enforcement of writer restrictions remains deferred.
+These declarations are only part of deployment. Configure approved worker routes,
+producer permissions and capacity limits using the
+[work-queue deployment guide](/gh-aw/guides/deploy-work-queue/). Frontmatter alone
+does not install Policy; the first trusted producer submit automatically
+bootstraps Policy and Work.
 
 ```mermaid
 flowchart LR

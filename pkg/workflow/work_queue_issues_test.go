@@ -79,9 +79,16 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "worker.md")
 	compile := func(issues string, trial bool) map[string]any {
-		source := "---\non: workflow_dispatch\nengine: claude\ntools:\n  work-queue:\n    worker: true\n" + issues + "safe-outputs:\n  noop:\n---\nProcess Claims.\n"
+		source := "---\non: workflow_dispatch\nengine: claude\ntools:\n  work-queue:\n    worker: true\nsafe-outputs:\n  noop:\n---\nProcess Claims.\n"
 		require.NoError(t, os.WriteFile(file, []byte(source), 0o600))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".github", "workflows"), 0o755))
+		config := "{}"
+		if issues != "" {
+			config = `{"work_queue":{"issues":` + issues + `}}`
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(dir, RepoConfigFileName), []byte(config), 0o600))
 		compiler := NewCompiler(WithVersion("integration"))
+		compiler.gitRoot = dir
 		compiler.SetApprove(true)
 		compiler.SetTrialMode(trial)
 		require.NoError(t, compiler.CompileWorkflow(file))
@@ -92,7 +99,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 		return compiled
 	}
 	baseline := compile("", false)
-	enabled := compile("    issues:\n      label: cookie\n", false)
+	enabled := compile(`{"label":"cookie"}`, false)
 	baseJobs := baseline["jobs"].(map[string]any)
 	jobs := enabled["jobs"].(map[string]any)
 	require.Len(t, jobs, len(baseJobs))
@@ -124,7 +131,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 		}
 	}
 	require.True(t, seen)
-	trial := compile("    issues: true\n", true)
+	trial := compile("true", true)
 	for _, name := range []string{"activation", "conclusion"} {
 		for _, value := range trial["jobs"].(map[string]any)[name].(map[string]any)["steps"].([]any) {
 			step := value.(map[string]any)

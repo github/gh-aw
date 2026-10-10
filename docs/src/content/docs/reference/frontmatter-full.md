@@ -18,113 +18,6 @@ JSON Schema for validating agentic workflow frontmatter configuration
 
 ```yaml wrap
 ---
-# Version-3 scheduling policy proposal. Workers and dispatchers proposing Policy
-# require explicit approved worker-profiles or pools with fixed numeric launch
-# principals; a dispatcher actor ID does not identify an alternate dispatch
-# credential. Credential-only read bindings are separate adapter configuration.
-# The installed ledger Policy remains authoritative; scheduling cannot be
-# disabled.
-# (optional)
-work-queue-policy:
-  # (optional)
-  mode: "weighted-priority"
-
-  # (optional)
-  class-weights: []
-
-  # (optional)
-  accounting-weights:
-    {}
-
-  # (optional)
-  outstanding:
-    # (optional)
-    claims: 1
-
-    # (optional)
-    dispatches: 1
-
-    # (optional)
-    per-account-claims: 1
-
-  # (optional)
-  worker-profiles:
-    {}
-
-  # (optional)
-  pools:
-    {}
-
-  # (optional)
-  producers:
-    {}
-
-  # (optional)
-  projectors: []
-    # Array items:
-      principal: "example-value"
-
-      workflow: "example-value"
-
-      ref: "example-value"
-
-      pools: []
-        # Array of strings
-
-      repositories: []
-        # Array of strings
-
-  # (optional)
-  dependencies:
-    # (optional)
-    repositories: []
-      # Array of strings
-
-    # (optional)
-    max-observation-age: "example-value"
-
-    # Separate read-only repository credentials, never part of a Policy proposal or
-    # snapshot. Credential-only configuration uses the installed Policy's allowed
-    # repositories.
-    # (optional)
-    read-credentials:
-      {}
-
-  # (optional)
-  limits:
-    # (optional)
-    ledger-bytes: 1
-
-    # (optional)
-    recovery-bytes: 1
-
-    # (optional)
-    payload-bytes: 1
-
-    # (optional)
-    graph-nodes: 1
-
-    # (optional)
-    predecessors: 1
-
-    # (optional)
-    pending-nodes: 1
-
-    # (optional)
-    operations: 1
-
-    # (optional)
-    assignment-bytes: 1
-
-    # (optional)
-    result-bytes: 1
-
-    # (optional)
-    evidence-bytes: 1
-
-    # (optional)
-    observation-writes: 1
-
 # Workflow name that appears in the GitHub Actions interface. If not specified,
 # defaults to the filename without extension.
 # (optional)
@@ -4561,6 +4454,9 @@ tools:
 
     # Format 2: object
     issues:
+      # Repository label prefix; GitHub labels are limited to 50 characters, leaving at
+      # most 33 bytes for the prefix before the longest status suffix, ': Needs
+      # attention'.
       # (optional)
       label: "example-value"
 

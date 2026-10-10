@@ -9,7 +9,7 @@ const queue = require("./work_queue_replay.cjs");
 const store = require("./work_queue_store.cjs");
 const { canonical, closed, digest, integer, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { normalizeAssignment, normalizeClaimScope } = require("./work_queue_claim_scope.cjs");
-const { actorFromContext } = require("./work_queue_policy.cjs");
+const { actorFromContext, dispatchPrincipal } = require("./work_queue_policy.cjs");
 const { DEFAULT_FINISH_INTENT_PATH, loadWorkQueueSnapshot } = require("./work_queue_mcp_server.cjs");
 const { readIntentLines, requestForIntent } = require("./work_queue_intents.cjs");
 const { bindWorkerAssignment, loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
@@ -107,7 +107,7 @@ async function authorizeWorkerClaim(options = {}) {
   const latest = await loadQueue(configured);
   const { dispatch, profile } = validateStoredAssignment(latest.projection, assignment);
   const trustedContext = await authenticatePublisher({ ...configured, role: "worker", dispatch_id: assignment.dispatch_id, claim_handle: member.handle });
-  const expected = expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository);
+  const expected = expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository, dispatchPrincipal(dispatch));
   const native = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
   if (!dispatch.run || dispatch.state !== "bound" || canonical(dispatch.run) !== canonical(bindingForRun(native, expected))) throw new Error("work_queue_binding_not_durable");
   const targets = [normalized.repository, normalized.repo, normalized.target_repo, normalized["target-repo"]].filter(value => value !== undefined);
@@ -250,7 +250,7 @@ async function finalizeWorkerResults(options = {}) {
   if (isStagedMode(options) || isStagedMode(options.config))
     return { version: 3, dispatch_id: assignment.dispatch_id, claims: Object.fromEntries(assignment.claims.map(member => [member.handle, { state: "staged_preview", effects: "unknown" }])) };
   const trustedContext = await authenticatePublisher({ ...configured, role: "reconciler" });
-  const expected = { ...expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository), run_id: dispatch.run?.run_id };
+  const expected = { ...expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository, dispatchPrincipal(dispatch)), run_id: dispatch.run?.run_id };
   if (!dispatch.run) throw new Error("work_queue_binding_not_durable");
   if (trustedContext.run_id === dispatch.run.run_id && trustedContext.run_attempt !== 1) throw new Error("rerun_not_authorized");
   const results = Object.create(null);
