@@ -58,6 +58,39 @@ describe("Session CLI adapter", () => {
     expect(sessionCLI(["agent-markdown", file, "codex"])).toContain("Codex response");
   });
 
+  it("normalizes published Pi observations without replaying messages or changing provenance", () => {
+    const header = { type: "session.format", data: { version: 1 }, provenance: { component: "collector" } };
+    const provenance = { component: "agent", phase: "agent", path: "agent-session.jsonl", index: 1 };
+    const records = [
+      header,
+      { type: "pi.message_snapshot", timestamp: 0, data: { role: "assistant", model: "reported", usage: { input: 0 } }, provenance },
+      { type: "assistant.message", data: { content: " exact answer\n", nativeExtra: [false, 0, null] }, provenance: { ...provenance, index: 2 } },
+      { type: "session.result", data: { numTurns: 1, usage: { inputTokens: 0 } }, provenance: { ...provenance, index: 3 } },
+      { type: "pi.future_extension", data: { opaque: [false, 0, null] }, provenance: { ...provenance, index: 4 } },
+    ];
+    const file = write("published.jsonl", records);
+    const text = sessionCLI(["normalize", file, "pi"]);
+    const normalized = text.trim().split("\n").map(JSON.parse);
+    expect(normalized[1]).toEqual({ type: "session.info", timestamp: 0, data: { model: "reported", sourceType: "message_snapshot", role: "assistant", usageSnapshot: { input: 0 } }, provenance });
+    expect(normalized.slice(2)).toEqual(records.slice(2));
+    expect(sessionCLI(["normalize", write("normalized.jsonl", text), "pi"])).toBe(text);
+    expect(sessionCLI(["normalize", file, "copilot"])).toBe(fs.readFileSync(file, "utf8"));
+    expect(sessionCLI(["normalize", file])).toBe(fs.readFileSync(file, "utf8"));
+  });
+
+  it("projects every expanded legacy subagent observation while retaining its source provenance", () => {
+    const provenance = { component: "agent", phase: "agent", path: "agent-session.jsonl", index: 0 };
+    const file = write("published-subagent.jsonl", [
+      { type: "session.format", data: { version: 1 }, provenance: { component: "collector" } },
+      { type: "pi.subagent_dispatch", data: { agent: "reader", invocation_id: "child", resolved_model: "small" }, provenance },
+    ]);
+    const normalized = sessionCLI(["normalize", file, "pi"]).trim().split("\n").map(JSON.parse);
+    expect(normalized.slice(1)).toEqual([
+      { type: "subagent.started", agentId: "child", data: { invocationId: "child", agentName: "reader", resolvedModel: "small" }, provenance },
+      { type: "subagent.configured", agentId: "child", data: { invocationId: "child", model: "small" }, provenance },
+    ]);
+  });
+
   it("rejects unrecognized agent logs rather than returning a metadata-only session", () => {
     write("agent-stdio.log", "unrecognized log text\n");
     vi.spyOn(console, "error").mockImplementation(() => {});

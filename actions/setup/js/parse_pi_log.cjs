@@ -12,7 +12,7 @@ const {
   parseLogEntries,
 } = require("./log_parser_shared.cjs");
 const { transformFlatSessionEntries, projectSessionResult, selectSessionResult, reconcileSessionUsage } = require("./agent_session.cjs");
-const { transformPiV3Entries, computePiV3Stats } = require("./pi_session.cjs");
+const { transformPiV3Entries, computePiV3Stats, normalizePiObservations } = require("./pi_session.cjs");
 
 const main = createEngineLogParser({
   parserName: "Pi",
@@ -61,7 +61,7 @@ function parsePiLog(logContent) {
   const logEntries = useV3Schema ? transformPiV3Entries(rawEntries) : transformPiEntries(rawEntries);
 
   const stats = useV3Schema ? computePiV3Stats(rawEntries) : null;
-  const canonicalLogEntries = convertLegacyLogEntriesToCopilotEvents(logEntries, { sourceEngine: "pi" });
+  const canonicalLogEntries = normalizePiObservations(convertLegacyLogEntriesToCopilotEvents(logEntries, { sourceEngine: "pi" }));
   if (stats) {
     const terminal = [...canonicalLogEntries].reverse().find(event => event.type === "session.result");
     const selected = selectSessionResult(canonicalLogEntries);
@@ -171,5 +171,6 @@ if (typeof module !== "undefined" && module.exports) {
     transformPiV3Entries,
     computePiV3Stats,
     normalizePiToolName,
+    normalizeSessionEvents: normalizePiObservations,
   };
 }

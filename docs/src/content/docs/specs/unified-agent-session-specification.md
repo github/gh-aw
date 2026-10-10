@@ -1035,6 +1035,27 @@ repeated anonymous text does not establish snapshot coverage.
 | Recognized `agent_end` or other terminal accounting | Reconcile any supplied session snapshot; do not add it again to per-turn totals. |
 | `agent_start`, `agent_settled`, retry, compaction, queue, entry, and reasoning-effort observations | Engine-independent `session.*` lifecycle extensions retaining the supplied payload. |
 
+Known historical `pi.*` observations in saved Pi sessions are normalized without
+replaying them as new conversation or inference usage. The engine dispatcher
+invokes the Pi adapter's saved-observation normalization hook; shared collection
+and CLI code do not import Pi-specific migration logic.
+
+| Historical observation | Normalized mapping |
+| --- | --- |
+| `pi.message_snapshot` | `session.info` with `sourceType: "message_snapshot"`, role/model/correlation metadata, and `usageSnapshot`. |
+| Argument `pi.message_update` | `tool.execution_update` retaining the native update subtype, argument fragments or finalized input, correlation, and optional `usageSnapshot`. |
+| Other `pi.message_update` | `assistant.message_update`, retaining the supplied boundary or update payload without inventing text. |
+| `pi.tool_execution_update` | `tool.execution_update` with partial output and the observed input and identities. |
+| `pi.error` | `session.error`. |
+| Recognized Pi lifecycle or subagent wrappers | The corresponding engine-independent `session.*` or `subagent.*` events. |
+
+`usageSnapshot` is repeated observation metadata, not additive accounting.
+Existing final messages, tool outcomes, and `session.result` accounting remain
+authoritative. Missing content in a compact historical snapshot is not recovered
+from model/usage metadata. Unknown `pi.*` extensions remain opaque. The session
+download command applies this normalization to published JSONL only when trusted
+run metadata identifies Pi; it does not rewrite stored Actions artifacts.
+
 The adapter can discover a reported model from a finalized turn without inventing an earlier model observation. Presentation aliases such as `bash` → `Bash` do not change canonical tool names. Sources lacking duration or cost do not supply zero duration or zero cost.
 
 ### 7.6 Custom engines
@@ -1355,7 +1376,7 @@ payloads with harmless examples.
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
-| Pi | [Smoke success](https://github.com/github/gh-aw/actions/runs/37789661712) and [failed workflow](https://github.com/github/gh-aw/actions/runs/37865831889) | `pi-streaming.jsonl`, `agent-session.jsonl`, and `usage/aw_session.jsonl` | Complete downloaded traces replayed locally; historical custom wrappers are replaced prospectively, not rewritten in published artifacts. |
+| Pi | [Smoke success](https://github.com/github/gh-aw/actions/runs/37789661712) and [failed workflow](https://github.com/github/gh-aw/actions/runs/37865831889) | `pi-streaming.jsonl`, `agent-session.jsonl`, and `usage/aw_session.jsonl` | Complete native and saved traces replayed locally. Historical migration replaces 475/9,036 custom observations in each saved representation without changing conversation, tool outcomes, accounting, or provenance; the CLI normalizes downloaded copies, not stored artifacts. |
 | Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
 | AGY | [Smoke](https://github.com/github/gh-aw/actions/runs/37848575608) and [authentication check](https://github.com/github/gh-aw/actions/runs/37732637929) | Smoke `agent-stdio.log`, `agent-session.jsonl`, and `usage/aw_session.jsonl`; authentication receipt only, not a native transcript | `fixtures/agy_ci_sessions.cjs`, `parse_agy_log_conformance.test.cjs` |
 | Aider | [Smoke success](https://github.com/github/gh-aw/actions/runs/37863370348), [downstream failure](https://github.com/github/gh-aw/actions/runs/37976723705), and [rate-limit failure](https://github.com/github/gh-aw/actions/runs/37080828156) | Each modern native/canonical agent trace has six records; the historical run has startup-framed rate-limit errors but no conversation capture | Repository-relative `pkg/workflow/testdata/aider_session/`; native-hook reasoning/refusal/partial/accounting cases are synthetic. |

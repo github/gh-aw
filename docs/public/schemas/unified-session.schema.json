@@ -141,7 +141,12 @@
                 "content": { "$ref": "#/definitions/JsonValue" },
                 "model": { "$ref": "#/definitions/JsonValue" },
                 "status": { "$ref": "#/definitions/JsonValue" },
-                "sourceType": { "$ref": "#/definitions/JsonValue" }
+                "sourceType": { "$ref": "#/definitions/JsonValue" },
+                "role": { "$ref": "#/definitions/JsonValue" },
+                "messageId": { "$ref": "#/definitions/JsonValue" },
+                "toolCallId": { "$ref": "#/definitions/JsonValue" },
+                "toolName": { "$ref": "#/definitions/JsonValue" },
+                "usageSnapshot": { "$ref": "#/definitions/JsonValue", "description": "Repeated observed metadata, never additive inference usage." }
               }
             }
           }
@@ -306,6 +311,8 @@
                 "partial": { "$ref": "#/definitions/JsonValue" },
                 "delta": { "$ref": "#/definitions/JsonValue" },
                 "contentIndex": { "$ref": "#/definitions/JsonValue" },
+                "sourceType": { "$ref": "#/definitions/JsonValue" },
+                "usageSnapshot": { "$ref": "#/definitions/JsonValue", "description": "Repeated observed metadata, never additive inference usage." },
                 "toolCallId": { "type": "string" },
                 "stepIndex": { "$ref": "#/definitions/SessionCount" },
                 "toolName": { "type": "string" },

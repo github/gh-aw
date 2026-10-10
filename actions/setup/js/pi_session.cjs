@@ -1,7 +1,7 @@
 // @ts-check
 
 const { isDeepStrictEqual } = require("node:util");
-const { createSessionEvent, isSessionEvent, normalizeAgentSession, transformFlatSessionEntries, isMetric, isTokenCount } = require("./agent_session.cjs");
+const { createSessionEvent, isSessionEvent, normalizeAgentSession, transformFlatSessionEntries, isMetric, isTokenCount, sessionScopeKey } = require("./agent_session.cjs");
 
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {{content: string, segments: SessionEvent[]}} TextState */
@@ -21,6 +21,82 @@ const PI_SESSION_EVENT_TYPES = {
   summarization_retry_attempt_start: "session.summarization_retry_attempt_start",
   summarization_retry_finished: "session.summarization_retry_finished",
 };
+
+const PI_LEGACY_SUBAGENT_TYPES = {
+  "pi.subagent_dispatch": "gh_aw_subagent_dispatch",
+  "pi.subagent_event": "gh_aw_subagent_event",
+  "pi.subagent_result": "gh_aw_subagent_result",
+};
+
+/** @param {any} record @returns {boolean} */
+function isLegacyPiObservation(record) {
+  if (!isSessionEvent(record) || (record.data.sourceEngine !== undefined && record.data.sourceEngine !== "pi")) return false;
+  return (
+    ["pi.message_snapshot", "pi.message_update", "pi.tool_execution_update", "pi.error"].includes(record.type) ||
+    Object.hasOwn(PI_LEGACY_SUBAGENT_TYPES, record.type) ||
+    (record.type.startsWith("pi.") && Object.hasOwn(PI_SESSION_EVENT_TYPES, record.type.slice(3)))
+  );
+}
+
+/**
+ * Normalize saved Pi observations without replaying snapshots as new messages.
+ * @param {any[]} records
+ * @param {(event: SessionEvent) => SessionEvent} [mapLegacyEvent] Applied only to converted historical observations.
+ * @returns {any[]}
+ */
+function normalizePiObservations(records, mapLegacyEvent) {
+  return records.some(isLegacyPiObservation) ? transformPiV3Entries(records, mapLegacyEvent) : records;
+}
+
+/**
+ * @param {any} record
+ * @param {Map<string, {toolCallId?: string, toolName?: string}>} calls
+ * @returns {any}
+ */
+function normalizeLegacyPiObservation(record, calls) {
+  if (!isLegacyPiObservation(record)) return record;
+  const data = { ...record.data, sourceEngine: "pi" };
+  const scope = `${sessionScopeKey(record)}:${JSON.stringify(data.parentToolCallId !== undefined ? data.parentToolCallId : record.parentToolCallId)}:`;
+  if (Object.hasOwn(PI_LEGACY_SUBAGENT_TYPES, record.type)) return { ...record, ...data, type: PI_LEGACY_SUBAGENT_TYPES[record.type] };
+  if (record.type === "pi.message_snapshot") {
+    const message = record.message;
+    for (const key of ["role", "model", "toolCallId", "toolName"]) if (data[key] === undefined && message?.[key] !== undefined) data[key] = message[key];
+    if (data.role === "assistant") {
+      for (const key of calls.keys()) if (key.startsWith(scope)) calls.delete(key);
+    }
+    const messageId = message?.id !== undefined ? message.id : message?.responseId;
+    if (data.messageId === undefined && messageId !== undefined) data.messageId = messageId;
+    if (data.usageSnapshot === undefined && data.usage !== undefined) data.usageSnapshot = data.usage;
+    return createSessionEvent(record, "session.info", { ...data, sourceType: "message_snapshot" });
+  }
+  if (record.type === "pi.tool_execution_update") {
+    if (data.output === undefined && Object.hasOwn(data, "partialResult")) data.output = data.partialResult;
+    return createSessionEvent(record, "tool.execution_update", { ...data, partial: true, sourceType: "tool_execution_update" });
+  }
+  if (record.type === "pi.message_update") {
+    if (!["toolcall_start", "toolcall_delta", "toolcall_end"].includes(data.type)) return createSessionEvent(record, "assistant.message_update", { ...data, sourceType: "message_update" });
+    const key = `${scope}${data.contentIndex}`;
+    const canCorrelate = isTokenCount(data.contentIndex);
+    const previous = data.type === "toolcall_start" || !canCorrelate ? {} : calls.get(key) || {};
+    const id = data.toolCallId !== undefined ? data.toolCallId : data.toolCall?.id !== undefined ? data.toolCall.id : data.type === "toolcall_start" ? data.id : undefined;
+    const name = data.toolName !== undefined ? data.toolName : data.toolCall?.name;
+    if (id !== undefined) data.toolCallId = id;
+    else if (data.toolCallId === undefined && previous.toolCallId !== undefined) data.toolCallId = previous.toolCallId;
+    if (name !== undefined) data.toolName = name;
+    else if (data.toolName === undefined && previous.toolName !== undefined) data.toolName = previous.toolName;
+    if (data.type === "toolcall_start") calls.delete(key);
+    if (canCorrelate && (typeof data.toolCallId === "string" || typeof data.toolName === "string")) calls.set(key, { toolCallId: data.toolCallId, toolName: data.toolName });
+    if (data.type === "toolcall_delta" && typeof data.delta === "string") {
+      data.input = data.delta;
+      data.delta = true;
+    } else if (data.input === undefined && data.toolCall && Object.hasOwn(data.toolCall, "arguments")) data.input = data.toolCall.arguments;
+    if (data.usageSnapshot === undefined && data.usage !== undefined) data.usageSnapshot = data.usage;
+    if (data.type === "toolcall_end") calls.delete(key);
+    return createSessionEvent(record, "tool.execution_update", { ...data, partial: true, sourceType: data.type });
+  }
+  if (record.type === "pi.error") return createSessionEvent(record, "session.error", data);
+  return createSessionEvent(record, PI_SESSION_EVENT_TYPES[record.type.slice(3)], data);
+}
 
 /** @param {any} message @returns {string|undefined} */
 function messageIdentity(message) {
@@ -52,14 +128,16 @@ function isPiResultError(result) {
  * Pi repeats complete messages at message_end, turn_end and agent_end. Text deltas
  * are observations, whereas those envelopes are snapshots of the same message.
  * @param {Array<any>} records
+ * @param {(event: SessionEvent) => SessionEvent} [mapLegacyEvent]
  * @returns {SessionEvent[]}
  */
-function transformPiV3Entries(records) {
+function transformPiV3Entries(records, mapLegacyEvent = event => event) {
   records = records.filter(record => record && typeof record === "object" && !Array.isArray(record));
   /** @type {SessionEvent[]} */
   const events = [];
   const subagentInvocations = new Map();
   const subagentInvocationCounts = new Map();
+  const legacyCallIds = new Map();
   const executionEnds = new Set(records.filter(r => r.type === "tool_execution_end" && r.toolCallId !== undefined).map(r => r.toolCallId));
   const calls = new Map();
   const completions = new Set();
@@ -70,6 +148,7 @@ function transformPiV3Entries(records) {
   let assistantState = newMessageState();
   let activeState = assistantState;
   let partialAssistant = false;
+  let legacyObservation = false;
   /**
    * @template {SessionEvent["type"]} T
    * @param {any} raw
@@ -79,7 +158,7 @@ function transformPiV3Entries(records) {
   const emit = (raw, type, data, metadata = {}) => {
     const event = createSessionEvent(raw, type, data);
     Object.assign(event, metadata);
-    events.push(event);
+    events.push(legacyObservation ? mapLegacyEvent(event) : event);
     return event;
   };
   const invocationIdentity = (raw, dispatch) => {
@@ -223,10 +302,12 @@ function transformPiV3Entries(records) {
     }
   };
 
-  for (const raw of records) {
+  for (const record of records) {
+    legacyObservation = isLegacyPiObservation(record);
+    const raw = normalizeLegacyPiObservation(record, legacyCallIds);
     if (isSessionEvent(raw)) {
       const event = structuredClone(raw);
-      events.push(event);
+      events.push(legacyObservation ? mapLegacyEvent(event) : event);
       if (event.type === "tool.execution_start" && event.data.toolCallId !== undefined) calls.set(event.data.toolCallId, event);
     } else if (raw.type === "gh_aw_subagent_dispatch") {
       const invocationId = invocationIdentity(raw, true);
@@ -487,4 +568,4 @@ function computePiV3Stats(records) {
   };
 }
 
-module.exports = { transformPiV3Entries, computePiV3Stats };
+module.exports = { transformPiV3Entries, computePiV3Stats, normalizePiObservations };
