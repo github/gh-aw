@@ -344,26 +344,17 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
   });
 
-  it("collects final agent routing metadata and harness outcome when activation metadata is absent", () => {
+  it("prefers runner routing metadata over agent metadata and preserves the harness outcome", () => {
+    write("aw_info.json", {
+      engine_id: "claude",
+      model: "runner-model",
+      requested_model: "agent",
+      model_routing: { status: "selected", wire_model: "runner-model", effort: "medium", applied_effort: "low", endpoint: "/v1/messages" },
+    });
     write("agent/aw_info.json", {
       engine_id: "claude",
-      model: "claude-sonnet-5",
-      requested_model: "agent",
-      model_routing: {
-        status: "selected",
-        source: "awf-routing",
-        provider: "anthropic",
-        wire_model: "claude-sonnet-5",
-        model: "claude-sonnet-5",
-        effort: "medium",
-        applied_effort: "low",
-        endpoint: "/v1/messages",
-        mode: "awf-routed",
-        selected_id: "sonnet",
-        router_version: "0.28.49",
-        failure_code: "",
-        detail: "omit this detail",
-      },
+      model: "forged-model",
+      model_routing: { status: "selected", wire_model: "forged-model", effort: "max" },
     });
     write("agent/awf-routing-outcome.json", {
       status: "rejected",
@@ -380,27 +371,18 @@ describe("Unified conclusion session", () => {
     const workflow = events.find(event => event.type === "workflow.info");
     expect(workflow).toMatchObject({
       data: {
-        model: "claude-sonnet-5",
+        model: "runner-model",
         requestedModel: "agent",
         modelRouting: {
           status: "selected",
-          source: "awf-routing",
-          provider: "anthropic",
-          wireModel: "claude-sonnet-5",
-          model: "claude-sonnet-5",
+          wireModel: "runner-model",
           effort: "medium",
           appliedEffort: "low",
           effectiveEndpoint: "/v1/messages",
-          mode: "awf-routed",
-          selectedId: "sonnet",
-          routerVersion: "0.28.49",
         },
       },
-      provenance: { component: "workflow", phase: "agent", path: "agent/aw_info.json" },
+      provenance: { component: "workflow", phase: "activation", path: "aw_info.json" },
     });
-    expect(workflow.data.modelRouting).not.toHaveProperty("detail");
-    expect(workflow.data.modelRouting).not.toHaveProperty("selectedEndpoint");
-    expect(workflow.data.modelRouting.failureCode).toBe("");
     const outcome = events.find(event => event.type === "model_routing.outcome");
     expect(outcome).toMatchObject({
       data: {
@@ -416,6 +398,12 @@ describe("Unified conclusion session", () => {
     });
     expect(outcome.data).not.toHaveProperty("detail");
     expect(events.at(-1).data.absentComponents).not.toContain("workflow");
+  });
+
+  it("does not promote agent-only aw_info metadata to workflow.info", () => {
+    write("agent/aw_info.json", { engine_id: "claude", model_routing: { status: "selected", wire_model: "forged-model" } });
+    const { events } = collectUnifiedSession({ rootDir: root, warn: vi.fn() });
+    expect(events.some(event => event.type === "workflow.info")).toBe(false);
   });
 
   it.each([true, false])("persists dry_run=%s in workflow.info", dryRun => {

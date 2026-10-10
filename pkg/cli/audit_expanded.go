@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -27,8 +28,8 @@ type AuditEngineConfig struct {
 	RequestedModel     string                      `json:"requested_model,omitempty" console:"header:Requested Model,omitempty"`
 	ModelEffort        string                      `json:"model_effort,omitempty" console:"header:Model Effort,omitempty"`
 	ModelRoutingStatus string                      `json:"model_routing_status,omitempty" console:"header:Model Routing,omitempty"`
-	HarnessOutcome     *AuditHarnessRoutingOutcome `json:"harness_outcome,omitempty"`
-	RoutingWarning     string                      `json:"routing_warning,omitempty"`
+	HarnessOutcome     *AuditHarnessRoutingOutcome `json:"harness_outcome,omitempty" console:"header:Harness Outcome,omitempty"`
+	RoutingWarning     string                      `json:"routing_warning,omitempty" console:"header:Routing Warning,omitempty"`
 	Version            string                      `json:"version,omitempty" console:"header:Version,omitempty"`
 	CLIVersion         string                      `json:"cli_version,omitempty" console:"header:CLI Version,omitempty"`
 	FirewallVersion    string                      `json:"firewall_version,omitempty" console:"header:Firewall Version,omitempty"`
@@ -176,9 +177,9 @@ type MCPSlowestToolCall struct {
 // The activation artifact may or may not have been flattened to the root directory.
 func findAwInfoPath(logsPath string) string {
 	candidates := []string{
-		filepath.Join(logsPath, "agent", "aw_info.json"),
 		filepath.Join(logsPath, "aw_info.json"),
 		filepath.Join(logsPath, "activation", "aw_info.json"),
+		filepath.Join(logsPath, "agent", "aw_info.json"),
 	}
 	for _, p := range candidates {
 		if fileutil.FileExists(p) {
@@ -196,17 +197,25 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 	awInfo := loadAwInfoForEngineConfig(logsPath)
 	if awInfo == nil {
 		auditExpandedLog.Printf("aw_info.json not found in %s", logsPath)
+		var config *AuditEngineConfig
 		if inferredEngineID != "" {
 			registry := workflow.GetGlobalEngineRegistry()
 			if engine, err := registry.GetEngine(inferredEngineID); err == nil {
 				auditExpandedLog.Printf("Inferred engine config without aw_info.json: engine=%s", inferredEngineID)
-				return &AuditEngineConfig{
+				config = &AuditEngineConfig{
 					EngineID:   inferredEngineID,
 					EngineName: engine.GetDisplayName(),
 				}
 			}
 		}
-		return nil
+		if config == nil {
+			config = &AuditEngineConfig{}
+		}
+		addHarnessRoutingOutcome(config, nil, logsPath)
+		if config.EngineID == "" && config.HarnessOutcome == nil {
+			return nil
+		}
+		return config
 	}
 
 	routing := analyzeModelRouting(logsPath)
@@ -239,10 +248,16 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 
 func addHarnessRoutingOutcome(config *AuditEngineConfig, awInfo *AwInfo, logsPath string) {
 	sessionRouting, _, err := readSessionModelRouting(logsPath)
-	if err != nil || sessionRouting == nil || sessionRouting.Outcome == nil {
+	var outcome *sessionModelRoutingOutcome
+	if err == nil && sessionRouting != nil {
+		outcome = sessionRouting.Outcome
+	}
+	if outcome == nil {
+		outcome = readHarnessRoutingOutcomeArtifact(logsPath)
+	}
+	if outcome == nil {
 		return
 	}
-	outcome := sessionRouting.Outcome
 	config.HarnessOutcome = &AuditHarnessRoutingOutcome{
 		Status:            outcome.Status,
 		WireModel:         outcome.WireModel,
@@ -252,17 +267,60 @@ func addHarnessRoutingOutcome(config *AuditEngineConfig, awInfo *AwInfo, logsPat
 		AppliedEffort:     outcome.AppliedEffort,
 		FailureCode:       outcome.FailureCode,
 	}
-	routing := awInfo.ModelRouting
-	if workflowInfo := sessionRouting.WorkflowInfo; workflowInfo != nil && workflowInfo.ModelRouting != nil {
-		data := workflowInfo.ModelRouting
-		routing = &AwInfoModelRouting{
-			Status: data.Status, WireModel: data.WireModel, Endpoint: data.EffectiveEndpoint,
-			SelectedEndpoint: data.SelectedEndpoint, Effort: data.Effort,
-			AppliedEffort: data.AppliedEffort, FailureCode: data.FailureCode,
+	var routing *AwInfoModelRouting
+	if awInfo != nil {
+		routing = awInfo.ModelRouting
+	}
+	if err == nil && sessionRouting != nil {
+		if workflowInfo := sessionRouting.WorkflowInfo; workflowInfo != nil && workflowInfo.ModelRouting != nil {
+			data := workflowInfo.ModelRouting
+			routing = &AwInfoModelRouting{
+				Status: data.Status, WireModel: data.WireModel, Endpoint: data.EffectiveEndpoint,
+				SelectedEndpoint: data.SelectedEndpoint, Effort: data.Effort,
+				AppliedEffort: data.AppliedEffort, FailureCode: data.FailureCode,
+			}
 		}
 	}
-	if sessionRouting.outcomeDisagreesWith(routing) {
+	if sessionRouting != nil && sessionRouting.outcomeDisagreesWith(routing) {
 		config.RoutingWarning = "Harness routing outcome disagrees with runner-written model routing metadata."
+	}
+}
+
+func readHarnessRoutingOutcomeArtifact(logsPath string) *sessionModelRoutingOutcome {
+	if logsPath == "" {
+		return nil
+	}
+	path := filepath.Join(logsPath, "agent", "awf-routing-outcome.json")
+	if err := validateSubagentSessionSource(path); err != nil {
+		return nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+	content, err := io.ReadAll(io.LimitReader(file, (64<<10)+1))
+	if err != nil || len(content) > 64<<10 {
+		return nil
+	}
+	var artifact struct {
+		Status            string `json:"status"`
+		WireModel         string `json:"wire_model"`
+		Endpoint          string `json:"endpoint"`
+		EffectiveEndpoint string `json:"effective_endpoint"`
+		SelectedEndpoint  string `json:"selected_endpoint"`
+		Effort            string `json:"effort"`
+		AppliedEffort     string `json:"applied_effort"`
+		FailureCode       string `json:"failure_code"`
+	}
+	if err := json.Unmarshal(content, &artifact); err != nil {
+		return nil
+	}
+	return &sessionModelRoutingOutcome{
+		Status: artifact.Status, WireModel: artifact.WireModel,
+		EffectiveEndpoint: firstNonEmpty(artifact.EffectiveEndpoint, artifact.Endpoint),
+		SelectedEndpoint:  artifact.SelectedEndpoint, Effort: artifact.Effort,
+		AppliedEffort: artifact.AppliedEffort, FailureCode: artifact.FailureCode,
 	}
 }
 
@@ -273,6 +331,7 @@ func loadAwInfoForEngineConfig(logsPath string) *AwInfo {
 			auditExpandedLog.Printf("Failed to parse aw_info.json for engine config: %v", err)
 			return nil
 		}
+		clearUntrustedAgentRoutingMetadata(logsPath, awInfoPath, awInfo)
 		return awInfo
 	}
 	sessionRouting, found, err := readSessionModelRouting(logsPath)
@@ -283,6 +342,16 @@ func loadAwInfoForEngineConfig(logsPath string) *AwInfo {
 		return sessionRouting.awInfo()
 	}
 	return nil
+}
+
+func clearUntrustedAgentRoutingMetadata(logsPath, awInfoPath string, awInfo *AwInfo) {
+	if awInfo != nil && filepath.Clean(awInfoPath) == filepath.Join(logsPath, "agent", "aw_info.json") {
+		if awInfo.ModelRouting != nil {
+			awInfo.Model = ""
+			awInfo.RequestedModel = ""
+		}
+		awInfo.ModelRouting = nil
+	}
 }
 
 func inferFallbackLogMetrics(logsPath string) (LogMetrics, string) {

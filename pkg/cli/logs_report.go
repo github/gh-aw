@@ -439,6 +439,7 @@ func extractRunEngineInfo(pr ProcessedRun) runEngineInfo {
 	var info runEngineInfo
 	awInfoPath := findAwInfoPath(pr.Run.LogsPath)
 	if parsed, err := parseAwInfo(awInfoPath, false); err == nil && parsed != nil {
+		clearUntrustedAgentRoutingMetadata(pr.Run.LogsPath, awInfoPath, parsed)
 		info.awInfo = parsed
 		info.engineID = parsed.EngineID
 		info.engineName = parsed.EngineName

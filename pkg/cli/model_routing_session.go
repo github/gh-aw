@@ -59,6 +59,7 @@ type sessionModelRoutingEvent struct {
 	Provenance struct {
 		Component string `json:"component"`
 		Phase     string `json:"phase"`
+		Path      string `json:"path"`
 	} `json:"provenance"`
 }
 
@@ -124,7 +125,10 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
-	case event.Type == "workflow.info" && event.Provenance.Component == "workflow":
+	case event.Type == "workflow.info" && event.Provenance.Component == "workflow" &&
+		(event.Provenance.Path == "aw_info.json" ||
+			event.Provenance.Path == "activation/aw_info.json" ||
+			event.Provenance.Path == "usage/aw_info.json"):
 		var info sessionWorkflowInfo
 		if err := json.Unmarshal(event.Data, &info); err != nil {
 			return fmt.Errorf("invalid workflow.info on line %d: %w", lineNumber, err)
@@ -169,13 +173,13 @@ func (attribution *sessionModelRoutingAttribution) outcomeDisagreesWith(routing 
 		return false
 	}
 	outcome := attribution.Outcome
-	return (outcome.Status != "" && outcome.Status != routing.Status) ||
-		(outcome.WireModel != "" && outcome.WireModel != routing.WireModel) ||
-		(outcome.EffectiveEndpoint != "" && outcome.EffectiveEndpoint != routing.Endpoint) ||
-		(outcome.SelectedEndpoint != "" && outcome.SelectedEndpoint != routing.SelectedEndpoint) ||
-		(outcome.Effort != "" && outcome.Effort != routing.Effort) ||
-		(outcome.AppliedEffort != "" && outcome.AppliedEffort != routing.AppliedEffort) ||
-		(outcome.FailureCode != "" && outcome.FailureCode != routing.FailureCode)
+	return (outcome.Status != "" && routing.Status != "" && outcome.Status != routing.Status) ||
+		(outcome.WireModel != "" && routing.WireModel != "" && outcome.WireModel != routing.WireModel) ||
+		(outcome.EffectiveEndpoint != "" && routing.Endpoint != "" && outcome.EffectiveEndpoint != routing.Endpoint) ||
+		(outcome.SelectedEndpoint != "" && routing.SelectedEndpoint != "" && outcome.SelectedEndpoint != routing.SelectedEndpoint) ||
+		(outcome.Effort != "" && routing.Effort != "" && outcome.Effort != routing.Effort) ||
+		(outcome.AppliedEffort != "" && routing.AppliedEffort != "" && outcome.AppliedEffort != routing.AppliedEffort) ||
+		(outcome.FailureCode != "" && routing.FailureCode != "" && outcome.FailureCode != routing.FailureCode)
 }
 
 func (attribution *sessionModelRoutingAttribution) awInfo() *AwInfo {

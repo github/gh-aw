@@ -276,23 +276,25 @@ func TestApplyAwInfoModelRoutingAddsEndpointMetadata(t *testing.T) {
 	}
 }
 
-func TestApplyAwInfoModelRoutingPrefersAgentArtifactCopy(t *testing.T) {
+func TestApplyAwInfoModelRoutingPrefersRunnerMetadata(t *testing.T) {
 	runDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(runDir, "agent"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{"model":"agent"}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(
+		`{"model":"runner-model","model_routing":{"status":"selected","endpoint":"/responses","selected_endpoint":"/responses"}}`,
+	), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "agent", "aw_info.json"), []byte(
-		`{"model":"claude-opus-5","model_routing":{"status":"selected","endpoint":"/v1/messages","selected_endpoint":"/chat/completions"}}`,
+		`{"model":"forged-model","model_routing":{"status":"selected","endpoint":"/v1/messages","selected_endpoint":"/chat/completions"}}`,
 	), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	result := applyAwInfoModelRouting(&ModelRoutingSummary{Status: "selected", Endpoint: "/chat/completions"}, runDir)
-	if result.EffectiveEndpoint != "/v1/messages" || result.SelectedEndpoint != "/chat/completions" {
-		t.Fatalf("agent artifact endpoint metadata was not preferred: %+v", result)
+	if result.EffectiveEndpoint != "/responses" || result.SelectedEndpoint != "/responses" {
+		t.Fatalf("runner endpoint metadata was not preferred: %+v", result)
 	}
 }
 
@@ -352,7 +354,7 @@ func TestUnifiedSessionModelRoutingAttribution(t *testing.T) {
 	}
 	session := strings.Join([]string{
 		`{"type":"session.format","data":{"version":1},"provenance":{"component":"collector","phase":"conclusion","path":"usage/aw_session.jsonl","index":0}}`,
-		`{"type":"workflow.info","data":{"engineId":"claude","model":"claude-sonnet-5","requestedModel":"agent","modelRouting":{"status":"selected","source":"awf-routing","provider":"anthropic","wireModel":"claude-sonnet-5","model":"claude-sonnet-5","effort":"medium","appliedEffort":"max","effectiveEndpoint":"/v1/messages","selectedEndpoint":"/chat/completions","mode":"awf-routed","selectedId":"sonnet","routerVersion":"0.28.49"}},"provenance":{"component":"workflow","phase":"agent","path":"agent/aw_info.json","index":0}}`,
+		`{"type":"workflow.info","data":{"engineId":"claude","model":"claude-sonnet-5","requestedModel":"agent","modelRouting":{"status":"selected","source":"awf-routing","provider":"anthropic","wireModel":"claude-sonnet-5","model":"claude-sonnet-5","effort":"medium","appliedEffort":"max","effectiveEndpoint":"/v1/messages","selectedEndpoint":"/chat/completions","mode":"awf-routed","selectedId":"sonnet","routerVersion":"0.28.49"}},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":0}}`,
 		`{"type":"model_routing.outcome","data":{"status":"rejected","wireModel":"forged-model","effectiveEndpoint":"/forged","selectedEndpoint":"/forged-selected","effort":"forged-effort","appliedEffort":"forged-applied-effort","failureCode":"forged-failure"},"provenance":{"component":"agent","phase":"agent","path":"agent/awf-routing-outcome.json","index":0}}`,
 	}, "\n") + "\n"
 	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0600); err != nil {
@@ -403,7 +405,10 @@ func TestOutcomeOnlySessionDoesNotAttributeModelRouting(t *testing.T) {
 	if err := os.MkdirAll(sessionDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	session := `{"type":"model_routing.outcome","data":{"status":"selected","wireModel":"forged-model"},"provenance":{"component":"agent","phase":"agent","path":"agent/awf-routing-outcome.json","index":0}}` + "\n"
+	session := strings.Join([]string{
+		`{"type":"workflow.info","data":{"engineId":"claude","model":"forged-model","modelRouting":{"status":"selected","wireModel":"forged-model"}},"provenance":{"component":"workflow","phase":"agent","path":"agent/aw_info.json","index":0}}`,
+		`{"type":"model_routing.outcome","data":{"status":"selected","wireModel":"forged-model"},"provenance":{"component":"agent","phase":"agent","path":"agent/awf-routing-outcome.json","index":0}}`,
+	}, "\n") + "\n"
 	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -415,8 +420,94 @@ func TestOutcomeOnlySessionDoesNotAttributeModelRouting(t *testing.T) {
 	if found || attribution.modelRouting() != nil || analyzeModelRouting(runDir) != nil {
 		t.Fatalf("outcome-only session attributed model routing: found=%t attribution=%+v", found, attribution)
 	}
-	if config := extractEngineConfigWithInferredEngine(runDir, ""); config != nil {
-		t.Fatalf("outcome-only session established engine attribution: %+v", config)
+	config := extractEngineConfigWithInferredEngine(runDir, "")
+	if config == nil || config.EngineID != "" || config.ModelRoutingStatus != "" ||
+		config.HarnessOutcome == nil || config.HarnessOutcome.WireModel != "forged-model" {
+		t.Fatalf("agent metadata established trusted attribution or outcome was lost: %+v", config)
+	}
+}
+
+func TestAgentAwInfoDoesNotEstablishModelRouting(t *testing.T) {
+	runDir := t.TempDir()
+	agentDir := filepath.Join(runDir, "agent")
+	if err := os.MkdirAll(agentDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "aw_info.json"), []byte(
+		`{"engine_id":"claude","model":"forged-model","model_routing":{"status":"selected","wire_model":"forged-model"}}`,
+	), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	config := extractEngineConfigWithInferredEngine(runDir, "")
+	if config == nil || config.EngineID != "claude" || config.ModelRoutingStatus != "" || config.Model != "" {
+		t.Fatalf("agent metadata was not isolated from trusted routing: %+v", config)
+	}
+	if summary := analyzeModelRouting(runDir); summary != nil {
+		t.Fatalf("agent aw_info established model routing: %+v", summary)
+	}
+}
+
+func TestMatchingSessionModelRoutingOutcomeDoesNotWarn(t *testing.T) {
+	runDir := t.TempDir()
+	sessionDir := filepath.Join(runDir, "usage")
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	session := strings.Join([]string{
+		`{"type":"workflow.info","data":{"engineId":"claude","model":"runner-model","modelRouting":{"status":"selected","wireModel":"runner-model"}},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":0}}`,
+		`{"type":"model_routing.outcome","data":{"status":"selected","wireModel":"runner-model","selectedEndpoint":"/responses","appliedEffort":"high"},"provenance":{"component":"agent","phase":"agent","path":"agent/awf-routing-outcome.json","index":0}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	config := extractEngineConfigWithInferredEngine(runDir, "")
+	if config == nil || config.RoutingWarning != "" {
+		t.Fatalf("matching outcome or unknown trusted fields produced a warning: %+v", config)
+	}
+	auditData := assembleAuditData(auditDataInputs{processedRun: ProcessedRun{Run: WorkflowRun{LogsPath: runDir}}})
+	if len(auditData.Warnings) != 0 {
+		t.Fatalf("matching outcome produced audit warnings: %+v", auditData.Warnings)
+	}
+}
+
+func TestHarnessOutcomeSurvivesMissingOrCorruptUnifiedSession(t *testing.T) {
+	for _, session := range []struct {
+		name string
+		data string
+	}{
+		{name: "missing"},
+		{name: "corrupt", data: `{"type":`},
+	} {
+		t.Run(session.name, func(t *testing.T) {
+			runDir := t.TempDir()
+			agentDir := filepath.Join(runDir, "agent")
+			if err := os.MkdirAll(agentDir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(agentDir, "awf-routing-outcome.json"), []byte(`{"status":"rejected","wire_model":"harness-model","endpoint":"/responses"}`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if session.data != "" {
+				sessionDir := filepath.Join(runDir, "usage")
+				if err := os.MkdirAll(sessionDir, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session.data), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			config := extractEngineConfigWithInferredEngine(runDir, "claude")
+			if config == nil || config.HarnessOutcome == nil ||
+				config.EngineID != "claude" ||
+				config.HarnessOutcome.Status != "rejected" ||
+				config.HarnessOutcome.WireModel != "harness-model" ||
+				config.HarnessOutcome.EffectiveEndpoint != "/responses" {
+				t.Fatalf("harness outcome missing without a usable session: %+v", config)
+			}
+		})
 	}
 }
 
