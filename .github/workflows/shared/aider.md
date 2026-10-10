@@ -401,7 +401,8 @@ engine:
         const interpretedTypes = new Set([
           "session.init", "session.start", "session.info", "session.shutdown",
           "session.task_complete", "user.message",
-          "assistant.message", "assistant.reasoning", "assistant.refusal",
+          "assistant.message", "assistant.message_delta",
+          "assistant.reasoning", "assistant.reasoning_delta", "assistant.refusal",
           "tool.execution_start", "tool.execution_update", "tool.execution_complete",
           "session.result", "session.error", "agent.execution",
           "detection.result", "session.format",
@@ -421,6 +422,7 @@ engine:
           "dynamicWorkflows.background_tasks_changed",
           "claude.assistant_error", "claude.api_retry", "turn.failed",
           "claude.stream_event", "claude.assistant_snapshot", "gemini.message_snapshot",
+          "pi.message_snapshot",
         ]);
         const isInterpreted = entry => interpretedTypes.has(entry.type) ||
           entry.type.startsWith("subagent.");

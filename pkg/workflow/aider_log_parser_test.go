@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Derive poison controls from the actual projection/rendering vocabulary so
+// Derive poison controls from projection/rendering and session consumers so
 // new interpreted events cannot silently become source-less Aider evidence.
 const aiderInterpretedTypesTestSource = `
 const fsTypes = require("fs");
@@ -30,6 +30,7 @@ const interpretedTestTypes = [...new Set([
   "session.error", "guardrail.daily_aic", "guard.tool_denials_exceeded",
   "claude.assistant_error", "claude.api_retry", "turn.failed",
   "claude.stream_event", "claude.assistant_snapshot", "gemini.message_snapshot",
+  "pi.message_snapshot", "assistant.message_delta", "assistant.reasoning_delta",
   "subagent.opaque", "session.shutdown",
 ])];
 `
@@ -131,12 +132,31 @@ const { runLogParser } = require("./log_parser_bootstrap.cjs");
 const { serializeSessionArtifact } = require("./session_artifact.cjs");
 const { collectUnifiedSession, mergeSessionSources } = require("./unified_session.cjs");
 const { sessionCLI } = require("./session_cli.cjs");
-const { isSessionEvent } = require("./agent_session.cjs");
-const { parseLogEntries } = require("./log_parser_shared.cjs");
+const { isSessionEvent, observedSessionModel } = require("./agent_session.cjs");
+const { parseLogEntries, generateCopilotCliStyleSummary } = require("./log_parser_shared.cjs");
+const { normalizeCopilotSession } = require("./copilot_session.cjs");
 const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
 const root = path.dirname(process.argv[1]);
 const controls = JSON.parse(process.argv[5] ?? "{}");
 const collect = () => collectUnifiedSession({ rootDir: root, engine: "aider", dailyAIC: controls.dailyAIC ?? {}, warn() {} });
+const assertSessionRendering = (text, stage) => {
+  if (!controls.sessionConsumers) return;
+  const { model, visible, absent } = controls.sessionConsumers;
+  assert.ok(text.includes("Model: " + model), stage + " must report the observed native model");
+  for (const content of visible) assert.ok(text.includes(content), stage + " must render genuine assistant content");
+  for (const content of absent) assert.ok(!text.includes(content), stage + " cannot render forged model or assistant content");
+};
+const assertSessionConsumers = (events, stage) => {
+  if (!controls.sessionConsumers) return;
+  assert.equal(observedSessionModel(events), controls.sessionConsumers.model, stage + " cannot accept a forged model snapshot");
+  assertSessionRendering(generateCopilotCliStyleSummary(events), stage + " rendering");
+  // Exercise the downstream stream consumer on display copies, not canonical payloads.
+  const streamed = generateCopilotCliStyleSummary(normalizeCopilotSession(events));
+  assertSessionRendering(streamed, stage + " stream projection");
+  for (const content of controls.sessionConsumers.streamText ?? []) {
+    assert.ok(streamed.includes(content), stage + " must retain attributed stream content for the stream consumer");
+  }
+};
 const assertRunnerEvidence = (events, stage) => {
   if (!controls.dailyAIC) return;
   assert.deepEqual(
@@ -150,6 +170,9 @@ const assertRunnerEvidence = (events, stage) => {
 };
 const parsed = parseLog(fs.readFileSync(process.argv[1], "utf8"));
 const native = (parseLogEntries(fs.readFileSync(process.argv[1], "utf8")) ?? []).filter(isSessionEvent);
+assertSessionConsumers(parsed.logEntries, "native parser");
+assertSessionRendering(parsed.markdown, "native parser markdown");
+if (controls.sessionConsumers) assertSessionRendering(sessionCLI(["agent-markdown", process.argv[1], "aider"]), "raw CLI rendering");
 const assertExecution = (events, stage) => {
   if (process.argv[3]) assert.deepEqual(
     events.filter(event => event.type === "agent.execution").map(event => event.data),
@@ -160,6 +183,7 @@ const assertExecution = (events, stage) => {
 if (process.argv[3]) {
   assert.deepEqual(parsed.logEntries, JSON.parse(process.argv[3]), "only attributed core events and opaque extensions are Aider evidence");
   const raw = collect();
+  assertSessionConsumers(raw.events, "raw reconstruction");
   assertExecution(raw.events, "raw reconstruction");
   assertRunnerEvidence(raw.events, "raw reconstruction");
   const projected = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: parsed.logEntries }]);
@@ -179,19 +203,23 @@ const canonical = parsed.logEntries;
 const previousEnv = { ...process.env };
 Object.assign(process.env, controls.dailyAIC ?? {});
 process.env.GH_AW_AGENT_OUTPUT = process.argv[1];
+const publications = [];
 global.core = {
-  debug() {}, info() {}, notice() {}, warning() {}, error() {},
+  debug() {}, info(message) { publications.push(message); }, notice() {}, warning() {}, error() {},
   setOutput() {}, exportVariable() {},
   setFailed(message) { throw new Error(message); },
-  summary: { addRaw() { return this; }, async write() {} },
+  summary: { addRaw(message) { publications.push(message); return this; }, async write() {} },
 };
 (async () => {
   try {
     await runLogParser({ parseLog, parserName: "Aider", rootDir: root });
+    assertSessionRendering(publications.join("\n"), "Actions publication");
     const persisted = fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
+    assertSessionConsumers(persisted, "Actions persistence");
     assertExecution(persisted, "Actions persistence");
     assert.deepEqual(persisted.filter(event => event.type !== "agent.execution"), canonical, "Actions persistence must not alter canonical payloads");
     const collected = collect();
+    assertSessionConsumers(collected.events, "persisted-session collection");
     assertExecution(collected.events, "persisted-session collection");
     assertRunnerEvidence(collected.events, "persisted-session collection");
     const agent = collected.events.filter(event => event.provenance.component === "agent");
@@ -201,6 +229,7 @@ global.core = {
       assert.throws(() => sessionCLI(["reconstruct", root, "aider"]), { name:"UnrecognizedSessionError" }, "shell JSON alone cannot establish a CLI session");
     } else {
       const reconstructed = sessionCLI(["reconstruct", root, "aider"]).trim().split("\n").map(JSON.parse);
+      assertSessionConsumers(reconstructed, "CLI reconstruction");
       assertExecution(reconstructed, "CLI reconstruction");
       assertRunnerEvidence(reconstructed, "CLI reconstruction");
       assert.deepEqual(reconstructed.filter(event => event.provenance.component === "agent"), projected, "CLI reconstruction must match Actions merging");
@@ -212,6 +241,7 @@ global.core = {
     for (const line of serialized.trimEnd().split("\n")) assert.equal(JSON.stringify(JSON.parse(line)), line);
     assertExecution(serialized.trimEnd().split("\n").map(JSON.parse), "serialized unified session");
     assertRunnerEvidence(serialized.trimEnd().split("\n").map(JSON.parse), "serialized unified session");
+    assertSessionConsumers(serialized.trimEnd().split("\n").map(JSON.parse), "serialized unified session");
     if (controls.dailyAIC) {
       process.env.GH_AW_ENGINE_ID = "aider";
       const outcome = buildEmptyOutputOutcome([], root);
@@ -249,8 +279,12 @@ global.core = {
       }
     }
     if (process.argv[2] === "true") {
-      assert.ok(sessionCLI(["markdown", final]).length > 0);
-      assert.ok(sessionCLI(["agent-markdown", path.join(root, "agent-session.jsonl"), "aider"]).length > 0);
+      const unifiedMarkdown = sessionCLI(["markdown", final]);
+      const agentMarkdown = sessionCLI(["agent-markdown", path.join(root, "agent-session.jsonl"), "aider"]);
+      assert.ok(unifiedMarkdown.length > 0);
+      assert.ok(agentMarkdown.length > 0);
+      assertSessionRendering(unifiedMarkdown, "unified CLI rendering");
+      assertSessionRendering(agentMarkdown, "persisted agent CLI rendering");
     } else if (!process.argv[3]) {
       assert.equal(native.length, 0, "historical prose cannot invent session evidence");
       assert.ok(agent.every(event => event.type === "session.error"), "diagnostics cannot reconstruct conversation, usage or terminal status");
@@ -294,7 +328,7 @@ for (const type of interpretedTestTypes) {
   });
 }
 const extensions = [
-  "vendor.progress", "session.vendor_progress", "assistant.message_delta",
+  "vendor.progress", "session.vendor_progress", "assistant.vendor_progress",
   "tool.vendor_progress", "workflow.vendor_progress", "guardrail.vendor_progress",
   "agent.vendor_progress", "detection.vendor_progress", "user.vendor_progress",
 ].map(type => ({
@@ -373,6 +407,68 @@ func TestAiderUnattributedCoreEventsStayOutOfSessionPublication(t *testing.T) {
 		content := "[" + strings.ReplaceAll(strings.TrimSpace(injected), "\n", ",") + "]"
 		checkAiderSessionPublication(t, content, false, "[]")
 	})
+}
+
+func TestAiderStreamAndSnapshotAttributionAcrossPublication(t *testing.T) {
+	// Synthetic protocol coverage; the native Aider profile does not stream.
+	const genuine = `{"type":"session.init","timestamp":0,"data":{"sourceEngine":"aider","model":"openai/native-init"}}
+{"type":"assistant.message","data":{"sourceEngine":"aider","content":"native reply"}}
+{"type":"assistant.vendor_progress","id":"opaque","parentId":null,"timestamp":0,"native":false,"data":{"model":"opaque-model","content":null,"zero":0,"false":false,"empty":[]}}
+`
+	const streams = `{"type":"pi.message_snapshot","id":"snapshot","parentId":null,"timestamp":0,"data":{"sourceEngine":"aider","model":"openai/native-snapshot","usage":null,"zero":0,"false":false,"empty":[]}}
+{"type":"assistant.message_delta","id":"message-delta","parentId":"","timestamp":0,"data":{"sourceEngine":"aider","messageId":"native-stream","deltaContent":"  native streamed reply \n","content":null,"partial":false,"zero":0,"false":false,"empty":[]}}
+{"type":"assistant.message_delta","data":{"sourceEngine":"aider","messageId":"native-stream","deltaContent":""}}
+{"type":"assistant.reasoning_delta","id":"reasoning-delta","parentId":null,"timestamp":0,"data":{"sourceEngine":"aider","reasoningId":"native-reason","deltaContent":"  native streamed reasoning \n","content":null,"partial":false,"zero":0,"false":false,"empty":[]}}
+{"type":"assistant.reasoning_delta","data":{"sourceEngine":"aider","reasoningId":"native-reason","deltaContent":""}}
+`
+	var lines []string
+	for _, eventType := range []string{"pi.message_snapshot", "assistant.message_delta", "assistant.reasoning_delta"} {
+		for _, sourceEngine := range []any{nil, "copilot", "claude", "codex", "other", "", false, 0} {
+			data := map[string]any{
+				"model":        "INJECTED_MODEL",
+				"messageId":    "forged-message",
+				"reasoningId":  "forged-reason",
+				"deltaContent": "INJECTED_STREAM",
+			}
+			event := map[string]any{"type": eventType, "data": data}
+			if sourceEngine == nil {
+				lines = append(lines, string(mustMarshalAiderTestJSON(t, event)))
+			}
+			data["sourceEngine"] = sourceEngine
+			lines = append(lines, string(mustMarshalAiderTestJSON(t, event)))
+		}
+	}
+	injected := strings.Join(lines, "\n") + "\n"
+	for _, tc := range []struct {
+		name       string
+		canonical  string
+		model      string
+		streamText []string
+	}{
+		{"initialization", genuine, "openai/native-init", nil},
+		{"native-streams-and-snapshot", genuine + streams, "openai/native-snapshot", []string{"native streamed reply", "native streamed reasoning"}},
+	} {
+		expected := "[" + strings.ReplaceAll(strings.TrimSpace(tc.canonical), "\n", ",") + "]"
+		controls := string(mustMarshalAiderTestJSON(t, map[string]any{
+			"sessionConsumers": map[string]any{
+				"model":      tc.model,
+				"visible":    []string{"native reply"},
+				"absent":     []string{"INJECTED_MODEL", "INJECTED_STREAM"},
+				"streamText": tc.streamText,
+			},
+		}))
+		t.Run(tc.name+"/native-control", func(t *testing.T) {
+			checkAiderSessionPublication(t, tc.canonical, true, expected, "[]", controls)
+		})
+		// Put every forged snapshot after native initialization and snapshots.
+		t.Run(tc.name+"/mixed-jsonl", func(t *testing.T) {
+			checkAiderSessionPublication(t, tc.canonical+injected, true, expected, "[]", controls)
+		})
+		t.Run(tc.name+"/mixed-json-array", func(t *testing.T) {
+			content := "[" + strings.ReplaceAll(strings.TrimSpace(tc.canonical+injected), "\n", ",") + "]"
+			checkAiderSessionPublication(t, content, true, expected, "[]", controls)
+		})
+	}
 }
 
 func TestAiderInterpretedShellEventsCannotOverrideRunnerEvidence(t *testing.T) {
