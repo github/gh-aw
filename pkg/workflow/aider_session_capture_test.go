@@ -17,6 +17,11 @@ import (
 // Synthetic provider protocol coverage; these responses are not Actions evidence.
 func runAiderSessionCapture(t *testing.T, scenario string) []map[string]any {
 	t.Helper()
+	return runAiderSessionCaptureWithMessage(t, scenario, nil)
+}
+
+func runAiderSessionCaptureWithMessage(t *testing.T, scenario string, providerMessage map[string]any) []map[string]any {
+	t.Helper()
 	dir := t.TempDir()
 	packageDir := filepath.Join(dir, "aider")
 	codersDir := filepath.Join(packageDir, "coders")
@@ -47,7 +52,8 @@ def run_cmd(command, *args, **kwargs):
         raise OSError("  command interrupted\n")
     return (1, "  failed\n") if command == "fail" else (0, "")
 `), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(packageDir, "main.py"), []byte(`import os
+	require.NoError(t, os.WriteFile(filepath.Join(packageDir, "main.py"), []byte(`import json
+import os
 from types import SimpleNamespace as Obj
 from .io import InputOutput
 from .coders import base_coder
@@ -80,6 +86,8 @@ def main():
         reason = "content_filter"
     if scenario == "partial":
         reason = "length"
+    if "AIDER_TEST_MESSAGE" in os.environ:
+        message = Payload(**json.loads(os.environ["AIDER_TEST_MESSAGE"]))
     usage = None if scenario == "missing" else Payload(
         prompt_tokens=0 if scenario == "zero" else 17,
         completion_tokens=0 if scenario == "zero" else 3,
@@ -112,6 +120,11 @@ def main():
 	execution := loadAiderSample(t).Behaviors.Execution
 	cmd := exec.Command("python3", execution.Args...)
 	cmd.Env = append(os.Environ(), "PYTHONPATH="+dir, "GH_AW_PROMPT="+prompt, "AIDER_TEST_SCENARIO="+scenario)
+	if providerMessage != nil {
+		messageJSON, err := json.Marshal(providerMessage)
+		require.NoError(t, err)
+		cmd.Env = append(cmd.Env, "AIDER_TEST_MESSAGE="+string(messageJSON))
+	}
 	output, err := cmd.CombinedOutput()
 	if scenario == "error" || scenario == "partial" || scenario == "command-error" {
 		require.Error(t, err, "%s", output)
@@ -182,11 +195,13 @@ func TestAiderSessionCaptureAccountingAvailability(t *testing.T) {
 			data := results[0]["data"].(map[string]any)
 			switch scenario {
 			case "null":
+				assert.Empty(t, aiderEventsOfType(events, "assistant.refusal"))
 				messages := aiderEventsOfType(events, "assistant.message")
 				require.Len(t, messages, 1)
 				assert.Contains(t, messages[0]["data"].(map[string]any), "content")
 				assert.Nil(t, messages[0]["data"].(map[string]any)["content"])
 			case "zero":
+				assert.Empty(t, aiderEventsOfType(events, "assistant.refusal"))
 				assert.Zero(t, data["totalCostUsd"])
 				assert.Zero(t, data["usage"].(map[string]any)["input_tokens"])
 				messages := aiderEventsOfType(events, "assistant.message")
@@ -233,6 +248,7 @@ func TestAiderSessionCaptureRefusalsPartialsAndErrors(t *testing.T) {
 				assert.NotContains(t, data, "exitCode")
 				assert.NotContains(t, data, "output")
 			case "refusal", "filter":
+				assert.Empty(t, aiderEventsOfType(events, "assistant.message"))
 				refusals := aiderEventsOfType(events, "assistant.refusal")
 				require.Len(t, refusals, 1)
 				data := refusals[0]["data"].(map[string]any)
@@ -256,6 +272,130 @@ func TestAiderSessionCaptureRefusalsPartialsAndErrors(t *testing.T) {
 				assert.Equal(t, "failed", result["status"])
 				assert.Zero(t, result["numTurns"])
 				assert.NotContains(t, result, "usage")
+			}
+		})
+	}
+}
+
+func TestAiderSessionCaptureRefusalContentAvailability(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		scenario     string
+		message      map[string]any
+		reason       string
+		content      any
+		hasContent   bool
+		hasReasoning bool
+	}{
+		{
+			name: "refusal-null", scenario: "normal",
+			message: map[string]any{"content": nil, "refusal": "  exact refusal\n", "reasoning_content": ""},
+			reason:  "refusal", content: "  exact refusal\n", hasContent: true, hasReasoning: true,
+		},
+		{
+			name: "refusal-with-content", scenario: "normal",
+			message: map[string]any{"content": "  filtered answer\n", "refusal": "  exact refusal\n", "reasoning_content": "  exact reasoning\n", "vendor_false": false, "vendor_zero": 0, "policy": map[string]any{"category": nil, "explanation": "  exact policy\n"}},
+			reason:  "refusal", content: "  exact refusal\n", hasContent: true, hasReasoning: true,
+		},
+		{
+			name: "refusal-empty", scenario: "normal",
+			message: map[string]any{"content": nil, "refusal": ""},
+			reason:  "refusal", content: "", hasContent: true,
+		},
+		{
+			name: "refusal-length-is-not-streaming", scenario: "partial",
+			message: map[string]any{"content": "  incomplete answer\n", "refusal": "  exact refusal\n", "reasoning_content": "  incomplete reasoning\n"},
+			reason:  "refusal", content: "  exact refusal\n", hasContent: true, hasReasoning: true,
+		},
+		{
+			name: "filter-null", scenario: "filter",
+			message: map[string]any{"content": nil, "refusal": nil},
+			reason:  "content_filter", hasContent: true,
+		},
+		{
+			name: "filter-content", scenario: "filter",
+			message: map[string]any{"content": "  exact filtered text\n", "refusal": nil},
+			reason:  "content_filter", content: "  exact filtered text\n", hasContent: true,
+		},
+		{
+			name: "filter-empty", scenario: "filter",
+			message: map[string]any{"content": ""},
+			reason:  "content_filter", content: "", hasContent: true,
+		},
+		{
+			name: "filter-false", scenario: "filter",
+			message: map[string]any{"content": false},
+			reason:  "content_filter", content: false, hasContent: true,
+		},
+		{
+			name: "filter-zero", scenario: "filter",
+			message: map[string]any{"content": 0},
+			reason:  "content_filter", content: 0, hasContent: true,
+		},
+		{
+			name: "filter-structured", scenario: "filter",
+			message: map[string]any{"content": []any{"  exact filtered text\n", false, 0, nil}},
+			reason:  "content_filter", content: []any{"  exact filtered text\n", false, 0, nil}, hasContent: true,
+		},
+		{
+			name: "filter-absent", scenario: "filter",
+			message: map[string]any{"refusal": nil},
+			reason:  "content_filter",
+		},
+		{
+			name: "filter-with-refusal", scenario: "filter",
+			message: map[string]any{"content": "  filtered text\n", "refusal": "  exact refusal\n"},
+			reason:  "content_filter", content: "  exact refusal\n", hasContent: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			events := runAiderSessionCaptureWithMessage(t, tc.scenario, tc.message)
+			assert.Empty(t, aiderEventsOfType(events, "assistant.message"))
+			refusals := aiderEventsOfType(events, "assistant.refusal")
+			require.Len(t, refusals, 1)
+			data := refusals[0]["data"].(map[string]any)
+			assert.Equal(t, tc.reason, data["reason"])
+			expectedJSON, err := json.Marshal(map[string]any{"message": tc.message, "content": tc.content})
+			require.NoError(t, err)
+			var expected map[string]any
+			require.NoError(t, json.Unmarshal(expectedJSON, &expected))
+			assert.Equal(t, expected["message"], data["message"])
+			if tc.hasContent {
+				assert.Contains(t, data, "content")
+				assert.Equal(t, expected["content"], data["content"])
+			} else {
+				assert.NotContains(t, data, "content")
+			}
+			assert.NotContains(t, data, "partial", "non-streaming length limits are not streamed refusal fragments")
+			assert.Equal(t, "native-response", data["apiCallId"])
+			assert.Equal(t, "native-model", data["model"])
+			assert.Zero(t, data["created"])
+			usage := data["usage"].(map[string]any)
+			assert.Equal(t, false, usage["vendor_false"])
+			assert.Zero(t, usage["vendor_zero"])
+			assert.InDelta(t, 17, usage["prompt_tokens"], 0)
+			reasoning := aiderEventsOfType(events, "assistant.reasoning")
+			if tc.hasReasoning {
+				require.Len(t, reasoning, 1)
+				reasoningData := reasoning[0]["data"].(map[string]any)
+				assert.Equal(t, tc.message["reasoning_content"], reasoningData["content"])
+				if tc.scenario == "partial" {
+					assert.Equal(t, true, reasoningData["partial"])
+				}
+			} else {
+				assert.Empty(t, reasoning)
+			}
+			results := aiderEventsOfType(events, "session.result")
+			require.Len(t, results, 1)
+			result := results[0]["data"].(map[string]any)
+			assert.InDelta(t, 1, result["numTurns"], 0)
+			assert.InDelta(t, 17, result["usage"].(map[string]any)["input_tokens"], 0)
+			if tc.scenario == "partial" {
+				assert.Equal(t, "failed", result["status"])
+				assert.Equal(t, "ValueError", result["sourceType"])
+			} else {
+				assert.Equal(t, "completed", result["status"], "a refusal is not a process failure")
+				assert.InDelta(t, 0.012345, result["totalCostUsd"], 0)
 			}
 		})
 	}

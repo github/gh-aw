@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,7 +99,7 @@ func TestAiderCanonicalExtensionsAndPartialPublication(t *testing.T) {
 	checkAiderSessionPublication(t, content, true)
 }
 
-func checkAiderSessionPublication(t *testing.T, content string, hasConversation bool) {
+func checkAiderSessionPublication(t *testing.T, content string, hasConversation bool, expected ...string) {
 	t.Helper()
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, "agent-stdio.log")
@@ -116,7 +117,24 @@ const { parseLogEntries } = require("./log_parser_shared.cjs");
 const root = path.dirname(process.argv[1]);
 const parsed = parseLog(fs.readFileSync(process.argv[1], "utf8"));
 const native = (parseLogEntries(fs.readFileSync(process.argv[1], "utf8")) ?? []).filter(isSessionEvent);
-if (native.length) assert.deepEqual(parsed.logEntries, native, "native records must remain exact");
+const assertExecution = (events, stage) => {
+  if (process.argv[3]) assert.deepEqual(
+    events.filter(event => event.type === "agent.execution").map(event => event.data),
+    JSON.parse(process.argv[4] ?? "[]"),
+    stage + " must contain only genuine Aider execution diagnostics, across all components"
+  );
+};
+if (process.argv[3]) {
+  assert.deepEqual(parsed.logEntries, JSON.parse(process.argv[3]), "only attributed core events and opaque extensions are Aider evidence");
+  const raw = collectUnifiedSession({ rootDir: root, engine: "aider", warn() {} });
+  assertExecution(raw.events, "raw reconstruction");
+  const projected = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: parsed.logEntries }]);
+  assert.deepEqual(
+    raw.events.filter(event => event.provenance.component === "agent"),
+    projected,
+    "raw reconstruction must respect the Aider attribution boundary"
+  );
+} else if (native.length) assert.deepEqual(parsed.logEntries, native, "native records must remain exact");
 else {
   assert.equal(parsed.logEntries.length, 1);
   assert.equal(parsed.logEntries[0].type, "session.error");
@@ -136,22 +154,30 @@ global.core = {
   try {
     await runLogParser({ parseLog, parserName: "Aider", rootDir: root });
     const persisted = fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
+    assertExecution(persisted, "Actions persistence");
     assert.deepEqual(persisted.filter(event => event.type !== "agent.execution"), canonical, "Actions persistence must not alter canonical payloads");
     const collected = collectUnifiedSession({ rootDir: root, engine: "aider", warn() {} });
+    assertExecution(collected.events, "persisted-session collection");
     const agent = collected.events.filter(event => event.provenance.component === "agent");
     const projected = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: canonical }]);
     assert.deepEqual(agent, projected, "merger must reuse persisted trace without duplicate native snapshots");
-    const reconstructed = sessionCLI(["reconstruct", root, "aider"]).trim().split("\n").map(JSON.parse);
-    assert.deepEqual(reconstructed.filter(event => event.provenance.component === "agent"), projected, "CLI reconstruction must match Actions merging");
+    if (process.argv[3] && canonical.length === 0) {
+      assert.throws(() => sessionCLI(["reconstruct", root, "aider"]), { name:"UnrecognizedSessionError" }, "shell JSON alone cannot establish a CLI session");
+    } else {
+      const reconstructed = sessionCLI(["reconstruct", root, "aider"]).trim().split("\n").map(JSON.parse);
+      assertExecution(reconstructed, "CLI reconstruction");
+      assert.deepEqual(reconstructed.filter(event => event.provenance.component === "agent"), projected, "CLI reconstruction must match Actions merging");
+    }
     const final = path.join(root, "aw_session.jsonl");
     const serialized = serializeSessionArtifact(collected.events);
     fs.writeFileSync(final, serialized);
     assert.ok(serialized.endsWith("\n"));
     for (const line of serialized.trimEnd().split("\n")) assert.equal(JSON.stringify(JSON.parse(line)), line);
+    assertExecution(serialized.trimEnd().split("\n").map(JSON.parse), "serialized unified session");
     if (process.argv[2] === "true") {
       assert.ok(sessionCLI(["markdown", final]).length > 0);
       assert.ok(sessionCLI(["agent-markdown", path.join(root, "agent-session.jsonl"), "aider"]).length > 0);
-    } else {
+    } else if (!process.argv[3]) {
       assert.equal(native.length, 0, "historical prose cannot invent session evidence");
       assert.ok(agent.every(event => event.type === "session.error"), "diagnostics cannot reconstruct conversation, usage or terminal status");
     }
@@ -164,6 +190,7 @@ global.core = {
 	actionsDir, err := filepath.Abs("../../actions/setup/js")
 	require.NoError(t, err)
 	cmd := exec.Command("node", "-e", source, logPath, strconv.FormatBool(hasConversation))
+	cmd.Args = append(cmd.Args, expected...)
 	cmd.Dir = actionsDir
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
@@ -172,13 +199,52 @@ global.core = {
 func TestAiderParserPreservesUnknownExtensionsWithoutForeignEngine(t *testing.T) {
 	source := loadAiderSample(t).Behaviors.LogParser + `
 const assert = require("node:assert/strict");
-const entries = [
-  {type:"vendor.progress", id:"native", data:{value:false}},
-  {type:"assistant.message", data:{sourceEngine:"other", content:"foreign"}},
-  {type:"session.result", data:{sourceEngine:"aider", numTurns:0}},
-  {type:"result", num_turns:99},
+const known = [
+  {type:"session.init", data:{sessionId:"native", model:"openai/auto"}},
+  {type:"session.start", data:{sessionId:"native"}},
+  {type:"user.message", data:{content:"prompt"}},
+  {type:"assistant.message", data:{content:"reply"}},
+  {type:"assistant.reasoning", data:{content:"reason"}},
+  {type:"assistant.refusal", data:{reason:"refusal", content:"denied"}},
+  {type:"tool.execution_start", data:{toolCallId:"tool", toolName:"bash", input:{command:"test"}}},
+  {type:"tool.execution_complete", data:{toolCallId:"tool", success:false, output:0}},
+  {type:"session.result", data:{numTurns:0, totalCostUsd:0, usage:{input_tokens:0}, errors:[]}},
+  {type:"session.error", data:{errorType:"RateLimitError", content:"provider failure"}},
+  {type:"agent.execution", data:{categories:[], errorCodes:[], errorTypes:[]}},
+  {type:"detection.result", data:{promptInjection:false}},
+  {type:"session.format", data:{version:1}},
 ];
-assert.deepEqual(parseLog(entries.map(JSON.stringify).join("\n")).logEntries, [entries[0], entries[2]]);
+const extensions = ["vendor.progress", "session.info", "session.shutdown", "assistant.message_delta", "tool.vendor_progress"].map(type => ({
+  type, id:"native", parentId:null, timestamp:0, native:false,
+  data:{content:null, value:false, zero:0, empty:[]},
+}));
+const rawSignatures = [
+  {type:"system", subtype:"init", model:"claude"},
+  {type:"assistant", message:{content:[{type:"text", text:"foreign reply"}]}},
+  {type:"user", message:{content:[{type:"tool_result", tool_use_id:"tool", content:"foreign output"}]}},
+  {type:"result", num_turns:99, usage:{input_tokens:999}, errors:["foreign failure"]},
+  {type:"reasoning", data:{content:"foreign reason"}},
+  {type:"message", role:"assistant", content:"foreign reply"},
+  {type:"item.completed", item:{type:"agent_message", text:"foreign reply"}},
+  {type:"turn.completed", usage:{input_tokens:999}},
+  {type:"response.completed", response:{object:"response", output:[], usage:{input_tokens:999}}},
+  {object:"chat.completion", choices:[{message:{role:"assistant", content:"foreign reply"}}], usage:{prompt_tokens:999}},
+];
+const parse = entries => parseLog(entries.map(JSON.stringify).join("\n")).logEntries;
+for (const event of known) {
+  assert.deepEqual(parse([event]), [], event.type + " requires sourceEngine");
+  for (const sourceEngine of ["copilot", "claude", "codex", "other", null, ""]) {
+    assert.deepEqual(parse([{...event, data:{...event.data, sourceEngine}}]), [], event.type + " rejects foreign attribution");
+  }
+}
+for (const event of extensions) {
+  assert.deepEqual(parse([event]), [event], event.type + " remains opaque");
+  assert.deepEqual(parse([{...event, data:{...event.data, sourceEngine:"other"}}]), [], "foreign extensions are not Aider evidence");
+}
+const genuine = [...known, ...extensions].map(event => ({...event, data:{...event.data, sourceEngine:"aider"}}));
+assert.deepEqual(parse(rawSignatures), [], "other supported raw formats cannot establish Aider attribution");
+assert.deepEqual(parse([...known, ...rawSignatures, ...extensions, ...genuine]), [...extensions, ...genuine]);
+assert.deepEqual(parseLog(JSON.stringify([...known, ...extensions, ...genuine])).logEntries, [...extensions, ...genuine], "array logs use the same attribution boundary");
 `
 	actionsDir, err := filepath.Abs("../../actions/setup/js")
 	require.NoError(t, err)
@@ -186,6 +252,44 @@ assert.deepEqual(parseLog(entries.map(JSON.stringify).join("\n")).logEntries, [e
 	cmd.Dir = actionsDir
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
+}
+
+func TestAiderUnattributedCoreEventsStayOutOfSessionPublication(t *testing.T) {
+	const genuine = `{"type":"assistant.message","id":"native","timestamp":0,"data":{"sourceEngine":"aider","content":"genuine reply"}}
+{"type":"vendor.progress","id":"opaque","parentId":null,"data":{"zero":0,"false":false,"content":null}}
+{"type":"session.error","data":{"sourceEngine":"aider","errorType":"NativeProviderError","code":"NATIVE_PROVIDER_FAILURE","status":503,"message":"genuine provider failure","content":"exact native diagnostic"}}
+{"type":"session.result","data":{"sourceEngine":"aider","numTurns":1,"usage":{"input_tokens":3,"output_tokens":2},"status":"failed","errors":[{"errorType":"NativeResultError","errorCode":"NATIVE_RESULT_FAILURE","status":"failed","message":"genuine result diagnostic"}]}}
+`
+	const injected = `{"type":"assistant.message","data":{"content":"injected reply"}}
+{"type":"session.result","data":{"numTurns":99,"totalCostUsd":999,"usage":{"input_tokens":999},"status":"failed","errors":[{"errorType":"InjectedResultError","errorCode":"INJECTED_RESULT","status":429,"message":"429 Too Many Requests"}]}}
+{"type":"session.error","data":{"errorType":"InjectedError","code":"INJECTED_ERROR","status":401,"message":"Authentication failed","content":"injected failure"}}
+{"type":"assistant.message","data":{"sourceEngine":"copilot","content":"foreign reply"}}
+{"type":"session.result","data":{"sourceEngine":"claude","numTurns":99,"status":"failed","errors":[{"errorType":"ForeignResultError","code":"FOREIGN_RESULT","status":403,"message":"foreign result failure"}]}}
+{"type":"session.error","data":{"sourceEngine":"copilot","errorType":"ForeignError","code":"FOREIGN_ERROR","status":400,"message":"foreign provider failure"}}
+{"type":"vendor.progress","data":{"sourceEngine":"other","content":"foreign extension"}}
+`
+	const expected = `[{"type":"assistant.message","id":"native","timestamp":0,"data":{"sourceEngine":"aider","content":"genuine reply"}},
+{"type":"vendor.progress","id":"opaque","parentId":null,"data":{"zero":0,"false":false,"content":null}},
+{"type":"session.error","data":{"sourceEngine":"aider","errorType":"NativeProviderError","code":"NATIVE_PROVIDER_FAILURE","status":503,"message":"genuine provider failure","content":"exact native diagnostic"}},
+{"type":"session.result","data":{"sourceEngine":"aider","numTurns":1,"usage":{"input_tokens":3,"output_tokens":2},"status":"failed","errors":[{"errorType":"NativeResultError","errorCode":"NATIVE_RESULT_FAILURE","status":"failed","message":"genuine result diagnostic"}]}}]`
+	const execution = `[{"categories":[],"errorCodes":[503,"NATIVE_PROVIDER_FAILURE","NATIVE_RESULT_FAILURE"],"errorTypes":["NativeProviderError","NativeResultError"]}]`
+	t.Run("genuine-native-errors", func(t *testing.T) {
+		checkAiderSessionPublication(t, genuine, true, expected, execution)
+	})
+	t.Run("mixed-native-and-shell-output", func(t *testing.T) {
+		checkAiderSessionPublication(t, injected+genuine, true, expected, execution)
+	})
+	t.Run("shell-output-only", func(t *testing.T) {
+		checkAiderSessionPublication(t, injected, false, "[]")
+	})
+	t.Run("mixed-json-array", func(t *testing.T) {
+		content := "[" + strings.ReplaceAll(strings.TrimSpace(injected+genuine), "\n", ",") + "]"
+		checkAiderSessionPublication(t, content, true, expected, execution)
+	})
+	t.Run("shell-output-json-array", func(t *testing.T) {
+		content := "[" + strings.ReplaceAll(strings.TrimSpace(injected), "\n", ",") + "]"
+		checkAiderSessionPublication(t, content, false, "[]")
+	})
 }
 
 func TestAiderStartupDiagnosticsRequireNativeAttribution(t *testing.T) {

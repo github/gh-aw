@@ -188,15 +188,15 @@ engine:
                   partial = {"partial": True} if finish_reason == "length" else {}
                   if reasoning is not None:
                       emit("assistant.reasoning", {**metadata, **partial, "content": reasoning})
-                  if has_field(message, "content"):
-                      emit("assistant.message", {**metadata, **partial, "content": content})
                   refusal = field(message, "refusal")
                   if refusal is not None or finish_reason == "content_filter":
                       emit("assistant.refusal", {
-                          **metadata, **partial,
+                          **metadata,
                           "reason": "content_filter" if finish_reason == "content_filter" else "refusal",
-                          **({"content": refusal if refusal is not None else content} if refusal is not None or content is not None else {}),
+                          **({"content": refusal if refusal is not None else content} if refusal is not None or has_field(message, "content") else {}),
                       })
+                  elif has_field(message, "content"):
+                      emit("assistant.message", {**metadata, **partial, "content": content})
               capturing_response = True
               try:
                   return original_show_send_output(coder, completion)
@@ -396,8 +396,20 @@ engine:
       function parseLog(logContent) {
         const { parseLogEntries, generateCopilotCliStyleSummary } = require("./log_parser_shared.cjs");
         const { isSessionEvent } = require("./agent_session.cjs");
+        // Shell stdout can contain JSON; core evidence requires Aider attribution.
+        // Unknown native extensions stay opaque, including within core namespaces.
+        const coreTypes = new Set([
+          "session.init", "session.start", "user.message",
+          "assistant.message", "assistant.reasoning", "assistant.refusal",
+          "tool.execution_start", "tool.execution_complete",
+          "session.result", "session.error", "agent.execution",
+          "detection.result", "session.format",
+        ]);
         const logEntries = (parseLogEntries(logContent) || []).filter(
-          entry => isSessionEvent(entry) && (entry.data.sourceEngine === undefined || entry.data.sourceEngine === "aider")
+          entry => isSessionEvent(entry) && (
+            entry.data.sourceEngine === "aider" ||
+            (entry.data.sourceEngine === undefined && !coreTypes.has(entry.type))
+          )
         );
         // Older Aider versions expose provider failures before any model reply.
         // Require the native startup preamble; unframed conversation/tool text
