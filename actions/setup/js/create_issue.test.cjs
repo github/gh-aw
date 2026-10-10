@@ -98,6 +98,7 @@ describe("create_issue", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     // Restore environment by mutating process.env in place
     for (const key of Object.keys(process.env)) {
       if (!(key in originalEnv)) {
@@ -115,11 +116,7 @@ describe("create_issue", () => {
       { footer: undefined, trackerId: undefined },
       { footer: false, trackerId: undefined },
     ])("should preserve sanitized issue content with footer=$footer and trackerId=$trackerId", async ({ footer, trackerId }) => {
-      if (trackerId === undefined) {
-        delete process.env.GH_AW_TRACKER_ID;
-      } else {
-        process.env.GH_AW_TRACKER_ID = trackerId;
-      }
+      vi.stubEnv("GH_AW_TRACKER_ID", trackerId);
       const handler = await main(footer === undefined ? {} : { footer });
       const result = await handler({
         title: "Tracker regression",
