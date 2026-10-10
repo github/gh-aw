@@ -574,8 +574,8 @@ async function main() {
               core.info(`Fetch of branch "${branchName}" on retry failed (non-fatal): ${getErrorMessage(fetchErr)}`);
             }
           }
-        } catch {
-          // ls-remote failed — ignored, keep existing baseRef.
+        } catch (remoteErr) {
+          core.warning(`Could not refresh baseRef for branch "${branchName}" on retry; keeping existing baseRef: ${getErrorMessage(remoteErr)}`);
         }
       } else {
         core.setFailed(`Failed to push ${stateLabel} after ${MAX_RETRIES + 1} attempts: ${errMsg}`);

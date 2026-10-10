@@ -16,7 +16,7 @@ const FAILED_JOBS_ISSUE_EXPIRES_HOURS = 24 * 7; // 1 week
 const STATE_PUSH_JOB_IDS = new Set(["push_ledger_changes", "push_repo_memory", "push_evals_state", "push_experiment_state"]);
 
 /**
- * Read only error lines from an already-masked state-push job log.
+ * Read error lines from an already-masked plain-text job log, not a workflow-log ZIP archive.
  * @param {number} jobId
  * @returns {Promise<string>}
  */

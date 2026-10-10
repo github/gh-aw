@@ -209,20 +209,32 @@ describe("getFailedNonBuiltinJobs", () => {
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not retrieve error details"));
   });
 
-  it("redacts credentials and neutralizes Markdown from binary job logs", async () => {
+  it.each(["buffer", "uint8array", "arraybuffer"])("redacts credentials and neutralizes Markdown from plain-text job logs returned as %s", async format => {
     vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ push_evals_state: { result: "failure" } }));
     global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
       data: { jobs: [{ id: 789, name: "push_evals_state", conclusion: "failure", html_url: null }] },
     });
     const credential = ["user", "password"].join(":");
-    global.github.rest.actions.downloadJobLogsForWorkflowRun = vi.fn().mockResolvedValue({
-      data: Buffer.from(`fatal: non-fast-forward https://${credential}@example.com/repo Authorization: ${["Basic", "encoded-value"].join(" ")} \`\`\` <!-- @someone -->`),
-    });
+    const bytes = Buffer.from(`fatal: non-fast-forward https://${credential}@example.com/repo Authorization: ${["Basic", "encoded-value"].join(" ")} \`\`\` <!-- @someone -->`);
+    const data = format === "buffer" ? bytes : format === "uint8array" ? new Uint8Array(bytes) : new Uint8Array(bytes).buffer;
+    global.github.rest.actions.downloadJobLogsForWorkflowRun = vi.fn().mockResolvedValue({ data });
     await main();
     const body = global.github.rest.issues.create.mock.calls[0][0].body;
     expect(body).toContain("non-fast-forward");
     expect(body).not.toMatch(/password|encoded-value|<!-- @someone -->/);
     expect((body.match(/```/g) || []).length).toBe(2);
+  });
+
+  it("warns and preserves the failure issue when the log response is not text or bytes", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ push_evals_state: { result: "failure" } }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
+      data: { jobs: [{ id: 789, name: "push_evals_state", conclusion: "failure", html_url: null }] },
+    });
+    global.github.rest.actions.downloadJobLogsForWorkflowRun = vi.fn().mockResolvedValue({ data: { message: "not a job log" } });
+    await main();
+    expect(global.github.rest.issues.create).toHaveBeenCalled();
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not retrieve error details"));
+    expect(global.github.rest.issues.create.mock.calls[0][0].body).not.toContain("not a job log");
   });
 
   it.each(["", "invalid JSON", "null", "[]"])("rejects invalid job result metadata %j rather than falling back to name-based filtering", async metadata => {

@@ -130,18 +130,19 @@ describe("push_experiment_state", () => {
     statSpy.mockRestore();
   });
 
-  it.each([false, true])("authenticates retry fetches and advances the base only after a successful fetch (fetch fails: %s)", async fetchFails => {
+  it.each(["none", "fetch", "ls-remote"])("authenticates retry operations and advances the base only after a successful fetch (failure: %s)", async failure => {
     const baseRef = "a".repeat(40);
     const remoteHead = "b".repeat(40);
     const gitEnv = { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader", GIT_CONFIG_VALUE_0: "masked-auth-header" };
     const execGitSync = vi.fn(args => {
       if (args[0] === "status") return "M state.json";
       if (args[0] === "rev-parse") return baseRef;
-      if (fetchFails && args[0] === "fetch" && args[1] === "origin") throw new Error("temporary fetch failure");
+      if (failure === "fetch" && args[0] === "fetch" && args[1] === "origin") throw new Error("temporary fetch failure");
       return "";
     });
     const pushSignedCommits = vi.fn().mockRejectedValueOnce(new Error("non-fast-forward")).mockResolvedValue(undefined);
     const exec = { getExecOutput: vi.fn().mockResolvedValue({ stdout: `${remoteHead}\trefs/heads/evals/test` }) };
+    if (failure === "ls-remote") exec.getExecOutput.mockRejectedValue(new Error("temporary ls-remote failure"));
     const require = createRequire(import.meta.url);
     const module = { exports: {} };
     const workspaceDir = path.join(tmpDir, "workspace");
@@ -164,9 +165,14 @@ describe("push_experiment_state", () => {
     });
     await module.exports.main();
     expect(exec.getExecOutput).toHaveBeenCalledWith("git", ["ls-remote", "origin", "refs/heads/evals/test"], { cwd: workspaceDir, env: expect.objectContaining(gitEnv) });
-    expect(execGitSync).toHaveBeenCalledWith(["fetch", "origin", "refs/heads/evals/test"], expect.objectContaining({ env: expect.objectContaining(gitEnv) }));
+    if (failure === "ls-remote") {
+      expect(execGitSync).not.toHaveBeenCalledWith(["fetch", "origin", "refs/heads/evals/test"], expect.anything());
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining('Could not refresh baseRef for branch "evals/test" on retry; keeping existing baseRef: temporary ls-remote failure'));
+    } else {
+      expect(execGitSync).toHaveBeenCalledWith(["fetch", "origin", "refs/heads/evals/test"], expect.objectContaining({ env: expect.objectContaining(gitEnv) }));
+    }
     expect(pushSignedCommits).toHaveBeenCalledTimes(2);
-    expect(pushSignedCommits.mock.calls[1][0].baseRef).toBe(fetchFails ? baseRef : remoteHead);
+    expect(pushSignedCommits.mock.calls[1][0].baseRef).toBe(failure === "none" ? remoteHead : baseRef);
     expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
 
