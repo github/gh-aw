@@ -70,6 +70,15 @@ func TestCacheMemorySyntaxVariations(t *testing.T) {
 				map[string]any{
 					"id":  "session",
 					"key": "memory-session",
+					"validation": map[string]any{
+						"json-schemas": []any{
+							map[string]any{
+								"file":   "state.json",
+								"format": "json",
+								"schema": map[string]any{"type": "object"},
+							},
+						},
+					},
 				},
 			},
 			shouldWork:  true,
@@ -203,6 +212,15 @@ func TestCacheMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 			map[string]any{
 				"id":  "session",
 				"key": "memory-session",
+				"validation": map[string]any{
+					"json-schemas": []any{
+						map[string]any{
+							"file":   "state.json",
+							"format": "json",
+							"schema": map[string]any{"type": "object"},
+						},
+					},
+				},
 			},
 		},
 	})
@@ -211,7 +229,8 @@ func TestCacheMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	require.Len(t, config.Caches, 2)
 	require.NotNil(t, config.Caches[0].Validation)
 	assert.Equal(t, 1, config.Caches[0].Validation.TimeoutMinutes)
-	assert.Nil(t, config.Caches[1].Validation)
+	require.NotNil(t, config.Caches[1].Validation)
+	assert.Empty(t, config.Caches[1].Validation.Script)
 
 	data := &WorkflowData{
 		CacheMemoryConfig: config,
@@ -223,13 +242,16 @@ func TestCacheMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	validationYAML := validation.String()
 	assert.Contains(t, validationYAML, "Validate cache-memory file types and domain content")
 	assert.Contains(t, validationYAML, "VALIDATION_SCRIPT_B64:")
+	assert.Contains(t, validationYAML, "MEMORY_JSON_SCHEMAS_REQUIRED: 'true'")
 	assert.Contains(t, validationYAML, "validate_memory_step.cjs")
 	assert.Contains(t, validationYAML, "id: "+cacheMemoryValidationStepID("default"))
+	assert.Contains(t, validationYAML, "id: "+cacheMemoryValidationStepID("session"))
 
 	var upload strings.Builder
 	generateCacheMemoryArtifactUpload(&upload, data, getActionPin)
 	uploadYAML := upload.String()
 	assert.Contains(t, uploadYAML, "steps."+cacheMemoryValidationStepID("default")+".outcome == 'success'")
+	assert.Contains(t, uploadYAML, "steps."+cacheMemoryValidationStepID("session")+".outcome == 'success'")
 
 	job, err := compiler.buildUpdateCacheMemoryJob(data, true)
 	require.NoError(t, err)
@@ -237,8 +259,10 @@ func TestCacheMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	updateYAML := strings.Join(job.Steps, "\n")
 	assert.Contains(t, updateYAML, "Validate cache-memory before save (default)")
 	assert.Contains(t, updateYAML, "VALIDATION_TIMEOUT_SECONDS: 60")
+	assert.Contains(t, updateYAML, "MEMORY_JSON_SCHEMAS_REQUIRED: 'true'")
 	assert.Contains(t, updateYAML, "validate_memory_step.cjs")
 	assert.Contains(t, updateYAML, "steps."+cacheMemoryValidationStepID("default")+".outcome == 'success'")
+	assert.Contains(t, updateYAML, "steps."+cacheMemoryValidationStepID("session")+".outcome == 'success'")
 }
 
 func TestCacheMemoryValidationStepIDsDoNotCollide(t *testing.T) {

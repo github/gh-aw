@@ -97,6 +97,41 @@ describe("unified session publication views", () => {
     expect(events[3].data.delta).toEqual(delta);
   });
 
+  it("renders episode lineage in both sinks without dumping the caller context", () => {
+    const events = [
+      header,
+      event(
+        "workflow.info",
+        {
+          run_id: "300",
+          context: {
+            episode_id: "100-1:root",
+            hop_id: "200-1:caller",
+            parent_hop_id: "",
+            origin_event: "issues",
+            root_repo: "org/repo",
+            root_workflow_id: "root.yml",
+            root_run_id: "100",
+            private: "PRIVATE_CONTEXT",
+          },
+        },
+        "workflow",
+        0
+      ),
+    ];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("runId=300");
+      expect(output).toContain("episodeId=100-1:root");
+      expect(output).toContain("hopId=200-1:caller");
+      expect(output).toContain("parentHopId=");
+      expect(output).toContain("originEvent=issues");
+      expect(output).toContain("rootRepo=org/repo");
+      expect(output).toContain("rootWorkflowId=root.yml");
+      expect(output).toContain("rootRunId=100");
+      expect(output).not.toContain("PRIVATE_CONTEXT");
+    }
+  });
+
   it("renders every known message in both sinks without dumping prompts or opaque payloads", () => {
     const original = structuredClone(trace);
     for (const output of [generatePlainTextSummary(trace), generateCopilotCliStyleSummary(trace)]) {

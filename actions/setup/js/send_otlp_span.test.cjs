@@ -246,12 +246,12 @@ describe("buildEpisodeAttributesFromContext", () => {
     expect(attrs).toContainEqual({ key: "gh-aw.episode.id", value: { stringValue: "episode-42" } });
     expect(attrs).toContainEqual({ key: "gh-aw.episode.kind", value: { stringValue: "workflow_call" } });
     expect(attrs).toContainEqual({ key: "gh-aw.hop.id", value: { stringValue: "200-3:owner/repo/.github/workflows/child.yml@refs/heads/main" } });
-    expect(attrs).toContainEqual({ key: "gh-aw.hop.parent_id", value: { stringValue: "199-1:owner/repo/.github/workflows/root.yml@refs/heads/main" } });
+    expect(attrs).toContainEqual({ key: "gh-aw.hop.parent_id", value: { stringValue: "200-3:owner/repo/.github/workflows/parent.yml@refs/heads/main" } });
     expect(attrs).toContainEqual({ key: "gh-aw.origin.event", value: { stringValue: "workflow_run" } });
     expect(attrs).toContainEqual({ key: "gh-aw.root.repo", value: { stringValue: "owner/repo" } });
     expect(attrs).toContainEqual({ key: "gh-aw.root.workflow_id", value: { stringValue: "owner/repo/.github/workflows/root.yml@refs/heads/main" } });
     expect(attrs).toContainEqual({ key: "gh-aw.workflow_call.id", value: { stringValue: "200-3:owner/repo/.github/workflows/child.yml@refs/heads/main" } });
-    expect(attrs).toContainEqual({ key: "gh-aw.workflow_call.parent_id", value: { stringValue: "199-1:owner/repo/.github/workflows/root.yml@refs/heads/main" } });
+    expect(attrs).toContainEqual({ key: "gh-aw.workflow_call.parent_id", value: { stringValue: "200-3:owner/repo/.github/workflows/parent.yml@refs/heads/main" } });
   });
 
   it("falls back to legacy workflow_call_id when canonical lineage fields are absent", () => {
@@ -271,6 +271,23 @@ describe("buildEpisodeAttributesFromContext", () => {
     expect(attrs).toContainEqual({ key: "gh-aw.workflow_call.id", value: { stringValue: "300-4:owner/repo/.github/workflows/root.yml@refs/heads/main" } });
     const keys = attrs.map(attr => attr.key);
     expect(keys).not.toContain("gh-aw.workflow_call.parent_id");
+  });
+
+  it("retains the parent when context already describes the current hop", () => {
+    vi.stubEnv("GITHUB_WORKFLOW_REF", "owner/repo/.github/workflows/current.yml@refs/heads/main");
+    const attrs = buildEpisodeAttributesFromContext({ context: { episode_id: "root-episode", hop_id: "200-1:owner/repo/.github/workflows/current.yml@refs/heads/main", parent_hop_id: "caller" } }, "200", "1");
+    expect(attrs).toContainEqual(buildAttr("gh-aw.hop.parent_id", "caller"));
+    expect(attrs).toContainEqual(buildAttr("gh-aw.workflow_call.parent_id", "caller"));
+    vi.unstubAllEnvs();
+  });
+
+  it("does not emit a self-parent for root context", () => {
+    vi.stubEnv("GITHUB_WORKFLOW_REF", "owner/repo/.github/workflows/root.yml@refs/heads/main");
+    const hopId = "100-1:owner/repo/.github/workflows/root.yml@refs/heads/main";
+    const attrs = buildEpisodeAttributesFromContext({ context: { episode_id: hopId, hop_id: hopId, parent_hop_id: "" } }, "100", "1");
+    expect(attrs).toContainEqual(buildAttr("gh-aw.episode.kind", "run"));
+    expect(attrs.map(attr => attr.key)).not.toContain("gh-aw.hop.parent_id");
+    vi.unstubAllEnvs();
   });
 });
 
@@ -1477,7 +1494,7 @@ describe("sendJobSetupSpan", () => {
     expect(attrs["gh-aw.workflow.name"]).toBe("Smoke Workflow Call");
     expect(attrs["gh-aw.episode.id"]).toBe("25280567207-1:owner/repo/.github/workflows/smoke-call-workflow.lock.yml@refs/heads/main");
     expect(attrs["gh-aw.hop.id"]).toBe("25280567207-1:owner/repo/.github/workflows/smoke-workflow-call.lock.yml@refs/heads/main");
-    expect(attrs["gh-aw.hop.parent_id"]).toBe("parent-hop-root");
+    expect(attrs["gh-aw.hop.parent_id"]).toBe("25280567207-1:owner/repo/.github/workflows/smoke-call-workflow.lock.yml@refs/heads/main");
 
     const resourceAttrs = Object.fromEntries(body.resourceSpans[0].resource.attributes.map(a => [a.key, attrValue(a)]));
     expect(resourceAttrs["github.workflow_ref"]).toBe("owner/repo/.github/workflows/smoke-workflow-call.lock.yml@refs/heads/main");
@@ -2394,11 +2411,11 @@ describe("sendJobSetupSpan", () => {
       expect(span.attributes).toContainEqual({ key: "gh-aw.episode.id", value: { stringValue: "episode-99" } });
       expect(span.attributes).toContainEqual({ key: "gh-aw.episode.kind", value: { stringValue: "workflow_call" } });
       expect(span.attributes).toContainEqual({ key: "gh-aw.hop.id", value: { stringValue: "777-3" } });
-      expect(span.attributes).toContainEqual({ key: "gh-aw.hop.parent_id", value: { stringValue: "122-1" } });
+      expect(span.attributes).toContainEqual({ key: "gh-aw.hop.parent_id", value: { stringValue: "123-1" } });
       expect(span.attributes).toContainEqual({ key: "gh-aw.origin.event", value: { stringValue: "workflow_run" } });
       expect(span.attributes).toContainEqual({ key: "gh-aw.root.repo", value: { stringValue: "owner/repo" } });
       expect(span.attributes).toContainEqual({ key: "gh-aw.workflow_call.id", value: { stringValue: "777-3" } });
-      expect(span.attributes).toContainEqual({ key: "gh-aw.workflow_call.parent_id", value: { stringValue: "122-1" } });
+      expect(span.attributes).toContainEqual({ key: "gh-aw.workflow_call.parent_id", value: { stringValue: "123-1" } });
     });
   });
 
@@ -2736,9 +2753,9 @@ describe("sendJobConclusionSpan", () => {
     expect(span.attributes).toContainEqual({ key: "gh-aw.episode.id", value: { stringValue: "episode-123" } });
     expect(span.attributes).toContainEqual({ key: "gh-aw.episode.kind", value: { stringValue: "workflow_call" } });
     expect(span.attributes).toContainEqual({ key: "gh-aw.hop.id", value: { stringValue: "888-4" } });
-    expect(span.attributes).toContainEqual({ key: "gh-aw.hop.parent_id", value: { stringValue: "122-1" } });
+    expect(span.attributes).toContainEqual({ key: "gh-aw.hop.parent_id", value: { stringValue: "123-1" } });
     expect(span.attributes).toContainEqual({ key: "gh-aw.workflow_call.id", value: { stringValue: "888-4" } });
-    expect(span.attributes).toContainEqual({ key: "gh-aw.workflow_call.parent_id", value: { stringValue: "122-1" } });
+    expect(span.attributes).toContainEqual({ key: "gh-aw.workflow_call.parent_id", value: { stringValue: "123-1" } });
     expect(span.traceId).toBe("a".repeat(32));
   });
 

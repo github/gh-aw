@@ -103,6 +103,7 @@ Use this mode for exploratory testing, persona walkthroughs, and "what workflow 
 
 - Do not create or edit workflow files.
 - Return a compact recommendation covering trigger, any scoped `paths:` filters for file-event triggers, read tools, safe outputs, permissions, and explicit `noop` criteria.
+- Before finalizing trigger or safe-output recommendations, check whether terms that affect scope or matching are ambiguous (for example, whether "completed" means closed issues or merged PRs, or where a coverage threshold comes from). Ask 1-2 targeted clarifying questions when the answer would change the recommendation. If the request needs an immediate recommendation, state the assumption and the relevant alternative rather than silently choosing.
 - For recurring reports or digests, always include the report window, grouping dimensions, and deduplication key. See [triggers.md](triggers.md) for key-format examples.
 - Exit ad hoc evaluation mode only when the user explicitly asks to create, implement, or write the workflow file.
 - End by offering to turn the recommendation into `.github/workflows/<workflow-id>.md` if the user wants to proceed.
@@ -173,13 +174,13 @@ Use [triggers.md](triggers.md), [workflow-patterns.md](workflow-patterns.md), an
 
 #### Choose the previous-result strategy
 
-For every daily or scheduled workflow that creates issues or pull requests, choose the strategy that best matches the workflow's goal:
+For recurring or PR-reactive workflows that create visible outputs, choose the strategy that best matches the workflow's goal:
 
-- **Wait for the previous result** when only one active result should exist. Configure `on.skip-if-match` to skip the entire agent execution while the issue or pull request created by an earlier run remains open. The workflow resumes after that item is closed or merged.
-- **Replace previous results** when the newest result supersedes older reports. For issues, configure `safe-outputs.create-issue.close-older-issues: true` and use `close-older-key` when an explicit matching key is needed.
-- **Keep previous results** when each run should produce a distinct item or preserve a history of work. Instruct the agent to search for and review existing issues or pull requests before acting, then select a materially different scope so it does not repeat previous work. Treat those existing items as the workflow's memory.
+- **Wait for the previous result** when a recurring workflow should have only one active issue or pull request. Configure `on.skip-if-match` to skip the entire agent execution while the item created by an earlier run remains open. The workflow resumes after that item is closed or merged.
+- **Replace previous results** when the newest result supersedes older reports. For issues, configure `safe-outputs.create-issue.close-older-issues: true` and use `close-older-key` when an explicit matching key is needed. For PR comments, configure `safe-outputs.add-comment.hide-older-comments: true` for rolling updates.
+- **Keep previous results** when each run should produce a distinct issue, pull request, or comment, or when an intentional history is needed. Instruct the agent to review prior outputs and ensure each new result has a distinct purpose.
 
-Do not default every scheduled workflow to the same strategy. Base the choice on whether the workflow needs a single active item, a latest-only result, or a continuing series of distinct results, and include the selected behavior in the generated workflow.
+Do not default every recurring or PR-reactive workflow to the same strategy. Base the choice on whether the workflow needs a single active item, a latest-only result, or a continuing series of distinct results, and include the selected behavior in the generated workflow.
 
 ### 3. Keep permissions read-only
 

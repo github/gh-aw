@@ -1603,12 +1603,23 @@ func TestRepoMemoryFormatJSONPushStepEnvVar(t *testing.T) {
 
 func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	toolsMap := map[string]any{
-		"repo-memory": map[string]any{
-			"branch-name":        "memory/notes",
-			"allowed-extensions": []any{".json"},
-			"validation": map[string]any{
-				"script":          "if (!fs.existsSync(path.join(memoryRoot, 'state.json'))) throw new Error('missing state');",
-				"timeout-minutes": 1,
+		"repo-memory": []any{
+			map[string]any{
+				"id":                 "default",
+				"branch-name":        "memory/notes",
+				"allowed-extensions": []any{".json"},
+				"validation": map[string]any{
+					"script":          "if (!fs.existsSync(path.join(memoryRoot, 'state.json'))) throw new Error('missing state');",
+					"timeout-minutes": 1,
+				},
+			},
+			map[string]any{
+				"id": "schema",
+				"validation": map[string]any{
+					"json-schemas": []any{
+						map[string]any{"file": "state.json", "format": "json", "schema": map[string]any{"type": "object"}},
+					},
+				},
 			},
 		},
 	}
@@ -1620,10 +1631,13 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	config, err := compiler.extractRepoMemoryConfig(toolsConfig, "")
 	require.NoError(t, err)
 	require.NotNil(t, config)
-	require.Len(t, config.Memories, 1)
+	require.Len(t, config.Memories, 2)
 	require.NotNil(t, config.Memories[0].Validation)
 	assert.Equal(t, 1, config.Memories[0].Validation.TimeoutMinutes)
 	assert.Contains(t, config.Memories[0].Validation.Script, "missing state")
+	require.NotNil(t, config.Memories[1].Validation)
+	assert.Empty(t, config.Memories[1].Validation.Script)
+	require.Len(t, config.Memories[1].Validation.JSONSchemas, 1)
 
 	data := &WorkflowData{RepoMemoryConfig: config}
 	var restore strings.Builder
@@ -1640,8 +1654,10 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	uploadYAML := upload.String()
 	assert.Contains(t, uploadYAML, "Validate repo-memory domain content (default)")
 	assert.Contains(t, uploadYAML, "VALIDATION_SCRIPT_B64:")
+	assert.Contains(t, uploadYAML, "MEMORY_JSON_SCHEMAS_REQUIRED: 'true'")
 	assert.Contains(t, uploadYAML, "validate_memory_step.cjs")
 	assert.Contains(t, uploadYAML, "steps."+repoMemoryValidationStepID("default")+".outcome == 'success'")
+	assert.Contains(t, uploadYAML, "steps."+repoMemoryValidationStepID("schema")+".outcome == 'success'")
 	skipCondition := "steps." + memoryValidationStepID("check_repo_memory_baseline", "default") + ".outputs.skip != 'true'"
 	assert.Contains(t, uploadYAML, "checkRepoMemoryBaseline(core)")
 	assert.Equal(t, 4, strings.Count(uploadYAML, skipCondition), "unchanged invalid memory must skip sanitize, filter, validation, and upload")
@@ -1651,6 +1667,7 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	require.NotNil(t, pushJob)
 	pushYAML := strings.Join(pushJob.Steps, "\n")
 	assert.Contains(t, pushYAML, "VALIDATION_SCRIPT_B64:")
+	assert.Contains(t, pushYAML, "MEMORY_JSON_SCHEMAS_REQUIRED: 'true'")
 	assert.Contains(t, pushYAML, "VALIDATION_TIMEOUT_SECONDS: 60")
 }
 

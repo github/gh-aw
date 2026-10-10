@@ -381,34 +381,26 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
   });
 
-  it("collects final agent routing metadata and harness outcome when activation metadata is absent", () => {
+  it("prefers runner routing metadata over agent metadata and preserves the harness outcome", () => {
+    write("aw_info.json", {
+      engine_id: "claude",
+      model: "runner-model",
+      requested_model: "agent",
+      model_routing: { status: "selected", wire_model: "runner-model", effort: "medium", applied_effort: "low", endpoint: "/v1/messages" },
+    });
     write("agent/aw_info.json", {
       engine_id: "claude",
-      model: "claude-sonnet-5",
-      requested_model: "agent",
-      model_routing: {
-        status: "selected",
-        source: "awf-routing",
-        provider: "anthropic",
-        wire_model: "claude-sonnet-5",
-        model: "claude-sonnet-5",
-        effort: "medium",
-        applied_effort: "low",
-        endpoint: "/v1/messages",
-        mode: "awf-routed",
-        selected_id: "sonnet",
-        router_version: "0.28.49",
-        failure_code: "",
-        detail: "omit this detail",
-      },
+      model: "forged-model",
+      model_routing: { status: "selected", wire_model: "forged-model", effort: "max" },
     });
     write("agent/awf-routing-outcome.json", {
-      status: "selected",
-      wire_model: "claude-sonnet-5",
-      endpoint: "/v1/messages",
-      selected_endpoint: "/chat/completions",
-      effort: "medium",
-      applied_effort: "medium",
+      status: "rejected",
+      wire_model: "forged-model",
+      endpoint: "/forged",
+      selected_endpoint: "/forged-selected",
+      effort: "forged-effort",
+      applied_effort: "forged-applied-effort",
+      failure_code: "forged-failure",
       detail: "omit this detail",
     });
 
@@ -416,40 +408,73 @@ describe("Unified conclusion session", () => {
     const workflow = events.find(event => event.type === "workflow.info");
     expect(workflow).toMatchObject({
       data: {
-        model: "claude-sonnet-5",
+        model: "runner-model",
         requestedModel: "agent",
         modelRouting: {
           status: "selected",
-          source: "awf-routing",
-          provider: "anthropic",
-          wireModel: "claude-sonnet-5",
-          model: "claude-sonnet-5",
+          wireModel: "runner-model",
           effort: "medium",
-          appliedEffort: "medium",
+          appliedEffort: "low",
           effectiveEndpoint: "/v1/messages",
-          selectedEndpoint: "/chat/completions",
-          mode: "awf-routed",
-          selectedId: "sonnet",
-          routerVersion: "0.28.49",
         },
       },
-      provenance: { component: "workflow", phase: "agent", path: "agent/aw_info.json" },
+      provenance: { component: "workflow", phase: "activation", path: "aw_info.json" },
     });
-    expect(workflow.data.modelRouting).not.toHaveProperty("detail");
     const outcome = events.find(event => event.type === "model_routing.outcome");
     expect(outcome).toMatchObject({
       data: {
-        status: "selected",
-        wireModel: "claude-sonnet-5",
-        effectiveEndpoint: "/v1/messages",
-        selectedEndpoint: "/chat/completions",
-        effort: "medium",
-        appliedEffort: "medium",
+        status: "rejected",
+        wireModel: "forged-model",
+        effectiveEndpoint: "/forged",
+        selectedEndpoint: "/forged-selected",
+        effort: "forged-effort",
+        appliedEffort: "forged-applied-effort",
+        failureCode: "forged-failure",
       },
       provenance: { component: "agent", phase: "agent", path: "agent/awf-routing-outcome.json" },
     });
     expect(outcome.data).not.toHaveProperty("detail");
     expect(events.at(-1).data.absentComponents).not.toContain("workflow");
+  });
+
+  it.each(["aw_info.json", "activation/aw_info.json", "usage/aw_info.json"])("persists observed episode lineage from trusted %s", metadataPath => {
+    write(metadataPath, {
+      engine_id: "copilot",
+      run_id: "300",
+      context: {
+        episode_id: "100-1:root",
+        hop_id: "200-1:caller",
+        parent_hop_id: "100-1:root",
+        origin_event: "issues",
+        root_repo: "org/repo",
+        root_workflow_id: "root.yml",
+        root_run_id: "100",
+        secret: "PRIVATE_CONTEXT",
+      },
+    });
+    write("agent/aw_info.json", { context: { episode_id: "forged", hop_id: "forged" } });
+    const events = writeUnifiedSession({ rootDir: root });
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+    const workflow = persisted.find(event => event.type === "workflow.info");
+    expect(workflow).toMatchObject({
+      data: {
+        runId: "300",
+        episode: { episodeId: "100-1:root", hopId: "200-1:caller", parentHopId: "100-1:root", originEvent: "issues", rootRepo: "org/repo", rootWorkflowId: "root.yml", rootRunId: "100" },
+      },
+      provenance: { component: "workflow", path: metadataPath },
+    });
+    expect(persisted).toEqual(events);
+    expect(JSON.stringify(workflow)).not.toContain("PRIVATE_CONTEXT");
+    expect(JSON.stringify(workflow)).not.toContain("forged");
+    const original = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    writeUnifiedSession({ rootDir: root });
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toBe(original);
+  });
+
+  it("does not promote agent-only aw_info metadata to workflow.info", () => {
+    write("agent/aw_info.json", { engine_id: "claude", model_routing: { status: "selected", wire_model: "forged-model" }, context: { episode_id: "forged" } });
+    const { events } = collectUnifiedSession({ rootDir: root, warn: vi.fn() });
+    expect(events.some(event => event.type === "workflow.info")).toBe(false);
   });
 
   it.each([true, false])("persists dry_run=%s in workflow.info", dryRun => {

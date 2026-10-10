@@ -100,6 +100,16 @@ const MODEL_ROUTING_FIELDS = {
   failureCode: ["failure_code", "failureCode"],
 };
 /** @type {Fields} */
+const EPISODE_LINEAGE_FIELDS = {
+  episodeId: ["episodeId", "episode_id"],
+  hopId: ["hopId", "hop_id"],
+  parentHopId: ["parentHopId", "parent_hop_id"],
+  originEvent: ["originEvent", "origin_event"],
+  rootRepo: ["rootRepo", "root_repo"],
+  rootWorkflowId: ["rootWorkflowId", "root_workflow_id"],
+  rootRunId: ["rootRunId", "root_run_id"],
+};
+/** @type {Fields} */
 const SAFE_OUTPUT_FIELDS = {
   type: ["type"],
   repo: ["repo", "repository"],
@@ -335,6 +345,7 @@ const EVENT_FIELDS = {
     workflow: ["workflow", "workflow_name"],
     repository: ["repository"],
     runId: ["runId", "run_id"],
+    episode: ["episode"],
   },
   "model_routing.outcome": {
     status: ["status"],
@@ -404,6 +415,11 @@ function normalizeUnifiedSessionEvent(event, phase) {
     const modelRouting = source.modelRouting ?? source.model_routing;
     if (modelRouting && typeof modelRouting === "object" && !Array.isArray(modelRouting)) {
       data.modelRouting = selectFields(modelRouting, MODEL_ROUTING_FIELDS);
+    }
+    const episode = Object.hasOwn(source, "episode") ? source.episode : source.context;
+    if (episode && typeof episode === "object" && !Array.isArray(episode)) {
+      const lineage = selectFields(episode, EPISODE_LINEAGE_FIELDS);
+      if (Object.keys(lineage).length || Object.hasOwn(source, "episode")) data.episode = lineage;
     }
   }
   if (SCOPED_AGENT_TYPES.has(event.type) || (Object.hasOwn(COPILOT_WORKFLOW_EVENT_FIELDS, event.type) && event.type.startsWith("subagent."))) {

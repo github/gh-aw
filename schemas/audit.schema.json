@@ -69,6 +69,27 @@
                 "workflow_call_id": {
                   "type": "string"
                 },
+                "episode_id": {
+                  "type": "string"
+                },
+                "hop_id": {
+                  "type": "string"
+                },
+                "parent_hop_id": {
+                  "type": "string"
+                },
+                "origin_event": {
+                  "type": "string"
+                },
+                "root_repo": {
+                  "type": "string"
+                },
+                "root_workflow_id": {
+                  "type": "string"
+                },
+                "root_run_id": {
+                  "type": "string"
+                },
                 "time": {
                   "type": "string"
                 },
@@ -1154,6 +1175,39 @@
               "type": "string"
             },
             "model_routing_status": {
+              "type": "string"
+            },
+            "harness_outcome": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "wire_model": {
+                  "type": "string"
+                },
+                "effective_endpoint": {
+                  "type": "string"
+                },
+                "selected_endpoint": {
+                  "type": "string"
+                },
+                "effort": {
+                  "type": "string"
+                },
+                "applied_effort": {
+                  "type": "string"
+                },
+                "failure_code": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "routing_warning": {
               "type": "string"
             },
             "version": {

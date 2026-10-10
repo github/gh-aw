@@ -236,14 +236,6 @@ func flattenUnifiedArtifact(outputDir string, verbose bool) error {
 		return err
 	}
 
-	// Keep the agent's final metadata at the canonical root path for consumers
-	// that predate findAwInfoPath's agent-first lookup.
-	agentAwInfo := filepath.Join(outputDir, "agent", "aw_info.json")
-	if fileutil.FileExists(agentAwInfo) {
-		if err := fileutil.CopyFile(agentAwInfo, filepath.Join(outputDir, "aw_info.json")); err != nil {
-			return fmt.Errorf("failed to publish final agent aw_info.json: %w", err)
-		}
-	}
 	return nil
 }
 

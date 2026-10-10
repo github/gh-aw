@@ -551,8 +551,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	mcpServerHealth := buildMCPServerHealth(inputs.mcpToolUsage, inputs.processedRun.MCPFailures)
 
 	if auditReportLog.Enabled() {
-		auditReportLog.Printf("Built audit data: %d jobs, %d errors, %d tool types, %d findings, %d recommendations",
-			len(inputs.jobs), len(inputs.errors), len(inputs.toolUsage), len(inputs.findings), len(inputs.recommendations))
+		auditReportLog.Printf("Built audit data: %d jobs, %d errors, %d tool types, %d findings, %d recommendations", len(inputs.jobs), len(inputs.errors), len(inputs.toolUsage), len(inputs.findings), len(inputs.recommendations))
 	}
 
 	return AuditData{
@@ -588,12 +587,20 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		PolicyAnalysis:          inputs.processedRun.PolicyAnalysis,
 		RedactedDomainsAnalysis: inputs.processedRun.RedactedDomainsAnalysis,
 		Errors:                  inputs.errors,
+		Warnings:                auditEngineConfigWarnings(engineConfig),
 		ToolUsage:               inputs.toolUsage,
 		MCPToolUsage:            inputs.mcpToolUsage,
 		CreatedItems:            inputs.createdItems,
 		Experiments:             inputs.expData,
 		Graders:                 extractGradersData(run.LogsPath),
 	}
+}
+
+func auditEngineConfigWarnings(config *AuditEngineConfig) []ValidationIssue {
+	if config == nil || config.RoutingWarning == "" {
+		return nil
+	}
+	return []ValidationIssue{{Type: "model_routing_outcome_disagreement", Message: config.RoutingWarning}}
 }
 
 func addAuditOutcomeSummary(ctx context.Context, auditData *AuditData, createdItems []CreatedItemReport) {

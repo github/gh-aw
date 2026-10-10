@@ -208,10 +208,7 @@ func generateCacheMemoryValidation(builder *strings.Builder, data *WorkflowData)
 		fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", cacheDir)
 		fmt.Fprintf(builder, "          MEMORY_ID: %s\n", cache.ID)
 		fmt.Fprintf(builder, "          ALLOWED_EXTENSIONS: '%s'\n", allowedExtsJSON)
-		if cache.Validation != nil {
-			fmt.Fprintf(builder, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(cache.Validation))
-			fmt.Fprintf(builder, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(cache.Validation))
-		}
+		appendMemoryValidationEnvironment(builder, cache.Validation)
 		builder.WriteString("        with:\n")
 		builder.WriteString("          script: |\n")
 		builder.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
@@ -495,10 +492,7 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 			fmt.Fprintf(&validationStep, "          MEMORY_DIR: %s\n", cacheDir)
 			fmt.Fprintf(&validationStep, "          MEMORY_ID: %s\n", cache.ID)
 			fmt.Fprintf(&validationStep, "          ALLOWED_EXTENSIONS: '%s'\n", allowedExtsJSON)
-			if cache.Validation != nil {
-				fmt.Fprintf(&validationStep, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(cache.Validation))
-				fmt.Fprintf(&validationStep, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(cache.Validation))
-			}
+			appendMemoryValidationEnvironment(&validationStep, cache.Validation)
 			validationStep.WriteString("        with:\n")
 			validationStep.WriteString("          script: |\n")
 			validationStep.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
