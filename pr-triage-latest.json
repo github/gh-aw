@@ -1,9 +1,9 @@
 {
-  "run_date": "2026-10-10T01:03:57Z",
-  "run_id": "38011533301",
+  "run_date": "2026-10-10T06:39:52Z",
+  "run_id": "38031541811",
   "source": "pr-triage-agent",
   "eligible_total": 0,
-  "cooldown_skipped": 9,
+  "cooldown_skipped": 0,
   "category_counts": {},
   "risk_counts": {},
   "priority_counts": {},
@@ -16,16 +16,6 @@
   },
   "batches": [],
   "selected_candidates": [],
-  "skipped_prs": [
-    67300,
-    67280,
-    67253,
-    67244,
-    67242,
-    67240,
-    67238,
-    56568,
-    67230
-  ],
+  "skipped_prs": [],
   "prs": []
 }
