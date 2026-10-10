@@ -3,7 +3,7 @@
 
 const { canonical, digest } = require("./work_queue_codec.cjs");
 const { policyProposalFor, loadQueue, publishOperations } = require("./work_queue_binding.cjs");
-const { verifyWorkerRoute } = require("./work_queue_provisioning.cjs");
+const { verifiedDefaultReference, configuredWorkerDeployment } = require("./work_queue_provisioning.cjs");
 
 function approvedWorkerProfiles(state, pool, config) {
   const workflows = new Set(config.work_queue_workflows ?? []);
@@ -17,28 +17,30 @@ function approvedWorkerProfiles(state, pool, config) {
     .sort();
 }
 
-// The proposal and target allowlists come exclusively from protected compiler
-// options. Intent parameters cannot register workers or expand their scope.
+// Caller-local compiler options may narrow targets, never approve code. Resolve
+// activation from the verified default revision, not the invoking run's SHA.
 async function synchronizeDeployments(options, context) {
   if (!["administrator", "producer", "dispatcher"].includes(context.role)) return;
   const proposal = policyProposalFor(options);
   if (proposal?.authorization !== "aw") return;
   let latest = await loadQueue({ ...options, policyProposal: undefined });
   if (!latest.projection.deployments?.size) return;
-  const updateRoute = async (pool, name, proposed, activate = true) => {
+  const targets = [...latest.projection.deployments].flatMap(([pool, workers]) =>
+    approvedWorkerProfiles(latest.projection, pool, options.config ?? {})
+      .filter(name => workers.has(name))
+      .map(name => [pool, name])
+  );
+  if (!targets.length) return;
+  const provisioning = { githubClient: options.githubClient, owner: options.context.repo.owner, repo: options.context.repo.repo };
+  const revision = await verifiedDefaultReference(provisioning);
+  const updateRoute = async (pool, name, ref = undefined) => {
+    const activate = ref === undefined;
     for (let attempt = 0; attempt < 3; attempt++) {
       const worker = latest.projection.deployments.get(pool).get(name);
-      const profile = proposed ?? worker.revisions[worker.current_ref].profile;
-      if (!profile.logical_contract) return;
-      let available = !!proposed;
-      if (available) {
-        try {
-          await verifyWorkerRoute({ githubClient: options.githubClient, owner: options.context.repo.owner, repo: options.context.repo.repo, profile });
-        } catch (error) {
-          if (error?.code !== "policy_missing") throw error;
-          available = false;
-        }
-      }
+      const installed = worker.revisions[ref ?? worker.current_ref].profile;
+      const checked = await configuredWorkerDeployment({ ...provisioning, profile: installed }, ref ?? revision);
+      const profile = activate ? checked.profile : installed;
+      const available = checked.available && (activate || canonical(checked.profile) === canonical(installed));
       const current = worker.revisions[profile.ref];
       if (current && canonical(current.profile) === canonical(profile) && current.available === available && (!activate || worker.current_ref === profile.ref)) return;
       const operation = {
@@ -62,20 +64,13 @@ async function synchronizeDeployments(options, context) {
       }
     }
   };
-  for (const [pool, workers] of latest.projection.deployments) {
-    const approved = new Set(approvedWorkerProfiles(latest.projection, pool, options.config ?? {}));
-    for (const [name] of workers) {
-      if (!approved.has(name)) continue;
-      const proposed = proposal.pools[pool]?.profiles[name];
-      await updateRoute(pool, name, proposed);
-      const worker = latest.projection.deployments.get(pool).get(name);
-      const pinned = new Set(
-        [...latest.projection.works.values()]
-          .filter(work => work.state === "available" && work.pool === pool && work.worker_profile === name && work.execution_ref && work.execution_ref !== worker.current_ref)
-          .map(work => work.execution_ref)
-      );
-      for (const ref of pinned) await updateRoute(pool, name, worker.revisions[ref].profile, false);
-    }
+  for (const [pool, name] of targets) {
+    await updateRoute(pool, name);
+    const worker = latest.projection.deployments.get(pool).get(name);
+    const pinned = new Set(
+      [...latest.projection.works.values()].filter(work => work.state === "available" && work.pool === pool && work.worker_profile === name && work.execution_ref && work.execution_ref !== worker.current_ref).map(work => work.execution_ref)
+    );
+    for (const ref of pinned) await updateRoute(pool, name, ref);
   }
 }
 

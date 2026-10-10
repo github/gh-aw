@@ -1247,13 +1247,20 @@ frozen in the accepted request for deterministic replay. Excluded targets
 remain globally unchanged; this local restriction neither expands permissions
 nor resets service debt.
 
-Native publication MUST re-derive active worker code and its contract from the
+JavaScript synchronization and native publication MUST derive active worker code and its contract from the
 repository's verified immutable default revision. A matching logical contract
 alone is compatibility evidence, not approval of caller-selected code.
+Installed profile authority MUST stay frozen; caller-local proposal metadata
+MUST NOT select a revision, expand that authority or drive shared availability.
 Availability in either direction MUST match native source/artifact and workflow
 registration checks; `activate: false` MUST reference an already registered
 exact immutable profile. Revalidate these host facts before new publication,
 but accepted-request recovery MUST NOT revalidate or revoke old authority.
+Missing or invalid source, lock or stamp pauses only the affected installed
+worker; permission, rate-limit, service and transport errors MUST propagate
+instead of publishing unavailable defaults. Bounded deployment models assume
+approved code and verified host evidence; contract equality alone does not
+discharge that host premise.
 
 #### Operational controls are not policy resets
 

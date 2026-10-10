@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
-const os = require("node:os");
+const { randomUUID } = require("node:crypto");
 const path = require("node:path");
 const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { buildAWPolicy } = require("./work_queue_settings.cjs");
@@ -209,7 +209,8 @@ function registerTests({ describe, it }) {
       assert.equal(result.status, 0, result.stderr);
     });
     it("provisions from copied runtime scripts with all npm package imports denied", () => {
-      const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-route-runtime-"));
+      const directory = path.resolve(`.queue-route-runtime-${randomUUID()}`);
+      fs.mkdirSync(directory);
       try {
         const copied = new Set();
         function copy(name) {
@@ -233,25 +234,36 @@ function registerTests({ describe, it }) {
               throw new Error("runtime npm package forbidden: " + name);
             return load.call(this, name, ...args);
           };
-          const { verifyWorkerRoute } = require(process.argv[1]);
-          const profile = JSON.parse(process.argv[2]);
-          const bytes = Buffer.from(process.argv[3], "utf8");
+          const { verifyWorkerRoute, verifiedDefaultReference, configuredWorkerDeployment } = require(process.argv[1]);
+          const profile = {...JSON.parse(process.argv[2]), logical_contract: "a".repeat(64)};
+          const bytes = Buffer.from(process.argv[3] + 'env:\\n  GH_AW_WORK_QUEUE_CONTRACT: "' + profile.logical_contract + '"\\n', "utf8");
           let reads = 0;
           const githubClient = {rest: {
-            repos: {getContent: async ({path, ref}) => {
-              assert.equal(path, profile.workflow);
+            repos: {
+              get: async () => ({data: {full_name: "owner/repo", default_branch: "main"}}),
+              getContent: async ({path, ref}) => {
+              assert.ok([profile.workflow, profile.workflow.replace(/\\.lock\\.yml$/, ".md")].includes(path));
               assert.equal(ref, profile.ref);
               reads++;
+              const content = path.endsWith(".md") ? Buffer.from("---\\ntools: {work-queue: {worker: true}}\\n---\\nApproved work.\\n") : bytes;
               return {data: {type: "file", path, encoding: "base64",
-                content: bytes.toString("base64"), size: bytes.length}};
+                content: content.toString("base64"), size: content.length}};
             }},
+            git: {getRef: async () => ({data: {ref: "refs/heads/main", object: {sha: profile.ref}}})},
             actions: {getWorkflow: async () => {
               reads++;
               return {data: {path: profile.workflow, state: "active"}};
             }}
           }};
-          verifyWorkerRoute({githubClient, owner: "owner", repo: "repo", profile})
-            .then(() => { assert.equal(reads, 2); })
+          const options = {githubClient, owner: "owner", repo: "repo", profile};
+          verifyWorkerRoute(options)
+            .then(async () => {
+              const revision = await verifiedDefaultReference(options);
+              assert.equal(revision, profile.ref);
+              const route = await configuredWorkerDeployment(options, revision);
+              assert.deepEqual(route, {profile, available: true});
+              assert.equal(reads, 5);
+            })
             .catch(error => { console.error(error); process.exitCode = 1; });
         `;
         const result = spawnSync(process.execPath, ["-e", script, path.join(directory, "work_queue_provisioning.cjs"), JSON.stringify(profile), validYAML], { encoding: "utf8", env: { ...process.env, NODE_PATH: "" } });

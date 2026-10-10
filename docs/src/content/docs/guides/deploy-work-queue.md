@@ -140,7 +140,10 @@ or revoke outstanding assignments to deploy new code. Historical workers
 without logical-contract metadata remain exact-ref routes.
 
 Protected producer/dispatcher processing automatically synchronizes its approved
-targets before new submit/dispatch requests. To refresh native operator routes:
+targets from the verified immutable default-branch revision before new
+submit/dispatch requests. Running a producer or dispatcher on a feature branch
+does not install that branch's worker code or use its missing artifacts to pause
+shared workers. To refresh native operator routes:
 
 ```bash
 gh aw work-queue --repo OWNER/REPO deploy --from-config

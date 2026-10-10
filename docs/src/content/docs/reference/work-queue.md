@@ -139,10 +139,14 @@ Native operators use `deploy --from-config`, optionally selecting `--pool` or
 pinned availability updates use `activate: false` and never promote an old
 revision as the current route.
 
-Native publication re-derives activation from the repository's verified
+JavaScript synchronization and native publication derive activation from the repository's verified
 immutable default revision, not a caller-selected ref with a matching contract
-stamp. Both available and unavailable proposals must match native worker
-approval, artifacts and registration. Historical availability-only updates
+stamp. Caller-local AW approval can narrow installed targets but cannot select
+their revision or alter installed authority. Availability comes from that
+revision's worker source declaration, compiled assignment input and literal
+contract stamp, plus exact active native registration. Missing artifacts pause
+only the affected worker; permission, rate-limit and transport failures propagate.
+Historical availability-only updates
 require an already registered exact revision and the same native checks.
 
 > [!WARNING]

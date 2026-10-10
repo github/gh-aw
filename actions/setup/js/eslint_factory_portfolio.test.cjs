@@ -1,7 +1,7 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import os from "node:os";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { ESLINT_WORKERS, buildESLintFactoryPlan, buildESLintFactoryPolicy } from "./eslint_factory_portfolio.cjs";
 import { normalizeDispatchParameters, normalizeSubmitParameters } from "./work_queue_intents.cjs";
@@ -157,7 +157,8 @@ describe("ESLint factory producer and dispatcher", () => {
   });
 
   it("bootstraps an absent queue and launches all three workers through the real trusted control adapter without duplicate launches", async () => {
-    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-eslint-dispatch-"));
+    const directory = path.resolve(`.gh-aw-eslint-dispatch-${randomUUID()}`);
+    fs.mkdirSync(directory);
     const fixture = queueFixture({ granted: false, workerPrincipal: "12" });
     const fake = fakeGitHub();
     const runs = new Map();
@@ -171,10 +172,18 @@ describe("ESLint factory producer and dispatcher", () => {
       status: 200,
       data: { full_name: REPOSITORY, id: 7, default_branch: "main", size: 1 },
     });
+    const getRef = fake.githubClient.rest.git.getRef;
+    fake.githubClient.rest.git.getRef = async parameters => {
+      const response = await getRef(parameters);
+      return { ...response, data: { ...response.data, ref: `refs/${parameters.ref}` } };
+    };
     fake.githubClient.rest.users = fixture.githubClient.rest.users;
+    const workerFiles = ESLINT_WORKERS.flatMap(profile => [`.github/workflows/${profile}.md`, `.github/workflows/${profile}.lock.yml`]);
+    const fileReads = [];
     fake.githubClient.rest.repos.getContent = async ({ path: filename, ref }) => {
       expect(ref).toBe(REF);
-      expect(ESLINT_WORKERS.map(profile => `.github/workflows/${profile}.lock.yml`)).toContain(filename);
+      expect(workerFiles).toContain(filename);
+      fileReads.push(filename);
       const content = fs.readFileSync(new URL(`../../../${filename}`, import.meta.url));
       return { data: { type: "file", path: filename, encoding: "base64", content: content.toString("base64") } };
     };
@@ -240,11 +249,15 @@ describe("ESLint factory producer and dispatcher", () => {
       expect(posts).toHaveLength(3);
       expect(new Set(posts.map(post => post.workflow_id))).toEqual(new Set(ESLINT_WORKERS.map(profile => `${profile}.lock.yml`)));
       const state = replayTransactions(fake.log());
+      expect(new Set(fileReads)).toEqual(new Set(workerFiles));
       expect(fake.log()[0].operations.map(operation => operation.kind)).toEqual(["Policy", "Work", "Work", "Work"]);
+      expect(state.policy).toEqual(policy);
       expect(state.works.size).toBe(3);
       expect(state.claims.size).toBe(3);
       expect([...state.dispatches.values()].every(dispatch => dispatch.state === "bound")).toBe(true);
+      const readsBeforeReplay = [...fileReads];
       expect((await processControls(controls)).success).toBe(true);
+      expect(fileReads).toEqual(readsBeforeReplay);
       expect(posts).toHaveLength(3);
       expect(replayTransactions(fake.log()).works.size).toBe(3);
       expect(failures).toEqual([]);

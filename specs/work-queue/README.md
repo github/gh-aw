@@ -201,14 +201,19 @@ or dispatch requests, derive the compiler allowlist, or implement
 `futurePolicy`/`FuturePolicy`. Those are runtime integration obligations.
 The future-policy view does not mutate installed scheduling economics.
 
-Native publication discharges part of that host premise by re-deriving active
+JavaScript synchronization and native publication discharge part of that host premise by deriving active
 code from the verified immutable default revision and checking both directions
 of availability against source, artifact and workflow registration. A matching
-contract stamp at a caller-selected ref is not code approval. Historical
+contract stamp at a caller-selected ref is not code approval. Caller proposals
+cannot replace installed profile authority or provide shared availability
+evidence. Missing default artifacts pause only affected workers; permission and
+rate errors propagate rather than becoming durable unavailability. Historical
 availability-only updates require an already registered immutable profile.
 `provisioning_deployment_boundary_test.go` covers forged refs/availability,
 trusted native participants and host changes between proposal and publication;
-the bounded model itself still assumes these facts rather than proving them.
+`work_queue_deployment_authority.test.cjs` covers caller-ref isolation,
+automatic default upgrades, local readiness failures and historical pins.
+The bounded model itself still assumes these facts rather than proving them.
 
 Run `check.sh` with `TLC_MODEL_FILTER=WorkerDeploymentBoundary` for its safety
 case, five named mutation controls and three guarded witnesses:
