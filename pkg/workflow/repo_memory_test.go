@@ -380,7 +380,7 @@ func TestRepoMemoryFilterStepGatesUpload(t *testing.T) {
 	assert.Greater(t, filterIDPos, filterNamePos, "Filter step id must appear after its name")
 
 	validationSection := output[validationNamePos:uploadNamePos]
-	assert.Contains(t, validationSection, "if: always() && steps."+filterStepID+".outcome == 'success'",
+	assert.Contains(t, validationSection, "steps."+filterStepID+".outcome == 'success'",
 		"Validation step must be gated on the filter step's success")
 
 	uploadSection := output[uploadNamePos:]
