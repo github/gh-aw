@@ -31,9 +31,9 @@ var requestSchemas = sync.OnceValues(func() (map[string]*jsonschema.Schema, erro
 })
 
 var requestRoleKinds = map[string][]string{
-	"administrator": {"policy", "control", "submit", "dispatch_next", "observe", "cancel_work", "checkpoint"},
-	"producer":      {"submit", "cancel_work"},
-	"dispatcher":    {"submit", "dispatch_next", "observe", "dispatch"},
+	"administrator": {"policy", "deployment", "control", "submit", "dispatch_next", "observe", "cancel_work", "checkpoint"},
+	"producer":      {"deployment", "submit", "cancel_work"},
+	"dispatcher":    {"deployment", "submit", "dispatch_next", "observe", "dispatch"},
 	"worker":        {"submit", "dispatch_next", "observe", "finish", "dispatch"},
 	"reconciler":    {"observe", "dispatch", "release", "result", "delivery_failure", "cancel_claim", "cancel_work"},
 	"projector":     {"issue_link"},
@@ -89,6 +89,18 @@ func validateRequestOrigin(actor Actor, request Request) error {
 }
 
 func validateDispatchParameters(params DispatchParameters) error {
+	if params.WorkerProfiles != nil {
+		if len(params.WorkerProfiles) > 256 {
+			return queueError("request_invalid", "dispatch worker allowlist exceeds 256 profiles")
+		}
+		seen := identitySet{}
+		for _, name := range params.WorkerProfiles {
+			if !validIdentity(name, false, 256) || seen.contains(name) {
+				return queueError("request_invalid", "dispatch worker allowlist requires unique profile names")
+			}
+			seen.add(name)
+		}
+	}
 	if params.MaxClaims < 1 || params.MaxClaims > 256 || params.MaxDispatches < 1 ||
 		params.MaxDispatches > 256 || params.MaxBytes < 1 || params.MaxBytes > 48<<10 {
 		return queueError("request_invalid", "dispatch budgets require claims/dispatches 1..256 and bytes 1..49152")

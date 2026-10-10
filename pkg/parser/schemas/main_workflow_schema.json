@@ -8,7 +8,8 @@
   "required": ["on"],
   "properties": {
     "work-queue-policy": {
-      "description": "Version-3 scheduling policy proposal. Workers and dispatchers proposing Policy require explicit approved worker-profiles or pools with fixed numeric launch principals; a dispatcher actor ID does not identify an alternate dispatch credential. Credential-only read bindings are separate adapter configuration. The installed ledger Policy remains authoritative; scheduling cannot be disabled.",
+      "description": "Deprecated legacy version-3 Policy proposal. Use scheduling-only work_queue in .github/workflows/aw.json and AW-approved dispatch targets. Cannot be combined with repository work_queue settings. Installed Policy remains authoritative and historical ledgers remain readable.",
+      "deprecated": true,
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -59,7 +60,7 @@
               "logical-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
               "native-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
               "per-account-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
-              "allowed-repositories": { "type": "array", "maxItems": 64, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+              "allowed-repositories": { "type": "array", "maxItems": 64, "items": { "type": "string", "anyOf": [{ "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" }, { "const": "${{ github.repository }}" }] } },
               "max-observation-age-ms": { "type": "integer", "minimum": 1, "maximum": 3600000 },
               "retry": {
                 "type": "object",

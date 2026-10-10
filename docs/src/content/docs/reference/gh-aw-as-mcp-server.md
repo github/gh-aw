@@ -128,6 +128,8 @@ The MCP server exposes these workflow-management tools:
 
 For `audit`, each run identifier may be a numeric run ID, a run URL, a job URL, or a job URL with a step anchor such as `https://github.com/owner/repo/actions/runs/123/job/456#step:7:1`.
 
+If `compile` fails before producing JSON, its fallback errors prioritize the actionable cause and remediation rather than debug stderr. Each diagnostic is limited to 4 KiB, and the fallback JSON is limited to 48 KiB. Omitted debug output or oversized diagnostics are marked explicitly. If per-workflow errors exceed that budget, the response contains one invalid `scope: "batch"` compile result with the affected workflow count. Structured compiler and scanner results are not subject to this fallback budget. The deprecated `compile` parameter `max_tokens` remains ignored.
+
 For `checks`, normalized states are `success`, `failed`, `pending`, `no_checks`, and `policy_blocked`. Use `required_state` as the authoritative CI verdict when optional third-party deployments are present.
 
 Available `fix` codemods include `timeout-minutes-migration`, `network-firewall-migration`, `mcp-scripts-mode-removal`, and `steps-run-secrets-to-env`.

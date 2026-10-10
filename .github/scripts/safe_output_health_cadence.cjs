@@ -1,5 +1,5 @@
-const fs = require("node:fs");
 const path = require("node:path");
+const { ensureSecureDirectory, writeFileSecure } = require("./secure_write.cjs");
 
 async function checkCadence({ github, context, core, outputPath = "/tmp/gh-aw/agent/safe-output-health-cadence.json" }) {
   const result = { status: "unknown", expected_interval_hours: 24, threshold_hours: 48 };
@@ -34,8 +34,8 @@ async function checkCadence({ github, context, core, outputPath = "/tmp/gh-aw/ag
     message = "Safe Output Health cadence: unknown; workflow run history could not be checked.";
   }
   result.message = message;
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
+  ensureSecureDirectory(path.dirname(outputPath));
+  writeFileSecure(outputPath, `${JSON.stringify(result, null, 2)}\n`);
   if (result.status !== "healthy") core.warning(message);
   core.info(message);
   await core.summary.addHeading("Safe Output Health cadence").addRaw(message).write();

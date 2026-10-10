@@ -1,6 +1,6 @@
-const fs = require("node:fs");
 const path = require("node:path");
 const { buildCorpus, collectIssues, collectDiscussions, metadata } = require("./aw_issue_clustering_publish.cjs");
+const { ensureSecureDirectory, writeFileSecure } = require("./secure_write.cjs");
 
 const stopWords = new Set(
   `a an and are as at be been by can code daily for from gh github has have in is
@@ -107,12 +107,12 @@ function compact(item) {
 }
 
 function writeEvidence(corpus, output) {
-  fs.mkdirSync(output, { recursive: true });
-  fs.writeFileSync(path.join(output, "corpus.json"), JSON.stringify(corpus));
+  ensureSecureDirectory(output);
+  writeFileSecure(path.join(output, "corpus.json"), JSON.stringify(corpus));
   for (const kind of ["issues", "reports"]) {
     const directory = path.join(output, kind);
-    fs.mkdirSync(directory, { recursive: true });
-    for (const item of corpus[kind]) fs.writeFileSync(path.join(directory, `${item.number}.json`), JSON.stringify(item));
+    ensureSecureDirectory(directory);
+    for (const item of corpus[kind]) writeFileSecure(path.join(directory, `${item.number}.json`), JSON.stringify(item));
   }
   const summary = {
     repo: corpus.repo,
@@ -129,7 +129,7 @@ function writeEvidence(corpus, output) {
     excluded: corpus.excluded,
     seeds: seedClusters(corpus.issues),
   };
-  fs.writeFileSync(path.join(output, "index.json"), JSON.stringify(summary, null, 2));
+  writeFileSecure(path.join(output, "index.json"), JSON.stringify(summary, null, 2));
   return summary;
 }
 

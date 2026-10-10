@@ -68,8 +68,8 @@ its run for other workers. Use the exact stored date, node definitions and budge
 additional candidates or admission identities.
 
 1. Call `work_queue_read` with `{"pool":"daily-reports","limit":32}`. An absent
-   Policy is a deployment failure, not permission to bootstrap or dispatch
-   ordinary workflows. Surface queue errors explicitly.
+   queue is an empty backlog; the first trusted submission atomically publishes
+   Policy and Work. Reads never seed the queue. Surface queue errors explicitly.
 2. Call `work_queue_submit` once with `{"nodes": <the plan.nodes array>}`.
    Date-keyed graph/node identities make an identical submission idempotent.
    Do not edit payloads on a retry or replace immutable admitted Work.
@@ -82,7 +82,10 @@ additional candidates or admission identities.
 Use only the advertised work-queue MCP tools (or their `work-queue` CLI wrapper).
 Do not call ordinary `dispatch_workflow` or target-specific dispatch tools.
 The allowlist approves routes; the installed Policy pins actual immutable
-revisions, principals, singleton assignments and resource scope.
+revisions, singleton assignments and resource scope. AW handles authorization
+and binds the actual native run to each Claim. Scheduling overrides, including
+the `daily-reports` pool and equal-weight report keys, live in the shared
+`.github/workflows/aw.json` `work_queue` section.
 
 This workflow has one daily schedule and no manual-dispatch trigger. Whole-run
 reruns cannot admit another cohort. At most three native launches are permitted
