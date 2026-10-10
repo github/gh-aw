@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { writeFile } = require("./create_files.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { formatJSONFiles, runCustomMemoryValidation, writeValidationMarker, clearValidationMarker, memoryTreeDigest, getRepoMemoryBaselinePath } = require("./memory_custom_validation.cjs");
 const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
@@ -85,7 +86,7 @@ function validateRepoMemoryBaseline(core) {
   }
   try {
     fs.mkdirSync(path.dirname(baselinePath), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(baselinePath, JSON.stringify({ digest, ...result }), { mode: 0o600 });
+    writeFile(baselinePath, JSON.stringify({ digest, ...result }));
   } catch (error) {
     throw new Error(`Unable to record repo-memory baseline '${memoryId}': ${getErrorMessage(error)}`, { cause: error });
   }
@@ -95,7 +96,7 @@ function validateRepoMemoryBaseline(core) {
     const logPath = baselinePath.replace(/\.json$/, ".log");
     const fullLog = `exitCode: ${result.exitCode}\ntimedOut: ${result.timedOut}\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}\n`;
     try {
-      fs.writeFileSync(logPath, fullLog, { mode: 0o600 });
+      writeFile(logPath, fullLog);
     } catch (error) {
       throw new Error(`Unable to write repo-memory baseline log '${memoryId}': ${getErrorMessage(error)}`, { cause: error });
     }
@@ -110,7 +111,7 @@ function validateRepoMemoryBaseline(core) {
       const promptPath = path.join(promptDir, name);
       if (fs.existsSync(promptPath)) {
         try {
-          fs.appendFileSync(promptPath, guidance);
+          writeFile(promptPath, fs.readFileSync(promptPath, "utf8") + guidance);
         } catch (error) {
           throw new Error(`Unable to add repo-memory baseline diagnostic to ${name}: ${getErrorMessage(error)}`, { cause: error });
         }

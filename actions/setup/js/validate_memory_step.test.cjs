@@ -27,6 +27,7 @@ describe("validateMemoryStep", () => {
     fs.rmSync(process.env.GH_AW_PROMPT_DIR, { recursive: true, force: true });
     fs.rmSync(getValidationMarkerPath("cache", "default"), { force: true });
     fs.rmSync(getRepoMemoryBaselinePath(process.env.MEMORY_ID), { force: true });
+    fs.rmSync(getRepoMemoryBaselinePath(process.env.MEMORY_ID).replace(/\.json$/, ".log"), { force: true });
     process.env = originalEnv;
   });
 
@@ -78,6 +79,54 @@ describe("validateMemoryStep", () => {
     validateRepoMemoryBaseline({ info: () => {}, warning: message => warnings.push(message) });
     expect(fs.readFileSync(path.join(tempDir, "state.json"), "utf8")).toBe("original");
     expect(warnings.join("\n")).toContain("must not modify memory files");
+  });
+
+  it("keeps large diagnostics in private temporary files with bounded prompt excerpts", () => {
+    process.env.MEMORY_ID = path.basename(tempDir);
+    process.env.VALIDATION_SCRIPT_B64 = Buffer.from('console.error("x".repeat(6000)); process.exitCode = 1;').toString("base64");
+    const baselinePath = getRepoMemoryBaselinePath(process.env.MEMORY_ID);
+    const logPath = baselinePath.replace(/\.json$/, ".log");
+    const promptPaths = ["user.txt", "prompt.txt"].map(name => path.join(process.env.GH_AW_PROMPT_DIR, name));
+    fs.mkdirSync(path.dirname(baselinePath), { recursive: true });
+    for (const file of [baselinePath, logPath, ...promptPaths]) {
+      fs.writeFileSync(file, "original\n");
+      fs.chmodSync(file, 0o666);
+    }
+    const warnings = [];
+
+    validateRepoMemoryBaseline({ info: () => {}, warning: message => warnings.push(message) });
+
+    expect(fs.readFileSync(logPath, "utf8")).toContain("x".repeat(6000));
+    for (const promptPath of promptPaths) {
+      const rendered = fs.readFileSync(promptPath, "utf8");
+      expect(rendered).toMatch(/^original\n/);
+      expect(rendered).toContain(logPath);
+      expect(rendered).toContain("(truncated)");
+      expect(rendered.length).toBeLessThan(2000);
+      expect(rendered).not.toContain("x".repeat(1001));
+    }
+    expect(warnings[0].length).toBeLessThan(1500);
+    if (process.platform !== "win32") {
+      for (const file of [baselinePath, logPath, ...promptPaths]) {
+        expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+      }
+    }
+  });
+
+  it.each(["baseline", "log", "user.txt", "prompt.txt"])("rejects a symlinked %s diagnostic destination without overwriting its target", destination => {
+    if (process.platform === "win32") return;
+    process.env.MEMORY_ID = path.basename(tempDir);
+    process.env.VALIDATION_SCRIPT_B64 = Buffer.from('throw new Error("invalid state");').toString("base64");
+    const baselinePath = getRepoMemoryBaselinePath(process.env.MEMORY_ID);
+    const target = path.join(tempDir, "protected");
+    fs.writeFileSync(target, "unchanged");
+    fs.mkdirSync(path.dirname(baselinePath), { recursive: true });
+    const destinationPath = destination === "baseline" ? baselinePath : destination === "log" ? baselinePath.replace(/\.json$/, ".log") : path.join(process.env.GH_AW_PROMPT_DIR, destination);
+    fs.rmSync(destinationPath, { force: true });
+    fs.symlinkSync(target, destinationPath);
+
+    expect(() => validateRepoMemoryBaseline({ info: () => {}, warning: () => {} })).toThrow(/Unable to (record|write|add)/);
+    expect(fs.readFileSync(target, "utf8")).toBe("unchanged");
   });
 
   it("validates cache content and writes its marker after success", () => {
