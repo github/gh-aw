@@ -58,8 +58,28 @@ function parseMultiProviderJson(value) {
   }
 }
 
+/**
+ * Resolve a catalog model to its BYOK selection id without guessing unknown models.
+ *
+ * @param {string | undefined} model
+ * @param {{ providers: Array<{name: string}>, models: Array<{id: string, provider: string}> } | null | undefined} config
+ * @returns {string | null}
+ */
+function qualifyModelForMultiProvider(model, config) {
+  const value = typeof model === "string" ? model.trim() : "";
+  if (!value || !config) return null;
+  const models = config.models.filter(entry => config.providers.some(provider => provider.name === entry.provider));
+  const qualified = models.find(entry => `${entry.provider}/${entry.id}` === value);
+  if (qualified) return value;
+  const legacy = value.startsWith("copilot/");
+  const id = legacy ? value.slice("copilot/".length) : value;
+  const match = models.find(entry => entry.id === id);
+  return match ? `${match.provider}/${match.id}` : null;
+}
+
 module.exports = {
   isValidProviderConfig,
   isValidModelConfig,
   parseMultiProviderJson,
+  qualifyModelForMultiProvider,
 };

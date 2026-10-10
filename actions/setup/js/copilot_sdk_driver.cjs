@@ -27,10 +27,11 @@
 "use strict";
 
 const fs = require("fs");
-const { runWithCopilotSDK, extractPromptFromArgs } = require("./copilot_sdk_session.cjs");
+const path = require("path");
+const { runWithCopilotSDK, extractPromptFromArgs, isCopilotSDKBareMode } = require("./copilot_sdk_session.cjs");
 const { parsePermissionConfigFromServerArgs } = require("./copilot_sdk_permissions.cjs");
 const { parseCopilotSDKToolConfig } = require("./copilot_sdk_tool_config.cjs");
-const { parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
+const { parseMultiProviderJson, qualifyModelForMultiProvider } = require("./copilot_sdk_multi_provider.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { resolveRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -109,6 +110,9 @@ async function main() {
   const sdkModels = multiProviderConfig.models;
   const routingEnabled = process.env.GH_AW_MODEL_ROUTING === "1";
   let model = (routingEnabled ? process.env.COPILOT_MODEL : applyModelFallback(process.env, "COPILOT_MODEL", log)) || multiProviderConfig.model || undefined;
+  const qualifiedModel = qualifyModelForMultiProvider(model, multiProviderConfig);
+  if (!qualifiedModel) throw new Error(`Cannot qualify session model "${model || "(none)"}" against the configured provider models`);
+  model = qualifiedModel;
   const reasoningEffort = resolveRoutingReasoningEffort(process.env);
   log(`multi-provider mode: ${providers.length} providers, ${sdkModels.length} models, model=${model ?? "(env)"}`);
   for (const p of providers) {
@@ -135,6 +139,8 @@ async function main() {
     models: sdkModels,
     permissionConfig,
     toolConfig,
+    workingDirectory: path.resolve(process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd()),
+    bare: isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS),
   });
 
   process.exit(result.exitCode);

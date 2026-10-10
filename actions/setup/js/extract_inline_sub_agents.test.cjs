@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
 
 // Provide a minimal core mock so the module loads correctly.
 global.core = {
@@ -14,10 +13,35 @@ global.core = {
   setFailed: () => {},
 };
 
-const { extractInlineSubAgents, writeInlineSubAgents, preserveSubAgentFrontmatter, closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
+const { extractInlineSubAgents, writeInlineSubAgents, preserveSubAgentFrontmatter, closeUnterminatedSubAgentMarkers, loadCopilotSDKCustomAgents } = require("./extract_inline_sub_agents.cjs");
 
 // Helper: returns a ## agent: `name` start marker line.
 const agentMarker = name => `## agent: \`${name}\``;
+
+describe("loadCopilotSDKCustomAgents", () => {
+  it("loads runtime files, preserving YAML descriptions and workflow precedence", () => {
+    const base = fs.mkdtempSync(path.join(process.cwd(), ".sdk-agents-test-"));
+    try {
+      const workspace = path.join(base, "workspace");
+      const workflow = path.join(base, "workflow");
+      fs.mkdirSync(path.join(workspace, ".github/agents"), { recursive: true });
+      fs.mkdirSync(path.join(workflow, ".github/agents"), { recursive: true });
+      fs.writeFileSync(path.join(workspace, ".github/agents/helper.agent.md"), "---\nname: helper\n---\nRepository version.");
+      fs.writeFileSync(path.join(workflow, ".github/agents/helper.agent.md"), "---\nname: helper\ndescription: |\n  First line\n  Second line\ntools: []\nmodel: small\n---\nWorkflow version.");
+      fs.writeFileSync(path.join(workspace, ".github/agents/plain.agent.md"), "Prompt without frontmatter.");
+      fs.writeFileSync(path.join(workspace, ".github/agents/ignored.md"), "Ignored file.");
+      fs.writeFileSync(path.join(workspace, ".github/agents/broken.agent.md"), "---\ntools: {invalid: true}\n---\nInvalid tools.");
+      const warnings = [];
+      expect(loadCopilotSDKCustomAgents(workspace, workflow, message => warnings.push(message))).toEqual([
+        { name: "helper", description: "First line\nSecond line\n", tools: [], model: "small", prompt: "Workflow version." },
+        { name: "plain", prompt: "Prompt without frontmatter." },
+      ]);
+      expect(warnings).toEqual([expect.stringContaining("agent tools must be a list")]);
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // extractInlineSubAgents — unit tests
@@ -230,7 +254,7 @@ describe("writeInlineSubAgents", () => {
   let tmpDir;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "inline-agents-test-"));
+    tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".inline-agents-test-"));
   });
 
   afterEach(() => {

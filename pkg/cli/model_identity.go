@@ -13,6 +13,7 @@ import (
 var (
 	modelDateSuffix            = regexp.MustCompile(`-[0-9]{4}(?:-[0-9]{2}-[0-9]{2}|[0-9]{4})$`)
 	claudeModelVersionSpelling = regexp.MustCompile(`^(claude-.+)-([0-9]+)-([0-9]+)$`)
+	copilotSDKModelProvider    = regexp.MustCompile(`^copilot-(?:responses|completions)(?:-[0-9]+)?$`)
 )
 
 type modelIdentityResolver struct {
@@ -45,6 +46,7 @@ func newModelIdentityResolver(runDir string) *modelIdentityResolver {
 
 func normalizeModelIdentity(model string) string {
 	model, _, _ = strings.Cut(strings.ToLower(strings.TrimSpace(model)), "?")
+	model = modelNameWithoutProvider(model)
 	model = modelDateSuffix.ReplaceAllString(model, "")
 	return claudeModelVersionSpelling.ReplaceAllString(model, "$1-$2.$3")
 }
@@ -106,7 +108,7 @@ func modelPatternMatches(pattern, observed, provider string) bool {
 	observed, _, _ = strings.Cut(strings.ToLower(observed), "?")
 	originalObserved := observed
 	patternProvider, patternModel, patternQualified := strings.Cut(pattern, "/")
-	observedProvider, observedModel, observedQualified := strings.Cut(observed, "/")
+	observedProvider, _, observedQualified := strings.Cut(observed, "/")
 	if patternQualified {
 		if provider == "" && observedQualified {
 			provider = observedProvider
@@ -120,7 +122,7 @@ func modelPatternMatches(pattern, observed, provider string) bool {
 		if provider != "" && normalizeModelProvider(observedProvider) != normalizeModelProvider(provider) {
 			return modelPatternMatches(patternModel, originalObserved, "")
 		}
-		observed = observedModel
+		observed = modelNameWithoutProvider(originalObserved)
 	}
 	patterns := []string{pattern, normalizeModelIdentity(pattern)}
 	observedModels := []string{observed, normalizeModelIdentity(observed)}
@@ -135,6 +137,10 @@ func modelPatternMatches(pattern, observed, provider string) bool {
 }
 
 func normalizeModelProvider(provider string) string {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if copilotSDKModelProvider.MatchString(provider) {
+		return "github-copilot"
+	}
 	switch provider {
 	case "github", "copilot", "github-copilot":
 		return "github-copilot"
@@ -148,8 +154,10 @@ func normalizeModelProvider(provider string) string {
 }
 
 func modelNameWithoutProvider(model string) string {
-	_, name, qualified := strings.Cut(model, "/")
+	provider, name, qualified := strings.Cut(model, "/")
 	if qualified {
+		// SDK metric keys can repeat the provider after the qualified model.
+		name = strings.TrimSuffix(name, ":"+provider)
 		return name
 	}
 	return model

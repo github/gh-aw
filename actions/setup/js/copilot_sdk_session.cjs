@@ -35,8 +35,10 @@ const { buildCopilotSDKToolCallBudget } = require("./copilot_sdk_tool_budget.cjs
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
 const { copilotSessionContext } = require("./copilot_session.cjs");
+const { loadCopilotSDKCustomAgents } = require("./extract_inline_sub_agents.cjs");
+const { qualifyModelForMultiProvider, parseMultiProviderJson } = require("./copilot_sdk_multi_provider.cjs");
 
-const CAPTURED_EPHEMERAL_EVENTS = new Set([...COPILOT_WORKFLOW_EVENT_TYPES, "assistant.usage", "assistant.message_delta", "assistant.reasoning_delta", "model.call_failure"]);
+const CAPTURED_EPHEMERAL_EVENTS = new Set([...COPILOT_WORKFLOW_EVENT_TYPES, "assistant.usage", "assistant.message_delta", "assistant.reasoning_delta", "model.call_failure", "model.call_final_result"]);
 
 // Default timeout for a single sendAndWait call: 10 minutes.
 // This is intentionally generous — the headless Copilot CLI has its own internal
@@ -88,6 +90,17 @@ function extractPromptFromArgs(args) {
   return null;
 }
 
+/** @param {string | undefined} serverArgs @returns {boolean} */
+function isCopilotSDKBareMode(serverArgs) {
+  try {
+    const args = JSON.parse(serverArgs || "[]");
+    if (!Array.isArray(args)) throw new Error("expected an array");
+    return args.includes("--no-custom-instructions");
+  } catch (error) {
+    throw new Error(`Invalid GH_AW_COPILOT_SDK_SERVER_ARGS: ${getErrorMessage(error)}`, { cause: error });
+  }
+}
+
 /**
  * Run a Copilot agentic session using the @github/copilot-sdk.
  *
@@ -126,6 +139,9 @@ function extractPromptFromArgs(args) {
  *     defineTool?: typeof import("@github/copilot-sdk").defineTool,
  *   },
  *   sessionStateBaseDir?: string,
+ *   workingDirectory?: string,
+ *   agentsBaseDir?: string,
+ *   bare?: boolean,
  * }} options
  * @returns {Promise<{exitCode: number, output: string, hasOutput: boolean, durationMs: number}>}
  */
@@ -146,6 +162,9 @@ async function runWithCopilotSDK({
   coreLogger,
   sdkModule,
   sessionStateBaseDir,
+  workingDirectory = path.resolve(process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd()),
+  agentsBaseDir = path.join(os.tmpdir(), "gh-aw"),
+  bare = isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS),
 }) {
   // Lazy-require to avoid loading the SDK when it is not needed.
   // The SDK is large and has side-effects on import (worker threads, etc.).
@@ -192,7 +211,7 @@ async function runWithCopilotSDK({
   });
   const client = new CopilotClient({
     connection,
-    workingDirectory: process.env.GITHUB_WORKSPACE || process.cwd(),
+    workingDirectory,
     logLevel,
   });
   /** @type {any} */
@@ -321,7 +340,7 @@ async function runWithCopilotSDK({
       coreLogger,
       logger: log,
       onDenied: requestSummary => recordToolDenial(`permission denied: ${requestSummary}`),
-      workspaceRoot: process.env.GITHUB_WORKSPACE,
+      workspaceRoot: workingDirectory,
     });
     const toolCallBudget = buildCopilotSDKToolCallBudget(toolConfig?.maxToolCalls, event => {
       writeDriverEvent(event.exhausted ? "guard.tool_call_budget_exceeded" : "guard.tool_call_budget_debit", event);
@@ -330,12 +349,30 @@ async function runWithCopilotSDK({
     // Build session config using the multi-provider surface.
     /** @type {any} */
     const sdkReasoningEffort = reasoningEffort;
+    const reflectedConfig = parseMultiProviderJson(process.env.GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON);
+    providers ??= reflectedConfig?.providers;
+    providerModels ??= reflectedConfig?.models;
+    const envModel = process.env.GH_AW_MODEL_ROUTING === "1" ? process.env.COPILOT_MODEL : resolveModelWithFallback(process.env, "COPILOT_MODEL");
+    const requestedModel = model || envModel || reflectedConfig?.model || undefined;
+    const providerConfig = providers && providerModels ? { providers, models: providerModels } : null;
+    const sessionModel = providerConfig ? qualifyModelForMultiProvider(requestedModel, providerConfig) : requestedModel;
+    if (providerConfig && !sessionModel) throw new Error(`Cannot qualify session model "${requestedModel || "(none)"}" against the configured provider models`);
+    const customAgents = loadCopilotSDKCustomAgents(workingDirectory, agentsBaseDir, log).map(agent => {
+      const requested = agent.model;
+      const alias = !requested || ["small", "medium", "large"].includes(requested.toLowerCase());
+      const qualified = alias ? sessionModel : qualifyModelForMultiProvider(requested, providerConfig);
+      if (!alias && !qualified) log(`warning: custom agent "${agent.name}" model "${requested}" is not in the configured provider models; using session model "${sessionModel || "(none)"}"`);
+      return { ...agent, model: qualified || sessionModel || undefined };
+    });
     /** @type {import("@github/copilot-sdk").SessionConfig} */
     const sessionConfig = {
-      model: model || resolveModelWithFallback(process.env, "COPILOT_MODEL") || undefined,
+      model: sessionModel || undefined,
       ...(sdkReasoningEffort ? { reasoningEffort: sdkReasoningEffort } : {}),
       providers,
       models: providerModels,
+      workingDirectory,
+      skipCustomInstructions: bare,
+      customAgents,
       onPermissionRequest,
       ...(toolCallBudget ? { hooks: { onPreToolUse: toolCallBudget.onPreToolUse } } : {}),
       ...buildCopilotSDKSessionToolConfig(toolConfig, sdk, webFetchOptions),
@@ -594,4 +631,4 @@ async function runWithCopilotSDK({
   }
 }
 
-module.exports = { SDK_SEND_TIMEOUT_MS_DEFAULT, SDK_POST_COMPLETION_IDLE_MS_DEFAULT, SDK_IDLE_TIMEOUT_PATTERN, extractPromptFromArgs, runWithCopilotSDK };
+module.exports = { SDK_SEND_TIMEOUT_MS_DEFAULT, SDK_POST_COMPLETION_IDLE_MS_DEFAULT, SDK_IDLE_TIMEOUT_PATTERN, extractPromptFromArgs, runWithCopilotSDK, isCopilotSDKBareMode };

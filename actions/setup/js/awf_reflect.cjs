@@ -24,6 +24,7 @@ const tls = require("tls");
 const { withRetry, sleep } = require("./error_recovery.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { AWF_REFLECT_OUTPUT_PATH } = require("./awf_reflect_paths.cjs");
+const { qualifyModelForMultiProvider } = require("./copilot_sdk_multi_provider.cjs");
 
 function parseReflectTimeoutMs(value) {
   const rawValue = String(value || "").trim();
@@ -919,15 +920,13 @@ function resolveOpenAICompatibleEndpointFromReflect(options) {
  * Returns `null` when no configured endpoints are present or the data is
  * unavailable.
  *
- * Each endpoint becomes a `NamedProviderConfig` (using the endpoint's `provider`
- * field as the stable name) and every model advertised by that endpoint becomes a
- * `ProviderModelConfig` tuple `{ id, provider }` referencing it.  Callers can
- * derive provider-qualified selection ids as `"<providerName>/<modelId>"` if needed.
+ * Copilot endpoints become separate responses and completions providers. Other
+ * endpoints retain a single provider. Models reference their inferred wire API.
  *
  * The primary model is the first model that matches `options.model` (if set),
  * otherwise the first model across all providers.
- * A valid `options.wireApi` overrides inference for the primary provider only,
- * except for Anthropic providers, which do not use an OpenAI wire API.
+ * A valid `options.wireApi` routes only the configured Copilot model; it never
+ * changes the wire API used by the other models. The primary model is qualified.
  *
  * @param {{
  *   model?: string,
@@ -970,6 +969,11 @@ function resolveMultiProviderFromReflect(options) {
   // provider label (e.g. two "copilot" entries at different ports).
   /** @type {Map<string, number>} */
   const providerNameCount = new Map();
+  const configuredWireApi = String(options?.wireApi || "")
+    .toLowerCase()
+    .trim();
+  let configuredModelMapped = false;
+  let mappedConfiguredModel = "";
 
   for (const endpoint of endpoints) {
     const baseUrl = endpointBaseUrl(endpoint);
@@ -985,18 +989,52 @@ function resolveMultiProviderFromReflect(options) {
     }
 
     // Ensure unique provider names by appending a suffix when the same name appears twice.
-    const existing = providerNameCount.get(rawProviderName) ?? 0;
-    providerNameCount.set(rawProviderName, existing + 1);
-    const providerName = existing === 0 ? rawProviderName : `${rawProviderName}-${existing}`;
+    const isCopilot = ["copilot", "github-copilot", "github"].includes(rawProviderName.toLowerCase());
+    const stableProviderName = isCopilot ? "copilot" : rawProviderName;
+    const existing = providerNameCount.get(stableProviderName) ?? 0;
+    providerNameCount.set(stableProviderName, existing + 1);
+    const suffix = existing === 0 ? "" : `-${existing}`;
+    const providerName = `${stableProviderName}${suffix}`;
 
     const endpointModels = Array.isArray(endpoint.models) ? endpoint.models.filter(m => typeof m === "string" && m.trim().length > 0) : [];
 
-    // Infer provider type and wire API using the configured model if available,
-    // otherwise fall back to the first model.
-    // For multi-model providers (e.g. Copilot), different models may have different wire APIs,
-    // so we prefer the configured model to ensure the correct wireApi is selected.
+    if (isCopilot) {
+      /** @type {Array<"responses" | "completions">} */
+      const wireApis = ["responses", "completions"];
+      for (const wireApi of wireApis) {
+        providers.push({ name: `copilot-${wireApi}${suffix}`, type: "openai", baseUrl, wireApi });
+      }
+      // Routing metadata uses model_id (not id); HTTP paths exclude ws:/responses.
+      const routingModels = Array.isArray(endpoint.routing_models) ? endpoint.routing_models : Array.isArray(rd.routing_models) ? rd.routing_models : [];
+      for (const modelId of endpointModels) {
+        const catalogEntry = getCatalogModelEntry(options?.modelsJson ?? null, modelId, "github-copilot");
+        let wireApi = inferWireApiForModel("openai", modelId, catalogEntry);
+        const metadata = routingModels.find(model => model?.model_id === modelId);
+        const supported = metadata?.supported_endpoints;
+        if (Array.isArray(supported)) {
+          const responses = supported.includes("/responses");
+          const completions = supported.includes("/chat/completions");
+          if (!responses && !completions) {
+            logger(`sdk-mode(multi): skipping Copilot model="${modelId}" with no supported SDK wire API`);
+            continue;
+          }
+          if (responses !== completions) wireApi = responses ? "responses" : "completions";
+        }
+        const matchesConfigured = configuredModel === modelId || configuredModel === `copilot/${modelId}` || ["responses", "completions"].some(api => configuredModel === `copilot-${api}${suffix}/${modelId}`);
+        if (!configuredModelMapped && matchesConfigured) {
+          configuredModelMapped = true;
+          if (configuredWireApi === "responses" || configuredWireApi === "completions") wireApi = configuredWireApi;
+          mappedConfiguredModel = `copilot-${wireApi}${suffix}/${modelId}`;
+        }
+        models.push({ id: modelId, provider: `copilot-${wireApi}${suffix}` });
+      }
+      logger(`sdk-mode(multi): split provider="${providerName}" into responses/completions modelCount=${endpointModels.length} baseUrl="${baseUrl}"`);
+      continue;
+    }
+
+    // Other endpoints retain their provider-wide inference.
     const firstModel = endpointModels.length > 0 ? endpointModels[0] : "";
-    const modelForInference = configuredModel && endpointModels.includes(configuredModel) ? configuredModel : firstModel;
+    const modelForInference = endpointModels.find(modelId => configuredModel === modelId || configuredModel === `${providerName}/${modelId}`) || firstModel;
     const catalogProviderName = rawProviderName.toLowerCase() === "copilot" ? "github-copilot" : rawProviderName;
     const catalogEntry = modelForInference ? getCatalogModelEntry(options?.modelsJson ?? null, modelForInference, catalogProviderName) : null;
     const providerType = inferProviderTypeForModel(rawProviderName, modelForInference, catalogEntry);
@@ -1026,13 +1064,9 @@ function resolveMultiProviderFromReflect(options) {
 
   // Determine the primary model: prefer the configured model if it appears in the model list;
   // otherwise fall back to the first model across all providers.
-  let primaryModel = "";
-  if (configuredModel) {
-    const match = models.find(m => m.id === configuredModel);
-    if (match) primaryModel = match.id;
-  }
+  let primaryModel = qualifyModelForMultiProvider(configuredModel, { providers, models }) || mappedConfiguredModel;
   if (!primaryModel && models.length > 0) {
-    primaryModel = models[0].id;
+    primaryModel = `${models[0].provider}/${models[0].id}`;
   }
 
   if (!primaryModel) {
@@ -1040,12 +1074,12 @@ function resolveMultiProviderFromReflect(options) {
     return null;
   }
 
-  const primaryProviderName = models.find(m => m.id === primaryModel)?.provider;
+  const primaryProviderName = models.find(m => `${m.provider}/${m.id}` === primaryModel)?.provider;
   const primaryProvider = providers.find(p => p.name === primaryProviderName);
   const wireApi = String(options?.wireApi || "")
     .toLowerCase()
     .trim();
-  if (primaryProvider && primaryProvider.type !== "anthropic" && (wireApi === "responses" || wireApi === "completions")) {
+  if (primaryProvider && !primaryProvider.name.startsWith("copilot-") && primaryProvider.type !== "anthropic" && (wireApi === "responses" || wireApi === "completions")) {
     primaryProvider.wireApi = wireApi;
     logger(`sdk-mode(multi): primary provider="${primaryProvider.name}" wireApi="${wireApi}" selected from configured wire API`);
   }

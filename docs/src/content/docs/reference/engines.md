@@ -561,6 +561,16 @@ Enable `engine.copilot-sdk: true` to run Copilot in SDK mode.
 In this mode, the harness starts a local sidecar and runs the
 SDK driver process instead of the default CLI-only flow.
 
+The built-in SDK driver loads inline sub-agents and repository
+`.github/agents/*.agent.md` files as custom agents. It qualifies session and
+sub-agent models against the AWF model catalog. Copilot models use separate
+Responses and Chat Completions providers according to their supported endpoints,
+so GPT and Claude agents can use different wire APIs in the same session.
+The aliases `small`, `medium`, and `large` inherit the session model; an unknown
+sub-agent model logs a warning and inherits it. Sub-agent activity and final model
+results, including BYOK status, are retained in `usage/aw_session.jsonl`.
+This behavior applies to SDK mode, not the default CLI mode.
+
 Use top-level `max-tool-denials` to stop SDK inference when
 tool requests are repeatedly denied. The default is `5`.
 This field is only supported when `engine.id: copilot` and

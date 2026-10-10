@@ -475,6 +475,59 @@ func TestCopilotUnifiedFixtureRetainsFailedCrossFamilySubagent(t *testing.T) {
 	require.Zero(t, summary.AgentUsage[1].AIC)
 }
 
+func TestCopilotUnifiedFixtureAttributesQualifiedCrossFamilyModels(t *testing.T) {
+	t.Parallel()
+	fixture := filepath.Join("testdata", "subagent_attribution", "copilot-qualified-cross-family")
+	entries, err := readUnifiedTokenUsageEntries(fixture)
+	require.NoError(t, err)
+	require.Len(t, entries, 3)
+	require.Equal(t, "/chat/completions", entries[0].Path)
+	require.Equal(t, "/responses", entries[2].Path)
+	summary := &TokenUsageSummary{AICFound: true, TotalAIC: 1, ByModel: map[string]*ModelTokenUsage{
+		"claude-haiku-4.5": {Provider: "github-copilot", Requests: 2},
+		"gpt-5.6-luna":     {Provider: "github-copilot", Requests: 1},
+	}}
+	augmentSubagentModelAttribution(fixture, summary)
+
+	require.Empty(t, summary.Warnings)
+	require.Zero(t, summary.MismatchCount)
+	require.Len(t, summary.SubagentModelRequests, 1)
+	request := summary.SubagentModelRequests[0]
+	require.Equal(t, "File-summarizer", request.AgentName)
+	require.Equal(t, "copilot-completions/claude-haiku-4.5", request.RequestedModel)
+	require.Equal(t, "claude-haiku-4.5", request.ResolvedModel)
+	require.Equal(t, "claude-haiku-4.5", request.EffectiveModel)
+	require.Equal(t, 1, request.CompletedCount)
+	require.Zero(t, request.FailedCount)
+	require.Contains(t, request.ServedModels, "claude-haiku-4.5")
+	require.NotContains(t, request.ServedModels, "gpt-5.6-luna")
+	require.Empty(t, request.ReasonCode)
+
+	require.Len(t, summary.AgentUsage, 2)
+	main, child := summary.AgentUsage[0], summary.AgentUsage[1]
+	require.Equal(t, "main", main.AgentType)
+	require.Equal(t, 1, main.Requests)
+	require.InDelta(t, 0.25, main.AIC, 0.000001)
+	require.Equal(t, "gpt-5.6-luna", main.Models[0].ResolvedModel)
+	require.Contains(t, main.ServedModels, "gpt-5.6-luna")
+	require.NotContains(t, main.ServedModels, "claude-haiku-4.5")
+	require.Equal(t, "file-summarizer", child.AgentName)
+	require.Equal(t, "subagent", child.AgentType)
+	require.Equal(t, 2, child.Requests)
+	require.InDelta(t, 0.75, child.AIC, 0.000001)
+	require.Contains(t, child.ServedModels, "claude-haiku-4.5")
+	require.NotContains(t, child.ServedModels, "gpt-5.6-luna")
+	require.Len(t, child.Models, 1)
+	require.Equal(t, "claude-haiku-4.5", child.Models[0].ResolvedModel)
+	require.InDelta(t, 0.75, child.Models[0].AIC, 0.000001)
+	require.Len(t, summary.SubagentModelActuals, 1)
+	actual := summary.SubagentModelActuals[0]
+	require.Equal(t, "claude-haiku-4.5", actual.Model)
+	require.Equal(t, 2, actual.Requests)
+	require.Equal(t, TokenCoreMetrics{InputTokens: 200, OutputTokens: 20, CacheReadTokens: 30, CacheWriteTokens: 40}, actual.TokenCoreMetrics)
+	require.InDelta(t, 0.75, actual.AIC, 0.000001)
+}
+
 func TestCopilotAgentMetricsWithoutLifecycleRetainAttribution(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "usage"), 0o755))

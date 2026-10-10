@@ -387,6 +387,53 @@ describe("copilot_harness.cjs", () => {
   });
 
   describe("buildCopilotSDKChildEnv", () => {
+    it("rejects an unknown model instead of passing it bare with a valid BYOK catalog", () => {
+      expect(() =>
+        buildCopilotSDKChildEnv({
+          sdkEnv: {},
+          copilotSDKMode: true,
+          copilotConnectionToken: "",
+          providerBaseUrl: "http://api-proxy:10002",
+          providerType: "openai",
+          providerWireApi: "responses",
+          resolvedModel: "unknown",
+          multiProviderJson: JSON.stringify({
+            model: "copilot-responses/gpt-5.6-luna",
+            providers: [{ name: "copilot-responses", type: "openai", baseUrl: "http://api-proxy:10002" }],
+            models: [{ id: "gpt-5.6-luna", provider: "copilot-responses" }],
+          }),
+        })
+      ).toThrow("not available in the configured BYOK provider catalog");
+    });
+
+    it.each(["gpt-5.6-luna", "copilot/gpt-5.6-luna", "copilot-responses/gpt-5.6-luna"])("passes a qualified routed model (%s) with isolated model routes", resolvedModel => {
+      const config = {
+        model: "copilot-responses/gpt-5.6-luna",
+        providers: [
+          { name: "copilot-responses", type: "openai", baseUrl: "http://api-proxy:10002", wireApi: "responses" },
+          { name: "copilot-completions", type: "openai", baseUrl: "http://api-proxy:10002", wireApi: "completions" },
+        ],
+        models: [
+          { id: "gpt-5.6-luna", provider: "copilot-responses" },
+          { id: "claude-haiku-4.5", provider: "copilot-completions" },
+        ],
+      };
+      const env = buildCopilotSDKChildEnv({
+        sdkEnv: {},
+        copilotSDKMode: true,
+        copilotConnectionToken: "",
+        providerBaseUrl: "http://api-proxy:10002",
+        providerType: "openai",
+        providerWireApi: "responses",
+        resolvedModel,
+        routingEffort: "high",
+        multiProviderJson: JSON.stringify(config),
+      });
+      expect(env.COPILOT_MODEL).toBe("copilot-responses/gpt-5.6-luna");
+      expect(env.COPILOT_REASONING_EFFORT).toBe("high");
+      expect(JSON.parse(env.GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON)).toEqual(config);
+    });
+
     it("includes native sidecar provider vars and multiProviderJson when wireApi is configured", () => {
       const multiProviderJson = JSON.stringify({ model: "gpt-5.4", providers: [{ name: "copilot", type: "openai", baseUrl: "http://api-proxy:10002", wireApi: "completions" }], models: [{ id: "gpt-5.4", provider: "copilot" }] });
       const env = buildCopilotSDKChildEnv({
@@ -405,7 +452,7 @@ describe("copilot_harness.cjs", () => {
         COPILOT_SDK_URI: "http://127.0.0.1:4000",
         COPILOT_CONNECTION_TOKEN: "token-123",
         GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON: multiProviderJson,
-        COPILOT_MODEL: "gpt-5.4",
+        COPILOT_MODEL: "copilot/gpt-5.4",
         COPILOT_REASONING_EFFORT: "high",
         COPILOT_PROVIDER_BASE_URL: "http://api-proxy:10002",
         COPILOT_PROVIDER_TYPE: "openai",

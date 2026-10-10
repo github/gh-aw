@@ -330,4 +330,61 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId) {
   return mainContent;
 }
 
-module.exports = { extractInlineSubAgents, writeInlineSubAgents, getEngineSubAgentTarget, preserveSubAgentFrontmatter, closeUnterminatedSubAgentMarkers };
+/**
+ * Read repository and workflow-written Copilot agents when the SDK session starts.
+ * Workflow definitions override repository definitions with the same name.
+ *
+ * @param {string} workspaceDir
+ * @param {string} agentsBaseDir
+ * @param {(message: string) => void} logger
+ * @returns {import("@github/copilot-sdk").CustomAgentConfig[]}
+ */
+function loadCopilotSDKCustomAgents(workspaceDir, agentsBaseDir, logger) {
+  const { extractFrontmatterAndBody } = require("./frontmatter_hash_pure.cjs");
+  const { parseDocument } = require("./work_queue_yaml.cjs");
+  const target = inlineArtifactTarget("SUB_AGENT", getEngineSubAgentTarget("copilot"));
+  const directories = new Set([path.join(workspaceDir, ".github/agents"), path.join(agentsBaseDir, target.dir)]);
+  const agents = new Map();
+  for (const directory of directories) {
+    let entries;
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) logger(`warning: cannot read custom agents in ${directory}: ${String(error)}`);
+      continue;
+    }
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!entry.isFile() || !entry.name.endsWith(".agent.md")) continue;
+      const agentPath = path.join(directory, entry.name);
+      try {
+        const { frontmatterText, markdown } = extractFrontmatterAndBody(fs.readFileSync(agentPath, "utf8"));
+        /** @type {any} */
+        const document = parseDocument(frontmatterText);
+        if (!document) throw new Error("cannot parse agent frontmatter");
+        if (document.errors.length) throw new Error(document.errors.map(error => error.message).join("; "));
+        const frontmatter = document.toJS() || {};
+        if (typeof frontmatter !== "object" || Array.isArray(frontmatter)) throw new Error("agent frontmatter must be a mapping");
+        const name = typeof frontmatter.name === "string" && frontmatter.name.trim() ? frontmatter.name.trim() : entry.name.slice(0, -".agent.md".length);
+        let tools = frontmatter.tools;
+        if (typeof tools === "string")
+          tools = tools
+            .split(",")
+            .map(tool => tool.trim())
+            .filter(Boolean);
+        if (tools !== undefined && tools !== null && (!Array.isArray(tools) || !tools.every(tool => typeof tool === "string"))) throw new Error("agent tools must be a list of names or a comma-separated string");
+        agents.set(name, {
+          name,
+          prompt: markdown.trim(),
+          ...(typeof frontmatter.description === "string" ? { description: frontmatter.description } : {}),
+          ...(typeof frontmatter.model === "string" ? { model: frontmatter.model.trim() } : {}),
+          ...(tools !== undefined ? { tools } : {}),
+        });
+      } catch (error) {
+        logger(`warning: cannot load custom agent ${agentPath}: ${String(error)}`);
+      }
+    }
+  }
+  return [...agents.values()];
+}
+
+module.exports = { extractInlineSubAgents, writeInlineSubAgents, getEngineSubAgentTarget, preserveSubAgentFrontmatter, closeUnterminatedSubAgentMarkers, loadCopilotSDKCustomAgents };
