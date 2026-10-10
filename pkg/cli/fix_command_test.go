@@ -839,7 +839,7 @@ This is a test workflow.
 
 	assert.Contains(t, output, "Would update dispatcher skill: "+skillPath)
 	assert.Contains(t, output, "Would update Agentic Workflows custom agent: "+agentPath)
-	assert.Contains(t, output, "✓ No workflow fixes needed")
+	assert.Contains(t, output, "No workflow fixes needed")
 }
 
 func TestFixCommand_WriteUpdatesPromptAndAgentFiles(t *testing.T) {

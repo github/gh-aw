@@ -3,6 +3,7 @@
 package repoutil
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -94,4 +95,36 @@ func TestSpec_PublicAPI_NormalizeRepoForAPI(t *testing.T) {
 			assert.Equal(t, tt.expectedHost, host, "host mismatch for input %q", tt.input)
 		})
 	}
+}
+
+// TestSpec_ThreadSafety_RepositoryHelpers validates the documented guarantee
+// that the pure, stateless repository helpers may be called concurrently.
+func TestSpec_ThreadSafety_RepositoryHelpers(t *testing.T) {
+	const callers = 32
+	var waitGroup sync.WaitGroup
+	errors := make(chan error, callers)
+
+	for range callers {
+		waitGroup.Go(func() {
+			owner, repo, err := SplitRepoSlug("github/gh-aw")
+			if err != nil {
+				errors <- err
+				return
+			}
+			if owner != "github" || repo != "gh-aw" {
+				errors <- assert.AnError
+				return
+			}
+
+			ownerRepo, host := NormalizeRepoForAPI("ghe.example.com/github/gh-aw")
+			if ownerRepo != "github/gh-aw" || host != "ghe.example.com" {
+				errors <- assert.AnError
+			}
+		})
+	}
+
+	waitGroup.Wait()
+	close(errors)
+	assert.Empty(t, errors,
+		"concurrent calls to the documented pure repository helpers should succeed")
 }

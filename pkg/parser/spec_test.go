@@ -760,3 +760,49 @@ func TestSpec_PublicAPI_FindClosestMatches(t *testing.T) {
 			"FindClosestMatches should return no more than maxResults results")
 	})
 }
+
+// TestSpec_PublicAPI_IsSimpleSecretExpression validates the README contract
+// that only a direct secrets reference is considered a simple expression.
+func TestSpec_PublicAPI_IsSimpleSecretExpression(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{name: "direct secret reference", input: "${{ secrets.API_TOKEN }}", expected: true},
+		{name: "reference with an additional operator", input: "${{ secrets.API_TOKEN || 'fallback' }}", expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsSimpleSecretExpression(tt.input),
+				"IsSimpleSecretExpression(%q) should enforce the documented direct-reference contract", tt.input)
+		})
+	}
+}
+
+// TestSpec_Constants_ParserValues validates the constant values documented in
+// the package README.md.
+func TestSpec_Constants_ParserValues(t *testing.T) {
+	assert.Equal(t, "@builtin:", BuiltinPathPrefix,
+		"BuiltinPathPrefix should equal the documented prefix")
+	assert.Equal(t, ".github/aw/imports", ImportCacheDir,
+		"ImportCacheDir should equal the documented cache directory")
+	assert.ElementsMatch(t, []string{"stdio", "http", "local"}, ValidMCPTypes,
+		"ValidMCPTypes should contain exactly the documented MCP transport types")
+
+	urlTypes := map[string]GitHubURLType{
+		"blob":       URLTypeBlob,
+		"issue":      URLTypeIssue,
+		"pull":       URLTypePullRequest,
+		"raw":        URLTypeRaw,
+		"rawcontent": URLTypeRawContent,
+		"run":        URLTypeRun,
+		"tree":       URLTypeTree,
+		"unknown":    URLTypeUnknown,
+	}
+	for expected, actual := range urlTypes {
+		assert.Equal(t, expected, string(actual),
+			"GitHubURLType constant should equal its documented value")
+	}
+}

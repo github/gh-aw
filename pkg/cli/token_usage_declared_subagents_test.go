@@ -66,21 +66,6 @@ func TestDeclaredExperimentalSubagentModelAudit(t *testing.T) {
 	require.Empty(t, generateSubagentModelFindings(summary))
 }
 
-func TestMatchesDeclaredModelEffectiveIDs(t *testing.T) {
-	for _, test := range []struct {
-		name, pattern, observed, provider string
-		want                              bool
-	}{
-		{"Claude dated version ID", "github-copilot/claude-haiku-4.5", "claude-haiku-4-5-20251001", "github-copilot", true},
-		{"OpenAI dated model ID", "copilot/gpt-4o-mini", "gpt-4o-mini-2024-07-18", "github-copilot", true},
-		{"unrelated model version", "copilot/gpt-4o-mini", "gpt-4o-mini-audio-2024-07-18", "github-copilot", false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.want, matchesDeclaredModel(test.pattern, test.observed, test.provider))
-		})
-	}
-}
-
 func TestModelIdentityResolverFoldsAliasAndDatedIDs(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(`{"sub_agent_models":[{"name":"quick-checker","model":"small","patterns":["copilot/gpt-5.4-mini"]}]}`), 0600))
@@ -472,5 +457,4 @@ func TestDeclaredSubagentModelsExcludeDetectionUsage(t *testing.T) {
 	augmentDeclaredSubagentModels(dir, summary)
 	require.Len(t, summary.DeclaredSubagentModels, 1)
 	require.Equal(t, modelMismatchReasonModelNotObserved, summary.DeclaredSubagentModels[0].ReasonCode)
-	require.True(t, matchesDeclaredModel("openrouter/anthropic/claude-sonnet-4", "anthropic/claude-sonnet-4", "openrouter"))
 }

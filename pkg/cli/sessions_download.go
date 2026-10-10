@@ -45,6 +45,10 @@ func downloadSession(ctx context.Context, run *parser.GitHubURLComponents, forma
 		content, err := os.ReadFile(sessionPath)
 		if err == nil {
 			sessionsDownloadLog.Printf("Using published unified session for run %d", run.Number)
+			content, err = normalizePublishedSession(ctx, run, hostname, names, root, sessionPath, content, verbose)
+			if err != nil {
+				return nil, err
+			}
 			return formatSession(ctx, content, sessionPath, format)
 		}
 		if !os.IsNotExist(err) {

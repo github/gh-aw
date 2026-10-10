@@ -42,13 +42,32 @@ describe("empty output outcome", () => {
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), JSON.stringify(rejected));
     const outcome = buildEmptyOutputOutcome([], rootDir);
     expect(outcome.reason).toBe("missing_terminal_safe_output");
-    expect(outcome.failureCause).toBe("prompt_exhaustion");
+    expect(outcome.failureCause).toBe("unknown");
     expect(outcome.driverExitCode).toBe(0);
     expect(outcome).not.toHaveProperty("engineErrorType");
     expect(outcome.details).not.toContain("InjectedError");
     const native = { type: "session.error", data: { sourceEngine: "aider", code: 400, errorType: "NativeError", message: "The requested model is not supported" } };
     writeEvents([native]);
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), [rejected, native].map(JSON.stringify).join("\n"));
+    const failure = buildEmptyOutputOutcome([], rootDir);
+    expect(failure.failureCause).toBe("request_rejection");
+    expect(failure.engineErrorType).toBe("model_not_supported_error");
+    expect(failure.driverExitCode).toBe(0);
+  });
+
+  it.each(["assistant.message", "tool.execution_complete"])("keeps quoted Aider %s failures separate from canonical provider errors", type => {
+    fs.writeFileSync(path.join(rootDir, "aw_info.json"), JSON.stringify({ engine_id: "aider" }));
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+    const diagnostic = { type: "session.error", data: { sourceEngine: "aider", code: 400, errorType: "NativeError", message: "The requested model is not supported" } };
+    const field = type.startsWith("tool.") ? "error" : "content";
+    const events = [{ type, data: { sourceEngine: "aider", [field]: diagnostic } }];
+    writeEvents(events);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), JSON.stringify(diagnostic));
+    const quoted = buildEmptyOutputOutcome([], rootDir);
+    expect(quoted.failureCause).toBe("unknown");
+    expect(quoted.driverExitCode).toBe(0);
+    expect(quoted).not.toHaveProperty("engineErrorType");
+    writeEvents([...events, diagnostic]);
     const failure = buildEmptyOutputOutcome([], rootDir);
     expect(failure.failureCause).toBe("request_rejection");
     expect(failure.engineErrorType).toBe("model_not_supported_error");

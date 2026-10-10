@@ -37,11 +37,6 @@ func RenderStructStdout(v any) string {
 	return renderStructWithRenderer(v, RenderTableStdout)
 }
 
-// RenderStructStderr renders reflected data for stderr, including nested tables.
-func RenderStructStderr(v any) string {
-	return renderStructWithRenderer(v, RenderTableStderr)
-}
-
 // RenderStructWithOptions propagates destination and width to nested tables.
 func RenderStructWithOptions(v any, options RenderOptions) string {
 	renderTable := func(config TableConfig) string {

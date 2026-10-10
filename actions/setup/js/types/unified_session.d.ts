@@ -344,7 +344,19 @@ export interface UnifiedSessionEventDataMap {
     sourceType?: JsonValue;
     exitCode?: JsonValue;
   } & UnifiedSessionContextData;
-  "session.info": { message?: JsonValue; content?: JsonValue; model?: JsonValue; status?: JsonValue; sourceType?: JsonValue } & UnifiedSessionContextData;
+  "session.info": {
+    message?: JsonValue;
+    content?: JsonValue;
+    model?: JsonValue;
+    status?: JsonValue;
+    sourceType?: JsonValue;
+    role?: JsonValue;
+    messageId?: JsonValue;
+    toolCallId?: JsonValue;
+    toolName?: JsonValue;
+    /** Repeated observed metadata, never additive inference usage. */
+    usageSnapshot?: JsonValue;
+  } & UnifiedSessionContextData;
   "session.shutdown": {
     shutdownType?: JsonValue;
     errorReason?: JsonValue;
@@ -367,6 +379,9 @@ export interface UnifiedSessionEventDataMap {
     partial?: JsonValue;
     delta?: JsonValue;
     contentIndex?: JsonValue;
+    sourceType?: JsonValue;
+    /** Repeated observed metadata, never additive inference usage. */
+    usageSnapshot?: JsonValue;
   } & UnifiedSessionContextData;
   "tool.execution_complete": Pick<
     ToolExecutionCompleteData,

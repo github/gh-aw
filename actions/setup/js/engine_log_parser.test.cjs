@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import vm from "node:vm";
-import { loadEngineLogParser, normalizeEngineLogEntries, parseBehaviorLog } from "./engine_log_parser.cjs";
+import { loadEngineLogParser, normalizeEngineLogEntries, normalizeEngineSessionEvents, parseBehaviorLog } from "./engine_log_parser.cjs";
 import { parseEngineSession } from "./unified_session.cjs";
 import { parseCustomLog } from "./parse_custom_log.cjs";
 
@@ -106,6 +106,26 @@ describe("Declared custom engine log parsers", () => {
     expect(events.find(event => event.type === "tool.execution_complete" && event.data.toolCallId === "call").data.success).toBeUndefined();
     expect(events.find(event => event.type === "tool.execution_complete" && event.data.toolCallId === "failed").data.success).toBe(false);
     expect(input).toEqual(original);
+  });
+
+  it("routes saved-observation migration and projection through the selected adapter only", () => {
+    const canonical = { type: "assistant.message", data: { content: "exact answer", nativeExtra: [false, 0, null] } };
+    const records = [{ type: "pi.agent_settled", data: {} }, canonical];
+    const project = vi.fn(event => ({ ...event, data: { observed: true } }));
+    expect(normalizeEngineSessionEvents(records, "pi", project)).toEqual([{ type: "session.idle", data: { observed: true } }, canonical]);
+    expect(project).toHaveBeenCalledTimes(1);
+    for (const engine of ["claude", "copilot", "gemini", "aider", "custom", "unknown-engine"]) {
+      expect(normalizeEngineSessionEvents(records, engine, project)).toBe(records);
+    }
+    expect(project).toHaveBeenCalledTimes(1);
+    expect(records[0].type).toBe("pi.agent_settled");
+  });
+
+  it("keeps engine-owned modules out of shared collector and CLI imports", () => {
+    for (const file of ["unified_session.cjs", "session_cli.cjs", "engine_log_parser.cjs"]) {
+      const source = fs.readFileSync(new URL(`./${file}`, import.meta.url), "utf8");
+      expect(source).not.toMatch(/require\s*\(\s*["']\.\/(?:pi_session|parse_pi_log)\.cjs["']/);
+    }
   });
 
   it.each(["aider", "crush"])("lets the declared %s parser own full mixed stdout and terminal snapshots", engine => {
