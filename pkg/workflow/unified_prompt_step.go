@@ -13,6 +13,11 @@ import (
 
 var unifiedPromptLog = logger.New("workflow:unified_prompt_step")
 
+const contextBudgetGuardPrompt = `Before starting, check the task scope against the available context and invocation budget. If the budget is tight or the task may outlast it, reduce exploration and reserve enough capacity to emit a terminal safe output. Do not wait for exhaustion: if you cannot complete within the remaining budget, call report_incomplete immediately with progress and blockers.`
+
+const finalTurnSafeOutputReminderPrompt = `## Final-turn safe-output reminder
+When nearing the last available context or invocation, stop all other work and emit exactly one terminal safe output now: use report_incomplete if incomplete or uncertain, otherwise the appropriate completed output or noop. Include the budget consumed and last meaningful action in report_incomplete; do not spend the final turn on more analysis.`
+
 // PromptSection represents a section of prompt text to be appended
 type PromptSection struct {
 	// Content is the actual prompt text or a reference to a file
@@ -58,6 +63,11 @@ func removeConsecutiveEmptyLines(content string) string {
 // collectPromptSections collects all prompt sections in the order they should be appended
 func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { //nolint:largefunc // Existing prompt section assembly preserves emitted section ordering.
 	var sections []PromptSection
+
+	hasSafeOutputGuidance := HasSafeOutputsEnabled(data.SafeOutputs) || data.CommentMemoryConfig != nil
+	if hasSafeOutputGuidance {
+		sections = append(sections, PromptSection{Content: contextBudgetGuardPrompt})
+	}
 
 	// 0. XPia instructions (unless disabled by feature flag)
 	if !isFeatureEnabled(constants.DisableXPIAPromptFeatureFlag, data) {
@@ -288,6 +298,10 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 		}
 	}
 
+	if hasSafeOutputGuidance {
+		sections = append(sections, PromptSection{Content: finalTurnSafeOutputReminderPrompt})
+	}
+
 	return sections
 }
 
@@ -444,10 +458,10 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	// Generate the step with all environment variables. Prompt text and expression
 	// values are passed as environment data and never interpolated into JavaScript.
 	yaml.WriteString("      - name: Create prompt with built-in context\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions\n")
-	fmt.Fprintf(yaml, "          GH_AW_PROMPT: %s\n", constants.AwPromptsFileExpr)
+	fmt.Fprintf(yaml, "          GH_AW_PROMPT: %s\n", constants.AwPromptsFileExpr) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	if data.SafeOutputs != nil {
 		yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl\n")
 	}
@@ -456,7 +470,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	// Add all environment variables in sorted order for consistency
 	envKeys := sliceutil.SortedKeys(allEnvVars)
 	for _, key := range envKeys {
-		fmt.Fprintf(yaml, "          %s: %s\n", key, allEnvVars[key])
+		fmt.Fprintf(yaml, "          %s: %s\n", key, allEnvVars[key]) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 	for _, key := range sliceutil.SortedKeys(renderContent) {
 		writeYAMLEnv(yaml, "          ", key, renderContent[key])

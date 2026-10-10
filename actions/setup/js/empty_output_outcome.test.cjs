@@ -234,6 +234,23 @@ describe("empty output outcome", () => {
     expect(outcome.details).toContain(`Failure classification: ${failureCause}`);
   });
 
+  it("returns report_incomplete with the exhausted budget and last tool call", () => {
+    writeEvents([
+      { type: "tool.execution_start", data: { toolCallId: "last-call", mcpServerName: "github", toolName: "get_file_contents" } },
+      {
+        type: "agent.execution",
+        data: { categories: ["effective_tokens_limit_exceeded"], errorCodes: [], errorTypes: [], exitCode: 1 },
+      },
+    ]);
+
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.type).toBe("report_incomplete");
+    expect(outcome.failureCause).toBe("prompt_exhaustion");
+    expect(outcome.details).toContain("Failure classification: prompt_exhaustion");
+    expect(outcome.details).toContain("Budget consumed: effective token limit");
+    expect(outcome.details).toContain("Last tool call: github.get_file_contents");
+  });
+
   it("captures retry count and HTTP status without copying retry messages", () => {
     fs.writeFileSync(
       path.join(rootDir, "agent-stdio.log"),

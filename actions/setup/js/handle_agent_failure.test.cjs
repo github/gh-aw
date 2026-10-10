@@ -2187,6 +2187,32 @@ describe("handle_agent_failure", () => {
         fs.rmSync(rootDir, { recursive: true, force: true });
       }
     });
+
+    it("renders exhausted budget and last tool diagnostics in the failure issue context", () => {
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const os = require("os");
+      const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "failure-empty-output-exhaustion-"));
+      try {
+        fs.writeFileSync(
+          path.join(rootDir, "agent-session.jsonl"),
+          [
+            { type: "tool.execution_start", data: { toolCallId: "last-call", mcpServerName: "github", toolName: "get_file_contents" } },
+            { type: "agent.execution", data: { categories: ["invocation_cap_exceeded"], errorCodes: [], errorTypes: [], exitCode: 1 } },
+          ]
+            .map(JSON.stringify)
+            .join("\n")
+        );
+
+        const outcome = buildEmptyOutputOutcome([], rootDir);
+        expect(outcome.type).toBe("report_incomplete");
+        const report = buildReportIncompleteContext([outcome]);
+        expect(report).toContain("Failure classification: prompt_exhaustion");
+        expect(report).toContain("Budget consumed: LLM invocation cap");
+        expect(report).toContain("Last tool call: github.get_file_contents");
+      } finally {
+        fs.rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("buildSecretVerificationContext", () => {

@@ -25,6 +25,10 @@ const EMPTY_OUTPUT_FAILURE_CAUSES = Object.freeze({
 });
 
 const PROMPT_EXHAUSTION_ERROR_CATEGORIES = new Set(["effective_tokens_limit_exceeded", "invocation_cap_exceeded"]);
+const PROMPT_EXHAUSTION_BUDGETS = Object.freeze({
+  effective_tokens_limit_exceeded: "effective token limit",
+  invocation_cap_exceeded: "LLM invocation cap",
+});
 const REQUEST_REJECTION_ERROR_CATEGORIES = new Set([
   "ai_credits_rate_limit_error",
   "authentication_failed",
@@ -99,6 +103,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   let driverExitCode;
   let executionCategories = [];
   let executionErrorCodes = [];
+  let lastToolCall = "";
   for (const event of events) {
     if (event.type === "agent.execution" && event.provenance.component === "execution" && event.provenance.phase === "agent" && event.data.exitCode > 0) {
       // A CLI parse error itself makes the bridge exit non-zero; preserve that more specific cause.
@@ -116,6 +121,8 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
     const key = `${event.provenance.path}:${event.session_id || ""}:${data.toolCallId}`;
     if (event.type === "tool.execution_start") {
       starts.set(key, data);
+      const toolName = [data.mcpServerName, data.toolName].filter(value => typeof value === "string" && value.trim()).map(value => value.replace(/[^\w.-]/g, "").slice(0, 100));
+      lastToolCall = toolName.join(".") || "unknown tool";
     } else if (
       event.type === "tool.execution_complete" &&
       (data.success === false ||
@@ -183,13 +190,24 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
     ),
   ];
   diagnostics.add(`Failure classification: ${failureCause}`);
+  const exhaustionDiagnostics = isPromptExhaustion
+    ? [
+        `Budget consumed: ${executionCategories
+          .filter(category => Object.hasOwn(PROMPT_EXHAUSTION_BUDGETS, category))
+          .map(category => PROMPT_EXHAUSTION_BUDGETS[category])
+          .join(", ")}`,
+        `Last tool call: ${lastToolCall || "none recorded"}`,
+      ]
+    : [];
   if (engineErrorType) {
     diagnostics.add(`Last engine error type: ${engineErrorType}`);
   } else if (reason === "engine_driver_failure") {
     diagnostics.add("Last engine error type: unknown");
   }
   diagnostics.add(`Retry attempts observed: ${retryCount}${retryStatusCodes.length ? ` (HTTP ${retryStatusCodes.join(", HTTP ")})` : ""}`);
-  const details = [...diagnostics].slice(0, 20).join("\n");
+  const details = [...new Set(["Agent finished without emitting a terminal safe output; task completion could not be confirmed.", `Failure classification: ${failureCause}`, ...exhaustionDiagnostics, ...diagnostics])]
+    .slice(0, 20)
+    .join("\n");
   const sanitized = redactAndBoundDiagnostics(details, { secrets, maskedValues });
   return {
     type: "report_incomplete",

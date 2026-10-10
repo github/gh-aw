@@ -192,6 +192,25 @@ func TestGenerateUnifiedPromptCreationStep_OrderingBuiltinFirst(t *testing.T) {
 	assert.Less(t, safeOutputsPos, userPromptPos, "Safe outputs prompt should come before user prompt")
 }
 
+func TestCollectPromptSections_AddsContextBudgetGuardAndFinalTurnReminder(t *testing.T) {
+	compiler := &Compiler{}
+	data := &WorkflowData{
+		ParsedTools: NewTools(map[string]any{}),
+		SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}},
+	}
+
+	sections := compiler.collectPromptSections(data)
+	require.NotEmpty(t, sections)
+	assert.Contains(t, sections[0].Content, "Before starting, check the task scope")
+	assert.Contains(t, sections[len(sections)-1].Content, "Final-turn safe-output reminder")
+
+	withoutSafeOutputs := compiler.collectPromptSections(&WorkflowData{ParsedTools: NewTools(map[string]any{})})
+	for _, section := range withoutSafeOutputs {
+		assert.NotContains(t, section.Content, "context and invocation budget")
+		assert.NotContains(t, section.Content, "Final-turn safe-output reminder")
+	}
+}
+
 // TestGenerateUnifiedPromptCreationStep_SubstitutionWithBuiltinExpressions tests that
 // expressions in built-in prompts (like GitHub context) are properly extracted and substituted
 func TestGenerateUnifiedPromptCreationStep_SubstitutionWithBuiltinExpressions(t *testing.T) {
