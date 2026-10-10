@@ -113,6 +113,17 @@ GitHub toolsets, cache memory, and custom MCP servers remain configured on that
 transport. This does not enable restrictions on dsh's native shell/file tools;
 restricted bash command allowlists are rejected at compilation.
 
+DeepSeek headless session parsing retains the configured provider/model even
+when execution fails or stdout is truncated. Completed, unambiguous stdout
+becomes `assistant.message`; attributed Node startup errors and harness failures
+become `session.error`, with observed failure exits in `agent.execution`.
+Unattributed partial output and wrapper diagnostics are omitted. This profile
+does not expose native reasoning, tool arguments/results, refusals, or session
+accounting, so those observations are not inferred from answer text or firewall
+usage. A configured model such as `auto` is not a resolved model observation,
+and process exit zero does not establish task success. Canonical session inputs
+are preserved, but this is not a native dsh JSON transcript format.
+
 The OpenCode sample routes `copilot`, `anthropic`, and `openai`/`codex` models
 through the selected AWF endpoint, retains configured MCP tools, and uses native
 JSONL session events for summaries and unified session artifacts. Copilot routing
