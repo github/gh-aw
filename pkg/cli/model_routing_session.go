@@ -64,8 +64,15 @@ type sessionModelRoutingEvent struct {
 }
 
 type sessionModelRoutingAttribution struct {
-	WorkflowInfo *sessionWorkflowInfo
-	Outcome      *sessionModelRoutingOutcome
+	WorkflowInfo              *sessionWorkflowInfo
+	Outcome                   *sessionModelRoutingOutcome
+	UnavailableSubagentModels []sessionSubagentModelUnavailable
+}
+
+type sessionSubagentModelUnavailable struct {
+	AgentName     string `json:"agentName"`
+	DeclaredModel string `json:"declaredModel"`
+	Model         string `json:"model"`
 }
 
 func readSessionModelRouting(runDir string) (*sessionModelRoutingAttribution, bool, error) {
@@ -140,6 +147,12 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 			return fmt.Errorf("invalid model_routing.outcome on line %d: %w", lineNumber, err)
 		}
 		attribution.Outcome = &outcome
+	case event.Type == "subagent.model_unavailable" && event.Provenance.Component == "agent" && event.Provenance.Phase == "agent":
+		var unavailable sessionSubagentModelUnavailable
+		if json.Unmarshal(event.Data, &unavailable) == nil &&
+			unavailable.AgentName != "" && unavailable.DeclaredModel != "" && unavailable.Model != "" {
+			attribution.UnavailableSubagentModels = append(attribution.UnavailableSubagentModels, unavailable)
+		}
 	}
 	return nil
 }
