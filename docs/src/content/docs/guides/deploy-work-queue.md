@@ -158,8 +158,10 @@ repository. Only this repository expression is accepted; inputs and event
 payloads cannot choose dependency repositories. Literal foreign repositories
 require separately bound read credentials.
 
-For an explicit operator-managed genesis or a later Policy update, an
-authenticated administrator may still run:
+There is no standalone Policy-seeding step. Workflow and Actions authorization
+already authorizes the trusted submission that creates the queue.
+For a later Policy update on an existing, quiescent queue, an administrator
+may run:
 
 ```bash
 gh aw work-queue --repo github/gh-aw policy \
@@ -174,8 +176,8 @@ approved `Branch.PolicyProposal`. Workflow submissions instead use the
 compiler-approved proposal.
 
 The default queue branch is `work-queue`. To use another queue branch, put
-`--branch QUEUE_BRANCH` before `policy`. If Policy is seeded explicitly, the
-subsequent producer submission must match that installed Policy proposal.
+`--branch QUEUE_BRANCH` before the submission command. Subsequent submissions
+must match the installed Policy proposal.
 
 Before changing Policy later, make the queue quiescent: settle all nonterminal
 (unfinished) Work, outstanding reservations, and unresolved delivery of

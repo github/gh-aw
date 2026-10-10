@@ -405,6 +405,16 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 			t.Fatalf("rejected command %v changed queue authority", args)
 		}
 	}
+	admin = true
+	seedingPolicy, err := json.Marshal(workqueue.DefaultPolicy("1001", remote))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject(string(seedingPolicy), "queue_missing", "policy", "--file", "-", "--epoch", "standalone")
+	if apiWrites != 0 {
+		t.Fatal("standalone administrator seeding wrote queue state")
+	}
+	admin = false
 	submitted := run(`{"task":"review"}`, "submit-work", "--file", "-", "--request-id", "stable-submit")
 	id := submitted["work_id"].(string)
 	if !submitted["created"].(bool) || id != "f096f37384d5cea26021021248638442ed2bb42a3b0b01e10e85224c130f97c5" {

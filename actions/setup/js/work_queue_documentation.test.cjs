@@ -64,7 +64,7 @@ describe("work-queue deployment documentation", () => {
     for (const file of [deploymentPath, referencePath, specificationPath]) {
       expect(instructions).toContain(file.replace(/^docs\//, "../../docs/"));
     }
-    for (const invariant of ["originally single-Claim", "max_claims", "max_dispatches", "writer-restriction automation remains deferred", "Result only after independently verified delivery"]) {
+    for (const invariant of ["originally single-Claim", "max_claims", "max_dispatches", "Standalone seeding is unsupported", "Repository access rules are GitHub's responsibility", "Result only after independently verified delivery"]) {
       expect(instructions).toContain(invariant);
     }
   });

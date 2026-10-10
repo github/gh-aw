@@ -41,7 +41,8 @@ immutable SHA, principal, trust domain and effect scope; moving `target-ref` is
 ignored.
 
 Configure producer entitlements. First submit automatically installs compiled
-Policy and Work without administrator seeding.
+Policy and Work. Standalone seeding is unsupported; AW and Actions authorize
+the trusted submission.
 Later Policy changes are admin-only. Admin
 status grants no producer entitlement. Never expose queue-write credentials to
 agents/snapshot MCP. Repository access rules are GitHub's responsibility, not

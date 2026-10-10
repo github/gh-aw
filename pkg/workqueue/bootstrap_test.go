@@ -176,7 +176,7 @@ func TestBootstrapRejectsUnentitledWorkBeforeNativeWrites(t *testing.T) {
 }
 
 func TestNonSubmissionCannotBootstrapNativeQueue(t *testing.T) {
-	for _, kind := range []string{"dispatch_next", "control"} {
+	for _, kind := range []string{"dispatch_next", "control", "policy"} {
 		t.Run(kind, func(t *testing.T) {
 			branch, mock := newQueueAPI(t)
 			actor, err := branch.Authenticate(context.Background(), "administrator")
@@ -187,6 +187,11 @@ func TestNonSubmissionCannotBootstrapNativeQueue(t *testing.T) {
 			if kind == "control" {
 				parameters = OperationsParameters{Operations: []Operation{mustOp(t, map[string]any{
 					"kind": "Control", "control": "admission_paused", "value": true, "reason": "operator",
+				})}}
+			}
+			if kind == "policy" {
+				parameters = OperationsParameters{Operations: []Operation{mustOp(t, map[string]any{
+					"kind": "Policy", "epoch": "standalone", "policy": DefaultPolicy(actor.Principal, actor.Repository),
 				})}}
 			}
 			request, err := NewRequest("no-bootstrap", kind, actor, parameters)

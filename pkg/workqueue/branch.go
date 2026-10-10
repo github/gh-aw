@@ -506,14 +506,12 @@ func (b Branch) readPublicationPrefix(ctx context.Context, actor Actor, request 
 	}
 	var initial *QueueCommit
 	if snapshot.head == "" {
-		genesis, genuine, err := b.initialPolicyCommit(ctx, actor, request)
+		genesis, err := b.initialSubmissionCommit(ctx, actor, request)
 		if err != nil {
 			return publicationPrefix{}, err
 		}
 		commits = []QueueCommit{genesis}
-		if genuine {
-			initial = &genesis
-		}
+		initial = &genesis
 	}
 	state, err := Replay(commits)
 	if err != nil {

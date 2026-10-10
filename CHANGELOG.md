@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Breaking changes
+
+Standalone work-queue Policy seeding is no longer supported. Submit Work through
+an authorized workflow/Action or `gh aw work-queue submit-work` / `submit-graph`;
+the first accepted submission atomically creates Policy and Work. Remove
+`initializeWorkQueue`, `initializationContext`, and pre-submission `policy`
+commands from setup scripts. The `policy` command only updates existing,
+quiescent queues. Historical Policy-only genesis records remain readable.
+
 ## v0.40.1 - 2026-02-03
 
 ### Move from githubnext/gh-aw to github/gh-aw

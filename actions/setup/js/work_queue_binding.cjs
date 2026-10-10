@@ -5,10 +5,9 @@ const queue = require("./work_queue_replay.cjs");
 const store = require("./work_queue_store.cjs");
 const { canonical, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { normalizeAssignment } = require("./work_queue_claim_scope.cjs");
-const { actorFromContext, validatePolicy, validateTrustedContext } = require("./work_queue_policy.cjs");
+const { actorFromContext, validatePolicy } = require("./work_queue_policy.cjs");
 const { requestForIntent } = require("./work_queue_intents.cjs");
 const { authenticatePublisher, validateNativeRun } = require("./work_queue_native.cjs");
-const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 function policyProposalFor(options) {
   const raw = Object.hasOwn(options, "policyProposal") ? options.policyProposal : process.env.GH_AW_WORK_QUEUE_POLICY;
@@ -27,6 +26,7 @@ function assertPolicyProposal(state, options) {
 }
 
 async function loadQueue(options) {
+  if (options.initializationContext !== undefined) throw new Error(`${SAFE_OUTPUT_E002}: work_queue_standalone_seeding_unsupported: submit Work to bootstrap the queue`);
   const context = options.context;
   const readLog = options.readWorkQueueLog || store.readWorkQueueLog;
   const parameters = {
@@ -42,24 +42,8 @@ async function loadQueue(options) {
     if (!Array.isArray(log.transactions) || log.transactions.some(commit => typeof commit?.actor?.repository !== "string" || commit.actor.repository.toLowerCase() !== repository)) throw new Error("work_queue_ledger_repository_mismatch");
     return log;
   };
-  let log = await readBoundLog();
-  let projection = log.state || queue.replayTransactions(log.transactions);
-  if (!projection.policy && options.initializationContext !== undefined) {
-    if (log.sha !== null || !Array.isArray(log.transactions) || log.transactions.length) throw new Error("work_queue_genesis_not_absent");
-    if (isStagedMode(options) || isStagedMode(options.config)) throw new Error("work_queue_policy_missing");
-    const approved = options.initializationContext;
-    const administrator = actorFromContext(approved);
-    validateTrustedContext(approved, administrator);
-    if (administrator.role !== "administrator") throw new Error("work_queue_initialization_not_authorized");
-    const actual = await authenticatePublisher({ ...options, role: "administrator" });
-    if (["principal", "repository", "workflow", "run_id", "run_attempt", "ref", "event"].some(field => approved[field] !== undefined && approved[field] !== actual[field])) throw new Error("work_queue_initialization_native_mismatch");
-    const proposal = policyProposalFor(options);
-    if (proposal === undefined) throw new Error("work_queue_policy_proposal_required");
-    await (options.initializeWorkQueue || store.initializeWorkQueue)({ ...parameters, context: actual, policyProposal: proposal });
-    log = await readBoundLog();
-    projection = log.state || queue.replayTransactions(log.transactions);
-    if (!projection.policy) throw new Error("work_queue_policy_missing");
-  }
+  const log = await readBoundLog();
+  const projection = log.state || queue.replayTransactions(log.transactions);
   if (!projection.policy && log.sha === null && log.transactions.length === 0) {
     // Validate the proposal, but defer installing it to the first checked commit.
     policyProposalFor(options);

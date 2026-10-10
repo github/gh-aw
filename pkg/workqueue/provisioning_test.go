@@ -49,12 +49,13 @@ func TestProductionInitializationRequiresVerifiedWorkerRoute(t *testing.T) {
 	}
 }
 
-func TestAuthenticatedInitialPolicyUsesExactProposalAndGenuineGenesisIdentity(t *testing.T) {
+func TestFirstSubmissionUsesExactProposalAndGenuineGenesisIdentity(t *testing.T) {
 	for _, ambiguous := range []bool{false, true} {
 		t.Run(map[bool]string{false: "confirmed", true: "acknowledgment lost"}[ambiguous], func(t *testing.T) {
 			branch, mock := newQueueAPI(t)
 			mock.ambiguous = ambiguous
-			actor, err := branch.Authenticate(context.Background(), "administrator")
+			mock.noAdmin = true
+			actor, err := branch.Authenticate(context.Background(), "producer")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -65,9 +66,12 @@ func TestAuthenticatedInitialPolicyUsesExactProposalAndGenuineGenesisIdentity(t 
 			profile.Workflow, profile.Ref = ".github/workflows/custom.lock.yml", strings.Repeat("a", 64)
 			pool.Profiles["default"] = profile
 			policy.Pools["default"] = pool
-			request, err := NewRequest("submit", "policy", actor, OperationsParameters{Operations: []Operation{
-				mustOp(t, map[string]any{"kind": "Policy", "epoch": "installed", "policy": policy}),
-			}})
+			branch.PolicyProposal = &policy
+			node, err := NewWork([]byte(`{"task":"custom bootstrap"}`), "custom-bootstrap", "root", "default", policy, 1000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request, err := NewRequest("submit", "submit", actor, SubmitParameters{Nodes: []WorkDefinition{node}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -77,7 +81,7 @@ func TestAuthenticatedInitialPolicyUsesExactProposalAndGenuineGenesisIdentity(t 
 			}
 			commits, err := branch.Read(context.Background())
 			if err != nil || len(commits) != 1 || commits[0].Previous != nil ||
-				commits[0].Request.ID != "submit" || commits[0].PolicyEpoch != "installed" ||
+				commits[0].Request.ID != "submit" || len(commits[0].Operations) != 2 || commits[0].Actor.Role != "producer" ||
 				commits[0].ID != "q_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" {
 				t.Fatalf("explicit proposal installed a synthetic default or non-genesis candidate: %+v %v", commits, err)
 			}
@@ -99,13 +103,17 @@ func TestAuthenticatedInitialPolicyUsesExactProposalAndGenuineGenesisIdentity(t 
 
 func TestInitialPolicyRejectsConstructorPlaceholderBeforeNativeWrites(t *testing.T) {
 	branch, mock := newQueueAPI(t)
-	actor, err := branch.Authenticate(context.Background(), "administrator")
+	actor, err := branch.Authenticate(context.Background(), "producer")
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err := NewRequest("install-placeholder", "policy", actor, OperationsParameters{Operations: []Operation{
-		mustOp(t, map[string]any{"kind": "Policy", "epoch": "installed", "policy": DefaultPolicy(actor.Principal, actor.Repository)}),
-	}})
+	policy := DefaultPolicy(actor.Principal, actor.Repository)
+	branch.PolicyProposal = &policy
+	node, err := NewWork([]byte(`{"task":"placeholder"}`), "placeholder", "root", "default", policy, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := NewRequest("install-placeholder", "submit", actor, SubmitParameters{Nodes: []WorkDefinition{node}})
 	if err != nil {
 		t.Fatal(err)
 	}

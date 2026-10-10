@@ -3,7 +3,6 @@ package workqueue
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"path"
 	"strings"
@@ -80,50 +79,10 @@ func (b Branch) verifyWorkerRoute(ctx context.Context, profile WorkerProfile) er
 	return nil
 }
 
-func (b Branch) initialPolicyCommit(ctx context.Context, actor Actor, request Request) (QueueCommit, bool, error) {
-	if request.Kind == "submit" && actor.Role == "producer" {
-		commit, err := b.initialSubmissionCommit(ctx, actor, request)
-		return commit, err == nil, err
-	}
-	if request.Kind != "policy" {
-		return QueueCommit{}, false, queueError("queue_missing", "only a first producer submission can bootstrap an absent queue")
-	}
-	if actor.Role != "administrator" {
-		return QueueCommit{}, false, queueError("actor_unauthorized", "explicit Policy installation requires administrator authority")
-	}
-	var parameters OperationsParameters
-	if err := json.Unmarshal(request.Parameters, &parameters); err != nil {
-		return QueueCommit{}, false, queueError("request_invalid", "initial policy requires exactly one Policy operation")
-	}
-	only, unique := singleOperation(parameters.Operations)
-	if !unique {
-		return QueueCommit{}, false, queueError("request_invalid", "initial policy requires exactly one Policy operation")
-	}
-	kind, err := operationKind(only)
-	if err != nil || kind != "Policy" {
-		return QueueCommit{}, false, queueError("request_invalid", "initial policy requires exactly one Policy operation")
-	}
-	var operation struct {
-		Policy Policy `json:"policy"`
-		Epoch  string `json:"epoch"`
-	}
-	if err := json.Unmarshal(only, &operation); err != nil {
-		return QueueCommit{}, false, queueError("request_invalid", "initial policy operation is malformed")
-	}
-	if err := b.verifyWorkerRoutes(ctx, operation.Policy); err != nil {
-		return QueueCommit{}, false, err
-	}
-	commit, err := Genesis(actor, operation.Policy, request.ID, operation.Epoch, time.Now().UnixMilli())
-	if err != nil {
-		return QueueCommit{}, false, err
-	}
-	if !sameJSON(commit.Request, request) {
-		return QueueCommit{}, false, queueError("actor_unauthorized", "initial policy differs from the authenticated administrator request")
-	}
-	return commit, true, nil
-}
-
 func (b Branch) initialSubmissionCommit(ctx context.Context, actor Actor, request Request) (QueueCommit, error) {
+	if request.Kind != "submit" || actor.Role != "producer" {
+		return QueueCommit{}, queueError("queue_missing", "submit Work to bootstrap an absent queue; standalone Policy seeding is unsupported")
+	}
 	policy := b.PolicyProposal
 	if policy == nil {
 		resolved, err := b.defaultPolicy(ctx, actor.Principal)

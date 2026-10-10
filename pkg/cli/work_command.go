@@ -495,7 +495,7 @@ func workDispatchNextCommand() *cobra.Command {
 
 func workPolicyCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "policy", Short: "Install an authenticated prospective policy epoch only on a quiescent queue",
+		Use: "policy", Short: "Update an existing quiescent queue's authenticated policy; never seed a queue",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			data, err := workReadJSON(cmd)

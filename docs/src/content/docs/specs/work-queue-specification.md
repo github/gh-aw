@@ -502,8 +502,9 @@ Policy proposal, publication MUST atomically create the queue branch
 with one genesis commit containing that Policy followed by the submitted Work.
 The proposal MUST authorize the submitting principal and the Work's pool,
 priority, and accounting keys; the runtime MUST validate its immutable worker
-routes before queue publication. This replaces administrator-seeded genesis for normal
-workflow bootstrap. Reads and dispatch-only requests MUST NOT initialize an
+routes before queue publication. Standalone administrator seeding MUST NOT be
+supported by publishers or activation: authorization supplied by Agentic Workflows
+and Actions already authorizes the trusted submission. Reads and dispatch-only requests MUST NOT initialize an
 absent queue. Existing nonempty ledgers without a valid Policy, empty or
 malformed logs, and unsupported histories MUST fail closed rather than being
 overwritten. Later Policy epochs remain administrator-only and require a drained
@@ -765,7 +766,8 @@ followed by the submitted Work nodes. Its request parameters still bind only
 those Work nodes, and `policy_epoch` binds the Policy operation. Replay permits
 this combined form only at ordinal zero; a producer cannot update Policy in an
 existing ledger. The ordinary administrator-only Policy request remains valid
-for explicit operator installation and later quiescent updates.
+only for later quiescent updates to an existing queue. Historical Policy-only
+genesis records remain readable; publishers MUST NOT create new ones.
 
 The request fingerprint binds the actor and the validated logical intent, not the observed branch SHA or tentative selected Work. Reusing a request ID with different meaning MUST fail. A conflict retry may regenerate the tentative operations and predecessor, but must reuse the same logical request. Once committed, its identity and result are immutable.
 
