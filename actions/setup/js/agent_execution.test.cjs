@@ -80,6 +80,17 @@ describe("unique agent execution observation", () => {
     expect(collectAgentExecution({ content: "CAPIError: 429 Too Many Requests" }).data.errorCodes).toEqual([429]);
   });
 
+  it.each(["statusCode", "status_code"])("retains source-reported %s values without inferring or coercing codes", field => {
+    for (const code of [0, "0", 401, "401"]) {
+      const event = { type: "session.error", data: { [field]: code, errorType: "authentication", message: "Synthetic main-agent failure." } };
+      expect(collectAgentExecution({ events: [event], content: JSON.stringify(event) }).data.errorCodes).toEqual([code]);
+      const child = { ...event, agentId: "child" };
+      expect(collectAgentExecution({ events: [child], content: JSON.stringify(child) })).toBeUndefined();
+    }
+    const unavailable = { type: "session.error", data: { [field]: null, message: "Synthetic failure without a reported status." } };
+    expect(collectAgentExecution({ events: [unavailable] }).data.errorCodes).toEqual([]);
+  });
+
   it("does not reinterpret a canonical failed result status as a provider error code", () => {
     const event = { type: "session.result", data: { sourceType: "turn.failed", status: "failed", errors: [{ code: "model_not_supported", type: "invalid_request_error" }] } };
     expect(collectAgentExecution({ events: [event] }).data.errorCodes).toEqual(["model_not_supported"]);

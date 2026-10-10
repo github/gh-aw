@@ -188,7 +188,7 @@ function collectNativeErrorEvidence(errors) {
         continue;
       }
       if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-      for (const key of ["code", "error_code", "errorCode", "status", "error_status", "api_error_status"]) {
+      for (const key of ["code", "error_code", "errorCode", "statusCode", "status_code", "status", "error_status", "api_error_status"]) {
         const code = value[key];
         if (key === "status" && typeof code === "string" && !/^\d{3}$/.test(code)) continue;
         if ((typeof code === "string" && code.length > 0) || Number.isSafeInteger(code)) codes.add(code);
