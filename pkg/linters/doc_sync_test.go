@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	docBulletRe   = regexp.MustCompile(`^//\s+-\s+([a-z0-9-]+)\s+—`)
-	readmeTableRe = regexp.MustCompile(`^\|\s+` + "`" + `([a-z0-9-]+)` + "`" + `\s+\|`)
+	docBulletRe   = regexp.MustCompile(`^//\s+-\s+([a-z0-9_-]+)\s+—`)
+	readmeTableRe = regexp.MustCompile(`^\|\s+` + "`" + `([a-z0-9_-]+)` + "`" + `\s+\|`)
 	linterFlagsRe = regexp.MustCompile(`LINTER_FLAGS="([^"]+)"`)
 )
 
@@ -43,6 +43,7 @@ var notYetEnforced = map[string]string{
 	"stringsconcatloop":           "has not yet completed an enforcement-readiness audit",
 	"typeassertionnil":            "needs a cross-platform enforcement-readiness audit before CI enables it",
 	"typeassertionokdiscarded":    "existing production violations need remediation before enforcement; nolint suppression already works",
+	"unchecked_deferredclose":     "existing deferred Close() findings need remediation before CI enforcement",
 	"uncheckedsliceindex":         "existing production violations need remediation before enforcement; nolint suppression already works",
 }
 

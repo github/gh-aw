@@ -38,6 +38,7 @@ const os = require("os");
 const path = require("path");
 
 const DEFAULT_ACTION_FAILURE_ISSUE_EXPIRES_HOURS = 24 * 7;
+const ALLOWED_AGENT_CONCLUSIONS = new Set(["success", "failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale"]);
 /** Claude Code error emitted when a `--continue` resume finds no deferred tool marker. */
 const NO_DEFERRED_MARKER_LINE_RE = /No deferred tool marker found/i;
 /** Claude harness line reporting that the no-deferred-marker error was recovered by a fresh retry. */
@@ -1731,9 +1732,10 @@ function isTaskCompleteRegistrationIssue(item) {
  * This surfaces the agent's structured incompletion signal so maintainers can
  * distinguish an incomplete task from a confirmed task outcome.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
+ * @param {{includeAgentText?: boolean}} [options]
  * @returns {string} Formatted report_incomplete context
  */
-function buildReportIncompleteContext(items) {
+function buildReportIncompleteContext(items, { includeAgentText = true } = {}) {
   const messages = loadReportIncompleteMessages(items);
 
   if (messages.length === 0) {
@@ -1742,8 +1744,15 @@ function buildReportIncompleteContext(items) {
 
   core.info(`Found ${messages.length} report_incomplete signal(s)`);
 
-  let context = buildWarningAlertLine("Task Could Not Be Completed", "The workflow recorded a `report_incomplete` signal: the task was not completed or completion could not be confirmed. See the reported reason and diagnostics below.");
-  context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
+  let context = buildWarningAlertLine(
+    "Task Could Not Be Completed",
+    "The workflow recorded a `report_incomplete` signal: the task was not completed or completion could not be confirmed." + (includeAgentText ? " See the reported reason and diagnostics below." : "")
+  );
+  if (includeAgentText) {
+    context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
+  } else {
+    return context + "\nA comment or other safe output does not confirm that the requested task was completed.\n\n";
+  }
   context +=
     "\nThis is a structured incompletion signal (`report_incomplete`), not confirmation of a completed task. Do not treat accompanying safe outputs (e.g., comments) as evidence that the requested review or action was completed.\n\n";
 
@@ -1751,64 +1760,94 @@ function buildReportIncompleteContext(items) {
 }
 
 /**
- * Find the failed step in the agent job for generic failure reports.
- * @returns {Promise<string>} The failed step name, or an empty string when unavailable
+ * Find the failed agent step using Actions metadata only, never agent-generated log text.
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string}>}
  */
-async function getFailedAgentStep() {
+async function getFailedAgentDiagnostics() {
+  let jobs;
   try {
     const { owner, repo } = context.repo;
-    const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+    jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
       owner,
       repo,
       run_id: context.runId,
       per_page: 100,
+      filter: "latest",
     });
-    const agentJob = jobs.find(job => job.name === "agent" && job.conclusion === "failure");
-    if (!agentJob) {
-      core.debug("No failed agent job found when looking up the failed agent step");
-      return "";
-    }
-    const failedStep = agentJob?.steps
-      ?.slice()
-      .reverse()
-      .find(step => step.conclusion === "failure" && typeof step.name === "string");
-    if (!failedStep) {
-      core.debug("No failed step found in the agent job");
-      return "";
-    }
-    return sanitizeContent(failedStep.name, 200);
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-    if (status === 403) {
-      core.warning("Could not identify the failed agent step; ensure the conclusion job grants actions: read.");
-    } else {
-      core.warning("Could not identify the failed agent step because the workflow run jobs API request failed.");
-    }
-    return "";
+    const reason = status === 403 ? "The Actions jobs API denied access; ensure the conclusion job grants actions: read." : "The Actions jobs API request failed.";
+    core.warning(reason);
+    return { failingStep: "", attributionUnavailable: reason };
   }
+
+  const agentJob = jobs.find(job => job.name === "agent");
+  if (!agentJob) {
+    return {
+      failingStep: "",
+      attributionUnavailable: jobs.length === 0 ? "The Actions jobs API returned no jobs for this run." : "The Actions jobs API returned no agent job.",
+    };
+  }
+  const agentConclusion = ALLOWED_AGENT_CONCLUSIONS.has(agentJob.conclusion) ? agentJob.conclusion : "";
+  if (!agentConclusion) {
+    return { failingStep: "", attributionUnavailable: "The Actions jobs API returned an invalid agent job conclusion." };
+  }
+  if (agentConclusion !== "failure" && agentConclusion !== "timed_out") {
+    return { failingStep: "", agentConclusion };
+  }
+  const failedStep = agentJob.steps
+    ?.slice()
+    .reverse()
+    .find(step => ["failure", "timed_out"].includes(step.conclusion) && typeof step.name === "string");
+  if (!failedStep) {
+    return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no failed step metadata." };
+  }
+
+  const failingStep = sanitizeContent(failedStep.name, 200).replace(/\s+/g, " ").trim();
+  if (!failingStep) {
+    return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no valid failed step name." };
+  }
+  return { failingStep, agentConclusion };
 }
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, engineFailureContext: string, items?: Array<any>}} options
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, engineFailureContext: string, items?: Array<any>}} options
  * @returns {string}
  */
-function buildFailureDiagnosticsContext({ failureCategories, failingStep, engineFailureContext, items = [] }) {
+function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", attributionUnavailable = "", engineFailureContext, items = [] }) {
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
-  const isGenericFailure = failureCategories.includes("agent_failure") || infrastructureMessages.length > 0;
+  const isGenericFailure = failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || infrastructureMessages.length > 0;
   if (!isGenericFailure) {
     return "";
   }
 
   let context = "\n### Failure Diagnostics\n\n";
+  context += "**Agent job:** `agent`  \n";
+  if (agentConclusion) {
+    const validatedConclusion = ALLOWED_AGENT_CONCLUSIONS.has(agentConclusion) ? agentConclusion : "unknown";
+    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(validatedConclusion)}  \n`;
+  } else if (attributionUnavailable) {
+    const rawConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
+    const conclusion = ALLOWED_AGENT_CONCLUSIONS.has(rawConclusion) ? rawConclusion : "unknown";
+    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(conclusion)} (from workflow dependency results)  \n`;
+  }
   if (failingStep) {
-    context += `**Failing step:** ${failingStep}\n\n`;
+    context += `**Failing step:** ${renderSafeInlineCodeSpan(failingStep)}\n\n`;
+  } else if (attributionUnavailable) {
+    context += "**Failing step:** Unavailable\n\n";
+  } else {
+    context += "\n";
   }
-
-  const hasInfrastructureDetails = infrastructureMessages.some(item => typeof item.details === "string" && item.details.trim());
-  if (!engineFailureContext.trim() && !hasInfrastructureDetails) {
-    context += "No cause was captured from the agent report or engine logs.\n\n";
+  if (engineFailureContext.trim()) {
+    context += engineFailureContext.trim() + "\n\n";
+  } else {
+    context += "The runtime did not record a specific cause. Check the linked run for failure details.\n\n";
   }
+  if (attributionUnavailable) {
+    context += `<details>\n<summary>Why step details are unavailable</summary>\n\n${attributionUnavailable}\n\n</details>\n\n`;
+  }
+  context += "_Only runtime metadata is shown; agent-generated text is excluded._\n\n";
 
   return context;
 }
@@ -3102,6 +3141,8 @@ function detectEngineRateLimit429Failure() {
  * First tries to match known error patterns (ERROR:, Error:, Fatal:, panic:, Reconnecting...).
  * Never copies arbitrary log tails into reports, since they can contain secrets.
  * The log file is available in the conclusion job after the agent artifact is downloaded.
+ * @param {{suppressEngineRateLimit429?: boolean, maxCacheMissesExceeded?: boolean, shellExpansionGuardRejected?: boolean, metadataOnly?: boolean}} [options]
+ * When metadataOnly is set, only the validated driver exit code is used, without reading engine logs.
  * @returns {string} Formatted context string, or empty string if no engine failure found
  */
 function buildEngineFailureContext(options = {}) {
@@ -3121,6 +3162,9 @@ function buildEngineFailureContext(options = {}) {
   try {
     const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
     const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : "";
+    if (options.metadataOnly === true) {
+      return exitDetails ? `**Driver exit code:** \`${exitCodeText}\`\n\n` : "";
+    }
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
         core.info("agent-stdio.log not found, but shell expansion guard rejection was detected — using dedicated context message");
@@ -4465,7 +4509,7 @@ async function main() {
     const agentOutputItems = Array.isArray(agentOutputResult.items) ? agentOutputResult.items : [];
     const needsFailureDiagnostics =
       failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || agentOutputItems.some(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
-    const failingStep = needsFailureDiagnostics ? await getFailedAgentStep() : "";
+    const failureDiagnostics = needsFailureDiagnostics ? await getFailedAgentDiagnostics() : { failingStep: "" };
 
     // Check if parent issue creation is enabled (defaults to false)
     const groupReports = process.env.GH_AW_GROUP_REPORTS === "true";
@@ -4550,7 +4594,7 @@ async function main() {
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
         const permissionDeniedContext = hasToolDenialsExceeded ? "" : buildPermissionDeniedContext(agentOutputResult.items, workflowID);
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items);
+        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items, { includeAgentText: !needsFailureDiagnostics });
 
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
@@ -4580,11 +4624,12 @@ async function main() {
           ? buildEngineFailureContext({
               suppressEngineRateLimit429: maxAICreditsExceeded,
               maxCacheMissesExceeded,
+              metadataOnly: needsFailureDiagnostics,
             })
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
           failureCategories,
-          failingStep,
+          ...failureDiagnostics,
           engineFailureContext,
           items: agentOutputItems,
         });
@@ -4654,7 +4699,7 @@ async function main() {
           report_incomplete_context: reportIncompleteContext,
           failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
-          engine_failure_context: engineFailureContext,
+          engine_failure_context: needsFailureDiagnostics ? "" : engineFailureContext,
           timeout_context: timeoutContext,
           fork_context: forkContext,
           inference_access_error_context: inferenceAccessErrorContext,
@@ -4790,7 +4835,7 @@ async function main() {
         const missingToolContext = missingToolReportAsFailure && !hasToolDenialsExceeded ? buildMissingToolContext(agentOutputResult.items) : "";
 
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items);
+        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items, { includeAgentText: !needsFailureDiagnostics });
 
         // Build permission denied context (denied commands list + fix prompt).
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
@@ -4821,11 +4866,11 @@ async function main() {
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
         const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
-          ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded })
+          ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded, metadataOnly: needsFailureDiagnostics })
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
           failureCategories,
-          failingStep,
+          ...failureDiagnostics,
           engineFailureContext,
           items: agentOutputItems,
         });
@@ -4900,7 +4945,7 @@ async function main() {
           report_incomplete_context: reportIncompleteContext,
           failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
-          engine_failure_context: engineFailureContext,
+          engine_failure_context: needsFailureDiagnostics ? "" : engineFailureContext,
           timeout_context: timeoutContext,
           fork_context: forkContext,
           inference_access_error_context: inferenceAccessErrorContext,
@@ -5034,7 +5079,7 @@ module.exports = {
   isDroppedPipeSafeOutputsCommand,
   detectAWFFirewallStartupFailureFromLog,
   buildReportIncompleteContext,
-  getFailedAgentStep,
+  getFailedAgentDiagnostics,
   buildFailureDiagnosticsContext,
   buildMCPPolicyErrorContext,
   buildCopilotOrgBillingErrorContext,
