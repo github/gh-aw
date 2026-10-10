@@ -426,12 +426,19 @@ type AwContext struct {
 	RunID          string `json:"run_id"`                     // GitHub Actions run ID of the calling workflow
 	WorkflowID     string `json:"workflow_id"`                // Full workflow ref, e.g. "owner/repo/.github/workflows/foo.yml@refs/heads/main"
 	WorkflowCallID string `json:"workflow_call_id,omitempty"` // Unique call attempt ID (run_id + run_attempt)
-	Time           string `json:"time,omitempty"`             // ISO 8601 timestamp of the dispatch
-	Actor          string `json:"actor,omitempty"`            // GitHub actor that triggered the calling workflow
-	EventType      string `json:"event_type,omitempty"`       // GitHub event name of the calling workflow
-	ItemType       string `json:"item_type,omitempty"`        // Kind of triggering item: "issue", "pull_request", "discussion", "check_run", "check_suite", or ""
-	ItemNumber     string `json:"item_number,omitempty"`      // Number (issue/PR/discussion) or database id (check_run/check_suite) of the triggering item
-	CommentID      string `json:"comment_id,omitempty"`       // ID of the triggering comment or review; empty when not a comment/review event
+	EpisodeID      string `json:"episode_id,omitempty"`
+	HopID          string `json:"hop_id,omitempty"`
+	ParentHopID    string `json:"parent_hop_id,omitempty"`
+	OriginEvent    string `json:"origin_event,omitempty"`
+	RootRepo       string `json:"root_repo,omitempty"`
+	RootWorkflowID string `json:"root_workflow_id,omitempty"`
+	RootRunID      string `json:"root_run_id,omitempty"`
+	Time           string `json:"time,omitempty"`        // ISO 8601 timestamp of the dispatch
+	Actor          string `json:"actor,omitempty"`       // GitHub actor that triggered the calling workflow
+	EventType      string `json:"event_type,omitempty"`  // GitHub event name of the calling workflow
+	ItemType       string `json:"item_type,omitempty"`   // Kind of triggering item: "issue", "pull_request", "discussion", "check_run", "check_suite", or ""
+	ItemNumber     string `json:"item_number,omitempty"` // Number (issue/PR/discussion) or database id (check_run/check_suite) of the triggering item
+	CommentID      string `json:"comment_id,omitempty"`  // ID of the triggering comment or review; empty when not a comment/review event
 }
 
 // AwInfo represents the structure of aw_info.json files
