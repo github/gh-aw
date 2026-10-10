@@ -1,0 +1,1 @@
+{"_schema":"token-usage/v0.28.50","event":"token_usage","request_id":"pi-request-1","provider":"anthropic","model":"claude-haiku-4-5-20251001","path":"/v1/messages","input_tokens":10,"output_tokens":2}

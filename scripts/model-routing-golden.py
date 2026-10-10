@@ -151,7 +151,7 @@ def redact(value, identities, key="", parent_key=""):
     if key.lower() in {"input", "arguments"} and isinstance(value, dict):
         return {
             child_key: redact(child, identities, child_key)
-            if re.sub(r"[^a-z]", "", child_key.lower()) in TOOL_IDENTIFIER_KEYS
+            if re.sub(r"[^a-z]", "", child_key.lower()) in TOOL_IDENTIFIER_KEYS and isinstance(child, str)
             else "[redacted]"
             for child_key, child in value.items()
         }
