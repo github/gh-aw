@@ -1,0 +1,5 @@
+{"type":"session.start","data":{"model":"gpt-5.6-luna","cwd":"/home/private-user/work/private-repo","repository":"private-org/private-repo","conversation_hash":"PRIVATE_HASH","signature":"PRIVATE_SIGNATURE","encrypted_content":"PRIVATE_CIPHERTEXT","email":"private-user@example.com"}}
+{"type":"session.init","data":{"sourceEngine":"pi"}}
+{"type":"tool.execution_start","data":{"toolName":"subagent","input":{"task":"PRIVATE_SUBAGENT_TASK"}}}
+{"type":"user.message","data":{"content":"PRIVATE_PROMPT_TEXT"}}
+{"type":"assistant.message","data":{"content":"PRIVATE_RESPONSE_TEXT"}}

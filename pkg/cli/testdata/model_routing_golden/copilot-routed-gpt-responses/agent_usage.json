@@ -1,0 +1,21 @@
+{
+  "input_tokens": 98203,
+  "output_tokens": 666,
+  "cache_read_tokens": 70123,
+  "cache_write_tokens": 0,
+  "ambient_context": 802,
+  "ai_credits": 0.781766,
+  "primary_model": "gpt-5.6-luna",
+  "model_routing": {
+    "status": "selected",
+    "source": "awf-routing",
+    "provider": "copilot",
+    "wire_model": "gpt-5.6-luna",
+    "model": "github-copilot/gpt-5.6-luna",
+    "effort": "high",
+    "endpoint": "/responses",
+    "mode": "economy",
+    "selected_id": "choice-0017",
+    "router_version": "0.1.3"
+  }
+}

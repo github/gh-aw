@@ -28,71 +28,73 @@ func evalCreateIssue(ctx context.Context, item CreatedItemReport, repoOverride s
 		return report
 	}
 
-	data, err := ghAPIGet(ctx, fmt.Sprintf("issues/%d", num), repo)
+	data, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("issues/%d", num), repo)
 	if err != nil {
-		report.OutcomeStatus = OutcomeStatusError
-		report.EvalError = err.Error()
+		outcomeAPIError(&report, err, true)
 		return report
 	}
 
-	state, _ := data["state"].(string)
-	stateReason, _ := data["state_reason"].(string)
-	closedAt, _ := data["closed_at"].(string)
+	return classifyCreatedIssue(ctx, item, data, report)
+}
 
-	comments, _ := data["comments"].(float64)
-	commentList, cerr := ghAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", num), repo)
-	if cerr == nil {
-		report.HumanComments = countHumanComments(commentList)
-	}
+func classifyCreatedIssue(ctx context.Context, item CreatedItemReport, data map[string]any, report OutcomeReport) OutcomeReport {
+	num, repo := report.ObjectNumber, report.Repo
+	state := outcomeValue[string](data["state"])
+	stateReason := outcomeValue[string](data["state_reason"])
+	closedAt := outcomeValue[string](data["closed_at"])
 
 	switch {
 	case state == "closed" && stateReason == "completed":
-		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = "completed"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "completed")
 		if closedAt != "" && item.Timestamp != "" {
 			report.TimeToOutcomeHours = timeBetween(item.Timestamp, closedAt)
 		}
 
 	case state == "closed" && stateReason == "not_planned":
 		// Check if closed by a bot (lifecycle) or human (rejection)
-		closedByBot := isClosedByBot(ctx, num, repo)
+		closedByBot, err := outcomeCloseActor(ctx, num, repo)
+		if err != nil {
+			outcomeAPIError(&report, err, false)
+			return report
+		}
 		outcomeEvalIssueLog.Printf("Issue #%d closed as not_planned, closed_by_bot=%v", num, closedByBot)
 		if closedByBot {
-			report.OutcomeStatus = OutcomeStatusLifecycle
 			report.Detail = "closed by bot (lifecycle)"
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusLifecycle, EvidenceMedium, "lifecycle")
 		} else {
-			report.OutcomeStatus = OutcomeStatusRejected
 			report.Detail = "closed as not planned"
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "closed_not_planned")
 		}
 		if closedAt != "" && item.Timestamp != "" {
 			report.TimeToOutcomeHours = timeBetween(item.Timestamp, closedAt)
 		}
 
 	case state == "closed":
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = "closed"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "unknown")
+		report.Detail = "closed without a resolution reason"
 		if closedAt != "" && item.Timestamp != "" {
 			report.TimeToOutcomeHours = timeBetween(item.Timestamp, closedAt)
 		}
 
-	case state == "open" && report.HumanComments > 0:
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = fmt.Sprintf("open, %d human comments", report.HumanComments)
-
-	case state == "open" && int(comments) > 0:
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "open with comments"
-
+	case state == "open":
+		commentList, err := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", num), repo)
+		if err != nil {
+			outcomeAPIError(&report, err, false)
+			return report
+		}
+		report.HumanComments = nonBotCommentsAfter(commentList, item.Timestamp)
+		if report.HumanComments > 0 {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "acted_on")
+			report.Detail = "open with non-bot engagement"
+		} else {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "open")
+			report.Detail = "open"
+		}
 	default:
-		report.OutcomeStatus = OutcomeStatusIgnored
-		report.Detail = "open, no engagement"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "unknown")
+		report.Detail = "unsupported issue state"
 	}
 
 	return report
-}
-
-// isClosedByBot checks the issue timeline to determine if the close event was performed by a bot.
-func isClosedByBot(ctx context.Context, issueNumber int, repo string) bool {
-	closedByBot, err := isLatestCloseByBot(ctx, issueNumber, repo, ghAPIGetArray)
-	return err == nil && closedByBot
 }

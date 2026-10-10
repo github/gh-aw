@@ -40,6 +40,7 @@ func writeOutcomeJSONL(dir string, runID int64, reports []OutcomeReport) {
 			"time_to_outcome_hours": r.TimeToOutcomeHours,
 			"human_comments":        r.HumanComments,
 			"human_edits":           r.HumanEdits,
+			"human_reviews":         r.HumanReviews,
 			"zero_touch":            r.ZeroTouch,
 			"created_at":            r.CreatedAt,
 			"checked_at":            r.CheckedAt,
