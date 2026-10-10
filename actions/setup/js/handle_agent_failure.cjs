@@ -425,7 +425,7 @@ function buildFailureIssueTitle(options) {
   if (terminalOutputFailureTitle) return `[aw] ${workflowName} ${terminalOutputFailureTitle}`;
   const emptyOutputCauseTitle = typeof options.emptyOutputCause === "string" && Object.prototype.hasOwnProperty.call(EMPTY_OUTPUT_CAUSES, options.emptyOutputCause) ? EMPTY_OUTPUT_CAUSES[options.emptyOutputCause] : "";
   if (emptyOutputCauseTitle) return `[aw] ${workflowName} ${emptyOutputCauseTitle}`;
-  if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result`;
+  if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result (report_incomplete)`;
   if (options.hasMissingSafeOutputs) return `[aw] ${workflowName} produced no safe outputs`;
   if (options.hasMissingTool) return `[aw] ${workflowName} is missing required tool`;
   if (options.hasMissingData) return `[aw] ${workflowName} is missing required data`;
@@ -1729,7 +1729,7 @@ function isTaskCompleteRegistrationIssue(item) {
 /**
  * Build report_incomplete context string for display in failure issues/comments.
  * This surfaces the agent's structured incompletion signal so maintainers can
- * distinguish a tool-failure report from a real task outcome.
+ * distinguish an incomplete task from a confirmed task outcome.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
  * @returns {string} Formatted report_incomplete context
  */
@@ -1742,10 +1742,10 @@ function buildReportIncompleteContext(items) {
 
   core.info(`Found ${messages.length} report_incomplete signal(s)`);
 
-  let context = buildWarningAlertLine("Task Could Not Be Completed", "The agent reported that the task could not be performed due to an infrastructure or tool failure.");
+  let context = buildWarningAlertLine("Task Could Not Be Completed", "The workflow recorded a `report_incomplete` signal: the task was not completed or completion could not be confirmed. See the reported reason and diagnostics below.");
   context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
   context +=
-    "\nThis is a structured incompletion signal (`report_incomplete`), not a real task outcome. Any other safe outputs emitted alongside this signal (e.g., comments) describe the failure state, not a completed review or action.\n\n";
+    "\nThis is a structured incompletion signal (`report_incomplete`), not confirmation of a completed task. Do not treat accompanying safe outputs (e.g., comments) as evidence that the requested review or action was completed.\n\n";
 
   return context;
 }
@@ -3422,7 +3422,7 @@ const SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH = 300;
 function isDroppedPipeSafeOutputsCommand(line) {
   let quote = "";
   let writerSeen = false;
-  for (let i = 0; i < line.length;) {
+  for (let i = 0; i < line.length; ) {
     const char = line[i];
     if (quote) {
       if (char === "\\" && quote === '"' && i + 1 < line.length) i += 2;

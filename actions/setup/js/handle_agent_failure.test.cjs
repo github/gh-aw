@@ -508,7 +508,7 @@ describe("handle_agent_failure", () => {
       { flag: "isTimedOut", expected: "[aw] Test Workflow timed out" },
       { flag: "hasToolDenialsExceeded", expected: "[aw] Test Workflow exceeded tool denial limit" },
       { flag: "hasCacheMissMisconfiguration", expected: "[aw] Test Workflow has cache-memory miss misconfiguration" },
-      { flag: "hasReportIncomplete", expected: "[aw] Test Workflow reported incomplete result" },
+      { flag: "hasReportIncomplete", expected: "[aw] Test Workflow reported incomplete result (report_incomplete)" },
       { flag: "hasMissingSafeOutputs", expected: "[aw] Test Workflow produced no safe outputs" },
       { flag: "hasMissingTool", expected: "[aw] Test Workflow is missing required tool" },
       { flag: "hasMissingData", expected: "[aw] Test Workflow is missing required data" },
@@ -537,9 +537,20 @@ describe("handle_agent_failure", () => {
     it.each([
       ["engine_outage", "[aw] Test Workflow experienced an engine outage"],
       ["request_rejection", "[aw] Test Workflow had a request rejected"],
-      ["prompt_exhaustion", "[aw] Test Workflow exhausted its prompt"],
+      ["prompt_exhaustion", "[aw] Test Workflow reported incomplete result (report_incomplete)"],
     ])("uses the classified terminal-output cause %s in the issue title", (terminalOutputFailureCause, title) => {
       expect(buildFailureIssueTitle({ ...baseOptions, terminalOutputFailureCause })).toBe(title);
+    });
+
+    it("focuses on report_incomplete when missing terminal output is classified as prompt exhaustion", () => {
+      expect(
+        buildFailureIssueTitle({
+          ...baseOptions,
+          hasReportIncomplete: true,
+          emptyOutputCause: "missing_terminal_safe_output",
+          terminalOutputFailureCause: "prompt_exhaustion",
+        })
+      ).toBe("[aw] Test Workflow reported incomplete result (report_incomplete)");
     });
 
     it("prefers unknownModelAICredits over isTimedOut when both are true", () => {
@@ -1670,7 +1681,7 @@ describe("handle_agent_failure", () => {
 
       expect(createIssueMock).toHaveBeenCalledOnce();
       const createCall = createIssueMock.mock.calls[0][0];
-      expect(createCall.title).toBe("[aw] Test Workflow reported incomplete result");
+      expect(createCall.title).toBe("[aw] Test Workflow reported incomplete result (report_incomplete)");
     });
 
     it.each([
@@ -2139,8 +2150,13 @@ describe("handle_agent_failure", () => {
       const commentTemplate = fs.readFileSync(path.join(__dirname, "../md/agent_failure_comment.md"), "utf8");
       const issueTemplate = fs.readFileSync(path.join(__dirname, "../md/agent_failure_issue.md"), "utf8");
 
-      expect(renderTemplate(commentTemplate, templateContext)).toContain(reportIncompleteMarker);
-      expect(renderTemplate(issueTemplate, templateContext)).toContain(reportIncompleteMarker);
+      for (const template of [commentTemplate, issueTemplate]) {
+        const rendered = renderTemplate(template, templateContext);
+        expect(rendered).toContain(reportIncompleteMarker);
+        expect(rendered).toContain("The workflow recorded a `report_incomplete` signal");
+        expect(rendered).toContain("completion could not be confirmed");
+        expect(rendered).not.toContain("due to an infrastructure or tool failure");
+      }
       expect(reportIncompleteContext).toContain("infrastructure_error");
       expect(reportIncompleteContext).toContain(reportIncompleteMarker);
       expect(failureDiagnosticsContext).toContain("Failing step:** Run agent");
@@ -4883,6 +4899,24 @@ describe("handle_agent_failure", () => {
   // ──────────────────────────────────────────────────────
 
   describe("buildReportIncompleteContext", () => {
+    it("explains collector-generated incompletion without assuming a prompt or infrastructure failure", () => {
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const { mkdtempSync, rmSync } = require("fs");
+      const { tmpdir } = require("os");
+      const rootDir = mkdtempSync(join(tmpdir(), "failure-incomplete-wording-"));
+      try {
+        const result = buildReportIncompleteContext([buildEmptyOutputOutcome([], rootDir)]);
+        expect(result).toContain("The workflow recorded a `report_incomplete` signal");
+        expect(result).toContain("completion could not be confirmed");
+        expect(result).toContain("missing_terminal_safe_output");
+        expect(result).toContain("Failure classification: prompt_exhaustion");
+        expect(result).not.toContain("exhausted its prompt");
+        expect(result).not.toContain("due to an infrastructure or tool failure");
+      } finally {
+        rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
+
     it("keeps all reasons and multiline diagnostics inside collapsed code", () => {
       const { buildReportIncompleteContext } = require("./handle_agent_failure.cjs");
       const result = buildReportIncompleteContext([
@@ -5777,7 +5811,7 @@ describe("handle_agent_failure", () => {
       };
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
-      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Test Workflow reported incomplete result" }));
+      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Test Workflow reported incomplete result (report_incomplete)" }));
       const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
       expect(categories).toContain("report_incomplete");
       expect(categories).not.toContain(reason);

@@ -20,7 +20,7 @@ const EMPTY_OUTPUT_CAUSES = Object.freeze({
 const EMPTY_OUTPUT_FAILURE_CAUSES = Object.freeze({
   engine_outage: "experienced an engine outage",
   request_rejection: "had a request rejected",
-  prompt_exhaustion: "exhausted its prompt",
+  prompt_exhaustion: "reported incomplete result (report_incomplete)",
 });
 
 const PROMPT_EXHAUSTION_ERROR_CATEGORIES = new Set(["effective_tokens_limit_exceeded", "invocation_cap_exceeded"]);
