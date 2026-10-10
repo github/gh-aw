@@ -63,70 +63,32 @@ func analyzeDeferClose(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 		return
 	}
 
-	// Get the type of the receiver to check if Close() returns an error
 	if pass.TypesInfo == nil {
 		return
 	}
 
-	// Get type of the object being closed (the receiver)
-	receiverType := pass.TypesInfo.TypeOf(selector.X)
-	if receiverType == nil {
+	selection := pass.TypesInfo.Selections[selector]
+	if selection == nil || selection.Kind() != types.MethodVal {
 		return
 	}
 
-	// Look for a Close method on this type
-	closeMethod, found := lookupClose(receiverType)
-	if !found {
+	sig, ok := selection.Obj().Type().(*types.Signature)
+	if !ok || !closeReturnsError(sig) {
 		return
 	}
 
-	// Check if Close() returns an error
-	if sig, ok := closeMethod.Type().(*types.Signature); ok {
-		if sig.Results() == nil || sig.Results().Len() == 0 {
-			return
-		}
-
-		// Check if the return type is error
-		lastResult := sig.Results().At(sig.Results().Len() - 1)
-		if lastResult.Type() != builtinErrorType {
-			return
-		}
-
-		// Report: defer close() ignores error return
-		pass.Reportf(
-			deferStmt.Pos(),
-			"defer close() call ignores error return value; consider handling errors explicitly",
-		)
-	}
+	// Report: defer close() ignores error return
+	pass.Reportf(
+		deferStmt.Pos(),
+		"defer close() call ignores error return value; consider handling errors explicitly",
+	)
 }
 
-// lookupClose searches for a Close method on the given type.
-func lookupClose(typ types.Type) (types.Object, bool) {
-	// Unwrap pointer type if necessary
-	ptr, ok := typ.(*types.Pointer)
-	if ok {
-		typ = ptr.Elem()
+func closeReturnsError(sig *types.Signature) bool {
+	if sig.Results() == nil || sig.Results().Len() == 0 {
+		return false
 	}
 
-	// If it's a named type, get its underlying type
-	if named, ok := typ.(*types.Named); ok {
-		for i := 0; i < named.NumMethods(); i++ {
-			method := named.Method(i)
-			if method.Name() == "Close" {
-				return method, true
-			}
-		}
-	}
-
-	// Check interface types
-	if iface, ok := typ.(*types.Interface); ok {
-		for i := 0; i < iface.NumMethods(); i++ {
-			method := iface.Method(i)
-			if method.Name() == "Close" {
-				return method, true
-			}
-		}
-	}
-
-	return nil, false
+	lastResult := sig.Results().At(sig.Results().Len() - 1)
+	return lastResult.Type() == builtinErrorType
 }
