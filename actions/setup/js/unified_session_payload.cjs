@@ -23,6 +23,7 @@ const SCOPED_AGENT_TYPES = new Set([
   "tool.execution_complete",
   "usage.report",
   "session.result",
+  "model.call_final_result",
 ]);
 
 /** @type {Fields} */

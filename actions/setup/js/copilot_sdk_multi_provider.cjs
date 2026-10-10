@@ -58,8 +58,38 @@ function parseMultiProviderJson(value) {
   }
 }
 
+/**
+ * Resolve a catalog model to its BYOK selection id without guessing unknown models.
+ *
+ * @param {string | undefined} model
+ * @param {{ providers: Array<{name: string}>, models: Array<{id: string, provider: string}> } | null | undefined} config
+ * @returns {string | null}
+ */
+function qualifyModelForMultiProvider(model, config) {
+  const value = typeof model === "string" ? model.trim() : "";
+  if (!value || !config) return null;
+  const models = config.models.filter(entry => config.providers.some(provider => provider.name === entry.provider));
+  const qualified = models.find(entry => `${entry.provider}/${entry.id}` === value);
+  if (qualified) return value;
+  const legacy = value.startsWith("copilot/");
+  const id = legacy ? value.slice("copilot/".length) : value;
+  const matches = models.filter(entry => entry.id === id && (!legacy || isCopilotProviderName(entry.provider)));
+  if (new Set(matches.map(entry => entry.provider)).size > 1) {
+    throw new Error(`Ambiguous model "${value}"; specify an explicit <provider>/<model>: ${matches.map(entry => `${entry.provider}/${entry.id}`).join(", ")}`);
+  }
+  const match = matches[0];
+  return match ? `${match.provider}/${match.id}` : null;
+}
+
+/** @param {string} name @returns {boolean} */
+function isCopilotProviderName(name) {
+  return /^(?:copilot(?:-(?:responses|completions))?|github-copilot|github)(?:-\d+)?$/i.test(name);
+}
+
 module.exports = {
   isValidProviderConfig,
   isValidModelConfig,
   parseMultiProviderJson,
+  qualifyModelForMultiProvider,
+  isCopilotProviderName,
 };

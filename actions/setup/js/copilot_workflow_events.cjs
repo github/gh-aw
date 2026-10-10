@@ -27,6 +27,17 @@ const COPILOT_WORKFLOW_EVENT_FIELDS = {
     spawnDepth: ["spawnDepth", "spawn_depth"],
   },
   "subagent.configured": { invocationId: ["invocationId"], model: ["model"], contextTier: ["contextTier"], reasoningEffort: ["reasoningEffort"], multiTurn: ["multiTurn"] },
+  "subagent.selected": {
+    invocationId: ["invocationId"],
+    toolCallId: ["toolCallId"],
+    agentName: ["agentName"],
+    agentDisplayName: ["agentDisplayName"],
+    tools: ["tools"],
+    model: ["model"],
+    selectedModel: ["selectedModel"],
+    resolvedModel: ["resolvedModel"],
+    modelSelectionSource: ["modelSelectionSource"],
+  },
   "subagent.request": {
     invocationId: ["invocationId"],
     agentName: ["agentName"],

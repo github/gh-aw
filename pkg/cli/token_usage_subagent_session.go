@@ -41,6 +41,7 @@ type sessionSubagentData struct {
 	RequestedModel   string                                `json:"requestedModel"`
 	ResolvedModel    string                                `json:"resolvedModel"`
 	Outcome          string                                `json:"outcome"`
+	Cancelled        bool                                  `json:"cancelled"`
 	ErrorCode        string                                `json:"errorCode"`
 	ErrorMessage     string                                `json:"errorMessage"`
 	ReasoningEffort  string                                `json:"reasoningEffort"`
@@ -906,6 +907,9 @@ func (models *subagentSessionModels) observeLifecycle(event sessionSubagentEvent
 }
 
 func observeLifecycleOutcome(row *SubagentModelRequest, agentUsage *AgentUsageBreakdown, event sessionSubagentEvent, data sessionSubagentData) {
+	if event.Type == "subagent.completed" && data.Cancelled && (row.CompletedCount > 0 || row.FailedCount > 0) {
+		return
+	}
 	if event.Type == "subagent.completed" {
 		row.CompletedCount++
 		row.IncompleteCount = max(0, row.IncompleteCount-1)

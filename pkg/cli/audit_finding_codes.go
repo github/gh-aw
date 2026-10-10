@@ -15,6 +15,7 @@ const (
 	AuditFindingBlockedNetworkRequests   AuditFindingCode = "blocked_network_requests"
 	AuditFindingWorkflowSucceeded        AuditFindingCode = "workflow_succeeded"
 	AuditFindingSubagentModelNotObserved AuditFindingCode = "subagent_model_not_observed"
+	AuditFindingSubagentModelUnavailable AuditFindingCode = "subagent_model_unavailable"
 	AuditFindingSubagentFailed           AuditFindingCode = "subagent_failed"
 	AuditFindingDetectionJobFailed       AuditFindingCode = "threat_detection_job_failed"
 	AuditFindingThreatDetected           AuditFindingCode = "threat_detected"
