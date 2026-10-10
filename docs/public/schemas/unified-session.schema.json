@@ -21,14 +21,23 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "sessionId": { "$ref": "#/definitions/JsonValue" },
-                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
-                "agentId": { "$ref": "#/definitions/JsonValue" },
-                "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
                 "content": { "$ref": "#/definitions/JsonValue" },
+                "delta": { "$ref": "#/definitions/JsonValue" },
+                "partial": { "type": "boolean", "description": "True for an observed streaming fragment, not a finalized refusal." },
+                "messageId": { "$ref": "#/definitions/JsonValue" },
+                "contentIndex": { "$ref": "#/definitions/JsonValue" },
+                "channel": { "$ref": "#/definitions/JsonValue" },
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "model": { "$ref": "#/definitions/JsonValue" },
+                "apiCallId": { "$ref": "#/definitions/JsonValue" },
+                "interactionId": { "$ref": "#/definitions/JsonValue" },
+                "turnId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
                 "policyCategory": { "type": ["string", "null"] },
-                "explanation": { "type": ["string", "null"] },
-                "partial": { "type": "boolean", "description": "True for an observed streaming fragment, not a finalized refusal." }
+                "explanation": { "type": ["string", "null"] }
               },
               "required": ["reason"]
             }
@@ -55,7 +64,26 @@
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.daily_aic" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DailyAICDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
-      { "if": { "properties": { "type": { "const": "mcp.event" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
+      {
+        "if": { "properties": { "type": { "const": "mcp.event" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "serverName": { "$ref": "#/definitions/JsonValue" },
+                "event": { "$ref": "#/definitions/JsonValue" },
+                "level": { "$ref": "#/definitions/JsonValue" },
+                "status": { "$ref": "#/definitions/JsonValue" },
+                "message": { "$ref": "#/definitions/JsonValue" },
+                "reason": { "$ref": "#/definitions/JsonValue" },
+                "requestId": { "$ref": "#/definitions/JsonValue" }
+              }
+            }
+          }
+        }
+      },
       { "if": { "properties": { "type": { "const": "mcp.guard.blocked" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
@@ -68,7 +96,56 @@
       { "if": { "properties": { "type": { "const": "safe_output.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "session.collection" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/CollectionData" } } } },
       { "if": { "properties": { "type": { "const": "session.collection_warning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/CollectionWarningData" } } } },
+      {
+        "if": { "properties": { "type": { "const": "session.error" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "error": { "$ref": "#/definitions/JsonValue" },
+                "message": { "$ref": "#/definitions/JsonValue" },
+                "content": { "$ref": "#/definitions/JsonValue" },
+                "code": { "$ref": "#/definitions/JsonValue" },
+                "errorType": { "$ref": "#/definitions/JsonValue" },
+                "model": { "$ref": "#/definitions/JsonValue" },
+                "severity": { "$ref": "#/definitions/JsonValue" },
+                "status": { "$ref": "#/definitions/JsonValue" },
+                "sourceType": { "$ref": "#/definitions/JsonValue" },
+                "exitCode": { "$ref": "#/definitions/JsonValue" }
+              }
+            }
+          }
+        }
+      },
       { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
+      {
+        "if": { "properties": { "type": { "const": "session.info" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "message": { "$ref": "#/definitions/JsonValue" },
+                "content": { "$ref": "#/definitions/JsonValue" },
+                "model": { "$ref": "#/definitions/JsonValue" },
+                "status": { "$ref": "#/definitions/JsonValue" },
+                "sourceType": { "$ref": "#/definitions/JsonValue" }
+              }
+            }
+          }
+        }
+      },
       {
         "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] },
         "then": {
@@ -79,6 +156,7 @@
               "properties": {
                 "sessionId": { "type": ["string", "null"] },
                 "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
                 "sourceEngine": { "type": "string" },
                 "model": { "type": "string" },
@@ -91,6 +169,30 @@
       },
       { "if": { "properties": { "type": { "const": "session.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedSessionResultData" } } } },
       {
+        "if": { "properties": { "type": { "const": "session.shutdown" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "shutdownType": { "$ref": "#/definitions/JsonValue" },
+                "errorReason": { "$ref": "#/definitions/JsonValue" },
+                "premiumRequests": { "$ref": "#/definitions/JsonValue" },
+                "totalNanoAiu": { "$ref": "#/definitions/JsonValue" },
+                "totalApiDurationMs": { "$ref": "#/definitions/JsonValue" },
+                "sessionStartTime": { "$ref": "#/definitions/JsonValue" },
+                "currentModel": { "$ref": "#/definitions/JsonValue" }
+              }
+            }
+          }
+        }
+      },
+      {
         "if": { "properties": { "type": { "const": "session.start" } }, "required": ["type"] },
         "then": {
           "properties": {
@@ -100,11 +202,31 @@
               "properties": {
                 "sessionId": { "type": ["string", "null"] },
                 "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
                 "sourceEngine": { "type": "string" },
                 "model": { "type": "string" },
                 "cwd": { "type": "string" },
                 "reasoningEffort": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      {
+        "if": { "properties": { "type": { "const": "session.task_complete" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "success": { "$ref": "#/definitions/JsonValue" },
+                "summary": { "$ref": "#/definitions/JsonValue" }
               }
             }
           }
@@ -120,14 +242,16 @@
               "properties": {
                 "sessionId": { "$ref": "#/definitions/JsonValue" },
                 "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
                 "toolCallId": { "type": "string" },
+                "stepIndex": { "$ref": "#/definitions/SessionCount" },
                 "toolName": { "type": "string" },
                 "success": { "type": "boolean" },
                 "output": { "$ref": "#/definitions/JsonValue" },
                 "error": { "$ref": "#/definitions/JsonValue" },
                 "durationMs": { "$ref": "#/definitions/SessionMetric" },
-                "exitCode": { "type": "number" },
+                "exitCode": { "type": ["number", "null"] },
                 "status": { "type": "string" },
                 "mcpServerName": { "type": "string" },
                 "isError": { "type": "boolean" },
@@ -150,11 +274,40 @@
               "properties": {
                 "sessionId": { "$ref": "#/definitions/JsonValue" },
                 "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
                 "agentId": { "$ref": "#/definitions/JsonValue" },
                 "toolCallId": { "type": "string" },
+                "stepIndex": { "$ref": "#/definitions/SessionCount" },
                 "toolName": { "type": "string" },
                 "input": { "$ref": "#/definitions/JsonValue" },
+                "inputTruncated": { "type": "boolean" },
                 "command": { "type": "string" },
+                "mcpServerName": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      {
+        "if": { "properties": { "type": { "const": "tool.execution_update" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sessionId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+                "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+                "agentId": { "$ref": "#/definitions/JsonValue" },
+                "output": { "$ref": "#/definitions/JsonValue" },
+                "partial": { "$ref": "#/definitions/JsonValue" },
+                "delta": { "$ref": "#/definitions/JsonValue" },
+                "contentIndex": { "$ref": "#/definitions/JsonValue" },
+                "toolCallId": { "type": "string" },
+                "stepIndex": { "$ref": "#/definitions/SessionCount" },
+                "toolName": { "type": "string" },
+                "input": { "$ref": "#/definitions/JsonValue" },
                 "mcpServerName": { "type": "string" }
               }
             }
@@ -583,6 +736,7 @@
         "agentMetrics": { "$ref": "#/definitions/JsonValue", "description": "Exact per-agent accounting snapshot supplied by the engine, not additive usage." },
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
         "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
       },
@@ -606,6 +760,11 @@
     "UsageReportData": {
       "type": "object",
       "properties": {
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
+        "stepIndex": { "$ref": "#/definitions/SessionCount" },
         "provider": { "$ref": "#/definitions/JsonValue" },
         "model": { "$ref": "#/definitions/JsonValue" },
         "purpose": { "$ref": "#/definitions/JsonValue" },
