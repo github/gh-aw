@@ -13,6 +13,10 @@ describe("validateMemoryStep", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-validate-memory-step-"));
     originalEnv = { ...process.env };
     process.env.MEMORY_DIR = tempDir;
+    process.env.GH_AW_PROMPT_DIR = `${tempDir}-prompts`;
+    fs.mkdirSync(process.env.GH_AW_PROMPT_DIR);
+    fs.writeFileSync(path.join(process.env.GH_AW_PROMPT_DIR, "user.txt"), "user prompt\n");
+    fs.writeFileSync(path.join(process.env.GH_AW_PROMPT_DIR, "prompt.txt"), "combined prompt\n");
     process.env.MEMORY_ID = "default";
     process.env.ALLOWED_EXTENSIONS = '[".json"]';
     process.env.VALIDATION_SCRIPT_B64 = Buffer.from('console.log("valid");').toString("base64");
@@ -20,6 +24,7 @@ describe("validateMemoryStep", () => {
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(process.env.GH_AW_PROMPT_DIR, { recursive: true, force: true });
     fs.rmSync(getValidationMarkerPath("cache", "default"), { force: true });
     fs.rmSync(getRepoMemoryBaselinePath(process.env.MEMORY_ID), { force: true });
     process.env = originalEnv;
@@ -50,6 +55,11 @@ describe("validateMemoryStep", () => {
     const baseline = JSON.parse(fs.readFileSync(getRepoMemoryBaselinePath(process.env.MEMORY_ID), "utf8"));
     expect(baseline.ok).toBe(!invalidBaseline);
     expect(baseline.stderr.includes("invalid state")).toBe(invalidBaseline);
+    for (const name of ["user.txt", "prompt.txt"]) {
+      const rendered = fs.readFileSync(path.join(process.env.GH_AW_PROMPT_DIR, name), "utf8");
+      expect(rendered.includes("invalid state")).toBe(invalidBaseline);
+      expect(rendered.includes("call push_repo_memory")).toBe(invalidBaseline);
+    }
     fs.writeFileSync(path.join(tempDir, ".git", "HEAD"), "updated");
     fs.writeFileSync(statePath, candidate);
     checkRepoMemoryBaseline(core);

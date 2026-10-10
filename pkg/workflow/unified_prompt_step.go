@@ -357,11 +357,10 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	}
 
 	type promptRenderItem struct {
-		ContentEnvVar      string `json:"content_env,omitempty"`
-		File               string `json:"file,omitempty"`
-		LedgerReplay       bool   `json:"ledger_replay,omitempty"`
-		RepoMemoryBaseline string `json:"repo_memory_baseline,omitempty"`
-		ConditionEnvVar    string `json:"condition_env,omitempty"`
+		ContentEnvVar   string `json:"content_env,omitempty"`
+		File            string `json:"file,omitempty"`
+		LedgerReplay    bool   `json:"ledger_replay,omitempty"`
+		ConditionEnvVar string `json:"condition_env,omitempty"`
 	}
 	type promptRenderConfig struct {
 		Items           []promptRenderItem `json:"items"`
@@ -397,13 +396,6 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 				continue
 			}
 			appendFile(section.Content, section.ConditionEnvVar)
-			if (section.Content == repoMemoryPromptFile || section.Content == repoMemoryPromptMultiFile) && data.RepoMemoryConfig != nil {
-				for _, memory := range data.RepoMemoryConfig.Memories {
-					if memory.Validation != nil {
-						renderConfig.Items = append(renderConfig.Items, promptRenderItem{RepoMemoryBaseline: memory.ID})
-					}
-				}
-			}
 			continue
 		}
 		normalizedContent := stringutil.NormalizeLeadingWhitespace(section.Content)
