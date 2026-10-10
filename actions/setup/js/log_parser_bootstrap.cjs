@@ -339,8 +339,14 @@ async function runLogParser(options) {
     }
     const finalSession = copilotSessions.at(-1);
     const retainedSessions = copilotSessions.filter(session => session.events.length);
+    const selectedWarnings = [];
     for (const session of retainedSessions) {
       if (hasMalformedJsonl(session.content)) core.warning(`Copilot session log from ${session.source} is partially malformed; retaining supported observations without claiming the missing records were recovered`);
+    }
+    if (parserName === "Copilot" && selectedSource && path.basename(selectedSource) === "events.jsonl" && hasMalformedJsonl(content) && !retainedSessions.some(session => session.source === selectedSource)) {
+      const source = path.isAbsolute(selectedSource) ? path.relative(rootDir, selectedSource) : selectedSource;
+      core.warning(`Copilot session log from ${source} is partially malformed; retaining supported observations without claiming the missing records were recovered`);
+      selectedWarnings.push({ type: "session.collection_warning", data: { path: source, code: "malformed_jsonl" } });
     }
     const redactPublication = text => applyAddMaskRedaction(redactStepSummaryContent(text), [...publicationMasks]);
 
@@ -387,7 +393,9 @@ async function runLogParser(options) {
           ),
           ...(selectedSource === finalSession?.source ? [] : supplementalEvents),
         ]
-      : logEntries;
+      : Array.isArray(logEntries)
+        ? [...logEntries, ...selectedWarnings]
+        : logEntries;
 
     // Enrich agent-stdio.log with a normalized result entry when the engine does not
     // write one directly (e.g. Copilot, Pi).  The OTEL conclusion span

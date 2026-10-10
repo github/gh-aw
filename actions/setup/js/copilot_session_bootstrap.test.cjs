@@ -210,6 +210,23 @@ describe("Copilot retry session bootstrap", () => {
     expect(core.setFailed).not.toHaveBeenCalled();
   });
 
+  it("persists partial-source diagnostics when the native file is supplied directly", async () => {
+    const file = writeSession("direct", [{ type: "assistant.message", data: { content: "  Direct partial response.\n" } }]);
+    fs.appendFileSync(file, '{"type":"assistant.message",\n');
+    process.env.GH_AW_AGENT_OUTPUT = file;
+
+    await run();
+
+    const canonical = readEvents(path.join(root, "agent-session.jsonl"));
+    expect(canonical.find(event => event.type === "assistant.message").data.content).toBe("  Direct partial response.\n");
+    expect(canonical.find(event => event.type === "session.collection_warning").data).toEqual({
+      code: "malformed_jsonl",
+      path: "sandbox/agent/logs/copilot-session-state/direct/events.jsonl",
+    });
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("without claiming the missing records were recovered"));
+    expect(core.setFailed).not.toHaveBeenCalled();
+  });
+
   it("surfaces directory enumeration failures with context and the original cause", () => {
     const failure = new Error("Permission denied");
     const readdir = fs.readdirSync;
