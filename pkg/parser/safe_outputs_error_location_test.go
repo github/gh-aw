@@ -425,7 +425,7 @@ safe-outputs:
 
 	errorText := err.Error()
 	// The path is shown without a leading '/'; line:col info appears both in the
-	// file:line:col prefix from console.FormatError and in each detail line.
+	// file:line:col prefix from console.FormatErrorStdout and in each detail line.
 	wantSubstrings := []string{
 		"safe-outputs/create-issue",
 		"safe-outputs/create-discussion",

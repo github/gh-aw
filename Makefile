@@ -10,6 +10,8 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 DOCKER_IMAGE=ghcr.io/github/gh-aw
 DOCKER_PLATFORMS=linux/amd64,linux/arm64
 BASE_REF ?= origin/main
+# Use the runtime's locked Prettier version from every working directory.
+PRETTIER := $(abspath actions/setup/js/node_modules/.bin/prettier)
 JS_IMPACTED_TEST_EXCLUDES=--exclude '**/*.integration.test.cjs' --exclude '**/frontmatter_hash_github_api.test.cjs'
 CI_WORKFLOW_FILE ?= ci.yml
 CI_COVERAGE_ARTIFACT_PATTERN ?= ci-integration-coverage-*
@@ -991,8 +993,8 @@ fmt-go:
 fmt-cjs:
 	@echo "→ Formatting JavaScript files..."
 	@cd actions/setup/js && npm run format:cjs --silent >/dev/null 2>&1
-	@cd eslint-factory && npx prettier --write '**/*.cjs' '**/*.ts' '**/*.json' --ignore-path ../.prettierignore --log-level=error 2>&1
-	@npx prettier --write 'scripts/**/*.js' --ignore-path .prettierignore --log-level=error 2>&1
+	@cd eslint-factory && "$(PRETTIER)" --write '**/*.cjs' '**/*.ts' '**/*.json' --ignore-path ../.prettierignore --log-level=error 2>&1
+	@"$(PRETTIER)" --write 'scripts/**/*.js' --ignore-path .prettierignore --log-level=error 2>&1
 	@echo "✓ JavaScript files formatted"
 
 # Format JSON files in pkg directory (excluding actions/setup/js, which is handled by npm script)
@@ -1000,7 +1002,7 @@ fmt-cjs:
 fmt-json:
 	@echo "→ Formatting JSON files..."
 	@cd actions/setup/js && npm run format:pkg-json --silent >/dev/null 2>&1
-	@npx prettier --write 'pkg/cli/data/models.json' 'actions/setup/js/models.json' --ignore-path .prettierignore --log-level=error 2>&1
+	@"$(PRETTIER)" --write 'pkg/cli/data/models.json' 'actions/setup/js/models.json' --ignore-path .prettierignore --log-level=error 2>&1
 	@echo "✓ JSON files formatted"
 
 # Check formatting
@@ -1017,8 +1019,8 @@ fmt-check:
 .PHONY: fmt-check-cjs
 fmt-check-cjs:
 	cd actions/setup/js && npm run lint:cjs
-	cd eslint-factory && npx prettier --check '**/*.cjs' '**/*.ts' '**/*.json' --ignore-path ../.prettierignore
-	npx prettier --check 'scripts/**/*.js' --ignore-path .prettierignore
+	cd eslint-factory && "$(PRETTIER)" --check '**/*.cjs' '**/*.ts' '**/*.json' --ignore-path ../.prettierignore
+	"$(PRETTIER)" --check 'scripts/**/*.js' --ignore-path .prettierignore
 
 # Check JSON file formatting in pkg directory (excluding actions/setup/js, which is handled by npm script)
 .PHONY: fmt-check-json

@@ -64,8 +64,10 @@ export interface AssistantRefusalData {
 
 export interface ToolExecutionStartData {
   toolCallId?: string;
+  stepIndex?: SessionCount;
   toolName?: string;
   input?: JsonValue;
+  inputTruncated?: boolean;
   parameters?: JsonValue;
   command?: string;
   mcpServerName?: string;
@@ -74,6 +76,7 @@ export interface ToolExecutionStartData {
 
 export interface ToolExecutionCompleteData {
   toolCallId?: string;
+  stepIndex?: SessionCount;
   toolName?: string;
   taskId?: string;
   taskType?: string;
@@ -84,7 +87,7 @@ export interface ToolExecutionCompleteData {
   result?: JsonValue;
   error?: JsonValue;
   durationMs?: SessionMetric;
-  exitCode?: number;
+  exitCode?: number | null;
   status?: string;
   is_error?: boolean;
   isError?: boolean;

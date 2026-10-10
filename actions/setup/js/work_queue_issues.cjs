@@ -2,9 +2,9 @@
 "use strict";
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const { canonical, closed, digest, parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
-const { actorFromContext } = require("./work_queue_policy.cjs");
-const { authenticatePublisher } = require("./work_queue_native.cjs");
-const { validateStoredAssignment } = require("./work_queue_binding.cjs");
+const { actorFromContext, dispatchPrincipal } = require("./work_queue_policy.cjs");
+const { authenticatePublisher, validateNativeRun } = require("./work_queue_native.cjs");
+const { validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
 const { readInboundWorkQueueAssignment, resolveWorkQueueRuntime } = require("./aw_context.cjs");
 const { assertProjectionAuthority, issueIdentity, issueCompletionPolicy } = require("./work_queue_issue_contract.cjs");
 const { dependencyStatus } = require("./work_queue_graph.cjs");
@@ -472,6 +472,12 @@ async function main(options = {}) {
       }));
     const assignment = runtime.assignment || readInboundWorkQueueAssignment(repositoryContext.payload);
     const initial = await (options.readCheckedQueue || readCheckedQueue)(boundOptions);
+    if (assignment && origin.native_run) {
+      const { dispatch, profile } = validateStoredAssignment(initial.state, assignment, { allowReleased: true });
+      const expected = { ...expectedWorkerRun(assignment, profile, repositoryContext, origin.repository, dispatchPrincipal(dispatch)), run_id: dispatch.run?.run_id };
+      const proof = validateNativeRun(origin.native_run, expected);
+      if (!dispatch.run || canonical(dispatch.run) !== canonical(bindingForRun(proof, expected))) throw queueError("projection_unauthorized", "native worker requires its original durable run binding");
+    }
     const permitted = ownProjectionTargets(initial.state, origin, origin.ref, assignment).targets;
     for (let offset = 0; offset < permitted.length; offset += MAX_PROJECTION_TARGETS) {
       const targets = permitted.slice(offset, offset + MAX_PROJECTION_TARGETS);

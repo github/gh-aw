@@ -117,7 +117,7 @@ func TestOutputCollectionGitHubAppOwnerAndWildcard(t *testing.T) {
 			compiler := NewCompiler()
 			output := strings.Join(compiler.addAppTokenMintingSteps(data), "")
 			assert.Contains(t, output, "- name: Derive GitHub App owner for mention resolution\n")
-			assert.Contains(t, output, "GH_AW_TARGET_REPOSITORY: ${{ needs.activation.outputs.target_repo }}")
+			assert.Contains(t, output, "GH_AW_TARGET_REPOSITORY: ${{ needs.activation.outputs.target_repo || github.repository }}")
 			assert.Contains(t, output, "owner: ${{ steps.safe-outputs-mentions-app-token-owner.outputs.owner }}")
 			assert.NotContains(t, output, "permission-members:")
 			if wildcard {
@@ -126,7 +126,7 @@ func TestOutputCollectionGitHubAppOwnerAndWildcard(t *testing.T) {
 					jobName: "safe_outputs", id: "safe-outputs-mentions-app-token", clientID: app.AppID, privateKey: app.PrivateKey,
 				}])
 			} else {
-				assert.Contains(t, output, "repositories: ${{ needs.activation.outputs.target_repo_name }}")
+				assert.Contains(t, output, "repositories: ${{ needs.activation.outputs.target_repo_name || github.event.repository.name }}")
 			}
 		})
 	}

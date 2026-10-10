@@ -20,7 +20,8 @@ const EMPTY_OUTPUT_CAUSES = Object.freeze({
 const EMPTY_OUTPUT_FAILURE_CAUSES = Object.freeze({
   engine_outage: "experienced an engine outage",
   request_rejection: "had a request rejected",
-  prompt_exhaustion: "exhausted its prompt",
+  prompt_exhaustion: "reported incomplete result",
+  unknown: "finished without a clear failure cause",
 });
 
 const PROMPT_EXHAUSTION_ERROR_CATEGORIES = new Set(["effective_tokens_limit_exceeded", "invocation_cap_exceeded"]);
@@ -60,7 +61,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   let events = [];
   let maskedValues = [];
   try {
-    ({ events, maskedValues } = collectUnifiedSession({ rootDir, warn: () => {} }));
+    ({ events, maskedValues } = collectUnifiedSession({ rootDir, ...(process.env.GH_AW_ENGINE_ID === "aider" ? { engine: "aider" } : {}), warn: () => {} }));
   } catch {
     diagnostics.add("Runtime diagnostics could not be collected.");
   }
@@ -154,9 +155,10 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
     })
     .join("\n");
   // Extract denied commands without copying harness configuration or transcript data.
-  const attributedDiagnostics = agentErrorDiagnosticText(safeStdio);
+  const rawSourceEngine = process.env.GH_AW_ENGINE_ID === "aider" || events.some(event => event.type === "workflow.info" && event.provenance.component === "workflow" && event.data.engineId === "aider") ? "aider" : undefined;
+  const attributedDiagnostics = agentErrorDiagnosticText(safeStdio, events, rawSourceEngine);
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
-  const engineSummary = agentErrorSummaryText(safeStdio);
+  const engineSummary = agentErrorSummaryText(safeStdio, events, rawSourceEngine);
   if (engineSummary) diagnostics.add(engineSummary);
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   if (driverExitCode !== undefined && ![...diagnostics].some(diagnostic => diagnostic.startsWith("Driver exit code:"))) {
@@ -166,7 +168,9 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));
   const isRequestRejection = ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) || executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) || errorCodes.some(code => code >= 400 && code < 500);
   const isEngineOutage = reason === "engine_driver_failure" || executionCategories.some(category => ["agentic_engine_timeout", "capi_server_error", "sandbox_runtime_crash"].includes(category)) || errorCodes.some(code => code >= 500);
-  const failureCause = isPromptExhaustion ? "prompt_exhaustion" : isRequestRejection ? "request_rejection" : isEngineOutage ? "engine_outage" : "prompt_exhaustion";
+  // Absence of evidence is not evidence of prompt exhaustion: without a matched category
+  // or status code, classify as "unknown" instead of guessing prompt_exhaustion.
+  const failureCause = isPromptExhaustion ? "prompt_exhaustion" : isRequestRejection ? "request_rejection" : isEngineOutage ? "engine_outage" : "unknown";
   const retryEvents = events.filter(event => event.type === "claude.api_retry" || (event.type === "system" && event.data.subtype === "api_retry"));
   const harnessRetryLines = stdio.split(/\r?\n/).filter(line => /^\[(?:copilot|claude|codex)-harness\].*\bretrying\b/i.test(line));
   const harnessRetryCount = harnessRetryLines.length;

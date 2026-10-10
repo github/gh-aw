@@ -284,7 +284,7 @@ type agyConformanceWorkflow struct {
 	Jobs        map[string]agyConformanceJob `yaml:"jobs"`
 }
 
-func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
+func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 	var caller agyConformanceWorkflow
 	parent, err := os.ReadFile("../../.github/workflows/credentials-check.yml")
 	require.NoError(t, err)
@@ -315,10 +315,15 @@ func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 			}
 			for name, config := range callee.Jobs {
 				allowedPermissions := binding.Permissions
+				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
+					allowedPermissions = map[string]string{
+						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
+					}
+				}
 				if entry.id == "engine-conformance-agy" {
 					switch name {
-					case "activation":
-						allowedPermissions = map[string]string{"actions": "read", "contents": "write"}
+					case "activation", "conclusion":
+						allowedPermissions = map[string]string{"actions": "read", "contents": "write", "issues": "write"}
 					case "safe_outputs":
 						allowedPermissions = map[string]string{"actions": "write", "contents": "write"}
 					}
@@ -327,15 +332,13 @@ func TestAgyProductionConformancePermissionsAreBounded(t *testing.T) {
 						continue
 					}
 				}
-				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
-					allowedPermissions = map[string]string{
-						"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read",
-					}
-				}
 				for permission, level := range config.Permissions {
 					expectedLevel, allowed := allowedPermissions[permission]
 					assert.True(t, allowed, "%s must not grant unscoped %s permission", name, permission)
 					assert.Equal(t, expectedLevel, level, "%s must use the scoped %s permission", name, permission)
+				}
+				if entry.id == "engine-conformance-agy" {
+					assert.Equal(t, allowedPermissions, config.Permissions, "%s must retain queue-worker permissions", name)
 				}
 			}
 			assert.Equal(t, 10, callee.Jobs["agent"].TimeoutMinutes)
@@ -362,6 +365,8 @@ func TestAgyConformanceEntryPointsShareConfiguration(t *testing.T) {
 	canonical["imports"] = []any{"shared/agy-conformance.md"}
 	delete(canonical, "tools")
 	assert.EqualValues(t, 5, canonical["max-ai-credits"])
+	canonical["imports"] = []any{"shared/agy-conformance.md"}
+	delete(canonical, "tools")
 	delete(canonical, "name")
 	delete(canonical, "description")
 	delete(canonical, "on")
@@ -458,6 +463,7 @@ func assertAgyConformanceProbes(t *testing.T, compiled agyConformanceWorkflow, w
 	}
 	if workQueueCLIServer {
 		assert.Contains(t, commands, `export GH_AW_MCP_CLI_SERVERS='["agy-native","mcpscripts","safeoutputs","work-queue"]'`)
+		assert.Contains(t, environment, "Without a valid matching assignment, stop with an error; never run standalone.")
 	} else {
 		assert.NotContains(t, commands, "export GH_AW_MCP_CLI_SERVERS=")
 	}

@@ -1401,7 +1401,7 @@ An `aw.json` mapping of action repository prefixes to mirror prefixes, such as `
 
 ### actionlint
 
-A static analysis tool for GitHub Actions workflow files that detects syntax errors, type mismatches, and other issues. Integrated into `gh aw compile` via the `--actionlint` flag. Runs in a Docker container and reports lint findings separately from tooling/integration errors (such as Docker failures or timeouts) that prevent the linter from running. See `--actionlint --zizmor --poutine` in the [Compilation Reference](/gh-aw/reference/compilation-process/).
+A static analysis tool for GitHub Actions workflow files that detects syntax errors, type mismatches, and other issues. Integrated into `gh aw compile` via the `--actionlint` flag. Uses a local binary on `PATH` when its version is at least 1.7.12, otherwise falls back to Docker. Local shellcheck/pyflakes integrations use tools available on `PATH`. Reports lint findings separately from tooling/integration errors (such as Docker failures or timeouts) that prevent the linter from running. See `--actionlint --zizmor --poutine` in the [Compilation Reference](/gh-aw/reference/compilation-process/).
 
 ### grant
 

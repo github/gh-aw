@@ -1,5 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
-import { normalizeAgentSession, createSessionEvent, selectSessionResult, projectSessionResult, normalizeSessionUsage, accumulateSessionUsage, sessionOutputText, sessionToolSuccess, sessionTokenTotal } from "./agent_session.cjs";
+import {
+  normalizeAgentSession,
+  createSessionEvent,
+  selectSessionResult,
+  projectSessionResult,
+  normalizeSessionUsage,
+  accumulateSessionUsage,
+  sessionOutputText,
+  sessionToolSuccess,
+  sessionTokenTotal,
+  sessionContext,
+} from "./agent_session.cjs";
+import { scopedAgentSessions } from "./unified_session_render.cjs";
 import {
   convertLegacyLogEntriesToCopilotEvents,
   convertCopilotEventsToLegacyLogEntries,
@@ -50,6 +62,21 @@ const canonical = freeze([
 ]);
 
 describe("Unified Agent Session 1.0.0 conformance", () => {
+  it("keeps Pi parent tool-call relationships in the root session group", () => {
+    const events = [
+      { type: "session.init", data: { sourceEngine: "pi", sessionId: "pi-root" } },
+      { type: "tool.execution_start", data: { toolCallId: "nested-tool", parentToolCallId: "root-tool", toolName: "bash", input: false } },
+      { type: "tool.execution_complete", data: { toolCallId: "nested-tool", parentToolCallId: "root-tool", output: 0, success: true } },
+      { type: "session.result", data: { sourceEngine: "pi", parentToolCallId: "root-tool", usage: { input_tokens: 0 } } },
+    ];
+    expect(sessionContext(events[1])).toEqual({});
+    expect(sessionContext({ ...events[1], parentToolCallId: "envelope-tool" })).toEqual({});
+    const grouped = scopedAgentSessions(events);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0].events).toHaveLength(4);
+    expect(projectSessionResult(events).usage.input_tokens).toBe(0);
+  });
+
   it("T-UAS-003/006/025/026/029: native events are deterministic, idempotent and JSON-preserving", () => {
     const original = json(canonical);
     const normalized = normalizeAgentSession(canonical);

@@ -36,6 +36,7 @@ type SkipIfCheckFailingConfig struct {
 }
 type WorkflowData struct {
 	WorkQueuePolicy                *WorkQueuePolicyConfig
+	workQueueRepoIssuesConfigured  bool
 	DryRun                         bool // Disable compiler-managed GitHub mutations while retaining local diagnostics
 	Name                           string
 	WorkflowID                     string           // workflow identifier derived from markdown filename (basename without extension)

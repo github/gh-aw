@@ -67,7 +67,7 @@ func CheckOutdatedDependencies(ctx context.Context, verbose bool) ([]OutdatedDep
 		latest, age, err := getLatestVersion(ctx, dep.Path, dep.Version, verbose)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: could not check %s: %v", dep.Path, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("could not check %s: %v", dep.Path, err)))
 			}
 			continue
 		}
@@ -92,7 +92,7 @@ func CheckOutdatedDependencies(ctx context.Context, verbose bool) ([]OutdatedDep
 // DisplayOutdatedDependencies shows outdated dependencies in a formatted table
 func DisplayOutdatedDependencies(outdated []OutdatedDependency, totalDeps int) {
 	if len(outdated) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✅ All dependencies are up to date"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All dependencies are up to date"))
 		return
 	}
 

@@ -78,9 +78,10 @@ Use the exact date, nodes and budget from the plan. The 7-day change window
 is a scheduling signal, not a new conformance requirement.
 
 Read the queue with `work_queue_read` using
-`{"pool":"engine-conformance","limit":32}`. An uninitialized or policyless
-ledger is a deployment failure; do not bootstrap it, submit tasks or dispatch
-ordinary workflows. Surface tool failures instead of claiming an empty queue.
+`{"pool":"engine-conformance","limit":32}`. An uninitialized queue is an empty
+backlog; the first trusted submission atomically installs Policy and Work.
+An existing policyless ledger is a failure. Surface tool failures instead of
+claiming an empty queue, and never dispatch ordinary workflows.
 
 Call `work_queue_submit` once with `{"nodes": <plan.nodes>}`. Date-keyed Work
 identities make a same-day repeat idempotent. Then call
@@ -90,9 +91,9 @@ the advertised work-queue MCP tools or their CLI wrappers. Do not choose the
 winning Work, worker, revision, or target: the installed Policy does that.
 Staged intents are not evidence of native launches or successful checks.
 
-The authenticated operator must install Policy with this dispatcher's producer
-entitlement, immutable worker revisions and worker principal before activation.
-Generate a validated Policy with
-`node actions/setup/js/engine_conformance_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID`.
+Global scheduling for the `engine-conformance` pool and its fairness keys lives
+in `.github/workflows/aw.json` under `work_queue`. AW handles authorization,
+approved worker routes and actual native-run binding; no producer enrollment,
+worker-principal configuration or administrator seeding is required.
 The three-launch cap may produce fewer launches if capacity is unavailable.
 Use `noop` only when there is no eligible grant, not when admission fails.

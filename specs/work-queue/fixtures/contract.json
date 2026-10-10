@@ -97,7 +97,7 @@
   "production_genesis": {
     "placeholder": "DefaultPolicy zero40 revision is a pure constructor/fixture placeholder, never a production worker revision",
     "default_route": "Authenticated native repository default-branch head plus exact approved worker workflow file at that immutable revision; requires work_queue_assignment string input and active exact Actions registration",
-    "explicit_policy": "Authenticated administrator Policy proposal initializes a genuine genesis using its original request ID/epoch and exact approved policy; no unrelated default route or synthetic installed policy",
+    "explicit_policy": "The authorized first producer/dispatcher submission atomically installs its approved Policy proposal and Work using the original submission request; standalone administrator seeding is unsupported",
     "authority": "Worker principal and credential/effect scopes come from the approved installed profile; producer/PR checkout SHA is never substituted for another worker route",
     "installed_policy": "Existing Policy is never automatically rewritten or reprovisioned during an ordinary publish or stable-request acknowledgment"
   },
@@ -130,14 +130,14 @@
     "handle": "h + one-based member index in original immutable group",
     "candidate_commit": "q_ + SHA256(UTF8(previous_tip + newline + request.id))",
     "genesis_commit": "q_ + SHA256(UTF8(genesis request.id)); no predecessor or newline",
-    "auto_bootstrap_request": "init_ + SHA256(UTF8(originating publication request.id))",
+    "auto_bootstrap_request": "Original submission request.id; no synthetic administrator request",
     "auto_bootstrap_epoch": "epoch_ + SHA256(UTF8(originating publication request.id))",
     "publisher_generation_example": {
       "publication_request_id": "submit",
-      "genesis_request_id": "init_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba",
+      "genesis_request_id": "submit",
       "genesis_policy_epoch": "epoch_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba",
-      "genesis_commit_id": "q_50ddbfa08f7148bbb21046bd6c12fed643985baa93ecc09ae9a6d1c6366d1be7",
-      "publication_commit_id": "q_55c9db94408bb38dd5f1731f2adc022fcca54ea724b4b1f4db2424d7194d9294"
+      "genesis_commit_id": "q_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba",
+      "publication_commit_id": "q_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba"
     },
     "commit_identity_validation": "Opaque unique ID; publisher naming conventions do not authenticate a commit or invalidate other accepted version-3 IDs"
   },

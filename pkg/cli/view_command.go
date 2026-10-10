@@ -175,7 +175,7 @@ func ViewWorkflowRun(ctx context.Context, runID int64, opts ViewOptions) error {
 	// Finish with a link to the GitHub Actions run page.
 	runURL := buildRunHTMLURL(hostname, opts.Owner, opts.Repo, runID)
 	if runURL != "" {
-		fmt.Fprintln(os.Stdout, console.FormatInfoMessage(runURL))
+		fmt.Fprintln(os.Stdout, console.FormatInfoMessageStdout(runURL))
 	}
 
 	return nil
@@ -203,7 +203,7 @@ func renderViewSafeOutputs(runDir string) {
 	}
 
 	fmt.Fprintln(os.Stdout)
-	fmt.Fprintln(os.Stdout, console.FormatSectionHeader("Safe Outputs"))
+	fmt.Fprintln(os.Stdout, console.FormatSectionHeaderStdout("Safe Outputs"))
 	for _, item := range items {
 		line := "  " + item.Type
 		if item.URL != "" {

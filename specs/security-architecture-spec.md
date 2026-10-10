@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.1.0<br>
+**Version**: 1.1.1<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -968,14 +968,15 @@ if: github.event.pull_request.head.repo.id == github.repository_id
 - Repository ID match: `github.event.workflow_run.repository.id == github.repository_id`
 - Not from fork: `!github.event.workflow_run.repository.fork`
 
-**RS-05a**: For `workflow_dispatch` triggers where the `aw_context` input encodes a pull request context (`item_type == "pull_request"`), the implementation MUST enforce all of the following before executing a PR checkout:
+**RS-05a**: Before any PR checkout, the implementation MUST enforce the following actor-trust and ref-isolation controls. The repository-scope and parse-resilience requirements apply to `workflow_dispatch` PR contexts encoded in `aw_context` (`item_type == "pull_request"`):
 
-1. **Repository scope**: If `aw_context.repo` is present, the implementation MUST compare it against the current repository identity (`context.repo.owner/context.repo.repo`). A mismatch MUST cause checkout to be skipped with a warning; cross-repository PR checkout is NOT supported.
+1. **Repository scope** (`workflow_dispatch` PR contexts): If `aw_context.repo` is present, the implementation MUST compare it against the current repository identity (`context.repo.owner/context.repo.repo`). A mismatch MUST cause checkout to be skipped with a warning; cross-repository PR checkout is NOT supported.
 2. **Actor trust**: The triggering actor MUST satisfy `assertTrustedCheckoutRuntime()`, which enforces two properties with different scopes:
    - **Fork-runtime rejection** (`workflow_dispatch` PR replay ONLY): the runtime repository MUST NOT be a fork. This check MUST NOT be evaluated for other PR-capable triggers (`pull_request`, `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment`), because a structurally forked base repository is a legitimate topology for those triggers and rejecting it produces a false positive (see the risk matrix below). The payload MUST contain `repository.fork` as the boolean `false`; missing or malformed fork metadata MUST fail closed rather than be treated as trusted.
-   - **Permission floor** (all PR checkout paths except the same-repository bot branch-event case below): the actor MUST hold write-or-higher repository permission. For centralized command or label dispatches where the runtime actor is `github-actions[bot]`, the platform-set `sender.type` MUST be `Bot`, a command/label marker MUST be present, and the originating `aw_context.actor` MUST be a different identity with write-or-higher permission. Missing or inconsistent identity metadata MUST fail closed before permission lookup.
-   - **Same-repository bot branch events**: `pull_request` or `pull_request_target` `opened` or `synchronize` events MAY bypass the collaborator-permission lookup only when `sender.type == "Bot"`, `sender.login` matches the triggering actor, and the positive runtime repository ID, PR head repository ID, and PR base repository ID are equal. Missing or inconsistent identity or repository metadata, forked PRs, and all other event actions MUST NOT use this exception and MUST satisfy the permission floor. Bot/app actors MUST NOT bypass the permission check on comments, reviews, dispatches, or metadata-only events; if permission cannot be verified, checkout MUST fail closed.
-3. **Parse resilience**: Malformed `aw_context` JSON MUST be caught; the implementation MUST emit a warning and skip checkout rather than propagating the parse error.
+   - **Permission floor** (all PR checkout paths except the two same-repository bot cases below): the actor MUST hold write-or-higher repository permission. For centralized command or label dispatches where the runtime actor is `github-actions[bot]`, the platform-set `sender.type` MUST be `Bot`, a command/label marker MUST be present, and the originating `aw_context.actor` MUST be a different identity with write-or-higher permission. Missing or inconsistent identity metadata MUST fail closed before permission lookup.
+   - **Same-repository bot branch events**: `pull_request` or `pull_request_target` `opened` or `synchronize` events MAY bypass the collaborator-permission lookup only when `sender.type == "Bot"`, `sender.login` matches the triggering actor, and the positive runtime repository ID, PR head repository ID, and PR base repository ID are equal. Missing or inconsistent identity or repository metadata, forked PRs, and all other event actions MUST NOT use this exception and MUST satisfy the permission floor.
+   - **Same-repository allow-listed bot comments**: `issue_comment` and `pull_request_review_comment` events MAY bypass the collaborator-permission lookup only when `sender.type == "Bot"`, `sender.login` exactly matches `comment.user.login`, the sender login is canonically equivalent to the triggering actor (the App slug and its `[bot]` form are equivalent), the actor is explicitly listed in `on.bots`, and the positive runtime repository ID equals both the fetched PR head and base repository IDs. Missing or mismatched identities, an unlisted actor, missing or mismatched repository IDs, and fork PRs MUST NOT use this exception and MUST satisfy the permission floor. Failure to fetch or verify the PR details MUST fail closed.
+3. **Parse resilience** (`workflow_dispatch` PR contexts): Malformed `aw_context` JSON MUST be caught; the implementation MUST emit a warning and skip checkout rather than propagating the parse error.
 4. **Ref isolation**: The PR head MUST be fetched exclusively via `refs/pull/N/head` from the current repository's origin, using array-based execution (no shell interpolation).
 
 The implementation MUST NOT perform checkout unless `aw_context.item_number` is a positive safe integer or its canonical decimal string representation. Values requiring JavaScript coercion (including booleans, whitespace, exponent notation, hexadecimal notation, fractional values, objects, and arrays) MUST be rejected before actor, API, or git operations.
@@ -988,13 +989,14 @@ Centralized actor propagation relies on the repository's `actions: write` trust 
 | --- | --- | --- |
 | `pull_request` (same-repo head) | yes/no | Allowed after actor trust check; direct branch fetch. |
 | `pull_request` (fork head) | yes/no | Allowed after actor trust check; fetches `refs/pull/N/head`. |
-| `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment` on a PR | yes/no | Allowed after actor trust check; fetches `refs/pull/N/head` from the base context. |
+| `pull_request_target`, `pull_request_review` on a PR | yes/no | Allowed after actor trust check; fetches `refs/pull/N/head` from the base context. |
+| `pull_request_review_comment`, `issue_comment` on a PR | yes/no | Allow-listed same-repository Bot comments may use the comment exception; all other actors require write-or-higher permission. Checkout fetches `refs/pull/N/head` from the base context. |
 | `workflow_dispatch` with valid PR `aw_context` | no | Allowed after actor trust check; fetches `refs/pull/N/head`. |
 | `workflow_dispatch` with valid PR `aw_context` | yes | Rejected before actor/API/git operations. |
 | `workflow_dispatch` with valid PR `aw_context` and no `repository` payload | unverifiable | Rejected (fail closed); the implementation MUST NOT infer non-fork status from absent data. |
 | Any trigger without PR context, or a malformed/non-PR/cross-repository `aw_context` | any | Checkout is skipped before the fork-runtime check is reached. |
 
-Only the fork-runtime rejection row is scope-limited to `workflow_dispatch`. Ref isolation applies uniformly across every row; the permission floor applies except for the explicitly constrained same-repository bot branch-event case.
+Only the fork-runtime rejection row is scope-limited to `workflow_dispatch`. Ref isolation applies uniformly across every row; the permission floor applies except for the explicitly constrained same-repository bot branch-event and allow-listed bot-comment cases.
 
 **RS-05a and the `on.fork` frontmatter field**: The `fork` GitHub Actions event (`on: {fork: null}`, exposed as `on: repository forked` in the DSL) is unrelated to RS-05a and does not interact with it. That event fires in the base/upstream repository when someone forks it, carries no `pull_request` payload, and is not `workflow_dispatch`, so `pullRequest` is never resolved in `checkout_pr_branch.cjs` and `assertTrustedCheckoutRuntime()` is never invoked for it — checkout is skipped before the fork-runtime check is reached (last row of the risk matrix above), regardless of `payload.repository.fork`. This is also distinct from the `pull_request`/`pull_request_target` `forks:` allowlist field (RS-04-adjacent), which gates workflow *activation* for inbound PRs from a forked head repository and is evaluated in the compiled `if:` condition, not in `assertTrustedCheckoutRuntime()`.
 
@@ -2051,6 +2053,15 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 
 ## Change Log
 
+### Version 1.1.1 (RS-05a Allow-Listed App Comment Checkout)
+
+**Published**: October 9, 2026
+
+- Adds a narrowly scoped same-repository checkout exception for allow-listed GitHub App comments on `issue_comment` and `pull_request_review_comment` events.
+- Requires exact sender/comment-author login equality, canonical sender/runtime actor equivalence, an explicit `on.bots` entry, and matching positive runtime, PR head, and PR base repository IDs.
+- Preserves the collaborator-permission floor for forks, unlisted bots, identity or repository mismatches, and all other actors; unavailable PR details fail closed.
+- Updates the RS-05a unit-test and Z3 evidence in `security-architecture-spec-validation.md`.
+
 ### Version 1.1.0 (RS-05a Trust Contract Revision)
 
 **Published**: October 1, 2026
@@ -2156,6 +2167,6 @@ The most recent full validation pass against this specification was completed on
 
 Sync check on **2026-08-25** found no new minor-version bump, reported security incident, or reference-implementation change requiring a full revalidation since the 2026-07-15 pass. This maintenance pass synchronized §9/§11 prose to the existing `pkg/workflow/threat_detection_config.go` parser and `pkg/workflow/threat_detection_inline_engine.go` runtime behavior; because it clarifies MUST-level runtime sequencing text, a targeted §9/§11 revalidation is scheduled with the Security Architecture maintainers by **2026-09-01**. The known Appendix G.10 partial-coverage gaps remain tracked there.
 
-On **2026-10-01**, RS-05a was revalidated against the same-repository bot branch-event implementation, unit tests, and Z3 safety model for Version 1.1.0. Evidence is recorded in `security-architecture-spec-validation.md` §7b; this targeted revalidation does not replace the full validation pass required by the revalidation policy.
+On **2026-10-09**, RS-05a was targeted-revalidated against the allow-listed same-repository App comment implementation, unit tests, and Z3 safety model for Version 1.1.1. Evidence is recorded in `security-architecture-spec-validation.md` §7b; this targeted revalidation does not replace the full validation pass required by the revalidation policy. The previous RS-05a branch-event revalidation was completed on 2026-10-01.
 
 *This specification is provided under the MIT License.*

@@ -80,7 +80,7 @@ func renderMCPToolTable(info *parser.MCPServerInfo, opts MCPToolTableOptions) st
 	}
 
 	// Render the table
-	table := console.RenderTable(console.TableConfig{
+	table := console.RenderTableStdout(console.TableConfig{
 		Headers: headers,
 		Rows:    rows,
 	})

@@ -6,7 +6,8 @@ const { collectUnifiedSession, parseEngineSession } = require("./unified_session
 const { serializeSessionArtifact } = require("./session_artifact.cjs");
 const { generateCopilotCliStyleSummary } = require("./log_parser_shared.cjs");
 const { validateSessionFileHeader } = require("./unified_session_render.cjs");
-const { normalizeEngineLogEntries, parseBehaviorLog } = require("./engine_log_parser.cjs");
+const { normalizeEngineLogEntries, normalizeEngineSessionEvents, parseBehaviorLog } = require("./engine_log_parser.cjs");
+const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 
 class UnrecognizedSessionError extends Error {
   constructor() {
@@ -42,8 +43,9 @@ function sessionCLI(args) {
     if (!events.some(event => event.provenance?.component === "agent" || event.type === "agent.execution")) throw new UnrecognizedSessionError();
     return serializeSessionArtifact(events, maskedValues);
   }
-  if (mode === "markdown") {
-    const events = readSessionInput(inputPath)
+  if (mode === "markdown" || mode === "normalize") {
+    const content = readSessionInput(inputPath);
+    const events = content
       .split(/\r?\n/)
       .filter(line => line.trim())
       .map((line, index) => {
@@ -57,6 +59,11 @@ function sessionCLI(args) {
         return event;
       });
     validateSessionFileHeader(events);
+    if (mode === "normalize") {
+      const normalized = normalizeEngineSessionEvents(events, engine ?? "custom", event => ({ ...normalizeUnifiedSessionEvent(event), provenance: event.provenance }));
+      if (normalized === events) return content;
+      return serializeSessionArtifact(normalized);
+    }
     return generateCopilotCliStyleSummary(events) + "\n";
   }
   if (mode === "agent-markdown") {

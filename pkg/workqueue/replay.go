@@ -184,6 +184,14 @@ func (state *Projection) replayCommit(commit QueueCommit, ordinal int, epochs, g
 		return err
 	}
 	hasAdmission := false
+	if commit.Request.Kind == "dispatch_next" {
+		var parameters DispatchParameters
+		if err := json.Unmarshal(commit.Request.Parameters, &parameters); err != nil {
+			return err
+		}
+		state.SchedulingProfiles = parameters.WorkerProfiles
+		defer func() { state.SchedulingProfiles = nil }()
+	}
 	hasObservations := false
 	firstClaim := -1
 	for index, operation := range commit.Operations {
@@ -232,20 +240,12 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	switch kind {
 	case "Policy":
 		return state.installReplayPolicy(operation, commit, isPolicy, epochs)
+	case "Deployment":
+		return state.applyDeployment(operation)
 	case "Control":
 		return state.applyReplayControl(operation, generations)
 	case "Work":
-		var node WorkDefinition
-		if err := json.Unmarshal(operation, &node); err != nil {
-			return err
-		}
-		if err := state.admitWork(node, commit, position); err != nil {
-			return err
-		}
-		if _, exists := state.WorkCreators[node.WorkID]; !exists {
-			state.WorkCreators[node.WorkID] = commit.Actor
-		}
-		return nil
+		return state.admitReplayWork(operation, commit, position)
 	case "Observation":
 		var observation Observation
 		if err := json.Unmarshal(operation, &observation); err != nil {
@@ -269,6 +269,20 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	default:
 		return queueError("unsupported_protocol", "unknown operation")
 	}
+}
+
+func (state *Projection) admitReplayWork(operation Operation, commit QueueCommit, position Position) error {
+	var node WorkDefinition
+	if err := json.Unmarshal(operation, &node); err != nil {
+		return err
+	}
+	if err := state.admitWork(node, commit, position); err != nil {
+		return err
+	}
+	if _, exists := state.WorkCreators[node.WorkID]; !exists {
+		state.WorkCreators[node.WorkID] = commit.Actor
+	}
+	return nil
 }
 
 func (state *Projection) replayCancellation(operation Operation, kind string, commit QueueCommit) error {
@@ -324,8 +338,18 @@ func (state *Projection) installReplayPolicy(op Operation, commit QueueCommit, i
 	if err := validatePolicy(operation.Policy); err != nil {
 		return err
 	}
+	if operation.Policy.Authorization == "aw" {
+		for _, pool := range operation.Policy.Pools {
+			for _, profile := range pool.Profiles {
+				if profile.EffectScope != commit.Actor.Repository {
+					return queueError("policy_invalid", "AW-managed effect scope must be the queue repository")
+				}
+			}
+		}
+	}
 	epochs.add(operation.Epoch)
 	state.Policy, state.PolicyEpoch = &operation.Policy, operation.Epoch
+	state.initializeDeployments()
 	state.Clocks = map[string]PoolClocks{}
 	state.ObservationWrites = map[string]int{}
 	return nil

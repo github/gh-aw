@@ -4,6 +4,9 @@ const { detectErrors, buildOutputLines, isCAPIServerError } = require("./agent_e
 const { detectNonRetryableHarnessGuard, isAuthenticationFailedError } = require("./harness_error_patterns.cjs");
 const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { sessionContext } = require("./agent_session.cjs");
+const { stripVTControlCharacters } = require("node:util");
+const { applyAddMaskRedaction, collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 
 /** @typedef {import("./types/agent_session").AgentExecutionData} AgentExecutionData */
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
@@ -47,8 +50,11 @@ function isAgentExecutionEvent(event) {
  */
 function recordErrors(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return [];
+  const { agentId, parentToolUseId } = sessionContext(record);
+  const parentToolCallId = record.data?.parentToolCallId !== undefined ? record.data.parentToolCallId : record.parentToolCallId;
+  if (agentId || parentToolUseId || (typeof parentToolCallId === "string" && parentToolCallId.length > 0)) return [];
   const data = record.data ?? record;
-  if (record.type === "error" && ["warning", "info"].includes(data.severity)) return [];
+  if (["error", "session.error"].includes(record.type) && ["warning", "info"].includes(data.severity)) return [];
   if (["session.error", "claude.assistant_error", "claude.api_retry", "error", "turn.failed"].includes(record.type)) return [data];
   if (record.type === "session.result") return [...(Array.isArray(data.errors) ? data.errors : []), ...(data.is_error === true || data.status === "failed" ? [data] : [])];
   if (record.type === "assistant" && record.is_api_error_message === true) return [record];
@@ -76,14 +82,69 @@ function isAgentDiagnosticLine(line) {
  * Plain transcript blocks are not diagnostics, even if their text starts with
  * an error signature. A source-prefixed runtime line restores attribution.
  * @param {string} content
+ * @param {SessionEvent[]} [events]
+ * @param {string} [rawSourceEngine] Required attribution for raw structured errors.
  * @returns {{diagnostics: string[], errors: any[]}}
  */
-function collectAgentErrorEvidence(content) {
+function collectAgentErrorEvidence(content, events = [], rawSourceEngine) {
   const diagnostics = [];
   const errors = [];
+  let conversationEvents = events;
+  if (!events.length && content.includes("[deepseek-harness]")) {
+    // Load lazily: the native parser also uses execution collection for failures.
+    const { isDeepSeekLog, parseDeepSeekLog } = require("./parse_deepseek_log.cjs");
+    if (isDeepSeekLog(content)) conversationEvents = parseDeepSeekLog(content).logEntries;
+  }
+  const maskedValues = collectAddMaskedValues(content);
+  /** @param {string} value */
+  const conversationKey = value => applyAddMaskRedaction(stripVTControlCharacters(value), maskedValues).trim();
+  /** @param {unknown} value */
+  const conversationDocumentKey = value =>
+    JSON.stringify(value, (_, item) => {
+      if (typeof item === "string") return applyAddMaskRedaction(stripVTControlCharacters(item), maskedValues);
+      if (item && typeof item === "object" && !Array.isArray(item))
+        return Object.fromEntries(
+          Object.keys(item)
+            .sort()
+            .map(key => [key, item[key]])
+        );
+      return item;
+    });
+  const conversationLines = new Set();
+  const conversationTexts = new Set();
+  const conversationDocuments = new Set();
+  /** @param {unknown} value @returns {void} */
+  const attributeConversationValue = value => {
+    if (typeof value === "string") {
+      conversationTexts.add(conversationKey(value));
+      for (const line of value.split(/\r?\n/)) conversationLines.add(conversationKey(line));
+    } else if (value && typeof value === "object") {
+      conversationDocuments.add(conversationDocumentKey(value));
+      for (const item of Object.values(value)) attributeConversationValue(item);
+    }
+  };
+  for (const event of conversationEvents) {
+    if (["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message"].includes(event?.type)) attributeConversationValue(event.data?.content);
+    else if (["tool.execution_complete", "tool.execution_update"].includes(event?.type)) {
+      for (const field of ["output", "result", "error"]) attributeConversationValue(event.data?.[field]);
+    }
+  }
+  if (conversationTexts.has(conversationKey(content))) return { diagnostics, errors };
+  /** @param {unknown} record */
+  const recordEvidence = record => {
+    if (rawSourceEngine !== undefined) {
+      if (!record || typeof record !== "object" || !("data" in record)) return [];
+      const data = record.data;
+      if (!data || typeof data !== "object" || !("sourceEngine" in data) || data.sourceEngine !== rawSourceEngine) return [];
+    }
+    const evidence = recordErrors(record);
+    return evidence.length && conversationDocuments.size && conversationDocuments.has(conversationDocumentKey(record)) ? [] : evidence;
+  };
   try {
     const document = JSON.parse(content);
-    for (const value of Array.isArray(document) ? document : [document]) errors.push(...recordErrors(value));
+    const evidence = (Array.isArray(document) ? document : [document]).flatMap(recordEvidence);
+    if (evidence.length && Array.isArray(document) && conversationDocuments.has(conversationDocumentKey(document))) return { diagnostics, errors };
+    errors.push(...evidence);
     return { diagnostics, errors };
   } catch {
     // Mixed stdio is parsed as individual records and attributed diagnostic lines.
@@ -102,6 +163,7 @@ function collectAgentErrorEvidence(content) {
       transcriptBlock = true;
       continue;
     }
+    if (conversationLines.has(conversationKey(line))) continue;
     let record;
     try {
       record = JSON.parse(line);
@@ -116,16 +178,25 @@ function collectAgentErrorEvidence(content) {
       continue;
     }
     if (!transcriptBlock) {
-      for (const value of Array.isArray(record) ? record : [record]) errors.push(...recordErrors(value));
+      const evidence = (Array.isArray(record) ? record : [record]).flatMap(recordEvidence);
+      if (evidence.length && Array.isArray(record) && conversationDocuments.has(conversationDocumentKey(record))) continue;
+      errors.push(...evidence);
     }
   }
   return { diagnostics, errors };
 }
 
-/** @param {string} content @returns {string} */
-function agentErrorDiagnosticText(content) {
-  const { diagnostics, errors } = collectAgentErrorEvidence(content);
-  return [...diagnostics, ...collectNativeErrorEvidence(errors).diagnostics].join("\n");
+/**
+ * @param {string} content
+ * @param {SessionEvent[] | string} [eventsOrSourceEngine]
+ * @param {string} [rawSourceEngine]
+ * @returns {string}
+ */
+function agentErrorDiagnosticText(content, eventsOrSourceEngine = [], rawSourceEngine) {
+  const events = Array.isArray(eventsOrSourceEngine) ? eventsOrSourceEngine : [];
+  const sourceEngine = typeof eventsOrSourceEngine === "string" ? eventsOrSourceEngine : rawSourceEngine;
+  const { diagnostics, errors } = collectAgentErrorEvidence(content, events, sourceEngine);
+  return [...diagnostics, ...collectNativeErrorEvidence([...events.flatMap(recordErrors), ...errors]).diagnostics].join("\n");
 }
 
 const ENGINE_ERROR_SUMMARIES = Object.freeze({
@@ -153,10 +224,14 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
 /**
  * Preserve actionable error classes without publishing raw log lines or payloads.
  * @param {string} content
+ * @param {SessionEvent[] | string} [eventsOrSourceEngine]
+ * @param {string} [rawSourceEngine]
  * @returns {string}
  */
-function agentErrorSummaryText(content) {
-  const execution = collectAgentExecution({ content });
+function agentErrorSummaryText(content, eventsOrSourceEngine = [], rawSourceEngine) {
+  const events = Array.isArray(eventsOrSourceEngine) ? eventsOrSourceEngine : [];
+  const sourceEngine = typeof eventsOrSourceEngine === "string" ? eventsOrSourceEngine : rawSourceEngine;
+  const execution = collectAgentExecution({ content, events, rawSourceEngine: sourceEngine });
   return (execution?.data.categories || [])
     .filter(category => Object.hasOwn(ENGINE_ERROR_SUMMARIES, category))
     .map(category => `Engine error: ${ENGINE_ERROR_SUMMARIES[category]} (${category})`)
@@ -185,7 +260,7 @@ function collectNativeErrorEvidence(errors) {
         continue;
       }
       if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-      for (const key of ["code", "error_code", "errorCode", "status", "error_status", "api_error_status"]) {
+      for (const key of ["code", "error_code", "errorCode", "statusCode", "status_code", "status", "error_status", "api_error_status"]) {
         const code = value[key];
         if (key === "status" && typeof code === "string" && !/^\d{3}$/.test(code)) continue;
         if ((typeof code === "string" && code.length > 0) || Number.isSafeInteger(code)) codes.add(code);
@@ -208,12 +283,12 @@ function collectNativeErrorEvidence(errors) {
 /**
  * One observation summarizes all attempts; it is not a claim of final failure.
  * Persisted detector categories are authoritative, including timeout-only evidence.
- * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[]}} [options]
+ * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[], rawSourceEngine?: string}} [options]
  * @returns {import("./types/agent_session").AgentExecutionEvent | undefined}
  */
-function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [] } = {}) {
+function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [], rawSourceEngine } = {}) {
   const categorySet = new Set(categories);
-  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content);
+  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content, events, rawSourceEngine);
   const errors = [...events.flatMap(recordErrors), ...rawErrors];
   const { diagnostics: nativeDiagnostics, codes, types } = collectNativeErrorEvidence(errors);
   let observedExit = exitCode;

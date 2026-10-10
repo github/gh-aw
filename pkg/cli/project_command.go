@@ -161,9 +161,9 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	if config.Repo != "" {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Linking project to repository %s...", config.Repo)))
 		if err := linkProjectToRepo(ctx, projectID, config.Repo, config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to link project to repository: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to link project to repository: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Project linked to repository"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Project linked to repository"))
 		}
 	}
 
@@ -182,30 +182,30 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	if config.WithProjectSetup {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating standard project views..."))
 		if err := createStandardViews(ctx, projectURL, config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create views: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create views: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created standard views"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created standard views"))
 		}
 
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating custom fields..."))
 		if err := createStandardFields(ctx, projectURL, projectNumber, config.Owner, config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create fields: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create fields: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created custom fields"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created custom fields"))
 		}
 	}
 
 	if config.WithProjectSetup {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Enhancing Status field..."))
 		if err := ensureStatusOption(ctx, projectURL, "Review Required", config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update Status field: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update Status field: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Added 'Review Required' status option"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added 'Review Required' status option"))
 		}
 	}
 
 	// Output success
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Created project #%v: %s", project["number"], config.Title)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Created project #%v: %s", project["number"], config.Title)))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("  URL: %s", project["url"])))
 
 	return nil

@@ -285,7 +285,7 @@ func TestStatusCommand_JSONOutputIncludesOnField(t *testing.T) {
 	}
 }
 
-// TestWorkflowStatus_ConsoleRendering tests that WorkflowStatus uses console.RenderStruct correctly
+// TestWorkflowStatus_ConsoleRendering tests that WorkflowStatus uses console.RenderStructStdout correctly
 func TestWorkflowStatus_ConsoleRendering(t *testing.T) {
 	t.Parallel()
 	// Create test data
@@ -310,8 +310,8 @@ func TestWorkflowStatus_ConsoleRendering(t *testing.T) {
 		},
 	}
 
-	// Render using console.RenderStruct
-	output := console.RenderStruct(statuses)
+	// Render using console.RenderStructStdout
+	output := console.RenderStructStdout(statuses)
 
 	// Verify the output contains table headers from console tags
 	expectedHeaders := []string{"workflow", "engine", "compiled"}
@@ -518,8 +518,8 @@ func TestWorkflowStatus_ConsoleRenderingWithRunStatus(t *testing.T) {
 		},
 	}
 
-	// Render using console.RenderStruct
-	output := console.RenderStruct(statuses)
+	// Render using console.RenderStructStdout
+	output := console.RenderStructStdout(statuses)
 
 	// Verify the output contains run status headers
 	expectedHeaders := []string{"workflow", "engine", "compiled", "status", "conclusion"}

@@ -41,6 +41,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Networking | `ToolCall`, `egress`, `NetworkPolicy` | Authorized GitHub/inference services, blocked destinations, and service-bound engine authentication. |
 | Git | `checkouts`, `cleanup`, `agentBegan`, `privilegedCheckout`, `operations`, `errors` | Per-repository auth, temporary setup credentials, verified cleanup/failure, available blobs/refs, sparse/shallow state, local operations, REST, and privileged push. |
 | `pull_request_target` checkout policy | [`PullRequestTargetCheckout.tla`](PullRequestTargetCheckout.tla) | Strict warning acknowledgment, explicit checkout disablement, trusted base checkout, exact allowlisted external checkout, and fail-closed `fetch` handling. |
+| Comment-triggered PR checkout | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Allow-listed Bot sender and exact comment-author identity, canonical App slug/bot actor equivalence, and same-repository head/base boundaries. |
 
 The `issue` effect creates at most one validated issue in the main public
 repository. The `pull-request` effect prepares a full checkout in the privileged
@@ -99,6 +100,32 @@ control, copy the `.cfg` to a temporary file, set `Fault` to
 confirm TLC reports `NoUntrustedCheckoutAcceptance`. This model specifies the
 compiler decision boundary; it does not model Git's parser or prove safety of
 the contents at an otherwise trusted mutable ref.
+
+## Comment-triggered pull request checkout
+
+[`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) exhaustively
+models `issue_comment` and `pull_request_review_comment` checkout authorization.
+The allow-listed App exception requires a Bot sender, exact equality between the
+webhook sender and comment author, canonical equality between the runtime actor
+and sender, and matching workflow, PR-head, and PR-base repository identities.
+Every other case retains the write-or-higher collaborator permission check.
+The finite model includes App slug and `[bot]` spellings, non-Bot actors, missing
+or mismatched repository identities, non-comment triggers, and a `Fault` control
+for bypassing each authorization guard. Runtime conformance vectors live in
+[`checkout_pr_branch.test.cjs`](../../actions/setup/js/checkout_pr_branch.test.cjs).
+
+Run the model with the same pinned TLA+ Tools installation:
+
+```bash
+java -cp /path/to/tla2tools.jar tlc2.TLC \
+  -config specs/workflow-security/CommentTriggeredPRCheckout.cfg \
+  specs/workflow-security/CommentTriggeredPRCheckout.tla
+```
+
+For each negative control, copy the `.cfg` to a temporary file, set `Fault` to
+one of `"event-bypass"`, `"sender-type-bypass"`, `"author-bypass"`,
+`"actor-bypass"`, `"allowlist-bypass"`, or `"repository-bypass"`, and confirm
+TLC reports `NoUnauthorizedBotBypass`.
 
 | Predicate | Required safety condition | Architecture / threat rule | Compiler/runtime evidence |
 |---|---|---|---|

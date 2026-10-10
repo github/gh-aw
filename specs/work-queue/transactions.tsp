@@ -104,6 +104,8 @@ model WorkOperation {
   @maxLength(128)
   fairness_key: string;
   worker_profile: Identity;
+  logical_contract?: Digest;
+  execution_ref?: Revision;
   batch_trust_domain: Identity;
   // All nested values also obey the native canonical wire profile, including numeric token restrictions.
   payload: Record<unknown>;
@@ -117,9 +119,10 @@ model WorkOperation {
 
 @jsonSchema
 model WorkerProfile {
+  logical_contract?: Digest;
   workflow: Identity;
   ref: Revision;
-  principal: Identity;
+  principal?: Identity;
   trust_domain: Identity;
   credential_scope: Identity;
   effect_scope: Identity;
@@ -189,6 +192,7 @@ model Limits {
 }
 @jsonSchema
 model QueuePolicy {
+  authorization?: "aw";
   mode: "weighted-priority" | "strict-priority";
   @minItems(5)
   @maxItems(5)
@@ -219,6 +223,18 @@ model ControlOperation {
   kind: "Control";
   control: "admission_paused" | "grants_paused" | "credential_generation";
   value: boolean | Identity;
+  reason: ReasonCode;
+}
+@jsonSchema
+model DeploymentOperation {
+  kind: "Deployment";
+  pool: Identity;
+  worker_profile: Identity;
+  expected_ref: Revision;
+  expected_contract: Digest;
+  profile: WorkerProfile;
+  available: boolean;
+  activate?: boolean;
   reason: ReasonCode;
 }
 @jsonSchema
@@ -275,6 +291,7 @@ model DispatchOperation {
   dispatch_id: Identity;
   state: "started" | "bound" | "rejected" | "uncertain" | "unresolved";
   sender?: Actor;
+  credential_principal?: Decimal;
   run?: RunBinding;
   evidence?: Evidence;
   reason?: ReasonCode;
@@ -372,7 +389,7 @@ model IssueCommentOperation {
 }
 @jsonSchema
 union QueueOperation {
-  PolicyOperation, ControlOperation, WorkOperation, ClaimOperation,
+  PolicyOperation, DeploymentOperation, ControlOperation, WorkOperation, ClaimOperation,
   CompletionOperation, ResultOperation, DeliveryFailureOperation,
   ObservationOperation, ClaimCancellationOperation, WorkCancellationOperation,
   DispatchOperation, ReleaseOperation, WorkPriorityOperation, CheckpointOperation,
@@ -394,6 +411,9 @@ model SubmitParameters {
 }
 @jsonSchema
 model DispatchNextParameters {
+  @maxItems(256)
+  @extension("uniqueItems", true)
+  worker_profiles?: Identity[];
   pool: Identity;
   max_claims: CountBound;
   max_dispatches: CountBound;
@@ -418,7 +438,7 @@ union RequestParameters {
 @jsonSchema
 model QueueRequest {
   id: Identity;
-  kind: "policy" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim" | "checkpoint" | "issue_link";
+  kind: "policy" | "deployment" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim" | "checkpoint" | "issue_link";
   parameters: RequestParameters;
   fingerprint: Digest;
 }
