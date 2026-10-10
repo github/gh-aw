@@ -190,7 +190,14 @@ async function pushRepoMemoryChangesWithRetry({
     core.info(`Pushing changes to ${branchName} (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
     // A typed ledger must revalidate the merged history after a concurrent
     // writer moves the branch; validation errors must not enter the retry loop.
-    if (validateBeforePush) validateBeforePush();
+    if (validateBeforePush) {
+      try {
+        validateBeforePush();
+      } catch (error) {
+        await setPushRepoMemoryFailure(`ERR_VALIDATION: Repo-memory candidate validation failed before push: ${getErrorMessage(error)}`);
+        return false;
+      }
+    }
     try {
       await pushSignedCommitsFn({
         githubClient,
@@ -357,6 +364,9 @@ async function main() {
   const fileGlobFilter = process.env.FILE_GLOB_FILTER || "";
   const formatJSON = process.env.FORMAT_JSON === "true";
   const validationScriptBase64 = process.env.VALIDATION_SCRIPT_B64 || "";
+  const validationScriptRequired = process.env.VALIDATION_SCRIPT_REQUIRED === "true";
+  const jsonSchemasRequired = process.env.MEMORY_JSON_SCHEMAS_REQUIRED === "true";
+  let jsonSchemas;
   const validationTimeoutSeconds = Number(process.env.VALIDATION_TIMEOUT_SECONDS || "60");
   /** @type {{normalized: string[], saving: {changedFiles: number, patchBytes: number, pushed: boolean}}} */
   const ledgerActivity = {
@@ -400,6 +410,22 @@ async function main() {
       await setPushRepoMemoryFailure(`Failed to parse ALLOWED_EXTENSIONS environment variable: ${getErrorMessage(error)}. Expected JSON array format.`);
       return;
     }
+  }
+
+  try {
+    if (process.env.MEMORY_JSON_SCHEMAS_B64) {
+      const encoded = process.env.MEMORY_JSON_SCHEMAS_B64;
+      const decoded = Buffer.from(encoded, "base64");
+      if (decoded.toString("base64") !== encoded) throw new TypeError("MEMORY_JSON_SCHEMAS_B64 is not valid base64");
+      jsonSchemas = JSON.parse(decoded.toString("utf8"));
+      if (!Array.isArray(jsonSchemas) || jsonSchemas.length === 0) throw new TypeError("json-schemas must be a non-empty array");
+    } else if (jsonSchemasRequired) {
+      throw new TypeError("MEMORY_JSON_SCHEMAS_B64 is missing");
+    }
+    if (validationScriptRequired && !validationScriptBase64) throw new TypeError("VALIDATION_SCRIPT_B64 is missing");
+  } catch (error) {
+    await setPushRepoMemoryFailure(`Memory validation configuration is invalid: ${getErrorMessage(error)}`);
+    return;
   }
 
   const ghToken = process.env.GH_TOKEN;
@@ -502,6 +528,10 @@ async function main() {
 
   // Check if artifact memory directory exists
   if (!fs.existsSync(sourceMemoryPath)) {
+    if (jsonSchemasRequired) {
+      await setPushRepoMemoryFailure(`ERR_VALIDATION: Repo-memory '${memoryId}' is missing the required schema file(s) in its artifact.`);
+      return;
+    }
     core.info(`Memory directory not found in artifact: ${sourceMemoryPath}`);
     return;
   }
@@ -800,10 +830,12 @@ async function main() {
     }
   }
 
-  if (validationScriptBase64) {
-    core.info("Running custom repo-memory validation before commit...");
+  if (validationScriptBase64 || jsonSchemas) {
+    core.info("Running repo-memory validation before commit...");
     const customValidation = runCustomMemoryValidation({
       scriptBase64: validationScriptBase64,
+      jsonSchemas,
+      requireJSONSchemas: jsonSchemasRequired,
       memoryDir: destMemoryPath,
       memoryId,
       kind: "repo",
@@ -813,7 +845,7 @@ async function main() {
     if (!customValidation.ok) {
       const reason = customValidation.timedOut ? `timed out after ${validationTimeoutSeconds} second(s)` : `exited with code ${customValidation.exitCode}`;
       const failureDetail = getCustomValidationFailureDetail(customValidation);
-      const errorMessage = `Custom repo-memory validation failed for '${memoryId}': ${reason}${failureDetail ? `:\n${failureDetail}` : "."}`;
+      const errorMessage = `Repo-memory validation failed for '${memoryId}': ${reason}${failureDetail ? `:\n${failureDetail}` : "."}`;
       if (customValidation.stdout) {
         core.info(`Custom repo-memory validation stdout:\n${redactFailureSummary(customValidation.stdout)}`);
       }
@@ -831,7 +863,7 @@ async function main() {
     if (customValidation.stderr) {
       core.info(`Custom repo-memory validation stderr:\n${redactFailureSummary(customValidation.stderr)}`);
     }
-    core.info("Custom repo-memory validation passed.");
+    core.info("Repo-memory validation passed.");
   }
 
   // Build literal pathspecs from the relative paths of files to copy.
@@ -969,6 +1001,26 @@ async function main() {
     workspaceDir,
     ghToken,
     serverHost,
+    validateBeforePush:
+      validationScriptBase64 || jsonSchemas
+        ? () => {
+            const validation = runCustomMemoryValidation({
+              scriptBase64: validationScriptBase64,
+              jsonSchemas,
+              requireJSONSchemas: jsonSchemasRequired,
+              memoryDir: destMemoryPath,
+              memoryId,
+              kind: "repo",
+              timeoutSeconds: validationTimeoutSeconds,
+              isEligibleFile,
+            });
+            if (!validation.ok) {
+              throw new Error(
+                `${validation.timedOut ? `timed out after ${validationTimeoutSeconds} second(s)` : `exited with code ${validation.exitCode}`}${getCustomValidationFailureDetail(validation) ? `: ${getCustomValidationFailureDetail(validation)}` : ""}`
+              );
+            }
+          }
+        : undefined,
   });
   await writeLedgerSummary();
 }

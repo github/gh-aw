@@ -297,6 +297,9 @@ func applyAwInfoModelRouting(routing *ModelRoutingSummary, runDir string) *Model
 		return routing
 	}
 	awInfoPath := findAwInfoPath(runDir)
+	if filepath.Clean(awInfoPath) == filepath.Join(runDir, "agent", "aw_info.json") {
+		return routing
+	}
 	awInfo, err := parseAwInfo(awInfoPath, false)
 	if err != nil {
 		return routing

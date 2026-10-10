@@ -183,6 +183,8 @@ For workflows that build, test, or install packages, add the matching ecosystem 
 
 > ⚠️ **`network: defaults` alone is never sufficient for code workflows** — `defaults` covers basic infrastructure (CAs, Ubuntu verification) but not package registries. Always add the language ecosystem.
 
+For artifact-first workflows, include `github-actions` when downloading Actions artifacts. If a missing artifact triggers recomputation, also infer the ecosystem from the manifests needed by the fallback build or tests and allow it alongside `defaults`. Artifact storage and package-registry access are separate needs.
+
 ## Common Patterns
 
 Reads GitHub data only:

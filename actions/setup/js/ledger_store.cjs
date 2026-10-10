@@ -5,6 +5,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { TextDecoder } = require("node:util");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
+const { validateSchemaContract } = require("./memory_schema_contract.cjs");
 
 const MAX_FILES = 1024;
 const MAX_SEGMENT_BYTES = 10 * 1024 * 1024;
@@ -84,33 +85,7 @@ function compileSchema(schemaPath) {
   } catch (error) {
     throw new TypeError("Ledger schema must be JSON", { cause: error });
   }
-  const allowed = new Set(["type", "enum", "required", "properties", "additionalProperties", "items", "oneOf", "anyOf"]);
-  const types = new Set(["object", "array", "string", "number", "integer", "boolean", "null"]);
-  function check(node, depth = 0) {
-    if (!node || typeof node !== "object" || Array.isArray(node) || depth > 32) throw new TypeError("Ledger schema must contain bounded objects");
-    if (("oneOf" in node || "anyOf" in node) && Object.keys(node).length !== 1) throw new TypeError("Ledger schema alternatives cannot combine with ignored constraints");
-    for (const [key, value] of Object.entries(node)) {
-      if (!allowed.has(key)) throw new TypeError("Unsupported ledger schema keyword");
-      if (key === "type") {
-        const entries = Array.isArray(value) ? value : [value];
-        if (!entries.length || !entries.every(type => types.has(type))) throw new TypeError("Invalid ledger schema type");
-      } else if (key === "enum") {
-        if (!Array.isArray(value) || !value.length || !value.every(item => item === null || ["string", "number", "boolean"].includes(typeof item))) throw new TypeError("Ledger schema enum supports only primitive JSON values");
-      } else if (key === "required") {
-        if (!Array.isArray(value) || !value.every(item => typeof item === "string")) throw new TypeError("Invalid ledger schema required fields");
-      } else if (key === "additionalProperties") {
-        if (value !== false) throw new TypeError("Only additionalProperties: false is supported");
-      } else if (key === "properties") {
-        if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Invalid ledger schema properties");
-        Object.values(value).forEach(child => check(child, depth + 1));
-      } else if (key === "items") check(value, depth + 1);
-      else if (key === "oneOf" || key === "anyOf") {
-        if (!Array.isArray(value) || value.length === 0) throw new TypeError("Invalid ledger schema alternatives");
-        value.forEach(child => check(child, depth + 1));
-      }
-    }
-  }
-  check(schema);
+  validateSchemaContract(schema);
   return value => validateValueAgainstSchema(value, schema) === null;
 }
 

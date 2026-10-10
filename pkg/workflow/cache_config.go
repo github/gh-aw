@@ -152,6 +152,9 @@ func parseCacheMemoryEntry(cacheMap map[string]any, defaultID string) (CacheMemo
 	}
 	entry.Validation = validation
 	applyDefaultAllowedExtensions(&entry)
+	if err := validateMemorySchemaTargets(entry.Validation, entry.AllowedExtensions, nil, "tools.cache-memory.validation"); err != nil {
+		return entry, err
+	}
 	cacheLog.Printf("Parsed cache-memory entry: id=%s, scope=%s, restore-only=%v, retention-days=%v", entry.ID, entry.Scope, entry.RestoreOnly, entry.RetentionDays)
 	return entry, nil
 }
