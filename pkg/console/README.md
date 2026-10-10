@@ -132,6 +132,9 @@ Intentional stdout output must use the corresponding `*Stdout` variants, such as
 preserve the former stdout terminal/color behavior. `RenderStructWithOptions`
 keeps its explicit contract: `Stderr: true` selects stderr; false or omitted
 selects stdout. These functions return strings and do not redirect any writes.
+Scanner findings, pin-resolution callbacks and bootstrap TODO messages also use
+the diagnostic defaults; their higher-level regressions cover differing stdout
+and stderr terminal states, including `NO_COLOR`.
 `TableConfig.MaxWidth` wraps native table content without dropping values; when
 columns cannot fit, rendering falls back to labeled rows. Width limits are
 opt-in: experiment human reports use 80 columns, not a universal truncation

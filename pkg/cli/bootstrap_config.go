@@ -21,7 +21,7 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 
 	bootstrapLog.Printf("Printing bootstrap config TODO: package=%s, actions=%d", profile.PackageID, len(profile.Profile.Config))
 	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, console.FormatInfoMessageStdout("Post-installation steps from "+profile.PackageID+":"))
+	fmt.Fprintln(w, console.FormatInfoMessage("Post-installation steps from "+profile.PackageID+":"))
 
 	for _, action := range profile.Profile.Config {
 		switch action.Type {
@@ -63,7 +63,7 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 		case "commit-and-push":
 			fmt.Fprintf(w, "  ☐ Commit and push local changes — %s\n", action.Message)
 		case "handoff":
-			fmt.Fprintln(w, console.FormatInfoMessageStdout(action.Message))
+			fmt.Fprintln(w, console.FormatInfoMessage(action.Message))
 		}
 	}
 

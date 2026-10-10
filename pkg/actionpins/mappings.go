@@ -29,7 +29,7 @@ func applyActionPinPrefix(repo, pinnedRef string, ctx *PinContext) string {
 		return pinnedRef
 	}
 	mappedRepo := ctx.PrefixMappings[longest] + strings.TrimPrefix(repo, longest)
-	ctx.emitOnce("prefix:"+repo, fmt.Sprintf("Action pin mapping applied: %s → %s", repo, mappedRepo), console.FormatInfoMessageStdout)
+	ctx.emitOnce("prefix:"+repo, fmt.Sprintf("Action pin mapping applied: %s → %s", repo, mappedRepo), console.FormatInfoMessage)
 	return mappedRepo + "@" + suffix
 }
 
@@ -67,7 +67,7 @@ func applyActionPinMapping(actionRepo, version string, ctx *PinContext) (string,
 	notifyKey := "map:" + cacheKey
 	msg := fmt.Sprintf("Action pin mapping applied: %s → %s", cacheKey, mapped)
 	actionPinsLog.Printf("%s", msg)
-	ctx.emitOnce(notifyKey, msg, console.FormatInfoMessageStdout)
+	ctx.emitOnce(notifyKey, msg, console.FormatInfoMessage)
 
 	return mappedRepo, mappedVersion
 }
@@ -90,7 +90,7 @@ func ApplyContainerPinMapping(image string, ctx *PinContext) string {
 	if !containerDigestPinPattern.MatchString(mapped) {
 		ctx.emitOnce("container-invalid:"+image,
 			fmt.Sprintf("container_pins: invalid replacement value %q for key %q (must use @sha256:<64 lowercase hex characters>); mapping skipped", mapped, image),
-			console.FormatWarningMessageStdout)
+			console.FormatWarningMessage)
 		return image
 	}
 
@@ -98,7 +98,7 @@ func ApplyContainerPinMapping(image string, ctx *PinContext) string {
 	notifyKey := "container-map:" + image
 	msg := fmt.Sprintf("Container pin mapping applied: %s → %s", image, mapped)
 	actionPinsLog.Printf("%s", msg)
-	ctx.emitOnce(notifyKey, msg, console.FormatInfoMessageStdout)
+	ctx.emitOnce(notifyKey, msg, console.FormatInfoMessage)
 
 	return mapped
 }
