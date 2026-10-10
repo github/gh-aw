@@ -23,7 +23,10 @@ const STATE_PUSH_JOB_IDS = new Set(["push_ledger_changes", "push_repo_memory", "
 async function getStatePushError(jobId) {
   try {
     const response = await github.rest.actions.downloadJobLogsForWorkflowRun({ ...context.repo, job_id: jobId });
-    const log = typeof response.data === "string" ? response.data : Buffer.from(response.data).toString("utf8");
+    if (typeof response.data !== "string" && !(response.data instanceof ArrayBuffer) && !(response.data instanceof Uint8Array)) {
+      throw new TypeError(`${SAFE_OUTPUT_E001}: Unsupported state-push job log response`);
+    }
+    const log = typeof response.data === "string" ? response.data : Buffer.from(response.data instanceof ArrayBuffer ? new Uint8Array(response.data) : response.data).toString("utf8");
     const errors = log.split(/\r?\n/).filter(line => /##\[error\]|fatal:|error:|remote: error:|!\s+\[rejected\]/i.test(line));
     const detail = redactBuiltInPatterns(errors.slice(-20).join("\n"))
       .content.replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")

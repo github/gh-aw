@@ -279,7 +279,7 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
     });
     if (result.exitCode !== 0) {
       const output = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
-      const secrets = [pushToken, process.env.GH_TOKEN, process.env.GITHUB_TOKEN, process.env.GITHUB_APP_TOKEN].filter(Boolean);
+      const secrets = [pushToken, process.env.GH_TOKEN, process.env.GITHUB_TOKEN, process.env.GITHUB_APP_TOKEN].filter(secret => typeof secret === "string");
       const detail = redactBuiltInPatterns(redactSecrets(output, secrets).content)
         .content.replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")
         .replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
