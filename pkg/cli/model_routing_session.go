@@ -59,6 +59,7 @@ type sessionModelRoutingEvent struct {
 	Provenance struct {
 		Component string `json:"component"`
 		Phase     string `json:"phase"`
+		Path      string `json:"path"`
 	} `json:"provenance"`
 }
 
@@ -89,7 +90,7 @@ func readSessionModelRouting(runDir string) (*sessionModelRoutingAttribution, bo
 		if err != nil {
 			return nil, false, fmt.Errorf("%s: %w", relative, err)
 		}
-		found := attribution.WorkflowInfo != nil || attribution.Outcome != nil
+		found := attribution.WorkflowInfo != nil
 		return attribution, found, nil
 	}
 	return nil, false, nil
@@ -124,7 +125,10 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
-	case event.Type == "workflow.info" && event.Provenance.Component == "workflow":
+	case event.Type == "workflow.info" && event.Provenance.Component == "workflow" &&
+		(event.Provenance.Path == "aw_info.json" ||
+			event.Provenance.Path == "activation/aw_info.json" ||
+			event.Provenance.Path == "usage/aw_info.json"):
 		var info sessionWorkflowInfo
 		if err := json.Unmarshal(event.Data, &info); err != nil {
 			return fmt.Errorf("invalid workflow.info on line %d: %w", lineNumber, err)
@@ -158,40 +162,24 @@ func (attribution *sessionModelRoutingAttribution) modelRouting() *AwInfoModelRo
 		}
 		found = true
 	}
-	if outcome := attribution.Outcome; outcome != nil {
-		if outcome.Status != "" {
-			routing.Status = outcome.Status
-			found = true
-		}
-		if outcome.WireModel != "" {
-			routing.WireModel = outcome.WireModel
-			found = true
-		}
-		if outcome.EffectiveEndpoint != "" {
-			routing.Endpoint = outcome.EffectiveEndpoint
-			found = true
-		}
-		if outcome.SelectedEndpoint != "" {
-			routing.SelectedEndpoint = outcome.SelectedEndpoint
-			found = true
-		}
-		if outcome.Effort != "" {
-			routing.Effort = outcome.Effort
-			found = true
-		}
-		if outcome.AppliedEffort != "" {
-			routing.AppliedEffort = outcome.AppliedEffort
-			found = true
-		}
-		if outcome.FailureCode != "" {
-			routing.FailureCode = outcome.FailureCode
-			found = true
-		}
-	}
 	if !found {
 		return nil
 	}
 	return &routing
+}
+
+func (attribution *sessionModelRoutingAttribution) outcomeDisagreesWith(routing *AwInfoModelRouting) bool {
+	if attribution == nil || attribution.Outcome == nil || routing == nil {
+		return false
+	}
+	outcome := attribution.Outcome
+	return (outcome.Status != "" && routing.Status != "" && outcome.Status != routing.Status) ||
+		(outcome.WireModel != "" && routing.WireModel != "" && outcome.WireModel != routing.WireModel) ||
+		(outcome.EffectiveEndpoint != "" && routing.Endpoint != "" && outcome.EffectiveEndpoint != routing.Endpoint) ||
+		(outcome.SelectedEndpoint != "" && routing.SelectedEndpoint != "" && outcome.SelectedEndpoint != routing.SelectedEndpoint) ||
+		(outcome.Effort != "" && routing.Effort != "" && outcome.Effort != routing.Effort) ||
+		(outcome.AppliedEffort != "" && routing.AppliedEffort != "" && outcome.AppliedEffort != routing.AppliedEffort) ||
+		(outcome.FailureCode != "" && routing.FailureCode != "" && outcome.FailureCode != routing.FailureCode)
 }
 
 func (attribution *sessionModelRoutingAttribution) awInfo() *AwInfo {
