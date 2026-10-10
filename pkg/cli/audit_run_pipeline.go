@@ -110,7 +110,7 @@ func resolveAuditOutputDir(outputDir string, runID int64) string {
 func ensureAuditNotCancelled(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 		return ctx.Err()
 	default:
 		return nil
@@ -122,21 +122,21 @@ func announceAuditRun(cfg auditRunConfig) {
 	if len(cfg.artifactFilter) > 0 {
 		auditLog.Printf("Artifact filter active: %v", cfg.artifactFilter)
 		if cfg.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Artifact filter: downloading only "+strings.Join(cfg.artifactFilter, ", ")))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(cfg.artifactFilter, ", ")))
 		}
 	}
 	if !cfg.verbose {
 		return
 	}
 	if cfg.jobID > 0 && cfg.stepNumber > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Auditing workflow run %d, job %d, step %d...", cfg.runID, cfg.jobID, cfg.stepNumber)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Auditing workflow run %d, job %d, step %d...", cfg.runID, cfg.jobID, cfg.stepNumber)))
 		return
 	}
 	if cfg.jobID > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Auditing workflow run %d, job %d...", cfg.runID, cfg.jobID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Auditing workflow run %d, job %d...", cfg.runID, cfg.jobID)))
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Auditing workflow run %d...", cfg.runID)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Auditing workflow run %d...", cfg.runID)))
 }
 
 func (cfg auditRunConfig) jobOptions() auditJobRunOptions {
@@ -185,7 +185,7 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 	}
 	auditLog.Printf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))
 	if cfg.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))))
 	}
 	if shouldSkipAuditRun(cfg.runID, cfg.outputDir, cfg.experimentFilter, cfg.variantFilter, cfg.runtimeFilter) {
 		return true, true, nil
@@ -290,7 +290,7 @@ func shouldSkipAuditRun(runID int64, runOutputDir, experimentFilter, variantFilt
 	if experimentFilter != "" {
 		expData := extractExperimentData(runOutputDir)
 		if !experimentMatchesFilter(expData, experimentFilter, variantFilter) {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(formatExperimentSkipMessage(runID, experimentFilter, variantFilter)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(formatExperimentSkipMessage(runID, experimentFilter, variantFilter)))
 			return true
 		}
 	}
@@ -302,7 +302,7 @@ func shouldSkipAuditRun(runID int64, runOutputDir, experimentFilter, variantFilt
 			if detectedRuntime == "" {
 				detectedRuntime = "unknown"
 			}
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d: runtime '%s' does not match filter '%s'", runID, detectedRuntime, runtimeFilter)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: runtime '%s' does not match filter '%s'", runID, detectedRuntime, runtimeFilter)))
 			return true
 		}
 	}
@@ -337,13 +337,13 @@ func fetchAuditRunWithCache(ctx context.Context, cfg auditRunConfig) (WorkflowRu
 			"GitHub API access denied and no local cache found.", cfg.runID, cfg.outputDir, err,
 		)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("GitHub API access denied, but found locally cached artifacts. Processing cached data..."))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage("GitHub API access denied, but found locally cached artifacts. Processing cached data..."))
 	return run, hasLocalCache, true, nil
 }
 
 func downloadAuditArtifactsIfNeeded(ctx context.Context, cfg auditRunConfig, run WorkflowRun, hasLocalCache bool) (bool, error) {
 	if cfg.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Run: %s (Status: %s, Conclusion: %s)", run.WorkflowName, run.Status, run.Conclusion)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run: %s (Status: %s, Conclusion: %s)", run.WorkflowName, run.Status, run.Conclusion)))
 	}
 	auditLog.Printf("Downloading artifacts for run %d", cfg.runID)
 	err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: cfg.runID, outputDir: cfg.outputDir, verbose: cfg.verbose, owner: cfg.owner, repo: cfg.repo, hostname: cfg.hostname, artifactFilter: cfg.artifactFilter, includeWorkQueue: cfg.includeWorkQueue})
@@ -352,13 +352,13 @@ func downloadAuditArtifactsIfNeeded(ctx context.Context, cfg auditRunConfig, run
 		if errors.Is(err, ErrNoArtifacts) {
 			auditLog.Printf("No artifacts found for run %d", cfg.runID)
 			if cfg.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No artifacts attached to this run. Proceeding with metadata-only audit."))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No artifacts attached to this run. Proceeding with metadata-only audit."))
 			}
 		}
 		return false, nil
 	}
 	if isPermissionError(err) && hasLocalCache {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Artifact download failed due to permissions, but found locally cached artifacts. Processing cached data..."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Artifact download failed due to permissions, but found locally cached artifacts. Processing cached data..."))
 		return true, nil
 	}
 	if isPermissionError(err) {
@@ -376,7 +376,7 @@ func downloadLegacyEvalsArtifactIfNeeded(ctx context.Context, cfg auditRunConfig
 	if err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: cfg.runID, outputDir: cfg.outputDir, verbose: cfg.verbose, owner: cfg.owner, repo: cfg.repo, hostname: cfg.hostname, artifactFilter: evalsArtifactFilter}); err != nil {
 		auditLog.Printf("Fallback evals artifact download failed for run %d: %v", cfg.runID, err)
 		if cfg.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Evals not found in usage artifact for run %d and fallback download failed: %v", cfg.runID, err)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Evals not found in usage artifact for run %d and fallback download failed: %v", cfg.runID, err)))
 		}
 		return
 	}
@@ -401,7 +401,7 @@ func prepareRunForAnalysis(run WorkflowRun, cfg auditRunConfig, useLocalCache bo
 			Status:       "unknown",
 			LogsPath:     cfg.outputDir,
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Using locally cached artifacts without metadata. Some report details may be unavailable."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Using locally cached artifacts without metadata. Some report details may be unavailable."))
 	}
 	run.LogsPath = cfg.outputDir
 	if !run.StartedAt.IsZero() && !run.UpdatedAt.IsZero() {
@@ -423,7 +423,7 @@ func shouldSkipForEvals(ctx context.Context, cfg auditRunConfig, run WorkflowRun
 	}
 	auditLog.Printf("Skipping run %d: no evals results found (filtered by --evals)", cfg.runID)
 	if cfg.verbose {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d: workflow does not have evals results (filtered by --evals)", cfg.runID)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: workflow does not have evals results (filtered by --evals)", cfg.runID)))
 	}
 	return true
 }

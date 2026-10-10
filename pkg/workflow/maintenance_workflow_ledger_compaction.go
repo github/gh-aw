@@ -45,7 +45,7 @@ func collectMaintenanceCompactionLedgers(workflowDataList []*WorkflowData) []Led
 				continue
 			}
 			if !reflect.DeepEqual(ledgerCompactionPayload(existing), ledgerCompactionPayload(ledger)) {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
 					"Ledger '%s' is configured differently in workflows '%s' and '%s'; Agentic Maintenance uses the compaction settings from '%s'.",
 					ledger.Name, owners[key], workflowData.WorkflowID, owners[key])))
 			}

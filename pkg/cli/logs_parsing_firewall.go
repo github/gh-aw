@@ -34,7 +34,7 @@ func parseFirewallLogs(runDir string, verbose bool) error {
 	if jsScript == "" {
 		logsParsingFirewallLog.Print("Failed to get firewall log parser script")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Failed to get firewall log parser script"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Failed to get firewall log parser script"))
 		}
 		return nil
 	}
@@ -50,13 +50,13 @@ func parseFirewallLogs(runDir string, verbose bool) error {
 		logsParsingFirewallLog.Print("No firewall logs found, skipping parsing")
 		// No firewall logs found - this is not an error, just skip parsing
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No firewall logs found in %s, skipping firewall log parsing", filepath.Base(runDir))))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No firewall logs found in %s, skipping firewall log parsing", filepath.Base(runDir))))
 		}
 		return nil
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found firewall logs in "+logsDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found firewall logs in "+logsDir))
 	}
 
 	// Create a temporary directory for running the parser

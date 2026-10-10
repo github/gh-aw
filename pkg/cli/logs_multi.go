@@ -263,7 +263,7 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	processedRuns, continuations, timeoutReached, countLimitReached, storageLimitReached, allErrors := mergeLogsTargetResults(results, initialErrors)
 	renderLogsCollectionStats(opts.collectionStats)
 	for _, err := range allErrors {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Skipping workflow target: "+err.Error()))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping workflow target: "+err.Error()))
 	}
 	if ctx.Err() != nil {
 		return context.Cause(ctx)
@@ -487,7 +487,7 @@ func mergeLogsTargetResults(
 				Repository:       targetResult.target.repoOverride,
 				ContinuationData: *targetResult.result.continuation,
 			})
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				"Partial results for workflow target "+targetResult.target.displayName()+"; continuation parameters were written to the report",
 			))
 		}

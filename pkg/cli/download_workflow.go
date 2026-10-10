@@ -24,7 +24,7 @@ var downloadLog = logger.New("cli:download_workflow")
 // downloadWorkflowContentViaGit downloads a workflow file using git archive
 func downloadWorkflowContentViaGit(ctx context.Context, repo, path, ref string, verbose bool) ([]byte, error) {
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Fetching %s/%s@%s via git", repo, path, ref)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Fetching %s/%s@%s via git", repo, path, ref)))
 	}
 
 	downloadLog.Printf("Attempting git fallback for downloading workflow content: %s/%s@%s", repo, path, ref)
@@ -64,7 +64,7 @@ func downloadWorkflowContentViaGit(ctx context.Context, repo, path, ref string, 
 	downloadLog.Printf("Extracted file from git archive: path=%s, size=%d bytes", path, len(content))
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Successfully fetched via git archive"))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Successfully fetched via git archive"))
 	}
 
 	return content, nil
@@ -84,7 +84,7 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 	path = filepath.ToSlash(cleanedPath)
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Fetching %s/%s@%s via git clone", repo, path, ref)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Fetching %s/%s@%s via git clone", repo, path, ref)))
 	}
 
 	downloadLog.Printf("Attempting git clone fallback for downloading workflow content: %s/%s@%s", repo, path, ref)
@@ -180,7 +180,7 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 	downloadLog.Printf("Read cloned file: path=%s, size=%d bytes", path, len(content))
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Successfully fetched via git sparse checkout"))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Successfully fetched via git sparse checkout"))
 	}
 
 	return content, nil
@@ -190,7 +190,7 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 func downloadWorkflowContent(ctx context.Context, repo, path, ref string, verbose bool) ([]byte, error) {
 	downloadLog.Printf("Downloading workflow content: %s/%s@%s", repo, path, ref)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Fetching %s/%s@%s", repo, path, ref)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Fetching %s/%s@%s", repo, path, ref)))
 	}
 
 	// Use gh CLI to download the file

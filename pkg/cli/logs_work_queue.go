@@ -352,7 +352,7 @@ func backfillWorkQueueReport(report **WorkQueueReport, runDir string) bool {
 	extracted, err := extractWorkQueueReport(runDir)
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to extract work queue report in %s: %v", runDir, err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		hadReport := *report != nil
 		*report = nil
 		return hadReport

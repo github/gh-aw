@@ -426,7 +426,7 @@ func handleMaintenanceDisabled(workflowDataList []*WorkflowData, workflowDir str
 			(workflowData.SafeOutputs.CreateIssues != nil && workflowData.SafeOutputs.CreateIssues.Expires > 0) ||
 			(workflowData.SafeOutputs.CreatePullRequests != nil && workflowData.SafeOutputs.CreatePullRequests.Expires > 0)
 		if usesExpires {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("Workflow '%s' uses the 'expires' field but maintenance is disabled in aw.json. "+
 					"Expiration will not run until maintenance is re-enabled.", workflowData.Name)))
 		}
@@ -434,7 +434,7 @@ func handleMaintenanceDisabled(workflowDataList []*WorkflowData, workflowDir str
 
 	// Ledger compaction is owned by maintenance; without it ledgers grow until they reach shard limits.
 	for _, ledger := range collectMaintenanceCompactionLedgers(workflowDataList) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 			fmt.Sprintf("Ledger '%s' has compaction enabled but maintenance is disabled in aw.json. "+
 				"Ledger compaction will not run until maintenance is re-enabled.", ledger.Name)))
 	}

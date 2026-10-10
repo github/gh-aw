@@ -50,7 +50,7 @@ func ListWorkflowMCP(workflowFile string, verbose bool) error {
 
 	mcpListLog.Printf("Found %d MCP servers in workflow", len(mcpConfigs))
 	if len(mcpConfigs) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No MCP servers found in workflow"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No MCP servers found in workflow"))
 		return nil
 	}
 
@@ -94,7 +94,7 @@ func ListWorkflowMCP(workflowFile string, verbose bool) error {
 			Headers: headers,
 			Rows:    rows,
 		}
-		fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
+		fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 	} else {
 		// Simple table for basic mode
 		headers := []string{"Server Name", "Status", "Tools Count", "Network Access"}
@@ -118,7 +118,7 @@ func ListWorkflowMCP(workflowFile string, verbose bool) error {
 			Headers: headers,
 			Rows:    rows,
 		}
-		fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
+		fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 	}
 
 	if !verbose {
@@ -160,7 +160,7 @@ func listWorkflowsWithMCPServers(workflowsDir string, verbose bool) error {
 	}
 
 	if len(workflowData) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflows with MCP servers found"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflows with MCP servers found"))
 		return nil
 	}
 
@@ -197,7 +197,7 @@ func listWorkflowsWithMCPServers(workflowsDir string, verbose bool) error {
 			Headers: headers,
 			Rows:    rows,
 		}
-		fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
+		fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 	} else {
 		// Simple table with just workflow names and counts
 		headers := []string{"Workflow", "Server Count"}
@@ -214,7 +214,7 @@ func listWorkflowsWithMCPServers(workflowsDir string, verbose bool) error {
 			Headers: headers,
 			Rows:    rows,
 		}
-		fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
+		fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 	}
 
 	if !verbose {

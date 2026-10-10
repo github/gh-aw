@@ -91,7 +91,7 @@ func analyzeRedactedDomains(runDir string, verbose bool) (*RedactedDomainsAnalys
 	if _, err := os.Stat(directPath); err == nil {
 		redactedDomainsLog.Printf("Found redacted-urls.log at direct path: %s", directPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found redacted-urls.log in run directory"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found redacted-urls.log in run directory"))
 		}
 		return parseRedactedDomainsLog(directPath, verbose)
 	}
@@ -101,7 +101,7 @@ func analyzeRedactedDomains(runDir string, verbose bool) (*RedactedDomainsAnalys
 	if _, err := os.Stat(agentOutputsPath); err == nil {
 		redactedDomainsLog.Printf("Found redacted-urls.log in agent_outputs: %s", agentOutputsPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found redacted-urls.log in agent_outputs directory"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found redacted-urls.log in agent_outputs directory"))
 		}
 		return parseRedactedDomainsLog(agentOutputsPath, verbose)
 	}
@@ -112,7 +112,7 @@ func analyzeRedactedDomains(runDir string, verbose bool) (*RedactedDomainsAnalys
 	if _, err := os.Stat(fullPath); err == nil {
 		redactedDomainsLog.Printf("Found redacted-urls.log at full path: %s", fullPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found redacted-urls.log at full artifact path"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found redacted-urls.log at full artifact path"))
 		}
 		return parseRedactedDomainsLog(fullPath, verbose)
 	}
@@ -133,13 +133,13 @@ func analyzeRedactedDomains(runDir string, verbose bool) (*RedactedDomainsAnalys
 		}
 		return nil
 	}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", runDir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", runDir, walkErr)))
 	}
 
 	if foundPath != "" {
 		redactedDomainsLog.Printf("Found redacted-urls.log via recursive search: %s", foundPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found redacted-urls.log at "+foundPath))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found redacted-urls.log at "+foundPath))
 		}
 		return parseRedactedDomainsLog(foundPath, verbose)
 	}
@@ -147,7 +147,7 @@ func analyzeRedactedDomains(runDir string, verbose bool) (*RedactedDomainsAnalys
 	// No redacted domains log found - this is not an error, just means no URLs were redacted
 	redactedDomainsLog.Print("No redacted-urls.log found")
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No redacted-urls.log found in "+runDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No redacted-urls.log found in "+runDir))
 	}
 	return nil, nil
 }

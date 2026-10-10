@@ -37,7 +37,7 @@ func RunWorkflowInteractively(ctx context.Context, opts RunWorkflowOptions) erro
 	}
 
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Starting interactive workflow run..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Starting interactive workflow run..."))
 	}
 
 	// Step 1: Find workflows with workflow_dispatch trigger
@@ -69,14 +69,14 @@ func RunWorkflowInteractively(ctx context.Context, opts RunWorkflowOptions) erro
 
 	// Step 5: Confirm execution
 	if !confirmExecution(ctx, selectedWorkflow, inputValues) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Workflow execution cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Workflow execution cancelled"))
 		return nil
 	}
 
 	// Step 6: Build command string for display
 	cmdStr := buildCommandString(selectedWorkflow.Name, inputValues, opts.RepoOverride, opts.RefOverride, opts.AutoMergePRs, opts.Push, opts.EngineOverride, opts.Approve)
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("\nRunning workflow..."))
-	fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr("Equivalent command: "+cmdStr))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("\nRunning workflow..."))
+	fmt.Fprintln(os.Stderr, console.FormatCommandMessage("Equivalent command: "+cmdStr))
 	fmt.Fprintln(os.Stderr, "")
 
 	// Step 7: Execute the workflow
@@ -98,10 +98,10 @@ func RunWorkflowInteractively(ctx context.Context, opts RunWorkflowOptions) erro
 
 	// Show success message with command to run again
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Workflow dispatched successfully!"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow dispatched successfully!"))
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("To run this workflow again, use:"))
-	fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr(cmdStr))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("To run this workflow again, use:"))
+	fmt.Fprintln(os.Stderr, console.FormatCommandMessage(cmdStr))
 
 	return nil
 }
@@ -232,10 +232,10 @@ func selectWorkflowNonInteractive(workflows []WorkflowOption) (*WorkflowOption, 
 // showWorkflowInfo displays information about the selected workflow
 func showWorkflowInfo(wf *WorkflowOption) {
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Workflow: "+wf.Name))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Workflow: "+wf.Name))
 
 	if len(wf.Inputs) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("\nWorkflow Inputs:"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("\nWorkflow Inputs:"))
 		for name, input := range wf.Inputs {
 			required := ""
 			if input.Required {
@@ -417,7 +417,7 @@ func RunSpecificWorkflowInteractively(ctx context.Context, opts RunWorkflowOptio
 
 	// Confirm execution (skip if no inputs were collected - user already confirmed they want to run)
 	if len(inputValues) > 0 && !confirmExecution(ctx, wf, inputValues) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Workflow execution cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Workflow execution cancelled"))
 		return nil
 	}
 

@@ -152,7 +152,7 @@ func parseAgentLogIfRequested(runID int64, runOutputDir string, verbose bool) {
 		engine := extractEngineFromAwInfo(awInfoPath, verbose)
 		if engine == nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No engine detected (aw_info.json missing or invalid); skipping agent log rendering"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No engine detected (aw_info.json missing or invalid); skipping agent log rendering"))
 			}
 			return
 		}
@@ -160,26 +160,26 @@ func parseAgentLogIfRequested(runID int64, runOutputDir string, verbose bool) {
 	}
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse agent log for run %d: %v", runID, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse agent log for run %d: %v", runID, err)))
 		}
 		return
 	}
 	logMdPath := filepath.Join(runOutputDir, "log.md")
 	if fileutil.FileExists(logMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Parsed log for run %d → %s", runID, logMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed log for run %d → %s", runID, logMdPath)))
 	}
 }
 
 func parseFirewallLogsIfRequested(runID int64, runOutputDir string, verbose bool) {
 	if err := parseFirewallLogs(runOutputDir, verbose); err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", runID, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", runID, err)))
 		}
 		return
 	}
 	firewallMdPath := filepath.Join(runOutputDir, "firewall.md")
 	if fileutil.FileExists(firewallMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Parsed firewall logs for run %d → %s", runID, firewallMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed firewall logs for run %d → %s", runID, firewallMdPath)))
 	}
 }
 
@@ -189,6 +189,6 @@ func renderAuditCompletion(runOutputDir string, jsonOutput bool) {
 	}
 	auditLog.Printf("Audit complete for %s", runOutputDir)
 	absOutputDir, _ := filepath.Abs(runOutputDir)
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Audit complete. Logs saved to "+absOutputDir))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Tip: use --artifacts to select specific artifact sets (agent, firewall, mcp, activation, detection, etc.)"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Audit complete. Logs saved to "+absOutputDir))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Tip: use --artifacts to select specific artifact sets (agent, firewall, mcp, activation, detection, etc.)"))
 }

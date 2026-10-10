@@ -81,7 +81,7 @@ func addResourceFileWithTracking(resolved *ResolvedWorkflow, tracker *FileTracke
 		return fmt.Errorf("failed to write resource file %q: %w", destFile, err)
 	}
 	if !opts.Quiet {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Added resource: "+filepath.ToSlash(rel)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added resource: "+filepath.ToSlash(rel)))
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func addActionWorkflowWithTracking(resolved *ResolvedWorkflow, tracker *FileTrac
 	addLog.Printf("Adding action workflow: dest=%s, content_size=%d bytes", destFile, len(resolved.Content))
 
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Adding action workflow: "+destFile))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Adding action workflow: "+destFile))
 	}
 
 	fileExists := false
@@ -102,13 +102,13 @@ func addActionWorkflowWithTracking(resolved *ResolvedWorkflow, tracker *FileTrac
 		fileExists = true
 		if !opts.Force {
 			if opts.FromWildcard {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Action workflow '%s' already exists. Skipping.", workflowName+".yml")))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Action workflow '%s' already exists. Skipping.", workflowName+".yml")))
 				return nil
 			}
 			return fmt.Errorf("action workflow '%s' already exists in %s. Use --force to overwrite", workflowName+".yml", githubWorkflowsDir)
 		}
 		if !opts.showInteractiveProgress() {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Overwriting existing file: "+destFile))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Overwriting existing file: "+destFile))
 		}
 	}
 
@@ -125,7 +125,7 @@ func addActionWorkflowWithTracking(resolved *ResolvedWorkflow, tracker *FileTrac
 	}
 
 	if !opts.Quiet {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Added action workflow: "+filepath.Base(destFile)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added action workflow: "+filepath.Base(destFile)))
 	}
 
 	return nil
@@ -159,7 +159,7 @@ func addSkillFileWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, 
 	addLog.Printf("Adding skill file: dest=%s, skill=%s, content_size=%d bytes", destFile, resolved.SkillName, len(resolved.Content))
 	if opts.Verbose {
 		skillDisplayDir := filepath.ToSlash(filepath.Join(engineSkillDir, resolved.SkillName))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Adding skill file to %s: %s", skillDisplayDir, relPath)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Adding skill file to %s: %s", skillDisplayDir, relPath)))
 	}
 
 	fileExists := false
@@ -167,11 +167,11 @@ func addSkillFileWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, 
 		fileExists = true
 		if !opts.Force {
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skill file '%s' already exists. Skipping.", destFile)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skill file '%s' already exists. Skipping.", destFile)))
 			}
 			return nil
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Overwriting existing skill file: "+destFile))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Overwriting existing skill file: "+destFile))
 	}
 	if tracker != nil {
 		if fileExists {
@@ -184,7 +184,7 @@ func addSkillFileWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, 
 		return fmt.Errorf("failed to write skill file '%s': %w", destFile, err)
 	}
 	if !opts.Quiet {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Added skill file: %s/%s/%s", engineSkillDir, resolved.SkillName, relPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Added skill file: %s/%s/%s", engineSkillDir, resolved.SkillName, relPath)))
 	}
 	return nil
 }
@@ -237,7 +237,7 @@ func addAgentFileWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, 
 	addLog.Printf("Adding agent file: dest=%s, content_size=%d bytes", destFile, len(resolved.Content))
 
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Adding agent file to %s: %s", engineAgentsDir, fileName)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Adding agent file to %s: %s", engineAgentsDir, fileName)))
 	}
 
 	fileExists := false
@@ -245,11 +245,11 @@ func addAgentFileWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, 
 		fileExists = true
 		if !opts.Force {
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Agent file '%s' already exists. Skipping.", destFile)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Agent file '%s' already exists. Skipping.", destFile)))
 			}
 			return nil
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Overwriting existing agent file: "+destFile))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Overwriting existing agent file: "+destFile))
 	}
 
 	if tracker != nil {
@@ -265,7 +265,7 @@ func addAgentFileWithTracking(resolved *ResolvedWorkflow, tracker *FileTracker, 
 	}
 
 	if !opts.Quiet {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Added agent file: %s/%s", engineAgentsDir, fileName)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Added agent file: %s/%s", engineAgentsDir, fileName)))
 	}
 
 	return nil
@@ -280,7 +280,7 @@ func printCompilationError(err error, quiet bool) {
 	var redirectErr *workflow.RedirectOnlyWorkflowError
 	if errors.As(err, &redirectErr) {
 		if !quiet {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(redirectErr.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(redirectErr.Error()))
 		}
 		return
 	}

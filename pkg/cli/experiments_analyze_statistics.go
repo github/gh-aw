@@ -813,9 +813,9 @@ func printExperimentRecommendation(a ExperimentAnalysis) {
 	fmt.Fprintln(os.Stderr)
 	switch a.Recommendation {
 	case "EXTEND":
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("  EXTEND — "+a.Rationale))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("  EXTEND — "+a.Rationale))
 	case "READY_FOR_ANALYSIS":
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("  READY FOR ANALYSIS — "+a.Rationale))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("  READY FOR ANALYSIS — "+a.Rationale))
 	default:
 		fmt.Fprintf(os.Stderr, "  %s — %s\n", a.Recommendation, a.Rationale)
 	}

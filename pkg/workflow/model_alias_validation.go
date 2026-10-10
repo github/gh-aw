@@ -230,7 +230,7 @@ func (c *Compiler) warnUnrecognizedModelParams(identifiers []string, markdownPat
 		for _, k := range UnrecognizedParams(p.Params) {
 			msg := fmt.Sprintf("models: unrecognised parameter key %q in %q — "+
 				"known parameters are: effort, temperature (V-MAF-011)", k, id)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				formatCompilerMessage(markdownPath, "warning", msg)))
 			c.IncrementWarningCount()
 		}

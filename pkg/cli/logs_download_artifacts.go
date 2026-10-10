@@ -108,7 +108,7 @@ func listRunArtifactNames(ctx context.Context, runID int64, owner, repo, hostnam
 
 	logsDownloadLog.Printf("Listing artifacts for run %d: gh %s", runID, strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Listing artifacts: gh "+strings.Join(args, " ")))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Listing artifacts: gh "+strings.Join(args, " ")))
 	}
 
 	cmd := workflow.ExecGHContext(ctx, args...)
@@ -152,7 +152,7 @@ func downloadArtifactsByName(ctx context.Context, opts downloadArtifactsOptions,
 
 		logsDownloadLog.Printf("Downloading artifact %q individually: gh %s", name, strings.Join(args, " "))
 		if shouldLogProgress {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Downloading artifact: "+name))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Downloading artifact: "+name))
 		}
 
 		cmd := workflow.ExecGHContext(ctx, args...)
@@ -161,7 +161,7 @@ func downloadArtifactsByName(ctx context.Context, opts downloadArtifactsOptions,
 			_ = os.RemoveAll(stagingDir)
 			logsDownloadLog.Printf("Failed to download artifact %q: %v (%s)", name, cmdErr, string(cmdOutput))
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to download artifact %q: %v", name, cmdErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to download artifact %q: %v", name, cmdErr)))
 			}
 			// Non-fatal: continue downloading other artifacts
 		} else {
@@ -237,7 +237,7 @@ func retryCriticalArtifact(ctx context.Context, opts downloadArtifactsOptions, r
 
 	logsDownloadLog.Printf("Retrying individual download for artifact %q: gh %s", name, strings.Join(retryArgs, " "))
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Retrying download for missing artifact: "+name))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Retrying download for missing artifact: "+name))
 	}
 
 	retryCmd := workflow.ExecGHContext(ctx, retryArgs...)
@@ -246,7 +246,7 @@ func retryCriticalArtifact(ctx context.Context, opts downloadArtifactsOptions, r
 		_ = os.RemoveAll(stagingDir)
 		logsDownloadLog.Printf("Failed to download artifact %q individually: %v (%s)", name, retryErr, string(retryOutput))
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not download artifact %q: %v", name, retryErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not download artifact %q: %v", name, retryErr)))
 		}
 		return
 	}
@@ -269,14 +269,14 @@ func retryCriticalArtifact(ctx context.Context, opts downloadArtifactsOptions, r
 		logsDownloadLog.Printf("Failed to mark artifact %q as downloaded: %v", name, err)
 	}
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Downloaded missing artifact: "+name))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Downloaded missing artifact: "+name))
 	}
 }
 
 // logVerboseDownloadSummary prints a success message and a shallow enumeration of the
 // files created under opts.outputDir. It is only invoked when verbose mode is enabled.
 func logVerboseDownloadSummary(opts downloadArtifactsOptions) {
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Downloaded artifacts for run %d to %s", opts.runID, opts.outputDir)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Downloaded artifacts for run %d to %s", opts.runID, opts.outputDir)))
 	// Enumerate created files (shallow + summary) for immediate visibility
 	var fileCount int
 	var firstFiles []string
@@ -299,21 +299,21 @@ func logVerboseDownloadSummary(opts downloadArtifactsOptions) {
 		}
 		return nil
 	}); walkErr != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error enumerating artifacts in %s: %v", opts.outputDir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error enumerating artifacts in %s: %v", opts.outputDir, walkErr)))
 	}
 	if fileCount == 0 {
 		if walkFailed {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Download completed but artifact files could not be enumerated (filesystem error)"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Download completed but artifact files could not be enumerated (filesystem error)"))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Download completed but no artifact files were created (empty run)"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Download completed but no artifact files were created (empty run)"))
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Artifact file count: %d", fileCount)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Artifact file count: %d", fileCount)))
 		for _, f := range firstFiles {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("  • "+f))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("  • "+f))
 		}
 		if fileCount > len(firstFiles) {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("  … %d more files omitted", fileCount-len(firstFiles))))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("  … %d more files omitted", fileCount-len(firstFiles))))
 		}
 	}
 }

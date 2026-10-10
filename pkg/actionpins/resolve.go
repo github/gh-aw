@@ -107,7 +107,7 @@ func handleUnresolvedActionPin(actionRepo, version, originalRepo, originalVersio
 	if ctx.Resolver != nil {
 		warningMsg += ": resolution failed"
 	}
-	ctx.emitOnce(cacheKey, warningMsg, console.FormatWarningMessage)
+	ctx.emitOnce(cacheKey, warningMsg, console.FormatWarningMessageStdout)
 	return "", nil
 }
 
@@ -222,7 +222,7 @@ func resolveNonStrictHardcodedPin(actionRepo, version string, matchingPins []Act
 	cacheKey := FormatCacheKey(actionRepo, version)
 	warningMsg := fmt.Sprintf("Unable to resolve %s@%s dynamically, using hardcoded pin for %s@%s",
 		actionRepo, version, actionRepo, selectedPin.Version)
-	ctx.emitOnce(cacheKey, warningMsg, console.FormatWarningMessage)
+	ctx.emitOnce(cacheKey, warningMsg, console.FormatWarningMessageStdout)
 
 	actionPinsLog.Printf("Using version in non-strict mode: %s@%s (requested) → %s@%s (used)",
 		actionRepo, version, actionRepo, selectedPin.Version)

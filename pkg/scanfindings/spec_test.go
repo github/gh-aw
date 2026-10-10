@@ -142,6 +142,6 @@ func TestSpec_PublicAPI_Render(t *testing.T) {
 	var buf bytes.Buffer
 	scanfindings.Render(&buf, findings)
 
-	expected := console.FormatError(findings[0].CompilerError())
+	expected := console.FormatErrorStdout(findings[0].CompilerError())
 	assert.Equal(t, expected, buf.String(), "rendered output should use the shared console format")
 }

@@ -121,7 +121,7 @@ func (e *ExpressionExtractor) processMatch(originalExpr, rawContent string) {
 
 	// Emit deprecation warning once per unique deprecated activation-output expression
 	if content != originalContent && strings.HasPrefix(content, "steps.sanitized.outputs.") {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 			fmt.Sprintf("Deprecated expression ${{ %s }}: use ${{ %s }} instead.", originalContent, content),
 		))
 	}

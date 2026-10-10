@@ -20,12 +20,12 @@ import (
 func fetchWorkflowRunMetadata(ctx context.Context, runID int64, owner, repo, hostname string, verbose bool) (WorkflowRun, error) {
 	args := buildWorkflowRunMetadataArgs(runID, owner, repo, hostname)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Executing: gh "+strings.Join(args, " ")))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Executing: gh "+strings.Join(args, " ")))
 	}
 	output, err := workflow.RunGHCombinedContext(ctx, "Fetching run metadata...", args...)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(string(output)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(string(output)))
 		}
 		return WorkflowRun{}, classifyWorkflowRunMetadataError(runID, err, output)
 	}

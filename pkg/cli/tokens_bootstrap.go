@@ -61,7 +61,7 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 		}
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Analyzing workflows in %s...", repoSlug)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Analyzing workflows in %s...", repoSlug)))
 
 	// Discover workflows in the repository
 	requirements, err := getSecretRequirements(engine)
@@ -76,7 +76,7 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 	if err != nil {
 		// If we can't check existing secrets (e.g., no gh auth), continue with empty map
 		tokensBootstrapLog.Printf("Could not check existing secrets: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Unable to check existing repository secrets. Will assume all secrets need to be configured."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Unable to check existing repository secrets. Will assume all secrets need to be configured."))
 		existingSecrets = make(map[string]struct {
 		})
 	}
@@ -89,7 +89,7 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 
 	if len(missing) == 0 {
 		tokensBootstrapLog.Print("All required secrets present")
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("All required secrets are configured."))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All required secrets are configured."))
 		return nil
 	}
 
@@ -102,7 +102,7 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 	}
 
 	// Interactive mode: prompt for missing secrets
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d missing required secret(s). You will be prompted to provide them.", len(missing))))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d missing required secret(s). You will be prompted to provide them.", len(missing))))
 	fmt.Fprintln(os.Stderr, "")
 
 	config := EngineSecretConfig{
@@ -120,7 +120,7 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 	}
 
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("All required secrets have been configured."))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All required secrets have been configured."))
 
 	return nil
 }

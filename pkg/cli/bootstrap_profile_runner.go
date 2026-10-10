@@ -196,7 +196,7 @@ func applyBootstrapAction(ctx context.Context, config bootstrapProfileRunConfig,
 		state.secrets[action.PrivateKeySecret] = struct{}{}
 	case "copilot-auth":
 		if config.UseCopilotRequests {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipping Copilot PAT setup because org Copilot billing is enabled."))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping Copilot PAT setup because org Copilot billing is enabled."))
 			return nil
 		}
 		applied, err := runBootstrapCopilotAuthAction(ctx, config.Repo, action, state, usesActionsToken)
@@ -211,7 +211,7 @@ func applyBootstrapAction(ctx context.Context, config bootstrapProfileRunConfig,
 			return err
 		}
 	case "handoff":
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(action.Message))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(action.Message))
 	default:
 		return fmt.Errorf("unsupported bootstrap action type %q. Example: use one of %s", action.Type, bootstrapActionTypeExample)
 	}

@@ -54,7 +54,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	if !workflow.IsReleasedVersion(currentVersion) {
 		updateExtensionCheckLog.Print("Not a released version, skipping upgrade check")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipping extension upgrade check (development build)"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping extension upgrade check (development build)"))
 		}
 		return false, "", nil
 	}
@@ -65,7 +65,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		// Fail silently - don't block the upgrade command if we can't reach GitHub
 		updateExtensionCheckLog.Printf("Failed to check for latest release (silently ignoring): %v", err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not check for extension updates: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not check for extension updates: %v", err)))
 		}
 		return false, "", nil
 	}
@@ -88,10 +88,10 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 			updateExtensionCheckLog.Print("Extension is already up to date")
 			if notice := prereleaseChannelNotice(currentVersion, latestVersion, includePrereleases); len(notice) > 0 {
 				for _, line := range notice {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(line))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(line))
 				}
 			} else if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("gh-aw extension is up to date"))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("gh-aw extension is up to date"))
 			}
 			return false, "", nil
 		}
@@ -104,7 +104,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 
 	// A newer version is available – upgrade automatically
 	updateExtensionCheckLog.Printf("Upgrading extension from %s to %s", currentVersion, latestVersion)
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Upgrading gh-aw extension from %s to %s...", renderReleaseVersion(currentVersion), renderReleaseVersion(latestVersion))))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Upgrading gh-aw extension from %s to %s...", renderReleaseVersion(currentVersion), renderReleaseVersion(latestVersion))))
 
 	// When targeting a prerelease version on platforms that do not lock running
 	// binaries (i.e., not Linux or Windows), gh extension upgrade --force resolves
@@ -135,7 +135,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		if versionErr != nil {
 			return false, "", fmt.Errorf("failed to verify gh-aw extension version after upgrade: %w", versionErr)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
 		return true, "", nil
 	}
 
@@ -172,7 +172,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 			}
 			firstErr = fmt.Errorf("gh extension upgrade reported success without installing target version: %w", mismatchErr)
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
 			return true, "", nil
 		}
 	}
@@ -289,10 +289,10 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		if runtime.GOOS == "windows" && isWindowsLockError(firstAttemptBuf.String(), retryErr) {
 			// On Windows, self-upgrade may not be possible while the binary is
 			// running. Guide the user to upgrade manually from a separate shell.
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("On Windows, gh-aw cannot self-upgrade while it is running."))
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Please upgrade manually by running one of the following:"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("On Windows, gh-aw cannot self-upgrade while it is running."))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Please upgrade manually by running one of the following:"))
 			fmt.Fprintln(os.Stderr, "  "+extensionUpgradeHelpCommand(latestVersion))
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("If that does not work, try reinstalling:"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("If that does not work, try reinstalling:"))
 			fmt.Fprintln(os.Stderr, "  gh extension remove gh-aw")
 			fmt.Fprintln(os.Stderr, "  "+extensionInstallHelpCommand(latestVersion))
 		}
@@ -312,7 +312,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		cleanupExecutableBackup(backupPath)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
 	return true, installPath, nil
 }
 

@@ -29,13 +29,13 @@ func (c *AddInteractiveConfig) selectAIEngineAndKey() error {
 
 	// If engine is already overridden, skip selection
 	if c.EngineOverride != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Using coding agent: "+c.EngineOverride))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Using coding agent: "+c.EngineOverride))
 		return c.selectEngineAuthMethod(c.EngineOverride)
 	}
 
 	// Inform user if workflow specifies an engine
 	if workflowSpecifiedEngine != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Workflow specifies engine: "+workflowSpecifiedEngine))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Workflow specifies engine: "+workflowSpecifiedEngine))
 	}
 
 	// Build engine options with notes about existing secrets and workflow specification.
@@ -59,7 +59,7 @@ func (c *AddInteractiveConfig) selectAIEngineAndKey() error {
 	}
 
 	c.EngineOverride = selectedEngine
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Selected engine: "+selectedEngine))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected engine: "+selectedEngine))
 
 	return c.selectEngineAuthMethod(selectedEngine)
 }
@@ -178,9 +178,9 @@ func (c *AddInteractiveConfig) configureEngineAPISecret(engine string) error {
 	if c.SkipSecret {
 		opt := constants.GetEngineOption(engine)
 		if opt != nil {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping %s secret setup (--no-secret flag set).", opt.SecretName)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping %s secret setup (--no-secret flag set).", opt.SecretName)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipping secret setup (--no-secret flag set)."))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping secret setup (--no-secret flag set)."))
 		}
 		return nil
 	}
@@ -198,10 +198,10 @@ func (c *AddInteractiveConfig) configureEngineAPISecret(engine string) error {
 		opt := constants.GetEngineOption(engine)
 		if opt != nil {
 			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping %s secret setup — write access is required to configure repository secrets.", opt.SecretName)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping %s secret setup — write access is required to configure repository secrets.", opt.SecretName)))
 			fmt.Fprintln(os.Stderr, "")
 			fmt.Fprintln(os.Stderr, "Once you have write access or an admin configures the repository, set the secret with:")
-			fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr(fmt.Sprintf("  gh aw secrets set %s --repo %s", opt.SecretName, c.RepoOverride)))
+			fmt.Fprintln(os.Stderr, console.FormatCommandMessage(fmt.Sprintf("  gh aw secrets set %s --repo %s", opt.SecretName, c.RepoOverride)))
 		}
 		return nil
 	}
@@ -324,12 +324,12 @@ func (c *AddInteractiveConfig) applyCopilotAuthMethodChoice(authMethod string) {
 	if authMethod == authMethodCopilotRequests {
 		c.UseCopilotRequests = true
 		c.UseCopilotPAT = false
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Selected copilot-requests: permissions.copilot-requests: write will be added to your workflow"))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No COPILOT_GITHUB_TOKEN secret is required — Copilot usage is billed to your org's Copilot seat."))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected copilot-requests: permissions.copilot-requests: write will be added to your workflow"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No COPILOT_GITHUB_TOKEN secret is required — Copilot usage is billed to your org's Copilot seat."))
 	} else {
 		c.UseCopilotRequests = false
 		c.UseCopilotPAT = authMethod == authMethodPAT
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Selected authentication: COPILOT_GITHUB_TOKEN"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected authentication: COPILOT_GITHUB_TOKEN"))
 	}
 	addInteractiveLog.Printf("Applied Copilot auth method choice: use_copilot_requests=%t use_copilot_pat=%t", c.UseCopilotRequests, c.UseCopilotPAT)
 }

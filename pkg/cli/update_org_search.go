@@ -109,7 +109,7 @@ func searchOrgReposByQuery(ctx context.Context, query string, verbose bool) ([]s
 
 	for {
 		if err := waitForOrgRateLimitFn(ctx, "search", verbose); err != nil && verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Continuing after search rate limit check failure: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Continuing after search rate limit check failure: %v", err)))
 		}
 		endpoint := fmt.Sprintf("/search/code?q=%s&per_page=%d&page=%d", url.QueryEscape(query), perPage, page)
 		output, err := workflow.RunGHContext(ctx, "Searching repositories...", "api", endpoint)

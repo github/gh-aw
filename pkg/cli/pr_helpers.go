@@ -69,7 +69,7 @@ func CreatePRWithChanges(ctx context.Context, branchPrefix, commitMessage, prTit
 		return prURL, fmt.Errorf("failed to switch back to branch %s: %w", currentBranch, err)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created PR: "+prURL))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created PR: "+prURL))
 	prHelpersLog.Printf("Created PR: %s", prURL)
 	return prURL, nil
 }

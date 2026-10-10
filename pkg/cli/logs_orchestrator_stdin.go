@@ -35,7 +35,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if len(artifactFilter) > 0 {
 		logsOrchestratorLog.Printf("Artifact filter active: %v", artifactFilter)
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
 		}
 	}
 	preparedCachedJSONL, err := prepareCachedLogsJSONLPath(opts.CachedJSONL)
@@ -57,13 +57,13 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if err := ensureLogsGitignore(); err != nil {
 		logsOrchestratorLog.Printf("Failed to ensure logs .gitignore: %v", err)
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to ensure .github/aw/logs/.gitignore: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to ensure .github/aw/logs/.gitignore: %v", err)))
 		}
 	}
 
 	select {
 	case <-ctx.Done():
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 		return ctx.Err()
 	default:
 	}
@@ -71,7 +71,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if len(opts.RunURLs) == 0 {
 		logsData := buildLogsData([]ProcessedRun{}, opts.OutputDir, nil)
 		logsData.Message = "No runs found. No run IDs or URLs were provided on stdin."
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No run IDs or URLs provided on stdin"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
 		return nil
 	}
 	// Parse owner/repo (and optional GHES host) from --repo override if provided.
@@ -122,12 +122,12 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	if opts.Timeout > 0 {
 		startTime = time.Now()
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Timeout set to %d minutes", opts.Timeout)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Timeout set to %d minutes", opts.Timeout)))
 		}
 	}
 
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Fetching metadata for %d runs from stdin...", len(opts.RunURLs))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Fetching metadata for %d runs from stdin...", len(opts.RunURLs))))
 	}
 
 	// Build WorkflowRun objects by fetching metadata for each provided URL.
@@ -135,19 +135,19 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	for _, rawURL := range opts.RunURLs {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 			return ctx.Err()
 		default:
 		}
 
 		if opts.Timeout > 0 && time.Since(startTime).Seconds() >= float64(opts.Timeout)*60 {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Timeout reached before all run metadata could be fetched"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Timeout reached before all run metadata could be fetched"))
 			break
 		}
 
 		components, err := parser.ParseRunURLExtended(rawURL)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping invalid run %q: %v", rawURL, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping invalid run %q: %v", rawURL, err)))
 			continue
 		}
 
@@ -170,7 +170,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 
 		run, err := fetchWorkflowRunMetadata(ctx, components.Number, owner, repo, host, opts.Verbose)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping run %d: failed to fetch metadata: %v", components.Number, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping run %d: failed to fetch metadata: %v", components.Number, err)))
 			continue
 		}
 		runs = append(runs, run)
@@ -192,7 +192,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 				}
 			}
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No valid runs could be loaded from stdin"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No valid runs could be loaded from stdin"))
 		return nil
 	}
 
@@ -230,14 +230,14 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		}
 		if result.Skipped {
 			if opts.Verbose && result.Error != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping run %d: %v", result.Run.DatabaseID, result.Error)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping run %d: %v", result.Run.DatabaseID, result.Error)))
 			}
 			finalizeLogsRunDownload(storageLimit, result)
 			continue
 		}
 
 		if result.Error != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to download artifacts for run %d: %v", result.Run.DatabaseID, result.Error)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to download artifacts for run %d: %v", result.Run.DatabaseID, result.Error)))
 			finalizeLogsRunDownload(storageLimit, result)
 			continue
 		}
@@ -253,26 +253,26 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 			detectedEngine := extractEngineFromAwInfo(awInfoPath, opts.Verbose)
 			if err := parseAgentLog(result.LogsPath, detectedEngine, opts.Verbose); err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse log for run %d: %v", processedRun.Run.DatabaseID, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log for run %d: %v", processedRun.Run.DatabaseID, err)))
 			} else {
 				logMdPath := filepath.Join(result.LogsPath, "log.md")
 				if fileutil.FileExists(logMdPath) {
-					fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
+					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
 				}
 			}
 			if err := parseFirewallLogs(result.LogsPath, opts.Verbose); err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", processedRun.Run.DatabaseID, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", processedRun.Run.DatabaseID, err)))
 			} else {
 				firewallMdPath := filepath.Join(result.LogsPath, "firewall.md")
 				if fileutil.FileExists(firewallMdPath) {
-					fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
+					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
 				}
 			}
 		}
 
 		processedRuns = append(processedRuns, processedRun)
 		if err := cachedJSONLWriter.Append(processedRun); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		}
 		finalizeLogsRunDownload(storageLimit, result)
 	}
@@ -298,9 +298,9 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			}
 		}
 		if storageLimitReached {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Storage limit reached before any new runs could be processed"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Storage limit reached before any new runs could be processed"))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No workflow runs with artifacts found matching the specified criteria"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No workflow runs with artifacts found matching the specified criteria"))
 		}
 		return nil
 	}
@@ -308,7 +308,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	message := ""
 	if storageLimitReached {
 		message = "Storage limit reached. Results are partial because some input runs were not downloaded."
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(message))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	}
 	finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)
 	cacheGitHubAPIRateLimitReports(cachedJSONLWriter, allAPIRateLimits...)

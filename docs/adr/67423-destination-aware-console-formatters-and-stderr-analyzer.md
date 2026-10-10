@@ -12,21 +12,25 @@
 
 ### Decision
 
-We will make console stream selection an explicitly enforced contract: every direct write of console-formatted text to stderr must use a destination-aware `*Stderr` formatter, and a new custom static analyzer, `pkg/linters/consolestderr`, blocks CI when a stdout-aware formatter is written directly to `os.Stderr`.
+We will correct the behavior of the existing diagnostic formatter names rather than rename their callers: `FormatError`, message formatters, `RenderTable`, and `RenderStruct` now consult stderr. Existing `*Stderr` entry points remain compatible aliases. Intentional stdout callers use explicit `*Stdout` entry points, preserving their previous terminal/color behavior and data contracts. Formatter signatures and actual write destinations do not change.
 
-The analyzer carries a fixed stdout→stderr replacement table and emits suggested fixes, so the ~1,600 selector substitutions across 241 files are mechanical and reproducible rather than hand-audited. The options-based `RenderStructWithOptions` entry point must explicitly supply a compile-time true `Stderr` field; unknown option variables receive a diagnostic without an unsafe automatic edit. To complete the contract, we add the missing stderr renderers (prompt, verbose, table, reflected struct), propagate the destination through nested tables and error-chain styling, and exempt already-stderr-aware helpers such as `FormatErrorMessage`. Separately, human-facing experiment tables gain an **opt-in** width budget (`TableConfig.MaxWidth`, `DefaultTableWidth = 80`) with a lossless labeled-row fallback when columns cannot fit; JSON, version, completion, compact-log and WASM renderers keep their existing unbounded/tab-separated contracts.
+The initial implementation mechanically renamed approximately 1,600 diagnostic calls across 241 files. On the author's direction, that migration is replaced by the API behavior change, eliminating bulk call-site churn. The `consolestderr` analyzer now checks both stdout and stderr writes, suggesting the appropriate default or explicit stdout entry point. The options-based `RenderStructWithOptions` keeps its explicit destination contract: `Stderr: true` selects stderr, and false or omitted selects stdout. Unknown option variables receive a diagnostic without an unsafe automatic edit. Nested tables and error-chain styling use the selected destination. Separately, human-facing experiment tables gain an **opt-in** width budget (`TableConfig.MaxWidth`, `DefaultTableWidth = 80`) with a lossless labeled-row fallback when columns cannot fit; JSON, version, completion, compact-log and WASM renderers keep their existing unbounded/tab-separated contracts.
 
 ### Alternatives Considered
 
-#### Alternative 1: Runtime stream assertion instead of static analysis
+#### Alternative 1: Rename every diagnostic call to a stderr variant
+
+The initial implementation used the existing `*Stderr` APIs at every proven direct stderr write. Replaced on the author's direction because fixing the API default achieves the same behavior with much less churn. The smaller set of intentional stdout callers must still opt into stdout styling so redirected output remains correct.
+
+#### Alternative 2: Runtime stream assertion instead of static analysis
 
 Make the formatters themselves detect their destination at runtime (for example by threading an `io.Writer` into every formatter and deriving styling from it), so a "wrong stream" call is impossible by construction. This was attractive because it would remove the duplicated `*Stderr` API surface entirely. It was not chosen because it would change the signature of nearly every console formatter and every call site simultaneously, breaking the string-returning API that callers compose into larger messages, and it would give no compile-time or CI signal for the remaining `fmt.Fprint*` patterns.
 
-#### Alternative 2: Convention plus a grep/regex CI check
+#### Alternative 3: Convention plus a grep/regex CI check
 
-Document the stdout/stderr rule and enforce it with a `grep`-based CI script over `fmt.Fprint*(os.Stderr, …)` call sites. This is far cheaper to build than a `go/analysis` analyzer. It was rejected because the incorrect pattern appears in nested, aliased-import, and multi-argument forms that a regex cannot classify without false positives, and because a text-level check cannot produce the suggested fixes that make a 241-file migration tractable.
+Document the stdout/stderr rule and enforce it with a `grep`-based CI script over standard-stream writes. It was rejected because the incorrect pattern appears in nested, aliased-import, and multi-argument forms that a regex cannot classify reliably.
 
-#### Alternative 3: Universal table width budget
+#### Alternative 4: Universal table width budget
 
 Apply the 80-column budget to all table rendering rather than making it opt-in. Rejected because JSON, version, completion and compact-log output are machine- or pipe-consumed; wrapping them would silently change existing output contracts. The budget is therefore limited to human experiment tables.
 
@@ -39,8 +43,8 @@ Apply the 80-column budget to all table rendering rather than making it opt-in. 
 - Redundant literal semantic markers at diagnostic call sites were removed, so messages no longer double-prefix.
 
 #### Negative
-- The `pkg/console` API surface grows a parallel `*Stderr` variant for each formatter, which must be kept in sync; the replacement table in the analyzer is a third place to update when a formatter is added.
-- The change touches 241 files mechanically, making the diff hard to review line-by-line and likely to conflict with in-flight branches.
+- The API surface includes explicit stdout variants and compatible stderr aliases; the destination map in the analyzer must be updated when a formatter is added.
+- The existing default names change styling behavior for callers that intentionally write to stdout. Repository stdout callers have been migrated to explicit variants; downstream callers need the same opt-in.
 - The analyzer deliberately does not perform dataflow analysis, so writes through intermediate writer/formatter aliases are not covered — the guarantee is "no direct mismatches", not "no mismatches".
 - The all-custom-analyzer local gate reports pre-existing legacy/advisory findings in mechanically touched files, plus an advisory false positive on explicitly bounds-guarded options indexing. These remain separate from the blocking production CI selection, which includes `consolestderr` and passes.
 

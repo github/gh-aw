@@ -120,10 +120,10 @@ func runPoutineOnDirectory(workflowDir string, verbose bool, strict bool) error 
 	}
 
 	// Always show that poutine is running (regular verbosity)
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running poutine security scanner"))
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running poutine security scanner"))
 
 	if verbose {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Run poutine directly: "+shellJoinArgs(displayArgs)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run poutine directly: "+shellJoinArgs(displayArgs)))
 	}
 
 	// Capture output
@@ -244,11 +244,11 @@ func runPoutineOnFile(lockFile string, verbose bool, strict bool) error {
 	}
 
 	// Always show that poutine is running (regular verbosity)
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running poutine security scanner"))
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running poutine security scanner"))
 
 	// In verbose mode, also show the command that users can run directly
 	if verbose {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Run poutine directly: "+shellJoinArgs(displayArgs)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run poutine directly: "+shellJoinArgs(displayArgs)))
 	}
 
 	// Capture output

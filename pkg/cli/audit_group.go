@@ -73,7 +73,7 @@ func runAuditGrouped(ctx context.Context, args []string, opts auditCommandOption
 func recordGroupedAuditRun(outputDir string, runID int64, report *GroupedAuditReport) {
 	auditData, ok := loadGroupedAuditData(outputDir, runID)
 	if !ok {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 			fmt.Sprintf("No audit data found for run %d after processing; skipping", runID)))
 		report.SkippedRuns = append(report.SkippedRuns, runID)
 		return
@@ -193,12 +193,12 @@ func renderGroupedAuditReport(report GroupedAuditReport, opts auditCommandOption
 }
 
 func renderGroupedAuditReportPretty(report GroupedAuditReport) {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Grouped audit findings across %d run(s)", report.RunsAnalyzed)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Grouped audit findings across %d run(s)", report.RunsAnalyzed)))
 	if len(report.SkippedRuns) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipped run(s): "+formatRunIDList(report.SkippedRuns)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipped run(s): "+formatRunIDList(report.SkippedRuns)))
 	}
 	if len(report.Entries) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("No audit findings found."))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("No audit findings found."))
 		return
 	}
 	for _, entry := range report.Entries {

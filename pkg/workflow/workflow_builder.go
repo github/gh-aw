@@ -186,7 +186,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		warningMsg := "permissions.contents: none skips the default workflow-repository checkout, " +
 			"but no other checkout: entries are configured; the agent job will have no repository " +
 			"checked out. Add a target checkout: entry, or set checkout: false to make the intent explicit."
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
 		c.IncrementWarningCount()
 	}
 

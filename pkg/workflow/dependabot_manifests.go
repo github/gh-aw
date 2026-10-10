@@ -35,7 +35,7 @@ func (c *Compiler) generateNpmManifests(ctx context.Context, workflowDataList []
 
 	dependabotLog.Printf("Found %d unique npm dependencies", len(npmDeps))
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d npm dependencies in workflows", len(npmDeps))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d npm dependencies in workflows", len(npmDeps))))
 	}
 
 	packageJSONPath := filepath.Join(workflowDir, "package.json")
@@ -60,7 +60,7 @@ func (c *Compiler) generatePipManifests(workflowDataList []*WorkflowData, workfl
 
 	dependabotLog.Printf("Found %d unique pip dependencies", len(pipDeps))
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d pip dependencies in workflows", len(pipDeps))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d pip dependencies in workflows", len(pipDeps))))
 	}
 
 	requirementsPath := filepath.Join(workflowDir, "requirements.txt")
@@ -81,7 +81,7 @@ func (c *Compiler) generateGoManifests(workflowDataList []*WorkflowData, workflo
 
 	dependabotLog.Printf("Found %d unique go dependencies", len(goDeps))
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d go dependencies in workflows", len(goDeps))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d go dependencies in workflows", len(goDeps))))
 	}
 
 	goModPath := filepath.Join(workflowDir, "go.mod")
@@ -188,7 +188,7 @@ func (c *Compiler) loadOrInitPackageJSON(path string) (PackageJSON, error) {
 		}
 
 		if c.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Merging with existing package.json"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Merging with existing package.json"))
 		}
 	} else {
 		// New package.json
@@ -237,7 +237,7 @@ func (c *Compiler) generatePackageJSON(path string, deps []NpmDependency, forceO
 
 	dependabotLog.Printf("Successfully wrote package.json with %d dependencies", len(pkgJSON.Dependencies))
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Generated package.json with %d dependencies", len(pkgJSON.Dependencies))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Generated package.json with %d dependencies", len(pkgJSON.Dependencies))))
 	}
 
 	// Track the created file
@@ -278,7 +278,7 @@ func (c *Compiler) generatePackageLock(ctx context.Context, workflowDir string) 
 	}
 
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Running npm install --package-lock-only..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Running npm install --package-lock-only..."))
 	}
 
 	if err := runNpmInstallPackageLockOnly(ctx, npmPath, absWorkflowDir); err != nil {
@@ -292,7 +292,7 @@ func (c *Compiler) generatePackageLock(ctx context.Context, workflowDir string) 
 
 	dependabotLog.Print("Successfully generated package-lock.json")
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Generated package-lock.json"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Generated package-lock.json"))
 	}
 
 	// Track the created file
@@ -423,7 +423,7 @@ func (c *Compiler) mergeExistingRequirements(path string, reqMap map[string]stri
 	}
 
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Merging with existing requirements.txt"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Merging with existing requirements.txt"))
 	}
 
 	return true, nil
@@ -467,7 +467,7 @@ func (c *Compiler) generateRequirementsTxt(path string, deps []PipDependency, fo
 
 	dependabotLog.Printf("Successfully wrote requirements.txt with %d dependencies", len(reqMap))
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Generated requirements.txt with %d dependencies", len(reqMap))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Generated requirements.txt with %d dependencies", len(reqMap))))
 	}
 
 	// Track the created file
@@ -574,7 +574,7 @@ func (c *Compiler) loadOrInitGoModLines(path string) ([]string, error) {
 		}
 
 		if c.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Merging with existing go.mod"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Merging with existing go.mod"))
 		}
 	} else {
 		// New go.mod
@@ -633,7 +633,7 @@ func (c *Compiler) generateGoMod(path string, deps []GoDependency, forceOverwrit
 
 	dependabotLog.Printf("Successfully wrote go.mod with %d dependencies", len(deps))
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Generated go.mod with %d dependencies", len(deps))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Generated go.mod with %d dependencies", len(deps))))
 	}
 
 	// Track the created file

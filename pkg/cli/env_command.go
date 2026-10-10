@@ -248,7 +248,7 @@ func defaultsGetToFile(target defaultsTarget, outputFile string) error {
 	if err := os.WriteFile(outputFile, data, constants.FilePermPublic); err != nil {
 		return fmt.Errorf("failed to write defaults file %q: %w", outputFile, err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Saved defaults to "+outputFile))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Saved defaults to "+outputFile))
 	return nil
 }
 
@@ -271,7 +271,7 @@ func defaultsUpdateFromFile(target defaultsTarget, inputFile string, skipConfirm
 	envCmdLog.Printf("Built %d default variable changes", len(changes))
 	if dryRun {
 		renderDefaultsUpdatePreview(target, inputFile, changes)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dry-run mode enabled; no variables were changed."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dry-run mode enabled; no variables were changed."))
 		return nil
 	}
 	if err := confirmDefaultsUpdate(target, inputFile, changes, skipConfirmation, console.ConfirmAction); err != nil {
@@ -290,7 +290,7 @@ func defaultsUpdateFromFile(target defaultsTarget, inputFile string, skipConfirm
 		}
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Updated defaults from "+inputFile))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated defaults from "+inputFile))
 	return nil
 }
 
@@ -408,7 +408,7 @@ func confirmDefaultsUpdate(
 	renderDefaultsUpdatePreview(target, inputFile, changes)
 
 	if skipConfirmation {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipping confirmation because --yes was provided."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping confirmation because --yes was provided."))
 		return nil
 	}
 
@@ -427,8 +427,8 @@ func confirmDefaultsUpdate(
 }
 
 func renderDefaultsUpdatePreview(target defaultsTarget, inputFile string, changes []defaultsUpdateChange) {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Defaults update preview:"))
-	fmt.Fprint(os.Stderr, console.RenderStructStderr(defaultsUpdatePreview{
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Defaults update preview:"))
+	fmt.Fprint(os.Stderr, console.RenderStruct(defaultsUpdatePreview{
 		Scope:  target.scope,
 		Target: target.displayName(),
 		File:   inputFile,
@@ -436,7 +436,7 @@ func renderDefaultsUpdatePreview(target defaultsTarget, inputFile string, change
 	}))
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprint(os.Stderr, console.RenderStructStderr(defaultsUpdateRows(changes)))
+	fmt.Fprint(os.Stderr, console.RenderStruct(defaultsUpdateRows(changes)))
 	fmt.Fprintln(os.Stderr)
 }
 

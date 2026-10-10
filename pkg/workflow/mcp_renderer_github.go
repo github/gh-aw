@@ -39,7 +39,7 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 	// user configured reactions with the gateway path.
 	if isFeatureEnabled(constants.IntegrityReactionsFeatureFlag, workflowData) {
 		if hasReactionFieldsInToolConfig(githubTool) {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				"integrity-reactions: endorsement/disapproval reactions are ignored in MCP gateway mode because "+
 					"reaction authors cannot be identified from the GitHub MCP server. Reactions are only enforced "+
 					"in proxy mode (DIFC proxy / CLI proxy)."))

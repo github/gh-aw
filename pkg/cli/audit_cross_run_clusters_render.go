@@ -54,7 +54,7 @@ func renderPrettyClusterAnalysis(ca *ClusterAnalysis) {
 	}
 
 	if len(ca.Patterns) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Cluster Patterns (%d detected)", len(ca.Patterns))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Cluster Patterns (%d detected)", len(ca.Patterns))))
 		for _, p := range ca.Patterns {
 			fmt.Fprintf(os.Stderr, "  %s [%s/%s] %s\n", renderSeverityIcon(p.Severity), p.Kind, p.Severity, p.Title)
 			fmt.Fprintf(os.Stderr, "     %s\n", p.Description)
@@ -66,7 +66,7 @@ func renderPrettyClusterAnalysis(ca *ClusterAnalysis) {
 	}
 
 	if len(ca.Clusters) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Run Clusters (%d groups)", len(ca.Clusters))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run Clusters (%d groups)", len(ca.Clusters))))
 		// Group by dimension for display
 		dimOrder := clusterDimensionOrder(ca.Clusters)
 		for _, dim := range dimOrder {

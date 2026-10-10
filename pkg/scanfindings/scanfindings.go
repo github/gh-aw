@@ -165,7 +165,7 @@ func FormatMessage(severityLabel, ruleID, description string) string {
 // Render writes the findings to w using the shared console error format.
 func Render(w io.Writer, findings []Finding) {
 	for _, finding := range findings {
-		fmt.Fprint(w, console.FormatError(finding.CompilerError()))
+		fmt.Fprint(w, console.FormatErrorStdout(finding.CompilerError()))
 	}
 }
 

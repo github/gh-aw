@@ -153,7 +153,7 @@ func closeExistingOrgIssuesByMarker(ctx context.Context, repo, markerPrefix stri
 			continue
 		}
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(
 				fmt.Sprintf("Closing outdated issue #%d in %s", issue.Number, repo),
 			))
 		}
@@ -182,7 +182,7 @@ func closeExistingOrgPRsByMarker(ctx context.Context, repo, markerPrefix string,
 			continue
 		}
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(
 				fmt.Sprintf("Closing outdated PR #%d in %s", pr.Number, repo),
 			))
 		}
@@ -203,7 +203,7 @@ func addLabelToOrgPR(ctx context.Context, prURL, label string, verbose bool) {
 	if _, err := workflow.RunGHContextWithHost(ctx, "Adding label to PR...", remoteHost, "pr", "edit", prURL, "--add-label", label); err != nil {
 		orgIPLog.Printf("Failed to add label %q to PR %s: %v", label, prURL, err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("Failed to add label %q to PR (non-fatal): %v", label, err),
 			))
 		}

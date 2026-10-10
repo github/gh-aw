@@ -250,15 +250,15 @@ func buildRemoteWorkflowStatuses(pattern string, githubWorkflows map[string]*Git
 func StatusWorkflows(ctx context.Context, pattern string, verbose bool, jsonOutput bool, ref string, labelFilter string, repoOverride string) error {
 	statusLog.Printf("Checking workflow status: pattern=%s, jsonOutput=%v, ref=%s, labelFilter=%s, repo=%s", pattern, jsonOutput, ref, labelFilter, repoOverride)
 	if verbose && !jsonOutput {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Checking status of workflow files"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checking status of workflow files"))
 		if pattern != "" {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Filtering by pattern: "+pattern))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Filtering by pattern: "+pattern))
 		}
 	}
 
 	// Verbose logging for network operations
 	if verbose && !jsonOutput {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Fetching GitHub workflow status..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Fetching GitHub workflow status..."))
 	}
 
 	// Get workflow statuses
@@ -271,7 +271,7 @@ func StatusWorkflows(ctx context.Context, pattern string, verbose bool, jsonOutp
 
 	// Additional verbose output after successful fetch
 	if verbose && !jsonOutput && len(statuses) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Successfully fetched status for %d workflows", len(statuses))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully fetched status for %d workflows", len(statuses))))
 	}
 
 	// Handle output
@@ -287,12 +287,12 @@ func StatusWorkflows(ctx context.Context, pattern string, verbose bool, jsonOutp
 
 	// Handle empty result for text output
 	if len(statuses) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflow files found."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow files found."))
 		return nil
 	}
 
 	// Render the table using struct-based rendering
-	fmt.Fprint(os.Stdout, console.RenderStruct(statuses))
+	fmt.Fprint(os.Stdout, console.RenderStructStdout(statuses))
 	if verbose {
 		if dependenciesTree := renderWorkflowDependencyTree(statuses); dependenciesTree != "" {
 			fmt.Fprintln(os.Stderr)

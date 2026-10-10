@@ -48,7 +48,7 @@ func ScanWorkflowsForMCP(workflowsDir string, serverFilter string, verbose bool)
 		content, err := os.ReadFile(file)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s: %v", filepath.Base(file), err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %v", filepath.Base(file), err)))
 			}
 			continue
 		}
@@ -56,7 +56,7 @@ func ScanWorkflowsForMCP(workflowsDir string, serverFilter string, verbose bool)
 		frontmatterData, err := parser.ExtractFrontmatterFromContent(string(content))
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s: %v", filepath.Base(file), err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %v", filepath.Base(file), err)))
 			}
 			continue
 		}
@@ -64,7 +64,7 @@ func ScanWorkflowsForMCP(workflowsDir string, serverFilter string, verbose bool)
 		mcpConfigs, err := parser.ExtractMCPConfigurations(frontmatterData.Frontmatter, serverFilter)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Error extracting MCP from %s: %v", filepath.Base(file), err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Error extracting MCP from %s: %v", filepath.Base(file), err)))
 			}
 			continue
 		}

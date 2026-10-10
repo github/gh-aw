@@ -29,7 +29,7 @@ func (c *AddInteractiveConfig) checkStatusAndOfferRun(ctx context.Context) error
 		return nil
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Workflow is ready"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow is ready"))
 
 	// Only offer to run if workflow has workflow_dispatch trigger
 	if !c.shouldOfferAddedWorkflowRun() {
@@ -55,11 +55,11 @@ func (c *AddInteractiveConfig) checkStatusAndOfferRun(ctx context.Context) error
 	}
 
 	if !runNow {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Selected workflow run: later"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected workflow run: later"))
 		c.showFinalInstructions()
 		return nil
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Selected workflow run: now"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected workflow run: now"))
 
 	if err := c.runAddedWorkflowOnce(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to run workflow: %v", err)))
@@ -145,7 +145,7 @@ func (c *AddInteractiveConfig) checkWorkflowStatusAttempt(attempt int) bool {
 }
 
 func (c *AddInteractiveConfig) showWorkflowStatusUnavailableInstructions() {
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not verify workflow status."))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not verify workflow status."))
 	fmt.Fprintf(os.Stderr, "You can check status with: %s status\n", string(constants.CLIExtensionPrefix))
 }
 
@@ -156,7 +156,7 @@ func (c *AddInteractiveConfig) shouldOfferAddedWorkflowRun() bool {
 func (c *AddInteractiveConfig) showCodespaceRunInstructions() {
 	addInteractiveLog.Print("Running in Codespaces, skipping run offer and showing Actions link")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Running in GitHub Codespaces - please trigger the workflow manually from the Actions page"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Running in GitHub Codespaces - please trigger the workflow manually from the Actions page"))
 	fmt.Fprintf(os.Stderr, "🔗 https://github.com/%s/actions\n", c.RepoOverride)
 }
 
@@ -216,7 +216,7 @@ func (c *AddInteractiveConfig) updateLocalBranchBeforeWorkflowRun() {
 			spinner.Stop()
 		}
 		addInteractiveLog.Printf("Failed to update local branch: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not update local branch: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update local branch: %v", err)))
 		fmt.Fprintln(os.Stderr, "You may need to switch to your repository's default branch (for example 'main') and run 'git pull' manually before running the workflow.")
 		return
 	}

@@ -120,10 +120,18 @@ The package is designed to adapt to the execution environment. Native builds det
 
 ## Usage Examples
 
-Use `Print*` or `Format*Stderr` for diagnostics; unsuffixed message formatters
-consult stdout, except `FormatErrorMessage` and `FormatErrorChain`, which are
-stderr diagnostics. Pass message text without a duplicate semantic icon.
-`RenderStructStderr` propagates the destination through nested tables.
+Use `Print*` or the existing unsuffixed message formatters for diagnostics:
+`FormatError`, `FormatSuccessMessage`, `FormatInfoMessage`, `FormatWarningMessage`,
+`FormatCommandMessage`, `FormatProgressMessage`, `FormatPromptMessage`,
+`FormatVerboseMessage`, `FormatListItem`, and `FormatSectionHeader` now consult
+stderr without changing their signatures. Existing `*Stderr` variants remain
+compatible aliases. Pass message text without a duplicate semantic icon.
+`RenderStruct` and `RenderTable` also default to stderr, including nested tables.
+Intentional stdout output must use the corresponding `*Stdout` variants, such as
+`FormatInfoMessageStdout`, `RenderTableStdout`, and `RenderStructStdout`. These
+preserve the former stdout terminal/color behavior. `RenderStructWithOptions`
+keeps its explicit contract: `Stderr: true` selects stderr; false or omitted
+selects stdout. These functions return strings and do not redirect any writes.
 `TableConfig.MaxWidth` wraps native table content without dropping values; when
 columns cannot fit, rendering falls back to labeled rows. Width limits are
 opt-in: experiment human reports use 80 columns, not a universal truncation

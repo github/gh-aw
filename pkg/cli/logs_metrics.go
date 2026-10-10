@@ -51,7 +51,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 	logsMetricsLog.Printf("Extracting log metrics from: %s", logDir)
 	var metrics LogMetrics
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Beginning metric extraction in "+logDir))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Beginning metric extraction in "+logDir))
 	}
 
 	// First check if this is a GitHub Copilot coding agent run (not Copilot CLI)
@@ -65,7 +65,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 	logsMetricsLog.Printf("GitHub Copilot coding agent detected: %v", isGitHubCopilotCodingAgent)
 
 	if isGitHubCopilotCodingAgent && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Detected GitHub Copilot coding agent run, using specialized parser"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected GitHub Copilot coding agent run, using specialized parser"))
 	}
 
 	// First check for aw_info.json to determine the engine
@@ -79,25 +79,25 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 			detectedEngine = engine
 			logsMetricsLog.Printf("Detected engine: %s", engine.GetID())
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Detected engine from aw_info.json: "+engine.GetID()))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected engine from aw_info.json: "+engine.GetID()))
 			}
 		} else {
 			logsMetricsLog.Print("Failed to extract engine from aw_info.json")
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("aw_info.json exists but failed to extract engine"))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("aw_info.json exists but failed to extract engine"))
 			}
 		}
 	} else {
 		if _, statErr := os.Stat(infoFilePath); statErr != nil {
 			logsMetricsLog.Printf("No aw_info.json found at %s: %v", infoFilePath, statErr)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No aw_info.json found at %s: %v", infoFilePath, statErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No aw_info.json found at %s: %v", infoFilePath, statErr)))
 			}
 		} else {
 			// Path exists but is not a regular file (for example, a directory).
 			logsMetricsLog.Printf("No aw_info.json file found at %s", infoFilePath)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No aw_info.json file found at "+infoFilePath))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No aw_info.json file found at "+infoFilePath))
 			}
 		}
 	}
@@ -109,7 +109,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 			// Report that the agentic output file was found
 			fileInfo, statErr := os.Stat(awOutputPath)
 			if statErr == nil {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found agentic output file: safe_output.jsonl (%s)", console.FormatFileSize(fileInfo.Size()))))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found agentic output file: safe_output.jsonl (%s)", console.FormatFileSize(fileInfo.Size()))))
 			}
 		}
 	}
@@ -128,7 +128,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 						if isBundle {
 							fileType = "git bundle"
 						}
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %s file: %s (%s)", fileType, name, console.FormatFileSize(fileInfo.Size()))))
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %s file: %s (%s)", fileType, name, console.FormatFileSize(fileInfo.Size()))))
 					}
 				}
 			}
@@ -141,7 +141,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 		if verbose {
 			fileInfo, statErr := os.Stat(agentOutputPath)
 			if statErr == nil {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found agent output file: %s (%s)", filepath.Base(agentOutputPath), console.FormatFileSize(fileInfo.Size()))))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found agent output file: %s (%s)", filepath.Base(agentOutputPath), console.FormatFileSize(fileInfo.Size()))))
 			}
 		}
 		// If the file is not already in the logDir root, copy it for convenience
@@ -149,7 +149,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 			rootCopy := filepath.Join(logDir, constants.AgentOutputArtifactName.String())
 			if _, err := os.Stat(rootCopy); errors.Is(err, os.ErrNotExist) {
 				if copyErr := fileutil.CopyFile(agentOutputPath, rootCopy); copyErr == nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Copied agent_output.json to run root for easy access"))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Copied agent_output.json to run root for easy access"))
 				}
 			}
 		}
@@ -164,9 +164,9 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 		if verbose {
 			fileInfo, statErr := os.Stat(eventsJSONLPath)
 			if statErr == nil {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found events.jsonl (%s), using as primary metrics source", console.FormatFileSize(fileInfo.Size()))))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found events.jsonl (%s), using as primary metrics source", console.FormatFileSize(fileInfo.Size()))))
 			} else {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found events.jsonl, using as primary metrics source"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found events.jsonl, using as primary metrics source"))
 			}
 		}
 		eventsMetrics, eventsErr := parseEventsJSONLMetrics(eventsJSONLPath, verbose)
@@ -178,7 +178,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 		} else {
 			logsMetricsLog.Printf("Failed to parse events.jsonl, falling back to log files: %v", eventsErr)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse events.jsonl: %v", eventsErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse events.jsonl: %v", eventsErr)))
 			}
 		}
 	}
@@ -212,7 +212,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 
 				fileMetrics, err := parseLogFileWithEngine(path, detectedEngine, isGitHubCopilotCodingAgent, verbose)
 				if err != nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse log file %s: %v", path, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log file %s: %v", path, err)))
 					return nil // Continue processing other files
 				}
 
@@ -238,7 +238,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 	gatewayMetrics, gatewayErr := parseGatewayLogs(logDir, verbose)
 	if gatewayErr == nil && gatewayMetrics != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Successfully parsed gateway.jsonl"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Successfully parsed gateway.jsonl"))
 		}
 		// We've successfully parsed gateway metrics, but we don't add them to the main metrics
 		// structure since they're tracked separately and displayed in their own table
@@ -248,7 +248,7 @@ func extractLogMetrics(logDir string, verbose bool, workflowPath ...string) (Log
 		// Only log if it's an error other than "not found"
 		logsMetricsLog.Printf("Failed to parse gateway.jsonl: %v", gatewayErr)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse gateway.jsonl: %v", gatewayErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse gateway.jsonl: %v", gatewayErr)))
 		}
 	}
 
@@ -296,7 +296,7 @@ func extractMissingToolsFromRun(runDir string, run WorkflowRun, verbose bool, ex
 		// New flattened structure: agent_output.json at root
 		resolvedAgentOutputFile = agentOutputJSONPath
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %s at root: %s", constants.AgentOutputFilename, agentOutputJSONPath)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %s at root: %s", constants.AgentOutputFilename, agentOutputJSONPath)))
 		}
 	} else {
 		// Try old structure: agent-output directory
@@ -308,14 +308,14 @@ func extractMissingToolsFromRun(runDir string, run WorkflowRun, verbose bool, ex
 				if fileutil.FileExists(nested) {
 					resolvedAgentOutputFile = nested
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("agent_output.json is a directory; using nested file "+nested))
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("agent_output.json is a directory; using nested file "+nested))
 					}
 				} else if verbose {
 					if _, nestedErr := os.Stat(nested); nestedErr != nil {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 							fmt.Sprintf("agent_output.json directory present but nested file missing: %v", nestedErr)))
 					} else {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 							"agent_output.json directory present but nested path is not a file"))
 					}
 				}
@@ -328,7 +328,7 @@ func extractMissingToolsFromRun(runDir string, run WorkflowRun, verbose bool, ex
 			if found, ok := findAgentOutputFile(runDir); ok {
 				resolvedAgentOutputFile = found
 				if verbose && found != agentOutputPath {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found agent_output.json at "+found))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found agent_output.json at "+found))
 				}
 			}
 		}
@@ -342,7 +342,7 @@ func extractMissingToolsFromRun(runDir string, run WorkflowRun, verbose bool, ex
 		content, readErr := os.ReadFile(cleanPath)
 		if readErr != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read safe output file %s: %v", cleanPath, readErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read safe output file %s: %v", cleanPath, readErr)))
 			}
 			return missingTools, nil // Continue processing without this file
 		}
@@ -355,7 +355,7 @@ func extractMissingToolsFromRun(runDir string, run WorkflowRun, verbose bool, ex
 
 		if err := json.Unmarshal(content, &safeOutput); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse safe output JSON from %s: %v", cleanPath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse safe output JSON from %s: %v", cleanPath, err)))
 			}
 			return missingTools, nil // Continue processing without this file
 		}
@@ -372,7 +372,7 @@ func extractMissingToolsFromRun(runDir string, run WorkflowRun, verbose bool, ex
 
 			if err := json.Unmarshal(itemRaw, &item); err != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
 				}
 				continue // Skip malformed items
 			}
@@ -388,19 +388,19 @@ func extractMissingToolsFromRun(runDir string, run WorkflowRun, verbose bool, ex
 				missingTools = append(missingTools, missingTool)
 
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found missing_tool entry: %s (%s)", item.Tool, item.Reason)))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found missing_tool entry: %s (%s)", item.Tool, item.Reason)))
 				}
 			}
 		}
 
 		if verbose && len(missingTools) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d missing tool reports in safe output artifact for run %d", len(missingTools), run.DatabaseID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d missing tool reports in safe output artifact for run %d", len(missingTools), run.DatabaseID)))
 		}
 		logsMetricsLog.Printf("Found %d missing tool reports", len(missingTools))
 	} else {
 		logsMetricsLog.Print("No safe output artifact found")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No safe output artifact found at %s for run %d", agentOutputJSONPath, run.DatabaseID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No safe output artifact found at %s for run %d", agentOutputJSONPath, run.DatabaseID)))
 		}
 	}
 
@@ -428,7 +428,7 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 		// New flattened structure: agent_output.json at root
 		resolvedAgentOutputFile = agentOutputJSONPath
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %s at root: %s", constants.AgentOutputFilename, agentOutputJSONPath)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %s at root: %s", constants.AgentOutputFilename, agentOutputJSONPath)))
 		}
 	} else {
 		// Try old structure: agent-output directory
@@ -440,14 +440,14 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 				if fileutil.FileExists(nested) {
 					resolvedAgentOutputFile = nested
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("agent_output.json is a directory; using nested file "+nested))
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("agent_output.json is a directory; using nested file "+nested))
 					}
 				} else if verbose {
 					if _, nestedErr := os.Stat(nested); nestedErr != nil {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 							fmt.Sprintf("agent_output.json directory present but nested file missing: %v", nestedErr)))
 					} else {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 							"agent_output.json directory present but nested path is not a file"))
 					}
 				}
@@ -460,7 +460,7 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 			if found, ok := findAgentOutputFile(runDir); ok {
 				resolvedAgentOutputFile = found
 				if verbose && found != agentOutputPath {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found agent_output.json at "+found))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found agent_output.json at "+found))
 				}
 			}
 		}
@@ -474,7 +474,7 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 		content, readErr := os.ReadFile(cleanPath)
 		if readErr != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read safe output file %s: %v", cleanPath, readErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read safe output file %s: %v", cleanPath, readErr)))
 			}
 			return noops, nil // Continue processing without this file
 		}
@@ -487,7 +487,7 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 
 		if err := json.Unmarshal(content, &safeOutput); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse safe output JSON from %s: %v", cleanPath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse safe output JSON from %s: %v", cleanPath, err)))
 			}
 			return noops, nil // Continue processing without this file
 		}
@@ -502,7 +502,7 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 
 			if err := json.Unmarshal(itemRaw, &item); err != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
 				}
 				continue // Skip malformed items
 			}
@@ -516,19 +516,19 @@ func extractNoopsFromRun(runDir string, run WorkflowRun, verbose bool, experimen
 				noops = append(noops, noop)
 
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found noop entry: "+item.Message))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found noop entry: "+item.Message))
 				}
 			}
 		}
 
 		if verbose && len(noops) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d noop messages in safe output artifact for run %d", len(noops), run.DatabaseID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d noop messages in safe output artifact for run %d", len(noops), run.DatabaseID)))
 		}
 		logsMetricsLog.Printf("Found %d noop messages", len(noops))
 	} else {
 		logsMetricsLog.Print("No safe output artifact found")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No safe output artifact found at %s for run %d", agentOutputJSONPath, run.DatabaseID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No safe output artifact found at %s for run %d", agentOutputJSONPath, run.DatabaseID)))
 		}
 	}
 
@@ -556,7 +556,7 @@ func extractMissingDataFromRun(runDir string, run WorkflowRun, verbose bool, exp
 		// New flattened structure: agent_output.json at root
 		resolvedAgentOutputFile = agentOutputJSONPath
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %s at root: %s", constants.AgentOutputFilename, agentOutputJSONPath)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %s at root: %s", constants.AgentOutputFilename, agentOutputJSONPath)))
 		}
 	} else {
 		// Try old structure: agent-output directory
@@ -568,14 +568,14 @@ func extractMissingDataFromRun(runDir string, run WorkflowRun, verbose bool, exp
 				if fileutil.FileExists(nested) {
 					resolvedAgentOutputFile = nested
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("agent_output.json is a directory; using nested file "+nested))
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("agent_output.json is a directory; using nested file "+nested))
 					}
 				} else if verbose {
 					if _, nestedErr := os.Stat(nested); nestedErr != nil {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 							fmt.Sprintf("agent_output.json directory present but nested file missing: %v", nestedErr)))
 					} else {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 							"agent_output.json directory present but nested path is not a file"))
 					}
 				}
@@ -588,7 +588,7 @@ func extractMissingDataFromRun(runDir string, run WorkflowRun, verbose bool, exp
 			if found, ok := findAgentOutputFile(runDir); ok {
 				resolvedAgentOutputFile = found
 				if verbose && found != agentOutputPath {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found agent_output.json at "+found))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found agent_output.json at "+found))
 				}
 			}
 		}
@@ -602,7 +602,7 @@ func extractMissingDataFromRun(runDir string, run WorkflowRun, verbose bool, exp
 		content, readErr := os.ReadFile(cleanPath)
 		if readErr != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read safe output file %s: %v", cleanPath, readErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read safe output file %s: %v", cleanPath, readErr)))
 			}
 			return missingData, nil // Continue processing without this file
 		}
@@ -615,7 +615,7 @@ func extractMissingDataFromRun(runDir string, run WorkflowRun, verbose bool, exp
 
 		if err := json.Unmarshal(content, &safeOutput); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse safe output JSON from %s: %v", cleanPath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse safe output JSON from %s: %v", cleanPath, err)))
 			}
 			return missingData, nil // Continue processing without this file
 		}
@@ -633,7 +633,7 @@ func extractMissingDataFromRun(runDir string, run WorkflowRun, verbose bool, exp
 
 			if err := json.Unmarshal(itemRaw, &item); err != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse item from safe output: %v", err)))
 				}
 				continue // Skip malformed items
 			}
@@ -650,19 +650,19 @@ func extractMissingDataFromRun(runDir string, run WorkflowRun, verbose bool, exp
 				missingData = append(missingData, missingDataItem)
 
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found missing_data entry: %s (%s)", item.DataType, item.Reason)))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found missing_data entry: %s (%s)", item.DataType, item.Reason)))
 				}
 			}
 		}
 
 		if verbose && len(missingData) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d missing data reports in safe output artifact for run %d", len(missingData), run.DatabaseID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d missing data reports in safe output artifact for run %d", len(missingData), run.DatabaseID)))
 		}
 		logsMetricsLog.Printf("Found %d missing data reports", len(missingData))
 	} else {
 		logsMetricsLog.Print("No safe output artifact found")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No safe output artifact found at %s for run %d", agentOutputJSONPath, run.DatabaseID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No safe output artifact found at %s for run %d", agentOutputJSONPath, run.DatabaseID)))
 		}
 	}
 
@@ -699,7 +699,7 @@ func extractMCPFailuresFromRun(runDir string, run WorkflowRun, verbose bool, exp
 			failures, parseErr := extractMCPFailuresFromLogFile(path, run, verbose, experimentName, variant)
 			if parseErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse MCP failures from %s: %v", filepath.Base(path), parseErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse MCP failures from %s: %v", filepath.Base(path), parseErr)))
 				}
 				return nil // Continue processing other files
 			}
@@ -714,7 +714,7 @@ func extractMCPFailuresFromRun(runDir string, run WorkflowRun, verbose bool, exp
 	}
 
 	if verbose && len(mcpFailures) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d MCP server failures for run %d", len(mcpFailures), run.DatabaseID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d MCP server failures for run %d", len(mcpFailures), run.DatabaseID)))
 	}
 	logsMetricsLog.Printf("Found %d MCP failures", len(mcpFailures))
 
@@ -801,7 +801,7 @@ func processMCPFailureEntry(entry map[string]any, run WorkflowRun, verbose bool,
 		*mcpFailures = append(*mcpFailures, failure)
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Found MCP server failure: %s (status: %s)", serverName, status)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Found MCP server failure: %s (status: %s)", serverName, status)))
 		}
 	}
 }
@@ -819,7 +819,7 @@ func extractSkillActivationsFromRun(runDir string, run WorkflowRun, verbose bool
 	// Phase 1 – look for explicit skill_invocation items in agent_output.json.
 	agentOutputActivations, err := extractSkillActivationsFromAgentOutput(runDir, run, verbose, experimentName, variant)
 	if err != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 			fmt.Sprintf("Failed to read skill activations from agent output for run %d: %v", run.DatabaseID, err),
 		))
 	}
@@ -829,7 +829,7 @@ func extractSkillActivationsFromRun(runDir string, run WorkflowRun, verbose bool
 	// Skills already found in Phase 1 are skipped to avoid duplicates.
 	logActivations, logErr := extractSkillActivationsFromLogFiles(runDir, run, verbose, experimentName, variant)
 	if logErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 			fmt.Sprintf("Failed to parse skill activations from logs for run %d: %v", run.DatabaseID, logErr),
 		))
 	}
@@ -849,7 +849,7 @@ func extractSkillActivationsFromRun(runDir string, run WorkflowRun, verbose bool
 	}
 
 	if verbose && len(activations) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 			fmt.Sprintf("Found %d skill activation(s) for run %d", len(activations), run.DatabaseID),
 		))
 	}
@@ -909,7 +909,7 @@ func extractSkillActivationsFromAgentOutput(runDir string, run WorkflowRun, verb
 		}
 		activations = append(activations, act)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 				fmt.Sprintf("Found skill_invocation entry: %s (status: %s)", item.Name, status),
 			))
 		}
@@ -1003,7 +1003,7 @@ func extractSkillActivationsFromLogFiles(runDir string, run WorkflowRun, verbose
 
 		found, parseErr := extractSkillActivationsFromLogFile(path, run, verbose, seen, experimentName, variant)
 		if parseErr != nil && verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("Failed to parse skill activations from %s: %v", filepath.Base(path), parseErr),
 			))
 			return nil
@@ -1051,7 +1051,7 @@ func extractSkillActivationsFromLogFile(logPath string, run WorkflowRun, verbose
 			}
 			activations = append(activations, act)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 					fmt.Sprintf("Detected skill invocation from log (%s): %s", pat.name, skillName),
 				))
 			}

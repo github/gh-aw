@@ -239,7 +239,7 @@ func (c *Compiler) extractCommandConfig(frontmatter map[string]any) (commandName
 	if hasCommand {
 		// Show deprecation warning if using old field name
 		if isDeprecated {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("The 'command:' trigger field is deprecated. Please use 'slash_command:' instead."))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("The 'command:' trigger field is deprecated. Please use 'slash_command:' instead."))
 			c.IncrementWarningCount()
 		}
 

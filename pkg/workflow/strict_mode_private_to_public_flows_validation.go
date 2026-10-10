@@ -31,7 +31,7 @@ func (c *Compiler) validatePrivateToPublicFlowsPolicy(workflowData *WorkflowData
 		)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 		"tools.github.private-to-public-flows is enabled; "+reason+". Remove this setting to keep private data isolated.",
 	))
 	c.IncrementWarningCount()

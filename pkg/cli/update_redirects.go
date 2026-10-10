@@ -113,7 +113,7 @@ func resolveRedirectedUpdateLocation(ctx context.Context, workflowName string, i
 
 		updateRedirectsLog.Printf("Following redirect: workflow=%s, from=%s, to=%s", workflowName, sourceSpecWithRef(current, latestRef), sourceSpecWithRef(redirectedSource, nextRef))
 		redirectMessage := fmt.Sprintf("Workflow %s redirect: %s → %s", workflowName, sourceSpecWithRef(current, latestRef), sourceSpecWithRef(redirectedSource, nextRef))
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(redirectMessage))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(redirectMessage))
 		history = append(history, redirectMessage)
 		current = redirectedSource
 	}

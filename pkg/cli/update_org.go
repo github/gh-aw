@@ -85,12 +85,12 @@ func runUpdateForOrg(ctx context.Context, org string, repoGlobs []string, opts U
 		if err != nil {
 			return orgRepoPreview{}, false, err
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 			fmt.Sprintf("%s: %d workflow(s), %d with updates", repo, preview.TotalWorkflows, len(preview.Workflows)),
 		))
 		if len(preview.Workflows) == 0 {
 			if v {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Skipping "+repo+": already up to date"))
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipping "+repo+": already up to date"))
 			}
 			return orgRepoPreview{}, false, nil
 		}
@@ -151,9 +151,9 @@ func formatUpdateOrgNoReposMessage(workflowNames []string) string {
 // early by a cancellation signal or a critical rate-limit condition.
 func renderOrgPreviewReport(previewByRepo []orgRepoPreview, applying bool) {
 	if applying {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Repositories with updates available (%d):", len(previewByRepo))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Repositories with updates available (%d):", len(previewByRepo))))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dry-run preview of update pull requests:"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dry-run preview of update pull requests:"))
 	}
 	for _, repo := range previewByRepo {
 		fmt.Fprintf(os.Stderr, "- %s (%d workflow(s))\n", repo.Repo, repo.TotalWorkflows)
@@ -195,14 +195,14 @@ func previewOrgRepoUpdates(ctx context.Context, repo string, opts UpdateWorkflow
 	for _, wf := range workflows {
 		sourceSpec, err := parseSourceSpec(wf.SourceSpec)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s/%s: failed to parse source: %v", repo, wf.Name, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s/%s: failed to parse source: %v", repo, wf.Name, err)))
 			orgUpdateLog.Printf("Failed to parse source for %s/%s: %v", repo, wf.Name, err)
 			continue
 		}
 		name := normalizeWorkflowID(wf.Name)
 		resolved, err := resolveRedirectedUpdateLocation(ctx, name, sourceSpec, opts.AllowMajor, verbose, opts.NoRedirect, opts.CoolDown)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s/%s: %v", repo, wf.Name, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s/%s: %v", repo, wf.Name, err)))
 			orgUpdateLog.Printf("Failed to resolve update location for %s/%s: %v", repo, wf.Name, err)
 			continue
 		}
@@ -285,7 +285,7 @@ func waitForOrgRateLimit(ctx context.Context, resource string, verbose bool) err
 		criticalRemaining := limit.Limit - orgUpdateCriticalConsumed
 		if criticalRemaining > buffer && limit.Remaining <= criticalRemaining {
 			orgUpdateLog.Printf("GitHub %s rate limit critical: %d/%d remaining (<= %d)", resource, limit.Remaining, limit.Limit, criticalRemaining)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("GitHub %s API budget critical: %d/%d remaining (consumed %d API units)", resource, limit.Remaining, limit.Limit, limit.Limit-limit.Remaining),
 			))
 			return errOrgRateLimitCritical
@@ -296,7 +296,7 @@ func waitForOrgRateLimit(ctx context.Context, resource string, verbose bool) err
 		resetAt := time.Unix(limit.Reset, 0)
 		waitFor := time.Until(resetAt) + rateLimitResetBuffer
 		if waitFor > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("Applying a %s delay to avoid reaching the GitHub %s rate limit (%d/%d remaining)", waitFor.Round(time.Second), resource, limit.Remaining, limit.Limit),
 			))
 			timer := time.NewTimer(waitFor)
@@ -311,7 +311,7 @@ func waitForOrgRateLimit(ctx context.Context, resource string, verbose bool) err
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(
 			fmt.Sprintf("GitHub %s rate limit OK: %d/%d remaining", resource, limit.Remaining, limit.Limit),
 		))
 	}
@@ -335,7 +335,7 @@ func createIssueForOrgRepo(ctx context.Context, preview orgRepoPreview, verbose 
 		return fmt.Errorf("failed to create issue in %s: %w", preview.Repo, err)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created issue in "+preview.Repo))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created issue in "+preview.Repo))
 	return nil
 }
 

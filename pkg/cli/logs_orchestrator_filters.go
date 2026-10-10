@@ -88,7 +88,7 @@ func skipByEngineFilter(result DownloadResult, opts runFilterOpts, awInfo *AwInf
 	}
 	logsOrchestratorLog.Printf("Skipping run %d: engine filter=%s, detected=%s", result.Run.DatabaseID, opts.engine, detectedEngineID)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d: engine '%s' does not match filter '%s'", result.Run.DatabaseID, detectedEngineID, opts.engine)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: engine '%s' does not match filter '%s'", result.Run.DatabaseID, detectedEngineID, opts.engine)))
 	}
 	return true
 }
@@ -106,7 +106,7 @@ func skipByRuntimeFilter(result DownloadResult, opts runFilterOpts, awInfo *AwIn
 	}
 	logsOrchestratorLog.Printf("Skipping run %d: runtime filter=%s, detected=%s", result.Run.DatabaseID, opts.runtime, detectedRuntime)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d: runtime '%s' does not match filter '%s'", result.Run.DatabaseID, detectedRuntime, opts.runtime)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: runtime '%s' does not match filter '%s'", result.Run.DatabaseID, detectedRuntime, opts.runtime)))
 	}
 	return true
 }
@@ -121,7 +121,7 @@ func skipByStagedFilter(result DownloadResult, opts runFilterOpts, awInfo *AwInf
 	}
 	logsOrchestratorLog.Printf("Skipping run %d: staged workflow filtered by --exclude-staged", result.Run.DatabaseID)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d: workflow is staged (filtered out by --exclude-staged)", result.Run.DatabaseID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: workflow is staged (filtered out by --exclude-staged)", result.Run.DatabaseID)))
 	}
 	return true
 }
@@ -163,13 +163,13 @@ func skipBySafeOutputFilter(result DownloadResult, opts runFilterOpts, verbose b
 	}
 	hasSafeOutputType, checkErr := runContainsSafeOutputType(result.LogsPath, opts.safeOutputType, verbose)
 	if checkErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to check safe output type for run %d: %v", result.Run.DatabaseID, checkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check safe output type for run %d: %v", result.Run.DatabaseID, checkErr)))
 	}
 	if hasSafeOutputType {
 		return false
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d: no '%s' safe output messages found", result.Run.DatabaseID, opts.safeOutputType)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: no '%s' safe output messages found", result.Run.DatabaseID, opts.safeOutputType)))
 	}
 	return true
 }
@@ -180,7 +180,7 @@ func skipByFilteredIntegrityFilter(result DownloadResult, opts runFilterOpts, ve
 	}
 	hasFiltered, checkErr := runHasDifcFilteredItems(result.LogsPath, verbose)
 	if checkErr != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to check DIFC filtered items for run %d: %v", result.Run.DatabaseID, checkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check DIFC filtered items for run %d: %v", result.Run.DatabaseID, checkErr)))
 		return true
 	}
 	if hasFiltered {
@@ -212,7 +212,7 @@ func skipByGradersFilter(result DownloadResult, opts runFilterOpts, verbose bool
 func logAndMaybeExplainSkip(runID int64, logReason, message string, verbose bool) {
 	logsOrchestratorLog.Printf("Skipping run %d: %s", runID, logReason)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d: %s", runID, message)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: %s", runID, message)))
 	}
 }
 
@@ -231,7 +231,7 @@ func buildProcessedRun(ctx context.Context, result DownloadResult, verbose, logF
 	if failedJobCount, err := fetchJobStatusesForProcessedRun(ctx, run.DatabaseID, verbose); err == nil {
 		run.ErrorCount += failedJobCount
 		if verbose && logFailedJobs && failedJobCount > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Added %d failed jobs to error count for run %d", failedJobCount, run.DatabaseID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Added %d failed jobs to error count for run %d", failedJobCount, run.DatabaseID)))
 		}
 	}
 

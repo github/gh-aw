@@ -54,7 +54,7 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Inspecting MCP servers in: "+workflowPath))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Inspecting MCP servers in: "+workflowPath))
 	}
 
 	// Use the compiler to parse the workflow file
@@ -66,13 +66,13 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 	if err != nil {
 		// Handle shared workflow error separately (not a fatal error for inspection)
 		if errors.As(err, new(*workflow.SharedWorkflowError)) {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Cannot inspect shared/imported workflows directly - they must be imported by a main workflow"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Cannot inspect shared/imported workflows directly - they must be imported by a main workflow"))
 			return nil
 		}
 
 		// Handle redirect-only workflow error separately (not a fatal error for inspection)
 		if errors.As(err, new(*workflow.RedirectOnlyWorkflowError)) {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Cannot inspect redirect-only workflows directly - run 'gh aw update' to follow the redirect and get the full workflow"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Cannot inspect redirect-only workflows directly - run 'gh aw update' to follow the redirect and get the full workflow"))
 			return nil
 		}
 
@@ -85,7 +85,7 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 		workflowData.Name, workflowData.MCPScripts != nil)
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Workflow parsed successfully"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow parsed successfully"))
 	}
 
 	// Build frontmatter map from WorkflowData for MCP extraction
@@ -114,7 +114,7 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 		config, serverCmd, tmpDir, err := startMCPScriptsServer(ctx, workflowData.MCPScripts, verbose)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to start mcp-scripts server: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to start mcp-scripts server: %v", err)))
 			}
 			mcpInspectLog.Printf("Failed to start mcp-scripts server: %v", err)
 		} else {
@@ -132,7 +132,7 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 			if mcpScriptsServerCmd.Process != nil {
 				// Try graceful shutdown first
 				if err := mcpScriptsServerCmd.Process.Signal(os.Interrupt); err != nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to send interrupt signal: %v", err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to send interrupt signal: %v", err)))
 				}
 				// Wait a moment for graceful shutdown (respects context cancellation)
 				select {
@@ -145,7 +145,7 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 			// Cleanup temporary directory
 			if mcpScriptsTmpDir != "" {
 				if err := os.RemoveAll(mcpScriptsTmpDir); err != nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to cleanup temporary directory: %v", err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cleanup temporary directory: %v", err)))
 				}
 			}
 		}()
@@ -153,23 +153,23 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 
 	if len(mcpConfigs) == 0 {
 		if serverFilter != "" {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No MCP servers matching filter '%s' found in workflow", serverFilter)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No MCP servers matching filter '%s' found in workflow", serverFilter)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No MCP servers found in workflow"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No MCP servers found in workflow"))
 		}
 		return nil
 	}
 
 	// Inspect each MCP server
 	if toolFilter != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d MCP server(s), looking for tool '%s'", len(mcpConfigs), toolFilter)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d MCP server(s), looking for tool '%s'", len(mcpConfigs), toolFilter)))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d MCP server(s) to inspect", len(mcpConfigs))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d MCP server(s) to inspect", len(mcpConfigs))))
 	}
 	if toolFilter == "" {
 		if hierarchy := renderMCPInspectionTree(workflowPath, workflowData, mcpConfigs); hierarchy != "" {
 			fmt.Fprintln(os.Stderr)
-			fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("MCP Server Hierarchy"))
+			fmt.Fprintln(os.Stderr, console.FormatSectionHeader("MCP Server Hierarchy"))
 			fmt.Fprintln(os.Stderr, hierarchy)
 		}
 	}
@@ -180,7 +180,7 @@ func InspectWorkflowMCP(ctx context.Context, workflowFile string, serverFilter s
 			fmt.Fprintln(os.Stderr)
 		}
 		if err := inspectMCPServer(config, toolFilter, verbose, useActionsSecrets); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatErrorStderr(console.CompilerError{
+			fmt.Fprintln(os.Stderr, console.FormatError(console.CompilerError{
 				Type:    "error",
 				Message: fmt.Sprintf("Failed to inspect MCP server '%s': %v", config.Name, err),
 			}))

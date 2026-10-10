@@ -106,7 +106,7 @@ func runHTTPServer(server *mcp.Server, port int) error {
 		ReadHeaderTimeout: MCPServerHTTPTimeout,
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Starting MCP server on "+mcpHTTPServerDisplayURL(port)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Starting MCP server on "+mcpHTTPServerDisplayURL(port)))
 	mcpLog.Printf("HTTP server listening on %s", addr)
 
 	// Run the HTTP server

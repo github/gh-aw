@@ -110,7 +110,7 @@ func RunListWorkflows(ctx context.Context, repo, path, pattern string, verbose b
 			fmt.Fprintln(os.Stdout, string(jsonBytes))
 			return nil
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflow files found."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow files found."))
 		return nil
 	}
 
@@ -231,13 +231,13 @@ func outputWorkflowList(workflows []WorkflowListItem, jsonOutput bool) error {
 	// Print workflow count message for text output
 	workflowCount := len(workflows)
 	if workflowCount == 1 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Found 1 workflow"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Found 1 workflow"))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Found %d workflows", workflowCount)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Found %d workflows", workflowCount)))
 	}
 
 	// Render the table using struct-based rendering
-	fmt.Fprint(os.Stderr, console.RenderStructStderr(workflows))
+	fmt.Fprint(os.Stderr, console.RenderStruct(workflows))
 
 	return nil
 }

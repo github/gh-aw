@@ -10,48 +10,54 @@ import (
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 )
 
-func checkRenderOptions(pass *analysis.Pass, call *ast.CallExpr) {
+func checkRenderOptions(pass *analysis.Pass, call *ast.CallExpr, destination string) {
 	if len(call.Args) > 1 {
-		checkOptionsArgument(pass, call.Args[1])
+		checkOptionsArgument(pass, call.Args[1], destination)
 	}
 }
 
-func checkOptionsArgument(pass *analysis.Pass, options ast.Expr) {
+func checkOptionsArgument(pass *analysis.Pass, options ast.Expr, destination string) {
 	// Unknown option variables are reported without an automatic fix: changing
 	// shared options could affect callers that intentionally target stdout.
 	literal, ok := astutil.UnwrapParenExpr(options).(*ast.CompositeLit)
-	if ok && literalTargetsStderr(pass, literal) {
-		return
+	if ok {
+		stderr, known := literalDestination(pass, literal)
+		if known && stderr == (destination == "Stderr") {
+			return
+		}
 	}
 	pass.Report(analysis.Diagnostic{
 		Pos: options.Pos(), End: options.End(),
-		Message: "RenderStructWithOptions written to stderr requires RenderOptions with explicit Stderr: true",
+		Message: "RenderStructWithOptions requires RenderOptions matching " + destination,
 	})
 }
 
-func literalTargetsStderr(pass *analysis.Pass, literal *ast.CompositeLit) bool {
+func literalDestination(pass *analysis.Pass, literal *ast.CompositeLit) (bool, bool) {
 	optionType := pass.TypesInfo.TypeOf(literal)
 	if optionType == nil {
-		return false
+		return false, false
 	}
 	fields, ok := optionType.Underlying().(*types.Struct)
 	if !ok {
-		return false
+		return false, false
 	}
 	for i, element := range literal.Elts {
 		if keyed, ok := element.(*ast.KeyValueExpr); ok {
 			key, ok := keyed.Key.(*ast.Ident)
 			if ok && key.Name == "Stderr" {
-				return constantTrue(pass, keyed.Value)
+				return constantBool(pass, keyed.Value)
 			}
 		} else if i < fields.NumFields() && fields.Field(i).Name() == "Stderr" {
-			return constantTrue(pass, element)
+			return constantBool(pass, element)
 		}
 	}
-	return false
+	return false, true
 }
 
-func constantTrue(pass *analysis.Pass, expr ast.Expr) bool {
+func constantBool(pass *analysis.Pass, expr ast.Expr) (bool, bool) {
 	value := pass.TypesInfo.Types[expr].Value
-	return value != nil && value.Kind() == constant.Bool && constant.BoolVal(value)
+	if value != nil && value.Kind() == constant.Bool {
+		return constant.BoolVal(value), true
+	}
+	return false, false
 }

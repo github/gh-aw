@@ -44,14 +44,14 @@ func runSyftOnLockFiles(lockFiles []string, verbose bool, strict bool) error { /
 	images := collectContainerImagesFromLockFiles(lockFiles)
 	if len(images) == 0 {
 		syftLog.Print("No container images found in lock files")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Running syft SBOM scanner (0 container images found in lock files)"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Running syft SBOM scanner (0 container images found in lock files)"))
 		return nil
 	}
 
 	if len(images) == 1 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Running syft SBOM scanner on 1 container image"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Running syft SBOM scanner on 1 container image"))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Running syft SBOM scanner on %d container images", len(images))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Running syft SBOM scanner on %d container images", len(images))))
 	}
 
 	// Create output directory for SBOM files
@@ -81,9 +81,9 @@ func runSyftOnLockFiles(lockFiles []string, verbose bool, strict bool) error { /
 
 	// Report SBOM file locations
 	if verbose && len(results) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("SBOM files saved to: "+sbomDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("SBOM files saved to: "+sbomDir))
 		for _, result := range results {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("  %s: %s (%d packages)", result.ImageRef, result.SBOMPath, result.PackageCount)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("  %s: %s (%d packages)", result.ImageRef, result.SBOMPath, result.PackageCount)))
 		}
 	}
 
@@ -95,7 +95,7 @@ func runSyftOnLockFiles(lockFiles []string, verbose bool, strict bool) error { /
 	if strict {
 		return fmt.Errorf("%s", errMsg)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(errMsg))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(errMsg))
 	return nil
 }
 
@@ -135,7 +135,7 @@ func runSyftOnImage(ctx context.Context, imageRef, sbomDir string, verbose bool)
 
 	if verbose {
 		dockerCmd := shellJoinArgs([]string{"docker", "run", "--rm", syftImageRef, validatedImageRef, "-o", "syft-json"})
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Run syft directly: "+dockerCmd))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Run syft directly: "+dockerCmd))
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -166,7 +166,7 @@ func runSyftOnImage(ctx context.Context, imageRef, sbomDir string, verbose bool)
 		return nil, fmt.Errorf("failed to write SBOM file for %s: %w", imageRef, err)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("syft scanned %s (%d packages, SBOM: %s)", imageRef, len(output.Artifacts), sbomPath)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("syft scanned %s (%d packages, SBOM: %s)", imageRef, len(output.Artifacts), sbomPath)))
 
 	return &SyftScanResult{
 		ImageRef:     imageRef,

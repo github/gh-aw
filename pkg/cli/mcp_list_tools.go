@@ -70,7 +70,7 @@ func ListToolsForMCP(workflowFile string, mcpServerName string, verbose bool) er
 
 	if targetConfig == nil {
 		mcpListToolsLog.Printf("MCP server %q not found in workflow %q", mcpServerName, filepath.Base(workflowPath))
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("MCP server '%s' not found in workflow '%s'", mcpServerName, filepath.Base(workflowPath))))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("MCP server '%s' not found in workflow '%s'", mcpServerName, filepath.Base(workflowPath))))
 
 		// Show available servers
 		if len(mcpConfigs) > 0 {
@@ -125,7 +125,7 @@ func findWorkflowsWithMCPServer(workflowsDir string, mcpServerName string, verbo
 	}
 
 	if len(matchingWorkflows) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("MCP server '%s' not found in any workflow", mcpServerName)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("MCP server '%s' not found in any workflow", mcpServerName)))
 		return nil
 	}
 
@@ -144,7 +144,7 @@ func findWorkflowsWithMCPServer(workflowsDir string, mcpServerName string, verbo
 // displayToolsList shows the tools available from the MCP server in a formatted table
 func displayToolsList(info *parser.MCPServerInfo, verbose bool) {
 	if len(info.Tools) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No tools available from this MCP server"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No tools available from this MCP server"))
 		return
 	}
 

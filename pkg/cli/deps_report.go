@@ -70,7 +70,7 @@ func GenerateDependencyReport(ctx context.Context, verbose bool) (*DependencyRep
 	outdated, err := CheckOutdatedDependencies(ctx, verbose)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("could not check outdated dependencies: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("could not check outdated dependencies: %v", err)))
 		}
 		outdated = []OutdatedDependency{}
 	}
@@ -79,7 +79,7 @@ func GenerateDependencyReport(ctx context.Context, verbose bool) (*DependencyRep
 	advisories, err := CheckSecurityAdvisories(ctx, verbose)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("could not check security advisories: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("could not check security advisories: %v", err)))
 		}
 		advisories = []SecurityAdvisory{}
 	}
@@ -101,14 +101,14 @@ func GenerateDependencyReport(ctx context.Context, verbose bool) (*DependencyRep
 
 // DisplayDependencyReport shows the comprehensive dependency report
 func DisplayDependencyReport(report *DependencyReport) {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("═══════════════════════════════════════"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  Dependency Health Report"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("═══════════════════════════════════════"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("═══════════════════════════════════════"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Dependency Health Report"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("═══════════════════════════════════════"))
 	fmt.Fprintln(os.Stderr, "")
 
 	// Summary section
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Summary"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("-------"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Summary"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("-------"))
 	fmt.Fprintf(os.Stderr, "Total dependencies: %d (%d direct, %d indirect)\n", report.TotalDeps, report.DirectDeps, report.IndirectDeps)
 
 	outdatedPercentage := 0.0
@@ -128,25 +128,25 @@ func DisplayDependencyReport(report *DependencyReport) {
 
 	// Outdated dependencies section
 	if len(report.Outdated) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Outdated Dependencies"))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("---------------------"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Outdated Dependencies"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("---------------------"))
 		DisplayOutdatedDependencies(report.Outdated, report.DirectDeps)
 		fmt.Fprintln(os.Stderr, "")
 	}
 
 	// Security status section
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Security Status"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("---------------"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Security Status"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("---------------"))
 	if len(report.Advisories) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("No known vulnerabilities"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("No known vulnerabilities"))
 	} else {
 		DisplaySecurityAdvisories(report.Advisories)
 	}
 	fmt.Fprintln(os.Stderr, "")
 
 	// Dependency maturity section
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dependency Maturity"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("-------------------"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dependency Maturity"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("-------------------"))
 	fmt.Fprintf(os.Stderr, "v0.x (unstable): %d (%.0f%%)", report.V0Count, v0Percentage)
 	if v0Percentage > 30 {
 		fmt.Fprintf(os.Stderr, " ⚠️")
@@ -162,8 +162,8 @@ func DisplayDependencyReport(report *DependencyReport) {
 
 	// Recommendations section
 	if len(report.Outdated) > 0 || len(report.Advisories) > 0 || v0Percentage > 30 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Recommendations"))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("---------------"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recommendations"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("---------------"))
 
 		if len(report.Advisories) > 0 {
 			fmt.Fprintf(os.Stderr, "🔴 CRITICAL: Address %d security %s immediately\n", len(report.Advisories), pluralize("advisory", len(report.Advisories)))

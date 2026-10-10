@@ -130,7 +130,7 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 	if len(artifactFilter) > 0 {
 		auditDiffLog.Printf("Artifact filter active: %v", artifactFilter)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
 		}
 	}
 
@@ -145,19 +145,19 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 	// Check context cancellation
 	select {
 	case <-ctx.Done():
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 		return ctx.Err()
 	default:
 	}
 
 	if len(compareRunIDs) == 1 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Comparing workflow runs: Run #%d → Run #%d", baseRunID, compareRunIDs[0])))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Comparing workflow runs: Run #%d → Run #%d", baseRunID, compareRunIDs[0])))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Comparing workflow runs: Run #%d (base) vs %d comparison runs", baseRunID, len(compareRunIDs))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Comparing workflow runs: Run #%d (base) vs %d comparison runs", baseRunID, len(compareRunIDs))))
 	}
 
 	// Load base run summary once (shared across all comparisons)
-	fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Loading data for base run %d...", baseRunID)))
+	fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Loading data for base run %d...", baseRunID)))
 	baseSummary, err := loadRunSummaryForDiff(ctx, baseRunID, outputDir, owner, repo, hostname, verbose, artifactFilter)
 	if err != nil {
 		return fmt.Errorf("failed to load data for base run %d: %w", baseRunID, err)
@@ -169,12 +169,12 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 		// Check context cancellation between downloads
 		select {
 		case <-ctx.Done():
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 			return ctx.Err()
 		default:
 		}
 
-		fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Loading data for run %d...", compareRunID)))
+		fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Loading data for run %d...", compareRunID)))
 		compareSummary, err := loadRunSummaryForDiff(ctx, compareRunID, outputDir, owner, repo, hostname, verbose, artifactFilter)
 		if err != nil {
 			return fmt.Errorf("failed to load data for run %d: %w", compareRunID, err)
@@ -184,13 +184,13 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 		fw1 := baseSummary.FirewallAnalysis
 		fw2 := compareSummary.FirewallAnalysis
 		if fw1 == nil && fw2 == nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No firewall data found for run pair %d→%d. Both runs may predate firewall logging.", baseRunID, compareRunID)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No firewall data found for run pair %d→%d. Both runs may predate firewall logging.", baseRunID, compareRunID)))
 		} else {
 			if fw1 == nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No firewall data found for base run %d (older run may lack firewall logs)", baseRunID)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No firewall data found for base run %d (older run may lack firewall logs)", baseRunID)))
 			}
 			if fw2 == nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No firewall data found for run %d", compareRunID)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No firewall data found for run %d", compareRunID)))
 			}
 		}
 

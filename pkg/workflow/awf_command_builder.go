@@ -626,7 +626,7 @@ func appendLegacyHostPortsArgs(workflowData *WorkflowData, firewallConfig *Firew
 		return awfArgs
 	}
 	warning := fmt.Sprintf("sandbox host ports require AWF %s or newer; skipping --allow-host-ports for AWF version %q", constants.AWFAllowHostPortsMinVersion, getAWFImageTag(firewallConfig))
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
 	awfHelpersLog.Printf("Warning: %s", warning)
 	return awfArgs
 }

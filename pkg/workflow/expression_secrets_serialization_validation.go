@@ -196,7 +196,7 @@ func (c *Compiler) validateSecretsSerializationExpressions(workflowData *Workflo
 		return fmt.Errorf("strict mode: %s", msg)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(msg))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
 	c.IncrementWarningCount()
 	return nil
 }

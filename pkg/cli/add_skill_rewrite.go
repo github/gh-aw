@@ -78,7 +78,7 @@ func applyLocalSkillRefRewriting(content string, sourceInfo *FetchedWorkflow, op
 	repoSlug, err := GetCurrentRepoSlug()
 	if err != nil {
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("Skipping local skill ref rewriting: could not determine current repository: %v", err),
 			))
 		}
@@ -89,7 +89,7 @@ func applyLocalSkillRefRewriting(content string, sourceInfo *FetchedWorkflow, op
 	headSHA, err := getLocalHeadSHA(gitRoot)
 	if err != nil {
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("Skipping local skill ref rewriting: could not determine HEAD commit: %v", err),
 			))
 		}
@@ -103,7 +103,7 @@ func applyLocalSkillRefRewriting(content string, sourceInfo *FetchedWorkflow, op
 		return content, nil
 	}
 	if updated != content && opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Rewrote local skill references to fully-qualified specs"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Rewrote local skill references to fully-qualified specs"))
 	}
 	return updated, nil
 }

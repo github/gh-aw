@@ -72,7 +72,7 @@ func GenerateActionMetadataCommand() error {
 		"close_discussion.cjs",
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("🔍 Generating actions for %d JavaScript modules...", len(targetFiles))))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("🔍 Generating actions for %d JavaScript modules...", len(targetFiles))))
 
 	generatedCount := 0
 	generateActionMetadataLog.Printf("Processing %d target JavaScript files in %s", len(targetFiles), jsDir)
@@ -84,12 +84,12 @@ func GenerateActionMetadataCommand() error {
 		contentBytes, err := os.ReadFile(jsPath)
 		if err != nil {
 			generateActionMetadataLog.Printf("Skipping %s: failed to read file: %v", filename, err)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s: %s", filename, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %s", filename, err)))
 			continue
 		}
 		content := string(contentBytes)
 
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("\n📦 Processing: "+filename))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("\n📦 Processing: "+filename))
 
 		// Extract metadata
 		metadata, err := extractActionMetadata(filename, content)
@@ -115,21 +115,21 @@ func GenerateActionMetadataCommand() error {
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Failed to generate action.yml: "+err.Error()))
 			continue
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  Generated action.yml"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Generated action.yml"))
 
 		// Generate README.md
 		if err := generateReadme(actionDir, metadata); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Failed to generate README.md: "+err.Error()))
 			continue
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  Generated README.md"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Generated README.md"))
 
 		// Copy source file with owner-only read/write permissions (0600) for security best practices
 		srcPath := filepath.Join(srcDir, "index.js")
 		if err := os.WriteFile(srcPath, []byte(content), constants.FilePermSensitive); err != nil {
 			return fmt.Errorf("failed to write source file: %w", err)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  Copied source to src/index.js"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Copied source to src/index.js"))
 
 		generatedCount++
 	}
@@ -139,12 +139,12 @@ func GenerateActionMetadataCommand() error {
 		return errors.New("no actions were generated")
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("\n✨ Successfully generated %d action(s)", generatedCount)))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("\nNext steps:"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  1. Review the generated action.yml and README.md files"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  2. Update dependency mapping in pkg/cli/actions_build_command.go"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  3. Run 'make actions-build' to build the actions"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("  4. Test the actions in a workflow"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("\n✨ Successfully generated %d action(s)", generatedCount)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("\nNext steps:"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  1. Review the generated action.yml and README.md files"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  2. Update dependency mapping in pkg/cli/actions_build_command.go"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  3. Run 'make actions-build' to build the actions"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  4. Test the actions in a workflow"))
 
 	return nil
 }

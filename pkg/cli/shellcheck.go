@@ -438,7 +438,7 @@ func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []strin
 
 	allSteps := collectShellcheckSteps(lockFiles, resources)
 	if len(allSteps) == 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running shellcheck on run steps (0 run steps found in lock files)"))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps (0 run steps found in lock files)"))
 		return nil
 	}
 	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker)
@@ -462,7 +462,7 @@ func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScript
 		lockSteps, err := extractRunStepsFromLockFile(lockFile)
 		if err != nil {
 			shellcheckLog.Printf("Failed to extract run steps from %s: %v", lockFile, err)
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr("shellcheck: could not parse "+filepath.Base(lockFile)+": "+err.Error()))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage("shellcheck: could not parse "+filepath.Base(lockFile)+": "+err.Error()))
 			continue
 		}
 		steps = append(steps, lockSteps...)
@@ -484,9 +484,9 @@ func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScript
 func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles []string, verbose bool, strict bool, useDocker bool) error {
 	shellcheckLog.Printf("Running shellcheck on %d run step resource(s) from %d lock file(s) (strict=%t, docker=%t)", len(allSteps), len(lockFiles), strict, useDocker)
 	if len(lockFiles) == 1 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running shellcheck on run steps in "+filepath.Base(lockFiles[0])))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps in "+filepath.Base(lockFiles[0])))
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Running shellcheck on %d run step resources", len(allSteps))))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running shellcheck on %d run step resources", len(allSteps))))
 	}
 	results := runShellcheckWorkers(ctx, allSteps, verbose, useDocker)
 	return reportShellcheckResults(allSteps, results, strict)

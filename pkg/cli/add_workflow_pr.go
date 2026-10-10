@@ -98,7 +98,7 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 	// Ensure we switch back to original branch on exit
 	defer func() {
 		if switchErr := switchBranch(currentBranch, opts.Verbose); switchErr != nil && opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to switch back to branch %s: %v", currentBranch, switchErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to switch back to branch %s: %v", currentBranch, switchErr)))
 		}
 	}()
 
@@ -123,7 +123,7 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil {
 			addWorkflowPRLog.Printf("Failed to rollback files after staging failure: %v", rollbackErr)
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 			}
 		}
 		return 0, "", fmt.Errorf("failed to stage workflow files: %w", err)
@@ -133,7 +133,7 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 	if err := stageGitAttributesIfChanged(); err != nil {
 		addWorkflowPRLog.Printf("Failed to stage .gitattributes: %v", err)
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to stage .gitattributes: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to stage .gitattributes: %v", err)))
 		}
 	}
 
@@ -183,8 +183,8 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 		addWorkflowPRLog.Printf("Failed to push branch: %v", err)
 		// Treat push failure as a warning: keep the files and commit intact so the
 		// user can push manually. Do NOT rollback.
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to push branch %s: %v", branchName, err)))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to push branch %s: %v", branchName, err)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 			"The workflow files have been committed to local branch "+branchName+".\n"+
 				"  To push the branch and create a pull request, run:\n\n"+
 				"    git push -u origin "+branchName+"\n"+
@@ -200,7 +200,7 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 	if err != nil {
 		addWorkflowPRLog.Printf("Failed to create PR: %v", err)
 		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil && opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
 		return 0, "", fmt.Errorf("failed to create PR: %w", err)
 	}
@@ -212,7 +212,7 @@ func addWorkflowsWithPR(ctx context.Context, workflows []*ResolvedWorkflow, opts
 		return prNumber, prURL, fmt.Errorf("failed to switch back to branch %s: %w", currentBranch, err)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created pull request "+prURL))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created pull request "+prURL))
 	return prNumber, prURL, nil
 }
 

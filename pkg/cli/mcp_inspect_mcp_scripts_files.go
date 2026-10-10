@@ -47,7 +47,7 @@ func writeMCPScriptsFiles(dir string, mcpScriptsConfig *workflow.MCPScriptsConfi
 			return fmt.Errorf("failed to write %s: %w", jsFile.name, err)
 		}
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Wrote "+jsFile.name))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Wrote "+jsFile.name))
 		}
 	}
 
@@ -60,7 +60,7 @@ func writeMCPScriptsFiles(dir string, mcpScriptsConfig *workflow.MCPScriptsConfi
 		return fmt.Errorf("failed to write tools.json: %w", err)
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Wrote tools.json"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Wrote tools.json"))
 	}
 
 	// Generate and write mcp-server.cjs entry point
@@ -72,7 +72,7 @@ func writeMCPScriptsFiles(dir string, mcpScriptsConfig *workflow.MCPScriptsConfi
 		return fmt.Errorf("failed to write mcp-server.cjs: %w", err)
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Wrote mcp-server.cjs"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Wrote mcp-server.cjs"))
 	}
 
 	// Generate and write tool handler files
@@ -104,7 +104,7 @@ func writeMCPScriptsFiles(dir string, mcpScriptsConfig *workflow.MCPScriptsConfi
 			return fmt.Errorf("failed to write tool %s: %w", toolName, err)
 		}
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Wrote tool handler: %s%s", toolName, extension)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Wrote tool handler: %s%s", toolName, extension)))
 		}
 	}
 

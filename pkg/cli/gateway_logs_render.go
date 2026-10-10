@@ -289,7 +289,7 @@ func displayAggregatedGatewayMetrics(processedRuns []ProcessedRun, outputDir str
 		fmt.Fprint(os.Stderr, metricsOutput)
 		if runCount > 1 {
 			fmt.Fprintf(os.Stderr, "\n%s\n",
-				console.FormatInfoMessageStderr(fmt.Sprintf("Gateway metrics aggregated from %d runs", runCount)))
+				console.FormatInfoMessage(fmt.Sprintf("Gateway metrics aggregated from %d runs", runCount)))
 		}
 	}
 }

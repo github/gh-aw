@@ -90,15 +90,15 @@ func (c *AddInteractiveConfig) ensurePullRequestMerged(prNumber int, prURL strin
 	addInteractiveLog.Printf("Ensuring PR merged: prNumber=%d", prNumber)
 	if prNumber == 0 {
 		if prURL == "" {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Requested workflow files already exist locally; no pull request was created."))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Requested workflow files already exist locally; no pull request was created."))
 			return nil
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not determine PR number"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not determine PR number"))
 		fmt.Fprintln(os.Stderr, "Please merge the PR manually from the GitHub web interface.")
 		return nil
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Pull request created: "+prURL))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Pull request created: "+prURL))
 	return c.runPRMergeLoop(prNumber, prURL)
 }
 
@@ -129,11 +129,11 @@ func (c *AddInteractiveConfig) runPRMergeLoop(prNumber int, prURL string) error 
 		case mergeActionReview:
 			userReviewing = true
 		case mergeActionConfirmed:
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Great – continuing with the merged pull request"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Great – continuing with the merged pull request"))
 			mergeDone = true
 		case mergeActionExit:
 			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Exiting. You can merge the pull request later: "+prURL))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Exiting. You can merge the pull request later: "+prURL))
 			return errors.New("user exited before PR was merged")
 		}
 	}
@@ -177,17 +177,17 @@ func buildMergeOptions(mergeFailed, userReviewing bool) []huh.Option[mergeAction
 func (c *AddInteractiveConfig) handleMergeAttempt(prNumber int, prURL string, mergeFailed bool) (mergeDone bool, nowFailed bool) {
 	if mergeErr := c.mergePullRequest(prNumber); mergeErr != nil {
 		if isAlreadyMergedGHError(mergeErr) {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Merged pull request "+prURL))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Merged pull request "+prURL))
 			return true, mergeFailed
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to merge PR: %v", mergeErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to merge PR: %v", mergeErr)))
 		if mergeFailed {
 			fmt.Fprintln(os.Stderr, "Please merge the PR manually: "+prURL)
 		}
 		return false, true
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Merged pull request "+prURL))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Merged pull request "+prURL))
 	return true, mergeFailed
 }
 
@@ -204,14 +204,14 @@ func (c *AddInteractiveConfig) promptAndEditPRTitle(prNumber int) (bool, error) 
 	}
 	newTitle = strings.TrimSpace(newTitle)
 	if newTitle == "" {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("PR title cannot be empty, keeping current title"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("PR title cannot be empty, keeping current title"))
 		return false, nil
 	}
 	if err := editPRTitle(prNumber, newTitle, c.RepoOverride); err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update PR title: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update PR title: %v", err)))
 		return false, nil
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("PR title updated to: "+newTitle))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("PR title updated to: "+newTitle))
 	return true, nil
 }
 
@@ -222,11 +222,11 @@ func (c *AddInteractiveConfig) configureRepositorySecret(secretName, secretValue
 		// Secret already exists in repo, nothing to do
 		if c.Verbose {
 			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Secret '%s' already configured", secretName)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Secret '%s' already configured", secretName)))
 		}
 	} else {
 		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Adding secret '%s' to repository...", secretName)))
+		fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Adding secret '%s' to repository...", secretName)))
 
 		if err := c.addRepositorySecret(secretName, secretValue); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to add secret: %v", err)))
@@ -237,7 +237,7 @@ func (c *AddInteractiveConfig) configureRepositorySecret(secretName, secretValue
 			return fmt.Errorf("failed to add secret: %w", err)
 		}
 
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Secret '%s' added", secretName)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Secret '%s' added", secretName)))
 	}
 
 	return nil
@@ -281,7 +281,7 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 
 	// Fetch the latest changes from origin
 	if c.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr("Fetching latest changes from GitHub..."))
+		fmt.Fprintln(os.Stderr, console.FormatProgressMessage("Fetching latest changes from GitHub..."))
 	}
 
 	fetchCmd := exec.Command("git", "fetch", "origin", defaultBranch)
@@ -313,7 +313,7 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 	}
 
 	if c.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Local branch updated with merged changes"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Local branch updated with merged changes"))
 	}
 
 	return nil
@@ -362,7 +362,7 @@ func (c *AddInteractiveConfig) checkCleanWorkingDirectoryForPR(workflowFiles, in
 			return inspectErr
 		}
 		if blockers.empty() {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Working tree is ready for pull request creation"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Working tree is ready for pull request creation"))
 			return nil
 		}
 
@@ -374,7 +374,7 @@ func (c *AddInteractiveConfig) checkCleanWorkingDirectoryForPR(workflowFiles, in
 		switch resolution {
 		case workingTreeOverwrite:
 			c.forceOverwrite = true
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Overlapping workflow files will be overwritten"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Overlapping workflow files will be overwritten"))
 			return nil
 		case workingTreeExit:
 			return errors.New("user exited before cleaning the working tree")
@@ -503,7 +503,7 @@ func (c *AddInteractiveConfig) mergePullRequest(prNumber int) error {
 	combinedText := strings.ToLower(string(squashOutput) + squashErr.Error())
 	if strings.Contains(combinedText, squashMergeNotAllowedErr) {
 		addInteractiveLog.Printf("Squash merge rejected for PR #%d, retrying with merge commit", prNumber)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Squash merges are not allowed on this repository, retrying with merge commit"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Squash merges are not allowed on this repository, retrying with merge commit"))
 		mergeOutput, mergeErr := workflow.RunGHCombined("Merging pull request...", "pr", "merge", prArg, "--repo", c.RepoOverride, "--merge")
 		if mergeErr != nil {
 			return fmt.Errorf("merge failed: %w (output: %s)", mergeErr, string(mergeOutput))

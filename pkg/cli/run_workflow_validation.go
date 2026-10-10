@@ -308,7 +308,7 @@ func validateRemoteWorkflow(workflowName string, repoOverride string, verbose bo
 	lockFileName := normalizedID + ".lock.yml"
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Checking if workflow '%s' exists in repository '%s'...", lockFileName, repoOverride)))
+		fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Checking if workflow '%s' exists in repository '%s'...", lockFileName, repoOverride)))
 	}
 
 	workflows, err := fetchGitHubWorkflows(context.Background(), repoOverride, verbose)
@@ -320,7 +320,7 @@ func validateRemoteWorkflow(workflowName string, repoOverride string, verbose bo
 	for _, wf := range workflows {
 		if filepath.Base(wf.Path) == lockFileName {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Found workflow '%s' in repository (path: %s, state: %s)",
+				fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Found workflow '%s' in repository (path: %s, state: %s)",
 					wf.Name, wf.Path, wf.State)))
 			}
 			return nil

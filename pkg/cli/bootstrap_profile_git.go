@@ -27,7 +27,7 @@ func runBootstrapCommitAndPushAction(ctx context.Context, repoDir string, action
 	}
 	if !pending {
 		bootstrapGitLog.Print("Skipping commit-and-push: local checkout is already clean")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipping commit and push because the local checkout is already clean."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping commit and push because the local checkout is already clean."))
 		return nil
 	}
 
@@ -47,7 +47,7 @@ func runBootstrapCommitAndPushAction(ctx context.Context, repoDir string, action
 	}
 
 	bootstrapGitLog.Print("Committed and pushed bootstrap changes successfully")
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Committed and pushed bootstrap changes"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Committed and pushed bootstrap changes"))
 	return nil
 }
 

@@ -233,7 +233,7 @@ func (c *Compiler) validateContainerImages(workflowData *WorkflowData) error {
 	// For requireDocker=true, the per-image errors are already returned below
 	// and surfaced as a warning by the caller — no extra warning is needed.
 	if daemonWasAvailable && !isDockerDaemonRunning() && !c.requireDocker {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Docker daemon is not running — skipping container image validation"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Docker daemon is not running — skipping container image validation"))
 		c.IncrementWarningCount()
 	}
 
@@ -272,7 +272,7 @@ func (c *Compiler) validateRuntimePackages(workflowData *WorkflowData) error {
 					// The workflow may still compile and run successfully in environments
 					// that have npm (e.g., GitHub Actions).
 					runtimeValidationLog.Print("npm not available, skipping npx package validation")
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("npm not found, skipping npx package validation"))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("npm not found, skipping npx package validation"))
 					c.IncrementWarningCount()
 				} else {
 					runtimeValidationLog.Printf("Npx package validation failed: %v", err)

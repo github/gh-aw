@@ -184,7 +184,7 @@ func (config *remoteDispatchWorkflowFetch) workflowPaths(workflowName string) (s
 	}
 	if rel, err := filepath.Rel(config.absTargetDir, absTargetPath); err != nil || strings.HasPrefix(rel, "..") {
 		if config.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Refusing to write dispatch workflow outside target directory: %q", workflowName)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write dispatch workflow outside target directory: %q", workflowName)))
 		}
 		return "", "", false
 	}
@@ -201,7 +201,7 @@ func (config *remoteDispatchWorkflowFetch) checkExisting(workflowName, targetPat
 	existingSourceRepo := readSourceRepoFromFile(targetPath)
 	if existingSourceRepo == config.spec.RepoSlug {
 		if config.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dispatch workflow from same source already exists, skipping: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dispatch workflow from same source already exists, skipping: "+targetPath))
 		}
 		return true, true, nil
 	}
@@ -218,7 +218,7 @@ func (config *remoteDispatchWorkflowFetch) saveYMLFallback(workflowName, remoteF
 	ymlContent, err := config.downloader(config.ctx, config.owner, config.repo, ymlRemotePath, config.ref)
 	if err != nil {
 		if config.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch dispatch workflow %s: %v", remoteFilePath, mdErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch dispatch workflow %s: %v", remoteFilePath, mdErr)))
 		}
 		return nil
 	}
@@ -233,7 +233,7 @@ func (config *remoteDispatchWorkflowFetch) saveYMLFallback(workflowName, remoteF
 		return fmt.Errorf("failed to write dispatch workflow %s: %w", ymlRemotePath, err)
 	}
 	if config.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched dispatch workflow (.yml): "+ymlLocalPath))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (.yml): "+ymlLocalPath))
 	}
 	return nil
 }
@@ -252,7 +252,7 @@ func (config *remoteDispatchWorkflowFetch) saveMarkdown(workflowContent []byte, 
 		return fmt.Errorf("failed to write dispatch workflow %s: %w", remoteFilePath, err)
 	}
 	if config.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched dispatch workflow: "+targetPath))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow: "+targetPath))
 	}
 	fetchDownloadedWorkflowFrontmatterImports(config.ctx, workflowContent, config.spec, remoteFilePath, config.targetDir, config.verbose, config.force, config.tracker)
 	return nil
@@ -278,7 +278,7 @@ func fetchDownloadedWorkflowFrontmatterImports(ctx context.Context, workflowCont
 		WorkflowPath: remoteFilePath,
 	}
 	if err := fetchAndSaveRemoteFrontmatterImports(ctx, string(workflowContent), depSpec, targetDir, verbose, force, tracker); err != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch frontmatter imports for %s: %v", remoteFilePath, err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch frontmatter imports for %s: %v", remoteFilePath, err)))
 	}
 }
 
@@ -352,7 +352,7 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 		// Early rejection of path traversal patterns (authoritative check is filepath.Rel below).
 		if strings.Contains(workflowName, "..") {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping dispatch workflow with unsafe name: %q", workflowName)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping dispatch workflow with unsafe name: %q", workflowName)))
 			}
 			continue
 		}
@@ -375,7 +375,7 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 		}
 		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Refusing to write dispatch workflow outside target directory: %q", workflowName)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write dispatch workflow outside target directory: %q", workflowName)))
 			}
 			continue
 		}
@@ -388,12 +388,12 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 				existingSourceRepo := readSourceRepoFromFile(targetPath)
 				if existingSourceRepo == spec.RepoSlug {
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dispatch workflow (from import) from same source already exists, skipping: "+targetPath))
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dispatch workflow (from import) from same source already exists, skipping: "+targetPath))
 					}
 					continue
 				}
 				// Different or missing source — warn and skip (post-write best-effort).
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
 					"Dispatch workflow %q already exists at %s from a different source (existing: %q, needed: %q); use --force to overwrite",
 					workflowName, targetPath, sourceRepoLabel(existingSourceRepo), spec.RepoSlug,
 				)))
@@ -411,13 +411,13 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 			ymlContent, ymlErr := parser.DownloadFileFromGitHub(ctx, owner, repo, ymlRemotePath, ref)
 			if ymlErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch dispatch workflow %s: %v", remoteFilePath, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch dispatch workflow %s: %v", remoteFilePath, err)))
 				}
 				continue
 			}
 			if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", ymlRemotePath, mkErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", ymlRemotePath, mkErr)))
 				}
 				continue
 			}
@@ -426,12 +426,12 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 			ymlFileExists := ymlFileExistsErr == nil
 			if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write dispatch workflow %s: %v", ymlRemotePath, writeErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", ymlRemotePath, writeErr)))
 				}
 				continue
 			}
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched dispatch workflow (.yml, from import): "+ymlLocalPath))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (.yml, from import): "+ymlLocalPath))
 			}
 			if tracker != nil {
 				if ymlFileExists {
@@ -451,20 +451,20 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 
 		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
 
 		if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write dispatch workflow %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched dispatch workflow (from import): "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (from import): "+targetPath))
 		}
 
 		if tracker != nil {
@@ -554,7 +554,7 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 		}
 		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Refusing to write call-workflow worker outside target directory: %q", workflowName)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write call-workflow worker outside target directory: %q", workflowName)))
 			}
 			continue
 		}
@@ -570,7 +570,7 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 				existingSource := readFullSourceFromFile(targetPath)
 				if existingSource == expectedSource {
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Call-workflow worker from same source already exists, skipping: "+targetPath))
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Call-workflow worker from same source already exists, skipping: "+targetPath))
 					}
 					continue
 				}
@@ -594,14 +594,14 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 			if ymlErr != nil {
 				// Neither .md nor .yml found — best-effort, continue
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, err)))
 				}
 				continue
 			}
 			// .yml fallback succeeded — write it (no source field for yml)
 			if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", ymlRemotePath, mkErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", ymlRemotePath, mkErr)))
 				}
 				continue
 			}
@@ -617,12 +617,12 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 			}
 			if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write call-workflow worker %s: %v", ymlRemotePath, writeErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", ymlRemotePath, writeErr)))
 				}
 				continue
 			}
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched call-workflow worker (.yml): "+ymlLocalPath))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker (.yml): "+ymlLocalPath))
 			}
 			continue
 		}
@@ -633,7 +633,7 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 
 		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
@@ -649,13 +649,13 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 
 		if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write call-workflow worker %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched call-workflow worker: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker: "+targetPath))
 		}
 
 		fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, spec, remoteFilePath, targetDir, verbose, force, tracker)
@@ -729,7 +729,7 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 	for _, workflowName := range filtered {
 		if strings.Contains(workflowName, "..") {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping call-workflow worker with unsafe name: %q", workflowName)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping call-workflow worker with unsafe name: %q", workflowName)))
 			}
 			continue
 		}
@@ -752,7 +752,7 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 		}
 		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Refusing to write call-workflow worker outside target directory: %q", workflowName)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write call-workflow worker outside target directory: %q", workflowName)))
 			}
 			continue
 		}
@@ -768,12 +768,12 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 				existingSource := readFullSourceFromFile(targetPath)
 				if existingSource == expectedSource {
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Call-workflow worker (from import) from same source already exists, skipping: "+targetPath))
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Call-workflow worker (from import) from same source already exists, skipping: "+targetPath))
 					}
 					continue
 				}
 				// Different or missing source — warn and skip (post-write best-effort).
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
 					"Call-workflow worker %q already exists at %s from a different source (existing: %q, needed: %q); use --force to overwrite",
 					workflowName, targetPath, sourceRepoLabel(existingSource), spec.RepoSlug,
 				)))
@@ -791,13 +791,13 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 			ymlContent, ymlErr := parser.DownloadFileFromGitHub(ctx, owner, repo, ymlRemotePath, ref)
 			if ymlErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, err)))
 				}
 				continue
 			}
 			if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", ymlRemotePath, mkErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", ymlRemotePath, mkErr)))
 				}
 				continue
 			}
@@ -813,12 +813,12 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 			}
 			if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write call-workflow worker %s: %v", ymlRemotePath, writeErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", ymlRemotePath, writeErr)))
 				}
 				continue
 			}
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched call-workflow worker (.yml, from import): "+ymlLocalPath))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker (.yml, from import): "+ymlLocalPath))
 			}
 			continue
 		}
@@ -829,7 +829,7 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 
 		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
@@ -845,13 +845,13 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 
 		if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write call-workflow worker %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched call-workflow worker (from import): "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker (from import): "+targetPath))
 		}
 
 		fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, spec, remoteFilePath, targetDir, verbose, force, tracker)

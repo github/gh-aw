@@ -72,13 +72,13 @@ func applyStyleWithTTY(style lipgloss.Style, text string, ttyCheck func() bool) 
 	return text
 }
 
-// FormatError formats a CompilerError with Rust-like rendering
-func FormatError(err CompilerError) string {
+// FormatErrorStdout formats a CompilerError with Rust-like rendering
+func FormatErrorStdout(err CompilerError) string {
 	return formatErrorWithStyle(err, applyStyle)
 }
 
-// FormatErrorStderr formats a CompilerError for stderr with stderr TTY detection.
-func FormatErrorStderr(err CompilerError) string {
+// FormatError formats a CompilerError for stderr with stderr TTY detection.
+func FormatError(err CompilerError) string {
 	return formatErrorStderrWithTTY(err, isStderrTTY, stderrEnviron())
 }
 
@@ -199,13 +199,13 @@ func renderContext(err CompilerError, styleText func(lipgloss.Style, string) str
 	return output.String()
 }
 
-// FormatSuccessMessage formats a success message with styling
-func FormatSuccessMessage(message string) string {
+// FormatSuccessMessageStdout formats a success message with styling
+func FormatSuccessMessageStdout(message string) string {
 	return formatSuccessMessageWithTTY(message, isTTY, stdoutEnviron())
 }
 
-// FormatSuccessMessageStderr formats a success message for stderr output.
-func FormatSuccessMessageStderr(message string) string {
+// FormatSuccessMessage formats a success message for stderr output.
+func FormatSuccessMessage(message string) string {
 	return applyStderrStyle(styles.Success, "✓ ") + message
 }
 
@@ -213,13 +213,13 @@ func formatSuccessMessageWithTTY(message string, ttyCheck func() bool, environ [
 	return applyStdoutStyleWithTTY(styles.Success, "✓ ", ttyCheck, environ) + message
 }
 
-// FormatInfoMessage formats an informational message
-func FormatInfoMessage(message string) string {
+// FormatInfoMessageStdout formats an informational message
+func FormatInfoMessageStdout(message string) string {
 	return formatInfoMessageWithTTY(message, isTTY, stdoutEnviron())
 }
 
-// FormatInfoMessageStderr formats an informational message for stderr output.
-func FormatInfoMessageStderr(message string) string {
+// FormatInfoMessage formats an informational message for stderr output.
+func FormatInfoMessage(message string) string {
 	return applyStderrStyle(styles.Info, "i ") + message
 }
 
@@ -232,18 +232,18 @@ func FormatTableHeaderStderr(text string) string {
 	return applyStderrStyle(styles.TableHeader, text)
 }
 
-// FormatWarningMessage formats a warning message
-func FormatWarningMessage(message string) string {
+// FormatWarningMessageStdout formats a warning message
+func FormatWarningMessageStdout(message string) string {
 	return applyStyle(styles.Warning, "⚠ ") + message
 }
 
-// FormatWarningMessageStderr formats a warning message for stderr output.
-func FormatWarningMessageStderr(message string) string {
+// FormatWarningMessage formats a warning message for stderr output.
+func FormatWarningMessage(message string) string {
 	return applyStderrStyle(styles.Warning, "⚠ ") + message
 }
 
-// RenderTable renders a formatted table using lipgloss/table package
-func RenderTable(config TableConfig) string {
+// RenderTableStdout renders a formatted table using lipgloss/table package
+func RenderTableStdout(config TableConfig) string {
 	if len(config.Headers) == 0 {
 		consoleLog.Print("No headers provided for table rendering")
 		return ""
@@ -262,15 +262,19 @@ func RenderTable(config TableConfig) string {
 	return renderTableWithTTY(config, ttyCheck, stdoutEnviron(), stdoutOutput)
 }
 
-// RenderTableStderr renders a table using stderr terminal and color detection.
-func RenderTableStderr(config TableConfig) string {
+// RenderTable renders a table using stderr terminal and color detection.
+func RenderTable(config TableConfig) string {
 	if len(config.Headers) == 0 {
 		return ""
 	}
-	return renderTableWithTTY(config, isStderrTTY, stderrEnviron(), true)
+	ttyCheck := isStderrTTY
+	if config.TTYFunc != nil {
+		ttyCheck = config.TTYFunc
+	}
+	return renderTableWithTTY(config, ttyCheck, stderrEnviron(), true)
 }
 
-// buildTableStyleFunc returns the lipgloss style function used by RenderTable.
+// buildTableStyleFunc returns the lipgloss style function used by RenderTableStdout.
 // config supplies the ShowTotal/TotalRow flags; ttyCheck detects terminal output;
 // dataRowCount is the number of data rows (excluding any total row).
 func buildTableStyleFunc(config TableConfig, ttyCheck func() bool, dataRowCount int) func(int, int) lipgloss.Style {
@@ -341,53 +345,53 @@ func renderTableWithTTY(config TableConfig, ttyCheck func() bool, environ []stri
 	return result
 }
 
-// FormatCommandMessage formats a command execution message
-func FormatCommandMessage(command string) string {
+// FormatCommandMessageStdout formats a command execution message
+func FormatCommandMessageStdout(command string) string {
 	return applyStyle(styles.Command, "$ ") + command
 }
 
-// FormatCommandMessageStderr formats a command execution message for stderr output.
-func FormatCommandMessageStderr(command string) string {
+// FormatCommandMessage formats a command execution message for stderr output.
+func FormatCommandMessage(command string) string {
 	return applyStderrStyle(styles.Command, "$ ") + command
 }
 
-// FormatProgressMessage formats a progress/activity message
-func FormatProgressMessage(message string) string {
+// FormatProgressMessageStdout formats a progress/activity message
+func FormatProgressMessageStdout(message string) string {
 	return applyStyle(styles.Progress, "▸ ") + message
 }
 
-// FormatProgressMessageStderr formats a progress message for stderr output.
-func FormatProgressMessageStderr(message string) string {
+// FormatProgressMessage formats a progress message for stderr output.
+func FormatProgressMessage(message string) string {
 	return applyStderrStyle(styles.Progress, "▸ ") + message
 }
 
-// FormatPromptMessage formats a user prompt message
-func FormatPromptMessage(message string) string {
+// FormatPromptMessageStdout formats a user prompt message
+func FormatPromptMessageStdout(message string) string {
 	return applyStyle(styles.Prompt, "? ") + message
 }
 
-// FormatPromptMessageStderr formats a prompt for stderr output.
-func FormatPromptMessageStderr(message string) string {
+// FormatPromptMessage formats a prompt for stderr output.
+func FormatPromptMessage(message string) string {
 	return applyStderrStyle(styles.Prompt, "? ") + message
 }
 
-// FormatVerboseMessage formats verbose debugging output
-func FormatVerboseMessage(message string) string {
+// FormatVerboseMessageStdout formats verbose debugging output
+func FormatVerboseMessageStdout(message string) string {
 	return applyStyle(styles.Verbose, "» ") + message
 }
 
-// FormatVerboseMessageStderr formats verbose output for stderr.
-func FormatVerboseMessageStderr(message string) string {
+// FormatVerboseMessage formats verbose output for stderr.
+func FormatVerboseMessage(message string) string {
 	return applyStderrStyle(styles.Verbose, "» ") + message
 }
 
-// FormatListItem formats an item in a list
-func FormatListItem(item string) string {
+// FormatListItemStdout formats an item in a list
+func FormatListItemStdout(item string) string {
 	return formatListItemWithTTY(item, isTTY, stdoutEnviron())
 }
 
-// FormatListItemStderr formats a list item for stderr output.
-func FormatListItemStderr(item string) string {
+// FormatListItem formats a list item for stderr output.
+func FormatListItem(item string) string {
 	return applyStderrStyle(styles.ListItem, "  • "+item)
 }
 
@@ -485,13 +489,13 @@ func formatMultilineError(msg string) string {
 	return sb.String()
 }
 
-// FormatSectionHeader formats a section header with proper styling
-func FormatSectionHeader(header string) string {
+// FormatSectionHeaderStdout formats a section header with proper styling
+func FormatSectionHeaderStdout(header string) string {
 	return formatSectionHeaderWithTTY(header, isTTY, stdoutEnviron())
 }
 
-// FormatSectionHeaderStderr formats a section header for stderr output.
-func FormatSectionHeaderStderr(header string) string {
+// FormatSectionHeader formats a section header for stderr output.
+func FormatSectionHeader(header string) string {
 	return applyStderrStyle(styles.Header, header)
 }
 

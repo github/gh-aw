@@ -184,7 +184,7 @@ func cacheGitHubAPIRateLimitReports(writer *cachedLogsJSONLWriter, reports ...*G
 			continue
 		}
 		if err := writer.AppendRateLimit(*report); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		}
 	}
 }
@@ -369,13 +369,13 @@ func checkAndWaitForRateLimitMode(ctx context.Context, verbose bool, configuredM
 			"GitHub API usage ceiling reached (%d of %d requests used; maximum %d). Waiting %.0f seconds until reset at %s",
 			rl.Used, rl.Limit, maxUsed, waitDur.Seconds(), resetAt.UTC().Format(time.RFC3339),
 		)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(msg))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
 		logsRateLimitLog.Printf("Sleeping for rate limit reset: duration=%s", waitDur)
 		return sleepWithContext(ctx, waitDur)
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(
 			fmt.Sprintf("Rate limit OK: %d/%d requests used (maximum %d)", rl.Used, rl.Limit, maxUsed),
 		))
 	}
@@ -393,6 +393,6 @@ func stopForLogsRateLimit(rl rateLimitResource, maxUsed int, resetAt time.Time) 
 		"%w (%d of %d requests used; maximum %d; resets at %s)",
 		errLogsAPIRateLimitReached, rl.Used, rl.Limit, maxUsed, resetAt.UTC().Format(time.RFC3339),
 	)
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()+". Stopping remaining workflow targets"))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()+". Stopping remaining workflow targets"))
 	return err
 }

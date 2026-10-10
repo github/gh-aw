@@ -99,7 +99,7 @@ func (c *Compiler) validateNpxPackages(workflowData *WorkflowData) error {
 		} else {
 			npmValidationLog.Printf("Package validated successfully: %s", pkg)
 			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("✓ npm package validated: "+pkg))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("✓ npm package validated: "+pkg))
 			}
 		}
 	}

@@ -295,9 +295,9 @@ func reconcileManifestManagedAssets(ctx context.Context, repoSpec *RepoSpec, cur
 			return fmt.Errorf("unable to install new package action workflow %s: %w", installable.DestinationPath, err)
 		}
 		if fileExists {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Updated package action workflow: "+filepath.Base(destPath)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated package action workflow: "+filepath.Base(destPath)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Added package action workflow: "+filepath.Base(destPath)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added package action workflow: "+filepath.Base(destPath)))
 		}
 	}
 
@@ -429,7 +429,7 @@ func warnUpstreamRemovedSkillsAndAgents(currentPkg, latestPkg *resolvedRepositor
 		if _, exists := latestSkillSources[skill.SourcePath]; exists {
 			continue
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
 			"Skill %q was removed from the upstream package; skipping update and keeping the local copy. Remove it manually if it is no longer needed.",
 			skill.SourcePath)))
 	}
@@ -442,7 +442,7 @@ func warnUpstreamRemovedSkillsAndAgents(currentPkg, latestPkg *resolvedRepositor
 		if _, exists := latestAgentSources[agent]; exists {
 			continue
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
 			"Agent %q was removed from the upstream package; skipping update and keeping the local copy. Remove it manually if it is no longer needed.",
 			agent)))
 	}
@@ -503,7 +503,7 @@ func removeManifestManagedWorkflow(workflowPath string) error {
 	if err := os.Remove(lockPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("unable to remove lock file %s: %w", filepath.Base(lockPath), err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Removed workflow no longer listed in manifest: "+filepath.Base(workflowPath)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed workflow no longer listed in manifest: "+filepath.Base(workflowPath)))
 	return nil
 }
 
@@ -520,7 +520,7 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 		if err == nil {
 			currentContent, readErr := os.ReadFile(update.wf.Path)
 			if readErr == nil && !hasLocalModifications(string(sourceContent), string(currentContent), sourceSpecCurrent, filepath.Dir(update.wf.Path), opts.Verbose) {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Workflow %s is already up to date (%s)", update.wf.Name, shortRef(update.currentRef))))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow %s is already up to date (%s)", update.wf.Name, shortRef(update.currentRef))))
 				return nil
 			}
 		}
@@ -592,10 +592,10 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 		return fmt.Errorf("unable to write updated workflow: %w", err)
 	}
 	if hasConflicts {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Updated %s from %s to %s with CONFLICTS - please review and resolve manually", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Updated %s from %s to %s with CONFLICTS - please review and resolve manually", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
 		return nil
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Updated %s from %s to %s", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %s from %s to %s", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
 	if !opts.NoCompile {
 		if err := compileWorkflowsForUpdate(ctx, []string{update.wf.Path}, opts.WorkflowsDir, opts.EngineOverride, opts.Verbose, opts.Approve); err != nil {
 			return fmt.Errorf("unable to compile updated workflow: %w", err)
@@ -639,7 +639,7 @@ func addManifestManagedWorkflow(ctx context.Context, targetDir, name, repo, late
 	if err := os.WriteFile(destPath, []byte(content), constants.FilePermPublic); err != nil {
 		return fmt.Errorf("unable to write new manifest workflow %s: %w", destPath, err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Added new workflow from manifest: "+filepath.Base(destPath)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added new workflow from manifest: "+filepath.Base(destPath)))
 	if !opts.NoCompile {
 		if err := compileWorkflowsForUpdate(ctx, []string{destPath}, opts.WorkflowsDir, opts.EngineOverride, opts.Verbose, opts.Approve); err != nil {
 			return fmt.Errorf("unable to compile new manifest workflow: %w", err)

@@ -17,7 +17,7 @@ import (
 
 var renderLog = logger.New("console:render")
 
-// RenderStruct renders a Go struct to console output using reflection and struct tags.
+// RenderStruct renders a Go struct for stderr using reflection and struct tags.
 // It supports:
 // - Rendering structs as markdown-style headers with key-value pairs
 // - Rendering slices as tables using the console table renderer
@@ -32,6 +32,11 @@ func RenderStruct(v any) string {
 	return renderStructWithRenderer(v, RenderTable)
 }
 
+// RenderStructStdout renders reflected data for stdout, including nested tables.
+func RenderStructStdout(v any) string {
+	return renderStructWithRenderer(v, RenderTableStdout)
+}
+
 // RenderStructStderr renders reflected data for stderr, including nested tables.
 func RenderStructStderr(v any) string {
 	return renderStructWithRenderer(v, RenderTableStderr)
@@ -44,7 +49,7 @@ func RenderStructWithOptions(v any, options RenderOptions) string {
 		if options.Stderr {
 			return RenderTableStderr(config)
 		}
-		return RenderTable(config)
+		return RenderTableStdout(config)
 	}
 	return wrapConsoleText(renderStructWithRenderer(v, renderTable), options.MaxWidth)
 }

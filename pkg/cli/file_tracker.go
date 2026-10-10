@@ -93,7 +93,7 @@ func (ft *FileTracker) StageAllFiles(verbose bool) error {
 	fileTrackerLog.Printf("Staging %d tracked files", len(allFiles))
 	if len(allFiles) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No files to stage"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No files to stage"))
 		}
 		return nil
 	}
@@ -101,7 +101,7 @@ func (ft *FileTracker) StageAllFiles(verbose bool) error {
 	console.LogVerbose(verbose, fmt.Sprintf("Staging %d files...", len(allFiles)))
 	if verbose {
 		for _, file := range allFiles {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("  - "+file))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("  - "+file))
 		}
 	}
 
@@ -167,7 +167,7 @@ func (ft *FileTracker) RollbackModifiedFiles(verbose bool) error {
 			}
 		} else {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No original content stored for "+file))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No original content stored for "+file))
 			}
 		}
 	}

@@ -152,13 +152,13 @@ func validateServerSecrets(config parser.RegistryMCPServerConfig, verbose bool, 
 	// Display information about secrets
 	if verbose {
 		if len(availableSecrets) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d available secret(s):", len(availableSecrets))))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d available secret(s):", len(availableSecrets))))
 			for _, secret := range availableSecrets {
 				source := "environment"
 				if secret.Source == "actions" {
 					source = "GitHub Actions"
 				}
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("  %s (from %s)", secret.Name, source)))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("  %s (from %s)", secret.Name, source)))
 			}
 		}
 	}
@@ -166,9 +166,9 @@ func validateServerSecrets(config parser.RegistryMCPServerConfig, verbose bool, 
 	// Warn about missing secrets
 	if len(missingSecrets) > 0 {
 		mcpValidationLog.Printf("Found %d missing secrets", len(missingSecrets))
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("%d required secret(s) not found:", len(missingSecrets))))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d required secret(s) not found:", len(missingSecrets))))
 		for _, secret := range missingSecrets {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("  ✗ "+secret.Name))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("  ✗ "+secret.Name))
 		}
 	}
 

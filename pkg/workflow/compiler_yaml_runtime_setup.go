@@ -144,7 +144,7 @@ func (c *Compiler) validateCustomSetupUVCache(customSteps string) error {
 	}
 
 	for _, warning := range warnings {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
 		c.IncrementWarningCount()
 	}
 	return nil
@@ -499,7 +499,7 @@ func (c *Compiler) sanitizeAndWarnCustomSteps(customSteps string) string {
 		return customSteps
 	}
 	for _, w := range warnings {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(w))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(w))
 		c.IncrementWarningCount()
 	}
 	return sanitized

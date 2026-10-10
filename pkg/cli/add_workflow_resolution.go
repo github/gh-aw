@@ -1106,7 +1106,7 @@ func resolveAddWorkflowSpecAndContent(ctx context.Context, initialSpec *Workflow
 		}
 		resolutionLog.Printf("Following redirect for add: from=%s to=%s", locationKey, nextSpec.String())
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Workflow redirect: %s -> %s", locationKey, nextSpec.String())))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Workflow redirect: %s -> %s", locationKey, nextSpec.String())))
 		}
 		followedRedirect = true
 		currentSpec = *nextSpec
@@ -1122,7 +1122,7 @@ func expandLocalWildcardWorkflows(specs []*WorkflowSpec, verbose bool) ([]*Workf
 		if spec.IsWildcard && isLocalWorkflowPath(spec.WorkflowPath) {
 			resolutionLog.Printf("Expanding local wildcard: %s", spec.WorkflowPath)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Discovering local workflows matching %s...", spec.WorkflowPath)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Discovering local workflows matching %s...", spec.WorkflowPath)))
 			}
 
 			// Expand local wildcard (e.g., ./*.md or ./workflows/*.md)
@@ -1132,10 +1132,10 @@ func expandLocalWildcardWorkflows(specs []*WorkflowSpec, verbose bool) ([]*Workf
 			}
 
 			if len(discovered) == 0 {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No workflows found matching "+spec.WorkflowPath))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No workflows found matching "+spec.WorkflowPath))
 			} else {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Found %d workflow(s)", len(discovered))))
+					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Found %d workflow(s)", len(discovered))))
 				}
 				expandedWorkflows = append(expandedWorkflows, discovered...)
 			}

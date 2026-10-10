@@ -345,7 +345,7 @@ func displayStatsTable(statsList []*WorkflowStats) {
 	}
 
 	// Render and print table
-	fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
+	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 
 	// Print summary
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Summary:"))

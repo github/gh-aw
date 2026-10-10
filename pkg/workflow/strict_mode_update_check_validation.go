@@ -45,7 +45,7 @@ func (c *Compiler) validateUpdateCheck(frontmatter map[string]any) error {
 	}
 
 	// Non-strict mode: emit a warning and continue
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 		"'check-for-updates: false' disables the compile-agentic version check. "+
 			"The workflow will not verify that it was compiled with a supported version of gh-aw. "+
 			"It is strongly recommended to keep check-for-updates enabled.",

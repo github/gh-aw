@@ -184,7 +184,7 @@ func maybeForceRefreshContainerPins(ctx context.Context, config CompileConfig, w
 	}
 	if config.NoEmit {
 		if config.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipping --force-refresh-container-pins because --no-emit is set"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping --force-refresh-container-pins because --no-emit is set"))
 		}
 		return nil
 	}

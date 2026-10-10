@@ -233,7 +233,7 @@ func (c *AddInteractiveConfig) selectScheduleFrequency() error {
 		// "custom" or same frequency means keep as-is
 		if selected == "custom" || selected == currentFreq {
 			scheduleWizardLog.Printf("Schedule unchanged: keeping %q", rawExpr)
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Selected schedule: "+rawExpr))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected schedule: "+rawExpr))
 			continue
 		}
 
@@ -262,7 +262,7 @@ func (c *AddInteractiveConfig) selectScheduleFrequency() error {
 		}
 		if updateErr != nil {
 			scheduleWizardLog.Printf("Failed to update schedule (isOnMap=%v): %v", detection.IsOnMap, updateErr)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not update schedule: %v", updateErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update schedule: %v", updateErr)))
 			continue
 		}
 
@@ -270,7 +270,7 @@ func (c *AddInteractiveConfig) selectScheduleFrequency() error {
 		if wf.SourceInfo != nil {
 			wf.SourceInfo.Content = []byte(updatedContent)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Selected schedule: "+selected))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Selected schedule: "+selected))
 	}
 
 	return nil

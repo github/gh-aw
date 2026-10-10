@@ -322,7 +322,7 @@ func printBootstrapGitHubAppManifestReview(owner string, manifest map[string]any
 	}
 	lines = append(lines, "")
 	for _, line := range lines {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(line))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(line))
 	}
 }
 

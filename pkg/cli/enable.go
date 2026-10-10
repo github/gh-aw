@@ -84,7 +84,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	githubWorkflows, err := fetchGitHubWorkflows(ctx, repoOverride, false)
 	if err != nil {
 		enableLog.Printf("Failed to fetch GitHub workflows: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Unable to fetch GitHub workflows (gh CLI may not be authenticated): %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Unable to fetch GitHub workflows (gh CLI may not be authenticated): %v", err)))
 		githubWorkflows = make(map[string]*GitHubWorkflow)
 	}
 	enableLog.Printf("Retrieved %d GitHub workflows from remote", len(githubWorkflows))
@@ -122,7 +122,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 				if enable {
 					if _, err := os.Stat(lockFile); os.IsNotExist(err) {
 						if err := compileWorkflow(ctx, file, false, false, ""); err != nil {
-							fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to compile workflow %s to create lock file: %v", name, err)))
+							fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile workflow %s to create lock file: %v", name, err)))
 							// If we can't compile and there's no GitHub entry, skip because we can't address it
 							if !exists {
 								continue
@@ -226,7 +226,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 			// First cancel any running workflows (by ID when available, else by lock file name)
 			if t.ID != 0 {
 				if err := cancelWorkflowRuns(t.ID); err != nil {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
 				}
 				// Prefer disabling by lock file name for reliability
 				args := []string{"workflow", "disable", t.LockFileBase}
@@ -236,7 +236,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 				cmd = workflow.ExecGH(args...)
 			} else {
 				if err := cancelWorkflowRunsByLockFile(t.LockFileBase); err != nil {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
 				}
 				args := []string{"workflow", "disable", t.LockFileBase}
 				if repoOverride != "" {
@@ -252,7 +252,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 				// Provide clearer hint on common permission issues
 				outStr := strings.ToLower(string(output))
 				if strings.Contains(outStr, "http 403") || strings.Contains(outStr, "resource not accessible by integration") {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Hint: Disabling/enabling workflows requires repository admin or maintainer permissions. Ensure your gh auth has write/admin access to this repo."))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Hint: Disabling/enabling workflows requires repository admin or maintainer permissions. Ensure your gh auth has write/admin access to this repo."))
 				}
 			} else {
 				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to %s workflow %s: %v", action, t.Name, err)))
@@ -284,7 +284,7 @@ func DisableAllWorkflowsExcept(repoSlug string, exceptWorkflows []string, verbos
 	// Check if workflows directory exists
 	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No .github/workflows directory found, nothing to disable"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No .github/workflows directory found, nothing to disable"))
 		}
 		return nil
 	}
@@ -303,7 +303,7 @@ func DisableAllWorkflowsExcept(repoSlug string, exceptWorkflows []string, verbos
 	enableLog.Printf("Found %d YAML workflow files", len(allYAMLFiles))
 	if len(allYAMLFiles) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No YAML workflow files found"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No YAML workflow files found"))
 		}
 		return nil
 	}
@@ -349,7 +349,7 @@ func DisableAllWorkflowsExcept(repoSlug string, exceptWorkflows []string, verbos
 
 	if len(workflowsToDisable) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflows to disable"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflows to disable"))
 		}
 		return nil
 	}
@@ -371,7 +371,7 @@ func DisableAllWorkflowsExcept(repoSlug string, exceptWorkflows []string, verbos
 		cmd := workflow.ExecGH(args...)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to disable workflow %s: %v\n%s", wf, err, string(output))))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to disable workflow %s: %v\n%s", wf, err, string(output))))
 			}
 			failures = append(failures, wf)
 		} else {
@@ -385,6 +385,6 @@ func DisableAllWorkflowsExcept(repoSlug string, exceptWorkflows []string, verbos
 		return fmt.Errorf("failed to disable %d workflow(s): %s", len(failures), strings.Join(failures, ", "))
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Disabled %d workflow(s)", len(workflowsToDisable))))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Disabled %d workflow(s)", len(workflowsToDisable))))
 	return nil
 }

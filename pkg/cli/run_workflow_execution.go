@@ -81,7 +81,7 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, opts RunO
 		return err
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Running workflow on GitHub Actions: "+workflowIdOrName))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Running workflow on GitHub Actions: "+workflowIdOrName))
 	}
 	if !isGHCLIAvailable() {
 		return errors.New("GitHub CLI (gh) is not available. Expected gh to be installed and on PATH before running workflows. Example: brew install gh")
@@ -107,7 +107,7 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, opts RunO
 func checkWorkflowRunContext(ctx context.Context, workflowIdOrName string) error {
 	select {
 	case <-ctx.Done():
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 		return ctx.Err()
 	default:
 	}
@@ -209,9 +209,9 @@ func warnLocalWorkflowStatus(workflowFile string) {
 	if len(warnings) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(strings.Join(warnings, ", ")))
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("These changes will not be reflected in the GitHub Actions run"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Consider pushing your changes before running the workflow"))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(strings.Join(warnings, ", ")))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage("These changes will not be reflected in the GitHub Actions run"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Consider pushing your changes before running the workflow"))
 }
 
 func handleWorkflowEnablement(ctx context.Context, workflowIdOrName string, opts RunOptions) (workflowEnableState, error) {
@@ -221,7 +221,7 @@ func handleWorkflowEnablement(ctx context.Context, workflowIdOrName string, opts
 	wf, err := getWorkflowStatus(ctx, workflowIdOrName, opts.RepoOverride, opts.Verbose)
 	if err != nil {
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not check workflow status: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not check workflow status: %v", err)))
 		}
 		return workflowEnableState{}, nil
 	}
@@ -233,12 +233,12 @@ func handleWorkflowEnablement(ctx context.Context, workflowIdOrName string, opts
 	state.wasDisabled = true
 	executionLog.Printf("Workflow %s is disabled, temporarily enabling for this run (id=%d)", workflowIdOrName, wf.ID)
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Workflow '%s' is disabled, enabling it temporarily...", workflowIdOrName)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow '%s' is disabled, enabling it temporarily...", workflowIdOrName)))
 	}
 	if err := enableWorkflowForRun(wf.ID, opts.RepoOverride); err != nil {
 		return workflowEnableState{}, fmt.Errorf("failed to enable workflow '%s': %w", workflowIdOrName, err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Enabled workflow: "+workflowIdOrName))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Enabled workflow: "+workflowIdOrName))
 	return state, nil
 }
 
@@ -278,7 +278,7 @@ func applyLocalWorkflowOverrides(ctx context.Context, workflowIdOrName string, p
 		return err
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Using lock file: "+prep.lockFileName))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Using lock file: "+prep.lockFileName))
 	}
 	maybeWarnAboutLockFile(workflowIdOrName, prep.lockFilePath, opts)
 	return maybePushWorkflowFiles(ctx, workflowIdOrName, prep.lockFilePath, opts)
@@ -287,12 +287,12 @@ func applyLocalWorkflowOverrides(ctx context.Context, workflowIdOrName string, p
 func maybeRecompileWorkflowOverride(ctx context.Context, lockFilePath string, opts RunOptions) error {
 	if opts.EngineOverride == "" || opts.RepoOverride != "" {
 		if opts.EngineOverride != "" && opts.RepoOverride != "" && opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Note: Engine override ignored for remote repository workflows"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Note: Engine override ignored for remote repository workflows"))
 		}
 		return nil
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Recompiling workflow with engine override: "+opts.EngineOverride))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflow with engine override: "+opts.EngineOverride))
 	}
 	config := CompileConfig{
 		MarkdownFiles:        []string{stringutil.LockFileToMarkdown(lockFilePath)},
@@ -311,7 +311,7 @@ func maybeRecompileWorkflowOverride(ctx context.Context, lockFilePath string, op
 		return fmt.Errorf("failed to recompile workflow with engine override: %w", err)
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Successfully recompiled workflow with engine: "+opts.EngineOverride))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Successfully recompiled workflow with engine: "+opts.EngineOverride))
 	}
 	return nil
 }
@@ -326,13 +326,13 @@ func maybeWarnAboutLockFile(workflowIdOrName, lockFilePath string, opts RunOptio
 		return
 	}
 	if status.Missing {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Lock file is missing"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Lock file is missing"))
 	} else if status.Outdated {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Lock file is outdated (workflow file is newer)"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Lock file is outdated (workflow file is newer)"))
 	} else {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Run 'gh aw run %s --push' to automatically compile and push the lock file", workflowIdOrName)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run 'gh aw run %s --push' to automatically compile and push the lock file", workflowIdOrName)))
 }
 
 func maybePushWorkflowFiles(ctx context.Context, workflowIdOrName, lockFilePath string, opts RunOptions) error {
@@ -343,7 +343,7 @@ func maybePushWorkflowFiles(ctx context.Context, workflowIdOrName, lockFilePath 
 		return errors.New("--push flag is only supported for local workflows, not remote repositories")
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Collecting workflow files for push..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Collecting workflow files for push..."))
 	}
 	files, err := collectWorkflowFiles(ctx, stringutil.LockFileToMarkdown(lockFilePath), opts.Verbose, opts.Approve)
 	if err != nil {
@@ -352,7 +352,7 @@ func maybePushWorkflowFiles(ctx context.Context, workflowIdOrName, lockFilePath 
 	if err := pushWorkflowFiles(ctx, workflowIdOrName, files, opts.RefOverride, opts.Verbose); err != nil {
 		return fmt.Errorf("failed to push workflow files: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Successfully pushed %d file(s) for workflow %s", len(files), workflowIdOrName)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully pushed %d file(s) for workflow %s", len(files), workflowIdOrName)))
 	return nil
 }
 
@@ -381,23 +381,23 @@ func resolveWorkflowRunRef(opts RunOptions) string {
 		return currentBranch
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Note: Could not determine current branch: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Note: Could not determine current branch: %v", err)))
 	}
 	return ""
 }
 
 func handleWorkflowDryRun(lockFileName string, args []string, opts RunOptions) error {
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dry run mode - command that would be executed:"))
-		fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr("gh "+strings.Join(args, " ")))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dry run mode - command that would be executed:"))
+		fmt.Fprintln(os.Stderr, console.FormatCommandMessage("gh "+strings.Join(args, " ")))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Validation passed for workflow: %s (dry run - not executed)", lockFileName)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Validation passed for workflow: %s (dry run - not executed)", lockFileName)))
 	return nil
 }
 
 func executeWorkflowRun(ctx context.Context, lockFileName string, args []string, opts RunOptions) (*workflowRunExecutionResult, error) {
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr("gh "+strings.Join(args, " ")))
+		fmt.Fprintln(os.Stderr, console.FormatCommandMessage("gh "+strings.Join(args, " ")))
 	}
 	stdout, err := workflow.ExecGHContext(ctx, args...).Output()
 	if err != nil {
@@ -405,9 +405,9 @@ func executeWorkflowRun(ctx context.Context, lockFileName string, args []string,
 	}
 	output := strings.TrimSpace(string(stdout))
 	if output != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(output))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(output))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Triggered workflow: "+lockFileName))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Triggered workflow: "+lockFileName))
 	executionLog.Printf("Workflow triggered successfully: %s", lockFileName)
 	runInfo, runErr := resolveWorkflowRunInfo(lockFileName, output, opts)
 	return &workflowRunExecutionResult{
@@ -441,13 +441,13 @@ func resolveWorkflowRunInfo(lockFileName, output string, opts RunOptions) (*Work
 
 func handleWorkflowRunInfo(runInfo *WorkflowRunInfo, runErr error, opts RunOptions) {
 	if runErr == nil && runInfo != nil && runInfo.URL != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("View workflow run: "+runInfo.URL))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("View workflow run: "+runInfo.URL))
 		executionLog.Printf("Workflow run URL: %s (ID: %d)", runInfo.URL, runInfo.DatabaseID)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Analyze this run: %s audit %d", string(constants.CLIExtensionPrefix), runInfo.DatabaseID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Analyze this run: %s audit %d", string(constants.CLIExtensionPrefix), runInfo.DatabaseID)))
 		return
 	}
 	if opts.Verbose && runErr != nil {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Note: Could not get workflow run URL: %v", runErr)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Note: Could not get workflow run URL: %v", runErr)))
 	}
 }
 
@@ -474,7 +474,7 @@ func waitForWorkflowRunCompletion(ctx context.Context, opts RunOptions, runInfo 
 	}
 	if opts.AutoMergePRs {
 		if err := AutoMergePullRequestsCreatedAfter(targetRepo, workflowStartTime, opts.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to auto-merge pull requests: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to auto-merge pull requests: %v", err)))
 		}
 	}
 	return nil
@@ -482,9 +482,9 @@ func waitForWorkflowRunCompletion(ctx context.Context, opts RunOptions, runInfo 
 
 func printWorkflowRunInfoWarning(opts RunOptions, runErr error) {
 	if opts.AutoMergePRs {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not get workflow run information for auto-merge: %v", runErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not get workflow run information for auto-merge: %v", runErr)))
 	} else if opts.WaitForCompletion {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not get workflow run information: %v", runErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not get workflow run information: %v", runErr)))
 	}
 }
 
@@ -495,7 +495,7 @@ func resolveWorkflowTargetRepo(opts RunOptions) string {
 	currentRepo, err := GetCurrentRepoSlug()
 	if err != nil {
 		if opts.AutoMergePRs {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not determine target repository for auto-merge: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not determine target repository for auto-merge: %v", err)))
 		}
 		return ""
 	}
@@ -507,7 +507,7 @@ func printWorkflowWaitMessage(autoMerge bool) {
 	if autoMerge {
 		message = "Auto-merge PRs enabled - waiting for workflow completion..."
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(message))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(message))
 }
 
 func printWorkflowCompletionWarning(autoMerge bool, err error) {
@@ -515,7 +515,7 @@ func printWorkflowCompletionWarning(autoMerge bool, err error) {
 	if autoMerge {
 		message = fmt.Sprintf("Workflow did not complete successfully, skipping auto-merge: %v", err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(message))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 }
 
 func restoreEnabledWorkflow(workflowIdOrName string, opts RunOptions, state workflowEnableState) {
@@ -553,16 +553,16 @@ func validateWorkflowsForRun(workflowNames []string, opts RunOptions) error {
 
 // executeAllWorkflowsOnce runs each workflow name once in sequence.
 func executeAllWorkflowsOnce(ctx context.Context, workflowNames []string, opts RunOptions) error {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Running %d workflow(s)...", len(workflowNames))))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Running %d workflow(s)...", len(workflowNames))))
 	for i, workflowName := range workflowNames {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 			return ctx.Err()
 		default:
 		}
 		if len(workflowNames) > 1 {
-			fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Running workflow %d/%d: %s", i+1, len(workflowNames), workflowName)))
+			fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Running workflow %d/%d: %s", i+1, len(workflowNames), workflowName)))
 		}
 		workflowOpts := opts
 		if opts.RepeatCount > 0 {
@@ -576,13 +576,13 @@ func executeAllWorkflowsOnce(ctx context.Context, workflowNames []string, opts R
 			select {
 			case <-ctx.Done():
 				timer.Stop()
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 				return ctx.Err()
 			case <-timer.C:
 			}
 		}
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Successfully triggered %d workflow(s)", len(workflowNames))))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully triggered %d workflow(s)", len(workflowNames))))
 	return nil
 }
 
@@ -621,7 +621,7 @@ func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, opts RunO
 	}
 	select {
 	case <-ctx.Done():
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
 		return ctx.Err()
 	default:
 	}

@@ -224,14 +224,14 @@ func runZizmorOnFiles(lockFiles []string, verbose bool, strict bool) error {
 
 	// Always show that zizmor is running (regular verbosity)
 	if len(lockFiles) == 1 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running zizmor security scanner on "+relPaths[0]))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running zizmor security scanner on "+relPaths[0]))
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Running zizmor security scanner on %d files", len(lockFiles))))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running zizmor security scanner on %d files", len(lockFiles))))
 	}
 
 	// In verbose mode, also show the command that users can run directly
 	if verbose {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Run zizmor directly: "+shellJoinArgs(dockerArgs)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run zizmor directly: "+shellJoinArgs(dockerArgs)))
 	}
 
 	// Capture output

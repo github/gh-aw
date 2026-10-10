@@ -28,16 +28,16 @@ func showUpdateSummary(successfulUpdates []string, failedUpdates []updateFailure
 		if !noCompile {
 			action = "Updated and compiled"
 		}
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("%s %d workflow(s)", action, len(successfulUpdates))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("%s %d workflow(s)", action, len(successfulUpdates))))
 		for _, name := range successfulUpdates {
-			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(name))
+			fmt.Fprintln(os.Stderr, console.FormatListItem(name))
 		}
 		fmt.Fprintln(os.Stderr, "")
 	}
 
 	if len(failedUpdates) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("%d workflow(s) could not be updated", len(failedUpdates))))
-		fmt.Fprint(os.Stderr, console.RenderStructStderr(groupUpdateFailures(failedUpdates)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflow(s) could not be updated", len(failedUpdates))))
+		fmt.Fprint(os.Stderr, console.RenderStruct(groupUpdateFailures(failedUpdates)))
 	}
 }
 

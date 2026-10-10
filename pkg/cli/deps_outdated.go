@@ -50,7 +50,7 @@ func CheckOutdatedDependencies(ctx context.Context, verbose bool) ([]OutdatedDep
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Reading go.mod from: "+goModPath))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Reading go.mod from: "+goModPath))
 	}
 
 	// Parse go.mod to get dependencies
@@ -67,7 +67,7 @@ func CheckOutdatedDependencies(ctx context.Context, verbose bool) ([]OutdatedDep
 		latest, age, err := getLatestVersion(ctx, dep.Path, dep.Version, verbose)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("could not check %s: %v", dep.Path, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("could not check %s: %v", dep.Path, err)))
 			}
 			continue
 		}
@@ -92,12 +92,12 @@ func CheckOutdatedDependencies(ctx context.Context, verbose bool) ([]OutdatedDep
 // DisplayOutdatedDependencies shows outdated dependencies in a formatted table
 func DisplayOutdatedDependencies(outdated []OutdatedDependency, totalDeps int) {
 	if len(outdated) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("All dependencies are up to date"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All dependencies are up to date"))
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Outdated Dependencies"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("====================="))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Outdated Dependencies"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("====================="))
 	fmt.Fprintln(os.Stderr, "")
 
 	// Sort by module name
@@ -132,14 +132,14 @@ func DisplayOutdatedDependencies(outdated []OutdatedDependency, totalDeps int) {
 		Headers: headers,
 		Rows:    rows,
 	}
-	fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
+	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 
 	fmt.Fprintln(os.Stderr, "")
 
 	// Summary
 	percentage := float64(len(outdated)) / float64(totalDeps) * 100
 	summary := fmt.Sprintf("Summary: %d of %d dependencies outdated (%.0f%%)", len(outdated), totalDeps, percentage)
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(summary))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(summary))
 }
 
 // parseGoMod extracts direct dependency information from go.mod.

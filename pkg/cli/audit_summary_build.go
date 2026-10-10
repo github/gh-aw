@@ -56,7 +56,7 @@ func buildProcessedAuditRun(run WorkflowRun, results auditAnalysisResults) Proce
 func saveAuditRunSummary(runOutputDir string, run WorkflowRun, processedRun ProcessedRun, results auditAnalysisResults, verbose bool) {
 	summary := buildAuditRunSummary(run, processedRun, results)
 	if err := saveRunSummary(runOutputDir, summary, verbose); err != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to save run summary: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to save run summary: %v", err)))
 	}
 }
 

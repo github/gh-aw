@@ -15,23 +15,23 @@ import (
 
 const consolePath = "github.com/github/gh-aw/pkg/console"
 
-var replacements = map[string]string{
-	"FormatError":           "FormatErrorStderr",
-	"FormatSuccessMessage":  "FormatSuccessMessageStderr",
-	"FormatInfoMessage":     "FormatInfoMessageStderr",
-	"FormatWarningMessage":  "FormatWarningMessageStderr",
-	"FormatCommandMessage":  "FormatCommandMessageStderr",
-	"FormatProgressMessage": "FormatProgressMessageStderr",
-	"FormatPromptMessage":   "FormatPromptMessageStderr",
-	"FormatVerboseMessage":  "FormatVerboseMessageStderr",
-	"FormatListItem":        "FormatListItemStderr",
-	"FormatSectionHeader":   "FormatSectionHeaderStderr",
-	"RenderStruct":          "RenderStructStderr",
-	"RenderTable":           "RenderTableStderr",
+var stdoutFormatters = map[string]string{
+	"FormatError":           "FormatErrorStdout",
+	"FormatSuccessMessage":  "FormatSuccessMessageStdout",
+	"FormatInfoMessage":     "FormatInfoMessageStdout",
+	"FormatWarningMessage":  "FormatWarningMessageStdout",
+	"FormatCommandMessage":  "FormatCommandMessageStdout",
+	"FormatProgressMessage": "FormatProgressMessageStdout",
+	"FormatPromptMessage":   "FormatPromptMessageStdout",
+	"FormatVerboseMessage":  "FormatVerboseMessageStdout",
+	"FormatListItem":        "FormatListItemStdout",
+	"FormatSectionHeader":   "FormatSectionHeaderStdout",
+	"RenderStruct":          "RenderStructStdout",
+	"RenderTable":           "RenderTableStdout",
 }
 
-// Analyzer reports stdout-aware console formatters written directly to stderr.
-var Analyzer = analyzerutil.New("consolestderr", "requires stderr-aware console formatting for direct stderr writes", run)
+// Analyzer reports console formatters whose styling disagrees with the destination.
+var Analyzer = analyzerutil.New("consolestderr", "requires destination-aware console formatting for direct standard-stream writes", run)
 
 func run(pass *analysis.Pass) (any, error) {
 	index, generated, err := analyzerutil.Indexes(pass)
@@ -40,7 +40,11 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	return analyzerutil.Preorder(pass, []ast.Node{(*ast.CallExpr)(nil)}, func(n ast.Node) {
 		call, ok := n.(*ast.CallExpr)
-		if !ok || !writesStderr(pass, call) {
+		if !ok {
+			return
+		}
+		destination := outputDestination(pass, call)
+		if destination == "" {
 			return
 		}
 		pos := pass.Fset.PositionFor(call.Pos(), false)
@@ -53,7 +57,7 @@ func run(pass *analysis.Pass) (any, error) {
 					return false
 				}
 				if inner, ok := node.(*ast.CallExpr); ok {
-					reportFormatter(pass, inner)
+					reportFormatter(pass, inner, destination)
 				}
 				return true
 			})
@@ -61,41 +65,59 @@ func run(pass *analysis.Pass) (any, error) {
 	})
 }
 
-func writesStderr(pass *analysis.Pass, call *ast.CallExpr) bool {
+func outputDestination(pass *analysis.Pass, call *ast.CallExpr) string {
 	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || !astutil.IsPkgSelector(pass, sel, "fmt") || len(call.Args) < 2 {
-		return false
+		return ""
 	}
 	switch sel.Sel.Name {
 	case "Fprint", "Fprintln", "Fprintf":
 	default:
-		return false
+		return ""
 	}
 	writer, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.SelectorExpr)
-	return ok && astutil.IsPkgSelector(pass, writer, "os") && writer.Sel.Name == "Stderr"
+	if ok && astutil.IsPkgSelector(pass, writer, "os") {
+		switch writer.Sel.Name {
+		case "Stderr", "Stdout":
+			return writer.Sel.Name
+		}
+	}
+	return ""
 }
 
-func reportFormatter(pass *analysis.Pass, call *ast.CallExpr) {
+func reportFormatter(pass *analysis.Pass, call *ast.CallExpr, destination string) {
 	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || !astutil.IsPkgSelector(pass, sel, consolePath) {
 		return
 	}
 	if sel.Sel.Name == "RenderStructWithOptions" {
-		checkRenderOptions(pass, call)
+		checkRenderOptions(pass, call, destination)
 		return
 	}
-	replacement, ok := replacements[sel.Sel.Name]
-	if !ok {
+	replacement := formatterReplacement(sel.Sel.Name, destination)
+	if replacement == "" {
 		return
 	}
 	pass.Report(analysis.Diagnostic{
 		Pos: sel.Sel.Pos(), End: sel.Sel.End(),
-		Message: sel.Sel.Name + " uses stdout styling; use " + replacement + " for stderr",
+		Message: sel.Sel.Name + " uses the wrong output styling; use " + replacement + " for " + destination,
 		SuggestedFixes: []analysis.SuggestedFix{{
-			Message: "Use the stderr-aware console formatter",
+			Message: "Use the destination-aware console formatter",
 			TextEdits: []analysis.TextEdit{{
 				Pos: sel.Sel.Pos(), End: sel.Sel.End(), NewText: []byte(replacement),
 			}},
 		}},
 	})
+}
+
+func formatterReplacement(name, destination string) string {
+	for diagnostic, stdout := range stdoutFormatters {
+		if destination == "Stdout" && (name == diagnostic || name == diagnostic+"Stderr") {
+			return stdout
+		}
+		if destination == "Stderr" && name == stdout {
+			return diagnostic
+		}
+	}
+	return ""
 }

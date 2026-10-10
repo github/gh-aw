@@ -52,13 +52,13 @@ func listWorkflowsWithMCP(workflowsDir string, verbose bool) error {
 	}
 
 	if len(workflowsWithMCP) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflows with MCP servers found"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflows with MCP servers found"))
 		return nil
 	}
 
 	mcpInspectListLog.Printf("Found %d workflows with MCP servers", len(workflowsWithMCP))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflow specified; showing MCP summary list (same behavior as 'gh aw mcp list')."))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Workflows with MCP servers:"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow specified; showing MCP summary list (same behavior as 'gh aw mcp list')."))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Workflows with MCP servers:"))
 	for _, workflow := range workflowsWithMCP {
 		fmt.Fprintf(os.Stderr, "  • %s\n", workflow)
 	}

@@ -123,7 +123,7 @@ func prepareLogsData(processedRuns []ProcessedRun, opts renderLogsOutputOptions)
 func cacheLogsAuditData(processedRuns []ProcessedRun, writer *cachedLogsJSONLWriter) {
 	for _, processedRun := range processedRuns {
 		if err := writer.AppendAudit(processedRun); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 				fmt.Sprintf("Failed to cache audit data for run %d: %v", processedRun.Run.DatabaseID, err)))
 		}
 	}

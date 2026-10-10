@@ -214,7 +214,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	updateLog.Printf("Updating GitHub Actions versions in actions-lock.json: allowMajor=%v, disableReleaseBump=%v", opts.AllowMajor, opts.DisableReleaseBump)
 	if err := updateActions(ctx, actionDeps, opts.AllowMajor, opts.Verbose, opts.DisableReleaseBump, opts.CoolDown); err != nil {
 		// Non-fatal: warn but don't fail the update
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not update actions-lock.json: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update actions-lock.json: %v", err)))
 	}
 
 	// Update action references in user-provided steps within workflow .md files.
@@ -239,7 +239,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 			}
 		} else {
 			// Non-fatal: warn but don't fail the update
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not update action references in workflow files: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update action references in workflow files: %v", err)))
 		}
 	}
 
@@ -251,14 +251,14 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 	newContainerPins, err := updateContainerPins(ctx, defaultContainerPinUpdateDeps(), opts.WorkflowsDir, opts.Verbose, containerPinUpdateOptions{refreshExisting: true})
 	if err != nil {
 		// Non-fatal: Docker may not be available in all environments.
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not update container pins: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update container pins: %v", err)))
 	}
 
 	// Recompile all workflows when new container pins were added so that the
 	// lock files embed the digest-pinned image references (image:tag@sha256:…).
 	if newContainerPins && !opts.NoCompile {
 		updateLog.Print("Recompiling workflows to embed new container digest pins")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Recompiling workflows to embed container digest pins..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflows to embed container digest pins..."))
 		recompileErr := recompileAllWorkflows(ctx, opts.WorkflowsDir, opts.EngineOverride, opts.Verbose, opts.Approve)
 		if recompileErr != nil {
 			compileErr := fmt.Errorf("workflow compilation after container pin update failed: %w", recompileErr)
@@ -276,7 +276,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) error 
 			return fmt.Errorf("update validation failed: %w", err)
 		}
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Validated action and container SHAs in actions-lock.json"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Validated action and container SHAs in actions-lock.json"))
 		}
 	}
 
@@ -308,7 +308,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Checked out "+targetRepo+" at "+checkoutDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checked out "+targetRepo+" at "+checkoutDir))
 	}
 
 	originalDir, err := os.Getwd()

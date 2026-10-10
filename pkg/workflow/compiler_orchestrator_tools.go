@@ -187,7 +187,7 @@ func (c *Compiler) extractEffectiveMarkdown(importsResult *parser.ImportsResult,
 	orchestratorToolsLog.Printf("Extracted inline sub-agents: count=%d", len(subAgents))
 	orchestratorToolsLog.Printf("Extracted inline skills: count=%d", len(inlineSkills))
 	for _, w := range importsResult.Warnings {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(w))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(w))
 		c.IncrementWarningCount()
 	}
 	return effectiveMarkdown, nil
@@ -377,7 +377,7 @@ func (c *Compiler) warnDeprecatedAPMImports(frontmatter map[string]any) {
 		return
 	}
 	if _, hasAPMPackages := importsMap["apm-packages"]; hasAPMPackages {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("The 'imports.apm-packages' field is deprecated and no longer supported. Migrate to 'imports: - uses: shared/apm.md' to configure APM packages."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("The 'imports.apm-packages' field is deprecated and no longer supported. Migrate to 'imports: - uses: shared/apm.md' to configure APM packages."))
 		c.IncrementWarningCount()
 	}
 }
@@ -648,7 +648,7 @@ func (c *Compiler) warnDeprecatedFrontmatterFields(frontmatter map[string]any) {
 		if msg == "" {
 			msg = fmt.Sprintf("'%s' is deprecated", f.Path)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(msg))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
 		c.IncrementWarningCount()
 	}
 }

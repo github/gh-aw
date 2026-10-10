@@ -408,7 +408,7 @@ func syncManifestManagedResources(ctx context.Context, repoSpec *RepoSpec, pkg *
 		})
 	}
 	for _, destination := range staleRemoved {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Removed stale package resource: "+destination))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed stale package resource: "+destination))
 	}
 	if len(record.Files) == 0 {
 		return nil
@@ -624,7 +624,7 @@ func removePackageOwnedFilesIfUnused(packageBase string) error {
 				kept = append(kept, entry)
 				continue
 			}
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Removed package-owned file: "+destination))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Removed package-owned file: "+destination))
 			continue
 		}
 		kept = append(kept, entry)

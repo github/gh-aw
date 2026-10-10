@@ -156,15 +156,15 @@ func RunExperimentsList(config ExperimentsListConfig) error {
 	}
 
 	if len(experiments) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No experiment workflow branches found (branches matching experiments/* pattern)."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No experiment workflow branches found (branches matching experiments/* pattern)."))
 		return nil
 	}
 
 	count := len(experiments)
 	if count == 1 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Found 1 experiment workflow"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Found 1 experiment workflow"))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Found %d experiment workflows", count)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Found %d experiment workflows", count)))
 	}
 	fmt.Fprint(os.Stderr, console.RenderStructWithOptions(experiments, console.RenderOptions{
 		Stderr: true, MaxWidth: console.DefaultTableWidth,

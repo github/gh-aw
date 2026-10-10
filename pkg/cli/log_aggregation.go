@@ -58,7 +58,7 @@ func aggregateLogFiles[T MutableLogAnalysis](
 	if len(files) == 0 {
 		logAggregationLog.Printf("No log files found matching pattern '%s' in %s", globPattern, logsDir)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No log files found in "+logsDir))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No log files found in "+logsDir))
 		}
 		return zero, nil
 	}
@@ -66,7 +66,7 @@ func aggregateLogFiles[T MutableLogAnalysis](
 	logAggregationLog.Printf("Found %d log files to aggregate", len(files))
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Analyzing %d log files from %s", len(files), logsDir)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Analyzing %d log files from %s", len(files), logsDir)))
 	}
 
 	// Initialize aggregated analysis
@@ -81,13 +81,13 @@ func aggregateLogFiles[T MutableLogAnalysis](
 	// Parse each file and aggregate results
 	for _, file := range files {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Parsing "+filepath.Base(file)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Parsing "+filepath.Base(file)))
 		}
 
 		analysis, err := parser(file, verbose)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse %s: %v", filepath.Base(file), err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse %s: %v", filepath.Base(file), err)))
 			}
 			continue
 		}

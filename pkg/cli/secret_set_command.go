@@ -109,7 +109,7 @@ The secret value can be provided in three ways:
 			}
 
 			secretSetLog.Printf("Successfully set secret %s for %s/%s", secretName, owner, repo)
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Secret %s updated for %s/%s", secretName, owner, repo)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Secret %s updated for %s/%s", secretName, owner, repo)))
 			return nil
 		},
 	}

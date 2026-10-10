@@ -60,7 +60,7 @@ func PollWithSignalHandling(options PollOptions) error {
 	pollLog.Printf("Starting polling: interval=%v, timeout=%v", options.PollInterval, options.Timeout)
 
 	if options.Verbose && options.StartMessage != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(options.StartMessage))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(options.StartMessage))
 	}
 
 	// Use provided context or fall back to background context
@@ -82,7 +82,7 @@ func PollWithSignalHandling(options PollOptions) error {
 	switch result {
 	case PollSuccess:
 		if options.Verbose && options.SuccessMessage != "" {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(options.SuccessMessage))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(options.SuccessMessage))
 		}
 		return nil
 	case PollFailure:
@@ -98,12 +98,12 @@ func PollWithSignalHandling(options PollOptions) error {
 			if err := ctx.Err(); err != nil {
 				msg = fmt.Sprintf("Operation cancelled (%v), stopping wait...", err)
 			}
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(msg))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(msg))
 			return ErrInterrupted
 
 		case <-sigChan:
 			pollLog.Print("Received interrupt signal")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Received interrupt signal, stopping wait..."))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Received interrupt signal, stopping wait..."))
 			return ErrInterrupted
 
 		case <-ticker.C:
@@ -119,7 +119,7 @@ func PollWithSignalHandling(options PollOptions) error {
 			switch result {
 			case PollSuccess:
 				if options.Verbose && options.SuccessMessage != "" {
-					fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(options.SuccessMessage))
+					fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(options.SuccessMessage))
 				}
 				return nil
 			case PollFailure:
@@ -128,7 +128,7 @@ func PollWithSignalHandling(options PollOptions) error {
 
 			// Still waiting, show progress if enabled
 			if options.Verbose && options.ProgressMessage != "" {
-				fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(options.ProgressMessage))
+				fmt.Fprintln(os.Stderr, console.FormatProgressMessage(options.ProgressMessage))
 			}
 		}
 	}

@@ -867,7 +867,7 @@ func writeSummaryFile(path string, data LogsData, verbose bool) error {
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Wrote summary to "+path))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Wrote summary to "+path))
 	}
 
 	reportLog.Printf("Successfully wrote summary file: %s", path)
@@ -883,11 +883,11 @@ func renderLogsConsoleToWriter(w io.Writer, data LogsData) {
 	mcpFailures := data.MCPFailures
 	consoleData := data
 	consoleData.MCPFailures = nil
-	if _, err := fmt.Fprint(w, console.RenderStruct(consoleData)); err != nil {
+	if _, err := fmt.Fprint(w, console.RenderStructStdout(consoleData)); err != nil {
 		console.PrintErrorMessage("Cannot render log diagnostics: " + err.Error())
 		return
 	}
-	if _, err := fmt.Fprint(w, console.RenderStruct(struct {
+	if _, err := fmt.Fprint(w, console.RenderStructStdout(struct {
 		MCPFailures []mcpFailureSummaryDisplay `console:"title:⚠️  MCP Server Failures,omitempty"`
 	}{MCPFailures: mcpFailureSummaryDisplays(mcpFailures)})); err != nil {
 		console.PrintErrorMessage("Cannot render log diagnostics: " + err.Error())
@@ -900,12 +900,12 @@ func renderLogsConsoleToWriter(w io.Writer, data LogsData) {
 
 	// Display concise summary at the end
 	fmt.Fprintln(os.Stderr, "") // Blank line for spacing
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Downloaded %d workflow logs to %s", data.Summary.TotalRuns, data.LogsLocation)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Downloaded %d workflow logs to %s", data.Summary.TotalRuns, data.LogsLocation)))
 
 	// Show key metrics in a concise format
 	if data.Summary.TotalErrors > 0 || data.Summary.TotalWarnings > 0 {
 		fmt.Fprintf(os.Stderr, "  %s %d errors, %d warnings across %d runs\n",
-			console.FormatInfoMessageStderr("•"),
+			console.FormatInfoMessage("•"),
 			data.Summary.TotalErrors,
 			data.Summary.TotalWarnings,
 			data.Summary.TotalRuns)
@@ -913,13 +913,13 @@ func renderLogsConsoleToWriter(w io.Writer, data LogsData) {
 
 	if len(data.ToolUsage) > 0 {
 		fmt.Fprintf(os.Stderr, "  %s %d unique tools used\n",
-			console.FormatInfoMessageStderr("•"),
+			console.FormatInfoMessage("•"),
 			len(data.ToolUsage))
 	}
 
 	if len(data.Observability) > 0 {
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("Observability Insights"))
+		fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Observability Insights"))
 		fmt.Fprintln(os.Stderr)
 		renderObservabilityInsights(data.Observability)
 	}

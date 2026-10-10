@@ -113,7 +113,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 					} else {
 						sanitized, wasSanitized := sanitizeCopilotShellCommand(cmdStr)
 						if wasSanitized {
-							fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+							fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 								fmt.Sprintf("bash tool %q contains single quotes that crash Copilot CLI; "+
 									"truncated to safe prefix %q for shell() prefix-matching. "+
 									"Use %q in your workflow to silence this warning.",

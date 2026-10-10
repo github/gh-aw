@@ -21,7 +21,7 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 
 	bootstrapLog.Printf("Printing bootstrap config TODO: package=%s, actions=%d", profile.PackageID, len(profile.Profile.Config))
 	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, console.FormatInfoMessage("Post-installation steps from "+profile.PackageID+":"))
+	fmt.Fprintln(w, console.FormatInfoMessageStdout("Post-installation steps from "+profile.PackageID+":"))
 
 	for _, action := range profile.Profile.Config {
 		switch action.Type {
@@ -63,7 +63,7 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 		case "commit-and-push":
 			fmt.Fprintf(w, "  ☐ Commit and push local changes — %s\n", action.Message)
 		case "handoff":
-			fmt.Fprintln(w, console.FormatInfoMessage(action.Message))
+			fmt.Fprintln(w, console.FormatInfoMessageStdout(action.Message))
 		}
 	}
 
@@ -83,7 +83,7 @@ func executeBootstrapConfigForAdd(ctx context.Context, repo string, sources []st
 
 	bootstrapLog.Printf("Applying bootstrap config for add: repo=%s, package=%s, actions=%d, useCopilotRequests=%t", repo, profile.PackageID, len(profile.Profile.Config), useCopilotRequests)
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Applying setup steps from "+profile.PackageID+"..."))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Applying setup steps from "+profile.PackageID+"..."))
 	repoDir, err := gitutil.FindGitRoot()
 	if err != nil {
 		bootstrapLog.Printf("Could not determine git root for add bootstrap config: %v", err)

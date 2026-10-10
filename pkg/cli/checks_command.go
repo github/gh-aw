@@ -415,15 +415,15 @@ func printChecksJSON(result *ChecksResult) error {
 func printChecksText(result *ChecksResult) error {
 	switch result.State {
 	case CheckStateSuccess:
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("PR #%s: all checks passed (%d total)", result.PRNumber, result.TotalCount)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("PR #%s: all checks passed (%d total)", result.PRNumber, result.TotalCount)))
 	case CheckStateFailed:
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("PR #%s: checks failed (%d total)", result.PRNumber, result.TotalCount)))
 	case CheckStatePending:
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("PR #%s: checks pending (%d total)", result.PRNumber, result.TotalCount)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("PR #%s: checks pending (%d total)", result.PRNumber, result.TotalCount)))
 	case CheckStateNoChecks:
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("PR #%s: no checks configured or triggered", result.PRNumber)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("PR #%s: no checks configured or triggered", result.PRNumber)))
 	case CheckStatePolicyBlocked:
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("PR #%s: blocked by policy or account gate (%d total)", result.PRNumber, result.TotalCount)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("PR #%s: blocked by policy or account gate (%d total)", result.PRNumber, result.TotalCount)))
 	}
 
 	// Always print the normalized state to stdout for machine consumption.

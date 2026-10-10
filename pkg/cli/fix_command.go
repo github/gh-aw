@@ -98,11 +98,11 @@ all steps and additionally:
 func listAvailableCodemods() error {
 	codemods := GetAllCodemods()
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Available Codemods:"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Available Codemods:"))
 	fmt.Fprintln(os.Stderr, "")
 
 	for _, codemod := range codemods {
-		fmt.Fprintf(os.Stderr, "  %s\n", console.FormatInfoMessageStderr(codemod.Name))
+		fmt.Fprintf(os.Stderr, "  %s\n", console.FormatInfoMessage(codemod.Name))
 		fmt.Fprintf(os.Stderr, "    ID: %s\n", codemod.ID)
 		if codemod.IntroducedIn != "" {
 			fmt.Fprintf(os.Stderr, "    Introduced in: %s\n", codemod.IntroducedIn)
@@ -149,7 +149,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	}
 
 	if len(files) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflow files found."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow files found."))
 		return nil
 	}
 
@@ -202,11 +202,11 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	// Update dispatcher skill
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false, write); err != nil {
 		fixLog.Printf("Failed to update dispatcher skill: %v", err)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update dispatcher skill: %v", err)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to update dispatcher skill: %v", err)))
 	}
 	if err := ensureAgenticWorkflowsAgent(verbose, write); err != nil {
 		fixLog.Printf("Failed to update agentic workflows custom agent: %v", err)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update agentic workflows custom agent: %v", err)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to update agentic workflows custom agent: %v", err)))
 	}
 
 	// Delete old template files from pkg/cli/templates/ (only with --write)
@@ -214,7 +214,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 		fixLog.Print("Cleaning up old template files")
 		if err := deleteOldTemplateFiles(verbose); err != nil {
 			fixLog.Printf("Failed to delete old template files: %v", err)
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(fmt.Sprintf("Failed to delete old template files: %v", err)))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to delete old template files: %v", err)))
 		}
 	}
 
@@ -223,7 +223,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 		fixLog.Print("Deleting old agent files")
 		if err := deleteLegacyAgentFiles(verbose); err != nil {
 			fixLog.Printf("Failed to delete old agent files: %v", err)
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(fmt.Sprintf("Failed to delete old agent files: %v", err)))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to delete old agent files: %v", err)))
 		}
 	}
 
@@ -234,15 +234,15 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 		if write {
 			if err := os.Remove(schemaPath); err != nil {
 				fixLog.Printf("Failed to delete schema file: %v", err)
-				fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(fmt.Sprintf("Failed to delete deprecated schema file: %v", err)))
+				fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to delete deprecated schema file: %v", err)))
 			} else {
 				fixLog.Print("Deleted deprecated schema file")
 				if verbose {
-					fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessageStderr("Deleted deprecated .github/aw/schemas/agentic-workflow.json"))
+					fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessage("Deleted deprecated .github/aw/schemas/agentic-workflow.json"))
 				}
 			}
 		} else {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Would delete deprecated .github/aw/schemas/agentic-workflow.json"))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Would delete deprecated .github/aw/schemas/agentic-workflow.json"))
 		}
 	}
 
@@ -250,27 +250,27 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	fmt.Fprintln(os.Stderr, "")
 	if write {
 		if totalFixed > 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessageStderr(fmt.Sprintf("Fixed %d of %d workflow files", totalFixed, totalFiles)))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessage(fmt.Sprintf("Fixed %d of %d workflow files", totalFixed, totalFiles)))
 		} else if totalGuidedErrors == 0 && totalProcessingErrors == 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("No fixes needed"))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("No fixes needed"))
 		}
 	} else {
 		if totalFixed > 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Would fix %d of %d workflow files", totalFixed, totalFiles)))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Would fix %d of %d workflow files", totalFixed, totalFiles)))
 			fmt.Fprintln(os.Stderr, "")
 
 			// Output as agent prompt
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("To fix these issues, run:"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("To fix these issues, run:"))
 			fmt.Fprintln(os.Stderr, "")
 			fmt.Fprintln(os.Stderr, "  gh aw fix --write")
 			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Or fix them individually:"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Or fix them individually:"))
 			fmt.Fprintln(os.Stderr, "")
 			for _, wf := range workflowsNeedingFixes {
 				fmt.Fprintf(os.Stderr, "  gh aw fix %s --write\n", strings.TrimSuffix(wf.File, ".md"))
 			}
 		} else if totalGuidedErrors == 0 && totalProcessingErrors == 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("No workflow fixes needed"))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("No workflow fixes needed"))
 		}
 	}
 
@@ -350,7 +350,7 @@ func processWorkflowFileWithInfo(filePath string, codemods []Codemod, write bool
 	// If no changes, report and return
 	if !hasChanges {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("  %s - no fixes needed", filepath.Base(filePath))))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("  %s - no fixes needed", filepath.Base(filePath))))
 		}
 		return false, nil, nil
 	}
@@ -367,12 +367,12 @@ func processWorkflowFileWithInfo(filePath string, codemods []Codemod, write bool
 			return false, nil, fmt.Errorf("failed to scaffold shared Serena workflow: %w", err)
 		}
 
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessageStderr(fileName))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessage(fileName))
 		for _, codemodName := range appliedCodemods {
 			fmt.Fprintf(os.Stderr, "    • %s\n", codemodName)
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(""+fileName))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(""+fileName))
 		for _, codemodName := range appliedCodemods {
 			fmt.Fprintf(os.Stderr, "    • %s\n", codemodName)
 		}
@@ -429,7 +429,7 @@ func scaffoldSerenaSharedWorkflowIfNeeded(filePath string, appliedCodemods []str
 	}
 
 	if verbose {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Scaffolded "+serenaPath))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Scaffolded "+serenaPath))
 	}
 
 	return nil

@@ -38,7 +38,7 @@ func checkAndSuggestSecrets(toolConfig map[string]any, verbose bool) error {
 	mcpSecretsLog.Printf("Found %d required secrets in configuration", len(requiredSecrets))
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Checking repository secrets..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checking repository secrets..."))
 	}
 
 	// Check each secret using GitHub CLI
@@ -49,7 +49,7 @@ func checkAndSuggestSecrets(toolConfig map[string]any, verbose bool) error {
 			// If we get a 403 error, ignore it as requested
 			if errorutil.IsForbiddenError(err) {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Repository secrets check skipped (insufficient permissions)"))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Repository secrets check skipped (insufficient permissions)"))
 				}
 				return nil
 			}
@@ -64,14 +64,14 @@ func checkAndSuggestSecrets(toolConfig map[string]any, verbose bool) error {
 	// Suggest CLI commands for missing secrets
 	if len(missingSecrets) > 0 {
 		mcpSecretsLog.Printf("Found %d missing secrets", len(missingSecrets))
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("The following secrets are required but not found in the repository:"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("The following secrets are required but not found in the repository:"))
 		for _, secretName := range missingSecrets {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("To add %s secret:", secretName)))
-			fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr("gh secret set "+secretName))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("To add %s secret:", secretName)))
+			fmt.Fprintln(os.Stderr, console.FormatCommandMessage("gh secret set "+secretName))
 		}
 	} else if verbose {
 		mcpSecretsLog.Print("All required secrets are available in repository")
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("All required secrets are available in the repository"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All required secrets are available in the repository"))
 	}
 
 	return nil

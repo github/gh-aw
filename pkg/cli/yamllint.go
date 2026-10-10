@@ -59,14 +59,14 @@ func runYamllintOnFiles(lockFiles []string, verbose bool, strict bool) error {
 	dockerArgs := buildYamllintDockerArgs(gitRoot, relPaths, strict)
 
 	if len(lockFiles) == 1 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running yamllint on "+relPaths[0]))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running yamllint on "+relPaths[0]))
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Running yamllint on %d files", len(lockFiles))))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running yamllint on %d files", len(lockFiles))))
 	}
 
 	if verbose {
 		dockerCmd := buildYamllintVerboseCommand(gitRoot, relPaths, strict)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Run yamllint directly: "+dockerCmd))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run yamllint directly: "+dockerCmd))
 	}
 
 	cmd := exec.Command("docker", dockerArgs...)
@@ -186,7 +186,7 @@ func parseAndDisplayYamllintOutput(stdout string) (int, error) {
 		issue, err := parseYamllintLine(line)
 		if err != nil {
 			yamllintLog.Printf("Failed to parse yamllint line %q: %v", line, err)
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr("Failed to parse yamllint output line: "+line))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage("Failed to parse yamllint output line: "+line))
 			fmt.Fprintln(os.Stderr, line)
 			continue
 		}

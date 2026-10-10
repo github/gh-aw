@@ -151,7 +151,7 @@ func determineMCPPropertyOrder(toolName string, mcpConfig *parser.RegistryMCPSer
 		}
 		return []string{"type", "url", "headers", "auth", "tools", "required"}, true
 	default:
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Custom MCP server '%s' has unsupported type '%s'. Supported types: stdio, http", toolName, mcpConfig.Type)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Custom MCP server '%s' has unsupported type '%s'. Supported types: stdio, http", toolName, mcpConfig.Type)))
 		return nil, false
 	}
 }

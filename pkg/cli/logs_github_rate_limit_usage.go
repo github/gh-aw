@@ -108,7 +108,7 @@ func findGitHubRateLimitsFile(runDir string) string {
 		}
 		return nil
 	}); walkErr != nil && !errors.Is(walkErr, filepath.SkipAll) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", runDir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", runDir, walkErr)))
 	}
 	if found != "" {
 		gitHubRateLimitUsageLog.Printf("Found rate limits file via walk: %s", found)

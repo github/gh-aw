@@ -77,7 +77,7 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 	containerPinsLog.Print("Starting container pin update")
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Updating container image pins..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updating container image pins..."))
 	}
 
 	// Collect all container images referenced in the compiled lock files.
@@ -86,14 +86,14 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		containerPinsLog.Printf("Failed to collect images from lock files: %v", err)
 		// Non-fatal — just skip
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to collect container images: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to collect container images: %v", err)))
 		}
 		return false, nil
 	}
 
 	if len(images) == 0 {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("No container images found in lock files"))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("No container images found in lock files"))
 		}
 		return false, nil
 	}
@@ -136,7 +136,7 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		existingPin, hasExistingPin := actionCache.GetContainerPin(image)
 		if hasExistingPin && existingPin.Digest != "" && !opts.refreshExisting {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("%s already pinned: %s", image, existingPin.Digest)))
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("%s already pinned: %s", image, existingPin.Digest)))
 			}
 			skippedImages = append(skippedImages, image)
 			continue
@@ -152,7 +152,7 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		pinnedImage := image + "@" + digest
 		if hasExistingPin && existingPin.Digest == digest && existingPin.PinnedImage == pinnedImage {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("%s already pinned: %s", image, digest)))
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("%s already pinned: %s", image, digest)))
 			}
 			skippedImages = append(skippedImages, image)
 			continue
@@ -161,7 +161,7 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		updatedImages = append(updatedImages, pinnedEntry{image: image, pinnedImage: pinnedImage})
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Pinned %s → %s", image, digest)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Pinned %s → %s", image, digest)))
 		}
 	}
 
@@ -169,25 +169,25 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 	fmt.Fprintln(os.Stderr, "")
 
 	if len(updatedImages) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Updated %d container image pin(s):", len(updatedImages))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %d container image pin(s):", len(updatedImages))))
 		for _, entry := range updatedImages {
-			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(entry.pinnedImage))
+			fmt.Fprintln(os.Stderr, console.FormatListItem(entry.pinnedImage))
 		}
 		fmt.Fprintln(os.Stderr, "")
 	}
 
 	if prunedCount > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Pruned %d stale container pin(s) from actions-lock.json", prunedCount)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Pruned %d stale container pin(s) from actions-lock.json", prunedCount)))
 		fmt.Fprintln(os.Stderr, "")
 	}
 
 	if len(skippedImages) > 0 && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("%d container image(s) already up to date", len(skippedImages))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("%d container image(s) already up to date", len(skippedImages))))
 		fmt.Fprintln(os.Stderr, "")
 	}
 
 	if len(failedImages) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to resolve digest for %d image(s) (Docker/crane may be unavailable):", len(failedImages))))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to resolve digest for %d image(s) (Docker/crane may be unavailable):", len(failedImages))))
 		for _, f := range failedImages {
 			fmt.Fprintf(os.Stderr, "  %s: %s\n", f.image, f.reason)
 		}
@@ -198,7 +198,7 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		if err := actionCache.Save(); err != nil {
 			return false, fmt.Errorf("failed to save actions-lock.json: %w", err)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Updated container pins in actions-lock.json"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updated container pins in actions-lock.json"))
 	}
 
 	if len(failedImages) > 0 && opts.failOnResolveErrors {

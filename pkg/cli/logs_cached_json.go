@@ -124,13 +124,13 @@ func loadCachedLogsJSONL(path string) (*cachedLogsJSONLCache, error) {
 		return cache.addRecord(record, recordNumber)
 	})
 	if errors.Is(err, os.ErrNotExist) {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Cached logs JSONL file not found: "+path))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Cached logs JSONL file not found: "+path))
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf(
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf(
 		"Found cached logs JSONL file: %s (lines=%d, runs=%d, workflow_run_lists=%d)",
 		path, recordCount, len(cache.runs), len(cache.workflowRunLists),
 	)))
@@ -199,7 +199,7 @@ func loadCachedLogsJSONLFiles(paths []string) (*cachedLogsJSONLCache, error) {
 
 func warnDuplicateCachedLogsJSONLRecord(message string) {
 	logsCacheLog.Print(message)
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(message))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 }
 
 func prepareCachedLogsJSONL(opts *LogsDownloadOptions) error {

@@ -74,8 +74,8 @@ func CreateWorkflowMarkdownFile(workflowName string, verbose bool, force bool, e
 		return fmt.Errorf("failed to write workflow file '%s': %w", destFile, err)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created new workflow: "+destFile))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Edit the file to customize your workflow, then run '%s compile' to generate the GitHub Actions workflow", string(constants.CLIExtensionPrefix))))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created new workflow: "+destFile))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Edit the file to customize your workflow, then run '%s compile' to generate the GitHub Actions workflow", string(constants.CLIExtensionPrefix))))
 
 	return nil
 }

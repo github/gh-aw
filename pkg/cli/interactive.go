@@ -73,7 +73,7 @@ func CreateWorkflowInteractively(ctx context.Context, workflowName string, verbo
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Starting interactive workflow creation..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Starting interactive workflow creation..."))
 	}
 
 	builder := &InteractiveWorkflowBuilder{
@@ -775,7 +775,7 @@ func (b *InteractiveWorkflowBuilder) compileWorkflow(ctx context.Context, verbos
 
 	// Stop spinner with success message
 	spinner.StopWithMessage("✓ Workflow compiled successfully!")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("You can now find your compiled workflow at .github/workflows/%s.lock.yml", b.WorkflowName)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("You can now find your compiled workflow at .github/workflows/%s.lock.yml", b.WorkflowName)))
 
 	return nil
 }
