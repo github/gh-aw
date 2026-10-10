@@ -84,7 +84,7 @@ func GenerateActionMetadataCommand() error {
 		contentBytes, err := os.ReadFile(jsPath)
 		if err != nil {
 			generateActionMetadataLog.Printf("Skipping %s: failed to read file: %v", filename, err)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("⚠ Skipping %s: %s", filename, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %s", filename, err)))
 			continue
 		}
 		content := string(contentBytes)
@@ -94,7 +94,7 @@ func GenerateActionMetadataCommand() error {
 		// Extract metadata
 		metadata, err := extractActionMetadata(filename, content)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("✗ Failed to extract metadata from %s: %s", filename, err)))
+			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to extract metadata from %s: %s", filename, err)))
 			continue
 		}
 
@@ -112,24 +112,24 @@ func GenerateActionMetadataCommand() error {
 
 		// Generate action.yml
 		if err := generateActionYml(actionDir, metadata); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("✗ Failed to generate action.yml: "+err.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Failed to generate action.yml: "+err.Error()))
 			continue
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  ✓ Generated action.yml"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Generated action.yml"))
 
 		// Generate README.md
 		if err := generateReadme(actionDir, metadata); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("✗ Failed to generate README.md: "+err.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Failed to generate README.md: "+err.Error()))
 			continue
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  ✓ Generated README.md"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Generated README.md"))
 
 		// Copy source file with owner-only read/write permissions (0600) for security best practices
 		srcPath := filepath.Join(srcDir, "index.js")
 		if err := os.WriteFile(srcPath, []byte(content), constants.FilePermSensitive); err != nil {
 			return fmt.Errorf("failed to write source file: %w", err)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  ✓ Copied source to src/index.js"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  Copied source to src/index.js"))
 
 		generatedCount++
 	}

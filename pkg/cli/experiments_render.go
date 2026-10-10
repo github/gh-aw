@@ -9,7 +9,6 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/sliceutil"
-	"github.com/github/gh-aw/pkg/tty"
 )
 
 func printExperimentDetails(d *ExperimentDetails) {
@@ -41,10 +40,10 @@ func printExperimentDetails(d *ExperimentDetails) {
 			}
 			if len(rows) > 0 {
 				fmt.Fprintf(os.Stderr, "\n%s", console.RenderTable(console.TableConfig{
-					Title:   fmt.Sprintf("%s (total: %d)", exp.Name, exp.Total),
-					Headers: []string{"Variant", "Count", "Percent"},
-					Rows:    rows,
-					TTYFunc: tty.IsStderrTerminal,
+					Title:    fmt.Sprintf("%s (total: %d)", exp.Name, exp.Total),
+					Headers:  []string{"Variant", "Count", "Percent"},
+					Rows:     rows,
+					MaxWidth: console.DefaultTableWidth,
 				}))
 			}
 		}
@@ -64,10 +63,10 @@ func printExperimentDetails(d *ExperimentDetails) {
 			rows = append(rows, []string{date, run.RunID, formatAssignments(run.Assignments)})
 		}
 		fmt.Fprintf(os.Stderr, "\n%s", console.RenderTable(console.TableConfig{
-			Title:   "Recent runs",
-			Headers: []string{"Date", "Run ID", "Assignments"},
-			Rows:    rows,
-			TTYFunc: tty.IsStderrTerminal,
+			Title:    "Recent runs",
+			Headers:  []string{"Date", "Run ID", "Assignments"},
+			Rows:     rows,
+			MaxWidth: console.DefaultTableWidth,
 		}))
 	}
 }

@@ -391,7 +391,7 @@ func handleWorkflowDryRun(lockFileName string, args []string, opts RunOptions) e
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dry run mode - command that would be executed:"))
 		fmt.Fprintln(os.Stderr, console.FormatCommandMessage("gh "+strings.Join(args, " ")))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Validation passed for workflow: %s (dry run - not executed)", lockFileName)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Validation passed for workflow: %s (dry run - not executed)", lockFileName)))
 	return nil
 }
 

@@ -127,7 +127,7 @@ func renderSingleAuditDiffPretty(diff *AuditDiff) {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Changes: "+strings.Join(summaryParts, " | ")))
 	}
 	if anomalyCount > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("⚠️  %d anomalies detected", anomalyCount)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d anomalies detected", anomalyCount)))
 	}
 	fmt.Fprintln(os.Stderr)
 

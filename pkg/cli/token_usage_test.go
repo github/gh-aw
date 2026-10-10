@@ -814,7 +814,7 @@ func TestTokenUsageSummaryMethods(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotContains(t, string(encoded), "reasoning_tokens", "row JSON should preserve legacy shape")
 
-		rendered := console.RenderStruct(rows)
+		rendered := console.RenderStructStdout(rows)
 		assert.Contains(t, rendered, "Input", "row table should keep quartet columns")
 		assert.Contains(t, rendered, "Output", "row table should keep quartet columns")
 		assert.Contains(t, rendered, "Cache Read", "row table should keep quartet columns")

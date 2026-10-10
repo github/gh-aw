@@ -277,7 +277,7 @@ func runUpgradeCommand(opts upgradeOptions) error {
 	}
 
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Updated dispatcher skill"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated dispatcher skill"))
 	}
 
 	// Step 2: Apply codemods to all workflows (unless --no-fix is specified)
@@ -296,7 +296,7 @@ func runUpgradeCommand(opts upgradeOptions) error {
 		if err := RunFix(fixConfig); err != nil {
 			upgradeLog.Printf("Failed to apply codemods: %v", err)
 			// Don't fail the upgrade if fix fails - this is non-critical
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to apply codemods: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to apply codemods: %v", err)))
 		}
 	} else {
 		upgradeLog.Print("Skipping codemods (--no-fix specified)")
@@ -313,10 +313,10 @@ func runUpgradeCommand(opts upgradeOptions) error {
 		if err := UpdateActions(opts.ctx, false, opts.verbose, false, 0); err != nil {
 			upgradeLog.Printf("Failed to update actions: %v", err)
 			// Don't fail the upgrade if action updates fail - this is non-critical
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update actions: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update actions: %v", err)))
 		} else {
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Updated GitHub Actions versions"))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated GitHub Actions versions"))
 			}
 
 			// Only update "uses:" references in source .md files when actions-lock.json
@@ -327,7 +327,7 @@ func runUpgradeCommand(opts upgradeOptions) error {
 				msg := fmt.Sprintf("Failed to update action references in workflow files: %v", err)
 				upgradeLog.Print(msg)
 				// Non-critical: warn but don't fail the upgrade
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Warning: "+msg))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(""+msg))
 			}
 		}
 	} else {
@@ -354,7 +354,7 @@ func runUpgradeCommand(opts upgradeOptions) error {
 		if compileErr := compileWorkflowsForUpdate(opts.ctx, nil, opts.workflowDir, opts.engineOverride, opts.verbose, opts.approve); compileErr != nil {
 			upgradeLog.Printf("Failed to compile workflows: %v", compileErr)
 			// Don't fail the upgrade if compilation fails - this is non-critical
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to compile workflows: %v", compileErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile workflows: %v", compileErr)))
 		}
 	} else {
 		if opts.noFix {
@@ -383,15 +383,15 @@ func runUpgradeCommand(opts upgradeOptions) error {
 		if err != nil {
 			upgradeLog.Printf("Failed to update container pins: %v", err)
 			// Non-critical — Docker may not be available in all environments.
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update container pins: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update container pins: %v", err)))
 		} else if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Updated container image pins"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated container image pins"))
 		}
 		if newPins && !opts.noCompile {
 			upgradeLog.Print("Recompiling workflows to embed new container digest pins")
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflows to embed container digest pins..."))
 			if recompileErr := recompileAllWorkflows(opts.ctx, opts.workflowDir, opts.engineOverride, opts.verbose, opts.approve); recompileErr != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to recompile after container pin update: %v", recompileErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to recompile after container pin update: %v", recompileErr)))
 			}
 		}
 	}
@@ -416,7 +416,7 @@ func updateCopilotArtifacts(ctx context.Context, verbose bool) error {
 	}
 	if err := deleteLegacyAgentFiles(verbose); err != nil {
 		upgradeLog.Printf("Failed to delete legacy agent files: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to delete legacy agent files: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agent files: %v", err)))
 	}
 
 	// Upgrade copilot-setup-steps.yml version
@@ -424,7 +424,7 @@ func updateCopilotArtifacts(ctx context.Context, verbose bool) error {
 	if err := upgradeCopilotSetupSteps(ctx, verbose, actionMode, GetVersion()); err != nil {
 		upgradeLog.Printf("Failed to upgrade copilot-setup-steps.yml: %v", err)
 		// Don't fail the upgrade if copilot-setup-steps upgrade fails - this is non-critical
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to upgrade copilot-setup-steps.yml: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to upgrade copilot-setup-steps.yml: %v", err)))
 	}
 
 	return nil

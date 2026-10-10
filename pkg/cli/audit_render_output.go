@@ -166,7 +166,7 @@ func parseAgentLogIfRequested(runID int64, runOutputDir string, verbose bool) {
 	}
 	logMdPath := filepath.Join(runOutputDir, "log.md")
 	if fileutil.FileExists(logMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed log for run %d → %s", runID, logMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed log for run %d → %s", runID, logMdPath)))
 	}
 }
 
@@ -179,7 +179,7 @@ func parseFirewallLogsIfRequested(runID int64, runOutputDir string, verbose bool
 	}
 	firewallMdPath := filepath.Join(runOutputDir, "firewall.md")
 	if fileutil.FileExists(firewallMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed firewall logs for run %d → %s", runID, firewallMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed firewall logs for run %d → %s", runID, firewallMdPath)))
 	}
 }
 

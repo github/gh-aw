@@ -28,8 +28,8 @@ func TestMissingToolSummaryDisplayFields(t *testing.T) {
 		},
 	}
 
-	// Render using console.RenderStruct
-	output := console.RenderStruct(summaries)
+	// Render using console.RenderStructStdout
+	output := console.RenderStructStdout(summaries)
 
 	// Verify that Display fields are included in output
 	if !strings.Contains(output, "workflow1, workflow2, workflow3") {
@@ -71,7 +71,7 @@ func TestMCPFailureSummaryDisplayFields(t *testing.T) {
 		},
 	}
 
-	output := console.RenderStruct(mcpFailureSummaryDisplays(summaries))
+	output := console.RenderStructStdout(mcpFailureSummaryDisplays(summaries))
 
 	// Verify that Display field is included in output
 	if !strings.Contains(output, "workflow-a, workflow-b") {

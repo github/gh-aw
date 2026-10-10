@@ -980,7 +980,7 @@ func main() {
 		// Check if error is already formatted to avoid double formatting:
 		// - Contains suggestions (FormatErrorWithSuggestions)
 		// - Starts with ✗ (FormatErrorMessage)
-		// - Contains file:line:column: pattern (console.FormatError)
+		// - Contains file:line:column: pattern (console.FormatErrorStdout)
 		isAlreadyFormatted := strings.Contains(errMsg, "Suggestions:") ||
 			strings.HasPrefix(errMsg, "✗") ||
 			strings.Contains(errMsg, ":") && (strings.Contains(errMsg, "error:") || strings.Contains(errMsg, "warning:"))

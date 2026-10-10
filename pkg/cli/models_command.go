@@ -117,16 +117,16 @@ func runModelsCommand(cmd *cobra.Command) error {
 	}
 
 	fmt.Fprintln(os.Stdout, "Catalog Models")
-	fmt.Fprint(os.Stdout, console.RenderStruct(report.Catalog))
+	fmt.Fprint(os.Stdout, console.RenderStructStdout(report.Catalog))
 	fmt.Fprintln(os.Stdout)
 	fmt.Fprintln(os.Stdout, "Model Aliases")
-	fmt.Fprint(os.Stdout, console.RenderStruct(report.Aliases))
+	fmt.Fprint(os.Stdout, console.RenderStructStdout(report.Aliases))
 	fmt.Fprintln(os.Stdout)
 	fmt.Fprintln(os.Stdout, "Observed Models")
 	if len(report.Observed) == 0 {
 		fmt.Fprintln(os.Stdout, "No observed models found in local logs/artifacts.")
 	} else {
-		fmt.Fprint(os.Stdout, console.RenderStruct(report.Observed))
+		fmt.Fprint(os.Stdout, console.RenderStructStdout(report.Observed))
 	}
 	for _, warning := range report.Warnings {
 		fmt.Fprintln(os.Stderr, warning)

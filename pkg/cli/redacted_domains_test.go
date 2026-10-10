@@ -245,7 +245,7 @@ func TestRedactedDomainsAnalysis_ConsoleRendering(t *testing.T) {
 
 	// Import the console package to render the struct
 	// We use RenderStruct to verify the domains are included
-	output := console.RenderStruct(analysis)
+	output := console.RenderStructStdout(analysis)
 
 	// Verify the output contains the domains
 	expectedDomains := []string{"evil.com", "malicious.org", "phishing.net"}
@@ -269,7 +269,7 @@ func TestRedactedDomainsLogSummary_ConsoleRendering(t *testing.T) {
 		Domains:      []string{"blocked.com", "denied.org"},
 	}
 
-	output := console.RenderStruct(summary)
+	output := console.RenderStructStdout(summary)
 
 	// Verify the output contains the domains
 	expectedDomains := []string{"blocked.com", "denied.org"}
@@ -288,7 +288,7 @@ func TestRedactedDomainsAnalysis_EmptyDomains(t *testing.T) {
 		Domains:      []string{},
 	}
 
-	output := console.RenderStruct(analysis)
+	output := console.RenderStructStdout(analysis)
 
 	// Verify the output does not contain "Redacted Domains" section header for empty list
 	// The omitempty tag should hide this when the slice is empty

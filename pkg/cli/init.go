@@ -115,11 +115,11 @@ func InitRepository(opts InitOptions) error {
 		}
 		if err := deleteLegacyAgentFiles(opts.Verbose); err != nil {
 			initLog.Printf("Failed to delete legacy agent files: %v", err)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to delete legacy agent files: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agent files: %v", err)))
 		}
 		if err := deleteAgenticWorkflowDesignerSkillDir(opts.Verbose); err != nil {
 			initLog.Printf("Failed to delete legacy agentic-workflow-designer skill directory: %v", err)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to delete legacy agentic-workflow-designer skill directory: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agentic-workflow-designer skill directory: %v", err)))
 		}
 	}
 

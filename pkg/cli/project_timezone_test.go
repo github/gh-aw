@@ -29,7 +29,7 @@ func TestConfigureProjectTimezone_UsesRepoConfigOverEnv(t *testing.T) {
 
 	ConfigureProjectTimezone()
 
-	consoleOutput := console.RenderStruct([]struct {
+	consoleOutput := console.RenderStructStdout([]struct {
 		CreatedAt time.Time `console:"header:Created"`
 	}{
 		{CreatedAt: time.Date(2025, 10, 28, 14, 30, 45, 0, time.UTC)},
@@ -56,7 +56,7 @@ func TestConfigureProjectTimezone_UsesEnvFallback(t *testing.T) {
 
 	ConfigureProjectTimezone()
 
-	consoleOutput := console.RenderStruct([]struct {
+	consoleOutput := console.RenderStructStdout([]struct {
 		CreatedAt time.Time `console:"header:Created"`
 	}{
 		{CreatedAt: time.Date(2025, 1, 28, 14, 30, 45, 0, time.UTC)},
@@ -84,7 +84,7 @@ func TestConfigureProjectTimezone_InvalidTimezoneResetsOverride(t *testing.T) {
 
 	ConfigureProjectTimezone()
 
-	consoleOutput := console.RenderStruct([]struct {
+	consoleOutput := console.RenderStructStdout([]struct {
 		CreatedAt time.Time `console:"header:Created"`
 	}{
 		{CreatedAt: time.Date(2025, 10, 28, 14, 30, 45, 0, time.UTC)},
