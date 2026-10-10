@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.45 | Audit-only clarification that same-repository checkout for allow-listed App comments is a runtime trust control governed by Security Architecture Specification RS-05a, not a new compiler threat rule. |
 | 1.0.44 | Clarified CTR-001: the `id-token: write` audience/trust-policy reminder is informational and does not increment compiler warnings or block warnings-as-errors validation; OIDC permission enforcement remains unchanged. |
 | 1.0.43 | Clarified CTR-008 for the scoped `pull_request_target` checkout policy: exact literal allowlist matching, warning-only risk acknowledgment, and rejection of configured `fetch` values. |
 | 1.0.42 | Audit-only clarification that same-repository bot PR checkout authorization is a runtime trust control governed by Security Architecture Specification RS-05a, not a new compiler threat rule. |
@@ -39,6 +40,16 @@ This changelog records the version history and the dated mapping audits for `spe
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-10-09)
+
+Reviewed the allow-listed GitHub App checkout exception for `issue_comment` and `pull_request_review_comment` in `actions/setup/js/checkout_pr_branch.cjs`, together with its regression tests and RS-05a validation evidence.
+
+Findings and disposition:
+
+- The exception requires a Bot sender whose login exactly matches the comment author and canonically matches the runtime actor, an explicit `on.bots` allow-list entry, and a positive runtime repository ID equal to the API-verified PR head and base repository IDs.
+- Fork PRs, unlisted bots, identity mismatches, missing repository provenance, and other actors retain the collaborator-permission floor. App slug and `[bot]` identities are treated as equivalent only for comparison with the runtime actor.
+- No compiler-generated construct or active CTR rule changed. This is a runtime checkout authorization control governed by Security Architecture Specification RS-05a; no new `CTR-*` rule is warranted.
 
 ### Mapping Audit (2026-09-23)
 

@@ -144,6 +144,9 @@ Test workflow content.`
 	if !strings.Contains(compiledStr, `GH_AW_ALLOWED_BOTS: "dependabot[bot],renovate[bot]"`) {
 		t.Errorf("Expected compiled workflow to contain GH_AW_ALLOWED_BOTS environment variable")
 	}
+	if strings.Contains(compiledStr, "GH_AW_COPILOT_BOT_NAMES:") {
+		t.Errorf("Expected compiled workflow to omit GH_AW_COPILOT_BOT_NAMES for non-Copilot bots")
+	}
 
 	// Also check that roles are still present
 	if !strings.Contains(compiledStr, `GH_AW_REQUIRED_ROLES: "triage"`) {
@@ -323,6 +326,8 @@ Test workflow content.`
 	// The "copilot" alias must be expanded to all Copilot bot identities
 	assert.Contains(t, lockStr, `GH_AW_ALLOWED_BOTS: "copilot-swe-agent,Copilot,copilot,@app/copilot-swe-agent"`,
 		`Expected compiled workflow to expand "copilot" alias to all Copilot bot identifiers`)
+	assert.Contains(t, lockStr, `GH_AW_COPILOT_BOT_NAMES: "copilot-swe-agent,Copilot,copilot,@app/copilot-swe-agent"`,
+		`Expected compiled workflow to pass the canonical Copilot bot identifiers to membership validation`)
 }
 
 // TestBotsImportMerge tests that on.bots from imported workflows are merged with main workflow bots

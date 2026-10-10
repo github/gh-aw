@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestMaintenanceWorkQueueCompactionUsesSingleJob(t *testing.T) {
@@ -37,7 +38,11 @@ func TestMaintenanceGeneratedForWorkQueueOnly(t *testing.T) {
 	require.NoError(t, err)
 	content, err := os.ReadFile(filepath.Join(directory, "agentics-maintenance.yml"))
 	require.NoError(t, err)
-	jobs := parseMaintenanceJobs(t, string(content))
+	var document struct {
+		Jobs map[string]any `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal(content, &document))
+	jobs := document.Jobs
 	assert.NotEmpty(t, jobs["work_queue_compaction"])
 	assert.Empty(t, jobs["work_queue_compaction_plan"])
 	assert.Empty(t, jobs["work_queue_compaction_apply"])
