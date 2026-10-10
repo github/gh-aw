@@ -1,0 +1,40 @@
+{
+  "model_mismatch": {
+    "evidence_kind": "redacted synthetic reconstruction, not live run evidence",
+    "lock_header": "# gh-aw-metadata: {\"compiler_version\":\"v0.89.21\"}",
+    "workflow": "engine:\n  id: copilot\n  model: auto\n",
+    "agent_stdio": "[copilot-harness] copilot model alias resolution: auto -> gpt-5.6-luna-utility\n[copilot-harness] COPILOT_PROVIDER_WIRE_API=completions (reconstructed old-run endpoint diagnostic)\n400 Cannot translate Copilot request feature 'tools[custom]' for gpt-5.6-luna-utility: /responses is incompatible",
+    "token_usage": {
+      "model": "gpt-5.6-luna-utility",
+      "path": "/chat/completions"
+    },
+    "expected_diagnosis": ["outdated gh-aw compiler", "resolved model and wire-API mismatch"],
+    "expected_fixes": ["Upgrade gh-aw and recompile.", "Pin a model that supports the required endpoint.", "Remove a conflicting `COPILOT_PROVIDER_WIRE_API` override.", "Use sub-agent models from the main model's family"],
+    "last_resort": "Switching to an older model is a last resort"
+  },
+  "silent_subagent_fallback": {
+    "evidence_kind": "redacted synthetic reconstruction, not live run evidence",
+    "awf_version": "v0.28.50",
+    "error": "Routing model \"<model>\" to /chat/completions is incompatible",
+    "event": "subagent.failed",
+    "event_file": "usage/aw_session.jsonl",
+    "audit_finding": "Sub-agent Failed",
+    "request_status": "deviated"
+  },
+  "misplaced_versions": {
+    "workflow": "engine:\n  id: copilot\n  version: 1.94.0\nsandbox:\n  agent:\n    version: 1.94.0\n",
+    "failures": [
+      {
+        "step": "Install GitHub Copilot CLI",
+        "error": "curl: (22) The requested URL returned error: 404",
+        "field": "engine.version"
+      },
+      {
+        "step": "Install AWF binary",
+        "error": "release asset not found",
+        "field": "sandbox.agent.version"
+      }
+    ],
+    "invalid_field": "engine.copilot.version"
+  }
+}

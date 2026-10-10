@@ -523,9 +523,13 @@ test-scripts: build
 	bash actions/setup/sh/download_docker_images_local_test.sh
 	@echo "✓ All script tests passed"
 
-# Test all code (Go, JavaScript, wasm golden, and shell scripts)
+# Test all code and guidance (Go, JavaScript, wasm golden, shell scripts, and guidance contracts)
 .PHONY: test-all
-test-all: test test-js test-wasm-golden test-scripts
+test-all: test test-js test-wasm-golden test-scripts test-guidance
+
+.PHONY: test-guidance
+test-guidance:
+	python3 -m unittest discover -s .github/skills/agentic-workflows/tests -p 'test_*.py'
 
 # Run tests with coverage
 .PHONY: test-coverage
@@ -1451,7 +1455,8 @@ help:
 	@echo "  test-impacted-go - Run impacted Go unit tests for current branch changes"
 	@echo "  test-impacted    - Run impacted JavaScript and Go unit tests for current branch changes"
 	@echo "  test-scripts     - Run Bash script tests (check-stale-lock-files, check-workflow-drift)"
-	@echo "  test-all         - Run all tests (Go, JavaScript, wasm golden, and shell scripts)"
+	@echo "  test-all         - Run all tests (Go, JavaScript, wasm golden, shell scripts, and guidance contracts)"
+	@echo "  test-guidance    - Run agentic-workflows documentation contract tests"
 	@echo "  test-wasm-golden - Run wasm golden tests (Go string API path)"
 	@echo "  test-wasm        - Build wasm and run Node.js golden comparison test"
 	@echo "  update-wasm-golden - Regenerate wasm golden files from current compiler output"
