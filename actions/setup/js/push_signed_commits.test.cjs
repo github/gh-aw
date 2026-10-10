@@ -305,7 +305,18 @@ describe("push_signed_commits integration tests", () => {
       // Push the branch so ls-remote can resolve its OID
       execGit(["push", "-u", "origin", "feature-branch"], { cwd: workDir });
 
-      global.exec = makeRealExec(workDir);
+      const realExec = makeRealExec(workDir);
+      const execOptions = [];
+      global.exec = {
+        getExecOutput: async (...args) => {
+          execOptions.push(args[2]);
+          return realExec.getExecOutput(...args);
+        },
+        exec: async (...args) => {
+          execOptions.push(args[2]);
+          return realExec.exec(...args);
+        },
+      };
       const githubClient = makeMockGithubClient();
 
       await pushSignedCommits({
@@ -318,6 +329,7 @@ describe("push_signed_commits integration tests", () => {
       });
 
       expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      expect(execOptions.every(options => options.silent)).toBe(true);
       // Verify the mutation query targets createCommitOnBranch
       const [query, variables] = githubClient.graphql.mock.calls[0];
       expect(query).toContain("createCommitOnBranch");

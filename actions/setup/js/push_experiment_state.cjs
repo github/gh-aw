@@ -561,7 +561,7 @@ async function main() {
         // pushSignedCommits can resolve the new baseRef in git rev-list.
         try {
           const gitEnv = { ...process.env, ...getGitAuthEnv(ghToken) };
-          const { stdout: lsOut } = await exec.getExecOutput("git", ["ls-remote", "origin", `refs/heads/${branchName}`], { cwd: workspaceDir, env: gitEnv });
+          const { stdout: lsOut } = await exec.getExecOutput("git", ["ls-remote", "origin", `refs/heads/${branchName}`], { cwd: workspaceDir, env: gitEnv, silent: true });
           const remoteHead = lsOut.trim().split(/\s+/)[0] || "";
           if (remoteHead && remoteHead !== currentBaseRef) {
             // Fetch the updated branch history into the local repo so pushSignedCommits

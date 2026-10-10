@@ -2205,12 +2205,8 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
     it("should fail deterministic validation errors without retrying", async () => {
       const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-validation-"));
       const setFailed = vi.fn();
-      const summaryContents = [];
       const summary = {
-        addRaw: vi.fn(content => {
-          summaryContents.push(content);
-          return { write: vi.fn().mockResolvedValue(undefined) };
-        }),
+        addRaw: vi.fn(),
         write: vi.fn(),
       };
       const previousGitHubToken = process.env.GH_TOKEN;
@@ -2238,8 +2234,7 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
         expect(pushed).toBe(false);
         expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected with [REDACTED]");
         expect(global.core.info).toHaveBeenCalledWith("Repo-memory push failed: Failed to push changes: ERR_VALIDATION: merge commit detected with [REDACTED]");
-        expect(summaryContents.join("\n")).toContain("ERR_VALIDATION: merge commit detected with [REDACTED]");
-        expect(summaryContents.join("\n")).not.toContain("not-a-real-token");
+        expect(summary.addRaw).not.toHaveBeenCalled();
         expect(isDeterministicPushValidationError("ERR_VALIDATION: policy violation")).toBe(true);
       } finally {
         if (previousGitHubToken === undefined) {

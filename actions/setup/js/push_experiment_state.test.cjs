@@ -164,7 +164,7 @@ describe("push_experiment_state", () => {
       process: { env: { GH_AW_STATE_BRANCH: "evals/test", GH_AW_STATE_DIR: tmpDir, GITHUB_WORKSPACE: workspaceDir, GH_TOKEN: "test-token" } },
     });
     await module.exports.main();
-    expect(exec.getExecOutput).toHaveBeenCalledWith("git", ["ls-remote", "origin", "refs/heads/evals/test"], { cwd: workspaceDir, env: expect.objectContaining(gitEnv) });
+    expect(exec.getExecOutput).toHaveBeenCalledWith("git", ["ls-remote", "origin", "refs/heads/evals/test"], { cwd: workspaceDir, env: expect.objectContaining(gitEnv), silent: true });
     if (failure === "ls-remote") {
       expect(execGitSync).not.toHaveBeenCalledWith(["fetch", "origin", "refs/heads/evals/test"], expect.anything());
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining('Could not refresh baseRef for branch "evals/test" on retry; keeping existing baseRef: temporary ls-remote failure'));
