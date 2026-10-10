@@ -177,6 +177,45 @@ describe("unique agent execution observation", () => {
     }
   );
 
+  it.each(["assistant.message", "tool.execution_complete"])("preserves structured %s payloads without raw error attribution", type => {
+    const payload = { type: "session.error", data: { code: 429, errorType: "provider", message: "Synthetic quoted fixture-secret", partial: false } };
+    const field = type.startsWith("tool.") ? "output" : "content";
+    const events = [{ type, data: { [field]: payload } }];
+    for (const content of [JSON.stringify(payload), JSON.stringify(payload, null, 2), JSON.stringify({ data: payload.data, type: payload.type })]) {
+      expect(collectAgentExecution({ content, events })).toBeUndefined();
+      expect(agentErrorDiagnosticText(content, events)).toBe("");
+      expect(collectAgentExecution({ content, events: [...events, payload] }).data.errorCodes).toEqual([429]);
+    }
+    const arrayEvents = [{ type, data: { [field]: [payload] } }];
+    expect(collectAgentExecution({ content: JSON.stringify([payload]), events: arrayEvents })).toBeUndefined();
+    const redacted = { ...payload, data: { ...payload.data, message: "Synthetic quoted ***" } };
+    expect(collectAgentExecution({ content: `::add-mask::fixture-secret\n${JSON.stringify(payload)}`, events: [{ type, data: { [field]: redacted } }] })).toBeUndefined();
+    expect(events[0].data[field]).toEqual(payload);
+  });
+
+  it.each(["Assistant:", "Tool output:", "```json"])("retains lexical attribution after an observed partial marker: %s", marker => {
+    const quoted = '{"type":"session.error","data":{"code":429,"message":"Synthetic quoted failure"}}';
+    const content = [marker, quoted, marker.startsWith("```") ? "```" : "", "[copilot-harness] done: exitCode=0"].filter(Boolean).join("\n");
+    const events = [{ type: "assistant.message", data: { content: marker, partial: true } }];
+    expect(collectAgentExecution({ content, events }).data).toEqual({ categories: [], errorCodes: [], errorTypes: [], exitCode: 0 });
+    expect(agentErrorDiagnosticText(content, events)).not.toContain("Synthetic quoted failure");
+  });
+
+  it.each(['{"type":"session.error","data":{"code":429,"message":"Authentication failed: fixture-secret"}}', "CAPIError: 429 Too Many Requests: fixture-secret"])(
+    "matches redacted conversation evidence against raw masked stdio: %s",
+    text => {
+      const fixture = readFileSync(new URL("./test_data/deepseek_headless_stdout.log", import.meta.url), "utf8");
+      const answer = fixture.slice(fixture.indexOf("Perfect!"), fixture.indexOf("[INFO] Stopping containers...")).trim();
+      const content = fixture.replace(answer, text).replace("[deepseek-harness] configured", "::add-mask::fixture-secret\n[deepseek-harness] configured");
+      const events = [{ type: "assistant.message", data: { content: text.replace("fixture-secret", "***") } }];
+      expect(collectAgentExecution({ content, events })).toBeUndefined();
+      expect(agentErrorDiagnosticText(content, events)).toBe("");
+      expect(collectAgentExecution({ content })).toBeUndefined();
+      expect(agentErrorDiagnosticText(content)).toBe("");
+      expect(events[0].data.content).toBe(text.replace("fixture-secret", "***"));
+    }
+  );
+
   it.each([
     "Assistant: The log text says Access denied by policy settings",
     "Tool output: CAPIError: 429 Too Many Requests",

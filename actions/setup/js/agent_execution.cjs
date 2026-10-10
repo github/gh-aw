@@ -6,6 +6,7 @@ const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { sessionContext } = require("./agent_session.cjs");
 const { stripVTControlCharacters } = require("node:util");
+const { applyAddMaskRedaction, collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 
 /** @typedef {import("./types/agent_session").AgentExecutionData} AgentExecutionData */
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
@@ -92,8 +93,24 @@ function collectAgentErrorEvidence(content, events = []) {
     const { isDeepSeekLog, parseDeepSeekLog } = require("./parse_deepseek_log.cjs");
     if (isDeepSeekLog(content)) conversationEvents = parseDeepSeekLog(content).logEntries;
   }
+  const maskedValues = collectAddMaskedValues(content);
+  /** @param {string} value */
+  const conversationKey = value => applyAddMaskRedaction(stripVTControlCharacters(value), maskedValues).trim();
+  /** @param {unknown} value */
+  const conversationDocumentKey = value =>
+    JSON.stringify(value, (_, item) => {
+      if (typeof item === "string") return applyAddMaskRedaction(stripVTControlCharacters(item), maskedValues);
+      if (item && typeof item === "object" && !Array.isArray(item))
+        return Object.fromEntries(
+          Object.keys(item)
+            .sort()
+            .map(key => [key, item[key]])
+        );
+      return item;
+    });
   const conversationLines = new Set();
   const conversationTexts = new Set();
+  const conversationDocuments = new Set();
   for (const event of conversationEvents) {
     const value = ["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message"].includes(event?.type)
       ? event?.data?.content
@@ -101,14 +118,21 @@ function collectAgentErrorEvidence(content, events = []) {
         ? event?.data?.output
         : undefined;
     if (typeof value === "string") {
-      conversationTexts.add(stripVTControlCharacters(value).trim());
-      for (const line of value.split(/\r?\n/)) conversationLines.add(stripVTControlCharacters(line).trim());
-    }
+      conversationTexts.add(conversationKey(value));
+      for (const line of value.split(/\r?\n/)) conversationLines.add(conversationKey(line));
+    } else if (value && typeof value === "object") conversationDocuments.add(conversationDocumentKey(value));
   }
-  if (conversationTexts.has(stripVTControlCharacters(content).trim())) return { diagnostics, errors };
+  if (conversationTexts.has(conversationKey(content))) return { diagnostics, errors };
+  /** @param {unknown} record */
+  const recordEvidence = record => {
+    const evidence = recordErrors(record);
+    return evidence.length && conversationDocuments.size && conversationDocuments.has(conversationDocumentKey(record)) ? [] : evidence;
+  };
   try {
     const document = JSON.parse(content);
-    for (const value of Array.isArray(document) ? document : [document]) errors.push(...recordErrors(value));
+    const evidence = (Array.isArray(document) ? document : [document]).flatMap(recordEvidence);
+    if (evidence.length && Array.isArray(document) && conversationDocuments.has(conversationDocumentKey(document))) return { diagnostics, errors };
+    errors.push(...evidence);
     return { diagnostics, errors };
   } catch {
     // Mixed stdio is parsed as individual records and attributed diagnostic lines.
@@ -118,7 +142,6 @@ function collectAgentErrorEvidence(content, events = []) {
   for (const raw of content.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
-    if (conversationLines.has(stripVTControlCharacters(line))) continue;
     if (/^```/.test(line)) {
       fencedBlock = !fencedBlock;
       continue;
@@ -128,6 +151,7 @@ function collectAgentErrorEvidence(content, events = []) {
       transcriptBlock = true;
       continue;
     }
+    if (conversationLines.has(conversationKey(line))) continue;
     let record;
     try {
       record = JSON.parse(line);
@@ -142,7 +166,9 @@ function collectAgentErrorEvidence(content, events = []) {
       continue;
     }
     if (!transcriptBlock) {
-      for (const value of Array.isArray(record) ? record : [record]) errors.push(...recordErrors(value));
+      const evidence = (Array.isArray(record) ? record : [record]).flatMap(recordEvidence);
+      if (evidence.length && Array.isArray(record) && conversationDocuments.has(conversationDocumentKey(record))) continue;
+      errors.push(...evidence);
     }
   }
   return { diagnostics, errors };
