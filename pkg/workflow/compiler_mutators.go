@@ -18,6 +18,11 @@ func (c *Compiler) SetContext(ctx context.Context) {
 	c.ctx = ctx
 }
 
+// SetModelPricingResolver configures pricing lookup for models absent from workflow frontmatter.
+func (c *Compiler) SetModelPricingResolver(resolver func(ctx context.Context, provider, model string) (map[string]float64, bool)) {
+	c.modelPricingResolver = resolver
+}
+
 // SetRequireDocker configures whether Docker must be available for container image validation.
 // When true, validation fails with an error if Docker is not installed or the daemon is not running.
 // When false (default), validation is silently skipped when Docker is unavailable.

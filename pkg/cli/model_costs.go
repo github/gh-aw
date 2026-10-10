@@ -141,6 +141,20 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 	return nil, false
 }
 
+// Guardrail pricing must match the provider and model, not a related model's prefix.
+func findExactModelPricing(provider, model string) (map[string]float64, bool) {
+	initModelPrices()
+
+	normalizedProvider := modelsdev.NormalizeProvider(provider)
+	normalizedModel := strings.ToLower(strings.TrimSpace(model))
+	for _, record := range modelPriceRecords {
+		if record.provider == normalizedProvider && record.model == normalizedModel && len(record.pricing) > 0 {
+			return record.pricing, true
+		}
+	}
+	return nil, false
+}
+
 func usdToAIC(usd float64) float64 {
 	return usd / 0.01
 }

@@ -3,10 +3,15 @@
 package cli
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/stretchr/testify/require"
 )
 
 func hasModelPricingResolver(compiler *workflow.Compiler) bool {
@@ -15,11 +20,67 @@ func hasModelPricingResolver(compiler *workflow.Compiler) bool {
 	return !reflect.ValueOf(compiler).Elem().FieldByName("modelPricingResolver").IsNil()
 }
 
-func TestCreateAndConfigureCompiler_DoesNotRegisterModelPricingResolverByDefault(t *testing.T) {
+func TestCreateAndConfigureCompiler_RegistersModelPricingResolverByDefault(t *testing.T) {
 	t.Parallel()
 	compiler := createAndConfigureCompiler(CompileConfig{})
-	if hasModelPricingResolver(compiler) {
-		t.Fatal("expected model pricing resolver to be nil by default")
+	if !hasModelPricingResolver(compiler) {
+		t.Fatal("expected local model pricing resolver to be registered")
+	}
+}
+
+func TestCreateAndConfigureCompiler_GPT61SolFirewallPricing(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		engine, model, provider, overlay, input string
+	}{
+		{"codex", "gpt-6.1-sol", "openai", "", "2e-06"},
+		{"codex", "openai/gpt-6.1-sol", "openai", "", "2e-06"},
+		{"copilot", "copilot/gpt-6.1-sol", "github-copilot", "", "2e-06"},
+		{"codex", "openai/gpt-6.1-sol", "openai", `
+models:
+  providers:
+    openai:
+      models:
+        gpt-6.1-sol:
+          cost:
+            input: "3e-06"
+            output: "1e-05"
+            cache_read: "1e-07"
+            cache_write: "2.5e-06"
+`, "3e-06"},
+	} {
+		t.Run(tt.engine+"/"+tt.model+"/"+tt.input, func(t *testing.T) {
+			t.Parallel()
+			workflowPath := filepath.Join(t.TempDir(), "priced-model.md")
+			content := fmt.Sprintf(`---
+on: workflow_dispatch
+engine: %s
+model: %s
+max-ai-credits: 1500
+%s
+---
+Check model pricing.
+`, tt.engine, tt.model, tt.overlay)
+			require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o600))
+			data, err := createAndConfigureCompiler(CompileConfig{}).ParseWorkflowFile(workflowPath)
+			require.NoError(t, err)
+			configJSON, err := workflow.BuildAWFConfigJSON(workflow.AWFCommandConfig{
+				EngineName: tt.engine, WorkflowData: data,
+			})
+			require.NoError(t, err)
+			var config struct {
+				APIProxy struct {
+					MaxAiCredits int                              `json:"maxAiCredits"`
+					Providers    map[string]modelsCatalogProvider `json:"providers"`
+				} `json:"apiProxy"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+			require.Equal(t, 1500, config.APIProxy.MaxAiCredits)
+			require.Equal(t, map[string]string{
+				"input": tt.input, "output": "1e-05",
+				"cache_read": "1e-07", "cache_write": "2.5e-06",
+			}, config.APIProxy.Providers[tt.provider].Models["gpt-6.1-sol"].Cost)
+		})
 	}
 }
 

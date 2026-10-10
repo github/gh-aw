@@ -13,13 +13,11 @@ var compilerModelPricingLog = logger.New("workflow:compiler_model_pricing")
 
 // resolveModelPricingIfMissing checks whether the workflow's configured model has pricing
 // in the frontmatter ModelCosts overlay. When pricing is absent it calls
-// c.modelPricingResolver (injected by the cli package) to fetch pricing from the
-// models.dev catalog and merges the result into ModelCosts so it is serialised into
-// GH_AW_INFO_MODEL_COSTS in the compiled lock.yml.
+// c.modelPricingResolver (injected by the cli package) to look up pricing and merges
+// the result into ModelCosts for both GH_AW_INFO_MODEL_COSTS and apiProxy.providers.
 //
-// Frontmatter-provided pricing always takes precedence; models already present in the
-// embedded actions/setup/js/models.json are skipped by the resolver (the runtime will
-// supply their pricing without an override).
+// Frontmatter-provided pricing always takes precedence. Local catalog entries must
+// also be supplied to AWF, whose built-in pricing table can lag behind gh-aw's.
 func (c *Compiler) resolveModelPricingIfMissing(modelCosts map[string]any, workflowData *WorkflowData) map[string]any {
 	if c.modelPricingResolver == nil {
 		return modelCosts
@@ -36,7 +34,7 @@ func (c *Compiler) resolveModelPricingIfMissing(modelCosts map[string]any, workf
 
 	// If the frontmatter overlay already supplies pricing for this model, leave it intact.
 	if modelCostsHasPricingFor(modelCosts, provider, model) {
-		compilerModelPricingLog.Printf("Pricing already in ModelCosts for %s/%s — skipping models.dev lookup", provider, model)
+		compilerModelPricingLog.Printf("Pricing already in ModelCosts for %s/%s — skipping pricing lookup", provider, model)
 		return modelCosts
 	}
 
@@ -44,11 +42,11 @@ func (c *Compiler) resolveModelPricingIfMissing(modelCosts map[string]any, workf
 
 	pricing, ok := c.modelPricingResolver(ctx, provider, model)
 	if !ok || len(pricing) == 0 {
-		compilerModelPricingLog.Printf("No external pricing found for model %q (provider=%q) — cost accounting may be unavailable", model, provider)
+		compilerModelPricingLog.Printf("No pricing found for model %q (provider=%q) — cost accounting may be unavailable", model, provider)
 		return modelCosts
 	}
 
-	compilerModelPricingLog.Printf("Resolved pricing for %s/%s from models.dev — injecting into lock.yml GH_AW_INFO_MODEL_COSTS", provider, model)
+	compilerModelPricingLog.Printf("Resolved pricing for %s/%s — injecting into lock.yml GH_AW_INFO_MODEL_COSTS", provider, model)
 	return mergeModelPricingIntoModelCosts(modelCosts, provider, model, pricing)
 }
 
