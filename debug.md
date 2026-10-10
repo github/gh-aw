@@ -30,7 +30,9 @@ If it is installed, run:
 gh extension upgrade aw
 ```
 
-to upgrade to latest. If it is not installed, run the installation script from the main branch of the gh-aw repository:
+to upgrade to the latest non-prerelease. This can lag behind prereleases; see
+[Model and engine misconfiguration](#model-and-engine-misconfiguration).
+If it is not installed, run the installation script from the main branch of the gh-aw repository:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
@@ -82,6 +84,54 @@ gh aw compile <workflow-name>
 ```
 
 3. Check for syntax errors or validation warnings.
+
+## Model and engine misconfiguration
+
+For AWF model/endpoint 400s, `model: auto` failures, install-step 404s after a
+version pin, or questions about version fields, use the
+[full checklist](.github/aw/debug-agentic-workflow.md#model-and-engine-misconfiguration):
+
+1. **Check the compiler first.** Read `compiler_version` from the lock file's
+   `gh-aw-metadata` header and `cli_version` from `aw_info.json`. Compare with
+   `gh release list --repo github/gh-aw --limit 20`, including prereleases.
+   `gh extension install` and `gh extension upgrade` default to the latest
+   non-prerelease. To install a specific prerelease, use
+   `gh extension install github/gh-aw --force --pin TAG`, then verify and recompile.
+   In the October 2026 case, v0.89.21 predated wire-API inference
+   ([#64177](https://github.com/github/gh-aw/pull/64177)); v0.91.7 was the reported
+   newest prerelease, not a permanent latest tag.
+2. **Check model/endpoint compatibility.** The harness resolves `auto` to a
+   concrete model. Wire-API precedence is explicit `engine.env` override →
+   catalog `wire_api` → `-utility` base-model catalog fallback → `gpt-5+` name rule
+   → CLI default `/chat/completions`. `COPILOT_PROVIDER_WIRE_API=responses` uses
+   `/responses`; `completions` uses `/chat/completions`. One wire API applies to the
+   whole session, including sub-agents. For `engine.model-routing`, inspect AWF's
+   selected endpoint too. `Cannot translate Copilot request feature`,
+   `Unsupported Responses custom tool`, `model_policy_violation`, and
+   `not accessible via the … endpoint` indicate incompatibility, not a transient
+   retry or prompt problem.
+3. **Apply fixes in this order:**
+   1. **Upgrade gh-aw and recompile.**
+   2. **Pin a model that supports the required endpoint.**
+   3. **Remove a conflicting `COPILOT_PROVIDER_WIRE_API` override.**
+   4. **Use sub-agent models from the main model's family.** Verify endpoint
+      compatibility; see [github/gh-aw#67460](https://github.com/github/gh-aw/issues/67460)
+      and [github/copilot-cli#5103](https://github.com/github/copilot-cli/issues/5103).
+   **Switching to an older model is a last resort** if these fail: leading with
+   `model: gpt-4.1` trades capability for a workaround and leaves the
+   underlying misconfiguration in place.
+4. **Check the version field.** `engine.version` is the agent CLI version
+   (Copilot CLI, 1.0.x in the customer case): **Install GitHub Copilot CLI** 404s
+   point here. `sandbox.agent.version` is the AWF release in `vX.Y.Z` form and
+   must match a GitHub release of `github/gh-aw-firewall`: **Install AWF binary**
+   failures point here. There is no `engine.copilot.version` field. Usually remove
+   the misplaced pin and recompile to use the compiled default.
+5. **Read the evidence.** Inspect `[copilot-harness]` alias and
+   `COPILOT_PROVIDER_WIRE_API` lines in `agent-stdio.log`; model and path per request
+   in `sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl`; and `model`,
+   `requested_model`, `cli_version` (gh-aw), `version` (agent CLI), and `awf_version`
+   in `aw_info.json`. Use `gh aw audit RUN_ID` for the combined view. Older runs may
+   omit diagnostics; do not assume routing was correct.
 
 ## Step 4: Commit and Push Changes
 

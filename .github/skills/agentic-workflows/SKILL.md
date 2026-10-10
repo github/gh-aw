@@ -99,6 +99,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Configure or add declarative engines: `.github/aw/configure-agentic-engine.md`
 - Update existing workflows: `.github/aw/update-agentic-workflow.md`
 - Diagnose, patch, audit, or actively debug workflows: `.github/aw/debug-agentic-workflow.md` (local-first strategy, evidence triage and live gates)
+- AWF 400s mentioning models or endpoints, `model: auto` failures, install-step 404s after a version pin, or questions about version fields: go directly to [Model and engine misconfiguration](../../aw/debug-agentic-workflow.md#model-and-engine-misconfiguration) before suggesting model changes.
 - Upgrade workflows and fix deprecations: `.github/aw/upgrade-agentic-workflows.md`
 - Create shared components or MCP wrappers: `.github/aw/create-shared-agentic-workflow.md`
 - Create report-generating workflows: `.github/aw/report.md`
