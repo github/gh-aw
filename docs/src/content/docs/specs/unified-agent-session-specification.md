@@ -669,7 +669,10 @@ Native error type identifiers retain their original spelling.
 Multiple retries, repeated source records,
 canonical events, and detector observations MUST NOT produce duplicate entries.
 Tool failures and errors quoted in user/assistant messages or tool outputs MUST
-NOT become agent execution errors. Original native and canonical error events
+NOT become agent execution errors. Diagnostics emitted in child-agent context
+(an observed caller `agentId` or nonempty parent-tool identity) MUST NOT supply
+main-agent classifications; subagent lifecycle target IDs alone do not establish
+the emitting caller's context. Original native and canonical error events
 remain available; the aggregate is not a replacement for their evidence.
 Errors from earlier attempts MAY coexist with a final `exitCode: 0`; neither
 the entry nor a nonempty error array asserts that the final execution failed.

@@ -61,7 +61,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   let events = [];
   let maskedValues = [];
   try {
-    ({ events, maskedValues } = collectUnifiedSession({ rootDir, warn: () => {} }));
+    ({ events, maskedValues } = collectUnifiedSession({ rootDir, ...(process.env.GH_AW_ENGINE_ID === "aider" ? { engine: "aider" } : {}), warn: () => {} }));
   } catch {
     diagnostics.add("Runtime diagnostics could not be collected.");
   }
@@ -155,9 +155,10 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
     })
     .join("\n");
   // Extract denied commands without copying harness configuration or transcript data.
-  const attributedDiagnostics = agentErrorDiagnosticText(safeStdio);
+  const rawSourceEngine = process.env.GH_AW_ENGINE_ID === "aider" || events.some(event => event.type === "workflow.info" && event.provenance.component === "workflow" && event.data.engineId === "aider") ? "aider" : undefined;
+  const attributedDiagnostics = agentErrorDiagnosticText(safeStdio, rawSourceEngine);
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
-  const engineSummary = agentErrorSummaryText(safeStdio);
+  const engineSummary = agentErrorSummaryText(safeStdio, rawSourceEngine);
   if (engineSummary) diagnostics.add(engineSummary);
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   if (driverExitCode !== undefined && ![...diagnostics].some(diagnostic => diagnostic.startsWith("Driver exit code:"))) {

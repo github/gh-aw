@@ -80,6 +80,24 @@ describe("essential unified session payloads", () => {
     for (const event of unified) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
   });
 
+  it.each([
+    [{ data: { parentToolCallId: "parent" } }, { parentToolCallId: "parent" }],
+    [{ parentToolCallId: "parent", data: {} }, { parentToolCallId: "parent" }],
+    [{ data: { parentToolCallId: null } }, { parentToolCallId: null }],
+    [{ data: { parentToolCallId: "parent", parentToolUseId: "observed-parent" } }, { parentToolCallId: "parent", parentToolUseId: "observed-parent" }],
+    [{ data: { parent_tool_use_id: "parent" } }, { parentToolUseId: "parent" }],
+    [{ data: { parentToolCallId: "parent", parentToolUseId: null } }, { parentToolCallId: "parent", parentToolUseId: null }],
+  ])("retains observed parent identities without a derived duplicate: %j", (scope, expected) => {
+    const event = { type: "session.error", ...scope, data: { message: "exact\n", statusCode: 401, ...scope.data } };
+    const projected = normalizeUnifiedSessionEvent(event);
+    expect(projected.data).toEqual({ message: "exact\n", statusCode: 401, ...expected });
+    expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+    const validate = createSessionValidator("unified").event;
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "diagnostics.jsonl", events: [event] }]);
+    expect(validate(unified[0]), JSON.stringify(validate.errors)).toBe(true);
+    expect(event.data).toEqual({ message: "exact\n", statusCode: 401, ...scope.data });
+  });
+
   it("compacts Copilot terminal transport observations without repeating accounting or textual answers", () => {
     const events = [
       {

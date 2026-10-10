@@ -146,7 +146,7 @@ function parseEngineSession(content, engine) {
   const events = parsed.logEntries ?? [];
   const observations = events.filter(isAgentExecutionEvent).map(event => event.data);
   if (observations.length) return events;
-  const execution = collectAgentExecution({ content, events, observations });
+  const execution = collectAgentExecution({ content, events, observations, ...(engine === "aider" ? { rawSourceEngine: "aider" } : {}) });
   return [...events.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
 }
 
@@ -508,6 +508,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const exitCode = observedExit ?? nativeExit?.exitCode ?? nativeExit?.exit_code;
   const execution = collectAgentExecution({
     content: stdioContent,
+    ...(engine === "aider" ? { rawSourceEngine: "aider" } : {}),
     events: executionAgentSources.flatMap(source => source.events),
     observations: executionObservations,
     ...(exists(exitFile) ? { exitCode: parseAgentExitCode(read(exitFile)) } : exitCode !== undefined ? { exitCode: validateAgentExitCode(exitCode) } : {}),

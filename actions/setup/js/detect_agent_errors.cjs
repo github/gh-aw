@@ -218,6 +218,7 @@ function persistAgentExecution(logContent, results, rootDir = path.dirname(LOG_F
   const exitPath = path.join(rootDir, "agent_execution_exit_code.txt");
   const execution = collectAgentExecution({
     content: logContent,
+    ...(process.env.GH_AW_ENGINE_ID === "aider" ? { rawSourceEngine: "aider" } : {}),
     categories: buildOutputLines(results)
       .filter(line => line.endsWith("=true"))
       .map(line => line.slice(0, -5)),
@@ -239,7 +240,7 @@ async function main() {
     process.stderr.write(`[detect-agent-errors] Log file not found: ${LOG_FILE}\n`);
   }
 
-  const stdioResults = detectErrors(agentErrorDiagnosticText(logContent));
+  const stdioResults = detectErrors(agentErrorDiagnosticText(logContent, process.env.GH_AW_ENGINE_ID === "aider" ? "aider" : undefined));
 
   // Also check the AWF firewall structured JSONL logs for the `unknown_model_ai_credits`
   // event — the API proxy event log is preferred and the audit log is used as a fallback.

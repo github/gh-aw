@@ -1,0 +1,26 @@
+{
+  "smoke-success.log": {
+    "run": "https://github.com/github/gh-aw/actions/runs/37863370348",
+    "agentArtifact": "https://github.com/github/gh-aw/actions/runs/37863370348/artifacts/11587805861",
+    "usageArtifact": "https://github.com/github/gh-aw/actions/runs/37863370348/artifacts/11586703777",
+    "source": "agent-stdio.log",
+    "sanitization": "Prompt, generated file edit, safe-output payload, repository output and random correlation IDs replaced. Native timestamps, model, types, counts, duration, outcomes and rounded accounting prose retained.",
+    "observations": "Six genuine session events persist without the synthesized legacy terminal. Rounded accounting prose cannot establish exact token or cost totals."
+  },
+  "downstream-failure.log": {
+    "run": "https://github.com/github/gh-aw/actions/runs/37976723705",
+    "agentArtifact": "https://github.com/github/gh-aw/actions/runs/37976723705/artifacts/11639222450",
+    "usageArtifact": "https://github.com/github/gh-aw/actions/runs/37976723705/artifacts/11639238148",
+    "source": "agent-stdio.log",
+    "sanitization": "Prompt, repository search output and random correlation IDs replaced. Native assistant reply, command, timestamps, model, counts, duration and outcomes retained.",
+    "observations": "Workflow conclusion failure is not an agent or shell failure: both observed process and command exit codes are zero."
+  },
+  "rate-limit-failure.log": {
+    "run": "https://github.com/github/gh-aw/actions/runs/37080828156",
+    "agentArtifact": "https://github.com/github/gh-aw/actions/runs/37080828156/artifacts/11258406912",
+    "usageArtifact": "https://github.com/github/gh-aw/actions/runs/37080828156/artifacts/11258971481",
+    "source": "agent-stdio.log",
+    "sanitization": "Retained first provider rate-limit diagnostic, retry delay, harness error and final exit line; removed repeated retries and infrastructure.",
+    "observations": "Historical run predates structured Aider entrypoint. No agent-session.jsonl or reconstructable conversation exists. The native startup preamble attributes the before-response LiteLLM diagnostic, mapped to session.error without a fabricated refusal, turn or session outcome."
+  }
+}
