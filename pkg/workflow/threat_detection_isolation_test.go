@@ -80,6 +80,59 @@ Review documentation.
 	}
 }
 
+func TestCompiledOTLPEnvExcludedFromAgentDetectionAndEvals(t *testing.T) {
+	for _, external := range []bool{false, true} {
+		t.Run(fmt.Sprintf("external=%t", external), func(t *testing.T) {
+			workflowPath := filepath.Join(t.TempDir(), "otlp-detection.md")
+			content := fmt.Sprintf(`---
+on: push
+engine: copilot
+observability:
+  otlp:
+    endpoint:
+      - url: https://primary.example.com:4317
+        headers: ${{ secrets.OTLP_HEADERS }}
+      - url: https://secondary.example.com:4317
+safe-outputs:
+  create-issue:
+  threat-detection: true
+evals:
+  - id: completed
+    question: Did the workflow complete?
+features:
+  gh-aw-detection: %t
+---
+Test workflow
+`, external)
+			if err := os.WriteFile(workflowPath, []byte(content), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+				t.Fatal(err)
+			}
+			result, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			compiled := string(result)
+			for _, name := range otlpSandboxExcludedEnvVarNames {
+				if !strings.Contains(compiled, name+":") {
+					t.Errorf("host-side OTLP environment must retain %s", name)
+				}
+				for _, job := range []string{"agent", "detection", "evals"} {
+					section := extractJobSection(compiled, job)
+					if section == "" {
+						t.Fatalf("%s job missing", job)
+					}
+					if !strings.Contains(section, "--exclude-env "+name) {
+						t.Errorf("%s AWF command must exclude %s", job, name)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestThreatDetectionIsolation(t *testing.T) {
 	compiler := NewCompiler()
 

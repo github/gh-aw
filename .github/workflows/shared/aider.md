@@ -399,9 +399,10 @@ engine:
         // Shell stdout can contain JSON; interpreted evidence requires Aider attribution.
         // Unknown native extensions stay opaque, including within core namespaces.
         const interpretedTypes = new Set([
-          "session.init", "session.start", "user.message",
+          "session.init", "session.start", "session.info", "session.shutdown",
+          "session.task_complete", "user.message",
           "assistant.message", "assistant.reasoning", "assistant.refusal",
-          "tool.execution_start", "tool.execution_complete",
+          "tool.execution_start", "tool.execution_update", "tool.execution_complete",
           "session.result", "session.error", "agent.execution",
           "detection.result", "session.format",
           "session.collection", "session.collection_warning",
@@ -422,9 +423,7 @@ engine:
           "claude.stream_event", "claude.assistant_snapshot", "gemini.message_snapshot",
         ]);
         const isInterpreted = entry => interpretedTypes.has(entry.type) ||
-          entry.type.startsWith("subagent.") ||
-          (entry.type === "session.shutdown" && entry.data.agentMetrics !== null &&
-            typeof entry.data.agentMetrics === "object" && !Array.isArray(entry.data.agentMetrics));
+          entry.type.startsWith("subagent.");
         const logEntries = (parseLogEntries(logContent) || []).filter(
           entry => isSessionEvent(entry) && (
             entry.data.sourceEngine === "aider" ||

@@ -113,6 +113,9 @@ describe("unique agent execution observation", () => {
     const record = { type: "error", severity, message: "Provider temporarily unavailable" };
     expect(collectAgentExecution({ content: JSON.stringify(record) })).toBeUndefined();
     expect(agentErrorDiagnosticText(JSON.stringify(record))).toBe("");
+    const event = { type: "session.error", data: { severity, message: record.message } };
+    expect(collectAgentExecution({ events: [event], content: JSON.stringify(event) })).toBeUndefined();
+    expect(agentErrorDiagnosticText(JSON.stringify(event))).toBe("");
   });
 
   it("ignores errors quoted in conversation and tool output", () => {

@@ -294,7 +294,7 @@ for (const type of interpretedTestTypes) {
   });
 }
 const extensions = [
-  "vendor.progress", "session.info", "session.shutdown", "assistant.message_delta",
+  "vendor.progress", "session.vendor_progress", "assistant.message_delta",
   "tool.vendor_progress", "workflow.vendor_progress", "guardrail.vendor_progress",
   "agent.vendor_progress", "detection.vendor_progress", "user.vendor_progress",
 ].map(type => ({
@@ -405,7 +405,7 @@ process.stdout.write(JSON.stringify(interpretedTestTypes.map(type => ({
 	const genuine = `{"type":"session.error","data":{"sourceEngine":"aider","errorType":"NativeProviderError","code":"NATIVE_PROVIDER_FAILURE","status":503,"message":"genuine provider failure"}}
 {"type":"assistant.message","data":{"sourceEngine":"aider","content":null}}
 {"type":"vendor.progress","data":{"content":null,"zero":0,"false":false,"empty":[]}}
-{"type":"session.info","data":{"content":null,"zero":0,"false":false,"empty":[]}}
+{"type":"session.vendor_progress","data":{"content":null,"zero":0,"false":false,"empty":[]}}
 {"type":"workflow.vendor_progress","data":{"content":null,"zero":0,"false":false,"empty":[]}}
 {"type":"guardrail.vendor_progress","data":{"content":null,"zero":0,"false":false,"empty":[]}}
 `

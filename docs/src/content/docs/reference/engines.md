@@ -113,6 +113,20 @@ GitHub toolsets, cache memory, and custom MCP servers remain configured on that
 transport. This does not enable restrictions on dsh's native shell/file tools;
 restricted bash command allowlists are rejected at compilation.
 
+DeepSeek headless session parsing retains the configured provider/model in
+`logEntries` and `agent-session.jsonl` even when execution fails or stdout is
+truncated. The essential `aw_session.jsonl` projection retains engine/model but
+omits duplicated provider metadata. Completed, unambiguous stdout
+becomes `assistant.message`; attributed Node startup errors and harness failures
+become `session.error`, with observed failure exits in `agent.execution`.
+Unattributed partial output and wrapper diagnostics are omitted. This profile
+does not expose native reasoning, tool arguments/results, refusals, or session
+accounting, so those observations are not inferred from answer text or firewall
+usage. A configured model such as `auto` is not a resolved model observation,
+and process exit zero does not establish task success. Shared session readers
+handle canonical artifacts; the stdout parser does not accept an additional
+native dsh JSON transcript format.
+
 The OpenCode sample routes `copilot`, `anthropic`, and `openai`/`codex` models
 through the selected AWF endpoint, retains configured MCP tools, and uses native
 JSONL session events for summaries and unified session artifacts. Copilot routing
@@ -129,7 +143,12 @@ usage events. Configuration and session state are temporary and keyring access
 is disabled. Goose has no native gh-aw `web-fetch` tool; supply an MCP tool or
 use the shell explicitly.
 Its parser emits canonical unified-session events, merges streaming text
-deltas, correlates tool calls and results, and retains native token/cache usage.
+deltas without reordering intervening observations, correlates tool calls and
+results with native MCP server identities, and retains native token/cache usage.
+Structured tool results retain observed exit codes and explicit error flags; simultaneous
+text and structured output remain available in the canonical agent trace.
+Completion accounting is cumulative, not additive. Partial logs do not invent
+completion or usage, and terminal errors remain distinct from tool failures.
 The same parser handles Actions artifacts and CLI session reconstruction.
 Copilot inference uses `${{ github.token }}` with
 `permissions: { copilot-requests: write }`; no PAT or `COPILOT_GITHUB_TOKEN`
