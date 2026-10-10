@@ -91,6 +91,45 @@ describe("AGY source-dependent observations (synthetic edge cases)", () => {
     const events = parseAgyLog(jsonl([raw])).logEntries;
     expect(events.filter(event => event.type === "tool.execution_start")).toEqual([]);
     expect(events.find(event => event.type === "tool.execution_complete")).toMatchObject({ id: "native-complete", data: { toolName: "", output: value, error: null, durationMs: 0 } });
+    expect(events.find(event => event.type === "tool.execution_complete").data).not.toHaveProperty("success");
+  });
+
+  it.each(["receipt", ["result"], { result: "ok" }])("does not infer a tool outcome from output %j", output => {
+    const record = { event: "step_update", step_update: { step_type: "tool", state: "DONE", tool_info: { name: "read", output } } };
+    const event = parseAgyLog(jsonl([record])).logEntries[0];
+    expect(event.data.output).toEqual(output);
+    expect(event.data).not.toHaveProperty("success");
+  });
+
+  it.each([true, false])("preserves explicit tool success %j even with empty output", success => {
+    for (const envelope of ["step", "tool"]) {
+      const step = { step_type: "tool", state: "DONE", tool_info: { name: "read", output: null, ...(envelope === "tool" ? { success } : {}) }, ...(envelope === "step" ? { success } : {}) };
+      const event = parseAgyLog(jsonl([{ event: "step_update", step_update: step }])).logEntries[0];
+      expect(event.data).toMatchObject({ output: null, success });
+    }
+  });
+
+  it.each([{ error: { code: 0, message: "denied" } }, { isError: true }, { is_error: true }])("explicit tool failure %j overrides success in either native envelope", failure => {
+    for (const envelope of ["step", "tool"]) {
+      const step = { step_type: "tool", state: "DONE", tool_info: { name: "read", success: true, output: "receipt", ...(envelope === "tool" ? failure : {}) }, ...(envelope === "step" ? failure : {}) };
+      const event = parseAgyLog(jsonl([{ event: "step_update", step_update: step }])).logEntries[0];
+      expect(event.data).toMatchObject({ ...failure, success: false, output: "receipt" });
+    }
+  });
+
+  it.each(["exitCode", "exit_code"])("nonzero %s takes precedence over a reported tool success", field => {
+    for (const envelope of ["step", "tool"]) {
+      const step = { step_type: "tool", state: "DONE", tool_info: { name: "run_command", success: true, output: "", ...(envelope === "tool" ? { [field]: 2 } : {}) }, ...(envelope === "step" ? { [field]: 2 } : {}) };
+      const event = parseAgyLog(jsonl([{ event: "step_update", step_update: step }])).logEntries[0];
+      expect(event.data).toMatchObject({ success: false, exitCode: 2, output: "" });
+    }
+  });
+
+  it("does not infer success from an observed zero exit code alone", () => {
+    const record = { event: "step_update", step_update: { step_type: "tool", state: "DONE", tool_info: { name: "run_command", output: "", exit_code: 0 } } };
+    const event = parseAgyLog(jsonl([record])).logEntries[0];
+    expect(event.data).toMatchObject({ output: "", exitCode: 0 });
+    expect(event.data).not.toHaveProperty("success");
   });
 
   it("preserves result order, bare successes, missing status/metrics and structured failures", () => {

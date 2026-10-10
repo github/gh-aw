@@ -189,11 +189,17 @@ function parseAgyLog(content) {
             if (toolKey !== undefined) starts.set(toolKey, event);
           }
         } else if (body.state === "DONE") {
-          const failed = (tool.error !== undefined && tool.error !== null && tool.error !== false && tool.error !== "") || tool.isError === true || tool.is_error === true;
+          const exitCode = Object.hasOwn(tool, "exitCode") ? tool.exitCode : Object.hasOwn(tool, "exit_code") ? tool.exit_code : Object.hasOwn(body, "exitCode") ? body.exitCode : body.exit_code;
+          const success = Object.hasOwn(tool, "success") ? tool.success : body.success;
+          const failed =
+            [tool.error, body.error].some(error => error !== undefined && error !== null && error !== false && error !== "") ||
+            [tool.isError, tool.is_error, body.isError, body.is_error].includes(true) ||
+            (typeof exitCode === "number" && Number.isFinite(exitCode) && exitCode !== 0);
           const event = emit("tool.execution_complete", {
             ...data,
             status: body.state,
-            ...(failed ? { success: false } : typeof tool.success === "boolean" ? { success: tool.success } : Object.hasOwn(tool, "output") ? { success: true } : {}),
+            ...(failed ? { success: false } : typeof success === "boolean" ? { success } : {}),
+            ...(exitCode !== undefined ? { exitCode } : {}),
             ...(isMetric(body.duration_seconds) && isMetric(body.duration_seconds * 1000) ? { durationMs: body.duration_seconds * 1000 } : {}),
           });
           if (toolKey !== undefined) replace(completions, toolKey, event);

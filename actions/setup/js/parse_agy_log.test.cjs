@@ -28,7 +28,8 @@ describe("native Agy session parser", () => {
     const completion = parsed.logEntries.find(event => event.type === "tool.execution_complete");
     expect(start.data).toMatchObject({ stepIndex: 1, sessionId: "conversation-1", toolName: "run_command", input: { command: "node probe.cjs" } });
     expect(start.data).not.toHaveProperty("toolCallId");
-    expect(completion.data).toMatchObject({ stepIndex: start.data.stepIndex, sessionId: start.data.sessionId, success: true, output: "receipt" });
+    expect(completion.data).toMatchObject({ stepIndex: start.data.stepIndex, sessionId: start.data.sessionId, output: "receipt" });
+    expect(completion.data).not.toHaveProperty("success");
     expect(parsed.logEntries.filter(event => event.type === "session.result")).toHaveLength(1);
     expect(parsed.logEntries.at(-1).data).toMatchObject({ status: "completed", numTurns: 2, usage: { input_tokens: 110, output_tokens: 25, total_tokens: 135, reasoning_output_tokens: 8, cache_read_input_tokens: 30 } });
     expect(parsed.markdown).toContain("Conformance passed.");

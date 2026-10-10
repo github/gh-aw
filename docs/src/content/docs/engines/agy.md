@@ -73,7 +73,9 @@ working directory and tool inventory. `user_input` steps remain `user.message`
 observations even when the native stream exposes no prompt text. Streaming
 answers retain exact text; exposed reasoning and structured refusals use their
 separate channels. Tool completions retain durations and structured outputs or
-errors, including `DONE` records with no output. Missing outcomes remain unknown,
+errors, including `DONE` records with no output. Only explicit success supplies a
+successful tool outcome; reported errors or nonzero exit codes take precedence.
+Output presence alone does not establish success. Missing outcomes remain unknown,
 and orphan completions do not invent invocations. Native numeric tool
 `step_index` maps to `stepIndex`, scoped by `sessionId`; it does not become a
 fabricated string `toolCallId`. Repeated active tool observations use
