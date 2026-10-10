@@ -106,6 +106,7 @@ function normalizeEngineLogEntries(entries, engine) {
 
 /** @param {string} content @param {string} engine @returns {any | undefined} */
 function parseBehaviorLog(content, engine) {
+  if (engine === "cursor") return require("./parse_cursor_log.cjs").parseCursorLog(content);
   if (engine === "kiro" && /^kiro-cli \d+\.\d+\.\d+/m.test(content) && /^\[(?:kiro-harness|tool)\]/m.test(content)) {
     return require("./parse_kiro_log.cjs").parseKiroLog(content);
   }

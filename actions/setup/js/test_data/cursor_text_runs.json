@@ -1,0 +1,19 @@
+[
+  {
+    "runUrl": "https://github.com/github/gh-aw/actions/runs/37866957846",
+    "agentArtifactId": 11589195120,
+    "usageArtifactId": 11588961230,
+    "conclusion": "success",
+    "processExitCode": 0,
+    "answer": "**Overall: FAIL** (build TLS error downloading go1.26.9)\n\n| Test | Result |\n|------|--------|\n| GitHub MCP | PASS — #101, #102 |\n| File Writing | PASS |\n| Bash | PASS |\n| Build | FAIL |\n\nIssue created: **Smoke Test: Cursor - RUN_ID**. No PR comment/labels (not a pull_request trigger).\n"
+  },
+  {
+    "runUrl": "https://github.com/github/gh-aw/actions/runs/37142216516",
+    "agentArtifactId": 11280289297,
+    "usageArtifactId": 11280703540,
+    "conclusion": "failure",
+    "failedStep": "Assert token_usage.jsonl is non-empty",
+    "processExitCode": 0,
+    "answer": "**Overall: FAIL** (build TLS error)\n\n| Test | Result |\n|------|--------|\n| GitHub MCP | PASS (#101, #102) |\n| File write | PASS |\n| Bash verify | PASS |\n| Build | FAIL |\n\nIssue created: \"Smoke Test: Cursor - RUN_ID\". No PR trigger — skipped comment/labels.\n"
+  }
+]

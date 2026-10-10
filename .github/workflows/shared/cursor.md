@@ -41,7 +41,7 @@ engine:
         - --trust
         - --approve-mcps
         - --output-format
-        - text
+        - stream-json
       step-name: Execute Cursor Agent CLI
       model-env-var: CURSOR_MODEL
       mcp-config-env-var: GH_AW_MCP_CONFIG
@@ -134,7 +134,7 @@ engine:
 
         const executable = join(installDir, "dist-package", "cursor-agent");
         if (!existsSync(executable)) throw new Error("Cursor Agent executable was not found in the release archive");
-        fail(spawnSync(executable, ["--version"], { stdio: "inherit" }), "Cursor Agent verification");
+        fail(spawnSync(executable, ["--version"], { stdio: ["ignore", 2, 2] }), "Cursor Agent verification");
 
         const promptPath = process.env.GH_AW_PROMPT;
         if (!promptPath) throw new Error("GH_AW_PROMPT is required");
@@ -154,65 +154,7 @@ engine:
       }
     log-parser: |
       function parseLog(logContent) {
-        const lines = logContent.split("\n");
-        const logEntries = [];
-        const mcpFailures = [];
-        let maxTurnsHit = false;
-        const AWF_INFRA_RE = /^\[(INFO|WARN|SUCCESS|ERROR|entrypoint|health-check|cursor-harness)\]|^ (?:Container|Network|Volume) |^Process exiting with code:/;
-        let toolCallIndex = 0;
-        let turnCount = 0;
-        let currentRole = null;
-        let currentText = [];
-
-        function flushEntry() {
-          if (!currentRole || currentText.length === 0) { currentText = []; return; }
-          const text = currentText.join("\n").trim();
-          if (!text) { currentText = []; return; }
-          if (currentRole === "tool_use") {
-            const toolId = `cursor_tool_${toolCallIndex++}`;
-            const nameMatch = text.match(/^(?:Tool|Running|Executing|>\s*)([\w_.-]+)/i);
-            const toolName = nameMatch ? nameMatch[1] : "unknown_tool";
-            logEntries.push({ type: "assistant", message: { content: [{ type: "tool_use", id: toolId, name: toolName, input: {} }] } });
-            logEntries.push({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: toolId, content: text }] } });
-          } else if (currentRole === "assistant") {
-            logEntries.push({ type: "assistant", message: { content: [{ type: "text", text }] } });
-            turnCount++;
-          }
-          currentText = [];
-        }
-
-        logEntries.push({ type: "system", subtype: "init", model: null, session_id: null });
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          if (AWF_INFRA_RE.test(line)) continue;
-          if (/max.?turns|maximum.*turns.*reached|turn limit/i.test(line)) maxTurnsHit = true;
-          if (/MCP server .* failed|MCP.*connection.*error|Failed to connect to MCP/i.test(line)) {
-            const serverMatch = line.match(/MCP server ['"]?([^\s'"]+)['"]?/i);
-            mcpFailures.push(serverMatch ? serverMatch[1] : line.trim());
-          }
-
-          if (/^(Tool|Running|Executing|>\s*[\w_.-]+)\b/i.test(line.trim())) {
-            flushEntry();
-            currentRole = "tool_use";
-            currentText.push(line);
-            continue;
-          }
-          if (/^(Assistant|Response|Output)\s*[>:]/i.test(line.trim())) {
-            if (currentRole !== "assistant") { flushEntry(); currentRole = "assistant"; }
-            currentText.push(line);
-            continue;
-          }
-          if (!currentRole) currentRole = "assistant";
-          currentText.push(line);
-        }
-        flushEntry();
-
-        logEntries.push({ type: "result", num_turns: turnCount, usage: {} });
-        const parts = [`**Turns:** ${turnCount}`, `**Tool calls:** ${toolCallIndex}`];
-        if (mcpFailures.length) parts.push(`**MCP failures:** ${mcpFailures.length}`);
-        if (maxTurnsHit) parts.push("**Max turns reached**");
-        return { markdown: parts.join(" · "), logEntries, mcpFailures, maxTurnsHit };
+        return require("./parse_cursor_log.cjs").parseCursorLog(logContent);
       }
 ---
 
@@ -233,4 +175,16 @@ imports:
 Configure the `CURSOR_API_KEY` GitHub Actions secret with an API key from the
 Cursor dashboard. Cursor serves the selected model through its own API, so this
 engine does not use universal provider routing.
+
+The sample requests `stream-json` without character-level partial output.
+Initialization, prompts, assistant segments, native tool lifecycles, and terminal
+accounting map to standard session events. Terminal response text is an aggregate
+snapshot, not a second assistant answer. Cursor suppresses thinking in print
+mode; unavailable reasoning, usage, cost, and turn counts are not reconstructed.
+Older text logs retain only the observed final answer and reported accounting;
+prose is never interpreted as executed tools.
+
+The native mapping follows the [Cursor output-format reference](https://cursor.com/docs/cli/reference/output-format).
+Historical Actions evidence covers final-answer-only text logs, not the new
+stream invocation. Native stream regressions use documented synthetic records.
 -->
