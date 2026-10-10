@@ -73,8 +73,17 @@ function qualifyModelForMultiProvider(model, config) {
   if (qualified) return value;
   const legacy = value.startsWith("copilot/");
   const id = legacy ? value.slice("copilot/".length) : value;
-  const match = models.find(entry => entry.id === id && (!legacy || /^(?:copilot(?:-(?:responses|completions))?|github-copilot|github)(?:-\d+)?$/.test(entry.provider)));
+  const matches = models.filter(entry => entry.id === id && (!legacy || isCopilotProviderName(entry.provider)));
+  if (new Set(matches.map(entry => entry.provider)).size > 1) {
+    throw new Error(`Ambiguous model "${value}"; specify an explicit <provider>/<model>: ${matches.map(entry => `${entry.provider}/${entry.id}`).join(", ")}`);
+  }
+  const match = matches[0];
   return match ? `${match.provider}/${match.id}` : null;
+}
+
+/** @param {string} name @returns {boolean} */
+function isCopilotProviderName(name) {
+  return /^(?:copilot(?:-(?:responses|completions))?|github-copilot|github)(?:-\d+)?$/i.test(name);
 }
 
 module.exports = {
@@ -82,4 +91,5 @@ module.exports = {
   isValidModelConfig,
   parseMultiProviderJson,
   qualifyModelForMultiProvider,
+  isCopilotProviderName,
 };

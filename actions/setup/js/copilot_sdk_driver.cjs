@@ -27,8 +27,7 @@
 "use strict";
 
 const fs = require("fs");
-const path = require("path");
-const { runWithCopilotSDK, extractPromptFromArgs, isCopilotSDKBareMode } = require("./copilot_sdk_session.cjs");
+const { runWithCopilotSDK, extractPromptFromArgs, isCopilotSDKBareMode, resolveCopilotSDKWorkingDirectory } = require("./copilot_sdk_session.cjs");
 const { parsePermissionConfigFromServerArgs } = require("./copilot_sdk_permissions.cjs");
 const { parseCopilotSDKToolConfig } = require("./copilot_sdk_tool_config.cjs");
 const { parseMultiProviderJson, qualifyModelForMultiProvider } = require("./copilot_sdk_multi_provider.cjs");
@@ -139,8 +138,8 @@ async function main() {
     models: sdkModels,
     permissionConfig,
     toolConfig,
-    workingDirectory: path.resolve(process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd()),
-    bare: isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS),
+    workingDirectory: resolveCopilotSDKWorkingDirectory(),
+    bare: isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, log),
   });
 
   process.exit(result.exitCode);

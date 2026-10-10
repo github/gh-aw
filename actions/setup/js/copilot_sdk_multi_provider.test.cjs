@@ -31,6 +31,18 @@ describe("qualifyModelForMultiProvider", () => {
     expect(qualifyModelForMultiProvider("gpt-5.6-luna", null)).toBeNull();
   });
 
+  it.each(["shared", "copilot/shared"])("rejects ambiguous model %s and accepts explicit qualification", model => {
+    const ambiguous = {
+      providers: [{ name: "copilot-responses" }, { name: "copilot-completions" }],
+      models: [
+        { id: "shared", provider: "copilot-responses" },
+        { id: "shared", provider: "copilot-completions" },
+      ],
+    };
+    expect(() => qualifyModelForMultiProvider(model, ambiguous)).toThrow(/Ambiguous model.*explicit <provider>\/<model>/);
+    expect(qualifyModelForMultiProvider("copilot-completions/shared", ambiguous)).toBe("copilot-completions/shared");
+  });
+
   it("uses the same per-model mapping after JSON handoff", () => {
     const parsed = parseMultiProviderJson(
       JSON.stringify({

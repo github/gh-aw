@@ -96,6 +96,14 @@ describe("copilot_sdk_driver.cjs", () => {
         })
       );
       expect(logger).toHaveBeenCalledWith(expect.stringMatching(/warning:.*unknown-agent.*unavailable-model.*session model/i));
+      const captured = fs
+        .readFileSync(path.join(testSessionStateDir, `${sessionProvider}-agent-session/events.jsonl`), "utf8")
+        .trim()
+        .split("\n")
+        .map(JSON.parse);
+      expect(captured.filter(event => event.type === "subagent.model_unavailable")).toEqual([
+        expect.objectContaining({ data: { agentName: "unknown-agent", declaredModel: "unavailable-model", model: `${sessionProvider}/${sessionModel}` } }),
+      ]);
     });
 
     it("captures ephemeral selection and final model results including BYOK and subagent context", async () => {

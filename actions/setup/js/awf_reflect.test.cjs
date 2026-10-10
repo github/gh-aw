@@ -988,10 +988,17 @@ describe("awf_reflect.cjs", () => {
       expect(result.model).toBe("copilot-responses/gpt-5.6-luna");
     });
 
-    it.each(["gpt-5.6-luna", "copilot/gpt-5.6-luna", "copilot-responses/gpt-5.6-luna"])("routes only the selected model (%s), not its siblings", model => {
+    it.each(["gpt-5.6-luna", "copilot/gpt-5.6-luna", "copilot-responses/gpt-5.6-luna"])("rejects an unsupported endpoint override for %s", model => {
+      expect(() => resolveMultiProviderFromReflect({ reflectData: { endpoints: [splitEndpoint] }, model, wireApi: "completions" })).toThrow(
+        'Model endpoint mismatch: model "gpt-5.6-luna" with COPILOT_PROVIDER_WIRE_API=completions requires /chat/completions; supported endpoints: /responses, ws:/responses'
+      );
+    });
+
+    it("routes a compatible override only for the selected model, not its siblings", () => {
+      const model = "gpt-5-mini";
       const result = resolveMultiProviderFromReflect({ reflectData: { endpoints: [splitEndpoint] }, model, wireApi: "completions" });
-      expect(result.model).toBe("copilot-completions/gpt-5.6-luna");
-      expect(result.models.find(entry => entry.id === "gpt-5-mini").provider).toBe("copilot-responses");
+      expect(result.model).toBe("copilot-completions/gpt-5-mini");
+      expect(result.models.find(entry => entry.id === "gpt-5.6-luna").provider).toBe("copilot-responses");
       expect(result.models.find(entry => entry.id === "claude-haiku-4.5").provider).toBe("copilot-completions");
       expect(result.providers[0].wireApi).toBe("responses");
     });

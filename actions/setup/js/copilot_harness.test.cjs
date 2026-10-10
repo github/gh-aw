@@ -1281,6 +1281,23 @@ describe("copilot_harness.cjs", () => {
       expect(spawnImpl).toHaveBeenCalledWith("copilot", engineGeneratedArgs, expect.objectContaining({ stdio: ["ignore", "pipe", "pipe"] }));
     });
 
+    it.each(["not-json", '{"port":3002}'])("retains headless defaults and workspace access for invalid SDK args %s", async value => {
+      const child = new EventEmitter();
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      child.exitCode = null;
+      child.signalCode = null;
+      const spawnImpl = vi.fn(() => child);
+      const logger = vi.fn();
+      const env = { COPILOT_SDK_URI: "http://127.0.0.1:3002" };
+      let args = parseCopilotSDKServerArgsFromEnv(value, { logger });
+      if (args.length === 0) args = buildCopilotSDKServerArgs(env);
+      args = [...args, "--add-dir", "/w"];
+      await startCopilotSDKServer({ command: "copilot", env, serverArgs: args, logger, spawnImpl, waitForReady: async () => {} });
+      expect(spawnImpl).toHaveBeenCalledWith("copilot", ["--headless", "--no-auto-update", "--port", "3002", "--add-dir", "/w"], expect.anything());
+      expect(logger.mock.calls.flat().join("\n")).toMatch(/GH_AW_COPILOT_SDK_SERVER_ARGS/);
+    });
+
     it("uses only base headless args when extraArgs is empty or omitted", async () => {
       const child = new EventEmitter();
       child.stdout = new PassThrough();

@@ -90,15 +90,21 @@ function extractPromptFromArgs(args) {
   return null;
 }
 
-/** @param {string | undefined} serverArgs @returns {boolean} */
-function isCopilotSDKBareMode(serverArgs) {
+/** @param {string | undefined} serverArgs @param {(message: string) => void} [logger] @returns {boolean} */
+function isCopilotSDKBareMode(serverArgs, logger = message => process.stderr.write(`[copilot-sdk] ${message}\n`)) {
   try {
     const args = JSON.parse(serverArgs || "[]");
-    if (!Array.isArray(args)) throw new Error("expected an array");
+    if (!Array.isArray(args) || args.some(arg => typeof arg !== "string")) throw new Error("expected a string array");
     return args.includes("--no-custom-instructions");
   } catch (error) {
-    throw new Error(`Invalid GH_AW_COPILOT_SDK_SERVER_ARGS: ${getErrorMessage(error)}`, { cause: error });
+    logger(`warning: Invalid GH_AW_COPILOT_SDK_SERVER_ARGS: ${getErrorMessage(error)}; using sidecar default args`);
+    return false;
   }
+}
+
+/** @returns {string} */
+function resolveCopilotSDKWorkingDirectory() {
+  return path.resolve(process.env.GITHUB_WORKSPACE || process.cwd(), process.env.GH_AW_ENGINE_CWD || ".");
 }
 
 /**
@@ -162,9 +168,9 @@ async function runWithCopilotSDK({
   coreLogger,
   sdkModule,
   sessionStateBaseDir,
-  workingDirectory = path.resolve(process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE || process.cwd()),
+  workingDirectory = resolveCopilotSDKWorkingDirectory(),
   agentsBaseDir = path.join(os.tmpdir(), "gh-aw"),
-  bare = isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS),
+  bare = isCopilotSDKBareMode(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, logger),
 }) {
   // Lazy-require to avoid loading the SDK when it is not needed.
   // The SDK is large and has side-effects on import (worker threads, etc.).
@@ -357,11 +363,15 @@ async function runWithCopilotSDK({
     const providerConfig = providers && providerModels ? { providers, models: providerModels } : null;
     const sessionModel = providerConfig ? qualifyModelForMultiProvider(requestedModel, providerConfig) : requestedModel;
     if (providerConfig && !sessionModel) throw new Error(`Cannot qualify session model "${requestedModel || "(none)"}" against the configured provider models`);
+    const unavailableModels = [];
     const customAgents = loadCopilotSDKCustomAgents(workingDirectory, agentsBaseDir, log).map(agent => {
       const requested = agent.model;
       const alias = !requested || ["small", "medium", "large"].includes(requested.toLowerCase());
       const qualified = alias ? sessionModel : providerConfig ? qualifyModelForMultiProvider(requested, providerConfig) : requested;
-      if (!alias && !qualified) log(`warning: custom agent "${agent.name}" model "${requested}" is not in the configured provider models; using session model "${sessionModel || "(none)"}"`);
+      if (!alias && !qualified) {
+        log(`warning: custom agent "${agent.name}" model "${requested}" is not in the configured provider models; using session model "${sessionModel || "(none)"}"`);
+        unavailableModels.push({ agentName: agent.name, declaredModel: requested, model: sessionModel || undefined });
+      }
       return { ...agent, model: qualified || sessionModel || undefined };
     });
     /** @type {import("@github/copilot-sdk").SessionConfig} */
@@ -386,6 +396,7 @@ async function runWithCopilotSDK({
     fs.mkdirSync(sessionDir, { recursive: true });
     const eventsPath = path.join(sessionDir, "events.jsonl");
     eventsStream = fs.createWriteStream(eventsPath, { flags: "a" });
+    for (const unavailable of unavailableModels) writeDriverEvent("subagent.model_unavailable", unavailable);
     // Snapshot to a non-null local for closure-safe writes (JSDoc nullability narrowing).
     const stream = eventsStream;
     const assistantEvents = [];
@@ -635,4 +646,4 @@ async function runWithCopilotSDK({
   }
 }
 
-module.exports = { SDK_SEND_TIMEOUT_MS_DEFAULT, SDK_POST_COMPLETION_IDLE_MS_DEFAULT, SDK_IDLE_TIMEOUT_PATTERN, extractPromptFromArgs, runWithCopilotSDK, isCopilotSDKBareMode };
+module.exports = { SDK_SEND_TIMEOUT_MS_DEFAULT, SDK_POST_COMPLETION_IDLE_MS_DEFAULT, SDK_IDLE_TIMEOUT_PATTERN, extractPromptFromArgs, runWithCopilotSDK, isCopilotSDKBareMode, resolveCopilotSDKWorkingDirectory };

@@ -24,7 +24,7 @@ const tls = require("tls");
 const { withRetry, sleep } = require("./error_recovery.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { AWF_REFLECT_OUTPUT_PATH } = require("./awf_reflect_paths.cjs");
-const { qualifyModelForMultiProvider } = require("./copilot_sdk_multi_provider.cjs");
+const { qualifyModelForMultiProvider, isCopilotProviderName } = require("./copilot_sdk_multi_provider.cjs");
 
 function parseReflectTimeoutMs(value) {
   const rawValue = String(value || "").trim();
@@ -989,7 +989,7 @@ function resolveMultiProviderFromReflect(options) {
     }
 
     // Ensure unique provider names by appending a suffix when the same name appears twice.
-    const isCopilot = ["copilot", "github-copilot", "github"].includes(rawProviderName.toLowerCase());
+    const isCopilot = isCopilotProviderName(rawProviderName);
     const stableProviderName = isCopilot ? "copilot" : rawProviderName;
     const existing = providerNameCount.get(stableProviderName) ?? 0;
     providerNameCount.set(stableProviderName, existing + 1);
@@ -1027,7 +1027,13 @@ function resolveMultiProviderFromReflect(options) {
           if (qualifiedWireApi && (!Array.isArray(supported) || supported.includes(qualifiedWireApi === "responses" ? "/responses" : "/chat/completions"))) {
             wireApi = qualifiedWireApi;
           }
-          if (configuredWireApi === "responses" || configuredWireApi === "completions") wireApi = configuredWireApi;
+          if (configuredWireApi === "responses" || configuredWireApi === "completions") {
+            const requestedEndpoint = configuredWireApi === "responses" ? "/responses" : "/chat/completions";
+            if (Array.isArray(supported) && !supported.includes(requestedEndpoint)) {
+              throw new Error(`Model endpoint mismatch: model "${modelId}" with COPILOT_PROVIDER_WIRE_API=${configuredWireApi} requires ${requestedEndpoint}; supported endpoints: ${supported.join(", ")}`);
+            }
+            wireApi = configuredWireApi;
+          }
           mappedConfiguredModel = `copilot-${wireApi}${suffix}/${modelId}`;
         }
         models.push({ id: modelId, provider: `copilot-${wireApi}${suffix}` });

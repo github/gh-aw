@@ -5,7 +5,7 @@ import * as path from "path";
 import os from "node:os";
 
 const require = createRequire(import.meta.url);
-const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
+const { runWithCopilotSDK, resolveCopilotSDKWorkingDirectory } = require("./copilot_sdk_session.cjs");
 const models = [
   { id: "gpt-5.4", provider: "openai" },
   { id: "claude-sonnet-4.6", provider: "anthropic" },
@@ -30,6 +30,73 @@ describe("copilot_sdk_session runtime configuration", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     fs.rmSync(base, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it("resolves engine.cwd against the workspace rather than the driver process directory", async () => {
+    vi.stubEnv("GITHUB_WORKSPACE", "/w");
+    vi.stubEnv("GH_AW_ENGINE_CWD", "packages/app");
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue("/w/packages/app");
+    expect(resolveCopilotSDKWorkingDirectory()).toBe("/w/packages/app");
+    cwd.mockRestore();
+
+    const app = path.join(base, "packages/app");
+    fs.mkdirSync(path.join(app, ".github/agents"), { recursive: true });
+    fs.writeFileSync(path.join(app, ".github/agents/local.agent.md"), "---\nmodel: small\n---\nApp agent.");
+    vi.stubEnv("GITHUB_WORKSPACE", base);
+    vi.spyOn(process, "cwd").mockReturnValue(app);
+    const createSession = vi.fn().mockResolvedValue({
+      sessionId: "relative-cwd",
+      on: () => {},
+      sendAndWait: async () => ({ data: { content: "done" } }),
+      disconnect: async () => {},
+    });
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = createSession;
+    }
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger: () => {},
+      agentsBaseDir: base,
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workingDirectory: app,
+        customAgents: [{ name: "local", displayName: "local", prompt: "App agent.", model: "anthropic/claude-sonnet-4.6" }],
+      })
+    );
+  });
+
+  it.each(["{bad json", '{"args":["--no-custom-instructions"]}'])("warns and starts a session for invalid server args %s", serverArgs => {
+    vi.stubEnv("GH_AW_COPILOT_SDK_SERVER_ARGS", serverArgs);
+    const createSession = vi.fn().mockResolvedValue({
+      sessionId: "invalid-args",
+      on: () => {},
+      sendAndWait: async () => ({ data: { content: "done" } }),
+      disconnect: async () => {},
+    });
+    class FakeCopilotClient {
+      start = async () => {};
+      stop = async () => {};
+      createSession = createSession;
+    }
+    const logger = vi.fn();
+    return runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test",
+      logger,
+      agentsBaseDir: base,
+      sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
+    }).then(result => {
+      expect(result.exitCode).toBe(0);
+      expect(createSession).toHaveBeenCalledWith(expect.objectContaining({ skipCustomInstructions: false }));
+      expect(logger).toHaveBeenCalledWith(expect.stringMatching(/warning: Invalid GH_AW_COPILOT_SDK_SERVER_ARGS.*using sidecar default args/));
+    });
   });
 
   it("preserves explicit agent models without a BYOK catalog or misleading warnings", async () => {

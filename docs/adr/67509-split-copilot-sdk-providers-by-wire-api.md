@@ -1,12 +1,14 @@
 # ADR-67509: Split Copilot SDK Providers by Wire API and Qualify Every Routed Model
 
 **Date**: 2026-10-10
-**Status**: Draft
-**Deciders**: SivaKesava1 (PR author); gh-aw maintainers (review pending)
+**Status**: Proposed
+**Deciders**: gh-aw maintainers
 
 ---
 
 ### Context
+
+The Copilot coding agent opened PR #67509 for issue #67507.
 
 The Copilot SDK engine configured a single provider per Copilot endpoint and passed bare model names
 (for example `gpt-5.6-luna`) to routed SDK sessions. Two problems followed. First, bare model names
@@ -25,10 +27,15 @@ We will split each Copilot endpoint into two sibling SDK providers, `copilot-res
 provider matching its wire API (`inferWireApiForModel`, with explicit `wire_api`/`wireApi` from the
 model catalog winning over the GPT-5+ `responses` heuristic). Every model identifier that reaches the
 SDK — routed, fallback, reflected, and sub-agent — is qualified as `<provider>/<model>` so BYOK
-inference is used; explicitly configured API selections are preserved rather than overridden.
+inference is used; explicitly configured API selections are preserved when supported.
+Each Copilot model's provider must match its `/reflect` `supported_endpoints`. An incompatible
+`COPILOT_PROVIDER_WIRE_API` override fails at startup before the sidecar starts with
+`Model endpoint mismatch: …`, naming the model, override, and supported endpoints.
 Declared agents are loaded as SDK `customAgents` carrying name, description, prompt, and tools, with
-concrete models qualified and aliases inheriting the session model (unknown agent models warn, then
-inherit). Non-Copilot endpoints and CLI mode are deliberately left unchanged. Observability captures
+concrete models qualified and aliases inheriting the session model. Unknown concrete agent models
+inherit without failing the run, but emit `subagent.model_unavailable` with the declared agent name,
+declared model, and inherited model; audit surfaces this as a warning finding. Aliases inherit quietly.
+Non-Copilot endpoints and CLI mode are deliberately left unchanged. Observability captures
 `subagent.selected` and `model.call_final_result` including BYOK status, and `pkg/cli` normalizes
 qualified identities (`copilot-(responses|completions)` stripped) so audit spend attribution still
 groups by real model. Smoke tests now require evidence of completed delegation on the expected model
@@ -85,11 +92,11 @@ transport handling and lose the SDK-native `customAgents` routing we rely on.
 
 - Non-Copilot endpoints (including Anthropic-typed providers, where `wireApi` is ignored) are
   unaffected by this change.
-- Unknown sub-agent models warn and inherit the session model rather than failing the run, trading
-  strictness for resilience.
+- Unknown sub-agent models inherit the session model without failing the run; structured events and
+  audit findings make this compatibility fallback visible.
 - `docs/src/content/docs/reference/engines.md` documents the new provider naming, so the qualified
   form is now part of the user-facing contract.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Proposed for review by the gh-aw maintainers.*
