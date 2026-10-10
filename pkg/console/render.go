@@ -202,11 +202,7 @@ func renderStructField(field reflect.Value, fieldName string, tag consoleTag, ma
 	}
 }
 
-// renderSlice renders a slice as a table using the console table renderer
-func renderSlice(val reflect.Value, title string, output *strings.Builder, depth int) {
-	renderSliceWithRenderer(val, title, output, depth, RenderTable)
-}
-
+// renderSliceWithRenderer renders slices using the selected table destination.
 func renderSliceWithRenderer(val reflect.Value, title string, output *strings.Builder, depth int, renderTable func(TableConfig) string) {
 	if val.Len() == 0 {
 		return

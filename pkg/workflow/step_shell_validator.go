@@ -109,7 +109,7 @@ func (c *Compiler) validateStepShellScriptsSection(frontmatter map[string]any, s
 		return fmt.Errorf("strict mode: %s", message)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Warning: "+message))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(message))
 	c.IncrementWarningCount()
 	return nil
 }

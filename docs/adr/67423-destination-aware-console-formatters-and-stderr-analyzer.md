@@ -1,7 +1,7 @@
 # ADR-67423: Enforce Destination-Aware Console Formatters with a Dedicated Analyzer
 
 **Date**: 2026-10-10
-**Status**: Draft
+**Status**: Proposed
 **Deciders**: pelikhan (PR author), gh-aw maintainers
 
 ---
@@ -14,7 +14,7 @@
 
 We will make console stream selection an explicitly enforced contract: every direct write of console-formatted text to stderr must use a destination-aware `*Stderr` formatter, and a new custom static analyzer, `pkg/linters/consolestderr`, blocks CI when a stdout-aware formatter is written directly to `os.Stderr`.
 
-The analyzer carries a fixed stdout→stderr replacement table and emits suggested fixes, so the ~1,600 selector substitutions across 241 files are mechanical and reproducible rather than hand-audited. To complete the contract, we add the missing stderr renderers (prompt, verbose, table, reflected struct), propagate the destination through nested tables and error-chain styling, and exempt already-stderr-aware helpers such as `FormatErrorMessage`. Separately, human-facing experiment tables gain an **opt-in** width budget (`TableConfig.MaxWidth`, `DefaultTableWidth = 80`) with a lossless labeled-row fallback when columns cannot fit; JSON, version, completion, compact-log and WASM renderers keep their existing unbounded/tab-separated contracts.
+The analyzer carries a fixed stdout→stderr replacement table and emits suggested fixes, so the ~1,600 selector substitutions across 241 files are mechanical and reproducible rather than hand-audited. The options-based `RenderStructWithOptions` entry point must explicitly supply a compile-time true `Stderr` field; unknown option variables receive a diagnostic without an unsafe automatic edit. To complete the contract, we add the missing stderr renderers (prompt, verbose, table, reflected struct), propagate the destination through nested tables and error-chain styling, and exempt already-stderr-aware helpers such as `FormatErrorMessage`. Separately, human-facing experiment tables gain an **opt-in** width budget (`TableConfig.MaxWidth`, `DefaultTableWidth = 80`) with a lossless labeled-row fallback when columns cannot fit; JSON, version, completion, compact-log and WASM renderers keep their existing unbounded/tab-separated contracts.
 
 ### Alternatives Considered
 
@@ -42,7 +42,7 @@ Apply the 80-column budget to all table rendering rather than making it opt-in. 
 - The `pkg/console` API surface grows a parallel `*Stderr` variant for each formatter, which must be kept in sync; the replacement table in the analyzer is a third place to update when a formatter is added.
 - The change touches 241 files mechanically, making the diff hard to review line-by-line and likely to conflict with in-flight branches.
 - The analyzer deliberately does not perform dataflow analysis, so writes through intermediate writer/formatter aliases are not covered — the guarantee is "no direct mismatches", not "no mismatches".
-- Enabling `consolestderr` in the blocking set surfaces pre-existing legacy/advisory findings in the mechanically touched files, which remain unaddressed in this PR.
+- The all-custom-analyzer local gate reports pre-existing legacy/advisory findings in mechanically touched files, plus an advisory false positive on explicitly bounds-guarded options indexing. These remain separate from the blocking production CI selection, which includes `consolestderr` and passes.
 
 #### Neutral
 - WASM builds keep tab-separated tables; width budgeting applies only to native human output.
@@ -51,4 +51,5 @@ Apply the 80-column budget to all table rendering rather than making it opt-in. 
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+The decision rationale and alternatives are complete for review. Maintainers
+retain responsibility for accepting this proposed decision before merge.

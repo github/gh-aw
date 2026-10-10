@@ -9,7 +9,6 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/sliceutil"
-	"github.com/github/gh-aw/pkg/tty"
 )
 
 func printExperimentDetails(d *ExperimentDetails) {
@@ -45,7 +44,6 @@ func printExperimentDetails(d *ExperimentDetails) {
 					Headers:  []string{"Variant", "Count", "Percent"},
 					Rows:     rows,
 					MaxWidth: console.DefaultTableWidth,
-					TTYFunc:  tty.IsStderrTerminal,
 				}))
 			}
 		}
@@ -69,7 +67,6 @@ func printExperimentDetails(d *ExperimentDetails) {
 			Headers:  []string{"Date", "Run ID", "Assignments"},
 			Rows:     rows,
 			MaxWidth: console.DefaultTableWidth,
-			TTYFunc:  tty.IsStderrTerminal,
 		}))
 	}
 }

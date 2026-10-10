@@ -80,6 +80,10 @@ func reportFormatter(pass *analysis.Pass, call *ast.CallExpr) {
 	if !ok || !astutil.IsPkgSelector(pass, sel, consolePath) {
 		return
 	}
+	if sel.Sel.Name == "RenderStructWithOptions" {
+		checkRenderOptions(pass, call)
+		return
+	}
 	replacement, ok := replacements[sel.Sel.Name]
 	if !ok {
 		return

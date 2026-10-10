@@ -14,7 +14,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `bytescomparestring` — reports `string(a) == string(b)` and `string(a) != string(b)` comparisons where `a` and `b` are `[]byte` values; use `bytes.Equal(a, b)` for `==` and `!bytes.Equal(a, b)` for `!=`.
 - `bytesbufferstring` — reports `string(buf.Bytes())` calls where `buf` is a `bytes.Buffer` value receiver, suggesting `buf.String()` instead.
 - `closeerrorunchecked` — reports `Close()` method calls where the error return value is explicitly discarded.
-- `consolestderr` — rejects stdout-aware console formatters and renderers in direct `fmt.Fprint*` stderr writes, with suggested fixes. It resolves imported packages and exempts stream-neutral and already-stderr-aware helpers; indirect writer/formatter aliases are outside its scope.
+- `consolestderr` — rejects stdout-aware console formatters and renderers in direct `fmt.Fprint*` stderr writes, with suggested fixes. `RenderStructWithOptions` requires an option literal whose `Stderr` field is compile-time true; unknown option variables are reported without an automatic fix. It resolves imported packages and exempts stream-neutral and already-stderr-aware helpers; indirect writer/formatter aliases are outside its scope.
 - `contextcancelnotdeferred` — reports context cancel functions that are called directly instead of deferred.
 - `ctxbackground` — reports `context.Background()` calls inside functions that already receive a `context.Context` parameter.
 - `deferinloop` — reports `defer` statements placed directly inside `for`/`range` loop bodies, which execute when the enclosing function returns rather than each iteration and can cause resource leaks.
