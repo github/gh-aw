@@ -98,11 +98,16 @@ function writeFileSecure(filePath, content) {
   ensureSecureDirectory(dir);
   const tmpPath = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${crypto.randomBytes(8).toString("hex")}.tmp`);
   const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW;
-  const fd = fs.openSync(tmpPath, flags, 0o600);
   try {
-    fs.writeFileSync(fd, content);
-  } finally {
-    fs.closeSync(fd);
+    const fd = fs.openSync(tmpPath, flags, 0o600);
+    try {
+      fs.writeFileSync(fd, content);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch (error) {
+    fs.rmSync(tmpPath, { force: true });
+    throw error;
   }
   try {
     fs.renameSync(tmpPath, filePath);

@@ -88,6 +88,15 @@ test("writeFileSecure creates a new file with 0600 mode and exact content", t =>
   assert.equal(mode(target), 0o600);
 });
 
+test("writeFileSecure leaves no leftover staging file when the write itself fails", t => {
+  const dir = tmpDir(t);
+  const target = path.join(dir, "out.json");
+  // fs.writeFileSync requires a string/Buffer; a plain number makes it throw
+  // after the staging file has already been opened via O_CREAT|O_EXCL.
+  assert.throws(() => writeFileSecure(target, 12345));
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
 test("writeFileSecure is safely repeatable against the same fixed path", t => {
   const dir = tmpDir(t);
   const target = path.join(dir, "out.json");
