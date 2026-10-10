@@ -111,8 +111,11 @@ promise that one queue admits 100,000 pending Work items. The saturation profile
 instead reports the first real admission refusal, accepted batch count and
 unattempted remainder without fabricating Claims or completions.
 
-Seeded faults force competing real Git reference updates and lose one successful
-publication response. JSON diagnostics report CAS conflicts, recovered requests,
+Each branch bootstraps through its first authorized producer submission, committing
+Policy and Work together with the original request identity. Retained-history
+fixtures include their live probe Work in that genesis commit.
+Seeded faults force competing real Git reference creations or updates and lose one
+successful publication response. JSON diagnostics report CAS conflicts, recovered requests,
 native POST counts, ledger bytes, cold replay timings, memory and workload scope.
 Workers have bounded deadlines and fixtures are cleaned up on completion or
 failure. Canonicalization must preserve the complete causal history and projection.

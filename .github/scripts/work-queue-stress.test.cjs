@@ -10,7 +10,7 @@ const { newWork } = require("../../actions/setup/js/work_queue_graph.cjs");
 const { actorFromContext, defaultPolicy } = require("../../actions/setup/js/work_queue_policy.cjs");
 const { newRequest, prepareCheckpoint, replayTransactions, serializeProjection, serializeTransactionLog } = require("../../actions/setup/js/work_queue_replay.cjs");
 const { authenticatePublisher } = require("../../actions/setup/js/work_queue_native.cjs");
-const { compactWorkQueue, initializeWorkQueue, publishWorkQueueRequest, readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
+const { compactWorkQueue, publishWorkQueueRequest, readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
 const { PRINCIPAL, PUBLISHER_WORKFLOW, REPOSITORY } = require("./work-queue-stress-git.cjs");
 
 test("checkpoint loses real-Git publication race, refreshes, and preserves cold replay", { timeout: 60000 }, async () => {
@@ -31,11 +31,11 @@ test("checkpoint loses real-Git publication race, refreshes, and preserves cold 
     const producer = await context("producer");
     const dispatcher = await context("dispatcher");
     const policy = defaultPolicy({ repository: REPOSITORY, principal: PRINCIPAL, ref: host.ref });
-    await initializeWorkQueue({ ...args, context: admin, policyProposal: policy, now: () => timestamp });
     const submit = async (name, at) =>
       publishWorkQueueRequest({
         ...args,
         context: producer,
+        policyProposal: policy,
         now: () => at,
         request: newRequest(name, "submit", actorFromContext(producer), {
           nodes: [newWork({ item: name, effect_contract: { kind: "none" } }, "checkpoint-graph", name, "default", policy, at)],
@@ -43,6 +43,15 @@ test("checkpoint loses real-Git publication race, refreshes, and preserves cold 
       });
     await submit("first", timestamp + 1);
     const stale = await readWorkQueueLog(args);
+    assert.equal(stale.transactions.length, 1, "first Work and Policy must share one native publication");
+    assert.deepEqual(
+      stale.transactions[0].operations.map(operation => operation.kind),
+      ["Policy", "Work"]
+    );
+    assert.equal(stale.transactions[0].request.id, "first");
+    assert.equal(stale.transactions[0].actor.role, "producer");
+    assert.deepEqual([...stale.state.works.values()][0].position, { commit: 0, operation: 1 });
+    assert.equal((await submit("first", timestamp + 1)).recovered, true, "genesis retry must recover the original submission");
     const staleCheckpoint = prepareCheckpoint(stale.state, stale.sha, actorFromContext(admin), timestamp + 2);
     await submit("racing", timestamp + 2);
     const grant = await publishWorkQueueRequest({
@@ -270,7 +279,7 @@ test("retained mode validates real Work/Claim history and separates fixture scal
   assert.equal(report.retained_history_entities, 256);
   assert.equal(report.requested_history_entities, 256);
   assert.equal(report.fixture_batch, 128);
-  assert.equal(report.transactions, 6, "genesis, probe submission, and four checked commits per 128 historical Work");
+  assert.equal(report.transactions, 5, "combined Policy/probe genesis and four checked commits per 128 historical Work");
   assert.equal(report.pending_work, 8);
   assert.equal(report.recovery_bytes_used, 0);
   assert.equal(report.queues.length, 2);
