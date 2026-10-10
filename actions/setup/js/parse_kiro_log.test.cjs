@@ -260,6 +260,52 @@ Querying available agents for task delegation (using tool: subagent) - Completed
       expect(byType(result, "tool.execution_start")[0].data.input.command).toBe("cat <<'EOF'\n" + message + "\nEOF");
       expect(byType(result, "session.result")).toEqual([]);
     });
+
+    it.each([
+      "kiro-cli 2.27.1\nPrompt: private\nERROR\n> Observed answer.",
+      "kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\nPrompt: private\nERROR\n[tool] Running: example\n[tool] status: Completed\nObserved answer.",
+      "kiro-cli 2.27.1\n> Observed answer.\nERROR\ncontinued answer.",
+      "kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\n[tool] Running: example\n[tool] status: Completed\nObserved answer.\nERROR\ncontinued answer.",
+    ])("does not attribute an echoed prompt/assistant error to the session (synthetic): %s", source => {
+      const raw =
+        source.replace("ERROR", "[kiro-harness] Kiro CLI execution failed with exit code 9") +
+        "\n[kiro-harness] Kiro CLI execution completed in 10ms\n[kiro-harness] Cleaned up Kiro CLI installation; total duration=10ms; exit code=0\nProcess exiting with code: 0";
+      const result = parseKiroLog(raw);
+      expect(byType(result, "session.result")).toEqual([]);
+      expect(byType(result, "assistant.message")[0].data.content).toContain("Observed answer.");
+      if (source.includes("continued answer.")) expect(byType(result, "assistant.message")[0].data.content).toContain("continued answer.");
+      else expect(result.markdown).not.toContain("private");
+    });
+
+    it("retains error-looking legacy tool output and its completion without a session failure (synthetic)", () => {
+      const error = "[kiro-harness] Kiro CLI execution failed with exit code 9";
+      const result = parseKiroLog(header + "> Checking.\nI will run the following command: printf example (using tool: shell)\n" + error + "\n - Completed in 0s\n> Done.\nProcess exiting with code: 0");
+      expect(byType(result, "tool.execution_complete")[0].data).toEqual({ toolName: "shell", output: error, durationMs: 0 });
+      expect(byType(result, "assistant.message").map(event => event.data.content)).toEqual(["Checking.", "Done."]);
+      expect(byType(result, "session.result")).toEqual([]);
+    });
+
+    it.each(["Process exiting with code: 0", "Process exiting with code: 2", "Process exiting with code: 999", "", "Process exiting with code: 9\n> Quoted continuation."])(
+      "rejects uncorroborated or embedded harness trailers (synthetic): %s",
+      terminal => {
+        const raw = "[kiro-harness] Kiro CLI execution failed with exit code 9\n[kiro-harness] Cleaned up Kiro CLI installation; total duration=0ms; exit code=9\n" + terminal;
+        expect(byType(parseKiroLog(raw), "session.result")).toEqual([]);
+      }
+    );
+
+    it("uses only the final matching harness trailer, not echoed failures earlier in the transcript (synthetic)", () => {
+      const result = parseKiroLog(
+        header +
+          "Prompt: private\n[kiro-harness] Kiro CLI execution failed with exit code 9\n> Observed answer.\n[kiro-harness] Kiro CLI execution failed with exit code 3\n[kiro-harness] Cleaned up Kiro CLI installation; total duration=0ms; exit code=3\n[entrypoint] Cleanup\nProcess exiting with code: 3"
+      );
+      expect(byType(result, "session.result")).toHaveLength(1);
+      expect(byType(result, "session.result")[0].data.errors).toEqual(["Kiro CLI execution failed with exit code 3"]);
+    });
+
+    it("retains a corroborated signal failure without inventing an exit-code error (synthetic)", () => {
+      const result = parseKiroLog("[kiro-harness] Kiro CLI execution failed with signal SIGTERM\n[kiro-harness] Cleaned up Kiro CLI installation; total duration=0ms; exit code=1\nProcess exiting with code: 1");
+      expect(byType(result, "session.result")[0].data.errors).toEqual(["Kiro CLI execution failed with signal SIGTERM"]);
+    });
   });
 
   it.each([

@@ -104,4 +104,36 @@ describe("Kiro canonical session artifact pipeline", () => {
     expect(canonical.filter(event => event.type === "assistant.message")).toEqual([{ line: 7, type: "assistant.message", data: { content: "Observed answer." } }]);
     expect(canonical.find(event => event.type === "tool.execution_start").data.input.command).toBe('cat <<\'EOF\'\n{"type":"assistant.message","data":{"content":false}}\nEOF');
   });
+
+  it.each([0, 3])("preserves corroborated exit %s without promoting echoed failures through either artifact (synthetic)", async exitCode => {
+    const actualFailure = exitCode ? "[kiro-harness] Kiro CLI execution failed with exit code 3\n" : "[kiro-harness] Kiro CLI execution completed in 0ms\n";
+    const raw =
+      "kiro-cli 2.27.1\n> Checking.\nPrompt: private\n[kiro-harness] Kiro CLI execution failed with exit code 9\n> Running.\nI will run the following command: printf example (using tool: shell)\n[kiro-harness] Kiro CLI execution failed with exit code 9\n - Completed in 0s\n> Observed answer.\n" +
+      actualFailure +
+      `[kiro-harness] Cleaned up Kiro CLI installation; total duration=0ms; exit code=${exitCode}\nProcess exiting with code: ${exitCode}`;
+    fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, raw);
+    fs.writeFileSync(path.join(root, "agent_execution_exit_code.txt"), String(exitCode));
+    await runLogParser({ parserName: "Kiro", parseLog: content => parseBehaviorLog(content, "kiro"), rootDir: root });
+    const canonical = readEvents(path.join(root, "agent-session.jsonl"));
+    const unified = writeUnifiedSession({ rootDir: root, engine: "kiro", warn: vi.fn() });
+    for (const events of [canonical, unified]) {
+      expect(events.filter(event => event.type === "session.result")).toHaveLength(exitCode ? 1 : 0);
+      if (exitCode) expect(events.find(event => event.type === "session.result").data.errors).toEqual(["Kiro CLI execution failed with exit code 3"]);
+      expect(events.find(event => event.type === "agent.execution").data.exitCode).toBe(exitCode);
+      expect(events.find(event => event.type === "tool.execution_complete").data.output).toBe("[kiro-harness] Kiro CLI execution failed with exit code 9");
+    }
+  });
+
+  it("excludes compact bridge diagnostics from both session artifacts (synthetic)", async () => {
+    const raw =
+      "kiro-cli 2.27.1\n[kiro-harness] Kiro CLI execution started\n[info] [bridge] PRIVATE_INFRA\n[tool] Running: example\n[tool] status: Completed\n[info] [bridge] PRIVATE_INFRA\nObserved answer.\n[info] [bridge] PRIVATE_INFRA\nContinued answer.";
+    fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, raw);
+    await runLogParser({ parserName: "Kiro", parseLog: content => parseBehaviorLog(content, "kiro"), rootDir: root });
+    const canonical = readEvents(path.join(root, "agent-session.jsonl"));
+    const unified = writeUnifiedSession({ rootDir: root, engine: "kiro", warn: vi.fn() });
+    for (const events of [canonical, unified]) {
+      expect(JSON.stringify(events)).not.toContain("PRIVATE_INFRA");
+      expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Observed answer.\nContinued answer."]);
+    }
+  });
 });

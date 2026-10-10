@@ -22,12 +22,13 @@ function parseKiroLog(content) {
   /** @type {import("./types/agent_session").SessionEvent[]} */
   const entries = [];
   const commandLines = new Set();
+  const harnessFailure = findKiroHarnessFailure(lines);
   const executionStart = lines.findIndex(line => line === "[kiro-harness] Kiro CLI execution started");
   const compactStart = executionStart !== -1 ? executionStart : banner;
   const isLegacyObservation = line => isAssistantLine(line) || /^(?:I will run the following command: |Searching for symbols matching: |Querying available agents for task delegation|\s*- Completed in \d)/.test(line);
   const firstSignature = compactStart !== -1 ? lines.slice(compactStart + 1).find(line => /^\[tool\] /.test(line) || isLegacyObservation(line)) : undefined;
   const compact = compactStart !== -1 && (firstSignature?.startsWith("[tool] ") || (executionStart !== -1 && firstSignature === undefined));
-  if (compact) entries.push(...parseCompactKiroLog(lines, compactStart, banner, commandLines));
+  if (compact) entries.push(...parseCompactKiroLog(lines, compactStart, banner, commandLines, harnessFailure));
   else if (banner !== -1 && lines.slice(banner + 1).some(isLegacyObservation)) {
     const emit = (line, type, data) => {
       const event = createSessionEvent({ line: line + 1 }, type, data);
@@ -94,7 +95,8 @@ function parseKiroLog(content) {
     for (let index = banner + 1; index < lines.length; index++) {
       const line = lines[index];
       if (isAddMaskCommandLine(line)) continue;
-      if (mode !== "command" && /^\s*▸ Credits:|^\[entrypoint\]|^\[kiro-harness\]|^\[INFO\] (?:Stopping containers|Executing agent command)|^Process exiting with code:/.test(line)) {
+      const harnessError = /^\[kiro-harness\] Kiro CLI execution failed with /.test(line);
+      if (mode !== "command" && (index === harnessFailure || (!harnessError && /^\s*▸ Credits:|^\[entrypoint\]|^\[kiro-harness\]|^\[INFO\] (?:Stopping containers|Executing agent command)|^Process exiting with code:/.test(line)))) {
         flushAssistant();
         flushOutput();
         mode = entries.length > 1 ? "stopped" : "idle";
@@ -155,10 +157,15 @@ function parseKiroLog(content) {
     flushAssistant();
     flushOutput();
   }
-  for (const [index, line] of lines.entries()) {
-    if (!commandLines.has(index) && /^\[kiro-harness\] Kiro CLI execution failed with (?:exit code \d+|signal \S+)(?:;|$)/.test(line)) {
-      entries.push(createSessionEvent({ line: index + 1 }, "session.result", { sourceEngine: "kiro", sourceType: "kiro-harness", status: "failed", errors: [line.slice("[kiro-harness] ".length)] }));
-    }
+  if (harnessFailure !== undefined && !commandLines.has(harnessFailure)) {
+    entries.push(
+      createSessionEvent({ line: harnessFailure + 1 }, "session.result", {
+        sourceEngine: "kiro",
+        sourceType: "kiro-harness",
+        status: "failed",
+        errors: [lines[harnessFailure].slice("[kiro-harness] ".length)],
+      })
+    );
   }
   entries.sort((left, right) => Number(left.line) - Number(right.line));
   const logEntries = normalizeAgentSession(entries, { sourceEngine: "kiro" });
@@ -171,15 +178,40 @@ function parseKiroLog(content) {
 }
 
 /**
+ * Mixed stdout cannot authenticate a diagnostic prefix. Require the final
+ * adjacent harness error/cleanup pair and a matching nonzero runner exit.
+ * @param {string[]} lines
+ * @returns {number | undefined}
+ */
+function findKiroHarnessFailure(lines) {
+  let terminal = lines.length - 1;
+  while (terminal >= 0 && (!lines[terminal].trim() || isAddMaskCommandLine(lines[terminal]))) terminal--;
+  const runner = lines[terminal]?.match(/^Process exiting with code: ([1-9]\d*)$/);
+  if (!runner || Number(runner[1]) > 255) return undefined;
+  let cleanupIndex = terminal - 1;
+  while (cleanupIndex >= 0 && !/^\[kiro-harness\] Cleaned up Kiro CLI installation;/.test(lines[cleanupIndex])) cleanupIndex--;
+  if (cleanupIndex <= 0 || cleanupIndex >= terminal) return undefined;
+  const cleanup = lines[cleanupIndex].match(/^\[kiro-harness\] Cleaned up Kiro CLI installation; total duration=\d+ms; exit code=([1-9]\d*)$/);
+  if (!cleanup || Number(cleanup[1]) !== Number(runner[1])) return undefined;
+  const failure = lines[cleanupIndex - 1].match(/^\[kiro-harness\] Kiro CLI execution failed with (?:exit code ([1-9]\d*)|signal (\S+))(?:;|$)/);
+  if (!failure || (failure[1] !== undefined && Number(failure[1]) !== Number(runner[1]))) return undefined;
+  if (failure[2] !== undefined && Number(runner[1]) !== 1) return undefined;
+  const infrastructure = /^(?:\s*$|\[entrypoint\]|\[(?:INFO|WARN|SUCCESS|health-check|info)\]|\s*(?:Container|Network) \S)/;
+  if (lines.slice(cleanupIndex + 1, terminal).some(line => !isAddMaskCommandLine(line) && !infrastructure.test(line))) return undefined;
+  return cleanupIndex - 1;
+}
+
+/**
  * The compact CLI prints tool statuses without IDs and buffers assistant prose
  * until after tool activity. Displayed commands may already be truncated.
  * @param {string[]} lines
  * @param {number} start
  * @param {number} banner
  * @param {Set<number>} commandLines
+ * @param {number | undefined} harnessFailure
  * @returns {import("./types/agent_session").SessionEvent[]}
  */
-function parseCompactKiroLog(lines, start, banner, commandLines) {
+function parseCompactKiroLog(lines, start, banner, commandLines, harnessFailure) {
   /** @type {import("./types/agent_session").SessionEvent[]} */
   const entries = [];
   const emit = (line, type, data) => {
@@ -205,7 +237,8 @@ function parseCompactKiroLog(lines, start, banner, commandLines) {
   for (let index = start + 1; index < lines.length; index++) {
     const line = lines[index];
     if (isAddMaskCommandLine(line)) continue;
-    if (!command && /^\[kiro-harness\]|^\[entrypoint\]|^\[INFO\] Stopping containers|^Process exiting with code:/.test(line)) {
+    const harnessError = /^\[kiro-harness\] Kiro CLI execution failed with /.test(line);
+    if (!command && (index === harnessFailure || (!harnessError && /^\[kiro-harness\]|^\[entrypoint\]|^\[INFO\] Stopping containers|^Process exiting with code:/.test(line)))) {
       flush();
       active = false;
       continue;

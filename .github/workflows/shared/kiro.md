@@ -283,6 +283,10 @@ remain anonymous because stdout supplies no tool-call IDs. `Failed` is an
 explicit tool failure; `Completed` establishes completion but does not supply
 an exit code or independently verified success. Elapsed time, natural-language
 claims, and credit summaries do not become token, USD, or turn accounting.
+Harness execution errors become failed session results only when the final
+adjacent error/cleanup diagnostics agree with the runner's nonzero exit.
+An error-looking line in a prompt, command, tool output, or assistant answer
+does not establish a session failure; incomplete trailers remain uncorroborated.
 
 Sanitized regression excerpts in `actions/setup/js/fixtures/kiro_ci_sessions.cjs`
 come from existing Smoke Kiro runs
