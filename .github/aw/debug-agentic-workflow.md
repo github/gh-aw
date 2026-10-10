@@ -342,13 +342,14 @@ order:
 
 `responses` selects `/responses`; `completions` selects `/chat/completions`.
 The CLI uses one wire API for the whole session, including sub-agents. A main
-model and sub-agent model requiring different endpoints cannot be repaired by
-changing only the sub-agent's model name. When `engine.model-routing` is enabled,
+model and sub-agent model cannot use different endpoints in the same session;
+replace an incompatible sub-agent model with one supporting the main session's
+endpoint. When `engine.model-routing` is enabled,
 also inspect AWF's selected model and endpoint rather than assuming this normal
 alias/inference path applies.
 
-Treat these signatures as model/endpoint incompatibility evidence, not a
-transient failure or a prompt problem:
+Investigate these signatures as model/endpoint or model-policy misconfiguration,
+not a transient failure or a prompt problem:
 
 - `Cannot translate Copilot request feature`
 - `Unsupported Responses custom tool`
@@ -356,7 +357,9 @@ transient failure or a prompt problem:
 - `not accessible via the … endpoint`
 
 Confirm the actual model and request path before diagnosing: the error may come
-from a sub-agent rather than the main model.
+from a sub-agent rather than the main model. For `model_policy_violation`, also
+inspect the configured model allowlist/denylist and the rejected model: a policy
+rejection alone does not establish an endpoint mismatch.
 
 ### 3. Apply fixes in this order
 

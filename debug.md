@@ -105,11 +105,14 @@ version pin, or questions about version fields, use the
    catalog `wire_api` → `-utility` base-model catalog fallback → `gpt-5+` name rule
    → CLI default `/chat/completions`. `COPILOT_PROVIDER_WIRE_API=responses` uses
    `/responses`; `completions` uses `/chat/completions`. One wire API applies to the
-   whole session, including sub-agents. For `engine.model-routing`, inspect AWF's
+   whole session, including sub-agents; replace an incompatible sub-agent with a
+   model supporting the main session's endpoint. For `engine.model-routing`, inspect AWF's
    selected endpoint too. `Cannot translate Copilot request feature`,
    `Unsupported Responses custom tool`, `model_policy_violation`, and
-   `not accessible via the … endpoint` indicate incompatibility, not a transient
-   retry or prompt problem.
+   `not accessible via the … endpoint` warrant model/endpoint or model-policy
+   investigation, not transient retries or prompt tuning. For
+   `model_policy_violation`, check the model allowlist/denylist and rejected model;
+   policy rejection alone does not establish an endpoint mismatch.
 3. **Apply fixes in this order:**
    1. **Upgrade gh-aw and recompile.**
    2. **Pin a model that supports the required endpoint.**
