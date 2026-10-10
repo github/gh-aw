@@ -36,7 +36,48 @@ test("ensureSecureDirectory rejects a symlink planted at the target path", t => 
   fs.mkdirSync(real);
   const link = path.join(root, "linked");
   fs.symlinkSync(real, link, "dir");
-  assert.throws(() => ensureSecureDirectory(link), /non-directory output path/);
+  assert.throws(() => ensureSecureDirectory(link), /symlinked component/);
+});
+
+test("ensureSecureDirectory rejects a symlinked ancestor several levels above the target", t => {
+  const root = tmpDir(t);
+  const real = path.join(root, "real");
+  fs.mkdirSync(real);
+  const link = path.join(root, "linked");
+  fs.symlinkSync(real, link, "dir");
+  const nested = path.join(link, "child", "grandchild");
+  assert.throws(() => ensureSecureDirectory(nested), /symlinked component/);
+  // The symlink target itself must stay untouched (no directories created through it).
+  assert.equal(fs.readdirSync(real).length, 0);
+});
+
+test("ensureSecureDirectory rejects a pre-existing directory that is group/other-writable", t => {
+  const root = tmpDir(t);
+  const dir = path.join(root, "insecure");
+  fs.mkdirSync(dir);
+  fs.chmodSync(dir, 0o777); // chmod bypasses umask, unlike the mkdirSync mode option
+  assert.throws(() => ensureSecureDirectory(dir), /untrusted or insecurely-permissioned directory/);
+});
+
+test("ensureSecureDirectory rejects a permissive directory several levels above the target", t => {
+  const root = tmpDir(t);
+  const insecureParent = path.join(root, "insecure");
+  fs.mkdirSync(insecureParent);
+  fs.chmodSync(insecureParent, 0o777);
+  const nested = path.join(insecureParent, "child");
+  assert.throws(() => ensureSecureDirectory(nested), /untrusted or insecurely-permissioned directory/);
+  // Nothing was created underneath the untrusted ancestor.
+  assert.deepEqual(fs.readdirSync(insecureParent), []);
+});
+
+test("ensureSecureDirectory accepts the standard sticky, world-writable /tmp model even when not owned by us", t => {
+  // os.tmpdir() itself is the trust boundary and is not walked component by
+  // component, so directories like the real system /tmp (sticky + world
+  // writable, usually root-owned) must not be rejected outright.
+  const stat = fs.lstatSync(os.tmpdir());
+  if (typeof process.getuid === "function" && stat.uid !== process.getuid()) {
+    assert.doesNotThrow(() => ensureSecureDirectory(os.tmpdir()));
+  }
 });
 
 test("writeFileSecure creates a new file with 0600 mode and exact content", t => {

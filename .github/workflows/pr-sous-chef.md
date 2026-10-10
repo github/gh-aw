@@ -30,6 +30,7 @@ checkout:
   sparse-checkout: |
     scripts
     actions
+    .github/scripts
 network:
   allowed: ["defaults"]
 model: copilot/claude-haiku-4.5
@@ -67,7 +68,9 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: scripts
+          sparse-checkout: |
+            scripts
+            .github/scripts
       - name: Fetch actionable PR queue
         id: fetch-prs
         env:

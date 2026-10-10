@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ensureSecureDirectory, writeFileSecure } from "./secure-write.mjs";
+import { ensureSecureDirectory, writeFileSecure } from "../.github/scripts/secure_write.cjs";
 
 const marker = "<!-- gh-aw-pr-sous-chef-nudge -->";
 const statePattern = /Sous-chef state: ([a-f0-9]{64})/;
