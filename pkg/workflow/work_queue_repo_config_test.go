@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -126,7 +127,7 @@ func TestAWQueueRejectsGlobalAndWorkflowPolicyDefinitions(t *testing.T) {
 
 func TestAWQueueInvalidConfigDoesNotWarnAboutDefaults(t *testing.T) {
 	c, _ := awQueueCompilerFixture(t, `{"work_queue":{"concurrency":0}}`)
-	stderr := captureStderr(func() {
+	stderr := testutil.CaptureStderr(t, func() {
 		require.Error(t, c.applyRepositoryWorkQueueOptions(awQueueDispatcherFixture()))
 	})
 	require.Contains(t, stderr, "invalid global work_queue configuration")
