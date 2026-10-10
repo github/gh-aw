@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -200,8 +199,7 @@ Returns JSON array with validation results for each workflow:
 					// Images are still downloading — ask the caller to retry.
 					// Build per-workflow validation errors instead of throwing an MCP protocol error,
 					// so callers always receive consistent JSON regardless of the failure mode.
-					results := buildCompileErrorResults(args.Workflows, err.Error())
-					jsonBytes, jsonErr := json.Marshal(results)
+					jsonBytes, jsonErr := marshalMCPCompileErrorResults(args.Workflows, err.Error())
 					if jsonErr != nil {
 						return nil, nil, newMCPError(jsonrpc.CodeInternalError, "failed to marshal docker error results", jsonErr.Error())
 					}
@@ -283,7 +281,7 @@ Returns JSON array with validation results for each workflow:
 		// Use separate stdout/stderr capture instead of CombinedOutput because:
 		// - Stdout contains JSON output (--json flag)
 		// - Stderr contains console messages that shouldn't be mixed with JSON
-		stdout, stderr, err := runMCPExecOutputWithStderr(ctx, execCmd, cmdArgs...)
+		stdout, diagnostics, err := runMCPCompileOutput(ctx, execCmd, cmdArgs...)
 
 		// The compile command always outputs JSON to stdout when --json flag is used, even on error.
 		// We should return the JSON output to the LLM so it can see validation errors.
@@ -295,22 +293,8 @@ Returns JSON array with validation results for each workflow:
 		if err != nil {
 			mcpLog.Printf("Compile command exited with error: %v (output length: %d)", err, len(outputStr))
 			// If we have no output, this is a real execution failure
-			if outputStr == "" {
-				// Try to get stderr for error details
-				var stderrText string
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					stderrText = string(exitErr.Stderr)
-				}
-				if strings.TrimSpace(stderrText) == "" {
-					stderrText = string(stderr)
-				}
-				errMsg := strings.TrimSpace(stderrText)
-				if errMsg == "" {
-					errMsg = err.Error()
-				}
-				results := buildCompileErrorResults(args.Workflows, errMsg)
-				jsonBytes, jsonErr := json.Marshal(results)
+			if strings.TrimSpace(outputStr) == "" {
+				jsonBytes, jsonErr := marshalMCPCompileErrorResults(args.Workflows, diagnostics.failureMessage(err))
 				if jsonErr != nil {
 					return nil, nil, newMCPError(jsonrpc.CodeInternalError, "failed to marshal compile error results", jsonErr.Error())
 				}
@@ -329,9 +313,9 @@ Returns JSON array with validation results for each workflow:
 			outputStr = injectDockerUnavailableWarning(outputStr, dockerUnavailableWarning)
 		}
 		if args.DryRun {
-			outputStr = injectDevelopmentShellcheckDiagnostics(outputStr, string(stderr))
+			outputStr = injectDevelopmentShellcheckDiagnostics(outputStr, diagnostics.shellcheck.String())
 		} else {
-			outputStr = injectShellcheckDiagnostics(outputStr, string(stderr))
+			outputStr = injectShellcheckDiagnostics(outputStr, diagnostics.shellcheck.String())
 		}
 
 		return &mcp.CallToolResult{
