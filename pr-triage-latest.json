@@ -1,56 +1,38 @@
 {
-  "run_date": "2026-10-10T12:34:10Z",
-  "run_id": "38052268421",
+  "run_date": "2026-10-10T18:31:23.853229Z",
+  "run_id": "38075816611",
   "source": "pr-triage-agent",
-  "eligible_total": 7,
-  "cooldown_skipped": 0,
-  "category_counts": {
-    "bug": 4,
-    "feature": 1,
-    "chore": 1,
-    "docs": 1
-  },
-  "risk_counts": {
-    "high": 4,
-    "medium": 2,
-    "low": 1
-  },
-  "priority_counts": {
-    "high": 4,
-    "medium": 2,
-    "low": 1
-  },
+  "eligible_total": 0,
+  "cooldown_skipped": 2,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
   "action_counts": {
     "auto_merge": 0,
-    "fast_track": 5,
-    "batch_review": 1,
-    "defer": 1,
+    "fast_track": 0,
+    "batch_review": 0,
+    "defer": 0,
     "close": 0
   },
-  "batches": [
+  "batches": [],
+  "selected_candidates": [],
+  "skipped_prs": [
     {
-      "id": "core-fixes",
-      "prs": [67114, 67092, 67020, 56568],
-      "reason": "high-priority bug fixes in routing/audit and git-state handling"
+      "number": 67488,
+      "title": "[WIP] Add checklist for diagnosing model and engine misconfiguration",
+      "reason": "cooldown: created 2026-10-10T18:24:54Z, updated 2026-10-10T18:29:41Z (<1h before run)",
+      "state": "open",
+      "user": "Copilot",
+      "draft": true
+    },
+    {
+      "number": 67487,
+      "title": "[WIP] Choose wire API from AWF data and improve error reporting",
+      "reason": "cooldown: created 2026-10-10T18:24:51Z, updated 2026-10-10T18:30:47Z (<1h before run)",
+      "state": "open",
+      "user": "Copilot",
+      "draft": true
     }
   ],
-  "selected_candidates": [
-    {"number": 67114, "category": "bug", "risk": "high", "priority": "high", "action": "fast_track"},
-    {"number": 67092, "category": "bug", "risk": "high", "priority": "high", "action": "fast_track"},
-    {"number": 67020, "category": "bug", "risk": "high", "priority": "high", "action": "fast_track"},
-    {"number": 56568, "category": "bug", "risk": "high", "priority": "high", "action": "fast_track"},
-    {"number": 67105, "category": "feature", "risk": "medium", "priority": "high", "action": "fast_track"},
-    {"number": 67091, "category": "chore", "risk": "medium", "priority": "medium", "action": "batch_review"},
-    {"number": 66942, "category": "docs", "risk": "low", "priority": "low", "action": "defer"}
-  ],
-  "skipped_prs": [],
-  "prs": [
-    {"number": 67114, "title": "Preserve model routing attribution in audit and logs", "category": "bug", "risk": "high", "priority": "high", "action": "fast_track", "score": 84},
-    {"number": 67092, "title": "Restore classifier cost attribution in routed-run audits", "category": "bug", "risk": "high", "priority": "high", "action": "fast_track", "score": 83},
-    {"number": 67020, "title": "Exclude Cloud Hypervisor HOME state from Git staging and agent patches", "category": "bug", "risk": "high", "priority": "high", "action": "fast_track", "score": 86},
-    {"number": 56568, "title": "Fall back to unsigned push instead of failing when a rebase hits a genuine merge conflict in `pushSignedCommits`", "category": "bug", "risk": "high", "priority": "high", "action": "fast_track", "score": 84},
-    {"number": 67105, "title": "Extending work queue protocol to support checkpoints and maintenance jobs", "category": "feature", "risk": "medium", "priority": "high", "action": "fast_track", "score": 71},
-    {"number": 67091, "title": "[yamllint-fixer] fix: indent sequence items under custom-job strategy/runs-on/services fields", "category": "chore", "risk": "medium", "priority": "medium", "action": "batch_review", "score": 47},
-    {"number": 66942, "title": "docs: replace Gemini with Antigravity in the homepage hero", "category": "docs", "risk": "low", "priority": "low", "action": "defer", "score": 31}
-  ]
+  "prs": []
 }
