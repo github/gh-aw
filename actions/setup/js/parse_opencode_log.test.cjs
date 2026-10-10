@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { parseOpenCodeLog, isOpenCodeEvent } from "./parse_opencode_log.cjs";
 import { parseCustomLog } from "./parse_custom_log.cjs";
-import { parseEngineSession } from "./unified_session.cjs";
+import { parseEngineSession, mergeSessionSources, writeUnifiedSession } from "./unified_session.cjs";
+import { opencodeCiExcerpt, opencodeCiStreamErrors } from "./fixtures/opencode_ci_sessions.cjs";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const sessionID = "ses_fixture";
 const timestamp = 1791040000000;
@@ -172,5 +176,171 @@ describe("OpenCode JSON session parser", () => {
     const result = parseOpenCodeLog(jsonl(records));
     expect(result.logEntries.at(-1).data.usage).not.toHaveProperty("total_tokens");
     expect(result.logEntries.at(-1).data.usage).not.toHaveProperty("reasoning_output_tokens");
+    expect(result.logEntries.at(-1).data.usage.overflowed_tokens).toEqual(expect.arrayContaining(["total_tokens", "reasoning_output_tokens"]));
+  });
+
+  it("preserves a CI-shaped agent session without treating downstream failure as an agent failure", () => {
+    const content = jsonl(opencodeCiExcerpt);
+    const events = parseOpenCodeLog(content).logEntries;
+    expect(events.filter(event => event.type === "tool.execution_complete")).toMatchObject([
+      { id: opencodeCiExcerpt[0].part.id, data: { success: false, exitCode: 2, output: "example: build failed\n", durationMs: 683 } },
+      { id: opencodeCiExcerpt[1].part.id, data: { success: false, error: '{"result":"error","error":"MCP rejected example"}', durationMs: 26 } },
+    ]);
+    expect(events.find(event => event.type === "assistant.message").data.content).toBe("Example finished.\n");
+    expect(events.at(-1).data).toEqual({
+      numTurns: 2,
+      totalCostUsd: 0,
+      usage: { total_tokens: 46187, input_tokens: 23222, output_tokens: 53, reasoning_output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 22912, input_tokens_include_cache: false },
+    });
+    expect(events.at(-1).data).not.toHaveProperty("status");
+    expect(events.at(-1).data).not.toHaveProperty("errors");
+    expect(parseCustomLog(content).logEntries).toEqual(events);
+    expect(parseEngineSession(content, "opencode")).toEqual(events);
+    expect(parseOpenCodeLog(jsonl(events)).logEntries).toEqual(events);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events }]);
+    expect(unified.at(-1).data.usage).toMatchObject({ totalTokens: 46187, inputTokens: 23222, cacheReadInputTokens: 22912 });
+    expect(unified.find(event => event.type === "tool.execution_complete").data).toMatchObject({ success: false, exitCode: 2, output: "example: build failed\n" });
+  });
+
+  it("recovers native logfmt stream errors without inventing terminal results or accounting", () => {
+    const result = parseOpenCodeLog(opencodeCiStreamErrors.join("\n"));
+    expect(result.logEntries).toHaveLength(2);
+    expect(result.logEntries.map(event => event.type)).toEqual(["session.error", "session.error"]);
+    expect(result.logEntries[0]).toMatchObject({
+      timestamp: "2026-10-09T00:37:13.776Z",
+      data: { error: "AI_APICallError: Too Many Requests", sessionId: "ses_ee1e84b56ffeap38OrBZh2U7qY", providerID: "awf-proxy", modelID: "auto", small: "false" },
+    });
+    expect(result.logEntries[1].data.error).toBe("AI_RetryError: Failed after 3 attempts. Last error: Too Many Requests");
+    expect(result.logEntries.some(event => event.type === "assistant.message" || event.type === "session.result")).toBe(false);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-session.jsonl", events: result.logEntries }]);
+    expect(unified[0].data).toEqual(result.logEntries[0].data);
+    expect(unified[0].provenance.timestampMs).toBe(1791506233776);
+    expect(parseEngineSession(opencodeCiStreamErrors.join("\n"), "opencode").filter(event => event.type !== "agent.execution")).toEqual(result.logEntries);
+    expect(parseOpenCodeLog(jsonl(result.logEntries)).logEntries).toEqual(result.logEntries);
+  });
+
+  it("does not reinterpret diagnostic prose, malformed logfmt, or unrelated error fields", () => {
+    const native = opencodeCiStreamErrors[0];
+    for (const content of [
+      `The prompt quotes ${native}`,
+      `\`\`\`log\n${native}\n\`\`\``,
+      `~~~log\n${native}\n~~~`,
+      native.replace("level=ERROR", "level=WARN"),
+      native.replace('message="stream error"', 'message="unrelated error"'),
+      native.replace("session.id=", "notSession="),
+      native.replace('error.error="AI_APICallError: Too Many Requests"', 'error.error="unterminated'),
+      `${native} malformed`,
+    ])
+      expect(parseOpenCodeLog(content).logEntries).toEqual([]);
+    const escaped = native.replace('error.error="AI_APICallError: Too Many Requests"', 'error.error="line\\nwith \\"quotes\\""');
+    expect(parseOpenCodeLog(escaped).logEntries[0].data.error).toBe('line\nwith "quotes"');
+  });
+
+  it("retains error/message arrival order without assuming a retried stream error was terminal", () => {
+    const message = record("text", { text: "Recovered.\n" });
+    const events = parseOpenCodeLog(`${opencodeCiStreamErrors[0]}\n${jsonl([message])}\n${opencodeCiStreamErrors[1]}`).logEntries;
+    expect(events.map(event => event.type)).toEqual(["session.error", "session.init", "assistant.message", "session.error"]);
+    expect(events[2].data.content).toBe("Recovered.\n");
+  });
+
+  it("reconciles changed step snapshots once while retaining previous independently known fields", () => {
+    const first = record("step_finish", { cost: 1, tokens: { input: 3, output: 2, total: 5, reasoning: 0 } });
+    const updated = { ...first, timestamp: timestamp + 1, part: { ...first.part, cost: 2, tokens: { input: 4 } } };
+    const events = parseOpenCodeLog(jsonl([first, first, updated, updated])).logEntries;
+    expect(events.filter(event => event.type === "opencode.step_finish")).toHaveLength(2);
+    expect(events.at(-1).data).toMatchObject({ numTurns: 1, totalCostUsd: 2, usage: { input_tokens: 4, output_tokens: 2, total_tokens: 5, reasoning_output_tokens: 0 } });
+    expect(events.filter(event => event.type === "opencode.step_finish").map(event => event.part)).toEqual([first.part, updated.part]);
+  });
+
+  it.each(["text", "reasoning"])("reconciles %s snapshots without duplicating content or losing native revisions", type => {
+    const first = record(type, { text: "  first\n", partial: true }, { nativeMetadata: { value: false } });
+    const final = { ...first, timestamp: timestamp + 1, part: { ...first.part, text: "  first\n\tlast \n", partial: false } };
+    const events = parseOpenCodeLog(jsonl([first, final, final])).logEntries;
+    const messages = events.filter(event => event.type === (type === "text" ? "assistant.message" : "assistant.reasoning"));
+    expect(messages).toHaveLength(1);
+    expect(messages[0].data).toMatchObject({ content: "  first\n\tlast \n", partial: false });
+    expect(messages[0].nativeSnapshots).toEqual([first, final]);
+    expect(messages[0].nativeMetadata).toEqual({ value: false });
+    expect(messages[0].id).toBe(first.part.id);
+    expect(parseOpenCodeLog(jsonl(events)).logEntries).toEqual(events);
+  });
+
+  it("retains unknown canonical extensions and structured/empty values without inventing metrics", () => {
+    const extension = { type: "vendor.progress", id: "native-id", timestamp: 0, parentId: null, nativeMetadata: [], data: { value: null, empty: "", list: [], nested: { flag: false, number: 0 } } };
+    expect(parseOpenCodeLog(jsonl([extension])).logEntries).toEqual([extension]);
+    const events = parseOpenCodeLog(jsonl([record("step_finish", { tokens: {}, cost: -1 })])).logEntries;
+    expect(events.at(-1).data).toEqual({ numTurns: 1 });
+  });
+
+  it("maps explicit structured refusals, not ordinary disclaimers or tool payloads", () => {
+    const refusal = { type: "assistant.message", id: "refusal", data: { content: "", refusal: "", partial: true } };
+    const events = parseOpenCodeLog(
+      jsonl([refusal, record("text", { text: "I cannot tell whether this is supported." }), record("tool_use", { tool: "example", state: { status: "completed", input: { refusal: "not a model response" }, output: null } })])
+    ).logEntries;
+    expect(events[0]).toEqual({ ...refusal, type: "assistant.refusal", data: { ...refusal.data, reason: "refusal" } });
+    expect(events.filter(event => event.type === "assistant.refusal")).toHaveLength(1);
+    expect(events.find(event => event.type === "tool.execution_complete").data.output).toBeNull();
+    const native = parseOpenCodeLog(jsonl([record("text", { text: "", stop_reason: "refusal", stop_details: { category: null, explanation: "" } })])).logEntries;
+    expect(native.find(event => event.type === "assistant.refusal").data).toEqual({ reason: "refusal", content: "", policyCategory: null, explanation: "" });
+  });
+
+  it.each([
+    ["content-filter", "content_filter"],
+    ["refusal", "refusal"],
+  ])("maps the explicit %s finish signal without duplicating its associated text", (finishReason, reason) => {
+    const text = record("text", { text: "  partial\n", partial: true });
+    const finish = record("step_finish", { reason: finishReason });
+    const events = parseOpenCodeLog(jsonl([text, finish])).logEntries;
+    expect(events.filter(event => event.type === "assistant.refusal")).toHaveLength(1);
+    expect(events.find(event => event.type === "assistant.refusal").data).toEqual({ reason, content: "  partial\n", partial: true });
+    expect(events.some(event => event.type === "assistant.message")).toBe(false);
+    expect(events.at(-1).data).toEqual({ numTurns: 1 });
+    const noText = parseOpenCodeLog(jsonl([finish])).logEntries.find(event => event.type === "assistant.refusal");
+    expect(noText.data).toEqual({ reason });
+    const other = record("text", { text: "Unrelated.", messageID: "other-message" });
+    expect(parseOpenCodeLog(jsonl([other, finish])).logEntries.find(event => event.type === "assistant.message").data.content).toBe("Unrelated.");
+    expect(parseOpenCodeLog(jsonl([text, record("step_finish", { reason: "length" })])).logEntries.some(event => event.type === "assistant.refusal")).toBe(false);
+  });
+
+  it("deduplicates changed tool snapshots and recovers input unavailable at the first observation", () => {
+    const pending = record("tool_use", { tool: "example", state: { status: "running" } });
+    const completed = { ...pending, timestamp: timestamp + 1, part: { ...pending.part, state: { status: "completed", input: false, output: "", result: { content: [] }, metadata: { exit: 0 } } } };
+    const updated = { ...completed, timestamp: timestamp + 2, part: { ...completed.part, state: { ...completed.part.state, output: "Updated.\n", metadata: { exit: 2 } } } };
+    const events = parseOpenCodeLog(jsonl([pending, completed, updated])).logEntries;
+    expect(events.filter(event => event.type === "tool.execution_start")).toHaveLength(1);
+    expect(events.find(event => event.type === "tool.execution_start").data.input).toBe(false);
+    const completions = events.filter(event => event.type === "tool.execution_complete");
+    expect(completions).toHaveLength(1);
+    expect(completions[0].data).toMatchObject({ output: "Updated.\n", result: { content: [] }, success: false, exitCode: 2 });
+    expect(completions[0].nativeSnapshots).toEqual([completed, updated]);
+  });
+
+  it("omits overflowing costs instead of retaining a misleading partial subtotal", () => {
+    const events = parseOpenCodeLog(jsonl([record("step_finish", { id: "cost-1", cost: Number.MAX_VALUE }), record("step_finish", { id: "cost-2", cost: Number.MAX_VALUE }), record("step_finish", { id: "cost-3", cost: 1 })])).logEntries;
+    expect(events.at(-1).data).not.toHaveProperty("totalCostUsd");
+    expect(events.at(-1).data.numTurns).toBe(3);
+  });
+
+  it("persists recovered errors and exact canonical content through the existing unified writer", () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-session-"));
+    try {
+      const events = parseOpenCodeLog(`${opencodeCiStreamErrors[0]}\n${jsonl(opencodeCiExcerpt)}`).logEntries;
+      fs.writeFileSync(path.join(rootDir, "agent-session.jsonl"), `${jsonl(events)}\n`);
+      const outputPath = path.join(rootDir, "aw_session.jsonl");
+      const warnings = [];
+      const warn = message => warnings.push(message);
+      writeUnifiedSession({ rootDir, engine: "opencode", outputPath, warn });
+      const persisted = fs.readFileSync(outputPath, "utf8").trim().split("\n").map(JSON.parse);
+      expect(persisted[0]).toMatchObject({ type: "session.format", data: { version: 1 } });
+      expect(persisted.find(event => event.type === "session.error").data.error).toBe("AI_APICallError: Too Many Requests");
+      expect(persisted.find(event => event.type === "assistant.message").data.content).toBe("Example finished.\n");
+      expect(persisted.find(event => event.type === "session.result").data.usage.totalTokens).toBe(46187);
+      const firstWrite = fs.readFileSync(outputPath, "utf8");
+      writeUnifiedSession({ rootDir, engine: "opencode", outputPath, warn });
+      expect(fs.readFileSync(outputPath, "utf8")).toBe(firstWrite);
+      expect(warnings).toEqual([]);
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
   });
 });

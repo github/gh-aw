@@ -160,6 +160,50 @@ engine:
 
 Workflow authors can still override it with `safe-outputs.threat-detection.engine`, or disable AI analysis with `safe-outputs.threat-detection.engine: false`.
 
+## OpenCode session evidence
+
+The repository sample uses `run --format json`. Its parser maps native text,
+reasoning, and tool parts to the standard session events, preserving exact
+whitespace, structured inputs/results, supplied partiality, and native metadata.
+Changed snapshots of the same message or tool part update one canonical parser
+observation and retain the native revisions in `nativeSnapshots`. Distinct model
+steps contribute accounting once; updated reports replace their supplied fields
+without erasing independently known fields. Unsafe token sums are marked
+unavailable, and overflowing cost totals are omitted rather than published as
+partial subtotals.
+
+OpenCode can emit a provider `stream error` only in its stderr logfmt diagnostics.
+The parser retains these as `session.error`, including their native timestamps,
+session identity, and error text. A retried stream error does not establish a
+terminal outcome, successful response, or zero usage. Explicit structured
+refusals map to `assistant.refusal`; natural-language disclaimers do not.
+Native streams that omit user messages, reasoning, or accounting remain partial.
+
+The sanitized regression corpus in
+[`fixtures/opencode_ci_sessions.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/fixtures/opencode_ci_sessions.cjs)
+comes from existing artifacts, not newly triggered runs:
+[October 5](https://github.com/github/gh-aw/actions/runs/37248124399) supplies JSON
+parts from a successful agent followed by failed detection, and
+[October 9](https://github.com/github/gh-aw/actions/runs/37865496743) supplies
+logfmt-only provider errors. The October 5 excerpt preserves two step reports,
+not the full run's twelve turns. Its original `agent-session.jsonl` and
+`usage/aw_session.jsonl` agree on the full run's reported accounting: 255,330 total
+tokens, 89,318 input, 764 output, 165,248 cache-read, zero reasoning/cache-write
+tokens, and zero cost. Supplemental snapshot, refusal, and overflow cases are
+synthetic; no native refusal or reasoning parts occurred in that sample.
+Its historical canonical trace marked only the MCP tool error as failed,
+despite two bash completions reporting exit code 2. The current parser already
+honors those exits; the run-shape regressions preserve that behavior.
+
+The latest successful
+[October 7 workflow](https://github.com/github/gh-aw/actions/runs/37552649918)
+skipped its agent. The older
+[September 1 agent success](https://github.com/github/gh-aw/actions/runs/33455480415)
+contains legacy prose/debug logs, not JSON parts or persisted normalized
+sessions. Neither establishes success-path conformance for the current JSON
+parser. Existing persisted artifacts are historical evidence; local parser fixes
+do not rewrite them.
+
 ## Recompile after workflow edits
 
 Engine settings live in workflow frontmatter. Recompile whenever you change the import reference, the engine version, or any other frontmatter field:
