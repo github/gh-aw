@@ -180,6 +180,23 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     margin: 0;
     padding-block: 2rem;
   }
+  :global([data-slideshow-slides] > .aw-title-slide) { display: none; }
+  dialog[open] :global([data-slideshow-slides] > .aw-title-slide:not([hidden])) {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    padding-inline: 2rem;
+  }
+  dialog :global(.aw-title-slide h1) {
+    margin: 0;
+    max-width: 72rem;
+    font-size: clamp(3rem, 6vw, 5rem);
+    font-weight: 460;
+    letter-spacing: -0.035em;
+    line-height: 1.06;
+    text-wrap: balance;
+    color: var(--aw-color-text);
+  }
   dialog :global([data-slideshow-slides] > section > :is(.aw-container, [data-variant-group])) {
     width: 100%;
   }

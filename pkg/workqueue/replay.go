@@ -235,17 +235,7 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	case "Control":
 		return state.applyReplayControl(operation, generations)
 	case "Work":
-		var node WorkDefinition
-		if err := json.Unmarshal(operation, &node); err != nil {
-			return err
-		}
-		if err := state.admitWork(node, commit, position); err != nil {
-			return err
-		}
-		if _, exists := state.WorkCreators[node.WorkID]; !exists {
-			state.WorkCreators[node.WorkID] = commit.Actor
-		}
-		return nil
+		return state.admitReplayWork(operation, commit, position)
 	case "Observation":
 		var observation Observation
 		if err := json.Unmarshal(operation, &observation); err != nil {
@@ -269,6 +259,20 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	default:
 		return queueError("unsupported_protocol", "unknown operation")
 	}
+}
+
+func (state *Projection) admitReplayWork(operation Operation, commit QueueCommit, position Position) error {
+	var node WorkDefinition
+	if err := json.Unmarshal(operation, &node); err != nil {
+		return err
+	}
+	if err := state.admitWork(node, commit, position); err != nil {
+		return err
+	}
+	if _, exists := state.WorkCreators[node.WorkID]; !exists {
+		state.WorkCreators[node.WorkID] = commit.Actor
+	}
+	return nil
 }
 
 func (state *Projection) replayCancellation(operation Operation, kind string, commit QueueCommit) error {

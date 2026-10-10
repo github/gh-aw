@@ -26,7 +26,7 @@ const { normalizeDispatchCredential, createDispatchCredentialValidator } = requi
  */
 
 function credentialBindings(raw) {
-  const value = raw === undefined ? {} : parseStrictJSON(raw);
+  const value = raw === undefined || raw === "" ? {} : parseStrictJSON(raw);
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 64) throw new Error(`${SAFE_OUTPUT_E001}: work_queue_dependency_credentials_invalid`);
   const normalized = new Map();
   for (const [repository, variable] of Object.entries(value)) {

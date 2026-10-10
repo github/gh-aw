@@ -9,6 +9,11 @@ import (
 
 var githubAppOwnerDerivationLog = logger.New("workflow:github_app_owner_derivation")
 
+const (
+	activationTargetRepoExpr     = "${{ needs.activation.outputs.target_repo || github.repository }}"
+	activationTargetRepoNameExpr = "${{ needs.activation.outputs.target_repo_name || github.event.repository.name }}"
+)
+
 // inferSingleCheckoutRepositoryForGitHubAppOwner returns the single explicit checkout.repository
 // value when the workflow targets exactly one distinct repository. It ignores the default checkout
 // of the current repository and returns an empty string when multiple distinct repositories are
@@ -37,7 +42,7 @@ func inferSingleCheckoutRepositoryForGitHubAppOwner(data *WorkflowData) string {
 
 	if repository == "" && hasWorkflowCallTrigger(data.On) {
 		githubAppOwnerDerivationLog.Print("No explicit checkout.repository found for workflow_call; using needs.activation.outputs.target_repo as owner source")
-		return "${{ needs.activation.outputs.target_repo }}"
+		return activationTargetRepoExpr
 	}
 
 	if repository == "" {

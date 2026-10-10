@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.46
+**Version**: 1.0.47
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.47` | Unreleased | Audit-only; same-repository checkout for allow-listed App comments is a runtime trust control governed by Security Architecture Specification RS-05a, not a new compiler threat rule. |
 | `1.0.46` | Unreleased | Extends CTR-017 OTLP sandbox exclusions to evals AWF invocations. No lock-file schema change. |
 | `1.0.45` | Unreleased | Extends CTR-017 with host-only OTLP exporter configuration: regenerated agent and threat-detection AWF commands exclude collector endpoints and headers when AWF supports `--exclude-env`. No lock-file schema change. |
 | `1.0.44` | Unreleased | Clarifies CTR-001: `id-token: write` is exempt from repository-write rejection, and its OIDC trust-policy reminder is informational rather than a warning. No lock-file compatibility change. |
@@ -62,7 +63,7 @@ Generated workflows run with elevated permissions and consume untrusted content 
 
 Runtime trust boundaries inside the agent workspace are out of scope for this specification. In particular, the safe-outputs repository checkout discovery path (`actions/setup/js/find_repo_checkout.cjs`) resolves an `owner/repo` target from agent-writable workspace state; its normative controls — manifest precedence, workspace confinement, per-invocation `safe.directory` scoping, read-only discovery, remote host constraint, and deferred durable trust — are specified as Threat T7 and requirements RCR1–RCR7 in the Safe Outputs MCP Gateway Specification and as §3.5 of the Checkout Behavior Specification. A conforming compiler is not required to detect this class, because the compiler emits no generated-workflow construct that selects the checkout directory.
 
-PR-branch checkout authorization in `actions/setup/js/checkout_pr_branch.cjs` is also a runtime trust control, not a compiler-detectable threat. Its same-repository bot exception is limited to `pull_request` and `pull_request_target` `opened` or `synchronize` events where the bot sender matches the actor and the runtime, PR head, and PR base repository IDs match. Forks, unverifiable identities, and other event types or actions retain the collaborator-permission check. The normative requirements are in the Security Architecture Specification, RS-05a; this control does not add a `CTR-*` rule.
+PR-branch checkout authorization in `actions/setup/js/checkout_pr_branch.cjs` is also a runtime trust control, not a compiler-detectable threat. The same-repository bot exception covers `pull_request` and `pull_request_target` `opened` or `synchronize` events with matching bot sender and actor plus equal runtime, PR head, and PR base repository IDs. For `issue_comment` and `pull_request_review_comment`, an explicitly `on.bots`-allow-listed App may bypass the collaborator check only when `sender.type` is `Bot`, the sender and comment author logins match exactly, the sender is canonically equivalent to the runtime actor (App slug or `[bot]` form), the runtime repository ID is positive, and the fetched PR head and base repository IDs both match it. Forks, unlisted bots, unverifiable or mismatched identities, and other actors retain the collaborator-permission check. The normative requirements are in the Security Architecture Specification, RS-05a; this control does not add a `CTR-*` rule.
 
 Sandbox bypass includes the provenance of the agent's own configuration. On pull-request triggers the workspace holds head-branch content that the PR author controls, so agent configuration folders and root instruction files are attacker-controlled inputs until the generated job replaces them with the base-branch snapshot captured before that content was checked out.
 
