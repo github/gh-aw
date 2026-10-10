@@ -32,6 +32,7 @@ export interface UnifiedSessionUsage {
 export interface UnifiedSessionContextData {
   sessionId?: JsonValue;
   parentToolUseId?: JsonValue;
+  parentToolCallId?: JsonValue;
   agentId?: JsonValue;
 }
 
@@ -185,7 +186,8 @@ export interface FirewallAccessData {
   durationMs?: JsonValue;
 }
 
-export interface UsageReportData {
+export interface UsageReportData extends UnifiedSessionContextData {
+  stepIndex?: SessionCount;
   provider?: JsonValue;
   model?: JsonValue;
   purpose?: JsonValue;
@@ -329,16 +331,45 @@ export interface UnifiedSessionEventDataMap {
   "agent.execution": AgentExecutionData;
   "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedSessionContextData;
   "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd" | "reasoningEffort"> & UnifiedSessionContextData;
+  "session.error": {
+    error?: JsonValue;
+    message?: JsonValue;
+    content?: JsonValue;
+    code?: JsonValue;
+    errorType?: JsonValue;
+    model?: JsonValue;
+    severity?: JsonValue;
+    status?: JsonValue;
+    sourceType?: JsonValue;
+    exitCode?: JsonValue;
+  } & UnifiedSessionContextData;
+  "session.info": { message?: JsonValue; content?: JsonValue; model?: JsonValue; status?: JsonValue; sourceType?: JsonValue } & UnifiedSessionContextData;
+  "session.shutdown": {
+    shutdownType?: JsonValue;
+    errorReason?: JsonValue;
+    premiumRequests?: JsonValue;
+    totalNanoAiu?: JsonValue;
+    totalApiDurationMs?: JsonValue;
+    sessionStartTime?: JsonValue;
+    currentModel?: JsonValue;
+  } & UnifiedSessionContextData;
+  "session.task_complete": { success?: JsonValue; summary?: JsonValue } & UnifiedSessionContextData;
   "user.message": UnifiedMessageData;
   "prompt.system": Pick<MessageData, "content">;
   "prompt.user": Pick<MessageData, "content">;
   "assistant.message": UnifiedMessageData;
-  "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial"> & UnifiedSessionContextData;
+  "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial"> & UnifiedMessageData;
   "assistant.reasoning": UnifiedMessageData;
-  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName"> & UnifiedSessionContextData;
+  "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "stepIndex" | "toolName" | "input" | "inputTruncated" | "command" | "mcpServerName"> & UnifiedSessionContextData;
+  "tool.execution_update": Pick<ToolExecutionStartData, "toolCallId" | "stepIndex" | "toolName" | "input" | "mcpServerName"> & {
+    output?: JsonValue;
+    partial?: JsonValue;
+    delta?: JsonValue;
+    contentIndex?: JsonValue;
+  } & UnifiedSessionContextData;
   "tool.execution_complete": Pick<
     ToolExecutionCompleteData,
-    "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError" | "taskId" | "taskType" | "workflowName" | "workflowRunId"
+    "toolCallId" | "stepIndex" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError" | "taskId" | "taskType" | "workflowName" | "workflowRunId"
   > &
     UnifiedSessionContextData;
   "dynamicWorkflows.task_started": DynamicWorkflowObservationData;
@@ -352,7 +383,7 @@ export interface UnifiedSessionEventDataMap {
   "mcp.difc.filtered": McpObservationData;
   "mcp.guard.blocked": McpObservationData;
   "mcp.tool_call": McpObservationData;
-  "mcp.event": RuntimeObservationData;
+  "mcp.event": RuntimeObservationData & { serverName?: JsonValue };
   "firewall.http_access": FirewallAccessData;
   "firewall.token_usage": UsageReportData;
   "firewall.model_routing": ModelRoutingData;

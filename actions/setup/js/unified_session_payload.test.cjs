@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 import { mergeSessionSources } from "./unified_session.cjs";
-import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
+import { generatePlainTextSummary, generateCopilotCliStyleSummary, convertCopilotEventsToLegacyLogEntries } from "./log_parser_shared.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
 import { normalizeCodexSession } from "./codex_session.cjs";
 import { normalizeClaudeSession } from "./claude_session.cjs";
@@ -14,6 +14,88 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it("retains declared partial-input and per-step usage evidence", () => {
+    const events = [
+      { type: "tool.execution_start", data: { sessionId: "session", stepIndex: 0, toolName: "bash", input: { command: "preview..." }, inputTruncated: true } },
+      { type: "usage.report", data: { sessionId: "session", stepIndex: 0, usage: { input_tokens: 0, cache_read_input_tokens: 1 } } },
+      { type: "tool.execution_complete", data: { sessionId: "session", stepIndex: 0, status: "declined", exitCode: null } },
+    ];
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "steps.jsonl", events }]);
+    expect(unified[0].data).toEqual(events[0].data);
+    expect(unified[1].data).toEqual({ sessionId: "session", stepIndex: 0, usage: { inputTokens: 0, cacheReadInputTokens: 1 } });
+    expect(unified[2].data).toEqual(events[2].data);
+    for (const [kind, trace] of [
+      ["agent", events],
+      ["unified", unified],
+    ]) {
+      const validate = createSessionValidator(kind).event;
+      for (const event of trace) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    }
+  });
+
+  it("preserves native step correlation without fabricating stored tool identifiers", () => {
+    const events = [
+      { type: "tool.execution_start", data: { sessionId: "session", stepIndex: 0, toolName: "lookup", input: "first" } },
+      { type: "tool.execution_start", data: { sessionId: "session", stepIndex: 1, toolName: "lookup", input: "second" } },
+      { type: "tool.execution_complete", data: { sessionId: "session", stepIndex: 1, toolName: "lookup", output: "second result", success: true } },
+      { type: "tool.execution_complete", data: { sessionId: "session", stepIndex: 0, toolName: "lookup", output: "first result", success: false } },
+    ];
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "steps.jsonl", events }]);
+    expect(unified.map(event => event.data.stepIndex)).toEqual([0, 1, 1, 0]);
+    expect(unified.every(event => !Object.hasOwn(event.data, "toolCallId"))).toBe(true);
+    const display = convertCopilotEventsToLegacyLogEntries(unified);
+    expect(display[2].message.content[0].tool_use_id).toBe(display[1].message.content[0].id);
+    expect(display[3].message.content[0].tool_use_id).toBe(display[0].message.content[0].id);
+    const validate = createSessionValidator("unified").event;
+    for (const event of unified) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it("retains diagnostic severity and refusal correlation without duplicate native envelopes", () => {
+    const events = [
+      { type: "session.error", agentId: "child", parentToolCallId: "parent", data: { severity: "warning", status: "warning", code: 0, error: null, message: "", content: "exact\n", sourceType: "error", opaque: "omit" } },
+      {
+        type: "assistant.refusal",
+        agentId: "child",
+        data: { reason: "refusal", content: "exact\n", messageId: "message", model: "model", apiCallId: "request", interactionId: "interaction", turnId: "turn", parentToolCallId: null, opaque: "omit" },
+      },
+      { type: "mcp.event", data: { event: "extension_start_failure", serverName: "github", status: "error", opaque: "omit" } },
+    ];
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "diagnostics.jsonl", events }]);
+    expect(unified[0].data).toEqual({ severity: "warning", status: "warning", code: 0, error: null, message: "", content: "exact\n", sourceType: "error", agentId: "child", parentToolCallId: "parent" });
+    expect(unified[1].data).toEqual({ reason: "refusal", content: "exact\n", messageId: "message", model: "model", apiCallId: "request", interactionId: "interaction", turnId: "turn", parentToolCallId: null, agentId: "child" });
+    expect(unified[2].data).toEqual({ event: "extension_start_failure", serverName: "github", status: "error" });
+    const validate = createSessionValidator("unified").event;
+    for (const event of unified) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it("compacts Copilot terminal transport observations without repeating accounting or textual answers", () => {
+    const events = [
+      {
+        type: "session.shutdown",
+        data: {
+          shutdownType: "error",
+          errorReason: "interrupted",
+          totalPremiumRequests: 0,
+          totalNanoAiu: 0,
+          totalApiDurationMs: 0,
+          sessionStartTime: 0,
+          currentModel: "model",
+          modelMetrics: { duplicated: true },
+          tokenDetails: { duplicated: true },
+          codeChanges: { duplicated: true },
+        },
+      },
+      { type: "session.task_complete", data: { success: false, summary: "already mapped answer\n" } },
+      { type: "session.task_complete", data: { success: true, summary: null } },
+    ];
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "copilot.jsonl", events }]);
+    expect(unified[0].data).toEqual({ shutdownType: "error", errorReason: "interrupted", premiumRequests: 0, totalNanoAiu: 0, totalApiDurationMs: 0, sessionStartTime: 0, currentModel: "model" });
+    expect(unified[1].data).toEqual({ success: false });
+    expect(unified[2].data).toEqual({ success: true, summary: null });
+    const validate = createSessionValidator("unified").event;
+    for (const event of unified) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+  });
+
   it("preserves completion-only dynamic workflow launch metadata without a tool start", () => {
     const record = dynamicWorkflow.find(record => record.tool_use_result);
     const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "partial.jsonl", events: normalizeClaudeSession([record]) }]);
@@ -150,6 +232,7 @@ describe("essential unified session payloads", () => {
     ["tool.execution_start", { toolCallId: "call", parameters: false, input: 0, command: "", text: "duplicate" }, { toolCallId: "call", input: 0, command: "" }],
     ["tool.execution_start", { toolName: "bash", arguments: { command: "cat restricted-file" } }, { toolName: "bash", input: { command: "cat restricted-file" } }],
     ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, isError: true, durationMs: 0, exitCode: 1 }],
+    ["tool.execution_complete", { toolCallId: "declined", status: "declined", exit_code: null }, { toolCallId: "declined", status: "declined", exitCode: null }],
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
     ["firewall.http_access", { domain: "example.com", http_status: 0, squid_request_status: "DENIED", credentials: "omit" }, { host: "example.com", status: 0, decision: "DENIED" }],
     ["firewall.steering", { eventName: "token_steering", message: "budget warning", reason: null, body: "omit" }, { event: "token_steering", message: "budget warning", reason: null }],
