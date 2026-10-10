@@ -10,6 +10,7 @@
     "work-queue-policy": {
       "description": "Deprecated legacy version-3 Policy proposal. Use scheduling-only work_queue in .github/workflows/aw.json and AW-approved dispatch targets. Cannot be combined with repository work_queue settings. Installed Policy remains authoritative and historical ledgers remain readable.",
       "deprecated": true,
+      "x-deprecation-message": "Move scheduling configuration to the repository-level work_queue in .github/workflows/aw.json and retain only AW-approved dispatch targets in the workflow. Installed Policies remain authoritative and historical ledgers remain readable.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
