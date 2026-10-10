@@ -178,28 +178,42 @@ jobs:
           Copy-Item -Path $binary -Destination (Join-Path $parenDir "gh-aw.exe") -Force
           Copy-Item -Path $binary -Destination (Join-Path $toolcacheDir "gh-aw.exe") -Force
 
-          $scenarioMatrix = @(
-            @{ name = "pwsh-default/direct/default/default"; shell = "pwsh-default"; launch = "direct"; env = "default"; path = "default" },
-            @{ name = "pwsh-noprofile/direct/default/default"; shell = "pwsh-noprofile"; launch = "direct"; env = "default"; path = "default" },
-            @{ name = "powershell-default/direct/default/default"; shell = "powershell-default"; launch = "direct"; env = "default"; path = "default" },
-            @{ name = "powershell-noprofile/direct/default/default"; shell = "powershell-noprofile"; launch = "direct"; env = "default"; path = "default" },
-            @{ name = "cmd/direct/default/default"; shell = "cmd"; launch = "direct"; env = "default"; path = "default" },
-            @{ name = "pwsh-default/path/default/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "default"; path = "workspace-first" },
-            @{ name = "pwsh-noprofile/path/default/workspace-first"; shell = "pwsh-noprofile"; launch = "path"; env = "default"; path = "workspace-first" },
-            @{ name = "powershell-default/path/default/workspace-first"; shell = "powershell-default"; launch = "path"; env = "default"; path = "workspace-first" },
-            @{ name = "powershell-noprofile/path/default/workspace-first"; shell = "powershell-noprofile"; launch = "path"; env = "default"; path = "workspace-first" },
-            @{ name = "cmd/path/default/toolcache-first"; shell = "cmd"; launch = "path"; env = "default"; path = "toolcache-first" },
-            @{ name = "pwsh-default/path/default/toolcache-first"; shell = "pwsh-default"; launch = "path"; env = "default"; path = "toolcache-first" },
-            @{ name = "pwsh-noprofile/path/default/toolcache-first"; shell = "pwsh-noprofile"; launch = "path"; env = "default"; path = "toolcache-first" },
-            @{ name = "powershell-default/path/default/toolcache-first"; shell = "powershell-default"; launch = "path"; env = "default"; path = "toolcache-first" },
-            @{ name = "powershell-noprofile/path/default/toolcache-first"; shell = "powershell-noprofile"; launch = "path"; env = "default"; path = "toolcache-first" },
-            @{ name = "pwsh-default/path/default/duplicate-workspace"; shell = "pwsh-default"; launch = "path"; env = "default"; path = "duplicate-workspace" },
-            @{ name = "pwsh-default/path/no-color/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "no-color"; path = "workspace-first" },
-            @{ name = "pwsh-default/path/term-dumb/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "term-dumb"; path = "workspace-first" },
-            @{ name = "pwsh-default/path/term-unset/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "term-unset"; path = "workspace-first" },
-            @{ name = "pwsh-default/path/ci-true/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "ci-true"; path = "workspace-first" },
-            @{ name = "pwsh-default/path/ci-unset/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "ci-unset"; path = "workspace-first" }
-          )
+          # Declared coverage dimensions. The matrix below is generated from these
+          # arrays (not hand-picked) so every shell is exercised directly and via
+          # PATH resolution, and every env-shape/path-style pair is exercised at
+          # least once. A full cross product (shells x launch x env x path) would
+          # be 240+ scenarios and risk the integration job's timeout, so growth is
+          # additive across dimension pairs rather than multiplicative across all
+          # four: shell coverage is paired with launch-mode, and env-shape coverage
+          # is paired with path-style via one representative shell/launch.
+          $shells = @("pwsh-default", "pwsh-noprofile", "powershell-default", "powershell-noprofile", "cmd")
+          $launchModes = @("direct", "path")
+          $envShapes = @("default", "no-color", "term-dumb", "term-unset", "ci-true", "ci-unset")
+          $pathStyles = @("default", "workspace-first", "toolcache-first", "duplicate-workspace")
+          $representativeShell = "pwsh-noprofile"
+
+          $scenarioMatrix = [System.Collections.Generic.List[hashtable]]::new()
+
+          # Dimension pair 1: shell x launch-mode, every shell exercised both as a
+          # direct invocation and resolved via PATH.
+          foreach ($shell in $shells) {
+            foreach ($launch in $launchModes) {
+              $path = if ($launch -eq "path") { "workspace-first" } else { "default" }
+              $scenarioMatrix.Add(@{ name = "$shell/$launch/default/$path"; shell = $shell; launch = $launch; env = "default"; path = $path })
+            }
+          }
+
+          # Dimension pair 2: env-shape x path-style, every environment variant
+          # exercised across every PATH arrangement via a fixed representative
+          # shell/launch (already covered above for env=default/path=default).
+          foreach ($env in $envShapes) {
+            foreach ($path in $pathStyles) {
+              if ($env -eq "default" -and $path -eq "default") { continue }
+              $scenarioMatrix.Add(@{ name = "$representativeShell/path/$env/$path"; shell = $representativeShell; launch = "path"; env = $env; path = $path })
+            }
+          }
+
+          Add-Content $env:GITHUB_STEP_SUMMARY "Generated $($scenarioMatrix.Count) scenarios from $($shells.Count) shells x $($launchModes.Count) launch modes x $($envShapes.Count) env shapes x $($pathStyles.Count) path styles"
 
           foreach ($scenario in $scenarioMatrix) {
             $env:PATH = $originalPath
@@ -222,45 +236,49 @@ jobs:
               default {}
             }
 
-            if ($scenario.launch -eq "path") {
-              $whereResult = Invoke-CliProcess -FilePath "cmd" -ArgumentList @("/d", "/s", "/c", "where gh-aw") -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars
-              $firstResolved = ($whereResult.Output -split "`r?`n" | Where-Object { $_ -match "gh-aw\.exe$" } | Select-Object -First 1)
-              $expectedPathDirectory = if ($scenario.path -eq "toolcache-first") { $toolcacheDir } else { $workspace }
-              $expectedExecutable = Join-Path $expectedPathDirectory "gh-aw.exe"
-              if (-not [System.String]::Equals($firstResolved, $expectedExecutable, [System.StringComparison]::OrdinalIgnoreCase)) {
-                throw "PATH resolution mismatch for '$($scenario.name)': $firstResolved"
-              }
-            }
-
-            switch ($scenario.shell) {
-              "pwsh-default" {
-                $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
-                Invoke-CliProcess -FilePath "pwsh" -ArgumentList @("-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
-              }
-              "pwsh-noprofile" {
-                $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
-                Invoke-CliProcess -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
-              }
-              "powershell-default" {
-                $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
-                Invoke-CliProcess -FilePath "powershell" -ArgumentList @("-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
-              }
-              "powershell-noprofile" {
-                $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
-                Invoke-CliProcess -FilePath "powershell" -ArgumentList @("-NoProfile", "-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
-              }
-              "cmd" {
-                if ($scenario.launch -eq "path") {
-                  Invoke-CliProcess -FilePath "cmd" -ArgumentList @("/d", "/s", "/c", "gh-aw --help") -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
-                } else {
-                  # Use RawArguments to bypass .NET's \"..\" quoting which conflicts with cmd.exe's ""..""
-                  # syntax. The outer "" pair is stripped by cmd /s, leaving "path\exe.exe" --help.
-                  Invoke-CliProcess -FilePath "cmd" -RawArguments "/d /s /c `"`"$binary`" --help`"" -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
+            try {
+              if ($scenario.launch -eq "path") {
+                $whereResult = Invoke-CliProcess -FilePath "cmd" -ArgumentList @("/d", "/s", "/c", "where gh-aw") -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars
+                $firstResolved = ($whereResult.Output -split "`r?`n" | Where-Object { $_ -match "gh-aw\.exe$" } | Select-Object -First 1)
+                $expectedPathDirectory = if ($scenario.path -eq "toolcache-first") { $toolcacheDir } else { $workspace }
+                $expectedExecutable = Join-Path $expectedPathDirectory "gh-aw.exe"
+                if (-not [System.String]::Equals($firstResolved, $expectedExecutable, [System.StringComparison]::OrdinalIgnoreCase)) {
+                  throw "PATH resolution mismatch: $firstResolved"
                 }
               }
-              default {
-                throw "Unknown shell scenario: $($scenario.shell)"
+
+              switch ($scenario.shell) {
+                "pwsh-default" {
+                  $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
+                  Invoke-CliProcess -FilePath "pwsh" -ArgumentList @("-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
+                }
+                "pwsh-noprofile" {
+                  $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
+                  Invoke-CliProcess -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
+                }
+                "powershell-default" {
+                  $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
+                  Invoke-CliProcess -FilePath "powershell" -ArgumentList @("-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
+                }
+                "powershell-noprofile" {
+                  $cmd = if ($scenario.launch -eq "path") { "& gh-aw --help" } else { "& '$binary' --help" }
+                  Invoke-CliProcess -FilePath "powershell" -ArgumentList @("-NoProfile", "-Command", $cmd) -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
+                }
+                "cmd" {
+                  if ($scenario.launch -eq "path") {
+                    Invoke-CliProcess -FilePath "cmd" -ArgumentList @("/d", "/s", "/c", "gh-aw --help") -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
+                  } else {
+                    # Use RawArguments to bypass .NET's \"..\" quoting which conflicts with cmd.exe's ""..""
+                    # syntax. The outer "" pair is stripped by cmd /s, leaving "path\exe.exe" --help.
+                    Invoke-CliProcess -FilePath "cmd" -RawArguments "/d /s /c `"`"$binary`" --help`"" -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars -AssertNoAnsi:$assertNoAnsi | Out-Null
+                  }
+                }
+                default {
+                  throw "Unknown shell scenario: $($scenario.shell)"
+                }
               }
+            } catch {
+              throw "Scenario '$($scenario.name)' failed: $($_.Exception.Message)"
             }
 
             Add-Content $env:GITHUB_STEP_SUMMARY "✅ Matrix scenario passed: $($scenario.name)"
@@ -631,6 +649,9 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      # Scoped to this job only (build/integration stay contents:read) and used
+      # solely by the failure-issue step below to dedupe/create a tracking issue.
+      issues: write
     steps:
       - name: Evaluate outcomes
         id: evaluate
@@ -643,6 +664,7 @@ jobs:
           if [[ "$INTEGRATION" != "success" ]]; then FAILED="${FAILED:+$FAILED, }integration($INTEGRATION)"; fi
           if [[ -n "$FAILED" ]]; then
             echo "failed=true" >> "$GITHUB_OUTPUT"
+            echo "failed_jobs=$FAILED" >> "$GITHUB_OUTPUT"
             RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             {
               echo "❌ Failed jobs: $FAILED"
@@ -652,6 +674,40 @@ jobs:
           else
             echo "failed=false" >> "$GITHUB_OUTPUT"
             echo "✅ All Windows integration jobs passed" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Minimal-permission failure reporting: only this step (and only on failure)
+      # uses issues:write. Reuses an existing open tracking issue when one exists
+      # so repeated scheduled failures don't spam new issues (see #66441).
+      - name: Create or update failure issue
+        if: steps.evaluate.outputs.failed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAILED_JOBS: ${{ steps.evaluate.outputs.failed_jobs }}
+        run: |
+          set -euo pipefail
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          TITLE="❌ Windows CLI integration failing"
+          BODY=$(cat <<EOF
+          ## Windows CLI Integration Failure
+
+          **Failed jobs:** ${FAILED_JOBS}
+
+          **Run:** [${GITHUB_RUN_ID}](${RUN_URL})
+
+          **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          This issue was created automatically by the daily Windows CLI integration workflow and is reused for subsequent failures until closed.
+          EOF
+          )
+
+          EXISTING=$(gh issue list --repo "${GITHUB_REPOSITORY}" --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number // empty')
+          if [[ -n "$EXISTING" ]]; then
+            gh issue comment "$EXISTING" --repo "${GITHUB_REPOSITORY}" --body "$BODY"
+            echo "🔁 Updated existing tracking issue #${EXISTING}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            NEW_URL=$(gh issue create --repo "${GITHUB_REPOSITORY}" --title "$TITLE" --body "$BODY" --label "bug")
+            echo "🆕 Created tracking issue: ${NEW_URL}" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Fail if any job failed
