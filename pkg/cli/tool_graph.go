@@ -64,7 +64,7 @@ func (g *ToolGraph) AddSequence(tools []string) {
 func (g *ToolGraph) GenerateMermaidGraph() string {
 	if len(g.Tools) == 0 {
 		toolGraphLog.Print("No tool calls found for Mermaid graph generation")
-		return console.FormatInfoMessage("No tool calls found")
+		return console.FormatInfoMessageStdout("No tool calls found")
 	}
 
 	toolGraphLog.Printf("Generating Mermaid graph: tools=%d, transitions=%d", len(g.Tools), len(g.Transitions))

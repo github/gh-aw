@@ -202,11 +202,11 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	// Update dispatcher skill
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false, write); err != nil {
 		fixLog.Printf("Failed to update dispatcher skill: %v", err)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update dispatcher skill: %v", err)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to update dispatcher skill: %v", err)))
 	}
 	if err := ensureAgenticWorkflowsAgent(verbose, write); err != nil {
 		fixLog.Printf("Failed to update agentic workflows custom agent: %v", err)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update agentic workflows custom agent: %v", err)))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to update agentic workflows custom agent: %v", err)))
 	}
 
 	// Delete old template files from pkg/cli/templates/ (only with --write)
@@ -214,7 +214,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 		fixLog.Print("Cleaning up old template files")
 		if err := deleteOldTemplateFiles(verbose); err != nil {
 			fixLog.Printf("Failed to delete old template files: %v", err)
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to delete old template files: %v", err)))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to delete old template files: %v", err)))
 		}
 	}
 
@@ -223,7 +223,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 		fixLog.Print("Deleting old agent files")
 		if err := deleteLegacyAgentFiles(verbose); err != nil {
 			fixLog.Printf("Failed to delete old agent files: %v", err)
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to delete old agent files: %v", err)))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to delete old agent files: %v", err)))
 		}
 	}
 
@@ -234,7 +234,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 		if write {
 			if err := os.Remove(schemaPath); err != nil {
 				fixLog.Printf("Failed to delete schema file: %v", err)
-				fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to delete deprecated schema file: %v", err)))
+				fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Failed to delete deprecated schema file: %v", err)))
 			} else {
 				fixLog.Print("Deleted deprecated schema file")
 				if verbose {
@@ -250,9 +250,9 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	fmt.Fprintln(os.Stderr, "")
 	if write {
 		if totalFixed > 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessage(fmt.Sprintf("✓ Fixed %d of %d workflow files", totalFixed, totalFiles)))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatSuccessMessage(fmt.Sprintf("Fixed %d of %d workflow files", totalFixed, totalFiles)))
 		} else if totalGuidedErrors == 0 && totalProcessingErrors == 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("✓ No fixes needed"))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("No fixes needed"))
 		}
 	} else {
 		if totalFixed > 0 {
@@ -270,7 +270,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 				fmt.Fprintf(os.Stderr, "  gh aw fix %s --write\n", strings.TrimSuffix(wf.File, ".md"))
 			}
 		} else if totalGuidedErrors == 0 && totalProcessingErrors == 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("✓ No workflow fixes needed"))
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("No workflow fixes needed"))
 		}
 	}
 
@@ -372,7 +372,7 @@ func processWorkflowFileWithInfo(filePath string, codemods []Codemod, write bool
 			fmt.Fprintf(os.Stderr, "    • %s\n", codemodName)
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage("⚠ "+fileName))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(""+fileName))
 		for _, codemodName := range appliedCodemods {
 			fmt.Fprintf(os.Stderr, "    • %s\n", codemodName)
 		}

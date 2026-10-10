@@ -19,6 +19,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
 	"github.com/github/gh-aw/pkg/linters/bytescomparestring"
 	"github.com/github/gh-aw/pkg/linters/closeerrorunchecked"
+	"github.com/github/gh-aw/pkg/linters/consolestderr"
 	"github.com/github/gh-aw/pkg/linters/contextcancelnotdeferred"
 	"github.com/github/gh-aw/pkg/linters/ctxbackground"
 	"github.com/github/gh-aw/pkg/linters/deferinloop"
@@ -103,7 +104,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 77 analyzer
+// "Public API > Subpackages" table. The README documents 78 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -126,6 +127,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"bytesbufferstring", bytesbufferstring.Analyzer},
 		{"bytescomparestring", bytescomparestring.Analyzer},
 		{"closeerrorunchecked", closeerrorunchecked.Analyzer},
+		{"consolestderr", consolestderr.Analyzer},
 		{"contextcancelnotdeferred", contextcancelnotdeferred.Analyzer},
 		{"ctxbackground", ctxbackground.Analyzer},
 		{"deferinloop", deferinloop.Analyzer},

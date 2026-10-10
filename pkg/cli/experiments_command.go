@@ -166,7 +166,9 @@ func RunExperimentsList(config ExperimentsListConfig) error {
 	} else {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Found %d experiment workflows", count)))
 	}
-	fmt.Fprint(os.Stderr, console.RenderStruct(experiments))
+	fmt.Fprint(os.Stderr, console.RenderStructWithOptions(experiments, console.RenderOptions{
+		Stderr: true, MaxWidth: console.DefaultTableWidth,
+	}))
 
 	return nil
 }

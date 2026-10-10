@@ -88,7 +88,7 @@ func CheckSecurityAdvisories(ctx context.Context, verbose bool) ([]SecurityAdvis
 // DisplaySecurityAdvisories shows security advisories in a formatted output
 func DisplaySecurityAdvisories(advisories []SecurityAdvisory) {
 	if len(advisories) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✅ No known security vulnerabilities"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("No known security vulnerabilities"))
 		return
 	}
 

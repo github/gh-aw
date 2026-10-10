@@ -14,6 +14,18 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each([401, 503, 0, null])("retains observed session-error status codes through projection and schema validation (%s)", statusCode => {
+    const source = { type: "session.error", data: { errorType: "provider", message: "Observed failure.", statusCode, opaque: "PRIVATE_ERROR_CONTEXT" } };
+    const original = structuredClone(source);
+    const [event] = mergeSessionSources([{ component: "agent", phase: "agent", path: "errors.jsonl", events: [source] }]);
+    expect(event.data).toEqual({ errorType: "provider", message: "Observed failure.", statusCode });
+    expect(normalizeUnifiedSessionEvent(event).data).toEqual(event.data);
+    const validate = createSessionValidator("unified").event;
+    expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    expect(normalizeUnifiedSessionEvent({ type: "session.error", data: { message: "No status observed." } }).data).not.toHaveProperty("statusCode");
+    expect(source).toEqual(original);
+  });
+
   it("retains declared partial-input and per-step usage evidence", () => {
     const events = [
       { type: "tool.execution_start", data: { sessionId: "session", stepIndex: 0, toolName: "bash", input: { command: "preview..." }, inputTruncated: true } },
@@ -66,6 +78,24 @@ describe("essential unified session payloads", () => {
     expect(unified[2].data).toEqual({ event: "extension_start_failure", serverName: "github", status: "error" });
     const validate = createSessionValidator("unified").event;
     for (const event of unified) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it.each([
+    [{ data: { parentToolCallId: "parent" } }, { parentToolCallId: "parent" }],
+    [{ parentToolCallId: "parent", data: {} }, { parentToolCallId: "parent" }],
+    [{ data: { parentToolCallId: null } }, { parentToolCallId: null }],
+    [{ data: { parentToolCallId: "parent", parentToolUseId: "observed-parent" } }, { parentToolCallId: "parent", parentToolUseId: "observed-parent" }],
+    [{ data: { parent_tool_use_id: "parent" } }, { parentToolUseId: "parent" }],
+    [{ data: { parentToolCallId: "parent", parentToolUseId: null } }, { parentToolCallId: "parent", parentToolUseId: null }],
+  ])("retains observed parent identities without a derived duplicate: %j", (scope, expected) => {
+    const event = { type: "session.error", ...scope, data: { message: "exact\n", statusCode: 401, ...scope.data } };
+    const projected = normalizeUnifiedSessionEvent(event);
+    expect(projected.data).toEqual({ message: "exact\n", statusCode: 401, ...expected });
+    expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+    const validate = createSessionValidator("unified").event;
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "diagnostics.jsonl", events: [event] }]);
+    expect(validate(unified[0]), JSON.stringify(validate.errors)).toBe(true);
+    expect(event.data).toEqual({ message: "exact\n", statusCode: 401, ...scope.data });
   });
 
   it("compacts Copilot terminal transport observations without repeating accounting or textual answers", () => {

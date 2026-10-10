@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureSecureDirectory, writeFileSecure } from "../.github/scripts/secure_write.cjs";
 
 const marker = "<!-- gh-aw-pr-sous-chef-nudge -->";
 const statePattern = /Sous-chef state: ([a-f0-9]{64})/;
@@ -458,8 +459,8 @@ function main() {
     return;
   }
   const directory = process.env.PR_SOUS_CHEF_OUTPUT_DIR ?? "/tmp/gh-aw/agent";
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(`${directory}/pr-sous-chef-candidates-compact.json`, JSON.stringify(output));
+  ensureSecureDirectory(directory);
+  writeFileSecure(`${directory}/pr-sous-chef-candidates-compact.json`, JSON.stringify(output));
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, `eligible_count=${output.prs.length}\neligible_pull_request_numbers=${JSON.stringify(output.prs.map(pr => String(pr.number)))}\nrate_limit_low=${output.rate_limit.low}\n`);
   }

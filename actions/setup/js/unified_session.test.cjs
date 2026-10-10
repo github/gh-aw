@@ -38,6 +38,32 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it.each([
+    { engine: "copilot", metadata: undefined, restricted: false },
+    { engine: "custom", metadata: undefined, restricted: false },
+    { engine: undefined, metadata: undefined, restricted: false },
+    { engine: "aider", metadata: undefined, restricted: true },
+    { engine: undefined, metadata: "aider", restricted: true },
+    { engine: undefined, metadata: "copilot", restricted: false },
+    { engine: "copilot", metadata: "aider", restricted: false },
+  ])("selects raw Aider diagnostic policy only from trusted caller or runner context: %j", ({ engine, metadata, restricted }) => {
+    const nativeError = { type: "session.error", data: { sourceEngine: "aider", code: 400, errorType: "NativeError", message: "genuine provider failure" } };
+    write("agent-session.jsonl", [{ type: "assistant.message", data: { sourceEngine: "aider", content: "observed answer" } }, nativeError]);
+    write("agent-stdio.log", JSON.stringify({ type: "session.error", data: { sourceEngine: "copilot", code: 429, errorType: "ProviderError", message: "CAPIError: 429 Too Many Requests" } }));
+    write("agent_execution_exit_code.txt", "0\n");
+    if (metadata !== undefined) write("aw_info.json", { engine_id: metadata });
+    const events = collectUnifiedSession({ rootDir: root, engine, warn() {} }).events;
+    const execution = events.find(event => event.type === "agent.execution");
+    expect(execution.data).toEqual({
+      categories: restricted ? [] : ["capi_quota_exceeded_error"],
+      errorCodes: restricted ? [400] : [400, 429],
+      errorTypes: restricted ? ["NativeError"] : ["NativeError", "ProviderError"],
+      exitCode: 0,
+    });
+    expect(events.find(event => event.type === "assistant.message").data.content).toBe("observed answer");
+    expect(events.find(event => event.type === "session.error").data).toEqual(normalizeUnifiedSessionEvent(nativeError).data);
+  });
+
   it("persists Claude workflow launch and lifecycle projections without scripts, prompts, or duplicate parent usage", () => {
     write("agent-stdio.log", dynamicWorkflow.map(JSON.stringify).join("\n"));
     const events = writeUnifiedSession({ rootDir: root, engine: "claude" });

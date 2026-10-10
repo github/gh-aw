@@ -112,6 +112,7 @@
                 "message": { "$ref": "#/definitions/JsonValue" },
                 "content": { "$ref": "#/definitions/JsonValue" },
                 "code": { "$ref": "#/definitions/JsonValue" },
+                "statusCode": { "$ref": "#/definitions/JsonValue" },
                 "errorType": { "$ref": "#/definitions/JsonValue" },
                 "model": { "$ref": "#/definitions/JsonValue" },
                 "severity": { "$ref": "#/definitions/JsonValue" },

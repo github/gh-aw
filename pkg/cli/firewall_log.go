@@ -94,7 +94,7 @@ var (
 //
 // # Output Examples
 //
-// Console output (via console.RenderStruct):
+// Console output (via console.RenderStructStdout):
 //   🔥 Firewall Log Analysis
 //   Total Requests : 4
 //   Allowed        : 2

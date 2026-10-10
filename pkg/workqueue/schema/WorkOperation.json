@@ -18,6 +18,10 @@
         }
       ]
     },
+    "Digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
     "Identity": {
       "maxLength": 256,
       "minLength": 1,
@@ -127,6 +131,10 @@
       "required": ["kind", "host", "repository", "repository_id", "resource_id", "number"],
       "type": "object"
     },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
     "Timestamp": {
       "maximum": 9007199254740991,
       "minimum": 0,
@@ -164,6 +172,9 @@
         "enqueued": {
           "$ref": "#/$defs/Timestamp"
         },
+        "execution_ref": {
+          "$ref": "#/$defs/Revision"
+        },
         "fairness_key": {
           "maxLength": 128,
           "type": "string"
@@ -173,6 +184,9 @@
         },
         "kind": {
           "const": "Work"
+        },
+        "logical_contract": {
+          "$ref": "#/$defs/Digest"
         },
         "node_key": {
           "$ref": "#/$defs/Identity"

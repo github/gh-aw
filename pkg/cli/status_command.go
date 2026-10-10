@@ -292,7 +292,7 @@ func StatusWorkflows(ctx context.Context, pattern string, verbose bool, jsonOutp
 	}
 
 	// Render the table using struct-based rendering
-	fmt.Fprint(os.Stdout, console.RenderStruct(statuses))
+	fmt.Fprint(os.Stdout, console.RenderStructStdout(statuses))
 	if verbose {
 		if dependenciesTree := renderWorkflowDependencyTree(statuses); dependenciesTree != "" {
 			fmt.Fprintln(os.Stderr)

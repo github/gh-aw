@@ -50,6 +50,10 @@ engine:
       env:
         KIRO_LOG_NO_COLOR: "1"
         NO_COLOR: "1"
+    log-parser: |
+      function parseLog(logContent) {
+        return require("./parse_kiro_log.cjs").parseKiroLog(logContent);
+      }
     mcp:
       config-path: .kiro/settings/mcp.json
       config-adapter: |
@@ -268,4 +272,29 @@ verification, process failures, and cleanup. These diagnostics do not print
 API keys, MCP headers, configuration contents, or prompt contents. For Kiro's
 own verbose CLI logging, add `--verbose` to `behaviors.execution.args` in this
 shared definition when investigating a runtime failure.
+
+The parser supports the older `> ` conversation layout and Kiro CLI 2.27's
+`[tool]` announcements/statuses with buffered assistant answers. It writes
+canonical `agent-session.jsonl`; conclusion projects that trace into
+`usage/aw_session.jsonl`. The observed 200-byte command previews ending in `...`
+are marked `inputTruncated: true`, not reconstructed as complete arguments.
+Concurrent and orphan statuses
+remain anonymous because stdout supplies no tool-call IDs. `Failed` is an
+explicit tool failure; `Completed` establishes completion but does not supply
+an exit code or independently verified success. Elapsed time, natural-language
+claims, and credit summaries do not become token, USD, or turn accounting.
+Harness execution errors become failed session results only when the final
+adjacent error/cleanup diagnostics agree with the runner's nonzero exit.
+An error-looking line in a prompt, command, tool output, or assistant answer
+does not establish a session failure; incomplete trailers remain uncorroborated.
+
+Sanitized regression excerpts in `actions/setup/js/fixtures/kiro_ci_sessions.cjs`
+come from existing Smoke Kiro runs
+[37862725262](https://github.com/github/gh-aw/actions/runs/37862725262) and
+[37549851664](https://github.com/github/gh-aw/actions/runs/37549851664).
+Both Kiro processes exited zero; the second workflow failed during log
+redaction, not engine execution. The sampled stdout does not expose structured
+user prompts, reasoning, provider refusals, tool outputs, or token usage.
+Synthetic partial/error and canonical round-trip cases are labeled separately
+and do not claim live coverage for those fields.
 -->

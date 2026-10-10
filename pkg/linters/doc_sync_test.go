@@ -121,7 +121,7 @@ func TestCIEnforcedLintersMatchRegistry(t *testing.T) {
 	require.NoError(t, err, "cgo.yml must be present")
 
 	flagMatches := linterFlagsRe.FindAllStringSubmatch(string(workflowBytes), -1)
-	require.Len(t, flagMatches, 2, "cgo.yml must define native and wasm LINTER_FLAGS values")
+	require.Len(t, flagMatches, 3, "cgo.yml must define native, console-stream, and wasm LINTER_FLAGS values")
 
 	enforced := make(map[string]struct{})
 	for _, match := range flagMatches {

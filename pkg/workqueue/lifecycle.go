@@ -161,9 +161,13 @@ func authorizeWorkerQueueRequest(state Projection, actor Actor, request Request)
 
 func evidenceFits(state Projection, dispatch *DispatchState, evidence Evidence, at int64) error {
 	profile := dispatch.Profile
+	principal := DispatchPrincipal(dispatch)
 	if evidence.Repository == "" || evidence.Repository != state.Requests[dispatch.RequestID].Actor.Repository ||
 		evidence.Workflow != profile.Workflow || evidence.Ref != profile.Ref ||
-		evidence.Principal != profile.Principal || evidence.CheckedAt > at ||
+		!decimalIdentity(evidence.Principal) ||
+		(principal != "" && evidence.Principal != principal) ||
+		(principal == "" && (state.Policy.Authorization != "aw" || dispatch.State != "reserved" || evidence.Kind != "prelaunch")) ||
+		evidence.CheckedAt > at ||
 		evidence.CheckedAt < 0 {
 		return queueError("evidence_invalid", "evidence does not match approved execution scope")
 	}
@@ -418,12 +422,13 @@ func (state Projection) reprioritizeWork(op Operation) error {
 }
 
 type dispatchLifecycle struct {
-	DispatchID string      `json:"dispatch_id"`
-	State      string      `json:"state"`
-	Sender     *Actor      `json:"sender"`
-	Run        *RunBinding `json:"run"`
-	Evidence   *Evidence   `json:"evidence"`
-	Reason     string      `json:"reason"`
+	DispatchID          string      `json:"dispatch_id"`
+	State               string      `json:"state"`
+	Sender              *Actor      `json:"sender"`
+	CredentialPrincipal string      `json:"credential_principal"`
+	Run                 *RunBinding `json:"run"`
+	Evidence            *Evidence   `json:"evidence"`
+	Reason              string      `json:"reason"`
 }
 
 func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
@@ -446,6 +451,9 @@ func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
 }
 
 func (state Projection) applyDispatchState(dispatch *DispatchState, lifecycle dispatchLifecycle, commit QueueCommit) error {
+	if lifecycle.State != "started" && lifecycle.CredentialPrincipal != "" {
+		return queueError("run_binding_conflict", "dispatch credential principal is immutable after launch")
+	}
 	switch lifecycle.State {
 	case "started":
 		if state.GrantsPaused {
@@ -457,7 +465,15 @@ func (state Projection) applyDispatchState(dispatch *DispatchState, lifecycle di
 			commit.Actor.RunAttempt < 1 || lifecycle.Run != nil || lifecycle.Evidence != nil {
 			return queueError("launch_started", "only one authenticated sender may record a start marker")
 		}
+		if dispatch.Profile.Principal == "" {
+			if state.Policy.Authorization != "aw" || !decimalIdentity(lifecycle.CredentialPrincipal) {
+				return queueError("run_binding_conflict", "AW launch requires the selected credential principal")
+			}
+		} else if lifecycle.CredentialPrincipal != "" && lifecycle.CredentialPrincipal != dispatch.Profile.Principal {
+			return queueError("run_binding_conflict", "selected credential principal differs from approved profile")
+		}
 		dispatch.State, dispatch.Sender = "started", lifecycle.Sender
+		dispatch.CredentialPrincipal = lifecycle.CredentialPrincipal
 	case "bound":
 		return state.bindDispatch(dispatch, lifecycle, commit)
 	case "uncertain", "unresolved":
@@ -469,6 +485,9 @@ func (state Projection) applyDispatchState(dispatch *DispatchState, lifecycle di
 			if lifecycle.Evidence == nil || lifecycle.Evidence.Kind != "reconciliation" ||
 				lifecycle.Evidence.Attempts < state.Policy.Pools[dispatch.Pool].Reconciliation.MaxAttempts {
 				return queueError("reconciliation_invalid", "unresolved requires bounded reconciliation exhaustion")
+			}
+			if err := evidenceFits(state, dispatch, *lifecycle.Evidence, commit.At); err != nil {
+				return err
 			}
 		}
 		dispatch.State, dispatch.Reason = lifecycle.State, lifecycle.Reason
@@ -496,7 +515,7 @@ func (state Projection) bindDispatch(dispatch *DispatchState, lifecycle dispatch
 	run := lifecycle.Run
 	if !decimalIdentity(run.RunID) || run.RunAttempt != 1 || run.Event != "workflow_dispatch" ||
 		run.Repository != commit.Actor.Repository || run.Workflow != profile.Workflow ||
-		run.Ref != profile.Ref || run.Principal != profile.Principal {
+		run.Ref != profile.Ref || !decimalIdentity(run.Principal) || run.Principal != DispatchPrincipal(dispatch) {
 		return queueError("run_binding_conflict", "native run does not match immutable approved target")
 	}
 	if err := evidenceFits(state, dispatch, *lifecycle.Evidence, commit.At); err != nil {

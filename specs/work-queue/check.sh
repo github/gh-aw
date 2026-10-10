@@ -10,14 +10,15 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle|IssueProjection|QueueBootstrap) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle|IssueProjection|QueueBootstrap|WorkerEvolution|WorkerDeploymentBoundary) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, QueueLifecycle, IssueProjection, or QueueBootstrap when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, QueueLifecycle, IssueProjection, QueueBootstrap, WorkerEvolution, or WorkerDeploymentBoundary when set." >&2
         exit 1
         ;;
 esac
-RESULTS_DIR="${TLC_RESULTS_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/work-queue-tlc.XXXXXX")}"
-mkdir -p "$RESULTS_DIR"
+RESULTS_DIR="${TLC_RESULTS_DIR:-$SPEC_DIR/../../.queue-validation-cache/tlc-$(date +%Y%m%d-%H%M%S)-$$}"
+mkdir -p "$RESULTS_DIR/java"
+RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 RUN_COUNT=0
 
 run_model() {
@@ -36,7 +37,7 @@ run_model() {
     RUN_COUNT=$((RUN_COUNT + 1))
     local output="$RESULTS_DIR/$config.log"
     local status=0
-    "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
+    "$JAVA_BIN" -Djava.io.tmpdir="$RESULTS_DIR/java" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
         -workers 2 -seed 1 -fp 0 -config "$SPEC_DIR/$config.cfg" \
         -metadir "$RESULTS_DIR/$config" "$SPEC_DIR/$module.tla" \
         >"$output" 2>&1 || status=$?
@@ -138,6 +139,38 @@ run_model BootstrapDeferredWitness NoDeferredPreparation Invariant 12 QueueBoots
 run_model BootstrapRetryWitness NoDeploymentRetry Invariant 12 QueueBootstrap
 run_model BootstrapLostResponseWitness NoLostResponseRecovery Invariant 12 QueueBootstrap
 run_model BootstrapLostResponseFailureWitness NoLostResponseFailure Invariant 12 QueueBootstrap
+run_model BrokenBootstrapHost TrustedAWAuthority Invariant 12 QueueBootstrap
+run_model BrokenBootstrapEnrollment NoEnrollmentGate Invariant 12 QueueBootstrap
+run_model BootstrapTrustedAWWitness NoTrustedAWBootstrap Invariant 12 QueueBootstrap
+run_model WorkerEvolution "" Invariant 0 WorkerEvolution
+run_model WorkerEvolutionPrincipal "" Invariant 0 WorkerEvolution
+run_model BrokenEvolutionCAS DeploymentCAS Invariant 12 WorkerEvolution
+run_model BrokenEvolutionRevision RevisionImmutability Invariant 12 WorkerEvolution
+run_model BrokenEvolutionPin PinnedExecution Invariant 12 WorkerEvolution
+run_model BrokenEvolutionContract ReadyGrants Invariant 12 WorkerEvolution
+run_model BrokenEvolutionAvailability ReadyGrants Invariant 12 WorkerEvolution
+run_model BrokenEvolutionGlobalPause LocalReadiness Invariant 12 WorkerEvolution
+run_model BrokenEvolutionDebt DebtPreservation Invariant 12 WorkerEvolution
+run_model BrokenEvolutionResult ResultPreservation Invariant 12 WorkerEvolution
+run_model BrokenEvolutionReservation ReservationPreservation Invariant 12 WorkerEvolution
+run_model BrokenEvolutionDispatch FrozenDispatch Invariant 12 WorkerEvolution
+run_model BrokenEvolutionCredential FrozenCredential Invariant 12 WorkerEvolution
+run_model BrokenEvolutionEconomics EconomicPolicy Invariant 12 WorkerEvolution
+run_model EvolutionCompatibleWitness NoCompatibleReroute Invariant 12 WorkerEvolution
+run_model EvolutionPinWitness NoPinnedOldRevision Invariant 12 WorkerEvolution
+run_model EvolutionIncompatibleWitness NoLocalIncompatibility Invariant 12 WorkerEvolution
+run_model EvolutionUnavailableWitness NoLocalUnavailability Invariant 12 WorkerEvolution
+run_model EvolutionCompletionWitness NoFrozenCompletion Invariant 12 WorkerEvolution
+run_model EvolutionRaceWitness NoDeploymentRace Invariant 12 WorkerEvolution
+run_model WorkerDeploymentBoundary "" Invariant 0 WorkerDeploymentBoundary
+run_model BrokenBoundaryAvailabilityCAS HistoricalAvailabilityCAS Invariant 12 WorkerDeploymentBoundary
+run_model BrokenBoundaryAvailabilityRoute HistoricalRoutePreservation Invariant 12 WorkerDeploymentBoundary
+run_model BrokenBoundaryWorker NoWorkerDeployment Invariant 12 WorkerDeploymentBoundary
+run_model BrokenBoundaryApproval CallerApprovalAuthority Invariant 12 WorkerDeploymentBoundary
+run_model BrokenBoundaryDebt DebtPreservation Invariant 12 WorkerDeploymentBoundary
+run_model BoundaryPinnedAvailabilityWitness NoPinnedAvailabilityUpdate Invariant 12 WorkerDeploymentBoundary
+run_model BoundaryUnapprovedWitness NoUnapprovedLocalPause Invariant 12 WorkerDeploymentBoundary
+run_model BoundaryCompletionWitness NoFrozenCallerCompletion Invariant 12 WorkerDeploymentBoundary
 if [ "$RUN_COUNT" -eq 0 ]; then
     echo "No configuration matches the requested TLC filters." >&2
     exit 1

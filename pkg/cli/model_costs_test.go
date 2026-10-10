@@ -55,6 +55,49 @@ func TestNewModelPricingEntries(t *testing.T) {
 	}
 }
 
+func TestFindExactModelPricing(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		provider, model string
+		found           bool
+	}{
+		{"openai", "gpt-6.1-sol", true},
+		{"openai", "gpt-6-1-sol", true},
+		{"copilot", "gpt-6.1-sol", true},
+		{"copilot", "gpt-6-1-sol?effort=high", true},
+		{"copilot", "gpt-6-1-sol", true},
+		{"github-copilot", " GPT-6.1-SOL ", true},
+		{"openai", "gpt-6.1-sol?effort=high", true},
+		{"copilot", "gpt-6.1-sol?temperature=0.2", true},
+		{"openai", "GPT_6_1_SOL", true},
+		{"copilot", "gpt_6.1_sol", true},
+		{"openai", "GPT_6.1_SOL?effort=high", true},
+		{"anthropic", "gpt-6.1-sol", false},
+		{"anthropic", "gpt-6-1-sol", false},
+		{"anthropic", "GPT_6_1_SOL?effort=high", false},
+		{"openai", "gpt-6.1-sol-unknown", false},
+		{"openai", "gpt-6-1-sol-unknown", false},
+		{"openai", "gpt_6.1_sol_unknown?effort=high", false},
+		{"openai", "gpt-6.1-sol*", false},
+		{"openai", "gpt-99", false},
+		{"copilot", "auto", false},
+		{"copilot", "auto?effort=high", false},
+		{"", "gpt-6.1-sol", false},
+	} {
+		t.Run(tt.provider+"/"+tt.model, func(t *testing.T) {
+			t.Parallel()
+			pricing, found := findExactModelPricing(tt.provider, tt.model)
+			require.Equal(t, tt.found, found)
+			if found {
+				require.InDelta(t, 2e-6, pricing["input"], 1e-15)
+				require.InDelta(t, 10e-6, pricing["output"], 1e-15)
+			} else {
+				require.Nil(t, pricing)
+			}
+		})
+	}
+}
+
 func TestFindModelPricing(t *testing.T) {
 	t.Parallel()
 	pricing, ok := findModelPricing("anthropic", "claude-sonnet-4.6")

@@ -258,6 +258,40 @@
         }
       ]
     },
+    "DeploymentOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "activate": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "expected_contract": {
+          "$ref": "#/$defs/Digest"
+        },
+        "expected_ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "kind": {
+          "const": "Deployment"
+        },
+        "pool": {
+          "$ref": "#/$defs/Identity"
+        },
+        "profile": {
+          "$ref": "#/$defs/WorkerProfile"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "worker_profile": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "pool", "worker_profile", "expected_ref", "expected_contract", "profile", "available", "reason"],
+      "type": "object"
+    },
     "Digest": {
       "pattern": "^[a-f0-9]{64}$",
       "type": "string"
@@ -265,6 +299,9 @@
     "DispatchOperation": {
       "additionalProperties": false,
       "properties": {
+        "credential_principal": {
+          "$ref": "#/$defs/Decimal"
+        },
         "dispatch_id": {
           "$ref": "#/$defs/Identity"
         },
@@ -773,6 +810,9 @@
           "$ref": "#/$defs/PolicyOperation"
         },
         {
+          "$ref": "#/$defs/DeploymentOperation"
+        },
+        {
           "$ref": "#/$defs/ControlOperation"
         },
         {
@@ -827,6 +867,9 @@
             "$ref": "#/$defs/Weight"
           },
           "type": "object"
+        },
+        "authorization": {
+          "const": "aw"
         },
         "class_weights": {
           "items": {
@@ -1104,6 +1147,9 @@
         "enqueued": {
           "$ref": "#/$defs/Timestamp"
         },
+        "execution_ref": {
+          "$ref": "#/$defs/Revision"
+        },
         "fairness_key": {
           "maxLength": 128,
           "type": "string"
@@ -1113,6 +1159,9 @@
         },
         "kind": {
           "const": "Work"
+        },
+        "logical_contract": {
+          "$ref": "#/$defs/Digest"
         },
         "node_key": {
           "$ref": "#/$defs/Identity"
@@ -1174,6 +1223,9 @@
         "effect_scope": {
           "$ref": "#/$defs/Identity"
         },
+        "logical_contract": {
+          "$ref": "#/$defs/Digest"
+        },
         "max_claims": {
           "$ref": "#/$defs/ClaimBound"
         },
@@ -1193,7 +1245,7 @@
           "$ref": "#/$defs/Identity"
         }
       },
-      "required": ["workflow", "ref", "principal", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
+      "required": ["workflow", "ref", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
       "type": "object"
     }
   },

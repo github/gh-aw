@@ -5,6 +5,7 @@ const { canonical, canonicalBytes, closed, digest, identity, integer, queueError
 const { boundedBytes } = require("./work_queue_limits.cjs");
 const { decimal, poolPolicy, validateRequestRole, validateSubmissionEntitlement, workerContinuationAuthority } = require("./work_queue_policy.cjs");
 const { externalVertex, indexesFor } = require("./work_queue_indexes.cjs");
+const { admissionProfile } = require("./work_queue_deployment.cjs");
 
 function nodeId(graph_id, node_key) {
   return digest({ graph_id, node_key });
@@ -36,6 +37,7 @@ function validateDependency(dependency) {
   }
 }
 
+/** @returns {{kind: string, work_id: string, graph_id: string, node_key: string, pool: string, priority: number, fairness_key: string, worker_profile: string, batch_trust_domain: string, logical_contract?: string, payload: any, depends_on: any[], enqueued: number, backing_issue?: ReturnType<typeof validateResource>}} */
 function newWork(payload, graph_id, node_key, pool, policy, at) {
   const configured = policy.pools[pool];
   if (!configured) throw queueError("pool_invalid", "pool is not approved");
@@ -49,6 +51,7 @@ function newWork(payload, graph_id, node_key, pool, policy, at) {
     fairness_key: "",
     worker_profile: configured.default_profile,
     batch_trust_domain: configured.profiles[configured.default_profile].trust_domain,
+    ...(configured.profiles[configured.default_profile].logical_contract ? { logical_contract: configured.profiles[configured.default_profile].logical_contract } : {}),
     payload,
     depends_on: [],
     enqueued: at,
@@ -69,7 +72,7 @@ function validateWork(node, state, actor) {
   closed(
     node,
     ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
-    ["subject", "backing_issue", "replacement_of"],
+    ["subject", "backing_issue", "replacement_of", "logical_contract", "execution_ref"],
     "Work",
     "unsupported_protocol"
   );
@@ -81,7 +84,7 @@ function validateWork(node, state, actor) {
   integer(node.enqueued, 0, Number.MAX_SAFE_INTEGER, "enqueue timestamp");
   const pool = poolPolicy(state, node.pool);
   validateSubmissionEntitlement(state, node, actor);
-  const profile = pool.profiles[node.worker_profile];
+  const profile = admissionProfile(state, node);
   if (!profile || profile.trust_domain !== node.batch_trust_domain || !Object.hasOwn(state.policy.accounting_weights, node.fairness_key)) throw queueError("work_invalid", "unapproved routing, trust domain, or accounting key");
   if (!node.payload || typeof node.payload !== "object" || Array.isArray(node.payload)) throw queueError("work_invalid", "payload must be a JSON object");
   boundedBytes(node.payload, state.policy.limits.payload_bytes, "Work payload");
@@ -142,7 +145,25 @@ function validateWork(node, state, actor) {
 }
 
 function workDefinition(work) {
-  const fields = ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued", "subject", "backing_issue", "replacement_of"];
+  const fields = [
+    "kind",
+    "work_id",
+    "graph_id",
+    "node_key",
+    "pool",
+    "priority",
+    "fairness_key",
+    "worker_profile",
+    "batch_trust_domain",
+    "payload",
+    "depends_on",
+    "enqueued",
+    "subject",
+    "backing_issue",
+    "replacement_of",
+    "logical_contract",
+    "execution_ref",
+  ];
   return Object.fromEntries(fields.filter(field => Object.hasOwn(work, field)).map(field => [field, work[field]]));
 }
 
@@ -158,7 +179,11 @@ function validateGraphAdmission(state, nodes, actor) {
     if (resource) issues.set(issueKey(resource), work.work_id);
   }
   for (const node of nodes) {
-    validateWork(node, state, actor);
+    const existing = state.works.get(node.work_id);
+    if (existing) {
+      validateSubmissionEntitlement(state, node, actor);
+      if (canonical(workDefinition(existing)) !== canonical(node)) throw queueError("work_conflict", "immutable node definition differs");
+    } else validateWork(node, state, actor);
     if (seen.has(node.work_id)) throw queueError("graph_invalid", "duplicate node key within one submission");
     seen.add(node.work_id);
     if (node.backing_issue) {
@@ -166,7 +191,6 @@ function validateGraphAdmission(state, nodes, actor) {
       if (issues.has(key) && issues.get(key) !== node.work_id) throw queueError("issue_binding_conflict", "one Work per backing Issue");
       issues.set(key, node.work_id);
     }
-    const existing = state.works.get(node.work_id);
     if (existing && canonical(workDefinition(existing)) !== canonical(node)) throw queueError("work_conflict", "immutable node definition differs");
     if (!existing && state.admission_paused) throw queueError("admission_paused", "new Work admission is paused");
     if (!existing) admitted.set(node.work_id, node);

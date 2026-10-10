@@ -1,8 +1,7 @@
 // @ts-check
 "use strict";
 
-const { DEFAULT_LIMITS } = require("./work_queue_limits.cjs");
-const { validatePolicy } = require("./work_queue_policy.cjs");
+const { buildAWPolicy } = require("./work_queue_settings.cjs");
 
 const ENGINES = Object.freeze(["agy", "aider", "claude", "codex", "copilot", "crush", "cursor", "deepseek-harness", "gemini", "goose", "kiro", "opencode", "pi", "pydantic-ai"]);
 const SUPPORTED = Object.freeze(["claude", "codex", "copilot", "pi"]);
@@ -70,7 +69,7 @@ function buildEngineConformancePlan({ date, repository, repositoryId, changedPat
       pool: POOL,
       priority: SUPPORTED.includes(engine) ? 1 : recent.has(engine) ? 2 : 3,
       fairness_key: engine,
-      worker_profile: engine,
+      worker_profile: `engine-conformance-${engine}`,
       payload: {
         plan: "Run the existing host-asserted conformance suite once for the assigned engine; do not modify repository files or dispatch other workflows.",
         engine,
@@ -84,52 +83,17 @@ function buildEngineConformancePlan({ date, repository, repositoryId, changedPat
   };
 }
 
-/** @param {{repository: string, ref: string, producerPrincipal: string, workerPrincipal: string}} options */
-function buildEngineConformancePolicy({ repository, ref, producerPrincipal, workerPrincipal }) {
+/** @param {{repository: string, ref: string, settings?: object}} options */
+function buildEngineConformancePolicy({ repository, ref, settings }) {
   assertRepository(repository);
-  const policy = {
-    mode: "weighted-priority",
-    class_weights: [8, 4, 2, 1, 1],
-    accounting_weights: Object.fromEntries([["", 1], ...ENGINES.map(engine => [engine, 1])]),
-    producers: { [producerPrincipal]: { pools: [POOL], priorities: [1, 2, 3], fairness_keys: [...ENGINES] } },
-    pools: {
-      [POOL]: {
-        default_profile: "copilot",
-        profiles: Object.fromEntries(
-          ENGINES.map(engine => [
-            engine,
-            {
-              workflow: `.github/workflows/engine-conformance-${engine}.lock.yml`,
-              ref,
-              principal: workerPrincipal,
-              trust_domain: engine,
-              credential_scope: "repository",
-              effect_scope: repository,
-              max_claims: 1,
-              share_keys: false,
-            },
-          ])
-        ),
-        logical_limit: DAILY_LIMIT,
-        native_limit: DAILY_LIMIT,
-        per_account_limit: 1,
-        allowed_repositories: [repository],
-        max_observation_age_ms: 60000,
-        retry: { max_attempts: 1, backoff_ms: 1000 },
-        reconciliation: { max_attempts: 5, deadline_ms: 300000 },
-      },
-    },
-    limits: { ...DEFAULT_LIMITS, graph_nodes: DAILY_LIMIT, pending_nodes: 60, operations: 32, payload_bytes: 8192 },
-  };
-  validatePolicy(policy);
-  return policy;
+  return buildAWPolicy({ repository, ref, workflows: ENGINES.map(engine => `engine-conformance-${engine}`), settings });
 }
 
 module.exports = { ENGINES, SUPPORTED, POOL, DAILY_LIMIT, changedEngines, buildEngineConformancePlan, buildEngineConformancePolicy };
 
 if (require.main === module) {
-  const [command, repository, ref, producerPrincipal, workerPrincipal, ...extra] = process.argv.slice(2);
-  if (command !== "policy" || extra.length || !repository || !ref || !producerPrincipal || !workerPrincipal)
-    throw new Error("Usage: node engine_conformance_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID");
-  process.stdout.write(JSON.stringify(buildEngineConformancePolicy({ repository, ref, producerPrincipal, workerPrincipal }), null, 2) + "\n");
+  const [command, repository, ref, ...extra] = process.argv.slice(2);
+  if (command !== "policy" || extra.length || !repository || !ref) throw new Error("Usage: node engine_conformance_portfolio.cjs policy OWNER/REPO IMMUTABLE_SHA");
+  const { readPortfolioSettings } = require("./work_queue_portfolio_config.cjs");
+  process.stdout.write(JSON.stringify(buildEngineConformancePolicy({ repository, ref, settings: readPortfolioSettings() }), null, 2) + "\n");
 }

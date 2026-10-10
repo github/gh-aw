@@ -153,8 +153,13 @@ if [ "${#go_files[@]}" -gt 0 ]; then
 fi
 
 if [ "${#prettier_files[@]}" -gt 0 ]; then
+    prettier_bin="./actions/setup/js/node_modules/.bin/prettier"
+    if [ ! -x "$prettier_bin" ]; then
+        echo "Pinned Prettier is not installed. Run 'npm ci --prefix actions/setup/js' before validation." >&2
+        exit 1
+    fi
     echo "Formatting ${#prettier_files[@]} changed JavaScript/TypeScript/JSON file(s)..."
-    npx prettier --write "${prettier_files[@]}" --ignore-path .prettierignore --log-level=error
+    "$prettier_bin" --write "${prettier_files[@]}" --ignore-path .prettierignore --log-level=error
 fi
 
 git diff --check "$BASE_COMMIT"

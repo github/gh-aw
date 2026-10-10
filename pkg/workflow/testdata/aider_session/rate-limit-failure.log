@@ -1,0 +1,13 @@
+Aider v0.86.2
+Model: openai/auto with diff edit format
+Git repo: none
+Repo-map: disabled
+
+litellm.RateLimitError: RateLimitError: OpenAIException - Sorry, you've exceeded
+your rate limit for utility models. Please review our [Terms of
+Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-ser
+vice).
+The API provider has rate limited you. Try again later or check your quotas.
+Retrying in 0.2 seconds...
+Error: Aider execution reported a LiteLLM error
+Process exiting with code: 1

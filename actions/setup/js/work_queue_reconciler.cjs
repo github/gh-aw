@@ -4,6 +4,7 @@ const { SAFE_OUTPUT_E007 } = require("./error_codes.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("reconciler");
 
 const { canonical, digest, integer } = require("./work_queue_codec.cjs");
+const { dispatchPrincipal } = require("./work_queue_policy.cjs");
 const { assignmentForDispatch } = require("./work_queue_replay.cjs");
 const { loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
 const { API_VERSION, nativeId, hasDispatchToken, authenticatePublisher, fetchNativeRunAttempt, validateNativeRun } = require("./work_queue_native.cjs");
@@ -119,7 +120,7 @@ async function reconcileDispatch(options) {
   if (dispatch.state === "reserved") return { state: "reserved", released: false };
   const trustedContext = await authenticatePublisher({ ...options, role: "reconciler" });
   const repository = trustedContext.repository;
-  const expected = expectedWorkerRun(assignment, profile, options.context, repository);
+  const expected = expectedWorkerRun(assignment, profile, options.context, repository, dispatchPrincipal(dispatch));
   if (dispatch.run) {
     const proof = validateNativeRun(await fetchNativeRunAttempt(options.githubClient, repository, dispatch.run.run_id), { ...expected, run_id: dispatch.run.run_id });
     log.debug("dispatch.reconcile.native_checked", { terminal: proof.terminal });
@@ -131,7 +132,13 @@ async function reconcileDispatch(options) {
       }
       return { state: options.requestCancellation ? "cancellation_requested" : "bound", run_id: proof.run_id, released: false };
     }
-    const evidence = lifecycleEvidence(assignment, profile, repository, "terminal_run", "github_api", options.now ?? Date.now(), { run_id: proof.run_id, run_attempt: 1, status: "completed", conclusion: proof.conclusion });
+    const evidence = lifecycleEvidence(assignment, profile, repository, "terminal_run", "github_api", options.now ?? Date.now(), {
+      run_id: proof.run_id,
+      run_attempt: 1,
+      status: "completed",
+      conclusion: proof.conclusion,
+      principal: proof.principal,
+    });
     return releaseAssignment(options, assignment, evidence);
   }
   const policy = initial.projection.policy.pools[assignment.pool].reconciliation;
@@ -158,7 +165,7 @@ async function reconcileDispatch(options) {
       if (candidates.length === 1) {
         const proof = candidates[0];
         const binding = bindingForRun(proof, expected);
-        const evidence = lifecycleEvidence(assignment, profile, repository, "reconciliation", "github_api", options.now ?? Date.now(), { run_id: proof.run_id, run_attempt: 1 });
+        const evidence = lifecycleEvidence(assignment, profile, repository, "reconciliation", "github_api", options.now ?? Date.now(), { run_id: proof.run_id, run_attempt: 1, principal: proof.principal });
         await publishOperations(options, trustedContext, ["bind", assignment.dispatch_id, proof.run_id], "dispatch", [{ kind: "Dispatch", dispatch_id: assignment.dispatch_id, state: "bound", run: binding, evidence }]);
         const latest = await loadQueue(options);
         const bound = latest.projection.dispatches.get(assignment.dispatch_id)?.run;
@@ -180,7 +187,7 @@ async function reconcileDispatch(options) {
     if (attempts + 1 < policy.max_attempts) await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** attempts));
   }
   if (attempts >= policy.max_attempts) {
-    const evidence = lifecycleEvidence(assignment, profile, repository, "reconciliation", "github_api", options.now ?? Date.now(), { attempts });
+    const evidence = lifecycleEvidence(assignment, profile, repository, "reconciliation", "github_api", options.now ?? Date.now(), { attempts, principal: dispatchPrincipal(dispatch) });
     try {
       await publishOperations(
         options,
@@ -209,7 +216,7 @@ async function cancelBeforeLaunch(options) {
   if (dispatch.released) return { state: "released", released: true };
   if (dispatch.state !== "reserved" || dispatch.sender || dispatch.run) throw new Error("work_queue_launch_may_have_started");
   const trustedContext = await authenticatePublisher({ ...options, role: "reconciler" });
-  const evidence = lifecycleEvidence(assignment, profile, trustedContext.repository, "prelaunch", "trusted_publisher", options.now ?? Date.now());
+  const evidence = lifecycleEvidence(assignment, profile, trustedContext.repository, "prelaunch", "trusted_publisher", options.now ?? Date.now(), { principal: profile.principal ?? trustedContext.principal });
   return releaseAssignment(options, assignment, evidence);
 }
 

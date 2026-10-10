@@ -98,7 +98,7 @@ func RunWorkflowInteractively(ctx context.Context, opts RunWorkflowOptions) erro
 
 	// Show success message with command to run again
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Workflow dispatched successfully!"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow dispatched successfully!"))
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("To run this workflow again, use:"))
 	fmt.Fprintln(os.Stderr, console.FormatCommandMessage(cmdStr))

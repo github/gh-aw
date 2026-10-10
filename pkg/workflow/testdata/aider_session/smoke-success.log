@@ -1,0 +1,11 @@
+[INFO] Firewall started
+{"type":"session.init","timestamp":1791504775339,"data":{"sourceEngine":"aider","sessionId":"sanitized-smoke-session","model":"openai/gpt-5.4"}}
+{"type":"user.message","timestamp":1791504775339,"data":{"sourceEngine":"aider","sessionId":"sanitized-smoke-session","content":"[sanitized workflow prompt]"}}
+Aider v0.86.2
+{"type":"assistant.message","timestamp":1791504779520,"data":{"sourceEngine":"aider","sessionId":"sanitized-smoke-session","content":"[sanitized file edit and safe-output payload]\n\n```bash\ngit log --oneline -1\n```"}}
+Tokens: 5.3k sent, 156 received. Cost: $0.02 message, $0.02 session.
+{"type":"tool.execution_start","timestamp":1791504779525,"data":{"sourceEngine":"aider","sessionId":"sanitized-smoke-session","toolCallId":"sanitized-smoke-command","toolName":"bash","input":{"command":"git log --oneline -1 && safeoutputs create_issue --title '[sanitized title]' --body '[sanitized body]'"}}}
+{"type":"tool.execution_complete","timestamp":1791504779797,"data":{"sourceEngine":"aider","sessionId":"sanitized-smoke-session","toolCallId":"sanitized-smoke-command","toolName":"bash","success":true,"exitCode":0,"output":"[sanitized git log and safe-output bridge diagnostics]\n{\"result\":\"success\"}\n","durationMs":271}}
+{"type":"session.result","timestamp":1791504779797,"data":{"sourceEngine":"aider","sessionId":"sanitized-smoke-session","numTurns":1,"durationMs":4458,"errors":[]}}
+Process exiting with code: 0
+{"type":"result","num_turns":1}

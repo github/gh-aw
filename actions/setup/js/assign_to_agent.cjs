@@ -11,6 +11,7 @@ const { parseAllowedRepos, validateRepo, resolveTargetRepoConfig, resolveAndVali
 const { resolvePullRequestRepo } = require("./pr_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
+const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
 
 /**
  * Create a dedicated GitHub client for assign-to-agent operations.
@@ -32,6 +33,24 @@ async function createAssignToAgentGitHubClient(config) {
   }
   core.info("Using dedicated github client for assign-to-agent operations");
   return global.getOctokit(token);
+}
+
+/**
+ * Add credential guidance only after an assignment attempt fails.
+ * @param {Object} config
+ * @param {string} errorMessage
+ * @returns {string}
+ */
+function describeAssignmentCredentialFailure(config, errorMessage) {
+  const token = config["github-token"] || process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN;
+  const source = config["github-token"]
+    ? "the configured assign-to-agent credential"
+    : process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN
+      ? "GH_AW_ASSIGN_TO_AGENT_TOKEN (GH_AW_AGENT_TOKEN, GH_AW_GITHUB_TOKEN, or GITHUB_TOKEN)"
+      : "the step-level GitHub token";
+  const remedy = renderTemplateFromFile(getPromptPath("copilot_assignment_credential_remedy.md"), {}).trim();
+  const installationToken = typeof token === "string" && token.startsWith("ghs_") ? " The selected credential is a GitHub App installation token." : "";
+  return `${errorMessage}. Agent assignment credential source: ${source}.${installationToken} ${remedy}`;
 }
 
 /**
@@ -478,8 +497,8 @@ async function main(config = {}) {
         return { success: true };
       }
 
-      const filterResult = await checkRequiredFilter(githubClient, { owner: effectiveOwner, repo: effectiveRepo }, number, requiredLabels, "", "assign_to_agent");
-      if (filterResult) return filterResult;
+      const finalFilterResult = await checkRequiredFilter(githubClient, { owner: effectiveOwner, repo: effectiveRepo }, number, requiredLabels, "", "assign_to_agent");
+      if (finalFilterResult) return finalFilterResult;
 
       core.info(`Assigning ${agentName} coding agent to ${type} #${number}...`);
       if (model) core.info(`Using model: ${model}`);
@@ -511,10 +530,11 @@ async function main(config = {}) {
       return { success: true };
     } catch (error) {
       let errorMessage = getErrorMessage(error);
+      const isPullRequestError = error && typeof error === "object" && error.isPullRequest;
 
       // When the agent specified an issue_number that turns out to be a PR, skip
       // silently without posting a comment — error comments on PRs are confusing.
-      if (/** @type {any} */ error.isPullRequest) {
+      if (isPullRequestError) {
         core.warning(`Skipping assign_to_agent for #${number}: target is a pull request, not an issue.`);
         allResults.push({
           issue_number: issueNumber,
@@ -530,8 +550,13 @@ async function main(config = {}) {
         return { success: false, skipped: true, error: errorMessage };
       }
 
-      const isAuthError = ["Bad credentials", "Not Authenticated", "Resource not accessible", "Insufficient permissions", "requires authentication"].some(msg => errorMessage.includes(msg));
+      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+      const isAuthError = status === 401 || ["Bad credentials", "Not Authenticated", "Resource not accessible", "Insufficient permissions", "requires authentication"].some(msg => errorMessage.includes(msg));
       const isAvailabilityError = errorMessage.includes("coding agent is not available for this repository");
+      if (isAuthError || errorMessage === `Failed to assign ${agentName} via REST`) {
+        if (status === 401 && !errorMessage.includes("Bad credentials")) errorMessage = `Bad credentials (HTTP 401): ${errorMessage}`;
+        errorMessage = describeAssignmentCredentialFailure(config, errorMessage);
+      }
 
       if (ignoreIfError && (isAuthError || isAvailabilityError)) {
         const errorType = isAuthError ? "authentication/permission" : "agent availability";

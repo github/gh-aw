@@ -729,7 +729,7 @@ func transferPR(prURL, targetRepo string, verbose bool) error { //nolint:largefu
 	}
 
 	if prInfo.State != "open" && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: PR is in '%s' state", prInfo.State)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("PR is in '%s' state", prInfo.State)))
 	}
 
 	// Create patch from PR

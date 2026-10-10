@@ -12,7 +12,7 @@ const { actorFromContext, defaultPolicy } = require("../../actions/setup/js/work
 const { newWork } = require("../../actions/setup/js/work_queue_graph.cjs");
 const { checkLedgerBudget, DEFAULT_LIMITS } = require("../../actions/setup/js/work_queue_limits.cjs");
 const { authenticatePublisher } = require("../../actions/setup/js/work_queue_native.cjs");
-const { initializeWorkQueue, readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
+const { publishWorkQueueRequest, readWorkQueueLog } = require("../../actions/setup/js/work_queue_store.cjs");
 const { applyScheduledClaim, planDispatch, planNext } = require("../../actions/setup/js/work_queue_scheduler.cjs");
 const { compactTransactions, generateRequestOperations, newRequest, newState, replayTransactions, serializeProjection, serializeTransactionLog, validateCommit } = require("../../actions/setup/js/work_queue_replay.cjs");
 
@@ -55,7 +55,9 @@ async function buildRetainedHistory(genesis, requested, checkDeadline = () => {}
   };
   const transactions = [...genesis.transactions];
   const prefix = genesis.branch;
-  const probeNodes = Array.from({ length: PROBES }, (_, index) => newWork({ probe: index }, `${prefix}-probes`, `p${index}`, "probe", policy, AT));
+  const probeWorks = [...genesis.state.works.values()];
+  const probeNodes = genesis.transactions[0].request.parameters.nodes;
+  assert.equal(probeWorks.length, PROBES);
   let tip = genesis.state.tip;
   let ledgerBytes = genesis.state.ledgerBytes;
   let clocks = new Map();
@@ -65,19 +67,12 @@ async function buildRetainedHistory(genesis, requested, checkDeadline = () => {}
   function boundedState() {
     const state = newState();
     Object.assign(state, { repository: REPOSITORY, policy, policy_epoch: genesis.state.policy_epoch, tip, ledgerBytes, clocks: new Map(clocks) });
-    for (const [index, node] of probeNodes.entries()) state.works.set(node.work_id, { ...node, state: "available", position: { commit: 1, operation: index }, attempts: 0, retry_not_before: 0, barrier: "none" });
+    for (const work of probeWorks) state.works.set(work.work_id, structuredClone(work));
     return state;
   }
 
   // Fixture construction is intentionally not a publisher benchmark. Every
   // historical request/Claim is subsequently checked by a complete cold replay.
-  const initial = boundedState();
-  const probeRequest = newRequest(`${prefix}:probes`, "submit", actors.producer, { nodes: probeNodes });
-  const probeCommit = checkedFixtureCommit(initial, probeRequest.id, "submit", actors.producer, probeRequest.parameters, probeNodes, true);
-  transactions.push(probeCommit);
-  tip = initial.tip;
-  ledgerBytes = initial.ledgerBytes;
-
   while (accepted < requested) {
     checkDeadline();
     const count = Math.min(BATCH, requested - accepted);
@@ -203,11 +198,18 @@ async function runSingleRetainedSimulator(options) {
     policy.pools.probe.logical_limit = 16;
     policy.pools.probe.native_limit = 1;
     policy.producers[PRINCIPAL].pools.push("probe");
-    const admin = await authenticatePublisher({ githubClient: host.client, context: host.nativeContext(), role: "administrator", workflowRef: `${REPOSITORY}/${PUBLISHER_WORKFLOW}@${host.ref}` });
-    assert.equal(actorFromContext(admin).principal, PRINCIPAL);
+    const producer = await authenticatePublisher({ githubClient: host.client, context: host.nativeContext(), role: "producer", workflowRef: `${REPOSITORY}/${PUBLISHER_WORKFLOW}@${host.ref}` });
+    assert.equal(actorFromContext(producer).principal, PRINCIPAL);
     const branch = `retained-${options.seed}-${options.historyShard || 0}`;
     const args = { githubClient: host.client, owner: "local", repo: "queue", branch };
-    await initializeWorkQueue({ ...args, context: admin, policyProposal: policy, now: () => AT });
+    const nodes = Array.from({ length: PROBES }, (_, index) => newWork({ probe: index }, `${branch}-probes`, `p${index}`, "probe", policy, AT));
+    await publishWorkQueueRequest({
+      ...args,
+      context: producer,
+      policyProposal: policy,
+      now: () => AT,
+      request: newRequest(`${branch}:probes`, "submit", actorFromContext(producer), { nodes }),
+    });
     const genesis = await readWorkQueueLog(args);
     const generatedAt = performance.now();
     const fixture = await buildRetainedHistory(genesis, options.items, checkDeadline);
