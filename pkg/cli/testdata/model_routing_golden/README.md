@@ -24,6 +24,17 @@ Review every changed expected file in the diff; regeneration is not a substitute
 for checking that the changed routing, credit, token, warning, and subagent
 values are correct.
 
+The five existing fixtures predate the capture tool, so the first recapture of
+an existing case may rewrite its fixture files without changing its analysis.
+For example, a recapture uses `example-org/routing-fixture` instead of the
+committed fixtures' `example-org/routing-sandbox`, retains a different set of
+fields, redacts `task_complexity`, and omits `usage/aw_info.json` for
+`claude-awf-selected-messages` and `copilot-subagent-failed-and-alias` because
+it was not present in those source downloads. When reviewing that refresh,
+confirm that the `expected*.json` files are unchanged and run
+`make verify-model-routing-golden`. The capture command also checks for
+unredacted source content before writing the fixture.
+
 ## Capture or add a case
 
 Capture a workflow run with:
