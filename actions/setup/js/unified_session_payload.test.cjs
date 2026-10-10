@@ -14,6 +14,32 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each([true, false])("retains final model result and BYOK=%s through persisted unified projection", isByok => {
+    const source = {
+      type: "model.call_final_result",
+      ephemeral: true,
+      agentId: "researcher",
+      parentToolCallId: "delegate-1",
+      data: {
+        model: "anthropic/claude-sonnet-4.6",
+        isByok,
+        result: { status: "success", usage: { inputTokens: 0, outputTokens: 42 }, stopReason: "end_turn" },
+        extensionEvidence: { retained: true },
+      },
+    };
+    const original = structuredClone(source);
+    const projected = normalizeUnifiedSessionEvent(source);
+    expect(projected.data).toEqual({ ...source.data, agentId: "researcher", parentToolCallId: "delegate-1" });
+    const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "sdk.jsonl", events: normalizeCopilotSession([source]) }]);
+    const persisted = JSON.parse(JSON.stringify(unified));
+    expect(persisted.data).toMatchObject(source.data);
+    expect(persisted.data.parentToolCallId).toBe("delegate-1");
+    expect(normalizeUnifiedSessionEvent(persisted).data).toEqual(persisted.data);
+    const validate = createSessionValidator("unified").event;
+    expect(validate(persisted), JSON.stringify(validate.errors)).toBe(true);
+    expect(source).toEqual(original);
+  });
+
   it.each([401, 503, 0, null])("retains observed session-error status codes through projection and schema validation (%s)", statusCode => {
     const source = { type: "session.error", data: { errorType: "provider", message: "Observed failure.", statusCode, opaque: "PRIVATE_ERROR_CONTEXT" } };
     const original = structuredClone(source);

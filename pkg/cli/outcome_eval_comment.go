@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/github/gh-aw/pkg/errorutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -20,6 +19,11 @@ func evalAddComment(ctx context.Context, item CreatedItemReport, repoOverride st
 		ObjectURL: item.URL,
 		Repo:      repo,
 	}
+	issueNumber := parseNumberFromURL(item.URL)
+	if repo == "" || issueNumber == 0 {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_reference")
+		return report
+	}
 
 	// Extract comment ID from URL: .../issues/123#issuecomment-456789 or .../comments/456789
 	commentID := extractCommentID(item.URL)
@@ -30,57 +34,13 @@ func evalAddComment(ctx context.Context, item CreatedItemReport, repoOverride st
 		return report
 	}
 
-	data, err := ghAPIGet(ctx, "issues/comments/"+commentID, repo)
+	data, err := outcomeEvidenceGHAPIGet(ctx, "issues/comments/"+commentID, repo)
 	if err != nil {
-		// 404 means deleted
-		if errorutil.IsNotFoundError(err) {
-			outcomeEvalCommentLog.Printf("Comment %s deleted (404)", commentID)
-			report.OutcomeStatus = OutcomeStatusRejected
-			report.Detail = "deleted"
-			return report
-		}
-		report.OutcomeStatus = OutcomeStatusError
-		report.EvalError = err.Error()
+		outcomeAPIError(&report, err, true)
 		return report
 	}
 
-	// Check reactions
-	reactions, _ := data["reactions"].(map[string]any)
-	totalReactions := 0
-	if reactions != nil {
-		if tc, ok := reactions["total_count"].(float64); ok {
-			totalReactions = int(tc)
-		}
-	}
-
-	// Check if the comment is minimized (hidden)
-	// The REST API field is "performed_via_github_app" but minimized state
-	// is not directly in REST. We approximate: if the comment body is empty
-	// or the node_id can be checked via GraphQL. For now, use reactions+replies.
-
-	// To check replies, we need the issue number and look for comments posted after this one
-	issueNumber := parseNumberFromURL(item.URL)
-	replyCount := 0
-	if issueNumber > 0 {
-		commentList, cerr := ghAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", issueNumber), repo)
-		if cerr == nil {
-			createdAt, _ := data["created_at"].(string)
-			replyCount = countHumanCommentsAfter(commentList, createdAt)
-		}
-	}
-
-	report.HumanComments = replyCount
-
-	switch {
-	case totalReactions > 0 || replyCount > 0:
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = fmt.Sprintf("%d reactions, %d replies", totalReactions, replyCount)
-	default:
-		report.OutcomeStatus = OutcomeStatusIgnored
-		report.Detail = "no engagement"
-	}
-
-	return report
+	return classifyComment(ctx, item, data, report, issueNumber)
 }
 
 // extractCommentID extracts the numeric comment ID from a GitHub comment URL.
@@ -97,13 +57,61 @@ func extractCommentID(url string) string {
 	if idx := strings.LastIndex(url, commentsPrefix); idx >= 0 {
 		rest := url[idx+len(commentsPrefix):]
 		// Take only digits
-		end := 0
-		for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
-			end++
+		end := len(rest)
+		for i, digit := range rest {
+			if digit < '0' || digit > '9' {
+				end = i
+				break
+			}
 		}
 		if end > 0 {
 			return rest[:end]
 		}
 	}
 	return ""
+}
+
+func classifyComment(ctx context.Context, item CreatedItemReport, data map[string]any, report OutcomeReport, issueNumber int) OutcomeReport {
+	repo := report.Repo
+	// Check reactions
+	reactions := outcomeValue[map[string]any](data["reactions"])
+	totalReactions := 0
+	if reactions != nil {
+		if tc, ok := reactions["total_count"].(float64); ok {
+			totalReactions = int(tc)
+		}
+	}
+
+	// Check if the comment is minimized (hidden)
+	// The REST API field is "performed_via_github_app" but minimized state
+	// is not directly in REST. We approximate: if the comment body is empty
+	// or the node_id can be checked via GraphQL. For now, use reactions+replies.
+
+	// To check replies, we need the issue number and look for comments posted after this one
+	replyCount := 0
+	if issueNumber > 0 {
+		commentList, cerr := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/comments", issueNumber), repo)
+		if cerr == nil {
+			createdAt := outcomeValue[string](data["created_at"])
+			replyCount = nonBotCommentsAfter(commentList, createdAt)
+		} else if totalReactions == 0 {
+			outcomeAPIError(&report, cerr, false)
+			return report
+		} else {
+			outcomeEvalCommentLog.Printf("Reply evidence unavailable: %v", cerr)
+		}
+	}
+
+	report.HumanComments = replyCount
+
+	switch {
+	case totalReactions > 0 || replyCount > 0:
+		report.Detail = fmt.Sprintf("%d reactions, %d replies", totalReactions, replyCount)
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "acted_on")
+	default:
+		report.Detail = "no follow-up"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "pending")
+	}
+
+	return report
 }

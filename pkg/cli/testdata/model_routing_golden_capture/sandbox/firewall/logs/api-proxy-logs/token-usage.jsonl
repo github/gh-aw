@@ -1,0 +1,2 @@
+{"_schema":"token-usage/v0.28.50","event":"token_usage","request_id":"capture-request-1","purpose":"routing_classification","provider":"copilot","model":"gpt-5.6-luna","path":"/responses","input_tokens":10,"output_tokens":2,"ai_credits_this_response":0.01,"ai_credits_total":0.01}
+{"_schema":"token-usage/v0.28.50","event":"token_usage","request_id":"capture-request-2","provider":"copilot","model":"gpt-5.6-luna","path":"/responses","input_tokens":100,"output_tokens":20,"ai_credits_this_response":0.25,"ai_credits_total":0.26}

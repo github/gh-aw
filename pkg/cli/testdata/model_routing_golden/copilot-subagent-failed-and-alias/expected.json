@@ -1,0 +1,301 @@
+{
+  "model_routing": {
+    "status": "selected",
+    "selected_model": "github-copilot/gpt-5.6-luna",
+    "selected_effort": "xhigh",
+    "endpoint": "/responses",
+    "effective_endpoint": "/responses",
+    "selected_endpoint": "/responses",
+    "routed_counts": {
+      "as_selected": 8,
+      "deviated": 5
+    },
+    "outcome_counts": {
+      "completed": 10,
+      "failed": 3
+    },
+    "deviations": [
+      {
+        "requested_model": "claude-haiku-4.5",
+        "selected_model": "github-copilot/gpt-5.6-luna",
+        "selected_effort": "xhigh",
+        "deviation": "model,effort",
+        "count": 3
+      },
+      {
+        "requested_model": "small",
+        "selected_model": "github-copilot/gpt-5.6-luna",
+        "selected_effort": "xhigh",
+        "deviation": "model,effort",
+        "count": 2
+      }
+    ],
+    "classifier_cost": {
+      "requests": 1,
+      "input_tokens": 835,
+      "output_tokens": 261,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0.04802
+    },
+    "selected_model_cost": {
+      "requests": 8,
+      "input_tokens": 171930,
+      "output_tokens": 2907,
+      "cache_read_tokens": 125878,
+      "cache_write_tokens": 0,
+      "aic": 1.521636
+    },
+    "deviated_traffic_cost": {
+      "requests": 2,
+      "input_tokens": 35945,
+      "output_tokens": 81,
+      "cache_read_tokens": 17408,
+      "cache_write_tokens": 0,
+      "aic": 1.548581
+    },
+    "main_agent_cost": {
+      "requests": 5,
+      "input_tokens": 112167,
+      "output_tokens": 1888,
+      "cache_read_tokens": 88747,
+      "cache_write_tokens": 23405,
+      "aic": 0.989479
+    },
+    "subagent_costs": [
+      {
+        "agent_name": "file-summarizer",
+        "agent_type": "subagent",
+        "instance_count": 4,
+        "completed_count": 1,
+        "failed_count": 3,
+        "effort": "xhigh",
+        "models": ["gpt-5.6-luna"],
+        "requests": 3,
+        "input_tokens": 59763,
+        "output_tokens": 1019,
+        "cache_read_tokens": 37131,
+        "cache_write_tokens": 22623,
+        "aic": 0.762297
+      },
+      {
+        "agent_name": "quick-checker",
+        "agent_type": "subagent",
+        "instance_count": 1,
+        "completed_count": 1,
+        "models": ["gpt-5.4-mini-2026-03-17"],
+        "requests": 2,
+        "input_tokens": 35945,
+        "output_tokens": 81,
+        "cache_read_tokens": 17408,
+        "cache_write_tokens": 0,
+        "aic": 1.557285
+      }
+    ]
+  },
+  "firewall_token_usage": {
+    "total_input_tokens": 208710,
+    "total_output_tokens": 3249,
+    "total_cache_read_tokens": 143286,
+    "total_cache_write_tokens": 0,
+    "total_requests": 11,
+    "total_duration_ms": 47785,
+    "total_response_bytes": 4179275,
+    "cache_efficiency": 0,
+    "total_aic": 3.118237,
+    "by_model": {
+      "gpt-5.4-mini-2026-03-17": {
+        "provider": "copilot",
+        "input_tokens": 35945,
+        "output_tokens": 81,
+        "cache_read_tokens": 17408,
+        "cache_write_tokens": 0,
+        "requests": 2,
+        "duration_ms": 3242,
+        "response_bytes": 612786,
+        "aic": 1.548581
+      },
+      "gpt-5.6-luna": {
+        "provider": "copilot",
+        "input_tokens": 172765,
+        "output_tokens": 3168,
+        "cache_read_tokens": 125878,
+        "cache_write_tokens": 0,
+        "requests": 9,
+        "duration_ms": 44543,
+        "response_bytes": 3566489,
+        "aic": 1.569656
+      }
+    },
+    "subagent_model_requests": [
+      {
+        "agent_name": "file-summarizer",
+        "requested_model": "claude-haiku-4.5",
+        "resolved_model": "claude-haiku-4.5",
+        "invocation_count": 3,
+        "failed_count": 3,
+        "error": "400 Cannot translate Copilot request feature 'include' between Responses and Chat Completions. Routing model \"claude-haiku-4.5\" to /chat/completions is incompatible: this request needs /responses to preserve 'include'. Choose a model supporting /responses for this request, or use function tools/feat…",
+        "reason_code": "SUBAGENT_FAILED"
+      },
+      {
+        "agent_name": "file-summarizer",
+        "requested_model": "gpt-5.6-luna",
+        "resolved_model": "gpt-5.6-luna",
+        "served_models": ["gpt-5.6-luna"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effort": "xhigh",
+        "effective_model": "gpt-5.6-luna"
+      },
+      {
+        "agent_name": "quick-checker",
+        "requested_model": "small",
+        "resolved_model": "gpt-5.4-mini",
+        "served_models": ["gpt-5.4-mini", "gpt-5.4-mini-2026-03-17"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "gpt-5.4-mini"
+      }
+    ],
+    "declared_subagent_models": [
+      {
+        "agent_name": "file-summarizer",
+        "requested_model": "claude-haiku-4.5",
+        "served_models": ["gpt-5.6-luna"],
+        "invocation_count": 4,
+        "completed_count": 1,
+        "failed_count": 3,
+        "effort": "xhigh",
+        "error": "400 Cannot translate Copilot request feature 'include' between Responses and Chat Completions. Routing model \"claude-haiku-4.5\" to /chat/completions is incompatible: this request needs /responses to preserve 'include'. Choose a model supporting /responses for this request, or use function tools/feat…",
+        "reason_code": "REQUESTED_MODEL_NOT_OBSERVED"
+      },
+      {
+        "agent_name": "quick-checker",
+        "requested_model": "small",
+        "resolved_model": "gpt-5.4-mini",
+        "served_models": ["gpt-5.4-mini", "gpt-5.4-mini-2026-03-17"],
+        "invocation_count": 1,
+        "completed_count": 1,
+        "effective_model": "gpt-5.4-mini"
+      }
+    ],
+    "subagent_model_actuals": [
+      {
+        "model": "gpt-5.4-mini",
+        "requests": 2,
+        "resolved_model": "gpt-5.4-mini",
+        "served_models": ["gpt-5.4-mini-2026-03-17"],
+        "input_tokens": 35945,
+        "output_tokens": 81,
+        "cache_read_tokens": 17408,
+        "cache_write_tokens": 0,
+        "aic": 1.557285
+      },
+      {
+        "model": "gpt-5.6-luna",
+        "requests": 3,
+        "resolved_model": "gpt-5.6-luna",
+        "served_models": ["gpt-5.6-luna"],
+        "input_tokens": 59763,
+        "output_tokens": 1019,
+        "cache_read_tokens": 37131,
+        "cache_write_tokens": 22623,
+        "reasoning_tokens": 707,
+        "aic": 0.762297
+      }
+    ],
+    "agent_usage": [
+      {
+        "agent_name": "file-summarizer",
+        "agent_type": "subagent",
+        "source_engine": "copilot",
+        "instance_count": 4,
+        "completed_count": 1,
+        "failed_count": 3,
+        "requested_models": ["claude-haiku-4.5", "gpt-5.6-luna"],
+        "resolved_models": ["claude-haiku-4.5", "gpt-5.6-luna"],
+        "served_models": ["gpt-5.6-luna"],
+        "effort": "xhigh",
+        "requests": 3,
+        "input_tokens": 59763,
+        "output_tokens": 1019,
+        "cache_read_tokens": 37131,
+        "cache_write_tokens": 22623,
+        "reasoning_tokens": 707,
+        "aic": 0.762297,
+        "total_api_duration_ms": 14549,
+        "models": [
+          {
+            "model": "gpt-5.6-luna",
+            "resolved_model": "gpt-5.6-luna",
+            "requests": 3,
+            "input_tokens": 59763,
+            "output_tokens": 1019,
+            "cache_read_tokens": 37131,
+            "cache_write_tokens": 22623,
+            "reasoning_tokens": 707,
+            "aic": 0.762297
+          }
+        ]
+      },
+      {
+        "agent_name": "main",
+        "agent_type": "main",
+        "source_engine": "copilot",
+        "instance_count": 1,
+        "served_models": ["gpt-5.6-luna"],
+        "requests": 5,
+        "input_tokens": 112167,
+        "output_tokens": 1888,
+        "cache_read_tokens": 88747,
+        "cache_write_tokens": 23405,
+        "reasoning_tokens": 1076,
+        "aic": 0.989479,
+        "total_api_duration_ms": 26207,
+        "models": [
+          {
+            "model": "gpt-5.6-luna",
+            "resolved_model": "gpt-5.6-luna",
+            "requests": 5,
+            "input_tokens": 112167,
+            "output_tokens": 1888,
+            "cache_read_tokens": 88747,
+            "cache_write_tokens": 23405,
+            "reasoning_tokens": 1076,
+            "aic": 0.989479
+          }
+        ]
+      },
+      {
+        "agent_name": "quick-checker",
+        "agent_type": "subagent",
+        "source_engine": "copilot",
+        "instance_count": 1,
+        "completed_count": 1,
+        "requested_models": ["small"],
+        "resolved_models": ["gpt-5.4-mini", "small"],
+        "served_models": ["gpt-5.4-mini-2026-03-17"],
+        "requests": 2,
+        "input_tokens": 35945,
+        "output_tokens": 81,
+        "cache_read_tokens": 17408,
+        "cache_write_tokens": 0,
+        "aic": 1.557285,
+        "total_api_duration_ms": 3260,
+        "models": [
+          {
+            "model": "gpt-5.4-mini",
+            "resolved_model": "gpt-5.4-mini",
+            "requests": 2,
+            "input_tokens": 35945,
+            "output_tokens": 81,
+            "cache_read_tokens": 17408,
+            "cache_write_tokens": 0,
+            "aic": 1.557285
+          }
+        ]
+      }
+    ],
+    "warnings": ["per-agent AI credits (3.309) differ from non-classifier proxy total (3.070) for endpoint /responses"]
+  }
+}

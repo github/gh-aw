@@ -1,0 +1,8 @@
+{
+  "status": "selected",
+  "wire_model": "claude-sonnet-5",
+  "endpoint": "/v1/messages",
+  "selected_endpoint": "/chat/completions",
+  "effort": "medium",
+  "applied_effort": "medium"
+}

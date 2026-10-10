@@ -124,6 +124,20 @@ update-wasm-golden:
 	@echo "Updating wasm golden test files..."
 	go test -v -timeout=5m -run='^TestWasmGolden_' ./pkg/workflow -update
 
+# Run model-routing golden tests without downloading source runs
+.PHONY: verify-model-routing-golden
+verify-model-routing-golden:
+	python3 scripts/test_model_routing_golden.py
+	go test ./pkg/cli -run '^TestModelRoutingGolden' -count=1
+
+# Update model-routing golden files from the committed fixtures
+.PHONY: update-model-routing-golden
+update-model-routing-golden:
+	@echo "Updating model-routing golden files..."
+	UPDATE_MODEL_ROUTING_GOLDEN=1 go test ./pkg/cli -run '^TestModelRoutingGolden' -count=1
+	@echo "Review changed model-routing golden files:"
+	@git status --short --untracked-files=all pkg/cli/testdata/model_routing_golden
+
 # Build wasm and run Node.js golden comparison test
 .PHONY: test-wasm
 test-wasm: build-wasm
@@ -509,9 +523,13 @@ test-scripts: build
 	bash actions/setup/sh/download_docker_images_local_test.sh
 	@echo "✓ All script tests passed"
 
-# Test all code (Go, JavaScript, wasm golden, and shell scripts)
+# Test all code and guidance (Go, JavaScript, wasm golden, shell scripts, and guidance contracts)
 .PHONY: test-all
-test-all: test test-js test-wasm-golden test-scripts
+test-all: test test-js test-wasm-golden test-scripts test-guidance
+
+.PHONY: test-guidance
+test-guidance:
+	python3 -m unittest discover -s .github/skills/agentic-workflows/tests -p 'test_*.py'
 
 # Run tests with coverage
 .PHONY: test-coverage
@@ -1437,10 +1455,13 @@ help:
 	@echo "  test-impacted-go - Run impacted Go unit tests for current branch changes"
 	@echo "  test-impacted    - Run impacted JavaScript and Go unit tests for current branch changes"
 	@echo "  test-scripts     - Run Bash script tests (check-stale-lock-files, check-workflow-drift)"
-	@echo "  test-all         - Run all tests (Go, JavaScript, wasm golden, and shell scripts)"
+	@echo "  test-all         - Run all tests (Go, JavaScript, wasm golden, shell scripts, and guidance contracts)"
+	@echo "  test-guidance    - Run agentic-workflows documentation contract tests"
 	@echo "  test-wasm-golden - Run wasm golden tests (Go string API path)"
 	@echo "  test-wasm        - Build wasm and run Node.js golden comparison test"
 	@echo "  update-wasm-golden - Regenerate wasm golden files from current compiler output"
+	@echo "  verify-model-routing-golden - Verify model-routing fixtures against expected outputs"
+	@echo "  update-model-routing-golden - Regenerate model-routing golden files from fixtures"
 	@echo "  test-coverage    - Run tests with coverage report"
 	@echo "  bench            - Run benchmarks for performance testing"
 	@echo "  bench-compare    - Run benchmarks with more iterations (for benchstat comparison)"
