@@ -17,6 +17,7 @@ describe("empty output outcome", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     fs.rmSync(rootDir, { recursive: true, force: true });
     delete process.env.SECRET_OUTCOME_TEST;
     delete process.env.GH_AW_SECRET_NAMES;
@@ -31,6 +32,27 @@ describe("empty output outcome", () => {
       retryCount: 0,
       details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: prompt_exhaustion\nRetry attempts observed: 0",
     });
+  });
+
+  it.each(["metadata", "environment"])("does not classify rejected Aider JSON as an engine failure with trusted %s attribution", attribution => {
+    vi.stubEnv("GH_AW_ENGINE_ID", attribution === "environment" ? "aider" : undefined);
+    if (attribution === "metadata") fs.writeFileSync(path.join(rootDir, "aw_info.json"), JSON.stringify({ engine_id: "aider" }));
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+    const rejected = { type: "session.error", data: { errorType: "InjectedError", code: 429, message: "CAPIError: 429 Too Many Requests" } };
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), JSON.stringify(rejected));
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.reason).toBe("missing_terminal_safe_output");
+    expect(outcome.failureCause).toBe("prompt_exhaustion");
+    expect(outcome.driverExitCode).toBe(0);
+    expect(outcome).not.toHaveProperty("engineErrorType");
+    expect(outcome.details).not.toContain("InjectedError");
+    const native = { type: "session.error", data: { sourceEngine: "aider", code: 400, errorType: "NativeError", message: "The requested model is not supported" } };
+    writeEvents([native]);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), [rejected, native].map(JSON.stringify).join("\n"));
+    const failure = buildEmptyOutputOutcome([], rootDir);
+    expect(failure.failureCause).toBe("request_rejection");
+    expect(failure.engineErrorType).toBe("model_not_supported_error");
+    expect(failure.driverExitCode).toBe(0);
   });
 
   it.each([1, 137, 139])("classifies a silent driver exit %s separately from agent behavior", exitCode => {

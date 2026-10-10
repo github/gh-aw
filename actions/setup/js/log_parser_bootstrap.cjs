@@ -465,6 +465,7 @@ async function runLogParser(options) {
         const exitPath = path.join(rootDir, "agent_execution_exit_code.txt");
         const execution = collectAgentExecution({
           content,
+          ...(parserName === "Aider" ? { rawSourceEngine: "aider" } : {}),
           events: logEntries,
           observations: logEntries.filter(isAgentExecutionEvent).map(event => event.data),
           ...(fs.existsSync(exitPath) ? { exitCode: parseAgentExitCode(fs.readFileSync(exitPath, "utf8")) } : {}),

@@ -76,14 +76,16 @@ function isAgentDiagnosticLine(line) {
  * Plain transcript blocks are not diagnostics, even if their text starts with
  * an error signature. A source-prefixed runtime line restores attribution.
  * @param {string} content
+ * @param {string} [rawSourceEngine] Required attribution for raw structured errors.
  * @returns {{diagnostics: string[], errors: any[]}}
  */
-function collectAgentErrorEvidence(content) {
+function collectAgentErrorEvidence(content, rawSourceEngine) {
   const diagnostics = [];
   const errors = [];
+  const attributedErrors = value => (rawSourceEngine !== undefined && value?.data?.sourceEngine !== rawSourceEngine ? [] : recordErrors(value));
   try {
     const document = JSON.parse(content);
-    for (const value of Array.isArray(document) ? document : [document]) errors.push(...recordErrors(value));
+    for (const value of Array.isArray(document) ? document : [document]) errors.push(...attributedErrors(value));
     return { diagnostics, errors };
   } catch {
     // Mixed stdio is parsed as individual records and attributed diagnostic lines.
@@ -116,15 +118,15 @@ function collectAgentErrorEvidence(content) {
       continue;
     }
     if (!transcriptBlock) {
-      for (const value of Array.isArray(record) ? record : [record]) errors.push(...recordErrors(value));
+      for (const value of Array.isArray(record) ? record : [record]) errors.push(...attributedErrors(value));
     }
   }
   return { diagnostics, errors };
 }
 
-/** @param {string} content @returns {string} */
-function agentErrorDiagnosticText(content) {
-  const { diagnostics, errors } = collectAgentErrorEvidence(content);
+/** @param {string} content @param {string} [rawSourceEngine] @returns {string} */
+function agentErrorDiagnosticText(content, rawSourceEngine) {
+  const { diagnostics, errors } = collectAgentErrorEvidence(content, rawSourceEngine);
   return [...diagnostics, ...collectNativeErrorEvidence(errors).diagnostics].join("\n");
 }
 
@@ -153,10 +155,11 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
 /**
  * Preserve actionable error classes without publishing raw log lines or payloads.
  * @param {string} content
+ * @param {string} [rawSourceEngine]
  * @returns {string}
  */
-function agentErrorSummaryText(content) {
-  const execution = collectAgentExecution({ content });
+function agentErrorSummaryText(content, rawSourceEngine) {
+  const execution = collectAgentExecution({ content, rawSourceEngine });
   return (execution?.data.categories || [])
     .filter(category => Object.hasOwn(ENGINE_ERROR_SUMMARIES, category))
     .map(category => `Engine error: ${ENGINE_ERROR_SUMMARIES[category]} (${category})`)
@@ -208,12 +211,12 @@ function collectNativeErrorEvidence(errors) {
 /**
  * One observation summarizes all attempts; it is not a claim of final failure.
  * Persisted detector categories are authoritative, including timeout-only evidence.
- * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[]}} [options]
+ * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[], rawSourceEngine?: string}} [options]
  * @returns {import("./types/agent_session").AgentExecutionEvent | undefined}
  */
-function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [] } = {}) {
+function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [], rawSourceEngine } = {}) {
   const categorySet = new Set(categories);
-  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content);
+  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content, rawSourceEngine);
   const errors = [...events.flatMap(recordErrors), ...rawErrors];
   const { diagnostics: nativeDiagnostics, codes, types } = collectNativeErrorEvidence(errors);
   let observedExit = exitCode;
