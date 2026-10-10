@@ -4,127 +4,64 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/github/gh-aw/pkg/logger"
 )
 
-var outcomeEvalAgentLog = logger.New("cli:outcome_eval_agent")
-
-// evalAssignToAgent checks whether an agent assignment led to a PR that was merged.
+// evalAssignToAgent requires a post-assignment link to a visible agent-authored PR.
 func evalAssignToAgent(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
 	repo := resolveItemRepo(item, repoOverride)
 	num := resolveItemNumber(item)
-	outcomeEvalAgentLog.Printf("Evaluating assign_to_agent: repo=%s, num=%d, url=%s", repo, num, item.URL)
-	report := OutcomeReport{
-		Type:         item.Type,
-		ObjectURL:    item.URL,
-		ObjectNumber: num,
-		Repo:         repo,
-	}
+	report := OutcomeReport{Type: item.Type, ObjectURL: item.URL, ObjectNumber: num, Repo: repo}
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_reference")
 	if num == 0 || repo == "" {
-		outcomeEvalAgentLog.Printf("Missing issue number or repo: num=%d, repo=%s", num, repo)
-		report.OutcomeStatus = OutcomeStatusError
-		report.EvalError = "missing issue number or repo"
 		return report
 	}
-
-	// Check issue state first
-	issueData, err := ghAPIGet(ctx, fmt.Sprintf("issues/%d", num), repo)
+	_, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("issues/%d", num), repo)
 	if err != nil {
-		report.OutcomeStatus = OutcomeStatusError
-		report.EvalError = err.Error()
+		outcomeAPIError(&report, err, false)
 		return report
 	}
-
-	state, _ := issueData["state"].(string)
-	stateReason, _ := issueData["state_reason"].(string)
-
-	// Search for linked PRs from copilot-swe-agent via timeline events
-	events, err := ghAPIGetArray(ctx, fmt.Sprintf("issues/%d/timeline", num), repo)
-	var agentPR map[string]any
-	if err == nil {
-		for _, event := range events {
-			eventType, _ := event["event"].(string)
-			if eventType != "cross-referenced" {
-				continue
-			}
-			source, _ := event["source"].(map[string]any)
-			if source == nil {
-				continue
-			}
-			issue, _ := source["issue"].(map[string]any)
-			if issue == nil {
-				continue
-			}
-			// Check if it's a PR (has pull_request field)
-			if _, hasPR := issue["pull_request"]; !hasPR {
-				continue
-			}
-			user, _ := issue["user"].(map[string]any)
-			login, _ := user["login"].(string)
-			if strings.Contains(login, "copilot") || strings.Contains(login, "github-actions") {
-				agentPR = issue
-				break
-			}
-		}
+	events, err := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/timeline", num), repo)
+	if err != nil {
+		outcomeAPIError(&report, err, false)
+		return report
 	}
-
-	if agentPR != nil {
-		prNumber := 0
-		if n, ok := agentPR["number"].(float64); ok {
-			prNumber = int(n)
+	for _, event := range events {
+		if outcomeString(event["event"]) != "cross-referenced" {
+			continue
 		}
-		outcomeEvalAgentLog.Printf("Found agent-linked PR for issue #%d: pr=%d", num, prNumber)
-
-		// Fetch the actual PR to check merge status
-		if prNumber > 0 {
-			prData, perr := ghAPIGet(ctx, fmt.Sprintf("pulls/%d", prNumber), repo)
-			if perr == nil {
-				merged, _ := prData["merged"].(bool)
-				prState, _ := prData["state"].(string)
-				mergedAt, _ := prData["merged_at"].(string)
-				closedAt, _ := prData["closed_at"].(string)
-
-				switch {
-				case merged:
-					report.OutcomeStatus = OutcomeStatusAccepted
-					report.Detail = fmt.Sprintf("agent PR #%d merged", prNumber)
-					if mergedAt != "" && item.Timestamp != "" {
-						report.TimeToOutcomeHours = timeBetween(item.Timestamp, mergedAt)
-					}
-					return report
-				case prState == "closed":
-					report.OutcomeStatus = OutcomeStatusRejected
-					report.Detail = fmt.Sprintf("agent PR #%d closed without merge", prNumber)
-					if closedAt != "" && item.Timestamp != "" {
-						report.TimeToOutcomeHours = timeBetween(item.Timestamp, closedAt)
-					}
-					return report
-				default:
-					report.OutcomeStatus = OutcomeStatusPending
-					report.Detail = fmt.Sprintf("agent PR #%d open", prNumber)
-					return report
-				}
-			}
+		at := outcomeString(event["created_at"])
+		if !outcomeAfter(at, item.Timestamp) {
+			continue
 		}
+		source, _ := event["source"].(map[string]any)
+		issue, _ := source["issue"].(map[string]any)
+		if issue["pull_request"] == nil {
+			continue
+		}
+		login := outcomeNestedString(issue["user"], "login")
+		if !strings.EqualFold(login, "copilot-swe-agent") && !strings.EqualFold(login, "github-actions[bot]") {
+			continue
+		}
+		prNumber := metadataInt(issue, "number")
+		if prNumber <= 0 {
+			continue
+		}
+		pr, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("pulls/%d", prNumber), repo)
+		if err != nil {
+			outcomeAPIError(&report, err, false)
+			return report
+		}
+		if merged, _ := pr["merged"].(bool); merged {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "merged")
+		} else if outcomeString(pr["state"]) == "closed" {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "closed_without_merge")
+		} else {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "open")
+		}
+		report.Detail = report.Signal
+		return report
 	}
-
-	// No agent PR found — check if issue was resolved by other means
-	switch {
-	case state == "closed" && stateReason == "completed":
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = "issue resolved (no agent PR found)"
-		closedAt, _ := issueData["closed_at"].(string)
-		if closedAt != "" && item.Timestamp != "" {
-			report.TimeToOutcomeHours = timeBetween(item.Timestamp, closedAt)
-		}
-	case state == "closed":
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "issue closed without resolution, no agent PR"
-	default:
-		report.OutcomeStatus = OutcomeStatusIgnored
-		report.Detail = "no agent PR created"
-	}
-
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+	report.Detail = "no attributable agent PR"
 	return report
 }

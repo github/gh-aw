@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 )
@@ -30,9 +31,7 @@ func countHumanCommentsAfter(comments []map[string]any, createdAt string) int {
 }
 
 func isHumanComment(comment map[string]any) bool {
-	user, _ := comment["user"].(map[string]any)
-	login, _ := user["login"].(string)
-	return !isBotUser(login)
+	return isNonBotActor(comment["user"])
 }
 
 func isLatestCloseByBot(ctx context.Context, number int, repo string, getEvents ghAPIGetArrayFunc) (bool, error) {
@@ -47,7 +46,10 @@ func isLatestCloseByBot(ctx context.Context, number int, repo string, getEvents 
 		}
 		actor, _ := events[i]["actor"].(map[string]any)
 		login, _ := actor["login"].(string)
-		return isBotUser(login), nil
+		if login == "" {
+			return false, errors.New("latest close actor is unavailable")
+		}
+		return !isNonBotActor(actor), nil
 	}
 	return false, fmt.Errorf("no close event found for %s#%d", repo, number)
 }

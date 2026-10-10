@@ -6706,6 +6706,9 @@
                     "pending": {
                       "type": "integer"
                     },
+                    "unknown": {
+                      "type": "integer"
+                    },
                     "accepted_strong": {
                       "type": "integer"
                     },
@@ -6806,6 +6809,7 @@
                     "rejected",
                     "ignored",
                     "pending",
+                    "unknown",
                     "lifecycle",
                     "errors",
                     "zero_touch",

@@ -36,8 +36,7 @@ func evalCloseSticky(ctx context.Context, item CreatedItemReport, repoOverride s
 
 	data, err := closeStickyGHAPIGet(ctx, endpoint, repo)
 	if err != nil {
-		report.OutcomeStatus = OutcomeStatusError
-		report.EvalError = err.Error()
+		outcomeAPIError(&report, err, false)
 		return report
 	}
 
@@ -50,7 +49,7 @@ func evalCloseSticky(ctx context.Context, item CreatedItemReport, repoOverride s
 	}
 
 	if merged {
-		report.OutcomeStatus = OutcomeStatusRejected
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "closed_by_merge")
 		report.Detail = "merged"
 		return report
 	}
@@ -67,8 +66,8 @@ func evalCloseSticky(ctx context.Context, item CreatedItemReport, repoOverride s
 		report.OutcomeStatus = OutcomeStatusLifecycleClose
 		report.Detail = "closed by bot (lifecycle_close)"
 	} else {
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "closed by non-bot"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "closed")
+		report.Detail = "closed"
 	}
 	return report
 }
@@ -77,39 +76,19 @@ func isClosedByLifecycleBot(ctx context.Context, number int, repo string) (bool,
 	return isLatestCloseByBot(ctx, number, repo, closeStickyGHAPIGetArray)
 }
 
-// evalCloseDiscussion checks whether a closed discussion stayed closed.
-// Uses REST API approximation since discussions don't have a direct REST endpoint.
+// evalCloseDiscussion has no GraphQL evaluator yet.
 func evalCloseDiscussion(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
-	// Discussions require GraphQL; for now return pending with a note
-	return OutcomeReport{
-		Type:              item.Type,
-		ObjectURL:         item.URL,
-		Repo:              resolveItemRepo(item, repoOverride),
-		OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending},
-		Detail:            "discussion outcome check requires GraphQL (not yet implemented)",
-	}
+	return unsupportedOutcome(item, repoOverride)
 }
 
 // evalCreateDiscussion checks whether a discussion received replies.
 func evalCreateDiscussion(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
-	return OutcomeReport{
-		Type:              item.Type,
-		ObjectURL:         item.URL,
-		Repo:              resolveItemRepo(item, repoOverride),
-		OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending},
-		Detail:            "discussion outcome check requires GraphQL (not yet implemented)",
-	}
+	return unsupportedOutcome(item, repoOverride)
 }
 
 // evalHideComment checks whether a hidden comment is still hidden.
 func evalHideComment(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
-	return OutcomeReport{
-		Type:              item.Type,
-		ObjectURL:         item.URL,
-		Repo:              resolveItemRepo(item, repoOverride),
-		OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending},
-		Detail:            "hidden comment check requires GraphQL (not yet implemented)",
-	}
+	return unsupportedOutcome(item, repoOverride)
 }
 
 // evalAssignMilestone checks whether a milestone assignment stuck.
@@ -129,43 +108,40 @@ func evalAssignMilestone(ctx context.Context, item CreatedItemReport, repoOverri
 		return report
 	}
 
-	data, err := ghAPIGet(ctx, fmt.Sprintf("issues/%d", num), repo)
+	expected := metadataInt(item.Metadata, "milestone_number")
+	if expected <= 0 {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+		report.Detail = "missing execution state"
+		return report
+	}
+	data, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("issues/%d", num), repo)
 	if err != nil {
 		report.OutcomeStatus = OutcomeStatusError
 		report.EvalError = err.Error()
 		return report
 	}
 
-	if data["milestone"] != nil {
+	milestone, _ := data["milestone"].(map[string]any)
+	if metadataInt(milestone, "number") == expected {
 		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = "milestone still assigned"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "milestone_assigned")
 	} else {
 		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = "milestone removed"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceMedium, "milestone_removed")
 	}
 	return report
 }
 
 // evalReviewComment checks whether a PR review comment thread was resolved or engaged.
 func evalReviewComment(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
-	return OutcomeReport{
-		Type:              item.Type,
-		ObjectURL:         item.URL,
-		Repo:              resolveItemRepo(item, repoOverride),
-		OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending},
-		Detail:            "review thread check requires GraphQL (not yet implemented)",
-	}
+	return unsupportedOutcome(item, repoOverride)
 }
 
 // evalResolveThread checks whether a resolved review thread stayed resolved.
 func evalResolveThread(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
-	return OutcomeReport{
-		Type:              item.Type,
-		ObjectURL:         item.URL,
-		Repo:              resolveItemRepo(item, repoOverride),
-		OutcomeEvaluation: OutcomeEvaluation{OutcomeStatus: OutcomeStatusPending},
-		Detail:            "resolve thread check requires GraphQL (not yet implemented)",
-	}
+	return unsupportedOutcome(item, repoOverride)
 }
 
 // evalMarkReady checks whether a PR marked as ready received reviews.
@@ -185,30 +161,36 @@ func evalMarkReady(ctx context.Context, item CreatedItemReport, repoOverride str
 		return report
 	}
 
-	reviews, err := ghAPIGetArray(ctx, fmt.Sprintf("pulls/%d/reviews", num), repo)
+	reviews, err := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("pulls/%d/reviews", num), repo)
 	if err != nil {
 		report.OutcomeStatus = OutcomeStatusError
 		report.EvalError = err.Error()
 		return report
 	}
 
-	if len(reviews) > 0 {
+	reviewed := false
+	for _, review := range reviews {
+		if isNonBotActor(review["user"]) && outcomeString(review["state"]) != "PENDING" && outcomeAfter(outcomeString(review["submitted_at"]), item.Timestamp) {
+			reviewed = true
+		}
+	}
+	if reviewed {
 		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = fmt.Sprintf("%d reviews submitted", len(reviews))
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "reviewed")
 	} else {
-		data, derr := ghAPIGet(ctx, fmt.Sprintf("pulls/%d", num), repo)
+		data, derr := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("pulls/%d", num), repo)
 		if derr == nil {
 			state, _ := data["state"].(string)
 			if state == "open" {
-				report.OutcomeStatus = OutcomeStatusPending
+				report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusPending, EvidenceMedium, "awaiting_review")
 				report.Detail = "awaiting review"
 			} else {
-				report.OutcomeStatus = OutcomeStatusIgnored
+				report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusIgnored, EvidenceMedium, "ignored")
 				report.Detail = "closed/merged without review"
 			}
 		} else {
-			report.OutcomeStatus = OutcomeStatusPending
-			report.Detail = "no reviews yet"
+			outcomeAPIError(&report, derr, false)
 		}
 	}
 	return report
@@ -231,7 +213,7 @@ func evalPushToPRBranch(ctx context.Context, item CreatedItemReport, repoOverrid
 		return report
 	}
 
-	data, err := ghAPIGet(ctx, fmt.Sprintf("pulls/%d", num), repo)
+	data, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("pulls/%d", num), repo)
 	if err != nil {
 		report.OutcomeStatus = OutcomeStatusError
 		report.EvalError = err.Error()
@@ -244,20 +226,46 @@ func evalPushToPRBranch(ctx context.Context, item CreatedItemReport, repoOverrid
 
 	switch {
 	case merged:
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = "PR merged"
+		shas := metadataStringSlice(item.Metadata, "pushed_commit_shas")
+		if sha := outcomeString(item.Metadata["commit_sha"]); sha != "" {
+			shas = append(shas, sha)
+		}
+		if len(shas) == 0 {
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+			report.Detail = "missing pushed commit evidence"
+			return report
+		}
+		base := outcomeString(data["merge_commit_sha"])
+		for _, sha := range shas {
+			if !validOutcomeSHA(sha) || !validOutcomeSHA(base) {
+				report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+				return report
+			}
+			compare, err := outcomeEvidenceGHAPIGet(ctx, fmt.Sprintf("compare/%s...%s", sha, base), repo)
+			if err != nil {
+				outcomeAPIError(&report, err, false)
+				return report
+			}
+			status := outcomeString(compare["status"])
+			if status != "ahead" && status != "identical" {
+				report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "commit_retention_unknown")
+				report.Detail = "pushed commits not verified in merged history"
+				return report
+			}
+		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "merged")
+		report.Detail = "pushed commits merged"
 	case state == "closed":
 		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = "PR closed without merge"
 	default:
 		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "PR still open"
+		report.Detail = "open"
 	}
 	return report
 }
 
-// evalGenericSticky is a fallback evaluator for types that modify an existing object.
-// It simply checks whether the target issue/PR still exists and is accessible.
+// evalGenericSticky never infers action acceptance from target existence.
 func evalGenericSticky(ctx context.Context, item CreatedItemReport, repoOverride string) OutcomeReport {
 	repo := resolveItemRepo(item, repoOverride)
 	num := resolveItemNumber(item)
@@ -269,8 +277,7 @@ func evalGenericSticky(ctx context.Context, item CreatedItemReport, repoOverride
 	}
 
 	if num == 0 || repo == "" {
-		// No number to check — just report what we know
-		report.OutcomeStatus = OutcomeStatusPending
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_reference")
 		report.Detail = "no object reference to check"
 		return report
 	}

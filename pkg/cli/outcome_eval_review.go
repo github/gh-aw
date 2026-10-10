@@ -107,16 +107,10 @@ func evalAddReviewer(ctx context.Context, item CreatedItemReport, repoOverride s
 		return report
 	}
 
-	// We cannot cheaply verify team membership for each reviewer from this endpoint,
-	// so any submitted post-request review counts as medium-evidence team activity.
+	// A submitted review does not establish membership in the requested team.
 	if len(requestedTeams) > 0 && hasReviewAfterTimestamp(reviews, item.Timestamp) {
-		report.OutcomeStatus = OutcomeStatusAccepted
-		report.Detail = "team review request received a review"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "review_submitted",
-		}
+		report.Detail = "team reviewer membership is unverified"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceWeak, "team_membership_unverified")
 		return report
 	}
 
@@ -186,9 +180,6 @@ func evalSubmitPullRequestReview(ctx context.Context, item CreatedItemReport, re
 
 	reviewID := metadataInt(item.Metadata, "review_id")
 	review := findReviewByID(reviews, reviewID)
-	if review == nil {
-		review = latestReviewAfterTimestamp(reviews, item.Timestamp)
-	}
 	if review == nil {
 		outcomeReviewLog.Printf("Submitted review not found for PR #%d (reviewID=%d, reviews=%d)", num, reviewID, len(reviews))
 		report.OutcomeStatus = OutcomeStatusUnknown
@@ -308,7 +299,9 @@ func metadataInt(metadata map[string]any, key string) int {
 		return int(value)
 	case string:
 		var parsed int
-		_, _ = fmt.Sscanf(value, "%d", &parsed)
+		if n, err := fmt.Sscanf(value, "%d", &parsed); err != nil || n != 1 {
+			return 0
+		}
 		return parsed
 	}
 	return 0

@@ -154,7 +154,28 @@ func evalAddLabels(ctx context.Context, item CreatedItemReport, repoOverride str
 		return report
 	}
 
-	labels, err := ghAPIGetArray(ctx, fmt.Sprintf("issues/%d/labels", num), repo)
+	before := item.LabelsBefore
+	if item.BeforeState != nil {
+		before = mutableStringSlice(item.BeforeState["labels"])
+	}
+	added := item.LabelsAdded
+	if len(added) == 0 {
+		for _, label := range item.Labels {
+			added = append(added, label.Name)
+		}
+	}
+	if before == nil || len(added) == 0 {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+		report.Detail = "missing execution state"
+		return report
+	}
+	delta := labelSetDiff(mutableStringSlice(added), mutableStringSlice(before))
+	if len(delta) == 0 {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "no_state_delta")
+		report.Detail = "no persisted state delta"
+		return report
+	}
+	labels, err := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/labels", num), repo)
 	if err != nil {
 		outcomeEvalLabelLog.Printf("Failed to fetch labels for %s#%d: %v", repo, num, err)
 		report.OutcomeStatus = OutcomeStatusError
@@ -162,16 +183,16 @@ func evalAddLabels(ctx context.Context, item CreatedItemReport, repoOverride str
 		return report
 	}
 
-	// We don't know exactly which labels were added (the manifest doesn't record them),
-	// so we cannot reliably verify retention. If labels are still present we report
-	// pending rather than accepted, because the current labels could differ entirely
-	// from the ones we added. Only an empty label list is a clear rejection signal.
-	if len(labels) > 0 {
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "cannot evaluate label retention (added labels not recorded; extend manifest to include label names)"
+	current := make([]string, 0, len(labels))
+	for _, label := range labels {
+		current = append(current, outcomeString(label["name"]))
+	}
+	if labelSetContainsAll(mutableStringSlice(current), delta) {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "state_retained")
+		report.Detail = "label addition retained"
 	} else {
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "all labels removed"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_replaced")
+		report.Detail = "added labels removed"
 	}
 
 	outcomeEvalLabelLog.Printf("Label evaluation result: result=%s, label_count=%d", report.OutcomeStatus, len(labels))

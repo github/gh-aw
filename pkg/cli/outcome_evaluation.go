@@ -48,6 +48,9 @@ func normalizeOutcomeEvaluation(report OutcomeReport) OutcomeEvaluation {
 	outcomeEvaluationLog.Printf("Normalizing outcome from heuristics: type=%s, result=%s, detail=%q", report.Type, report.OutcomeStatus, report.Detail)
 
 	if report.EvalError != "" || report.OutcomeStatus == OutcomeStatusError {
+		if strings.HasPrefix(report.EvalError, "missing ") || strings.HasPrefix(report.EvalError, "cannot extract comment ID") {
+			return outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_reference")
+		}
 		return OutcomeEvaluation{
 			OutcomeStatus:    OutcomeStatusError,
 			EvidenceStrength: EvidenceWeak,
@@ -69,6 +72,9 @@ func normalizeOutcomeEvaluation(report OutcomeReport) OutcomeEvaluation {
 	case strings.Contains(detail, "closed by bot"):
 		return OutcomeEvaluation{OutcomeStatus: OutcomeStatusLifecycle, EvidenceStrength: EvidenceMedium, Signal: "lifecycle"}
 	case strings.Contains(detail, "merged"):
+		if report.OutcomeStatus == OutcomeStatusRejected {
+			return outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "closed_by_merge")
+		}
 		return OutcomeEvaluation{OutcomeStatus: OutcomeStatusAccepted, EvidenceStrength: EvidenceStrong, Signal: "merged"}
 	case strings.Contains(detail, "reopened"):
 		return OutcomeEvaluation{OutcomeStatus: OutcomeStatusRejected, EvidenceStrength: EvidenceStrong, Signal: "reopened"}

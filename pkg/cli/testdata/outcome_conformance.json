@@ -1,0 +1,340 @@
+[
+  {
+    "name": "commit at action boundary is not follow up",
+    "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": {
+      "pulls/1": { "merged": true, "user": { "login": "author" } },
+      "issues/1/comments": [],
+      "pulls/1/reviews": [],
+      "pulls/1/commits": [{ "author": { "login": "alice" }, "commit": { "committer": { "date": "2026-01-01T00:00:00Z" } } }]
+    },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" },
+    "zero_touch": true
+  },
+  {
+    "name": "equivalent review timestamp not follow up",
+    "item": { "type": "mark_pull_request_as_ready_for_review", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1": { "state": "open" }, "pulls/1/reviews": [{ "user": { "login": "alice" }, "state": "APPROVED", "submitted_at": "2026-01-01T01:00:00+01:00" }] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "awaiting_review" }
+  },
+  {
+    "name": "replacement primary API failure",
+    "item": { "type": "replace_label", "number": 1, "before_state": { "labels": ["old"] }, "after_state": { "labels": ["new"] } },
+    "responses": {},
+    "errors": { "issues/1": 404 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "retained merged PR edit",
+    "item": { "type": "update_pull_request", "number": 1, "before_state": { "title": "old" }, "after_state": { "title": "new" } },
+    "responses": { "pulls/1": { "title": "new", "merged": true } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "state_retained_and_merged" }
+  },
+  {
+    "name": "PR edit reverted",
+    "item": { "type": "update_pull_request", "number": 1, "before_state": { "title": "old" }, "after_state": { "title": "new" } },
+    "responses": { "pulls/1": { "title": "old" } },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "state_reverted" }
+  },
+  { "name": "unsupported close discussion", "item": { "type": "close_discussion", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "unsupported_evaluator" } },
+  { "name": "unsupported review comment", "item": { "type": "create_pull_request_review_comment", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "unsupported_evaluator" } },
+  { "name": "unsupported hidden comment", "item": { "type": "hide_comment", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "unsupported_evaluator" } },
+  { "name": "unsupported review thread", "item": { "type": "resolve_pull_request_review_thread", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "unsupported_evaluator" } },
+  {
+    "name": "review comment URL retains PR identity",
+    "item": { "type": "create_pull_request", "url": "https://github.com/acme/repo/pull/1/comments/456" },
+    "responses": { "pulls/1": { "state": "open" }, "issues/1/comments": [], "pulls/1/reviews": [], "pulls/1/commits": [] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "open" }
+  },
+  {
+    "name": "issue supplementary 404 is not deletion",
+    "item": { "type": "create_issue", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "issues/1": { "state": "open" } },
+    "errors": { "issues/1/comments": 404 },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "missing PR reference does not guess",
+    "item": { "type": "create_pull_request", "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": {},
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_reference" }
+  },
+  {
+    "name": "unknown comment actor prevents zero touch",
+    "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1": { "merged": true }, "issues/1/comments": [{ "created_at": "2026-01-02T00:00:00Z", "user": {} }], "pulls/1/reviews": [], "pulls/1/commits": [] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" },
+    "zero_touch": false
+  },
+  {
+    "name": "invalid review timestamp prevents zero touch",
+    "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1": { "merged": true }, "issues/1/comments": [], "pulls/1/reviews": [{ "submitted_at": "invalid", "state": "APPROVED", "user": { "login": "alice" } }], "pulls/1/commits": [] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" },
+    "zero_touch": false
+  },
+  {
+    "name": "ready review at action boundary not follow up",
+    "item": { "type": "mark_pull_request_as_ready_for_review", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1": { "state": "open" }, "pulls/1/reviews": [{ "user": { "login": "alice" }, "state": "APPROVED", "submitted_at": "2026-01-01T00:00:00Z" }] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "awaiting_review" }
+  },
+  {
+    "name": "requested reviewer approved",
+    "item": { "type": "add_reviewer", "number": 1, "timestamp": "2026-01-01T00:00:00Z", "metadata": { "requested_reviewers": ["alice"] } },
+    "responses": { "pulls/1/reviews": [{ "state": "APPROVED", "user": { "login": "alice" }, "submitted_at": "2026-01-02T00:00:00Z" }], "pulls/1/requested_reviewers": { "users": [], "teams": [] } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "review_approved" }
+  },
+  {
+    "name": "unverified team review",
+    "item": { "type": "add_reviewer", "number": 1, "timestamp": "2026-01-01T00:00:00Z", "metadata": { "requested_team_reviewers": ["team"] } },
+    "responses": { "pulls/1/reviews": [{ "state": "APPROVED", "user": { "login": "alice" }, "submitted_at": "2026-01-02T00:00:00Z" }], "pulls/1/requested_reviewers": { "users": [], "teams": [] } },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "team_membership_unverified" }
+  },
+  {
+    "name": "submitted review cannot borrow another review",
+    "item": { "type": "submit_pull_request_review", "number": 1, "timestamp": "2026-01-01T00:00:00Z", "metadata": { "review_id": 4 } },
+    "responses": { "pulls/1": { "state": "closed", "merged": true }, "pulls/1/reviews": [{ "id": 5, "state": "APPROVED", "submitted_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "review_missing" }
+  },
+  {
+    "name": "submitted review dismissed",
+    "item": { "type": "submit_pull_request_review", "number": 1, "metadata": { "review_id": 4 } },
+    "responses": { "pulls/1": { "state": "open" }, "pulls/1/reviews": [{ "id": 4, "state": "DISMISSED", "submitted_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "review_dismissed" }
+  },
+  {
+    "name": "ready PR reviewed after action",
+    "item": { "type": "mark_pull_request_as_ready_for_review", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1/reviews": [{ "user": { "login": "alice" }, "state": "APPROVED", "submitted_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "reviewed" }
+  },
+  {
+    "name": "ready PR bot review does not count",
+    "item": { "type": "mark_pull_request_as_ready_for_review", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1": { "state": "open" }, "pulls/1/reviews": [{ "user": { "login": "alice[bot]" }, "state": "APPROVED", "submitted_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "awaiting_review" }
+  },
+  {
+    "name": "retained intended milestone",
+    "item": { "type": "assign_milestone", "number": 1, "metadata": { "milestone_number": 2 } },
+    "responses": { "issues/1": { "milestone": { "number": 2 } } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "milestone_assigned" }
+  },
+  {
+    "name": "different milestone not accepted",
+    "item": { "type": "assign_milestone", "number": 1, "metadata": { "milestone_number": 2 } },
+    "responses": { "issues/1": { "milestone": { "number": 3 } } },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "medium", "signal": "milestone_removed" }
+  },
+  {
+    "name": "pushed commit verified in merged history",
+    "item": { "type": "push_to_pull_request_branch", "number": 1, "metadata": { "commit_sha": "abcdef123" } },
+    "responses": { "pulls/1": { "merged": true, "merge_commit_sha": "123456789" }, "compare/abcdef123...123456789": { "status": "ahead" } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" }
+  },
+  {
+    "name": "merged PR does not prove pushed commit",
+    "item": { "type": "push_to_pull_request_branch", "number": 1, "metadata": { "commit_sha": "abcdef123" } },
+    "responses": { "pulls/1": { "merged": true, "merge_commit_sha": "123456789" }, "compare/abcdef123...123456789": { "status": "diverged" } },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "commit_retention_unknown" }
+  },
+  {
+    "name": "agent PR from post-action link",
+    "item": { "type": "assign_to_agent", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": {
+      "issues/1": { "state": "open" },
+      "issues/1/timeline": [{ "event": "cross-referenced", "created_at": "2026-01-02T00:00:00Z", "source": { "issue": { "number": 2, "pull_request": {}, "user": { "login": "copilot-swe-agent" } } } }],
+      "pulls/2": { "merged": true }
+    },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" }
+  },
+  {
+    "name": "old agent PR not attributed",
+    "item": { "type": "assign_to_agent", "number": 1, "timestamp": "2026-01-03T00:00:00Z" },
+    "responses": {
+      "issues/1": { "state": "closed" },
+      "issues/1/timeline": [{ "event": "cross-referenced", "created_at": "2026-01-02T00:00:00Z", "source": { "issue": { "number": 2, "pull_request": {}, "user": { "login": "copilot-swe-agent" } } } }]
+    },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
+  },
+  {
+    "name": "completed issue without engagement",
+    "item": { "type": "create_issue", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "issues/1": { "state": "closed", "state_reason": "completed" } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "completed" }
+  },
+  { "name": "closed issue without reason", "item": { "type": "create_issue", "number": 1 }, "responses": { "issues/1": { "state": "closed" } }, "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "unknown" } },
+  {
+    "name": "open issue with bot engagement",
+    "item": { "type": "create_issue", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "issues/1": { "state": "open" }, "issues/1/comments": [{ "user": { "login": "other[bot]" }, "created_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "open" }
+  },
+  {
+    "name": "open issue with non-bot engagement",
+    "item": { "type": "create_issue", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "issues/1": { "state": "open" }, "issues/1/comments": [{ "user": { "login": "alice" }, "created_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "acted_on" }
+  },
+  {
+    "name": "bot-closed issue",
+    "item": { "type": "create_issue", "number": 1 },
+    "responses": { "issues/1": { "state": "closed", "state_reason": "not_planned" }, "issues/1/events": [{ "event": "closed", "actor": { "login": "some-app", "type": "Bot" } }] },
+    "expected": { "outcome_status": "lifecycle", "evidence_strength": "medium", "signal": "lifecycle" }
+  },
+  {
+    "name": "dismissed issue",
+    "item": { "type": "create_issue", "number": 1 },
+    "responses": { "issues/1": { "state": "closed", "state_reason": "not_planned" }, "issues/1/events": [{ "event": "closed", "actor": { "login": "alice" } }] },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "closed_not_planned" }
+  },
+  {
+    "name": "close actor unavailable",
+    "item": { "type": "create_issue", "number": 1 },
+    "responses": { "issues/1": { "state": "closed", "state_reason": "not_planned" }, "issues/1/events": [] },
+    "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" }
+  },
+  {
+    "name": "approved open PR",
+    "item": { "type": "create_pull_request", "number": 1 },
+    "responses": { "pulls/1": { "state": "open", "merged": false }, "issues/1/comments": [], "pulls/1/reviews": [{ "state": "APPROVED" }], "pulls/1/commits": [] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "open" }
+  },
+  {
+    "name": "merged PR",
+    "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1": { "state": "closed", "merged": true }, "issues/1/comments": [], "pulls/1/reviews": [], "pulls/1/commits": [] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" },
+    "zero_touch": true
+  },
+  {
+    "name": "merged PR with non-bot edit",
+    "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": {
+      "pulls/1": { "state": "closed", "merged": true, "user": { "login": "author[bot]" } },
+      "issues/1/comments": [],
+      "pulls/1/reviews": [],
+      "pulls/1/commits": [{ "author": { "login": "alice" }, "commit": { "committer": { "date": "2026-01-02T00:00:00Z" } } }]
+    },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" },
+    "zero_touch": false
+  },
+  {
+    "name": "merged PR with unavailable effort evidence",
+    "item": { "type": "create_pull_request", "number": 1, "timestamp": "2026-01-01T00:00:00Z" },
+    "responses": { "pulls/1": { "state": "closed", "merged": true } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "merged" },
+    "zero_touch": false
+  },
+  {
+    "name": "unmerged closed PR",
+    "item": { "type": "create_pull_request", "number": 1 },
+    "responses": { "pulls/1": { "state": "closed", "merged": false }, "issues/1/comments": [], "pulls/1/reviews": [], "pulls/1/commits": [] },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "closed_without_merge" }
+  },
+  {
+    "name": "comment with bot follow-up",
+    "item": { "type": "add_comment", "url": "https://github.com/acme/repo/issues/1#issuecomment-7" },
+    "responses": { "issues/comments/7": { "id": 7, "created_at": "2026-01-01T00:00:00Z", "reactions": { "total_count": 0 } }, "issues/1/comments": [{ "user": { "login": "app", "type": "Bot" }, "created_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "pending", "evidence_strength": "medium", "signal": "pending" }
+  },
+  {
+    "name": "comment with non-bot reply",
+    "item": { "type": "add_comment", "url": "https://github.com/acme/repo/issues/1#issuecomment-7" },
+    "responses": { "issues/comments/7": { "id": 7, "created_at": "2026-01-01T00:00:00Z" }, "issues/1/comments": [{ "user": { "login": "alice" }, "created_at": "2026-01-02T00:00:00Z" }] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "acted_on" }
+  },
+  {
+    "name": "comment reaction",
+    "item": { "type": "add_comment", "url": "https://github.com/acme/repo/issues/1#issuecomment-7" },
+    "responses": { "issues/comments/7": { "id": 7, "reactions": { "total_count": 1 } }, "issues/1/comments": [] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "acted_on" }
+  },
+  {
+    "name": "retained labels",
+    "item": { "type": "add_labels", "number": 1, "before_state": { "labels": ["old"] }, "labelsAdded": ["new"] },
+    "responses": { "issues/1/labels": [{ "name": "old" }, { "name": "new" }, { "name": "unrelated" }] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "state_retained" }
+  },
+  {
+    "name": "removed labels",
+    "item": { "type": "add_labels", "number": 1, "before_state": { "labels": ["old"] }, "labelsAdded": ["new"] },
+    "responses": { "issues/1/labels": [{ "name": "old" }] },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "state_replaced" }
+  },
+  { "name": "labels without execution evidence", "item": { "type": "add_labels", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" } },
+  {
+    "name": "retained replacement with unrelated label",
+    "item": { "type": "replace_label", "number": 1, "before_state": { "labels": ["old"] }, "after_state": { "labels": ["new"] } },
+    "responses": { "issues/1": { "labels": [{ "name": "new" }, { "name": "unrelated" }] }, "issues/1/labels": [{ "name": "new" }, { "name": "unrelated" }] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "state_retained" }
+  },
+  {
+    "name": "retained issue edit",
+    "item": { "type": "update_issue", "number": 1, "before_state": { "title": "old" }, "after_state": { "title": "new" } },
+    "responses": { "issues/1": { "state": "open", "title": "new" } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "medium", "signal": "state_retained" }
+  },
+  {
+    "name": "reverted issue edit",
+    "item": { "type": "update_issue", "number": 1, "before_state": { "title": "old" }, "after_state": { "title": "new" } },
+    "responses": { "issues/1": { "state": "open", "title": "old" } },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "state_reverted" }
+  },
+  {
+    "name": "closed action retained",
+    "item": { "type": "close_issue", "number": 1 },
+    "responses": { "issues/1": { "state": "closed" }, "issues/1/events": [{ "event": "closed", "actor": { "login": "alice" } }] },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "closed" }
+  },
+  {
+    "name": "bot lifecycle close",
+    "item": { "type": "close_issue", "number": 1 },
+    "responses": { "issues/1": { "state": "closed" }, "issues/1/events": [{ "event": "closed", "actor": { "login": "stale[bot]" } }] },
+    "expected": { "outcome_status": "lifecycle_close", "evidence_strength": "medium", "signal": "lifecycle_close" }
+  },
+  { "name": "reopened action", "item": { "type": "close_issue", "number": 1 }, "responses": { "issues/1": { "state": "open" } }, "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "reopened" } },
+  {
+    "name": "close replaced by merge",
+    "item": { "type": "close_pull_request", "number": 1 },
+    "responses": { "pulls/1": { "state": "closed", "merged": true } },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "closed_by_merge" }
+  },
+  {
+    "name": "successful dispatch",
+    "item": { "type": "dispatch_workflow", "metadata": { "run_id": 9 } },
+    "responses": { "actions/runs/9": { "status": "completed", "conclusion": "success" } },
+    "expected": { "outcome_status": "accepted", "evidence_strength": "strong", "signal": "workflow_success" }
+  },
+  { "name": "dispatch missing run ID", "item": { "type": "dispatch_workflow" }, "responses": {}, "expected": { "outcome_status": "pending", "evidence_strength": "none", "signal": "missing_run_id" } },
+  {
+    "name": "failed dispatch",
+    "item": { "type": "dispatch_workflow", "metadata": { "run_id": 9 } },
+    "responses": { "actions/runs/9": { "status": "completed", "conclusion": "failure" } },
+    "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "workflow_failed" }
+  },
+  { "name": "unsupported discussion", "item": { "type": "create_discussion", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "unsupported_evaluator" } },
+  {
+    "name": "generic closed target does not imply acceptance",
+    "item": { "type": "update_project", "number": 1, "url": "https://github.com/acme/repo/issues/1" },
+    "responses": { "issues/1": { "state": "closed" } },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "weak", "signal": "target_exists_only" }
+  },
+  { "name": "missing reference", "item": { "type": "create_issue" }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_reference" } },
+  { "name": "API failure", "item": { "type": "create_issue", "number": 1 }, "responses": {}, "expected": { "outcome_status": "error", "evidence_strength": "weak", "signal": "evaluation_error" } },
+  { "name": "deleted issue", "item": { "type": "create_issue", "number": 1 }, "responses": {}, "errors": { "issues/1": 404 }, "expected": { "outcome_status": "rejected", "evidence_strength": "strong", "signal": "deleted" } },
+  {
+    "name": "merged push without commit evidence",
+    "item": { "type": "push_to_pull_request_branch", "number": 1 },
+    "responses": { "pulls/1": { "state": "closed", "merged": true } },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
+  },
+  {
+    "name": "unattributed agent assignment",
+    "item": { "type": "assign_to_agent", "number": 1 },
+    "responses": { "issues/1": { "state": "closed", "state_reason": "completed" }, "issues/1/timeline": [] },
+    "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" }
+  },
+  { "name": "milestone without expected identity", "item": { "type": "assign_milestone", "number": 1 }, "responses": {}, "expected": { "outcome_status": "unknown", "evidence_strength": "none", "signal": "missing_execution_state" } }
+]

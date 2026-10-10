@@ -26,9 +26,22 @@ To support that measurement, every evaluated output is classified into an outcom
 | `accepted` | The result was kept, merged, completed, or otherwise accepted by the repository state. |
 | `rejected` | The result was explicitly undone, closed, removed, or not accepted. |
 | `pending` | The result exists, but has not reached a terminal state yet. |
-| `ignored` | The result received no meaningful follow-up within the evaluation window. |
+| `ignored` | The action reached a state without its expected effect, such as a dispatched run skipped without success or failure. |
 | `lifecycle` | Closed or removed by the workflow itself as part of its normal operation (for example, a `close-older-issues` workflow) — not a rejection. |
 | `lifecycle_close` | A `close_issue` or `close_pull_request` output where the close actor was a lifecycle bot (for example, a stale bot) and no visible non-bot actor has since reopened it. |
+| `unknown` | The action cannot be verified: required execution evidence is missing, the evaluator is unsupported, or only target existence is known. |
+| `error` | An API or evaluation failure prevented checking the action. |
+
+The CLI and scheduled collector use the same action-specific classifications,
+evidence strengths, and signals. An open issue or PR remains `pending`; approval,
+bot comments, and unrelated target state do not turn a creation into acceptance.
+Generic existence checks return weak `unknown`, never `accepted`. Unsupported
+evaluators return `unknown` with no evidence. Summary counts include unknown,
+error, and lifecycle outcomes so all evaluated items reconcile.
+
+`zero_touch` is only true for an accepted PR when comments, submitted reviews,
+and commits are available and show no visible non-bot follow-up after the action.
+Missing actor or commit evidence cannot establish zero-touch acceptance.
 
 ## Accepted Outcomes
 
@@ -48,32 +61,33 @@ Outcome evaluation is based on visible repository state and visible actor identi
 | Safe output type | `accepted` at a glance | Current rule source |
 | --- | --- | --- |
 | `create_pull_request` | merged | dedicated rule |
-| `create_issue` | completed/closed | dedicated rule |
+| `create_issue` | closed as completed | dedicated rule |
 | `add_comment` | reacted to or replied to | dedicated rule |
-| `add_labels` | label retention | limited check |
-| `add_reviewer` | reviewer acted or request remained/was removed | dedicated rule |
+| `add_labels` | recorded label addition retained | dedicated rule |
+| `add_reviewer` | recorded requested reviewer submitted a review | dedicated rule |
 | `update_issue` | intended edit still matches current issue state | dedicated rule |
 | `update_pull_request` | intended edit still matches current PR state | dedicated rule |
-| `close_issue` | still closed | dedicated rule |
-| `close_pull_request` | still closed | dedicated rule |
+| `close_issue` | still closed by a visible non-bot actor | dedicated rule |
+| `close_pull_request` | still closed unmerged by a visible non-bot actor | dedicated rule |
 | `close_discussion` | none yet | no implemented rule yet |
 | `create_discussion` | none yet | no implemented rule yet |
-| `update_discussion` | discussion target exists | fallback rule |
+| `update_discussion` | none yet | no implemented rule yet |
 | `create_pull_request_review_comment` | none yet | no implemented rule yet |
 | `submit_pull_request_review` | review affected PR lifecycle | dedicated rule |
-| `reply_to_pull_request_review_comment` | review target exists | fallback rule |
+| `reply_to_pull_request_review_comment` | none; target existence is unknown | fallback rule |
 | `resolve_pull_request_review_thread` | none yet | no implemented rule yet |
-| `push_to_pull_request_branch` | merged | dedicated rule |
+| `push_to_pull_request_branch` | recorded pushed commits verified in merged history | dedicated rule |
 | `mark_pull_request_as_ready_for_review` | reviewed | dedicated rule |
-| `assign_to_agent` | merged or completed | dedicated rule |
-| `dispatch_workflow` | dispatch target exists | fallback rule |
-| `autofix_code_scanning_alert` | alert target exists | fallback rule |
-| `create_code_scanning_alert` | alert target exists | fallback rule |
-| `link_sub_issue` | sub-issue link target exists | fallback rule |
+| `assign_to_agent` | attributable post-assignment agent PR merged | dedicated rule |
+| `dispatch_workflow` | recorded dispatched run completed successfully | dedicated rule |
+| `autofix_code_scanning_alert` | none; target existence is unknown | fallback rule |
+| `create_code_scanning_alert` | none; target existence is unknown | fallback rule |
+| `link_sub_issue` | none; target existence is unknown | fallback rule |
 | `hide_comment` | none yet | no implemented rule yet |
-| `assign_milestone` | milestone still set | dedicated rule |
-| `update_project` | project target exists | fallback rule |
-| `update_release` | release target exists | fallback rule |
+| `assign_milestone` | recorded milestone identity still assigned | dedicated rule |
+| `replace_label` | recorded label replacement delta retained | dedicated rule |
+| `update_project` | none; target existence is unknown | fallback rule |
+| `update_release` | none; target existence is unknown | fallback rule |
 | `noop` | skipped | skipped |
 | `missing_tool` | skipped | skipped |
 

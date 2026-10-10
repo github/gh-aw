@@ -201,7 +201,7 @@ func TestEvalUpdateDiscussionReturnsIgnored(t *testing.T) {
 		URL:  "https://github.com/owner/repo/discussions/1",
 	}, "owner/repo")
 
-	assert.Equal(t, OutcomeStatusIgnored, report.OutcomeStatus,
-		"evalUpdateDiscussion must return OutcomeStatusIgnored to prevent infinite retry")
+	assert.Equal(t, OutcomeStatusUnknown, report.OutcomeStatus,
+		"an unsupported evaluator cannot establish lack of engagement")
 	assert.NotEmpty(t, report.Detail)
 }

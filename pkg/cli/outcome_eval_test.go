@@ -64,6 +64,19 @@ func TestComputeOutcomeSummaryEmpty(t *testing.T) {
 	assert.InDelta(t, 0.0, s.ZeroTouchRate, 1e-12, "empty zero-touch rate")
 }
 
+func TestComputeOutcomeSummaryReconcilesUnknownAndErrors(t *testing.T) {
+	reports := []OutcomeReport{
+		{OutcomeEvaluation: outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_reference")},
+		{OutcomeEvaluation: outcomeEvidence(OutcomeStatusError, EvidenceWeak, "evaluation_error")},
+		{OutcomeEvaluation: outcomeEvidence(OutcomeStatusLifecycleClose, EvidenceMedium, "lifecycle_close")},
+	}
+	s := ComputeOutcomeSummary(reports, github.DefaultObjectiveMapping())
+	assert.Equal(t, 1, s.Unknown)
+	assert.Equal(t, 1, s.Errors)
+	assert.Equal(t, 1, s.Lifecycle)
+	assert.Equal(t, s.Total, s.Accepted+s.Rejected+s.Ignored+s.Pending+s.Unknown+s.Errors+s.Lifecycle)
+}
+
 func TestParseNumberFromURL(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -73,6 +86,8 @@ func TestParseNumberFromURL(t *testing.T) {
 		{"PR URL", "https://github.com/owner/repo/pull/42", 42},
 		{"issue URL", "https://github.com/owner/repo/issues/108", 108},
 		{"comment URL", "https://github.com/owner/repo/issues/123#issuecomment-456", 123},
+		{"review comment URL", "https://github.com/owner/repo/pull/123/comments/456", 123},
+		{"non-object numeric URL", "https://github.com/owner/repo/actions/runs/123", 0},
 		{"empty", "", 0},
 		{"no number", "https://github.com/owner/repo", 0},
 	}
@@ -184,7 +199,7 @@ func TestCountHumanComments(t *testing.T) {
 
 	assert.Equal(t, 2, countHumanComments(comments), "should count only non-bot comments")
 	assert.Equal(t, 0, countHumanComments(nil), "empty comment list")
-	assert.Equal(t, 1, countHumanComments([]map[string]any{{}}), "missing user preserves existing human classification")
+	assert.Equal(t, 0, countHumanComments([]map[string]any{{}}), "missing actor cannot establish non-bot activity")
 }
 
 func TestCountHumanCommentsAfter(t *testing.T) {
@@ -337,7 +352,7 @@ func TestEvaluateOutcomesErrorOnMissingData(t *testing.T) {
 
 	reports := EvaluateOutcomes(context.Background(), items, "", github.DefaultObjectiveMapping())
 	assert.Len(t, reports, 1, "should produce one report")
-	assert.Equal(t, OutcomeStatusError, reports[0].OutcomeStatus, "should error on missing repo and number")
+	assert.Equal(t, OutcomeStatusUnknown, reports[0].OutcomeStatus, "missing reference is unknown, not an API failure")
 }
 
 func TestEnrichOutcomeWithObjectiveValue_TracesPullRequestToRootIssue(t *testing.T) {

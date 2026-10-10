@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +54,7 @@ type OutcomeSummary struct {
 	Rejected                int               `json:"rejected" console:"header:Rejected"`
 	Ignored                 int               `json:"ignored" console:"header:Ignored"`
 	Pending                 int               `json:"pending" console:"header:Pending"`
+	Unknown                 int               `json:"unknown" console:"header:Unknown"`
 	AcceptedStrong          int               `json:"accepted_strong,omitempty"`
 	AcceptedMedium          int               `json:"accepted_medium,omitempty"`
 	AcceptedWeak            int               `json:"accepted_weak,omitempty"`
@@ -169,6 +171,8 @@ func ComputeOutcomeSummary(reports []OutcomeReport, mapping *github.ObjectiveMap
 			s.Ignored++
 		case OutcomeStatusPending:
 			s.Pending++
+		case OutcomeStatusUnknown:
+			s.Unknown++
 		}
 		if eval.Signal == "target_exists_only" {
 			s.FallbackExistsOnlyCount++
@@ -276,7 +280,7 @@ func ghAPIGetArray(ctx context.Context, endpoint string, repo string) ([]map[str
 		return nil, fmt.Errorf("invalid endpoint %q: %w", endpoint, err)
 	}
 	ownerRepo, host := repoutil.NormalizeRepoForAPI(repo)
-	args := []string{"api", fmt.Sprintf("repos/%s/%s", escapeOwnerRepo(ownerRepo), escapeEndpoint(endpoint))}
+	args := []string{"api", fmt.Sprintf("repos/%s/%s", escapeOwnerRepo(ownerRepo), escapeEndpoint(endpoint)), "--paginate", "--slurp"}
 	var output []byte
 	var err error
 	if host != "" {
@@ -287,9 +291,13 @@ func ghAPIGetArray(ctx context.Context, endpoint string, repo string) ([]map[str
 	if err != nil {
 		return nil, fmt.Errorf("gh api %s: %w", endpoint, err)
 	}
-	var result []map[string]any
-	if err := json.Unmarshal(output, &result); err != nil {
+	var pages [][]map[string]any
+	if err := json.Unmarshal(output, &pages); err != nil {
 		return nil, fmt.Errorf("parsing response for %s: %w", endpoint, err)
+	}
+	var result []map[string]any
+	for _, page := range pages {
+		result = append(result, page...)
 	}
 	return result, nil
 }
@@ -354,12 +362,17 @@ func timeBetween(from, to string) float64 {
 // parseNumberFromURL extracts a number from a GitHub URL like
 // https://github.com/owner/repo/pull/42 or .../issues/108
 func parseNumberFromURL(url string) int {
-	parts := strings.Split(url, "/")
-	for i := range slices.Backward(parts) {
-		var n int
-		if _, err := fmt.Sscanf(parts[i], "%d", &n); err == nil && n > 0 {
-			return n
+	clean, _, _ := strings.Cut(url, "#")
+	clean, _, _ = strings.Cut(clean, "?")
+	nextIsNumber := false
+	for part := range strings.SplitSeq(clean, "/") {
+		if nextIsNumber {
+			n, err := strconv.Atoi(part)
+			if err == nil && n > 0 {
+				return n
+			}
 		}
+		nextIsNumber = part == "issues" || part == "pull" || part == "discussions"
 	}
 	return 0
 }
@@ -381,6 +394,7 @@ func parseRepoFromURL(url string) string {
 
 // isBotUser returns true if the login looks like a bot account.
 func isBotUser(login string) bool {
+	login = strings.ToLower(login)
 	return strings.HasSuffix(login, "[bot]") || login == "github-actions" || login == "copilot-swe-agent"
 }
 
