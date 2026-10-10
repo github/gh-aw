@@ -30,7 +30,7 @@ The native protocol distinguishes the following records and lifecycle events:
 | --- | --- |
 | Work | An immutable task definition. Tasks can form a directed acyclic graph (DAG), a dependency graph with no cycles. |
 | Claim | Authorization for one attempt at a Work item. Its original `claim_handle` identifies that attempt. |
-| Policy | Compiler-approved rules for scheduling, producer permissions, worker routing, and limits. The first trusted producer submission installs the proposal with Work when the branch is absent; later changes are administrator-only. |
+| Policy | Approved rules for scheduling, producer permissions, worker routing, and limits. The first trusted submission installs the proposal with Work when the branch is absent; later changes are administrator-only. |
 | Pool | A group of tasks with shared worker routes and capacity limits. |
 | Reservation | Native worker capacity held for an assignment, including while launch or termination is uncertain. |
 | Native launch | The request to start a GitHub Actions worker run. A committed assignment is not proof of launch. |
@@ -40,7 +40,7 @@ The native protocol distinguishes the following records and lifecycle events:
 | IssueLink | An immutable, checked link from one admitted Work item to one backing Issue. |
 | IssueComment | An immutable canonical summary or historical Claim-comment handle. |
 
-See [deployment](/gh-aw/guides/deploy-work-queue/) for Policy installation, the
+See [deployment](/gh-aw/guides/deploy-work-queue/) for first-use bootstrap, the
 [specification](/gh-aw/specs/work-queue-specification/) for normative behavior and
 implementation coverage, and the
 [formal verification reference](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md)
@@ -50,6 +50,40 @@ For workflow examples, see the [Linter Factory](/gh-aw/patterns/linter-factory/)
 for fair dispatch and Claim-scoped worker outputs, and the
 [Daily Report Portfolio](/gh-aw/patterns/daily-report-portfolio/) for a daily
 dispatcher coordinating reporting workers.
+
+## Initialization and authorization
+
+An absent queue is uninitialized, not an error to repair with administrator
+seeding. The first accepted producer or dispatcher submission creates the queue
+with one version-3 commit containing Policy followed by Work. The commit retains
+the original submission request and identity; there is no separate Policy
+request or queue-enrollment step. Read commands may report `queue_missing`;
+that result does not require Policy seeding.
+
+| Entry point | First-use behavior |
+| --- | --- |
+| Workflow `work_queue_submit` | Installs the exact compiler-approved Policy proposal with entitled Work. |
+| Native `submit-work`, `submit-graph` | Installs native defaults bound to the submitting operator and `.github/workflows/worker.lock.yml` at the verified default-branch commit. Embedding hosts can supply an approved `Branch.PolicyProposal`. |
+| Activation, reads, snapshots, dispatch-only requests and controls | Do not create a queue or install Policy. |
+| `policy` | Updates only an existing, quiescent queue. Standalone Policy seeding is unsupported. |
+
+Agentic Workflows and Actions supply authenticated runtime identity. The queue
+uses that identity for Policy entitlements, operation roles and Claim ownership;
+it does not define another authentication mechanism. Agents cannot choose Policy
+or receive queue-write credentials. Worker routes must accept
+`work_queue_assignment` and be verifiable at their approved immutable revisions.
+
+GitHub enforces repository access rules; the queue requires no branch-protection
+setup or repository-rule inventory. Actual Git access denials remain errors.
+An installed Policy stays authoritative, and malformed or policyless existing
+ledgers are rejected rather than reset. Historical Policy-only genesis records
+remain readable.
+
+> [!WARNING]
+> Direct repository writers can replace or delete the ledger. A missing queue
+> branch is fresh genesis and may lose prior request identities, reservations
+> and delivery evidence. Checkpoints preserve accepted request identities and
+> bootstrap Work positions; they do not recover a deleted branch.
 
 ## Backing Issues
 
@@ -303,10 +337,10 @@ initialize Policy over an invalid log.
 | `explain --pool POOL [--work-id ID]` | Evaluate scheduler selection or inspect a dependency path without changing scheduling counters. |
 | `explain --request-id ID` or `explain --claim-id ID` | Reconstruct an exact historical grant from the authoritative log up to that point. |
 | `trace --request-id ID` or `trace --claim-id ID` | Read causal events within size limits, without exposing payloads or receipt contents. `--offset` and `--limit` control pagination. |
-| `compact` | Replace the current log prefix with a version-3 checkpoint of deterministic replay state. The checkpoint names the prior Git commit and preserves fairness accounting, ownership, delivery barriers, and request identities. |
+| `compact` | Replace the current log prefix with a version-3 checkpoint of deterministic replay state. Preserves fairness accounting, ownership, delivery barriers, bootstrap Work positions and request identities, including across repeated compaction. |
 | `policy --file policy.json --epoch EPOCH` | Update an existing queue's authorized Policy for future work only when quiescent. Does not seed an absent queue. |
 | `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to producer permissions. On an absent queue, atomically install the verified native default Policy and Work without administrator seeding. |
-| `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. |
+| `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. Bootstraps an absent queue under the same rules as `submit-work`. |
 | `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit the next assignments selected by deterministic fair scheduling and their reservations. Does not send a workflow-dispatch POST. |
 | `control`, `cancel-work` | Apply authorized pause, cutover, or cancellation decisions without refunding accounted service or force-releasing a reservation for a possible native run. |
 | `cancel-claim --claim-id ID[,ID...] --reason CODE` | Atomically revoke the exact current Claims' authority and terminally cancel their Work. Does not retry work, impersonate a worker, or stop a native run. |
@@ -321,23 +355,8 @@ not proof of launch.
 
 A Policy update requires a quiescent queue: no nonterminal (unfinished) Work,
 outstanding reservations, or unresolved delivery barriers for completed Work.
-GitHub enforces repository access rules independently of the queue protocol.
-Queue use needs no repository-administration access.
-A trusted workflow producer can publish only the exact
-compiler-approved proposal with its first Work on an absent branch; the agent
-cannot choose or update Policy or receive queue-write credentials.
-Direct repository writers can alter or delete the queue; malformed
-existing history fails validation, but a missing branch is a fresh queue.
-For native first use, the default Policy binds the submitting operator and
-`.github/workflows/worker.lock.yml` at the verified default-branch commit.
-The worker must accept `work_queue_assignment` and be registered and active.
-An embedding host may supply an approved `Branch.PolicyProposal` instead.
-Workflow safe outputs use the compiler-approved proposal. Both paths publish
-one Policy-and-Work genesis commit; reads, dispatches and controls do not
-initialize an absent queue. Installed Policy remains authoritative.
-Standalone administrator seeding is unsupported: workflow and Actions
-authorization already authorizes the trusted first submission.
-On a repository with no branches, a valid first producer submission initializes
+On a JavaScript workflow submission to a repository with no branches, a valid
+first producer submission initializes
 the default branch with `.gh-aw/work-queue-bootstrap`. If the approved worker
 workflow is not yet deployed and verifiable at its immutable revision, the
 submission stops there: deploy the worker, then retry the same submission.
@@ -345,6 +364,13 @@ Policy and Work enter the queue together only after verification, in its first
 commit on a separate queue branch. Reads and dispatches never initialize a
 repository. The queue branch must differ from the empty repository's default
 branch.
+
+### Migration from standalone seeding
+
+Setup scripts that call `initializeWorkQueue`, supply `initializationContext`,
+or run `policy` before the first submission are unsupported. Authorized first
+submission replaces those steps; `policy` remains available only for later
+quiescent updates. Existing queues do not need a reset or history rewrite.
 
 Worker finish is a Claim-scoped MCP intent, not an operator command that can
 impersonate a worker. Direct `claim --work-id`, legacy scalar assignments

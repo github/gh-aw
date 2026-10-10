@@ -24,7 +24,7 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 
 The current operator commands and keyboard browser are documented in the
 [queue reference](../../docs/src/content/docs/reference/work-queue.md#operator-commands).
-First-submit Policy bootstrap and explicit operator Policy installation are documented in the
+First-submit Policy bootstrap and later quiescent Policy updates are documented in the
 [deployment guide](../../docs/src/content/docs/guides/deploy-work-queue.md).
 This directory retains executable specifications and formal evidence, not a
 second current user guide. The historical material below is model provenance,
@@ -55,6 +55,11 @@ Bootstrap needs no administrator seed. The model assumes checked append-only
 publishers using runtime-supplied identity. Direct replacement or deletion by other
 repository writers is outside its guarantees. GitHub enforces repository access
 rules independently.
+
+Current publishers create queues only through accepted Policy-and-Work
+submissions; standalone Policy initialization and activation seeding are
+unsupported. Historical Policy-only genesis records remain readable. This
+compatibility does not authorize new standalone seeding.
 
 Run the focused checks using the official jar documented below:
 

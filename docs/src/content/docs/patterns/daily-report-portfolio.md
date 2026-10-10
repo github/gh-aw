@@ -536,16 +536,18 @@ validates a dedicated portfolio policy from those explicit values:
 node actions/setup/js/daily_report_portfolio.cjs policy \
   OWNER/REPO IMMUTABLE_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID \
   > daily-report-policy.json
-gh aw work-queue --repo OWNER/REPO policy \
-  --file daily-report-policy.json --epoch daily-reports-v1
 ```
 
-These are authenticated deployment commands, not workflow prompt steps. The
-generator does not verify the supplied identities against GitHub or install
-anything. If the queue already serves other workflows, merge the portfolio
-pool, accounting keys and producer entitlements into its complete policy;
-preserve other pools and limits, and quiesce before installation. Never
-overwrite a shared queue with the dedicated example policy.
+The generator does not verify identities against GitHub or install anything.
+Represent the proposal in the dispatcher's compiler-approved configuration.
+On an absent queue, its first authorized `work_queue_submit` publishes Policy
+and the daily cohort together. No administrator-seeding command or separate
+queue authentication step is supported.
+
+If the queue already serves other workflows, merge the portfolio pool,
+accounting keys and producer entitlements into its complete Policy. Preserve
+other pools and limits, and quiesce before a later `policy` update. Never
+overwrite a shared queue with the dedicated example Policy.
 
 When expanding an already installed ten-profile portfolio, pause admission and
 drain its original Claims before installing a new Policy epoch with all thirteen

@@ -10,11 +10,11 @@ use GitHub read tools and safe outputs, but do not provide native fair
 scheduling, Claim authority, or verified dependency graphs. Native version-3
 `tools.work-queue` always uses Git; no storage selector is available.
 
-Before you begin, prepare a trusted producer identity, an approved worker, and
-a compiler-approved Policy proposal (the queue's scheduling and authorization
-rules). The first accepted producer submission installs that proposal with its
-Work when the branch is absent, without administrator seeding.
-Workflow frontmatter alone does not install Policy.
+Publish an approved worker and configure a compiler-approved Policy proposal
+(the queue's scheduling and authorization rules). Agentic Workflows and Actions
+supply the trusted submission identity; no separate queue authentication,
+enrollment or administrator seed is needed. The first accepted submission
+installs Policy and Work together. Compilation alone does not install Policy.
 
 ## Publish the worker and dispatcher
 
@@ -127,10 +127,11 @@ producers permission to use each additional key.
 
 ## Automatic first-use bootstrap
 
-Do not create the queue branch or seed Policy before using the queue. The first
-accepted producer submission creates `work-queue` with Policy and Work together.
-Normal repository contents-write permission is sufficient for queue publication;
-repository-administration permission is not required.
+Submit Work through the authorized producer or dispatcher. Its first accepted
+`work_queue_submit` atomically creates `work-queue` with the compiler-approved
+Policy followed by Work in one commit. Normal contents-write permission is
+sufficient for publication; no queue-specific administrator seed or repository
+rule setup is required.
 
 GitHub enforces repository access rules independently of the queue protocol.
 Report an actual Git write denial rather than bypassing it.
@@ -143,10 +144,9 @@ Report an actual Git write denial rather than bypassing it.
 > lose prior request identities, reservations and completion evidence.
 
 Make sure the configured worker routes are active and the trusted producer
-workflow embeds its complete compiler-approved Policy proposal. On an absent
-branch, the first accepted `work_queue_submit` safe output atomically creates
-the branch with one Policy-and-Work genesis commit. No administrator seed is
-required. Dispatch-only requests, reads, and snapshots do not provision it.
+workflow embeds its complete compiler-approved Policy proposal. Submit before
+requesting dispatch. Activation, dispatch-only requests, reads and controls do
+not provision the queue.
 Activation treats a genuinely absent branch as an uninitialized, empty queue,
 even when a compiled Policy proposal is present. It validates the proposal
 without installing it; the checked commit publication creates the branch.
@@ -158,26 +158,29 @@ repository. Only this repository expression is accepted; inputs and event
 payloads cannot choose dependency repositories. Literal foreign repositories
 require separately bound read credentials.
 
-There is no standalone Policy-seeding step. Workflow and Actions authorization
-already authorizes the trusted submission that creates the queue.
-For a later Policy update on an existing, quiescent queue, an administrator
-may run:
-
-```bash
-gh aw work-queue --repo github/gh-aw policy \
-  --file queue-policy.json --epoch eslint-queue-v1
-```
-
 Native `submit-work` and `submit-graph` also bootstrap on first submission
 without an administrator seed. Their default Policy binds the operator to
 `.github/workflows/worker.lock.yml` at the verified default-branch commit;
 publish that assignment-capable worker first. Embedding hosts can provide an
-approved `Branch.PolicyProposal`. Workflow submissions instead use the
-compiler-approved proposal.
+approved `Branch.PolicyProposal`.
+
+```bash
+gh aw work-queue --repo OWNER/REPO submit-work \
+  --file work.json --request-id initial-work
+```
+
+Keep the same request ID and immutable input when retrying an uncertain
+publication. Recovery returns the accepted result without another admission.
 
 The default queue branch is `work-queue`. To use another queue branch, put
 `--branch QUEUE_BRANCH` before the submission command. Subsequent submissions
 must match the installed Policy proposal.
+
+Remove any setup calls to `initializeWorkQueue`, `initializationContext`, or
+pre-submission `policy`: standalone seeding is unsupported. Existing historical
+Policy-only genesis records remain readable and do not require migration.
+
+## Update an existing Policy
 
 Before changing Policy later, make the queue quiescent: settle all nonterminal
 (unfinished) Work, outstanding reservations, and unresolved delivery of
@@ -186,6 +189,13 @@ reservation; reconcile exact termination or nonlaunch evidence separately.
 Frontmatter alone does not install or update Policy; the first accepted producer
 submission installs its compiled proposal, and later changes remain
 administrator-only.
+
+```bash
+gh aw work-queue --repo OWNER/REPO policy \
+  --file queue-policy.json --epoch revised-policy
+```
+
+This command cannot initialize an absent queue.
 
 ## Enable backing Issue projection
 

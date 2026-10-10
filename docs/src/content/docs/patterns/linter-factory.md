@@ -62,26 +62,25 @@ Policy and admitted Work. A dispatch-only request cannot bootstrap the queue.
 No administrator seed is required. Do not substitute an ordinary workflow
 dispatch for a queue assignment.
 
-For optional administrator-managed seeding, the checked-in policy generator
-provides three immutable worker profiles, singleton assignments, three native
-slots, and a 30-pending-task limit:
+The checked-in policy generator provides a reference proposal with three
+immutable worker profiles, singleton assignments, three native slots and a
+30-pending-task limit:
 
 ```bash
 node actions/setup/js/eslint_factory_portfolio.cjs policy \
   github/gh-aw IMMUTABLE_WORKER_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID \
   > eslint-factory-policy.json
-./gh-aw work-queue --repo github/gh-aw policy \
-  --file eslint-factory-policy.json --epoch eslint-factory-v1
 ```
 
-Generation does not authenticate principals or launch
-workers. The generated policy must be represented by the dispatcher's
-compiler-validated work-queue configuration for safe-output bootstrap. Use
+Generation does not install Policy or launch workers. Represent the proposal
+in the dispatcher's compiler-validated work-queue configuration; its first
+accepted submission publishes Policy and Work together. Standalone
+administrator seeding is unsupported. Use
 verified positive decimal principal IDs from trusted producer and dispatch
 credential flows, not display names or assumed `github.actor` values. Follow the
-[deployment guide](/gh-aw/guides/deploy-work-queue/) to configure branch rules.
-An administrator may still install Policy explicitly; later policy changes
-require a drained queue. If the queue already serves other pools, retain their
+[deployment guide](/gh-aw/guides/deploy-work-queue/) for first-use bootstrap.
+GitHub enforces repository rules without queue-specific setup. Later Policy
+updates require an existing, drained queue. If it already serves other pools, retain their
 configuration rather than replacing it with this single-pool template.
 
 Prepared payloads freeze the repository's verified numeric identity and
@@ -90,7 +89,7 @@ requires one memory snapshot and bounds issues/discussions; the monster bounds
 issue changes, assignments, and its discussion. If no rule or remediation is
 needed, cancel the write-capable task rather than claiming a verified Result from
 `noop`. Only explicitly no-write Work permits a completed no-write Result. Producer
-permission does not authorize the agent to broaden these scopes or install Policy.
+permission does not authorize the agent to broaden these scopes or choose Policy.
 
 The dispatcher requests
 `work_queue_dispatch_next({"pool":"default","max_claims":3,"max_dispatches":3})`.
@@ -119,8 +118,7 @@ The agent's `work_queue_read` snapshot reports
 `queue_state: "uninitialized"`. Continue with the trusted producer plan and
 `work_queue_submit`; do not claim a successful empty-queue `noop`. Missing
 compiler Policy, invalid producer entitlements, or a denied Git read still block
-publication. Do not invent worker principal IDs or bypass queue-branch writer
-protections.
+publication. Do not invent worker principal IDs or bypass GitHub access denials.
 
 Hosted activation can fail at **Snapshot work queue state**, before the agent
 starts. Diagnose that boundary separately from the agent's queue tools.
@@ -326,7 +324,6 @@ not authoritative records.
 
 ```mermaid
 sequenceDiagram
-    participant O as Authenticated operator
     participant P as Authorized producer
     participant D as Trusted dispatcher
     participant L as work-queue.jsonl
@@ -334,8 +331,8 @@ sequenceDiagram
     participant T as Trusted reconciliation and delivery
     participant G as GitHub resources
 
-    O->>L: Policy with profiles, entitlements, and resource scopes
-    P->>L: Work admission with immutable contract
+    P->>L: CAS first Policy and Work with immutable contract
+    Note over P,L: Later submissions admit Work under installed Policy
     D->>L: Replay current head and request fair prefix
     D->>L: CAS Claim operations and immutable assignment
     Note over D,L: Each durable Claim is charged once with no refunds

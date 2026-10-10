@@ -504,7 +504,8 @@ The proposal MUST authorize the submitting principal and the Work's pool,
 priority, and accounting keys; the runtime MUST validate its immutable worker
 routes before queue publication. Standalone administrator seeding MUST NOT be
 supported by publishers or activation: authorization supplied by Agentic Workflows
-and Actions already authorizes the trusted submission. Reads and dispatch-only requests MUST NOT initialize an
+and Actions already authorizes the trusted submission. Reads, controls and
+dispatch-only requests MUST NOT initialize an
 absent queue. Existing nonempty ledgers without a valid Policy, empty or
 malformed logs, and unsupported histories MUST fail closed rather than being
 overwritten. Later Policy epochs remain administrator-only and require a drained
@@ -522,6 +523,12 @@ This default resolution MUST NOT request administrator authority. Replay MUST
 validate the submitted Work against that Policy before publication, and the
 publisher MUST verify worker routes and submission resource evidence. Existing
 Policy MUST NOT be replaced by a first-use proposal.
+
+The bootstrap QueueCommit MUST retain the original submission request ID,
+fingerprint and Actor; it MUST NOT introduce a synthetic administrator request.
+Checkpoint restoration MUST preserve the original Work operation positions,
+including the offset after the first Policy operation, and recover the same
+accepted submission through repeated checkpoints without another admission.
 
 Ref conflicts MUST NOT establish absence unless an independent native observation
 confirms the requested repository identity and `isEmpty = true`. In a branchless

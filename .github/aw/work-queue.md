@@ -43,7 +43,7 @@ ignored.
 Configure producer entitlements. First submit automatically installs compiled
 Policy and Work. Standalone seeding is unsupported; AW and Actions authorize
 the trusted submission.
-Later Policy changes are admin-only. Admin
+Policy updates require an existing, quiescent queue and administrator authority. Admin
 status grants no producer entitlement. Never expose queue-write credentials to
 agents/snapshot MCP. Repository access rules are GitHub's responsibility, not
 queue configuration. See [deployment](../../docs/src/content/docs/guides/deploy-work-queue.md).
@@ -103,6 +103,8 @@ rerun effects after Completion with uncertain delivery; bounded verification
 yields Result or DeliveryFailure. Use pause/drain for incompatible revisions;
 quiesce before Policy changes. Reject old protocols, scalar assignments and
 automatic upgrades; preserve old evidence before explicit redeployment.
+Retries and repeated checkpoints preserve accepted submission identity; do not
+delete a queue to retry admission.
 
 ## Load details only when needed
 
