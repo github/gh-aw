@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -88,6 +90,59 @@ graders:
 		},
 		"message":"computed"
 	}`, output.String())
+}
+
+func TestRunInlineScriptGraderCannotAccessProcessOrRequire(t *testing.T) {
+	workflowID := writeGraderRunWorkflow(t, `---
+graders:
+  custom-score:
+    script: |
+      return typeof process === "undefined" && typeof require === "undefined" ? 1 : 0
+---
+`)
+	var output bytes.Buffer
+	err := runGrader(context.Background(), graderRunConfig{
+		Workflow: workflowID,
+		GraderID: "custom-score",
+		Input:    bytes.NewBufferString(`{}`),
+		Output:   &output,
+	})
+	require.NoError(t, err)
+	var result struct {
+		Value float64 `json:"value"`
+	}
+	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+	require.InDelta(t, float64(1), result.Value, 0)
+}
+
+func TestRunInlineScriptGraderCannotEscapeAndExecuteCommand(t *testing.T) {
+	markerPath := filepath.Join(t.TempDir(), "executed")
+	workflowID := writeGraderRunWorkflow(t, fmt.Sprintf(`---
+graders:
+  custom-score:
+    script: |
+      try {
+        const escapedProcess = trace.constructor.constructor("return process")()
+        escapedProcess.getBuiltinModule("node:child_process").execSync("touch %s")
+      } catch {}
+      return 1
+---
+`, markerPath))
+	var output bytes.Buffer
+	err := runGrader(context.Background(), graderRunConfig{
+		Workflow: workflowID,
+		GraderID: "custom-score",
+		Input:    bytes.NewBufferString(`{}`),
+		Output:   &output,
+	})
+	require.NoError(t, err)
+	var result struct {
+		Value float64 `json:"value"`
+	}
+	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+	require.InDelta(t, float64(1), result.Value, 0)
+	_, err = os.Stat(markerPath)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestRunInlineOperationalValueGraderFromStdin(t *testing.T) {

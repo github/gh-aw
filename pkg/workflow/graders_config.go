@@ -451,12 +451,6 @@ func parseGraderEntryFields(def *GraderDefinition, entry map[string]any, id stri
 		if scriptCharCount > 4096 {
 			return fmt.Errorf("graders.%s.script exceeds maximum length of 4096 characters (%d)", id, scriptCharCount)
 		}
-		forbiddenPatterns := []string{"require(", "import(", "import ", "fetch(", "eval(", "process.exit", "child_process", "execSync", "spawnSync", "Function("}
-		for _, p := range forbiddenPatterns {
-			if strings.Contains(s, p) {
-				return fmt.Errorf("graders.%s.script contains forbidden pattern %q — inline grader scripts must be pure functions without side effects", id, p)
-			}
-		}
 		def.Script = s
 	}
 

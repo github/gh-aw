@@ -229,7 +229,8 @@ func runJavaScriptGrader(ctx context.Context, grader graderRunDefinition, payloa
 	}
 	commandCtx, cancel := context.WithTimeout(ctx, graderJSTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(commandCtx, nodePath, scriptPath)
+	cmd := exec.CommandContext(commandCtx, nodePath, "--permission", scriptPath)
+	cmd.Env = []string{}
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stdout = output
 	stderr := &boundedCommandBuffer{limit: maxOperationalValueOutputBytes}

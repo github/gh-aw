@@ -880,13 +880,13 @@ function executeCustomGraderInSubprocess(id, script, trace, meta) {
     timeoutMs: SCRIPT_TIMEOUT_MS,
   };
   const safeEnv = {};
-  for (const key of ["PATH", "HOME", "TMPDIR", "TEMP", "TMP", "SystemRoot", "ComSpec"]) {
+  for (const key of ["SystemRoot"]) {
     if (process.env[key]) {
       safeEnv[key] = process.env[key];
     }
   }
   const timeoutMs = SCRIPT_TIMEOUT_MS + SCRIPT_WORKER_OVERHEAD_MS;
-  const proc = cp.spawnSync(process.execPath, [SCRIPT_WORKER_PATH], {
+  const proc = cp.spawnSync(process.execPath, ["--permission", SCRIPT_WORKER_PATH], {
     input: JSON.stringify(payload),
     encoding: "utf-8",
     timeout: timeoutMs,

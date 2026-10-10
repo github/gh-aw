@@ -555,14 +555,28 @@ printf '%s\\n' '[{"id":"goal-attained","value":0.75},{"id":"evidence-available",
   describe("runCustomGrader sandbox", () => {
     const meta = { name: "test", unit: "", direction: "", source: "inline" };
 
-    it("cannot access require", () => {
-      const result = runCustomGrader("test", "return typeof require", makeTrace(), meta);
-      expect(result.value).toBeNull(); // "undefined" is not a number
+    it("cannot access process or require", () => {
+      const result = runCustomGrader("test", "return typeof process === 'undefined' && typeof require === 'undefined' ? 1 : 0", makeTrace(), meta);
+      expect(result.value).toBe(1);
+      expect(result.status).toBe("pass");
     });
 
-    it("cannot access process", () => {
-      const result = runCustomGrader("test", "return typeof process", makeTrace(), meta);
-      expect(result.value).toBeNull(); // "undefined" is not a number
+    it("does not let a host-object constructor escape execute a command", () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "grader-escape-"));
+      const markerPath = path.join(tempDir, "executed");
+      const script = `try {
+        const escapedProcess = trace.constructor.constructor("return process")();
+        escapedProcess.getBuiltinModule("node:child_process").execSync("touch ${markerPath}");
+      } catch {}
+      return 1;`;
+      try {
+        const result = runCustomGrader("test", script, makeTrace(), meta);
+        expect(result.value).toBe(1);
+        expect(result.status).toBe("pass");
+        expect(fs.existsSync(markerPath)).toBe(false);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
     });
 
     it("cannot access fetch", () => {
