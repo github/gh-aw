@@ -7,7 +7,23 @@ const { COPILOT_WORKFLOW_EVENT_FIELDS } = require("./copilot_workflow_events.cjs
 const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 const { sessionContext } = require("./agent_session.cjs");
 
-const SCOPED_AGENT_TYPES = new Set(["session.init", "session.start", "user.message", "assistant.message", "assistant.reasoning", "assistant.refusal", "tool.execution_start", "tool.execution_complete", "session.result"]);
+const SCOPED_AGENT_TYPES = new Set([
+  "session.init",
+  "session.start",
+  "session.error",
+  "session.info",
+  "session.shutdown",
+  "session.task_complete",
+  "user.message",
+  "assistant.message",
+  "assistant.reasoning",
+  "assistant.refusal",
+  "tool.execution_start",
+  "tool.execution_update",
+  "tool.execution_complete",
+  "usage.report",
+  "session.result",
+]);
 
 /** @type {Fields} */
 const USAGE_FIELDS = {
@@ -27,6 +43,8 @@ const TOOL_FIELDS = {
   toolCallId: ["toolCallId", "tool_call_id", "tool_use_id"],
   toolName: ["toolName", "tool_name"],
   mcpServerName: ["mcpServerName"],
+  parentToolCallId: ["parentToolCallId"],
+  stepIndex: ["stepIndex", "step_index"],
 };
 /** @type {Fields} */
 const RUNTIME_FIELDS = {
@@ -130,13 +148,24 @@ const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model", "selectedModel"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"], reasoningEffort: ["reasoningEffort"] },
+  "session.shutdown": {
+    shutdownType: ["shutdownType"],
+    errorReason: ["errorReason"],
+    premiumRequests: ["premiumRequests", "totalPremiumRequests"],
+    totalNanoAiu: ["totalNanoAiu"],
+    totalApiDurationMs: ["totalApiDurationMs"],
+    sessionStartTime: ["sessionStartTime"],
+    currentModel: ["currentModel"],
+  },
+  "session.task_complete": { success: ["success"] },
   "user.message": MESSAGE_FIELDS,
   "prompt.system": { content: ["content"] },
   "prompt.user": { content: ["content"] },
   "assistant.message": MESSAGE_FIELDS,
-  "assistant.refusal": { reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
+  "assistant.refusal": { ...MESSAGE_FIELDS, reason: ["reason"], policyCategory: ["policyCategory"], explanation: ["explanation"] },
   "assistant.reasoning": MESSAGE_FIELDS,
-  "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
+  "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments", "argumentText"], inputTruncated: ["inputTruncated"], command: ["command"] },
+  "tool.execution_update": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], output: ["output", "partialResult"], partial: ["partial"], delta: ["delta"], contentIndex: ["contentIndex"] },
   "tool.execution_complete": {
     ...TOOL_FIELDS,
     success: ["success"],
@@ -162,12 +191,25 @@ const EVENT_FIELDS = {
     permissionDenials: ["permissionDenials", "permission_denials"],
     agentMetrics: ["agentMetrics"],
   },
+  "session.error": {
+    error: ["error"],
+    message: ["message"],
+    content: ["content"],
+    code: ["code"],
+    errorType: ["errorType"],
+    model: ["model"],
+    severity: ["severity"],
+    status: ["status"],
+    sourceType: ["sourceType"],
+    exitCode: ["exitCode", "exit_code"],
+  },
+  "session.info": { message: ["message"], content: ["content"], model: ["model"], status: ["status"], sourceType: ["sourceType"] },
   "mcp.rpc.request": MCP_FIELDS,
   "mcp.rpc.response": MCP_FIELDS,
   "mcp.difc.filtered": MCP_FIELDS,
   "mcp.guard.blocked": MCP_FIELDS,
   "mcp.tool_call": MCP_FIELDS,
-  "mcp.event": RUNTIME_FIELDS,
+  "mcp.event": { ...RUNTIME_FIELDS, serverName: ["serverName", "server_name"] },
   "firewall.http_access": {
     host: ["host", "domain"],
     method: ["method"],
@@ -283,7 +325,7 @@ const EVENT_FIELDS = {
   },
 };
 EVENT_FIELDS["session.start"] = EVENT_FIELDS["session.init"];
-EVENT_FIELDS["usage.report"] = EVENT_FIELDS["firewall.token_usage"];
+EVENT_FIELDS["usage.report"] = { ...EVENT_FIELDS["firewall.token_usage"], stepIndex: ["stepIndex", "step_index"] };
 for (const type of Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES)) {
   EVENT_FIELDS[type] = TASK_FIELDS;
 }
@@ -344,7 +386,10 @@ function normalizeUnifiedSessionEvent(event, phase) {
   }
   if (SCOPED_AGENT_TYPES.has(event.type) || (Object.hasOwn(COPILOT_WORKFLOW_EVENT_FIELDS, event.type) && event.type.startsWith("subagent."))) {
     for (const [key, value] of Object.entries(sessionContext(event))) if (!Object.hasOwn(data, key)) data[key] = value;
+    const parentToolCallId = Object.hasOwn(source, "parentToolCallId") ? source.parentToolCallId : event.parentToolCallId;
+    if (parentToolCallId !== undefined && !Object.hasOwn(data, "parentToolCallId")) data.parentToolCallId = structuredClone(parentToolCallId);
   }
+  if (event.type === "session.task_complete" && Object.hasOwn(source, "summary") && typeof source.summary !== "string") data.summary = structuredClone(source.summary);
   if (known && event.type.startsWith("dynamicWorkflows.")) {
     if (!Object.hasOwn(data, "status") && source.patch?.status !== undefined) data.status = structuredClone(source.patch.status);
     const usage = selectFields(source.usage, { totalTokens: ["totalTokens", "total_tokens"], toolUses: ["toolUses", "tool_uses"], durationMs: ["durationMs", "duration_ms"] });
@@ -368,7 +413,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
       );
     }
   }
-  if (event.type === "user.message" || event.type === "assistant.message" || event.type === "assistant.reasoning") {
+  if (event.type === "user.message" || event.type === "assistant.message" || event.type === "assistant.reasoning" || event.type === "assistant.refusal") {
     const metadata = selectFields(event, MESSAGE_FIELDS);
     delete metadata.content;
     for (const [key, value] of Object.entries(metadata)) if (!Object.hasOwn(data, key)) data[key] = value;
