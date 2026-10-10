@@ -14,6 +14,18 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each([401, 503, 0, null])("retains observed session-error status codes through projection and schema validation (%s)", statusCode => {
+    const source = { type: "session.error", data: { errorType: "provider", message: "Observed failure.", statusCode, opaque: "PRIVATE_ERROR_CONTEXT" } };
+    const original = structuredClone(source);
+    const [event] = mergeSessionSources([{ component: "agent", phase: "agent", path: "errors.jsonl", events: [source] }]);
+    expect(event.data).toEqual({ errorType: "provider", message: "Observed failure.", statusCode });
+    expect(normalizeUnifiedSessionEvent(event).data).toEqual(event.data);
+    const validate = createSessionValidator("unified").event;
+    expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    expect(normalizeUnifiedSessionEvent({ type: "session.error", data: { message: "No status observed." } }).data).not.toHaveProperty("statusCode");
+    expect(source).toEqual(original);
+  });
+
   it("retains declared partial-input and per-step usage evidence", () => {
     const events = [
       { type: "tool.execution_start", data: { sessionId: "session", stepIndex: 0, toolName: "bash", input: { command: "preview..." }, inputTruncated: true } },
