@@ -100,9 +100,9 @@ Both safe outputs require a fine-grained PAT. The default `GITHUB_TOKEN` lacks t
 
 See the [official GitHub Copilot cloud agent API documentation](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/use-cloud-agent-via-the-api#using-the-issues-api) for full details on token requirements.
 
-`assign-to-agent` checks the selected credential with an authenticated `GET /user` before looking up or assigning Copilot. This check runs once per handler invocation, only when an eligible assignment is processed; staged assignments do not run it. Known GitHub App installation tokens are rejected without an API call. Failures name the configured token source and link to the authentication remedy, and remain visible in assignment error outputs even with `ignore-if-error: true`. The handler does not retry with a lower-priority credential.
+`assign-to-agent` attempts assignment without a separate credential preflight. Only failed authentication or assignment attempts add credential diagnostics: the selected token source, PAT permissions, and an authentication remedy link. Diagnostics do not make additional API calls or retry assignment with a lower-priority credential, and remain visible in assignment error outputs even with `ignore-if-error: true`.
 
-A successful credential preflight verifies authentication, not all repository write permissions or Copilot availability. The subsequent target checks and assignment API still enforce these requirements. If you see `Bad credentials`, replace or renew the selected user token and check its repository access and organization approval/SSO; a green workflow conclusion alone does not prove that Copilot was assigned.
+If you see `Bad credentials`, replace or renew the selected user token and check its repository access and organization approval/SSO. The target checks and assignment API enforce repository permissions and Copilot availability; a green workflow conclusion alone does not prove that Copilot was assigned.
 
 ### Using a Personal Access Token (PAT)
 

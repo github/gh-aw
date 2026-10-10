@@ -35,14 +35,12 @@ async function createAssignToAgentGitHubClient(config) {
 }
 
 /**
- * Validate the selected user credential lazily, without changing token precedence.
- * Authentication failures are shared by all assignments in this handler invocation.
- *
+ * Add credential guidance only after an assignment attempt fails.
  * @param {Object} config
- * @param {Object} githubClient
- * @returns {() => Promise<void>}
+ * @param {string} errorMessage
+ * @returns {string}
  */
-function createAssignmentCredentialPreflight(config, githubClient) {
+function describeAssignmentCredentialFailure(config, errorMessage) {
   const token = config["github-token"] || process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN;
   const source = config["github-token"]
     ? "the configured assign-to-agent credential"
@@ -53,28 +51,8 @@ function createAssignmentCredentialPreflight(config, githubClient) {
     "Configure GH_AW_AGENT_TOKEN or assign-to-agent.github-token with a valid user token: a fine-grained PAT with metadata: read and actions, contents, issues, and pull requests: write, or a classic PAT with repo scope. " +
     "Check token expiry, repository access, and organization approval/SSO. GitHub App installation tokens, including GITHUB_TOKEN, cannot assign Copilot. " +
     "See https://github.github.com/gh-aw/reference/copilot-cloud-agent/#authentication";
-  /** @type {Promise<void>|null} */
-  let validation = null;
-
-  return () => {
-    if (!validation) {
-      validation = (async () => {
-        try {
-          if (typeof token === "string" && token.startsWith("ghs_")) {
-            throw new Error("Insufficient permissions: GitHub App installation token is not a user credential");
-          }
-          await githubClient.request("GET /user", { request: { timeout: 10000 } });
-        } catch (error) {
-          const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-          const reason = status === 401 ? `Bad credentials (HTTP 401): ${getErrorMessage(error)}` : getErrorMessage(error);
-          const failure = new Error(`Agent assignment credential preflight failed for ${source}: ${reason}. ${remedy}`, { cause: error });
-          failure.name = "AssignmentCredentialPreflightError";
-          throw failure;
-        }
-      })();
-    }
-    return validation;
-  };
+  const installationToken = typeof token === "string" && token.startsWith("ghs_") ? " The selected credential is a GitHub App installation token." : "";
+  return `${errorMessage}. Agent assignment credential source: ${source}.${installationToken} ${remedy}`;
 }
 
 /**
@@ -217,7 +195,6 @@ async function main(config = {}) {
 
   // Create a dedicated Octokit instance using the agent token
   const githubClient = await createAssignToAgentGitHubClient(config);
-  const validateCredential = createAssignmentCredentialPreflight(config, githubClient);
 
   // Check if we're in staged mode
   const isStaged = isStagedMode(config);
@@ -469,11 +446,6 @@ async function main(config = {}) {
     }
 
     try {
-      await validateCredential();
-
-      const filterResult = await checkRequiredFilter(githubClient, { owner: effectiveOwner, repo: effectiveRepo }, number, requiredLabels, "", "assign_to_agent");
-      if (filterResult) return filterResult;
-
       // Find agent (use cache to avoid repeated lookups)
       let agentLogin = agentCache[agentName];
       if (!agentLogin) {
@@ -527,7 +499,6 @@ async function main(config = {}) {
         return { success: true };
       }
 
-      // Re-check after lookups to catch label changes; credential validation is cached per handler.
       const finalFilterResult = await checkRequiredFilter(githubClient, { owner: effectiveOwner, repo: effectiveRepo }, number, requiredLabels, "", "assign_to_agent");
       if (finalFilterResult) return finalFilterResult;
 
@@ -581,8 +552,13 @@ async function main(config = {}) {
         return { success: false, skipped: true, error: errorMessage };
       }
 
-      const isAuthError = ["Bad credentials", "Not Authenticated", "Resource not accessible", "Insufficient permissions", "requires authentication"].some(msg => errorMessage.includes(msg));
+      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+      const isAuthError = status === 401 || ["Bad credentials", "Not Authenticated", "Resource not accessible", "Insufficient permissions", "requires authentication"].some(msg => errorMessage.includes(msg));
       const isAvailabilityError = errorMessage.includes("coding agent is not available for this repository");
+      if (isAuthError || errorMessage === `Failed to assign ${agentName} via REST`) {
+        if (status === 401 && !errorMessage.includes("Bad credentials")) errorMessage = `Bad credentials (HTTP 401): ${errorMessage}`;
+        errorMessage = describeAssignmentCredentialFailure(config, errorMessage);
+      }
 
       if (ignoreIfError && (isAuthError || isAvailabilityError)) {
         const errorType = isAuthError ? "authentication/permission" : "agent availability";
@@ -614,18 +590,16 @@ async function main(config = {}) {
       core.error(`Failed to assign agent "${agentName}" to ${type} #${number}: ${errorMessage}`);
 
       // Post failure comment on the issue/PR so the user sees the failure in context
-      if (!(error && typeof error === "object" && error.name === "AssignmentCredentialPreflightError")) {
-        try {
-          await githubClient.rest.issues.createComment({
-            owner: effectiveOwner,
-            repo: effectiveRepo,
-            issue_number: number,
-            body: sanitizeContent(`⚠️ **Assignment failed**: Failed to assign ${agentName} coding agent to this ${type}.\n\nError: ${errorMessage}`, { maxLength: 65000 }),
-          });
-          core.info(`Posted failure comment on ${type} #${number} in ${effectiveOwner}/${effectiveRepo}`);
-        } catch (commentError) {
-          core.warning(`Failed to post failure comment on ${type} #${number}: ${getErrorMessage(commentError)}`);
-        }
+      try {
+        await githubClient.rest.issues.createComment({
+          owner: effectiveOwner,
+          repo: effectiveRepo,
+          issue_number: number,
+          body: sanitizeContent(`⚠️ **Assignment failed**: Failed to assign ${agentName} coding agent to this ${type}.\n\nError: ${errorMessage}`, { maxLength: 65000 }),
+        });
+        core.info(`Posted failure comment on ${type} #${number} in ${effectiveOwner}/${effectiveRepo}`);
+      } catch (commentError) {
+        core.warning(`Failed to post failure comment on ${type} #${number}: ${getErrorMessage(commentError)}`);
       }
 
       allResults.push({ issue_number: issueNumber, pull_number: pullNumber, agent: agentName, owner: effectiveOwner, repo: effectiveRepo, pull_request_repo: effectivePullRequestRepoSlug, success: false, error: errorMessage });
