@@ -1,0 +1,6 @@
+[codex-harness] 2026-10-02T08:00:00Z attempt 1: spawning: codex exec --model auto -c web_search=disabled --skip-git-repo-check <prompt omitted>
+{"type":"thread.started","thread_id":"sanitized-failed-thread"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata unavailable; using fallback metadata."}}
+{"type":"turn.started"}
+{"type":"error","message":"{\"error\":{\"message\":\"The requested model is not supported.\",\"code\":\"model_not_supported\",\"param\":\"model\",\"type\":\"invalid_request_error\"}}\n"}
+{"type":"turn.failed","error":{"message":"{\"error\":{\"message\":\"The requested model is not supported.\",\"code\":\"model_not_supported\",\"param\":\"model\",\"type\":\"invalid_request_error\"}}\n"}}

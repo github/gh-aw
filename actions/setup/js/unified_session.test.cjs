@@ -8,6 +8,7 @@ import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 
 const req = require;
 const { writeDetectionUsageResult } = req("./generate_usage_activity_summary.cjs");
+const { parseCustomLog } = req("./parse_custom_log.cjs");
 const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
 const claudeFixtures = req("./fixtures/claude_ci_sessions.cjs");
 const { dynamicWorkflow } = req("./fixtures/claude_dynamic_workflow.cjs");
@@ -160,7 +161,8 @@ describe("Unified conclusion session", () => {
       provenance: { component: "execution", phase: "agent", path: "agent-errors.jsonl" },
     });
     expect(executions[0]).not.toHaveProperty("timestamp");
-    expect(events.filter(event => event.type === "claude.assistant_error")).toHaveLength(1);
+    expect(events.filter(event => event.type === "claude.assistant_error")).toHaveLength(0);
+    expect(events.filter(event => event.type === "session.result" && event.data.errors?.some(error => error?.error === "server_error"))).toHaveLength(1);
     expect(writeUnifiedSession({ rootDir: root, engine: "claude" })).toEqual(events);
   });
 
@@ -208,10 +210,19 @@ describe("Unified conclusion session", () => {
   });
 
   it("recovers declared-engine stdout when persisted evidence contains only execution", () => {
+    const source = "Assistant: recovered answer\n";
+    const expectedEvents = parseCustomLog(source, "cursor").logEntries;
+    const expectedAssistantEvents = expectedEvents.filter(event => event.type === "assistant.message");
+    expect(expectedAssistantEvents).toHaveLength(1);
     write("agent-session.jsonl", [{ type: "agent.execution", data: { categories: ["agentic_engine_timeout"], errorCodes: [], errorTypes: [], exitCode: 1 } }]);
-    write("agent-stdio.log", "Assistant: recovered answer\n");
+    write("agent-stdio.log", source);
     const { events } = collectUnifiedSession({ rootDir: root, engine: "cursor" });
-    expect(events.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "Assistant: recovered answer" }, provenance: { path: "agent-stdio.log" } }]);
+    expect(events.filter(event => event.type === "assistant.message")).toEqual(
+      expectedAssistantEvents.map(event => ({
+        ...normalizeUnifiedSessionEvent(event, "agent"),
+        provenance: { component: "agent", phase: "agent", path: "agent-stdio.log", index: expectedEvents.indexOf(event) },
+      }))
+    );
     expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: ["agentic_engine_timeout"], exitCode: 1 } }]);
   });
 
@@ -566,7 +577,10 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "session.init").data).toMatchObject({ sourceEngine: "copilot", model: "fixture-model" });
     expect(events.find(event => event.type === "assistant.message").data.content).toBe("Recovered response.");
     expect(events.find(event => event.type === "tool.execution_complete").data).toMatchObject({ toolName: "bash", success: true, exitCode: 0 });
-    expect(events.filter(event => event.type === "session.result").map(event => event.data)).toEqual([{ durationMs: 5000, usage: { inputTokens: 10, outputTokens: 4 } }, { numTurns: 1 }]);
+    expect(events.filter(event => event.type === "session.result").map(event => event.data)).toEqual([
+      { sourceEngine: "copilot", sessionId: "native", durationMs: 5000, usage: { inputTokens: 10, outputTokens: 4 } },
+      { sourceEngine: "copilot", sessionId: "native", numTurns: 1 },
+    ]);
     expect(events.filter(event => event.provenance.component === "agent").every(event => event.provenance.path === nativePath)).toBe(true);
     const { generatePlainTextSummary } = require("./log_parser_shared.cjs");
     const summary = generatePlainTextSummary(events);
@@ -576,20 +590,23 @@ describe("Unified conclusion session", () => {
     expect(summary).toContain("Tools: 1/1 succeeded");
   });
 
-  it.each([
-    [`{"type":"session.start","data":{"sessionId":"native"}}\n`],
-    [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`],
-    [`{"type":"assistant.message","data":{"content":"partial native"}}\n{"type":"assistant.message",`],
-  ])("falls back to stdio when native Copilot events are incomplete", nativeContent => {
-    const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
-    write(nativePath, nativeContent);
-    write("agent-stdio.log", JSON.stringify({ type: "assistant.message", data: { content: "recovered stdio" } }));
-    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
-    const agentEvents = events.filter(event => event.provenance.component === "agent");
-    expect(agentEvents).toEqual([expect.objectContaining({ type: "assistant.message", data: { content: "recovered stdio" }, provenance: expect.objectContaining({ path: "agent-stdio.log" }) })]);
-    expect(events.some(event => event.type === "session.collection_warning" && event.data.path === nativePath)).toBe(true);
-    expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: nativePath, events: 0 }));
-  });
+  it.each([[`{"type":"session.start","data":{"sessionId":"native"}}\n`], [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`]])(
+    "falls back to stdio when native Copilot events are incomplete",
+    nativeContent => {
+      const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
+      write(nativePath, nativeContent);
+      write("agent-stdio.log", JSON.stringify({ type: "assistant.message", data: { content: "recovered stdio" } }));
+      const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+      const agentEvents = events.filter(event => event.provenance.component === "agent");
+      expect(agentEvents).toEqual([
+        expect.objectContaining({ type: "session.start", provenance: expect.objectContaining({ path: nativePath }) }),
+        expect.objectContaining({ type: "session.init", provenance: expect.objectContaining({ path: nativePath }) }),
+        expect.objectContaining({ type: "assistant.message", data: { content: "recovered stdio" }, provenance: expect.objectContaining({ path: "agent-stdio.log" }) }),
+      ]);
+      expect(events.some(event => event.type === "session.collection_warning" && event.data.path === nativePath)).toBe(true);
+      expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: nativePath, events: 2 }));
+    }
+  );
 
   it("prefers persisted canonical events over raw logs and avoids replicated firewall accounting", () => {
     write("agent-session.jsonl", [{ type: "vendor.extension", data: { preserved: true } }]);
@@ -601,6 +618,41 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.provenance.component === "agent")).toHaveLength(1);
     expect(events.some(event => event.data.input_tokens === 999)).toBe(false);
     expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", events: 0 }));
+  });
+
+  it.each([false, true])("deduplicates identified stdio snapshots against retained initialization-only native evidence (answer: %s)", hasAnswer => {
+    const nativePath = "sandbox/agent/logs/copilot-session-state/partial/events.jsonl";
+    const start = { type: "session.start", id: "same-start", data: { sessionId: "partial" } };
+    write(nativePath, [start]);
+    write("agent-stdio.log", [start, ...(hasAnswer ? [{ type: "assistant.message", id: "answer", data: { content: "  recovered answer\n" } }] : [])]);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+    expect(events.filter(event => event.type === "session.start")).toHaveLength(1);
+    expect(events.filter(event => event.type === "session.init")).toHaveLength(1);
+    expect(events.find(event => event.type === "session.start").provenance.path).toBe(nativePath);
+    expect(events.filter(event => event.type === "assistant.message")).toEqual(
+      hasAnswer ? [{ type: "assistant.message", id: "answer", data: { content: "  recovered answer\n" }, provenance: { component: "agent", phase: "agent", path: "agent-stdio.log", index: 0 } }] : []
+    );
+    expect(events.some(event => event.type === "session.collection_warning" && event.data.code === "unrecognized_engine_log")).toBe(false);
+  });
+
+  it.each([undefined, 3, 4])("reconciles persisted malformed-source warnings with collector copies (line: %s)", line => {
+    const nativePath = "sandbox/agent/logs/copilot-session-state/partial/events.jsonl";
+    const start = { type: "session.start", id: "start", data: { sessionId: "partial" } };
+    const answer = { type: "assistant.message", id: "answer", data: { content: "valid adjacent text\n" } };
+    const persisted = [
+      { ...start, provenance: { path: nativePath, index: 0 } },
+      { ...answer, provenance: { path: nativePath, index: 1 } },
+      { type: "session.collection_warning", data: { path: nativePath, code: "malformed_jsonl", ...(line !== undefined ? { line } : {}) } },
+      { type: "session.collection_warning", data: { path: "unrelated.jsonl", code: "malformed_jsonl", line: 3 } },
+      { type: "session.collection_warning", data: { path: nativePath, code: "unrelated_problem", line: 3 } },
+    ];
+    write("agent-session.jsonl", persisted);
+    write(nativePath, `${JSON.stringify(start)}\n${JSON.stringify(answer)}\nINVALID_LINE_THREE\n`);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot", warn: () => {} });
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["valid adjacent text\n"]);
+    expect(events.filter(event => event.type === "session.collection_warning")).toHaveLength(4);
+    expect(events.at(-1).data.warnings).toBe(line === 4 ? 4 : 3);
+    expect(events.at(-1).data.warnings).toBe(collectUnifiedSession({ rootDir: root, engine: "copilot", warn: () => {} }).events.at(-1).data.warnings);
   });
 
   it("preserves canonical native source groups without needing raw snapshots", () => {
@@ -658,7 +710,8 @@ describe("Unified conclusion session", () => {
     expect(answers.map(event => event.data.content)).toEqual([summary]);
     expect(answers[0].id).toBe("complete");
     expect(answers[0].provenance.path).toBe("agent-session.jsonl");
-    expect(events.find(event => event.type === "session.task_complete").data.sourceDetail).toBe("observed metadata");
+    expect(events.find(event => event.type === "session.task_complete").data).not.toHaveProperty("sourceDetail");
+    expect(events.find(event => event.type === "session.task_complete").data).not.toHaveProperty("summary");
     const markdown = require("./session_cli.cjs").sessionCLI(["markdown", write("usage/aw_session.jsonl", events)]);
     expect(markdown).toContain("Observed historical final answer");
     expect(markdown).toContain("Second paragraph.");

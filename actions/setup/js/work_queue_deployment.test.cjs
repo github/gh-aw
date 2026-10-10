@@ -292,7 +292,7 @@ describe("prospective drain-free worker evolution", () => {
     }
   });
 
-  it("missing default sources pause only the installed target without replacing its identity or revoking frozen launch/reconciliation", async () => {
+  it("ignores caller-proposed revisions and pauses missing default sources without revoking frozen launch/reconciliation", async () => {
     const f = fixture();
     f.append("dispatch_next", { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 48000 }, f.dispatcher);
     const assignment = assignmentOnly([...f.state.dispatches.values()][0]);
@@ -313,8 +313,9 @@ describe("prospective drain-free worker evolution", () => {
     };
     const trusted = { ...f.dispatcher, authenticated: true, roles: ["dispatcher"] };
     await synchronizeDeployments(options, trusted);
-    expect(f.state.deployments.get("default").get("default").revisions[REF].available).toBe(false);
+    expect(f.state.deployments.get("default").get("default").current_ref).toBe(REF);
     expect(f.state.deployments.get("default").get("default").revisions[NEW_REF]).toBeUndefined();
+    expect(f.state.deployments.get("default").get("default").revisions[REF].available).toBe(false);
     expect(f.state.deployments.get("default").get("other").current_ref).toBe(REF);
     expect(f.state.dispatches.get(assignment.dispatch_id).profile.ref).toBe(REF);
     const post = vi.fn().mockResolvedValue({ status: 200, data: { workflow_run_id: "42", run_url: "https://api.github.com/repos/owner/repo/actions/runs/42", html_url: "https://github.com/owner/repo/actions/runs/42" } });
