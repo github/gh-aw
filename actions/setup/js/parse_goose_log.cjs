@@ -1,7 +1,7 @@
 // @ts-check
 
 const { createEngineLogParser, generateCopilotCliStyleSummary, buildStepSummaryDetailsSection } = require("./log_parser_shared.cjs");
-const { createSessionEvent, isSessionEvent, isTokenCount, isMetric } = require("./agent_session.cjs");
+const { createSessionEvent, isSessionEvent, isTokenCount, isMetric, reconcileSessionUsage } = require("./agent_session.cjs");
 
 const main = createEngineLogParser({ parserName: "Goose", parseFunction: parseGooseLog, supportsDirectories: false });
 
@@ -16,11 +16,16 @@ function isGooseEvent(event) {
 /** @param {any} event @returns {Record<string, any>} */
 function sourceMetadata(event) {
   const source = { ...event };
-  if (typeof event.message?.id === "string") source.id = event.message.id;
+  if (!Object.hasOwn(source, "id") && typeof event.message?.id === "string") source.id = event.message.id;
   // Goose's Message.created is Unix seconds, not milliseconds.
   const seconds = event.message?.created;
-  if (typeof seconds === "number" && Number.isFinite(seconds) && Math.abs(seconds * 1000) <= 8640000000000000) source.timestamp = new Date(seconds * 1000).toISOString();
+  if (!Object.hasOwn(source, "timestamp") && typeof seconds === "number" && Number.isFinite(seconds) && Math.abs(seconds * 1000) <= 8640000000000000) source.timestamp = new Date(seconds * 1000).toISOString();
   return source;
+}
+
+/** @param {unknown} error @returns {boolean} */
+function isMaxTurnsError(error) {
+  return typeof error === "string" && /maximum.*turns|turn limit|max.?turns/i.test(error);
 }
 
 /**
@@ -47,7 +52,7 @@ function parseGooseLog(content) {
       const failure = line.match(/^(?:Warning:|[ \t]*⚠)\s*Failed to start extension '([^']+)'/);
       if (failure && !mcpFailures.has(failure[1])) {
         mcpFailures.add(failure[1]);
-        logEntries.push({ type: "goose.mcp_failure", data: { serverName: failure[1] } });
+        logEntries.push({ type: "mcp.event", data: { event: "extension_start_failure", serverName: failure[1], status: "error" } });
       }
       continue;
     }
@@ -61,8 +66,8 @@ function parseGooseLog(content) {
     if (isSessionEvent(raw)) {
       logEntries.push(structuredClone(raw));
       if (raw.type === "session.init") initialized = true;
-      if (raw.type === "goose.max_turns") maxTurnsHit = true;
-      if (raw.type === "goose.mcp_failure" && typeof raw.data.serverName === "string") mcpFailures.add(raw.data.serverName);
+      if (raw.type === "goose.max_turns" || (raw.type === "session.error" && isMaxTurnsError(raw.data.error))) maxTurnsHit = true;
+      if ((raw.type === "goose.mcp_failure" || (raw.type === "mcp.event" && raw.data.event === "extension_start_failure")) && typeof raw.data.serverName === "string") mcpFailures.add(raw.data.serverName);
       continue;
     }
     if (!isGooseEvent(raw)) continue;
@@ -70,7 +75,8 @@ function parseGooseLog(content) {
     const emit = (type, data) => logEntries.push(createSessionEvent(source, type, data));
     if (raw.type === "message") {
       if (!initialized) {
-        emit("session.init", { sourceEngine: "goose", ...(raw.message.metadata?.inference?.requestedModel ? { model: raw.message.metadata.inference.requestedModel } : {}) });
+        const model = raw.message.metadata?.inference?.requestedModel;
+        emit("session.init", { sourceEngine: "goose", ...(typeof model === "string" ? { model } : {}) });
         initialized = true;
       }
       if (raw.message.role === "assistant") turns.add(raw.message.id);
@@ -85,38 +91,52 @@ function parseGooseLog(content) {
           const type = item.type === "thinking" ? "assistant.reasoning" : raw.message.role === "assistant" ? "assistant.message" : "user.message";
           const key = JSON.stringify([type, raw.message.id]);
           const previous = messages.get(key);
-          if (previous) previous.data.content += text;
+          const metadataKey = JSON.stringify({ ...source, type: undefined, message: { ...raw.message, content: undefined }, contentMetadata: { ...item, text: undefined, thinking: undefined } });
+          if (previous && logEntries.at(-1) === previous.event && previous.metadataKey === metadataKey) previous.event.data.content += text;
           else {
             const event = createSessionEvent(source, type, { content: text });
-            messages.set(key, event);
+            messages.set(key, { event, metadataKey });
             logEntries.push(event);
           }
-        } else if (item.type === "toolRequest" && typeof item.id === "string" && !toolStarts.has(item.id)) {
+        } else if (item.type === "toolRequest") {
           const call = item.toolCall;
-          if (call?.status !== "error" && (call?.status !== "success" || typeof call.value?.name !== "string")) {
-            emit("session.collection_warning", { code: "malformed_tool_request", toolCallId: item.id });
+          if (typeof item.id !== "string" || (!(call?.status === "error" && typeof call.error === "string") && (call?.status !== "success" || typeof call.value?.name !== "string"))) {
+            emit("session.collection_warning", { code: "malformed_tool_request", ...(typeof item.id === "string" ? { toolCallId: item.id } : {}) });
             continue;
           }
-          const data = { toolCallId: item.id, ...(call?.status === "success" ? { toolName: call.value.name, input: call.value.arguments ?? {} } : {}) };
+          if (toolStarts.has(item.id)) continue;
+          const data = {
+            toolCallId: item.id,
+            ...(call?.status === "success" ? { toolName: call.value.name, ...(Object.hasOwn(call.value, "arguments") ? { input: call.value.arguments } : {}) } : {}),
+            ...(typeof item._meta?.goose_extension === "string" ? { mcpServerName: item._meta.goose_extension } : {}),
+          };
           toolStarts.set(item.id, data);
           emit("tool.execution_start", data);
           if (call?.status === "error") emit("session.error", { error: call.error, toolCallId: item.id });
-        } else if (item.type === "toolResponse" && typeof item.id === "string" && !toolCompletions.has(item.id)) {
+        } else if (item.type === "toolResponse") {
           const result = item.toolResult;
           const value = result?.value;
           const validSuccess =
             result?.status === "success" && value && typeof value === "object" && !Array.isArray(value) && (value.content === undefined || Array.isArray(value.content)) && (value.isError === undefined || typeof value.isError === "boolean");
           const validError = result?.status === "error" && typeof result.error === "string";
-          if (!validSuccess && !validError) {
-            emit("session.collection_warning", { code: "malformed_tool_response", toolCallId: item.id });
+          if (typeof item.id !== "string" || (!validSuccess && !validError)) {
+            emit("session.collection_warning", { code: "malformed_tool_response", ...(typeof item.id === "string" ? { toolCallId: item.id } : {}) });
             continue;
           }
+          if (toolCompletions.has(item.id)) continue;
           const success = result?.status === "success" && result.value?.isError !== true;
+          const start = toolStarts.get(item.id);
+          // Developer shell results expose the process outcome independently of MCP status.
+          const exitCode = start?.toolName === "shell" ? value?.structuredContent?.exit_code : undefined;
           emit("tool.execution_complete", {
             toolCallId: item.id,
-            toolName: toolStarts.get(item.id)?.toolName,
+            ...(start?.toolName !== undefined ? { toolName: start.toolName } : {}),
+            ...(typeof item._meta?.goose_extension === "string" ? { mcpServerName: item._meta.goose_extension } : start?.mcpServerName !== undefined ? { mcpServerName: start.mcpServerName } : {}),
             success,
             ...(value?.content !== undefined ? { output: value.content } : value?.structuredContent !== undefined ? { output: value.structuredContent } : {}),
+            ...(Object.hasOwn(value ?? {}, "structuredContent") ? { structuredContent: value.structuredContent } : {}),
+            ...(typeof value?.isError === "boolean" ? { isError: value.isError } : {}),
+            ...(Number.isSafeInteger(exitCode) ? { exitCode } : {}),
             ...(result?.error !== undefined ? { error: result.error } : {}),
           });
           toolCompletions.add(item.id);
@@ -129,22 +149,21 @@ function parseGooseLog(content) {
         else if (raw[key] != null) emit("session.collection_warning", { code: "invalid_usage", field: key });
       }
       if (isTokenCount(raw.cache_write_input_tokens)) usage.cache_creation_input_tokens = raw.cache_write_input_tokens;
+      else if (raw.cache_write_input_tokens != null) emit("session.collection_warning", { code: "invalid_usage", field: "cache_write_input_tokens" });
       if (Object.keys(usage).length) usage.input_tokens_include_cache = true;
       resultSource = source;
       resultData = {
-        status: "completed",
+        ...resultData,
+        status: resultData?.status === "error" ? "error" : "completed",
         ...(turns.size ? { numTurns: turns.size } : {}),
-        ...(Object.keys(usage).length ? { usage } : {}),
+        ...(Object.keys(usage).length ? { usage: reconcileSessionUsage(resultData?.usage, usage) } : {}),
         ...(isMetric(raw.cost_usd) ? { totalCostUsd: raw.cost_usd } : {}),
       };
     } else if (raw.type === "error") {
       emit("session.error", { error: raw.error });
-      if (/maximum.*turns|turn limit|max.?turns/i.test(raw.error)) {
-        maxTurnsHit = true;
-        emit("goose.max_turns", { error: raw.error });
-      }
+      if (isMaxTurnsError(raw.error)) maxTurnsHit = true;
       resultSource = source;
-      resultData = { status: "error", errors: [raw.error], ...(turns.size ? { numTurns: turns.size } : {}) };
+      resultData = { ...resultData, status: "error", errors: [...(resultData?.errors ?? []), raw.error], ...(turns.size ? { numTurns: turns.size } : {}) };
     }
   }
   if (resultSource) logEntries.push(createSessionEvent(resultSource, "session.result", resultData));

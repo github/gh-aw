@@ -129,7 +129,12 @@ usage events. Configuration and session state are temporary and keyring access
 is disabled. Goose has no native gh-aw `web-fetch` tool; supply an MCP tool or
 use the shell explicitly.
 Its parser emits canonical unified-session events, merges streaming text
-deltas, correlates tool calls and results, and retains native token/cache usage.
+deltas without reordering intervening observations, correlates tool calls and
+results with native MCP server identities, and retains native token/cache usage.
+Shell results retain observed exit codes and explicit error flags; simultaneous
+text and structured output remain available in the canonical agent trace.
+Completion accounting is cumulative, not additive. Partial logs do not invent
+completion or usage, and terminal errors remain distinct from tool failures.
 The same parser handles Actions artifacts and CLI session reconstruction.
 Copilot inference uses `${{ github.token }}` with
 `permissions: { copilot-requests: write }`; no PAT or `COPILOT_GITHUB_TOKEN`
