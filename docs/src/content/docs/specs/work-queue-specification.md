@@ -1214,10 +1214,7 @@ repeating the entire protocol verification suite. Retain the body hash as
 provenance when available. This choice does not replace the immutable Git
 revision required to dispatch and authenticate an approved worker route, nor
 does it waive focused validation of changed behavior or the protocol-safety
-acceptance cases below. The
-[formal model](../../../../../specs/work-queue/README.md#evaluation-identity-and-worker-routing)
-checks all three identity scopes and the immutability of a dispatched worker's
-revision.
+acceptance cases below.
 
 The scheduler admits the largest **fair prefix** allowed by the request and
 capacity limits. It does not promise to fill every physically idle slot.

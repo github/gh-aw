@@ -158,6 +158,7 @@ func TestGenerateExperimentSteps_CacheStorage(t *testing.T) {
 func TestGenerateExperimentSteps_SpecJSON(t *testing.T) {
 	c := &Compiler{}
 	data := &WorkflowData{
+		FrontmatterYAML: "experiments:\n  style: [concise, detailed]",
 		FrontmatterHash: "frontmatter-hash",
 		BodyHash:        "body-hash",
 		Experiments: map[string][]string{
@@ -167,18 +168,18 @@ func TestGenerateExperimentSteps_SpecJSON(t *testing.T) {
 	steps := c.generateExperimentSteps(data)
 	joined := strings.Join(steps, "")
 	assert.Contains(t, joined, `{"style":["concise","detailed"]}`, "spec JSON should be embedded in the step")
-	assert.Contains(t, joined, "GH_AW_HARNESS_VERSION: frontmatter-hash", "assignment identity should use only the compiled frontmatter hash")
+	assert.Contains(t, joined, "GH_AW_HARNESS_VERSION: "+experimentHarnessVersion(data), "assignment identity should use only the compiled frontmatter hash")
 }
 
 func TestExperimentHarnessVersionUsesOnlyFrontmatterHash(t *testing.T) {
-	assert.Equal(t, "frontmatter-hash", experimentHarnessVersion(&WorkflowData{FrontmatterHash: "frontmatter-hash", BodyHash: "body-hash"}))
+	assert.Equal(t, "unknown", experimentHarnessVersion(&WorkflowData{FrontmatterHash: "frontmatter-hash", BodyHash: "body-hash"}))
 	frontmatter := "experiments:\n  style: [short, long]"
 	assert.Equal(t,
 		experimentHarnessVersion(&WorkflowData{FrontmatterYAML: frontmatter, FrontmatterHash: "frontmatter-hash", BodyHash: "body-hash"}),
 		experimentHarnessVersion(&WorkflowData{FrontmatterYAML: frontmatter, FrontmatterHash: "changed-by-inline-body", BodyHash: "different-body"}),
 		"pure frontmatter identity must ignore compiler freshness and body hashes",
 	)
-	assert.Equal(t, "frontmatter-hash", experimentHarnessVersion(&WorkflowData{FrontmatterHash: "frontmatter-hash"}))
+	assert.Equal(t, "unknown", experimentHarnessVersion(&WorkflowData{FrontmatterHash: "frontmatter-hash"}))
 	assert.Equal(t, "unknown", experimentHarnessVersion(&WorkflowData{BodyHash: "body-hash"}))
 	assert.Equal(t, "unknown", experimentHarnessVersion(&WorkflowData{}))
 }
@@ -212,7 +213,12 @@ func TestExperimentHarnessVersionIdentityModes(t *testing.T) {
 }
 
 func TestCompileWorkflowFrontmatterIdentityIgnoresInlinedBodyEdits(t *testing.T) {
-	compile := func(body string) string {
+	type compiledIdentity struct {
+		harnessVersion  string
+		frontmatterHash string
+		bodyHash        string
+	}
+	compile := func(body string) compiledIdentity {
 		t.Helper()
 		dir := t.TempDir()
 		workflowPath := filepath.Join(dir, "harness.md")
@@ -235,10 +241,21 @@ experiments:
 		require.NotEqual(t, -1, lineStart, "compiled workflow should expose the experiment identity")
 		lineEnd := bytes.IndexByte(lock[lineStart:], '\n')
 		require.NotEqual(t, -1, lineEnd, "compiled identity should end at a newline")
-		return strings.TrimSpace(string(lock[lineStart+len(marker) : lineStart+lineEnd]))
+		metadata, _, err := ExtractMetadataFromLockFile(string(lock))
+		require.NoError(t, err)
+		require.NotNil(t, metadata)
+		return compiledIdentity{
+			harnessVersion:  strings.TrimSpace(string(lock[lineStart+len(marker) : lineStart+lineEnd])),
+			frontmatterHash: metadata.FrontmatterHash,
+			bodyHash:        metadata.BodyHash,
+		}
 	}
 
-	assert.Equal(t, compile("First prompt body."), compile("Revised prompt body."))
+	first := compile("First prompt body.")
+	revised := compile("Revised prompt body.")
+	assert.Equal(t, first.harnessVersion, revised.harnessVersion)
+	assert.NotEqual(t, first.frontmatterHash, revised.frontmatterHash, "inlined body edits must continue to change the compiler freshness hash")
+	assert.NotEqual(t, first.bodyHash, revised.bodyHash)
 }
 
 func TestGenerateExperimentSteps_SingleQuoteEscaping(t *testing.T) {

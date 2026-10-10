@@ -30,16 +30,6 @@ This directory retains executable specifications and formal evidence, not a
 second current user guide. The historical material below is model provenance,
 not supported deployment guidance.
 
-### Evaluation identity and worker routing
-
-[`HarnessIdentity.tla`](HarnessIdentity.tla) models the distinction between
-evaluation identity and dispatch identity. The configured identity is either
-the full freshness/body fingerprint, a pure frontmatter hash (the default), or
-the workflow ID. Body and frontmatter edits affect those modes independently.
-A worker assignment captures the current immutable source revision, and later
-edits do not alter that route. Run the focused model with
-`TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=HarnessIdentity TLC_CONFIG_FILTER=HarnessIdentity bash specs/work-queue/check.sh`.
-
 ## First-submit bootstrap model
 
 `QueueBootstrap.tla` is a separate bounded refinement of the first valid producer

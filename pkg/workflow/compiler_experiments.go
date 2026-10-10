@@ -742,9 +742,6 @@ func experimentHarnessVersion(data *WorkflowData) string {
 			hash := sha256.Sum256([]byte(frontmatter))
 			return hex.EncodeToString(hash[:])
 		}
-		if data.FrontmatterHash != "" {
-			return data.FrontmatterHash
-		}
 		return "unknown"
 	}
 }
