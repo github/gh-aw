@@ -51,6 +51,7 @@ engine:
         - -c
         - |
           import json
+          import math
           import os
           import sys
           import time
@@ -64,6 +65,9 @@ engine:
           started_at = time.monotonic()
           turns = 0
           errors = []
+          response_usage = []
+          observed_cost = None
+          capturing_response = False
 
           def emit(event_type, data):
               print("\n" + json.dumps({
@@ -71,6 +75,60 @@ engine:
                   "timestamp": int(time.time() * 1000),
                   "data": {"sourceEngine": "aider", "sessionId": session_id, **data},
               }), flush=True)
+
+          def native_value(value):
+              if hasattr(value, "model_dump"):
+                  return value.model_dump()
+              return value
+
+          def field(value, name):
+              if isinstance(value, dict):
+                  return value.get(name)
+              return getattr(value, name, None)
+
+          def has_field(value, name):
+              return name in value if isinstance(value, dict) else hasattr(value, name)
+
+          def accounting(usage):
+              mapped = {}
+              for target, names in {
+                  "input_tokens": ("prompt_tokens", "input_tokens"),
+                  "output_tokens": ("completion_tokens", "output_tokens"),
+                  "total_tokens": ("total_tokens",),
+                  "cache_read_input_tokens": ("cache_read_input_tokens", "prompt_cache_hit_tokens"),
+                  "cache_creation_input_tokens": ("cache_creation_input_tokens",),
+              }.items():
+                  for name in names:
+                      if name in usage:
+                          mapped[target] = usage[name]
+                          break
+              for target, details, name in (
+                  ("cache_read_input_tokens", "prompt_tokens_details", "cached_tokens"),
+                  ("reasoning_output_tokens", "completion_tokens_details", "reasoning_tokens"),
+              ):
+                  nested = usage.get(details)
+                  if target not in mapped and isinstance(nested, dict) and name in nested:
+                      mapped[target] = nested[name]
+              if "prompt_tokens" in usage:
+                  mapped["input_tokens_include_cache"] = not (
+                      "cache_read_input_tokens" in usage or "cache_creation_input_tokens" in usage
+                  )
+              return mapped
+
+          def total_usage():
+              if not response_usage:
+                  return {}
+              result = {}
+              for name in set.intersection(*(set(usage) for usage in response_usage)):
+                  values = [usage[name] for usage in response_usage]
+                  if name == "input_tokens_include_cache":
+                      if all(value is values[0] for value in values):
+                          result[name] = values[0]
+                  elif all(type(value) is int and 0 <= value <= 9007199254740991 for value in values):
+                      total = sum(values)
+                      if total <= 9007199254740991:
+                          result[name] = total
+              return result
 
           class WorkflowInputOutput(InputOutput):
               def confirm_ask(self, question, *args, **kwargs):
@@ -80,14 +138,79 @@ engine:
 
               def assistant_output(self, message, pretty=None):
                   global turns
+                  if not capturing_response:
+                      turns += 1
+                      emit("assistant.message", {"content": message})
+                  # Keep empty-response warnings without duplicating rendered provider text.
                   if not message:
                       return super().assistant_output(message, pretty)
-                  turns += 1
-                  emit("assistant.message", {"content": message})
 
               def tool_error(self, message="", strip=True):
-                  errors.append(str(message))
+                  content = native_value(message)
+                  if not isinstance(content, (str, int, float, bool, list, dict, type(None))):
+                      content = str(message)
+                  errors.append(content)
+                  emit("session.error", {"content": content})
                   return super().tool_error(message, strip)
+
+          original_show_send_output = base_coder.Coder.show_send_output
+          original_calculate_usage = base_coder.Coder.calculate_and_show_tokens_and_cost
+
+          def workflow_show_send_output(coder, completion):
+              global turns, capturing_response
+              choices = field(completion, "choices")
+              usage = native_value(field(completion, "usage"))
+              if isinstance(usage, dict):
+                  response_usage.append(accounting(usage))
+              else:
+                  response_usage.append({})
+              if choices:
+                  turns += 1
+              for choice in choices or []:
+                  message = field(choice, "message")
+                  if message is None:
+                      continue
+                  metadata = {}
+                  for name in ("id", "model", "created"):
+                      value = field(completion, name)
+                      if value is not None:
+                          metadata["apiCallId" if name == "id" else name] = value
+                  metadata["message"] = native_value(message)
+                  finish_reason = field(choice, "finish_reason")
+                  if finish_reason is not None:
+                      metadata["finishReason"] = finish_reason
+                  if isinstance(usage, dict):
+                      metadata["usage"] = usage
+                  reasoning = field(message, "reasoning_content")
+                  if reasoning is None:
+                      reasoning = field(message, "reasoning")
+                  content = field(message, "content")
+                  partial = {"partial": True} if finish_reason == "length" else {}
+                  if reasoning is not None:
+                      emit("assistant.reasoning", {**metadata, **partial, "content": reasoning})
+                  if has_field(message, "content"):
+                      emit("assistant.message", {**metadata, **partial, "content": content})
+                  refusal = field(message, "refusal")
+                  if refusal is not None or finish_reason == "content_filter":
+                      emit("assistant.refusal", {
+                          **metadata, **partial,
+                          "reason": "content_filter" if finish_reason == "content_filter" else "refusal",
+                          **({"content": refusal if refusal is not None else content} if refusal is not None or content is not None else {}),
+                      })
+              capturing_response = True
+              try:
+                  return original_show_send_output(coder, completion)
+              finally:
+                  capturing_response = False
+
+          def workflow_calculate_usage(coder, messages, completion=None):
+              global observed_cost
+              result = original_calculate_usage(coder, messages, completion)
+              if getattr(coder, "usage_report", None) and coder.main_model.info.get("input_cost_per_token"):
+                  cost = getattr(coder, "total_cost", None)
+                  if type(cost) in (int, float) and math.isfinite(cost) and cost >= 0:
+                      observed_cost = cost
+              return result
 
           original_run_cmd = base_coder.run_cmd
 
@@ -97,7 +220,15 @@ engine:
                   "toolCallId": tool_id, "toolName": "bash", "input": {"command": command},
               })
               tool_started_at = time.monotonic()
-              exit_code, output = original_run_cmd(command, *args, **kwargs)
+              try:
+                  exit_code, output = original_run_cmd(command, *args, **kwargs)
+              except BaseException as error:
+                  emit("tool.execution_complete", {
+                      "toolCallId": tool_id, "toolName": "bash", "success": False,
+                      "error": str(error), "status": "failed",
+                      "durationMs": int((time.monotonic() - tool_started_at) * 1000),
+                  })
+                  raise
               emit("tool.execution_complete", {
                   "toolCallId": tool_id, "toolName": "bash", "success": exit_code == 0,
                   "exitCode": exit_code, "output": output,
@@ -106,17 +237,34 @@ engine:
               return exit_code, output
 
           aider_main.InputOutput = WorkflowInputOutput
+          base_coder.Coder.show_send_output = workflow_show_send_output
+          base_coder.Coder.calculate_and_show_tokens_and_cost = workflow_calculate_usage
           base_coder.run_cmd = workflow_run_cmd
-          emit("session.init", {"model": os.environ.get("AIDER_MODEL")})
+          emit("session.init", {"model": os.environ.get("AIDER_MODEL"), "cwd": os.getcwd()})
           emit("user.message", {
               "content": Path(os.environ["GH_AW_PROMPT"]).read_text(encoding="utf-8"),
           })
+          terminal = {}
           try:
               exit_code = aider_main.main()
+              if type(exit_code) is int:
+                  terminal = {
+                      "status": "completed" if exit_code == 0 else "failed",
+                      "sourceType": "process.exit",
+                      "exitCode": exit_code,
+                  }
+          except BaseException as error:
+              errors.append(str(error))
+              terminal = {"status": "failed", "sourceType": type(error).__name__}
+              raise
           finally:
+              usage = total_usage()
               emit("session.result", {
+                  **terminal,
                   "numTurns": turns, "durationMs": int((time.monotonic() - started_at) * 1000),
                   "errors": errors,
+                  **({"usage": usage} if usage else {}),
+                  **({"totalCostUsd": observed_cost} if observed_cost is not None else {}),
               })
           sys.exit(exit_code)
         - --yes-always
@@ -249,8 +397,41 @@ engine:
         const { parseLogEntries, generateCopilotCliStyleSummary } = require("./log_parser_shared.cjs");
         const { isSessionEvent } = require("./agent_session.cjs");
         const logEntries = (parseLogEntries(logContent) || []).filter(
-          entry => isSessionEvent(entry) && entry.data.sourceEngine === "aider"
+          entry => isSessionEvent(entry) && (entry.data.sourceEngine === undefined || entry.data.sourceEngine === "aider")
         );
+        // Older Aider versions expose provider failures before any model reply.
+        // Require the native startup preamble; unframed conversation/tool text
+        // cannot establish diagnostic attribution.
+        if (!logEntries.length) {
+          const lines = logContent.split("\n");
+          let banner = false;
+          let startup = false;
+          for (let index = 0; index < lines.length; index++) {
+            const line = lines[index];
+            if (/^Aider v\d+\.\d+\.\d+$/.test(line)) banner = true;
+            if (banner && /^Repo-map: /.test(line)) {
+              startup = true;
+              continue;
+            }
+            if (!startup || !line.trim() || /^Retrying in \d+(?:\.\d+)? seconds\.\.\.$/.test(line)) continue;
+            const diagnostic = line.match(/^litellm\.([A-Za-z][A-Za-z0-9]*Error): .+/);
+            if (!diagnostic) {
+              startup = false;
+              continue;
+            }
+            let content = line + (index < lines.length - 1 ? "\n" : "");
+            while (index + 1 < lines.length) {
+              const next = lines[index + 1];
+              if (!next.trim() || /^(?:Retrying in |litellm\.|```|~~~|>|[\[{"]|(?:assistant|user|tool|exec)(?::|\s*$)|Error:|Process exiting)/i.test(next)) break;
+              content += next + (index + 1 < lines.length - 1 ? "\n" : "");
+              index++;
+            }
+            logEntries.push({
+              type: "session.error",
+              data: { sourceEngine: "aider", errorType: diagnostic[1], content },
+            });
+          }
+        }
         return {
           markdown: generateCopilotCliStyleSummary(logEntries),
           logEntries,
@@ -311,8 +492,19 @@ deliberately declines when explicit confirmation is required. The adapter
 changes only the two shell-command confirmation prompts; other explicit
 confirmation requirements remain intact. Commands run in the configured
 workflow sandbox.
-The entrypoint emits native session events for model replies, shell commands
-and their results, and session boundaries. The declarative log parser publishes
+The entrypoint emits canonical session events for exact provider reply text,
+separate reasoning and structured refusals, shell commands and their results,
+errors, and session boundaries. Provider token counts and observed Aider cost
+are captured before display rounding; missing accounting remains absent, and
+session totals are emitted once. Length-limited replies retain `partial: true`.
+Repository configuration that enables streaming instead of this profile's
+`--no-stream` is outside this response-hook coverage. Historical logs with only
+rounded `Tokens:`/`Cost:` prose cannot recover exact accounting, and older runs
+without structured events cannot reconstruct conversations. Before-response
+LiteLLM diagnostics are retained as `session.error` only when the native Aider
+startup preamble establishes their origin; quoted, tool and conversation text
+does not establish attribution. These diagnostics do not imply a session result.
+The declarative log parser publishes
 normalized agent logs used by Actions summaries and the unified session artifact;
 local log reconstruction also recognizes these events.
 The edit format is pinned to `diff` (the editblock coder) because the proxied

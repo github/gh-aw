@@ -35,6 +35,13 @@ func TestAiderEntrypointAcceptsOnlyShellConfirmations(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(codersDir, "__init__.py"), nil, 0o600))
 	commandSource := `def run_cmd(command, *args, **kwargs):
     return (7, "command failed") if command == "fail" else (0, "command output")
+
+class Coder:
+    def show_send_output(self, completion):
+        pass
+
+    def calculate_and_show_tokens_and_cost(self, messages, completion=None):
+        pass
 `
 	require.NoError(t, os.WriteFile(filepath.Join(codersDir, "base_coder.py"), []byte(commandSource), 0o600))
 	mainSource := `import os
