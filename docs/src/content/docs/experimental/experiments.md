@@ -37,6 +37,7 @@ on:
 engine: copilot
 
 experiments:
+  identity: frontmatter # full, frontmatter (default), or workflow
   style: [concise, detailed]
 ---
 
@@ -100,6 +101,23 @@ by variant.
 > Experiment names must be valid identifiers: start with a letter or
 > underscore, followed by letters, digits, or underscores. For example, use
 > `style` or `feature_1`. Names that do not match this pattern are ignored.
+
+### Choosing experiment history identity
+
+The reserved `identity` key controls when experiment history is considered to
+belong to a new workflow evaluation:
+
+| Value | Identity fingerprint |
+|---|---|
+| `full` | Compiler freshness hash plus the complete workflow body hash. Prompt or imported-body changes start a new history. |
+| `frontmatter` (default) | SHA-256 of the normalized workflow frontmatter text only. Body-only edits keep the same history. |
+| `workflow` | Workflow ID derived from the workflow filename. Frontmatter and body edits keep the same history. |
+
+For example, set `experiments.identity: full` when every prompt revision should
+be evaluated as a separate harness. Use `workflow` only when history should span
+all revisions of that workflow. This choice affects experiment-history grouping;
+it does not change the immutable source revision used to route a dispatched
+worker.
 
 ## Using variants in the prompt
 

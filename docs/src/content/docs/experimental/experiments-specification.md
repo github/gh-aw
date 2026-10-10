@@ -191,9 +191,28 @@ Notes, rationale blocks, and appendices are **informative** and carry no conform
 **MUST** be rejected at compile time with a descriptive error.
 
 **R-SCHEMA-003**: Every key in the `experiments` map, except the reserved `storage` key
-(§7.1), **MUST** be an experiment name that matches the regular expression
+(§7.1) and `identity` key (§4.1.1), **MUST** be an experiment name that matches the regular expression
 `^[a-zA-Z_][a-zA-Z0-9_]*$`. Keys that do not match **MUST** be silently skipped with a
 compile-time warning emitted to stderr.
+
+#### 4.1.1 Experiment History Identity
+
+The reserved `identity` key **MUST** accept one of `full`, `frontmatter`, or
+`workflow`. If omitted or unrecognized, implementations **MUST** use
+`frontmatter`.
+
+| Value | Fingerprint |
+|---|---|
+| `full` | Compiler freshness hash and complete workflow body hash |
+| `frontmatter` | SHA-256 of normalized workflow frontmatter text, excluding the markdown body |
+| `workflow` | Workflow ID derived from the workflow filename |
+
+The default `frontmatter` mode **MUST** preserve history across body-only edits,
+including workflows that inline imports or use body template expressions.
+`full` **MUST** create a new identity when the workflow body changes.
+`workflow` **MUST** preserve identity across frontmatter and body edits to the
+same workflow ID. Identity selection **MUST NOT** change the immutable source
+revision used to route work to a worker.
 
 > **Note (informative)**: The identifier pattern ensures experiment names can be used as
 > GitHub Actions step output names and embedded in `${{ experiments.<name> }}` expressions

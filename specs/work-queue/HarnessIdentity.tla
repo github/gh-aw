@@ -1,66 +1,91 @@
 -------------------------- MODULE HarnessIdentity --------------------------
 EXTENDS FiniteSets, TLC
 
-CONSTANTS FrontmatterHashes, BodyHashes, Revisions, Workers, None
+CONSTANTS FrontmatterHashes, BodyHashes, FreshnessHashes, WorkflowIDs,
+          IdentityModes, Revisions, Workers, None
 ASSUME /\ FrontmatterHashes # {}
        /\ BodyHashes # {}
+       /\ FreshnessHashes # {}
+       /\ WorkflowIDs # {}
+       /\ IdentityModes = {"full", "frontmatter", "workflow"}
        /\ Revisions # {}
        /\ Workers # {}
        /\ None \notin Revisions
 
-VARIABLES frontmatterHash, bodyHash, sourceRevision, usedRevisions,
-          assignmentRevision
-vars == <<frontmatterHash, bodyHash, sourceRevision, usedRevisions,
-          assignmentRevision>>
+VARIABLES pureFrontmatterHash, bodyHash, compilerFreshnessHash, workflowID,
+          identityMode, sourceRevision, usedRevisions, assignmentRevision
+vars == <<pureFrontmatterHash, bodyHash, compilerFreshnessHash, workflowID,
+          identityMode, sourceRevision, usedRevisions, assignmentRevision>>
 
-HarnessVersion == frontmatterHash
+HarnessVersion ==
+    CASE identityMode = "full" -> <<compilerFreshnessHash, bodyHash>>
+      [] identityMode = "frontmatter" -> pureFrontmatterHash
+      [] identityMode = "workflow" -> workflowID
 
 Init ==
-    /\ frontmatterHash \in FrontmatterHashes
+    /\ pureFrontmatterHash \in FrontmatterHashes
     /\ bodyHash \in BodyHashes
+    /\ compilerFreshnessHash \in FreshnessHashes
+    /\ workflowID \in WorkflowIDs
+    /\ identityMode \in IdentityModes
     /\ sourceRevision \in Revisions
     /\ usedRevisions = {sourceRevision}
     /\ assignmentRevision = [w \in Workers |-> None]
 
 BodyEdit ==
     /\ bodyHash' \in BodyHashes \ {bodyHash}
+    /\ compilerFreshnessHash' \in FreshnessHashes \ {compilerFreshnessHash}
     /\ sourceRevision' \in Revisions \ usedRevisions
     /\ usedRevisions' = usedRevisions \cup {sourceRevision'}
-    /\ UNCHANGED <<frontmatterHash, assignmentRevision>>
+    /\ UNCHANGED <<pureFrontmatterHash, workflowID, identityMode, assignmentRevision>>
 
 FrontmatterEdit ==
-    /\ frontmatterHash' \in FrontmatterHashes \ {frontmatterHash}
+    /\ pureFrontmatterHash' \in FrontmatterHashes \ {pureFrontmatterHash}
+    /\ compilerFreshnessHash' \in FreshnessHashes \ {compilerFreshnessHash}
     /\ sourceRevision' \in Revisions \ usedRevisions
     /\ usedRevisions' = usedRevisions \cup {sourceRevision'}
-    /\ UNCHANGED <<bodyHash, assignmentRevision>>
+    /\ UNCHANGED <<bodyHash, workflowID, identityMode, assignmentRevision>>
 
 Dispatch(w) ==
     /\ assignmentRevision[w] = None
     /\ assignmentRevision' = [assignmentRevision EXCEPT ![w] = sourceRevision]
-    /\ UNCHANGED <<frontmatterHash, bodyHash, sourceRevision, usedRevisions>>
+    /\ UNCHANGED <<pureFrontmatterHash, bodyHash, compilerFreshnessHash,
+                    workflowID, identityMode, sourceRevision, usedRevisions>>
 
 Next == BodyEdit \/ FrontmatterEdit \/ \E w \in Workers : Dispatch(w)
 Spec == Init /\ [][Next]_vars
 
 TypeOK ==
-    /\ frontmatterHash \in FrontmatterHashes
+    /\ pureFrontmatterHash \in FrontmatterHashes
     /\ bodyHash \in BodyHashes
+    /\ compilerFreshnessHash \in FreshnessHashes
+    /\ workflowID \in WorkflowIDs
+    /\ identityMode \in IdentityModes
     /\ sourceRevision \in Revisions
     /\ usedRevisions \subseteq Revisions
     /\ sourceRevision \in usedRevisions
     /\ assignmentRevision \in [Workers -> (Revisions \cup {None})]
 
-EvaluationIdentityIsFrontmatter == HarnessVersion = frontmatterHash
+EvaluationIdentityUsesConfiguredMode ==
+    /\ (identityMode = "full" =>
+            HarnessVersion = <<compilerFreshnessHash, bodyHash>>)
+    /\ (identityMode = "frontmatter" =>
+            HarnessVersion = pureFrontmatterHash)
+    /\ (identityMode = "workflow" => HarnessVersion = workflowID)
 
-BodyEditPreservesIdentity ==
+BodyEditIdentityBehavior ==
     [][Next =>
         (bodyHash' # bodyHash =>
-            frontmatterHash' = frontmatterHash /\ HarnessVersion' = HarnessVersion)]_vars
+            /\ (identityMode = "full" => HarnessVersion' # HarnessVersion)
+            /\ (identityMode = "frontmatter" => HarnessVersion' = HarnessVersion)
+            /\ (identityMode = "workflow" => HarnessVersion' = HarnessVersion))]_vars
 
-FrontmatterEditUpdatesIdentity ==
+FrontmatterEditIdentityBehavior ==
     [][Next =>
-        (frontmatterHash' # frontmatterHash =>
-            HarnessVersion' = frontmatterHash')]_vars
+        (pureFrontmatterHash' # pureFrontmatterHash =>
+            /\ (identityMode = "full" => HarnessVersion' # HarnessVersion)
+            /\ (identityMode = "frontmatter" => HarnessVersion' # HarnessVersion)
+            /\ (identityMode = "workflow" => HarnessVersion' = HarnessVersion))]_vars
 
 DispatchCapturesCurrentRevision ==
     [][Next =>

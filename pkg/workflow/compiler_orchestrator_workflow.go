@@ -647,6 +647,7 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	workflowData.ExperimentConfigs = extractExperimentConfigsFromFrontmatter(frontmatter)
 	workflowData.Experiments = experimentVariantsFromConfigs(workflowData.ExperimentConfigs)
 	workflowData.ExperimentsStorage = extractExperimentsStorageFromFrontmatter(frontmatter)
+	workflowData.ExperimentsIdentity = extractExperimentsIdentityFromFrontmatter(frontmatter)
 
 	// Rewrite ${{ experiments.<name> }} references that ended up in engine.model (e.g.
 	// `engine: { model: ${{ experiments.model }} }`) so the compiled workflow reads the

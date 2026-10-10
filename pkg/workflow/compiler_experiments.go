@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -34,12 +36,26 @@ const (
 	ExperimentsStorageRepo ExperimentStorageMode = "repo"
 )
 
+// ExperimentIdentityMode controls which workflow fingerprint scopes experiment history.
+type ExperimentIdentityMode string
+
+const (
+	// ExperimentsIdentityFull includes compiler freshness and body hashes.
+	ExperimentsIdentityFull ExperimentIdentityMode = "full"
+	// ExperimentsIdentityFrontmatter hashes only the workflow's frontmatter text.
+	ExperimentsIdentityFrontmatter ExperimentIdentityMode = "frontmatter"
+	// ExperimentsIdentityWorkflow uses the workflow identifier without content hashes.
+	ExperimentsIdentityWorkflow ExperimentIdentityMode = "workflow"
+)
+
 // experimentsBranchPrefix is the git branch prefix used when storage: repo is selected.
 // Branches are named "experiments/{sanitizedWorkflowID}".
 const experimentsBranchPrefix = "experiments"
 
-// experimentsStorageReservedKey is the reserved key in the experiments map that controls storage mode.
-const experimentsStorageReservedKey = "storage"
+const (
+	experimentsStorageReservedKey  = "storage"
+	experimentsIdentityReservedKey = "identity"
+)
 
 // experimentNamePattern validates experiment names as identifier-style keys.
 // Experiment names must match [a-zA-Z_][a-zA-Z0-9_]* so they can be used
@@ -74,8 +90,8 @@ func extractExperimentConfigsFromFrontmatter(frontmatter map[string]any) map[str
 	}
 	result := make(map[string]*ExperimentConfig, len(rawMap))
 	for name, val := range rawMap {
-		// "storage" is a reserved key that controls persistence mode, not an experiment name.
-		if name == experimentsStorageReservedKey {
+		// These reserved keys configure experiment behavior, not experiment names.
+		if name == experimentsStorageReservedKey || name == experimentsIdentityReservedKey {
 			continue
 		}
 		if !experimentNamePattern.MatchString(name) {
@@ -117,6 +133,27 @@ func extractExperimentsStorageFromFrontmatter(frontmatter map[string]any) Experi
 		}
 	}
 	return ExperimentsStorageRepo
+}
+
+// extractExperimentsIdentityFromFrontmatter reads the identity mode from the experiments
+// map. Frontmatter identity is the default to keep routine prompt edits from resetting history.
+func extractExperimentsIdentityFromFrontmatter(frontmatter map[string]any) ExperimentIdentityMode {
+	raw, ok := frontmatter["experiments"].(map[string]any)
+	if !ok {
+		return ExperimentsIdentityFrontmatter
+	}
+	if identityRaw, ok := raw[experimentsIdentityReservedKey]; ok {
+		if identity, ok := identityRaw.(string); ok {
+			mode := ExperimentIdentityMode(identity)
+			switch mode {
+			case ExperimentsIdentityFull, ExperimentsIdentityFrontmatter, ExperimentsIdentityWorkflow:
+				return mode
+			default:
+				experimentsLog.Printf("Unknown experiments identity %q; falling back to %q", identity, ExperimentsIdentityFrontmatter)
+			}
+		}
+	}
+	return ExperimentsIdentityFrontmatter
 }
 
 // experimentsBranchName returns the git branch name used for repo-based experiment storage.
@@ -685,10 +722,31 @@ func (c *Compiler) generatePickExperimentStep(data *WorkflowData, experimentName
 }
 
 func experimentHarnessVersion(data *WorkflowData) string {
-	if data.FrontmatterHash == "" {
+	if data == nil {
 		return "unknown"
 	}
-	return data.FrontmatterHash
+	switch data.ExperimentsIdentity {
+	case ExperimentsIdentityFull:
+		if data.FrontmatterHash == "" || data.BodyHash == "" {
+			return "unknown"
+		}
+		return data.FrontmatterHash + ":" + data.BodyHash
+	case ExperimentsIdentityWorkflow:
+		if data.WorkflowID == "" {
+			return "unknown"
+		}
+		return data.WorkflowID
+	default:
+		frontmatter := strings.TrimSpace(strings.ReplaceAll(data.FrontmatterYAML, "\r\n", "\n"))
+		if frontmatter != "" {
+			hash := sha256.Sum256([]byte(frontmatter))
+			return hex.EncodeToString(hash[:])
+		}
+		if data.FrontmatterHash != "" {
+			return data.FrontmatterHash
+		}
+		return "unknown"
+	}
 }
 
 // generateExperimentArtifactUploadStep generates the artifact upload step shared by both storage modes.

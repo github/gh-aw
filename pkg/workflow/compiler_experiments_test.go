@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -171,10 +172,73 @@ func TestGenerateExperimentSteps_SpecJSON(t *testing.T) {
 
 func TestExperimentHarnessVersionUsesOnlyFrontmatterHash(t *testing.T) {
 	assert.Equal(t, "frontmatter-hash", experimentHarnessVersion(&WorkflowData{FrontmatterHash: "frontmatter-hash", BodyHash: "body-hash"}))
-	assert.Equal(t, "frontmatter-hash", experimentHarnessVersion(&WorkflowData{FrontmatterHash: "frontmatter-hash", BodyHash: "different-body"}))
+	frontmatter := "experiments:\n  style: [short, long]"
+	assert.Equal(t,
+		experimentHarnessVersion(&WorkflowData{FrontmatterYAML: frontmatter, FrontmatterHash: "frontmatter-hash", BodyHash: "body-hash"}),
+		experimentHarnessVersion(&WorkflowData{FrontmatterYAML: frontmatter, FrontmatterHash: "changed-by-inline-body", BodyHash: "different-body"}),
+		"pure frontmatter identity must ignore compiler freshness and body hashes",
+	)
 	assert.Equal(t, "frontmatter-hash", experimentHarnessVersion(&WorkflowData{FrontmatterHash: "frontmatter-hash"}))
 	assert.Equal(t, "unknown", experimentHarnessVersion(&WorkflowData{BodyHash: "body-hash"}))
 	assert.Equal(t, "unknown", experimentHarnessVersion(&WorkflowData{}))
+}
+
+func TestExperimentHarnessVersionIdentityModes(t *testing.T) {
+	base := &WorkflowData{
+		WorkflowID:          "daily-fact",
+		FrontmatterYAML:     "experiments:\n  style: [short, long]",
+		FrontmatterHash:     "compiler-freshness-hash",
+		BodyHash:            "body-hash",
+		ExperimentsIdentity: ExperimentsIdentityFrontmatter,
+	}
+	frontmatterVersion := experimentHarnessVersion(base)
+	bodyEdit := *base
+	bodyEdit.FrontmatterHash = "freshness-hash-changed-by-body"
+	bodyEdit.BodyHash = "different-body-hash"
+	assert.Equal(t, frontmatterVersion, experimentHarnessVersion(&bodyEdit))
+
+	full := *base
+	full.ExperimentsIdentity = ExperimentsIdentityFull
+	fullVersion := experimentHarnessVersion(&full)
+	full.BodyHash = "different-body-hash"
+	assert.NotEqual(t, fullVersion, experimentHarnessVersion(&full))
+
+	workflow := *base
+	workflow.ExperimentsIdentity = ExperimentsIdentityWorkflow
+	assert.Equal(t, "daily-fact", experimentHarnessVersion(&workflow))
+	workflow.BodyHash = "different-body-hash"
+	workflow.FrontmatterHash = "different-frontmatter-hash"
+	assert.Equal(t, "daily-fact", experimentHarnessVersion(&workflow))
+}
+
+func TestCompileWorkflowFrontmatterIdentityIgnoresInlinedBodyEdits(t *testing.T) {
+	compile := func(body string) string {
+		t.Helper()
+		dir := t.TempDir()
+		workflowPath := filepath.Join(dir, "harness.md")
+		content := `---
+on: workflow_dispatch
+strict: false
+engine: copilot
+inlined-imports: true
+experiments:
+  style: [short, long]
+---
+
+` + body + "\n"
+		require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0600))
+		require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+		lock, err := os.ReadFile(filepath.Join(dir, "harness.lock.yml"))
+		require.NoError(t, err)
+		const marker = "GH_AW_HARNESS_VERSION: "
+		lineStart := bytes.Index(lock, []byte(marker))
+		require.NotEqual(t, -1, lineStart, "compiled workflow should expose the experiment identity")
+		lineEnd := bytes.IndexByte(lock[lineStart:], '\n')
+		require.NotEqual(t, -1, lineEnd, "compiled identity should end at a newline")
+		return strings.TrimSpace(string(lock[lineStart+len(marker) : lineStart+lineEnd]))
+	}
+
+	assert.Equal(t, compile("First prompt body."), compile("Revised prompt body."))
 }
 
 func TestGenerateExperimentSteps_SingleQuoteEscaping(t *testing.T) {
@@ -691,17 +755,38 @@ func TestExperimentsBranchName(t *testing.T) {
 
 // ── storage key is excluded from experiment configs ───────────────────────
 
-func TestExtractExperimentConfigsFromFrontmatter_StorageKeyIsSkipped(t *testing.T) {
+func TestExtractExperimentConfigsFromFrontmatter_ReservedKeysAreSkipped(t *testing.T) {
 	frontmatter := map[string]any{
 		"experiments": map[string]any{
-			"storage": "repo",
-			"my_exp":  []any{"A", "B"},
+			"storage":  "repo",
+			"identity": "frontmatter",
+			"my_exp":   []any{"A", "B"},
 		},
 	}
 	got := extractExperimentConfigsFromFrontmatter(frontmatter)
 	require.NotNil(t, got, "experiment configs should not be nil")
 	assert.Contains(t, got, "my_exp", "my_exp should be present")
 	assert.NotContains(t, got, "storage", "storage key should be excluded from experiment configs")
+	assert.NotContains(t, got, "identity", "identity key should be excluded from experiment configs")
+}
+
+func TestExtractExperimentsIdentityFromFrontmatter(t *testing.T) {
+	tests := []struct {
+		name        string
+		frontmatter map[string]any
+		want        ExperimentIdentityMode
+	}{
+		{name: "defaults to frontmatter", frontmatter: map[string]any{}, want: ExperimentsIdentityFrontmatter},
+		{name: "full", frontmatter: map[string]any{"experiments": map[string]any{"identity": "full"}}, want: ExperimentsIdentityFull},
+		{name: "frontmatter", frontmatter: map[string]any{"experiments": map[string]any{"identity": "frontmatter"}}, want: ExperimentsIdentityFrontmatter},
+		{name: "workflow", frontmatter: map[string]any{"experiments": map[string]any{"identity": "workflow"}}, want: ExperimentsIdentityWorkflow},
+		{name: "unknown defaults to frontmatter", frontmatter: map[string]any{"experiments": map[string]any{"identity": "other"}}, want: ExperimentsIdentityFrontmatter},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, extractExperimentsIdentityFromFrontmatter(tt.frontmatter))
+		})
+	}
 }
 
 func TestParseExperimentMetricEvalReference(t *testing.T) {
