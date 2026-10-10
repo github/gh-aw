@@ -62,7 +62,9 @@ func TestFindExactModelPricing(t *testing.T) {
 		found           bool
 	}{
 		{"openai", "gpt-6.1-sol", true},
+		{"openai", "gpt-6-1-sol", true},
 		{"copilot", "gpt-6.1-sol", true},
+		{"copilot", "gpt-6-1-sol?effort=high", true},
 		{"github-copilot", " GPT-6.1-SOL ", true},
 		{"openai", "gpt-6.1-sol?effort=high", true},
 		{"copilot", "gpt-6.1-sol?temperature=0.2", true},
@@ -70,8 +72,10 @@ func TestFindExactModelPricing(t *testing.T) {
 		{"copilot", "gpt_6.1_sol", true},
 		{"openai", "GPT_6.1_SOL?effort=high", true},
 		{"anthropic", "gpt-6.1-sol", false},
+		{"anthropic", "gpt-6-1-sol", false},
 		{"anthropic", "GPT_6_1_SOL?effort=high", false},
 		{"openai", "gpt-6.1-sol-unknown", false},
+		{"openai", "gpt-6-1-sol-unknown", false},
 		{"openai", "gpt_6.1_sol_unknown?effort=high", false},
 		{"openai", "gpt-6.1-sol*", false},
 		{"openai", "gpt-99", false},
