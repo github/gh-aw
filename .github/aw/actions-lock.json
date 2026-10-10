@@ -48,6 +48,11 @@
       "version": "v3.2.0",
       "sha": "bcd2ba49218906704ab6c1aa796996da409d3eb1"
     },
+    "actions/download-artifact@v8.0.1": {
+      "repo": "actions/download-artifact",
+      "version": "v8.0.1",
+      "sha": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+    },
     "actions/download-artifact@v8.0.2": {
       "repo": "actions/download-artifact",
       "version": "v8.0.2",
@@ -83,6 +88,11 @@
       "version": "v6.0.1",
       "sha": "de7274f081f381c8f8158605e0321c36c376e2e6"
     },
+    "actions/setup-node@v7.0.0": {
+      "repo": "actions/setup-node",
+      "version": "v7.0.0",
+      "sha": "820762786026740c76f36085b0efc47a31fe5020"
+    },
     "actions/setup-node@v7.1.0": {
       "repo": "actions/setup-node",
       "version": "v7.1.0",
@@ -92,6 +102,11 @@
       "repo": "actions/setup-python",
       "version": "v7.0.0",
       "sha": "5fda3b95a4ea91299a34e894583c3862153e4b97"
+    },
+    "actions/upload-artifact@v7.0.1": {
+      "repo": "actions/upload-artifact",
+      "version": "v7.0.1",
+      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     },
     "actions/upload-artifact@v7.0.2": {
       "repo": "actions/upload-artifact",
@@ -148,10 +163,10 @@
       "version": "v4.38.3",
       "sha": "24c54180a607b1449ed407dd24f251e4e9147c8d"
     },
-    "github/stale-repos@v9.1.1": {
+    "github/stale-repos@v9.0.19": {
       "repo": "github/stale-repos",
-      "version": "v9.1.1",
-      "sha": "07243c72d78533a27c0e37a93bfa87275fca4aa1"
+      "version": "v9.0.19",
+      "sha": "cd662591ad9d5d8967f84431eb94a45f828c1db3"
     },
     "haskell-actions/setup@v2.12.1": {
       "repo": "haskell-actions/setup",
@@ -173,9 +188,9 @@
       "version": "v1",
       "sha": "5ac0f275b83d9d5a9342c6aae977ec32fa330daa"
     },
-    "super-linter/super-linter@v9.0.0": {
+    "super-linter/super-linter@v9": {
       "repo": "super-linter/super-linter",
-      "version": "v9.0.0",
+      "version": "v9",
       "sha": "2da136927bd4a73596db63044b504547c62cb854"
     }
   },
