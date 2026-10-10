@@ -196,7 +196,8 @@ describe("Structured policy refusals", () => {
     const events = normalizeClaudeSession(records);
     expect(refusals(events)).toMatchObject([{ data: { reason: "refusal", content: " partial\n", policyCategory: "general_harms" } }]);
     expect(events.filter(event => event.type === "assistant.message")).toEqual([]);
-    expect(events.filter(event => event.type === "claude.assistant_snapshot")).toHaveLength(1);
+    expect(events.filter(event => event.type === "claude.assistant_snapshot")).toHaveLength(0);
+    expect(refusals(events)[0].data.snapshots).toContainEqual(records.at(-1));
     expect(projectSessionResult(events).usage.output_tokens).toBe(0);
     expect(records).toEqual(original);
     expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));

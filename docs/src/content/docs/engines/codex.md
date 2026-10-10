@@ -104,6 +104,25 @@ Use `${ENV_VAR}` inside TOML strings to reference an environment value configure
 
 For shell environment filtering, use either `[shell_environment_policy.filters]` or the legacy `include_only`/`exclude` arrays. Selecting one representation replaces inherited settings from the other; declaring both in the same custom configuration is a compile-time error.
 
+## Session artifacts
+
+The `agent` artifact retains native `agent-stdio.log` and normalized `agent-session.jsonl`. The conclusion job projects essential fields into `usage/aw_session.jsonl`, following the [unified session contract](/gh-aw/specs/unified-agent-session-specification/).
+
+| Codex observation | Session mapping |
+| --- | --- |
+| Thread startup and recognized legacy headers | `session.init`, with observed model, working directory, reasoning effort, and available inventories. |
+| Agent text, reasoning, and user text | `assistant.message`, `assistant.reasoning`, and `user.message`, with exact content. Explicit provider refusal signals use `assistant.refusal`; natural-language disclaimers do not. |
+| Commands and MCP calls | Independent `tool.execution_start` and `tool.execution_complete` events, preserving native IDs, arguments, outputs, and explicit failures, including declined commands. |
+| File changes | An `apply_patch` tool completion with observed changes and status. A change summary does not supply executed patch arguments or a missing start. |
+| Web searches and collaboration calls | Standard tool events with observed queries/actions or receiver IDs/prompts, and available search results or agent states. Completing `spawn_agent` does not mean the child finished. |
+| Completed turns and session errors | `session.result`, with cumulative per-turn usage or separate error observations. A completed CLI turn does not establish task success. |
+
+Tool IDs remain scoped to their observed thread for correlation across retries. Unfinished tools remain dangling; orphan completions do not acquire invented inputs. Known message updates are snapshots, not text deltas: only the latest available content is exposed as a core message, while superseded snapshots remain native evidence. Todo-list snapshots and unknown native extensions remain available without fabricating tool executions.
+
+Reported totals and cache aliases are counted once. Later authoritative accounting snapshots replace corresponding totals rather than adding to them; unavailable counts, duration, and cost remain absent. Legacy message sections retain JSON-looking answers as text instead of interpreting them as execution or usage records.
+
+Regression fixtures include sanitized excerpts from [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579), [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249), and an [unsupported-model failure](https://github.com/github/gh-aw/actions/runs/37100404405). Advanced tool, refusal, overflow, and mixed-format cases are synthetic protocol-shaped regressions, not claims that these features appeared in the sampled runs.
+
 ## GitHub Agentic Workflows vs. running Codex directly in Actions
 
 Running coding agent CLIs such as `codex` directly in GitHub Actions without an adequate security architecture is not recommended. GitHub Agentic Workflows gives an appropriate security architecture and workflow portability across AI engines.
