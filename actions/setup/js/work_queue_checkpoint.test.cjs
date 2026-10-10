@@ -5,15 +5,40 @@ import { deflateRawSync, inflateRawSync } from "node:zlib";
 
 const require = createRequire(import.meta.url);
 const fixture = require("../../../specs/work-queue/fixtures/checkpoint.json");
-const { administrator, bind, context, finish, genesis, grant, submission } = require("./work_queue_test_helpers.cjs");
+const { administrator, bind, context, finish, genesis, grant, producer, submission } = require("./work_queue_test_helpers.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
 const { diagnostics } = require("./work_queue_scheduler.cjs");
 const { appendCommit, compactTransactions, generateRequestOperations, newRequest, prepareCheckpoint, proposedCommitId, replayTransactions, serializeTransactionLog } = require("./work_queue_replay.cjs");
 const { readWorkQueueLog } = require("./work_queue_store.cjs");
 const { readCheckedQueue } = require("./work_queue_checked_transport.cjs");
 const { acceptedSubmissionParameters } = require("./work_queue_dispatch.cjs");
+const { fakeGitHub, options } = require("./work_queue_store_checks.cjs");
+const { publishWorkQueueRequest } = require("./work_queue_store.cjs");
 
 describe("shared version-3 checkpoint conformance", () => {
+  it("preserves first-submit genesis Work and request identity across repeated checkpoints", async () => {
+    const fake = fakeGitHub();
+    const policy = genesis().operations[0].policy;
+    policy.pools.default.profiles.default.ref = fake.state.defaultRevision;
+    const nodes = submission([genesis(policy)], ["bootstrap-root"]).operations;
+    const request = newRequest("checkpoint-bootstrap", "submit", producer, { nodes });
+    const result = await publishWorkQueueRequest(options(fake, request, producer, { policyProposal: policy, maxRetries: 0 }));
+    assert.deepEqual(
+      result.commit.operations.map(operation => operation.kind),
+      ["Policy", "Work"]
+    );
+    let history = result.transactions;
+    for (let iteration = 0; iteration < 2; iteration++) {
+      history = prepareCheckpoint(history, "c".repeat(40), administrator, 10000 + iteration);
+      const restored = replayTransactions(history);
+      assert.equal(restored.works.size, 1);
+      assert.equal(restored.works.get(nodes[0].work_id).position.operation, 1);
+      assert.equal(canonical(restored.requests.get(request.id).request.parameters), canonical(request.parameters));
+      assert.equal(restored.requests.get(request.id).request.fingerprint, request.fingerprint);
+      assert.equal(generateRequestOperations(restored, request, producer, 10001 + iteration, "unused").commit.id, result.commit.id);
+    }
+  });
+
   it("preserves pending delivery deadline and bound native capacity", () => {
     const history = [genesis()];
     history.push(submission(history, ["delivery"]));
@@ -53,8 +78,18 @@ describe("shared version-3 checkpoint conformance", () => {
     );
     assert.equal(after.transactions.length, 1);
     assert.equal(serializeTransactionLog(after.transactions), serializeTransactionLog(fixture.checkpoint));
-    assert.deepEqual(compactTransactions(fixture.history, fixture.prior_git_sha, administrator, 100), fixture.checkpoint);
-    assert.deepEqual(prepareCheckpoint(fixture.history.slice(0, 1), fixture.prior_git_sha, administrator, 0), fixture.genesis_checkpoint);
+    const decodedCheckpoint = history => {
+      replayTransactions(history);
+      const decoded = structuredClone(history);
+      // Deflate bytes vary across zlib versions; compare the entire decoded envelope.
+      for (const commit of decoded) {
+        const state = commit.operations[0].state;
+        state.requests_compressed = inflateRawSync(Buffer.from(state.requests_compressed, "base64")).toString("utf8");
+      }
+      return decoded;
+    };
+    assert.deepEqual(decodedCheckpoint(compactTransactions(fixture.history, fixture.prior_git_sha, administrator, 100)), decodedCheckpoint(fixture.checkpoint));
+    assert.deepEqual(decodedCheckpoint(prepareCheckpoint(fixture.history.slice(0, 1), fixture.prior_git_sha, administrator, 0)), decodedCheckpoint(fixture.genesis_checkpoint));
     assert.equal(canonical(prepareCheckpoint(before, fixture.prior_git_sha)), canonical(prepareCheckpoint(fixture.history, fixture.prior_git_sha)));
     assert.equal(prepareCheckpoint(before, fixture.prior_git_sha)[0].operations[0].prior_git_sha, fixture.prior_git_sha);
     const originalRequest = fixture.history[1].request;

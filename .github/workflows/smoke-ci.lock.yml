@@ -191,6 +191,7 @@ jobs:
           GH_AW_INFO_CACHE_MEMORY: "true"
           GH_AW_INFO_FRONTMATTER_EMOJI: "🧪"
           GH_AW_COMPILED_STRICT: "true"
+          GH_AW_INFO_MODEL_COSTS: '{"providers":{"github-copilot":{"models":{"gpt-6-luna":{"cost":{"cache_read":"1e-08","cache_write":"1.25e-07","input":"1e-07","output":"5e-07"}}}}}}'
           GH_AW_INFO_FEATURES: '{"gh-aw-detection":false}'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:

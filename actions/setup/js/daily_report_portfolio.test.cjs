@@ -9,7 +9,8 @@ import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
 import { validateDeliveryContract } from "./work_queue_delivery.cjs";
 
 const repository = "owner/repo";
-const policyOptions = { repository, ref: "a".repeat(40), producerPrincipal: "11", workerPrincipal: "12" };
+const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
+const policyOptions = { repository, ref: "a".repeat(40), settings };
 const planOptions = { repository, repositoryId: "7", date: "2026-10-07" };
 const source = name => fs.readFileSync(new URL(`../../../.github/workflows/${name}.md`, import.meta.url), "utf8");
 
@@ -85,19 +86,20 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
     expect(() => buildDailyReportPlan({ ...planOptions, repositoryId: "007" })).toThrow();
   });
 
-  it("generates a validated singleton, one-attempt, equal-weight policy with all thirteen immutable routes", () => {
+  it("uses shared scheduling and all thirteen immutable AW routes without enrollment", () => {
     const policy = buildDailyReportPolicy(policyOptions);
     expect(validatePolicy(policy)).toEqual(policy);
     const pool = policy.pools[REPORT_POOL];
-    expect(pool).toMatchObject({ logical_limit: 3, native_limit: 3, per_account_limit: 1, retry: { max_attempts: 1 } });
-    expect(Object.keys(pool.profiles)).toEqual(REPORT_PROFILES);
+    expect(policy.authorization).toBe("aw");
+    expect(policy.producers).toEqual({});
+    expect(pool).toMatchObject({ logical_limit: 3, native_limit: 3, per_account_limit: 1, retry: { max_attempts: 3, backoff_ms: 30000 } });
+    expect(Object.keys(pool.profiles).sort()).toEqual([...REPORT_PROFILES].sort());
     for (const profile of REPORT_PROFILES) {
       expect(policy.accounting_weights[profile]).toBe(1);
       expect(pool.profiles[profile]).toEqual({
         workflow: `.github/workflows/${profile}.lock.yml`,
         ref: policyOptions.ref,
-        principal: "12",
-        trust_domain: profile,
+        trust_domain: "default",
         credential_scope: "repository",
         effect_scope: repository,
         max_claims: 1,
@@ -105,8 +107,6 @@ describe("bounded daily and weekly discussion-report portfolio", () => {
       });
     }
     expect(() => buildDailyReportPolicy({ ...policyOptions, ref: "main" })).toThrow();
-    expect(() => buildDailyReportPolicy({ ...policyOptions, workerPrincipal: "github-actions[bot]" })).toThrow();
-    expect(() => buildDailyReportPolicy({ ...policyOptions, producerPrincipal: "0" })).toThrow();
   });
 
   it("records idempotent daily Work and three singleton grants in the same QueueCommit history", () => {

@@ -34,6 +34,35 @@ func TestWorkQueuePolicySchema(t *testing.T) {
 	}, "worker.md"))
 }
 
+func TestWorkQueuePolicyRepositorySchema(t *testing.T) {
+	for _, repository := range []string{"owner/repo", "${{ github.repository }}", "${{ inputs.repository }}", "${{ github.event.repository.full_name }}", "not-a-repository"} {
+		t.Run(repository, func(t *testing.T) {
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+				"on": "workflow_dispatch",
+				"work-queue-policy": map[string]any{
+					"pools": map[string]any{
+						"default": map[string]any{
+							"default-profile": "worker",
+							"profiles": map[string]any{
+								"worker": map[string]any{
+									"workflow": ".github/workflows/worker.lock.yml", "ref": strings.Repeat("a", 40),
+									"principal": "12345", "trust-domain": "worker", "credential-scope": "repository", "effect-scope": "${{ github.repository }}",
+								},
+							},
+							"logical-limit": 3, "native-limit": 3, "allowed-repositories": []any{repository},
+						},
+					},
+				},
+			}, "dispatcher.md")
+			if repository == "owner/repo" || repository == "${{ github.repository }}" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
 func TestWorkQueueMemorySchema(t *testing.T) {
 	memory := map[string]any{"path": "memory.json", "target-repo": "owner/repo", "base-revision": strings.Repeat("a", 40), "branch-prefix": "memory/runs", "schema": map[string]any{"type": "object"}}
 	validate := func(config map[string]any) error {

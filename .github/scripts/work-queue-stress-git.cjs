@@ -234,13 +234,30 @@ class LocalGitHub {
         return data({ sha });
       }
       case "git.createRef": {
+        const branch = args.ref.replace(/^refs\/heads\//, "");
+        await this.barrier(branch, meta);
+        const fault = this.faults.get(branch);
+        let changed = false;
         try {
-          await this.git(["update-ref", args.ref, args.sha, "0".repeat(40)]);
-        } catch {
-          this.metrics.cas_conflicts++;
-          throw apiError(422, "reference already exists");
+          try {
+            await this.git(["update-ref", args.ref, args.sha, "0".repeat(40)]);
+          } catch {
+            this.metrics.cas_conflicts++;
+            throw apiError(422, "reference already exists");
+          }
+          changed = true;
+          if (fault && !fault.lost) {
+            fault.lost = true;
+            this.metrics.lost_success_responses++;
+            throw apiError(503, "injected lost successful create response");
+          }
+          return data({ object: { sha: args.sha } });
+        } finally {
+          if (changed && fault?.next) {
+            fault.next.resolve();
+            delete fault.next;
+          }
         }
-        return data({ object: { sha: args.sha } });
       }
       case "git.updateRef": {
         assert.equal(args.force, false, "publisher must not force refs");
@@ -289,7 +306,7 @@ class LocalGitHub {
       }
       case "actions.createWorkflowDispatch": {
         assert.equal(args.ref, this.ref);
-        assert.equal(args.workflow_id, WORKFLOW);
+        assert.equal(args.workflow_id, path.basename(WORKFLOW));
         assert.equal(args.headers["X-GitHub-Api-Version"], "2026-03-10");
         assert.equal(args.request.retries, 0);
         const assignment = JSON.parse(args.inputs.work_queue_assignment);

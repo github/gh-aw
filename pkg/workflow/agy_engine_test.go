@@ -322,8 +322,8 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 				}
 				if entry.id == "engine-conformance-agy" {
 					switch name {
-					case "activation":
-						allowedPermissions = map[string]string{"actions": "read", "contents": "write"}
+					case "activation", "conclusion":
+						allowedPermissions = map[string]string{"actions": "read", "contents": "write", "issues": "write"}
 					case "safe_outputs":
 						allowedPermissions = map[string]string{"actions": "write", "contents": "write"}
 					}

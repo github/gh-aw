@@ -346,7 +346,7 @@ YAML error that demonstrates column position handling.`,
 				// For schema validation errors, check for filename:line:column: format
 				expectedPattern := fmt.Sprintf(".md:%d:%d:", tt.expectedErrorLine, tt.expectedErrorColumn)
 				if !strings.Contains(errorStr, expectedPattern) {
-					t.Errorf("%s: error should contain console.FormatError 'filename:line:column:' format '%s', got: %s", tt.description, expectedPattern, errorStr)
+					t.Errorf("%s: error should contain console.FormatErrorStdout 'filename:line:column:' format '%s', got: %s", tt.description, expectedPattern, errorStr)
 				}
 			}
 

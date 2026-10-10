@@ -1527,6 +1527,9 @@ jobs:
     - name: Run custom linters
       run: make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false"
 
+    - name: Check console stderr formatting
+      run: make golint-custom LINTER_FLAGS="-consolestderr -test=false"
+
     - name: Report unchecked printf errors as warnings
       run: |
         set +e

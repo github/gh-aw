@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/rhysd/actionlint v1.7.12
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/net v0.60.0
@@ -60,7 +61,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260811164956-006e29f97886 // indirect
-	github.com/charmbracelet/x/ansi v0.11.8 // indirect
 	github.com/charmbracelet/x/exp/ordered v0.1.0 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20251106172358-54469c29c2bc // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect

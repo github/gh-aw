@@ -17,6 +17,7 @@ tools:
 safe-outputs:
   dispatch-workflow:
     workflows: [eslint-miner, eslint-refiner, eslint-monster]
+    github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}
     target-ref: ${{ github.event.repository.default_branch }}
     max: 3
   noop:
@@ -72,9 +73,9 @@ Call `work_queue_submit` once with
 `{"nodes": <the plan.nodes array>}` before requesting any grants. Date-keyed
 graph/node identities make repeated submissions on the same UTC day idempotent,
 including manual runs and reruns. Do not change stored task payloads on retries
-or replace admitted Work. Trusted processing enforces the authenticated
-dispatcher's installed producer entitlement for pool `default`, priority `3`,
-and accounting key `""`; a failed admission is not permission to bypass Policy.
+or replace admitted Work. AW authorizes trusted participants; the installed
+Policy controls scheduling for pool `default`, priority `3`, and accounting key
+`""`. A failed admission is not permission to bypass scheduling bounds.
 With CLI wrappers, use the `work-queue work_queue_submit` subcommand with one
 JSON argument containing the exact stored nodes. Submission is also a staged
 intent, not proof of durable admission.
@@ -97,10 +98,18 @@ The scheduler selects eligible Work and launches only the compatible worker
 profile at its installed immutable workflow revision. This workflow's
 `safe-outputs.dispatch-workflow.workflows` list is the compiler-approved
 worker-name allowlist; it does not replace the installed policy's profile,
-revision, or principal binding. Do not call ordinary `dispatch_workflow` or typed
+revision, or Claim/run ownership. Do not call ordinary `dispatch_workflow` or typed
 per-worker dispatch tools.
 
 Safe-output processing uses only the compiler-approved Policy proposal; never
-choose or modify Policy. The proposal must grant this dispatcher's principal
-producer entitlement. If bootstrap or admission fails, report the failure; do
+choose or modify Policy. If bootstrap or admission fails, report the failure; do
 not bypass it with `noop` or ordinary worker dispatch.
+
+Scheduling overrides are shared in `.github/workflows/aw.json` under
+`work_queue`. AW selects the launch credential and pins declared worker routes
+to the immutable workflow revision; it binds each actual native run to its
+Claim. The first accepted submission automatically creates the queue with
+compiled Policy and Work; no administrator seed is required.
+Changing scheduling or worker revisions after bootstrap requires a quiescent
+queue and an administrator Policy update; editing this proposal alone cannot
+replace installed Policy.

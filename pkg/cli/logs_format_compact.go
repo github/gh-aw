@@ -196,7 +196,7 @@ func renderCompactLogsRuns(w *compactLogsWriter, runs []RunData) {
 		})
 	}
 	// RenderTable appends a trailing newline, so following section headers remain separated.
-	w.print(console.RenderTable(console.TableConfig{
+	w.print(console.RenderTableStdout(console.TableConfig{
 		Headers: []string{"RUNID", "WORKFLOW", "ENGINE", "STATUS", "DUR", "TOKENS", "AIC", "TURNS", "ERR", "WSRF", "EVENT", "ACTOR", "BRANCH"},
 		Rows:    rows,
 	}))
@@ -415,7 +415,7 @@ func renderCompactLogsVerboseRuns(w *compactLogsWriter, runs []RunData) {
 		})
 	}
 	// RenderTable appends a trailing newline, so following section headers remain separated.
-	w.print(console.RenderTable(console.TableConfig{
+	w.print(console.RenderTableStdout(console.TableConfig{
 		Headers: []string{"RUNID", "WORKFLOW", "ENGINE", "STATUS", "DUR", "TOKENS", "AIC", "TURNS", "ERR", "WARN", "WSRF", "EVENT", "ACTOR", "TBT", "CLASS", "CREATED", "BRANCH"},
 		Rows:    rows,
 	}))

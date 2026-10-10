@@ -81,10 +81,10 @@ type Compiler struct {
 	allowedDomainsCache     map[string]allowedDomain // Cached allowed-domains per markdown path with the frontmatter hash that produced it
 	wildcardAppTokenSteps   map[appTokenStepKey]bool // Job-scoped compiler-generated token steps with explicit repositories: ["*"].
 	// modelPricingResolver is an optional callback for resolving per-token pricing of models that
-	// are absent from the embedded models.json catalog. When non-nil it is called during
+	// are absent from workflow frontmatter. When non-nil it is called during
 	// buildInitialWorkflowData for the workflow's configured model; any returned pricing is merged
 	// into WorkflowData.ModelCosts so it is embedded in GH_AW_INFO_MODEL_COSTS in the lock.yml.
-	// Injected by the cli package (which has access to the embedded catalog and models.dev download).
+	// Injected by the cli package, which has access to the embedded pricing catalog.
 	modelPricingResolver     func(ctx context.Context, provider, model string) (map[string]float64, bool)
 	configuredModelValidator func(data *WorkflowData) []string
 }

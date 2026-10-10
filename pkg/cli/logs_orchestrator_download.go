@@ -1017,12 +1017,12 @@ func parseWorkflowRunArtifacts(result DownloadResult, processedRun ProcessedRun,
 	if err := parseAgentLog(result.LogsPath, detectedEngine, verbose); err != nil {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log for run %d: %v", processedRun.Run.DatabaseID, err)))
 	} else if logMdPath := filepath.Join(result.LogsPath, "log.md"); fileutil.FileExists(logMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
 	}
 	if err := parseFirewallLogs(result.LogsPath, verbose); err != nil {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", processedRun.Run.DatabaseID, err)))
 	} else if firewallMdPath := filepath.Join(result.LogsPath, "firewall.md"); fileutil.FileExists(firewallMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
 	}
 }
 

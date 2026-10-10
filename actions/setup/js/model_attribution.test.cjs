@@ -1,0 +1,222 @@
+import { describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const require = createRequire(import.meta.url);
+const { resolveModelRoutingSummary } = require("./model_attribution.cjs");
+
+function createRoot() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-model-routing-"));
+}
+
+function writeJSONL(filePath, records) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, records.map(record => JSON.stringify(record)).join("\n"));
+}
+
+describe("resolveModelRoutingSummary", () => {
+  it("reads allow-listed routing data and counts agent request deviations", () => {
+    const root = createRoot();
+    const sessionPath = path.join(root, "usage/aw_session.jsonl");
+    try {
+      writeJSONL(sessionPath, [
+        {
+          type: "workflow.info",
+          data: { modelRouting: { status: "selected", mode: "session-mode", routerVersion: "1.2.3" } },
+          provenance: { component: "workflow", phase: "agent" },
+        },
+        {
+          type: "model_routing.outcome",
+          data: { status: "selected" },
+          provenance: { component: "agent", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: {
+            schema: "model-routing/v0.28.49",
+            stage: "selection",
+            objective: { goal: "cost" },
+            labels: { task_type: "fix", scope: "local", task_complexity: "medium" },
+            mode: "selection-mode",
+            router: { version: "selection-version" },
+            degraded_classification: false,
+            ranked_choices: ["MUST_NOT_BE_EXPORTED"],
+            rationale: "MUST_NOT_BE_EXPORTED",
+          },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: { schema: "model-routing/v0.28.49", stage: "request", routed: "as_selected" },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: { schema: "model-routing/v0.28.49", stage: "request", routed: "deviated", deviations: ["effort"] },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.token_usage",
+          data: { purpose: "routing_classification", path: "/responses", xInitiator: "router", aic: 0.04, totalAic: 99 },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.token_usage",
+          data: { purpose: "agent", aic: 1 },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.token_usage",
+          data: { purpose: "routing_classification", aic: 9 },
+          provenance: { component: "firewall", phase: "subagent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: { schema: "model-routing/v0.28.49", stage: "request", routed: "deviated" },
+          provenance: { component: "firewall", phase: "subagent" },
+        },
+      ]);
+
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath: path.join(root, "aw_info.json"), ghAwDir: root })).toEqual({
+        status: "selected",
+        mode: "session-mode",
+        router_version: "1.2.3",
+        objective: "cost",
+        task_type: "fix",
+        scope: "local",
+        complexity: "medium",
+        degraded: false,
+        classifier_aic: 0.04,
+        deviated_requests: 1,
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses aw_info and proxy logs when the session file is absent", () => {
+    const root = createRoot();
+    const infoPath = path.join(root, "aw_info.json");
+    const proxyPath = path.join(root, "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl");
+    try {
+      fs.writeFileSync(infoPath, JSON.stringify({ model_routing: { status: "selected", mode: "awf-routed", router_version: "0.28.49" } }));
+      const proxyRecords = [
+        {
+          _schema: "model-routing/v0.28.49",
+          stage: "selection",
+          objective: { goal: "cost" },
+          labels: { task_type: "fix", scope: "local", task_complexity: "medium" },
+          degraded_classification: true,
+        },
+        { _schema: "model-routing/v0.28.49", stage: "request", routed: "deviated", deviations: ["effort"] },
+      ];
+      writeJSONL(proxyPath, proxyRecords);
+      writeJSONL(path.join(root, "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl"), proxyRecords);
+
+      expect(resolveModelRoutingSummary({ infoPath, sessionPath: path.join(root, "missing.jsonl"), ghAwDir: root })).toEqual({
+        status: "selected",
+        mode: "awf-routed",
+        router_version: "0.28.49",
+        objective: "cost",
+        task_type: "fix",
+        scope: "local",
+        complexity: "medium",
+        degraded: true,
+        deviated_requests: 1,
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses runner-written routing and ignores agent outcomes", () => {
+    const root = createRoot();
+    const sessionPath = path.join(root, "usage/aw_session.jsonl");
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(
+        infoPath,
+        JSON.stringify({
+          model_routing: {
+            status: "rejected",
+            failure_code: "runner_failure",
+            mode: "runner-mode",
+            router_version: "runner-version",
+          },
+        })
+      );
+      writeJSONL(sessionPath, [
+        {
+          type: "model_routing.outcome",
+          data: { status: "selected", failureCode: "prompt-derived-failure" },
+          provenance: { component: "agent", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: {
+            schema: "model-routing/v0.28.38",
+            stage: "selection",
+            labels: { task_type: "private_user_prompt", scope: "unsafe value", task_complexity: "prompt-derived-value" },
+          },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: { schema: "model-routing/v0.28.38", stage: "request", routed: "deviated", deviations: ["endpoint"] },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+      ]);
+
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath, ghAwDir: root })).toEqual({
+        status: "rejected",
+        mode: "runner-mode",
+        router_version: "runner-version",
+        failure_code: "runner_failure",
+        objective: "",
+        task_type: "",
+        scope: "",
+        complexity: "",
+        deviated_requests: 0,
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("estimates classifier AIC from attributed token usage when response AIC is absent", () => {
+    const root = createRoot();
+    const sessionPath = path.join(root, "usage/aw_session.jsonl");
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      fs.writeFileSync(infoPath, JSON.stringify({ model_routing: { status: "selected" } }));
+      writeJSONL(sessionPath, [
+        {
+          type: "model_routing.outcome",
+          data: { status: "selected" },
+          provenance: { component: "agent", phase: "agent" },
+        },
+        {
+          type: "firewall.model_routing",
+          data: { stage: "selection" },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+        {
+          type: "firewall.token_usage",
+          data: {
+            provider: "anthropic",
+            model: "claude-sonnet-4.6",
+            purpose: "routing_classification",
+            usage: { inputTokens: 100, outputTokens: 10 },
+          },
+          provenance: { component: "firewall", phase: "agent" },
+        },
+      ]);
+
+      expect(resolveModelRoutingSummary({ sessionPath, infoPath, ghAwDir: root }).classifier_aic).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

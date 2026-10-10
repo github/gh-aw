@@ -222,6 +222,7 @@ async function findAgent(owner, repo, agentName, issueNumber = null, githubClien
       const statusLabel = status ? ` (${status})` : "";
       aliasFailures.push(`${loginName}${statusLabel}: ${errorMessage}`);
       if (
+        status === 401 ||
         errorMessage.includes("Bad credentials") ||
         errorMessage.includes("Not Authenticated") ||
         errorMessage.includes("Resource not accessible") ||

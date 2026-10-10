@@ -121,6 +121,7 @@ Compile each work-queue workflow phase.
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
 
 	compiler := NewCompiler(WithVersion("integration"))
+	compiler.gitRoot = dir
 	compiler.SetApprove(true)
 	require.NoError(t, compiler.CompileWorkflow(workflowPath))
 
@@ -131,6 +132,7 @@ Compile each work-queue workflow phase.
 	compiled := string(lockContent)
 	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_STORAGE")
 	require.NotContains(t, compiled, "WORK_QUEUE_HMAC_SECRET")
+	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_ISSUES:")
 	require.Contains(t, compiled, `GH_AW_WORK_QUEUE_ROLE: "worker"`)
 	require.NotContains(t, compiled, "GH_AW_WORK_QUEUE_POLICY:")
 	require.Contains(t, compiled, "work_queue_assignment:")

@@ -17,6 +17,7 @@ describe("empty output outcome", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     fs.rmSync(rootDir, { recursive: true, force: true });
     delete process.env.SECRET_OUTCOME_TEST;
     delete process.env.GH_AW_SECRET_NAMES;
@@ -27,10 +28,62 @@ describe("empty output outcome", () => {
     expect(buildEmptyOutputOutcome([], rootDir)).toEqual({
       type: "report_incomplete",
       reason: "missing_terminal_safe_output",
-      failureCause: "prompt_exhaustion",
+      failureCause: "unknown",
       retryCount: 0,
-      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: prompt_exhaustion\nRetry attempts observed: 0",
+      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: unknown\nRetry attempts observed: 0",
     });
+  });
+
+  it.each(["metadata", "environment"])("does not classify rejected Aider JSON as an engine failure with trusted %s attribution", attribution => {
+    vi.stubEnv("GH_AW_ENGINE_ID", attribution === "environment" ? "aider" : undefined);
+    if (attribution === "metadata") fs.writeFileSync(path.join(rootDir, "aw_info.json"), JSON.stringify({ engine_id: "aider" }));
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+    const rejected = { type: "session.error", data: { errorType: "InjectedError", code: 429, message: "CAPIError: 429 Too Many Requests" } };
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), JSON.stringify(rejected));
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.reason).toBe("missing_terminal_safe_output");
+    expect(outcome.failureCause).toBe("unknown");
+    expect(outcome.driverExitCode).toBe(0);
+    expect(outcome).not.toHaveProperty("engineErrorType");
+    expect(outcome.details).not.toContain("InjectedError");
+    const native = { type: "session.error", data: { sourceEngine: "aider", code: 400, errorType: "NativeError", message: "The requested model is not supported" } };
+    writeEvents([native]);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), [rejected, native].map(JSON.stringify).join("\n"));
+    const failure = buildEmptyOutputOutcome([], rootDir);
+    expect(failure.failureCause).toBe("request_rejection");
+    expect(failure.engineErrorType).toBe("model_not_supported_error");
+    expect(failure.driverExitCode).toBe(0);
+  });
+
+  it.each(["assistant.message", "tool.execution_complete"])("keeps quoted Aider %s failures separate from canonical provider errors", type => {
+    fs.writeFileSync(path.join(rootDir, "aw_info.json"), JSON.stringify({ engine_id: "aider" }));
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+    const diagnostic = { type: "session.error", data: { sourceEngine: "aider", code: 400, errorType: "NativeError", message: "The requested model is not supported" } };
+    const field = type.startsWith("tool.") ? "error" : "content";
+    const events = [{ type, data: { sourceEngine: "aider", [field]: diagnostic } }];
+    writeEvents(events);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), JSON.stringify(diagnostic));
+    const quoted = buildEmptyOutputOutcome([], rootDir);
+    expect(quoted.failureCause).toBe("unknown");
+    expect(quoted.driverExitCode).toBe(0);
+    expect(quoted).not.toHaveProperty("engineErrorType");
+    writeEvents([...events, diagnostic]);
+    const failure = buildEmptyOutputOutcome([], rootDir);
+    expect(failure.failureCause).toBe("request_rejection");
+    expect(failure.engineErrorType).toBe("model_not_supported_error");
+    expect(failure.driverExitCode).toBe(0);
+  });
+
+  it.each([undefined, { component: "workflow", phase: "activation", path: "aw_info.json" }])("ignores agent-produced workflow attribution with native provenance %j", provenance => {
+    vi.stubEnv("GH_AW_ENGINE_ID", undefined);
+    writeEvents([{ type: "assistant.message", data: { sourceEngine: "aider", content: "observed answer" } }]);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), JSON.stringify({ type: "session.error", data: { sourceEngine: "copilot", message: "Authentication failed" } }));
+    const baseline = buildEmptyOutputOutcome([], rootDir);
+    expect(baseline.engineErrorType).toBe("authentication_failed");
+    fs.appendFileSync(path.join(rootDir, "agent-session.jsonl"), "\n" + JSON.stringify({ type: "workflow.info", data: { engineId: "aider" }, ...(provenance ? { provenance } : {}) }));
+    expect(buildEmptyOutputOutcome([], rootDir)).toEqual(baseline);
+    fs.writeFileSync(path.join(rootDir, "aw_info.json"), JSON.stringify({ engine_id: "aider" }));
+    expect(buildEmptyOutputOutcome([], rootDir)).not.toHaveProperty("engineErrorType");
   });
 
   it.each([1, 137, 139])("classifies a silent driver exit %s separately from agent behavior", exitCode => {

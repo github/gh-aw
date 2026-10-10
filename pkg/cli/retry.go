@@ -62,7 +62,7 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 	if startMsg == "" {
 		startMsg = fmt.Sprintf("Repeating %d more times. Press Ctrl+C to stop.", options.RepeatCount)
 	}
-	fmt.Fprintln(output, console.FormatInfoMessage(startMsg))
+	fmt.Fprintln(output, console.FormatInfoMessageStdout(startMsg))
 
 	// Use provided context or fall back to background context
 	ctx := ctxutil.OrBackground(options.Ctx)
@@ -86,13 +86,13 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 		select {
 		case <-ctx.Done():
 			retryLog.Printf("Context cancelled at iteration %d/%d", i, options.RepeatCount)
-			fmt.Fprintln(output, console.FormatInfoMessage("Received interrupt signal, stopping repeat..."))
+			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
 			runCleanup()
 			return ctx.Err()
 
 		case <-sigChan:
 			retryLog.Printf("Interrupt signal received at iteration %d/%d", i, options.RepeatCount)
-			fmt.Fprintln(output, console.FormatInfoMessage("Received interrupt signal, stopping repeat..."))
+			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
 			runCleanup()
 			return context.Canceled
 
@@ -108,7 +108,7 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 					repeatMsg = fmt.Sprintf(repeatMsg, time.Now().Format("2006-01-02 15:04:05"))
 				}
 			}
-			fmt.Fprintln(output, console.FormatInfoMessage(repeatMsg))
+			fmt.Fprintln(output, console.FormatInfoMessageStdout(repeatMsg))
 
 			if err := options.ExecuteFunc(); err != nil {
 				retryLog.Printf("Error during iteration %d: %v", i, err)

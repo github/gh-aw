@@ -31,7 +31,7 @@ type nativeDeliveryHostKey struct{}
 // filename, verifier executable, digest, or actor/source assertion.
 func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "work-queue", Short: "Inspect and publish the current fair Git-backed DAG work queue",
+		Use: "work-queue", Aliases: []string{"work"}, Short: "Inspect and publish the current fair Git-backed DAG work queue",
 		Long: "Inspect and publish the current fair Git-backed DAG work queue.\n\n" +
 			"Direct claim and operator finish are unsupported. Use dispatch-next for mandatory\n" +
 			"scheduler grants; only the originally bound worker may stage work_queue_claim_finish.\n" +
@@ -57,7 +57,7 @@ func NewWorkCommandWithNativeDeliveryHost(host *workqueue.NativeDeliveryHost) *c
 	cmd.PersistentFlags().Bool("json", false, "Output JSON")
 	cmd.AddCommand(workReplayCommand(), workStatsCommand(), workExplainCommand(),
 		workSubmitCommand(), workSubmitGraphCommand(), workDispatchNextCommand(),
-		workPolicyCommand(), workControlCommand(), workCancelCommand(),
+		workPolicyCommand(), workDeployCommand(), workControlCommand(), workCancelCommand(),
 		workReconcileCommand(), workEvidenceCommand(), workCompactCommand(), workTraceCommand(),
 		workStateCommand(), workInspectCommand(), workCancelClaimCommand(), workPriorityCommand(), workTUICommand())
 	return cmd
@@ -345,6 +345,7 @@ func workSubmitCommand() *cobra.Command {
 	cmd.Flags().Int("priority", 3, "Entitled priority 1..5")
 	cmd.Flags().String("fairness-key", "", "Entitled accounting key (default: one shared bucket)")
 	cmd.Flags().String("worker-profile", "", "Approved profile (default: pool default)")
+	cmd.Flags().String("execution-ref", "", "Pin this Work to an approved immutable worker SHA instead of following future compatible deployments")
 	return cmd
 }
 
@@ -378,21 +379,18 @@ func workRunSubmitCommand(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	work.Priority, _ = cmd.Flags().GetInt("priority")
-	work.FairnessKey, _ = cmd.Flags().GetString("fairness-key")
-	profile, _ := cmd.Flags().GetString("worker-profile")
-	if profile != "" {
-		approved, ok := policy.Pools[pool].Profiles[profile]
-		if !ok {
-			return errors.New("profile_invalid: worker profile is not approved")
-		}
-		work.WorkerProfile, work.BatchTrustDomain = profile, approved.TrustDomain
+	work, err = workConfigureSubmission(cmd, state, policy, work)
+	if err != nil {
+		return err
 	}
 	work, err = workReuseSubmission(state, work)
 	if err != nil {
 		return err
 	}
-	published, err := workPublish(cmd, "producer", "submit", workqueue.SubmitParameters{Nodes: []workqueue.WorkDefinition{work}})
+	if state.Policy == nil {
+		branch.PolicyProposal = &policy
+	}
+	published, err := workPublishSubmission(cmd, branch, actor, work)
 	if err != nil {
 		return err
 	}
@@ -405,14 +403,65 @@ func workRunSubmitCommand(cmd *cobra.Command, _ []string) error {
 		"Admitted Work "+work.WorkID)
 }
 
-func workReadSubmissionPolicy(cmd *cobra.Command, principal, repository string) (workqueue.Projection, workqueue.Policy, error) {
+func workConfigureSubmission(cmd *cobra.Command, state workqueue.Projection, policy workqueue.Policy, work workqueue.WorkDefinition) (workqueue.WorkDefinition, error) {
+	pool := work.Pool
+	work.Priority, _ = cmd.Flags().GetInt("priority")
+	work.FairnessKey, _ = cmd.Flags().GetString("fairness-key")
+	profile, _ := cmd.Flags().GetString("worker-profile")
+	if profile != "" {
+		approved, ok := policy.Pools[pool].Profiles[profile]
+		if !ok {
+			return workqueue.WorkDefinition{}, errors.New("profile_invalid: worker profile is not approved")
+		}
+		work.WorkerProfile, work.BatchTrustDomain = profile, approved.TrustDomain
+		work.LogicalContract = approved.LogicalContract
+	}
+	pin, _ := cmd.Flags().GetString("execution-ref")
+	if cmd.Flags().Changed("execution-ref") && pin == "" {
+		return workqueue.WorkDefinition{}, errors.New("work_invalid: execution-ref must be a nonempty approved immutable worker SHA")
+	}
+	if existing := state.Works[work.WorkID]; existing != nil && cmd.Flags().Changed("execution-ref") && existing.ExecutionRef != pin {
+		return workqueue.WorkDefinition{}, errors.New("work_conflict: an existing Work execution pin is immutable; use its original pin or a new node identity")
+	}
+	if pin != "" {
+		approved := policy.Pools[pool].Profiles[work.WorkerProfile]
+		if pin != approved.Ref {
+			deployment := state.Deployments[pool][work.WorkerProfile]
+			if deployment == nil {
+				return workqueue.WorkDefinition{}, errors.New("work_invalid: execution-ref must name the exact installed worker SHA or a registered immutable revision")
+			}
+			revision, exists := deployment.Revisions[pin]
+			if !exists {
+				return workqueue.WorkDefinition{}, errors.New("work_invalid: execution-ref is not a registered immutable worker revision")
+			}
+			approved = revision.Profile
+		}
+		work.ExecutionRef, work.LogicalContract = pin, approved.LogicalContract
+	}
+	return work, nil
+}
+
+func workPublishSubmission(cmd *cobra.Command, branch workqueue.Branch, actor workqueue.Actor, work workqueue.WorkDefinition) (workqueue.Publication, error) {
+	requestID, err := workRequestID(cmd)
+	if err != nil {
+		return workqueue.Publication{}, err
+	}
+	request, err := workqueue.NewRequest(requestID, "submit", actor, workqueue.SubmitParameters{Nodes: []workqueue.WorkDefinition{work}})
+	if err != nil {
+		return workqueue.Publication{}, err
+	}
+	return branch.Publish(cmd.Context(), actor, request)
+}
+
+func workReadSubmissionPolicy(cmd *cobra.Command, _, _ string) (workqueue.Projection, workqueue.Policy, error) {
 	state, err := workRead(cmd)
 	if err == nil {
-		return state, *state.Policy, nil
+		return state, workqueue.FuturePolicy(state), nil
 	}
 	var protocolError *workqueue.ProtocolError
 	if errors.As(err, &protocolError) && protocolError.Code == "queue_missing" {
-		return state, workqueue.DefaultPolicy(principal, repository), nil
+		policy, err := workBranch(cmd).PolicyFromConfig(cmd.Context())
+		return state, policy, err
 	}
 	return workqueue.Projection{}, workqueue.Policy{}, err
 }
@@ -423,6 +472,7 @@ func workReuseSubmission(state workqueue.Projection, work workqueue.WorkDefiniti
 		return work, nil
 	}
 	work.Enqueued = existing.Enqueued
+	work.LogicalContract, work.ExecutionRef = existing.LogicalContract, existing.ExecutionRef
 	left, err := workqueue.CanonicalValue(existing.WorkDefinition)
 	if err != nil {
 		return workqueue.WorkDefinition{}, err
@@ -495,16 +545,23 @@ func workDispatchNextCommand() *cobra.Command {
 
 func workPolicyCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "policy", Short: "Install an authenticated prospective policy epoch only on a quiescent queue",
+		Use: "policy", Short: "Update an existing quiescent queue's authenticated policy; never seed a queue",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			data, err := workReadJSON(cmd)
-			if err != nil {
-				return err
-			}
 			epoch, _ := cmd.Flags().GetString("epoch")
 			if epoch == "" {
 				return errors.New("--epoch is required")
+			}
+			fromConfig, _ := cmd.Flags().GetBool("from-config")
+			if fromConfig {
+				if cmd.Flags().Changed("file") {
+					return errors.New("policy: --from-config and --file are mutually exclusive")
+				}
+				return workPolicyFromConfig(cmd, epoch)
+			}
+			data, err := workReadJSON(cmd)
+			if err != nil {
+				return err
 			}
 			var policy map[string]any
 			if err := json.Unmarshal(data, &policy); err != nil {
@@ -522,8 +579,45 @@ func workPolicyCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().String("file", "", "Complete QueuePolicy JSON (- for stdin)")
+	cmd.Flags().Bool("from-config", false, "Resolve current scheduling and approved AW workers from the target repository's immutable default ref")
 	cmd.Flags().String("epoch", "", "New unique policy epoch")
 	return cmd
+}
+
+func workPolicyFromConfig(cmd *cobra.Command, epoch string) error {
+	branch := workBranch(cmd)
+	actor, err := branch.Authenticate(cmd.Context(), "administrator")
+	if err != nil {
+		return err
+	}
+	commits, err := branch.Read(cmd.Context())
+	if err != nil {
+		return err
+	}
+	if len(commits) == 0 {
+		return errors.New("queue_missing: --from-config updates an existing quiescent queue; submit Work for first-use initialization")
+	}
+	policy, err := branch.PolicyFromConfig(cmd.Context())
+	if err != nil {
+		return err
+	}
+	operation, err := workqueue.Op(map[string]any{"kind": "Policy", "epoch": epoch, "policy": policy})
+	if err != nil {
+		return err
+	}
+	requestID, err := workRequestID(cmd)
+	if err != nil {
+		return err
+	}
+	request, err := workqueue.NewRequest(requestID, "policy", actor, workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
+	if err != nil {
+		return err
+	}
+	published, err := branch.Publish(cmd.Context(), actor, request)
+	if err != nil {
+		return err
+	}
+	return workPrint(cmd, published, "Installed prospective AW policy epoch "+epoch)
 }
 
 func workControlCommand() *cobra.Command {

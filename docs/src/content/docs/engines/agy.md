@@ -66,6 +66,36 @@ repeated cumulative usage snapshots are not added together. Missing metrics
 retain their last valid value when a later result omits them; metrics never
 reported remain absent. Status and errors come from the current result.
 
+The agent artifact's `agent-session.jsonl` retains native evidence as canonical
+events; conclusion projects its essential fields into `usage/aw_session.jsonl`.
+Native `conversation_id` maps to `sessionId`, and initialization preserves the
+working directory and tool inventory. `user_input` steps remain `user.message`
+observations even when the native stream exposes no prompt text. Streaming
+answers retain exact text; exposed reasoning and structured refusals use their
+separate channels. Tool completions retain durations and structured outputs or
+errors, including `DONE` records with no output. Only explicit success supplies a
+successful tool outcome; reported errors or nonzero exit codes take precedence.
+Output presence alone does not establish success. Missing outcomes remain unknown,
+and orphan completions do not invent invocations. Native numeric tool
+`step_index` maps to `stepIndex`, scoped by `sessionId`; it does not become a
+fabricated string `toolCallId`. Repeated active tool observations use
+`tool.execution_update`, retaining their supplied metadata.
+
+Per-step and checkpoint token observations use `usage.report`, separately from
+the cumulative `session.result`; these overlapping observations must not be
+summed. Native v1.3.1 `input_tokens` excludes `cache_read_tokens`, represented by
+`input_tokens_include_cache: false`. Missing native event IDs and timestamps
+remain absent. Unrecognized native events retain their payloads as extensions.
+
+The parser regression fixture samples the native transcript and published
+artifacts from [Smoke Agy run 37848575608](https://github.com/github/gh-aw/actions/runs/37848575608).
+Native inference succeeded, but the workflow's conformance checker failed; this
+is not evidence of a passing production gate. The successful
+[authentication run 37732637929](https://github.com/github/gh-aw/actions/runs/37732637929)
+publishes only a sanitized receipt, including negative-probe status and usage,
+not the native transcript. Reasoning, refusal, and additional failure cases in
+the parser tests are synthetic, not observations from these runs.
+
 Agent writes to `GITHUB_STEP_SUMMARY` use an isolated file that is appended to
 the runner's step summary only after secret redaction, matching other built-in engines.
 

@@ -114,8 +114,12 @@ describe("Copilot final completion summary", () => {
     expect(answers(events).map(event => event.data.content)).toEqual([summary, `${summary}Correction.\n`]);
   });
 
-  it.each([undefined, null, false, 42, {}, "", " \n\t"])("does not invent an answer from an unavailable summary (%j)", unavailable => {
+  it.each([undefined, null, false, 42, {}])("does not invent an answer from an unavailable summary (%j)", unavailable => {
     expect(answers(normalizeCopilotSession([completion({ summary: unavailable })]))).toHaveLength(0);
+  });
+
+  it.each(["", " \n\t"])("preserves an explicitly supplied empty or whitespace-only summary (%j)", supplied => {
+    expect(answers(normalizeCopilotSession([completion({ summary: supplied })]))[0].data.content).toBe(supplied);
   });
 
   it("never treats arbitrary tool outputs or unknown extension summaries as final answers", () => {

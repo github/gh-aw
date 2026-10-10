@@ -1,9 +1,16 @@
 "use strict";
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { computeInferenceAIC } = require("./model_costs.cjs");
 
 const ROUTING_STATUSES = new Set(["selected", "pending", "failed", "rejected", "unavailable"]);
 const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "off"]);
+const ROUTING_TASK_TYPES = new Set(["explain", "plan", "fix", "refactor", "chore", "implement", "unknown"]);
+const ROUTING_SCOPES = new Set(["local", "multi_file", "subsystem", "cross_system", "unknown"]);
+const ROUTING_COMPLEXITIES = new Set(["trivial", "easy", "medium", "hard", "expert", "unknown"]);
+const MODEL_ROUTING_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
+
+/** @typedef {{ status: string, mode: string, router_version: string, failure_code?: string, objective: string, task_type: string, scope: string, complexity: string, degraded?: boolean, classifier_aic?: number, deviated_requests?: number }} ModelRoutingSummary */
 
 /** @param {unknown} value @returns {string} */
 function validateModelIdentifier(value) {
@@ -118,6 +125,162 @@ function getModelRouting(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"
   };
 }
 
+function readModelRoutingSession(sessionPath) {
+  const fs = require("fs");
+  let content;
+  try {
+    content = fs.readFileSync(sessionPath, "utf8");
+  } catch {
+    return [];
+  }
+  const events = [];
+  for (const line of content.split("\n")) {
+    try {
+      const event = JSON.parse(line);
+      const provenance = event?.provenance;
+      const agentEvent =
+        (event?.type === "workflow.info" && provenance?.component === "workflow" && provenance?.phase === "agent") ||
+        ((event?.type === "firewall.model_routing" || event?.type === "firewall.token_usage") && provenance?.component === "firewall" && provenance?.phase === "agent");
+      if (agentEvent) events.push(event);
+    } catch {
+      // Ignore partial session records.
+    }
+  }
+  return events;
+}
+
+function readModelRoutingProxyRecords(ghAwDir) {
+  const fs = require("fs");
+  for (const relativePath of MODEL_ROUTING_LOG_PATHS) {
+    let content;
+    try {
+      content = fs.readFileSync(require("path").join(ghAwDir, relativePath), "utf8");
+    } catch {
+      continue;
+    }
+    const records = [];
+    for (const line of content.split("\n")) {
+      try {
+        const record = JSON.parse(line);
+        if (typeof record?._schema === "string" && record._schema.startsWith("model-routing/")) records.push(record);
+      } catch {
+        // Ignore incomplete proxy records.
+      }
+    }
+    return records;
+  }
+  return [];
+}
+
+function isLegacyEndpointOnlyDeviation(schema) {
+  const match = /^model-routing\/v?(\d+)\.(\d+)\.(\d+)/.exec(schema || "");
+  if (!match) return false;
+  const [, major, minor, patch] = match.map(Number);
+  return major === 0 && (minor < 28 || (minor === 28 && patch < 39));
+}
+
+function countDeviatedModelRoutingRequests(records, schema) {
+  const legacyEndpointOnly = isLegacyEndpointOnlyDeviation(schema);
+  return records.filter(record => {
+    if (record?.routed !== "deviated") return false;
+    const deviations = record.deviations;
+    return !(legacyEndpointOnly && Array.isArray(deviations) && deviations.length === 1 && deviations[0] === "endpoint");
+  }).length;
+}
+
+function classifierAIC(sessionEvents) {
+  const classifierUsage = sessionEvents.filter(event => event.type === "firewall.token_usage" && event.data?.purpose === "routing_classification");
+  if (classifierUsage.length === 0) return undefined;
+
+  return classifierUsage.reduce((total, event) => {
+    const data = event.data;
+    const reportedAIC = data.aic;
+    if (typeof reportedAIC === "number" && Number.isFinite(reportedAIC) && reportedAIC >= 0) return total + reportedAIC;
+
+    const usage = data.usage ?? {};
+    const tokenCount = value => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0);
+    const estimatedAIC = computeInferenceAIC({
+      provider: typeof data.provider === "string" ? data.provider : "",
+      model: typeof data.model === "string" ? data.model : "",
+      inputTokens: tokenCount(usage.inputTokens),
+      outputTokens: tokenCount(usage.outputTokens),
+      cacheReadTokens: tokenCount(usage.cacheReadInputTokens),
+      cacheWriteTokens: tokenCount(usage.cacheCreationInputTokens),
+      reasoningTokens: tokenCount(usage.reasoningOutputTokens),
+      ...(typeof usage.inputTokensIncludeCache === "boolean" ? { inputTokensIncludeCache: usage.inputTokensIncludeCache } : {}),
+    });
+    return total + (Number.isFinite(estimatedAIC) && estimatedAIC >= 0 ? estimatedAIC : 0);
+  }, 0);
+}
+
+function firstValidated(...values) {
+  for (const value of values) {
+    const validated = validateModelIdentifier(value);
+    if (validated) return validated;
+  }
+  return "";
+}
+
+function firstAllowed(allowedValues, ...values) {
+  return values.find(value => typeof value === "string" && allowedValues.has(value)) || "";
+}
+
+function resolveModelRoutingSummary({
+  infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`,
+  sessionPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/usage/aw_session.jsonl`,
+  ghAwDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw",
+} = {}) {
+  const sessionEvents = readModelRoutingSession(sessionPath);
+  const workflowInfo = sessionEvents.find(event => event.type === "workflow.info")?.data;
+  const sessionRouting = workflowInfo?.modelRouting ?? workflowInfo?.model_routing ?? {};
+  const sessionRecords = sessionEvents.filter(event => event.type === "firewall.model_routing").map(event => event.data);
+  const sessionSelection = sessionRecords.find(record => record?.stage === "selection");
+  const runnerRouting = resolveEffectiveModel(infoPath, "agent").routing ?? {};
+
+  // The agent post-step runs before the usage-artifact step writes aw_session.jsonl.
+  // Use runner-written routing metadata for routing state, and proxy records for classifier details.
+  const proxyRecords = readModelRoutingProxyRecords(ghAwDir);
+  const proxySelection = proxyRecords.filter(record => record.stage === "selection").at(-1);
+  const proxyRequests = proxyRecords.filter(record => record.stage === "request");
+  const proxySchema = proxyRecords.find(record => record?._schema)?.["_schema"] || "";
+  const sessionRequests = sessionRecords.filter(record => record?.stage === "request");
+  const requestRecords = sessionRequests.length ? sessionRequests : proxyRequests;
+  const requestSchema = sessionRecords.find(record => typeof (record?._schema || record?.schema) === "string")?._schema || sessionRecords.find(record => typeof record?.schema === "string")?.schema || proxySchema;
+
+  const status = [runnerRouting.status, sessionRouting.status].find(value => typeof value === "string" && ROUTING_STATUSES.has(value));
+  if (!status) return null;
+
+  const selection = sessionSelection || proxySelection || {};
+  const objective = selection.objective?.goal ?? selection.objective?.Goal;
+  const labels = selection.labels ?? {};
+  const classifierAic = classifierAIC(sessionEvents);
+  /** @type {ModelRoutingSummary} */
+  const result = {
+    status,
+    mode: firstValidated(runnerRouting.mode, sessionRouting.mode, sessionRouting.Mode),
+    router_version: firstValidated(runnerRouting.router_version, runnerRouting.routerVersion, runnerRouting.router?.version, sessionRouting.routerVersion, sessionRouting.router_version, sessionRouting.router?.version),
+    ...(status !== "selected"
+      ? {
+          failure_code: firstValidated(runnerRouting.failure_code, runnerRouting.failureCode, sessionRouting.failureCode, sessionRouting.failure_code),
+        }
+      : {}),
+    objective: firstValidated(objective),
+    task_type: firstAllowed(ROUTING_TASK_TYPES, labels.task_type, labels.taskType),
+    scope: firstAllowed(ROUTING_SCOPES, labels.scope),
+    complexity: firstAllowed(ROUTING_COMPLEXITIES, labels.task_complexity, labels.taskComplexity),
+    ...(typeof classifierAic === "number" ? { classifier_aic: classifierAic } : {}),
+  };
+  if (typeof selection.degraded_classification === "boolean") {
+    result.degraded = selection.degraded_classification;
+  } else if (typeof selection.degradedClassification === "boolean") {
+    result.degraded = selection.degradedClassification;
+  }
+  if (requestRecords.length > 0) {
+    result.deviated_requests = countDeviatedModelRoutingRequests(requestRecords, requestSchema);
+  }
+  return result;
+}
+
 function resolveEffectiveModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
   let routing = getModelRouting(infoPath, phase);
   if (!routing && typeof env.GH_AW_MODEL_ROUTING_STATUS === "string" && ROUTING_STATUSES.has(env.GH_AW_MODEL_ROUTING_STATUS)) {
@@ -182,6 +345,7 @@ module.exports = {
   recordFallbackModelFromUsage,
   recordModelRouting,
   getModelRouting,
+  resolveModelRoutingSummary,
   resolveEffectiveModel,
   getEffectiveModelLabel,
   validateRoutingEffort,

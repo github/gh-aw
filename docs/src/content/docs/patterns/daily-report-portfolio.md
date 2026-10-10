@@ -17,10 +17,10 @@ Completion and verified delivery share that transaction log.
 
 > [!IMPORTANT]
 > The sources are an orchestration example, not an already provisioned live
-> deployment. Configure the complete compiler-approved Policy proposal,
-> verified immutable worker bindings, and queue-branch protections before
-> enabling a producer. Its first submission atomically bootstraps Policy and
-> Work; compiling a workflow alone does not protect the branch or launch workers.
+> deployment. Declare AW workers and approved dispatch targets; put shared
+> scheduling overrides in `aw.json`. Its first
+> submission atomically bootstraps Policy and Work without administrator seeding.
+> Compiling a workflow alone does not install Policy or launch workers.
 
 ## Thirteen reports, one dispatcher
 
@@ -160,8 +160,8 @@ dispatcher requires a new calendar-budget design.
 ## Dispatcher source and consuming prompt
 
 The following source excerpt omits engine settings and the preparation step.
-The dispatch allowlist approves routes; the compiler-approved Policy proposal
-supplies actual immutable revisions, launch principals and resource scope.
+The AW dispatch allowlist approves routes; the resolved Policy supplies
+immutable revisions and scheduling, and AW binds actual native runs to Claims.
 
 ```aw wrap title=".github/workflows/daily-report-dispatcher.md (excerpt)"
 ---
@@ -293,7 +293,7 @@ Both queue writes initially return a staging acknowledgement:
 ```
 
 That response is neither a Claim nor proof of a native launch. Trusted
-processing replays the current ledger, validates entitlements and publishes
+processing replays the current ledger, validates scheduling bounds and publishes
 accepted operations using compare-and-swap.
 
 ## Worker source, assignment and publication
@@ -527,25 +527,19 @@ successful no-write Result.
 ## Provision and inspect the example
 
 Deploy the compiled worker sources and matching setup runtime on the default
-branch. Independently verify the deployed immutable revision, numeric producer
-principal and native launch principal. The
-[policy generator](https://github.com/github/gh-aw/blob/main/actions/setup/js/daily_report_portfolio.cjs)
-validates a dedicated portfolio policy from those explicit values:
+branch. AW verifies the deployed immutable revision and actual native run.
+The shared `.github/workflows/aw.json` `work_queue` section defines the
+`daily-reports` pool, concurrency three, per-account limit one, equal-weight
+report keys, pending limit 30 and three attempts with 30-second backoff.
+No producer IDs, worker principals or credential scopes are queue configuration.
+On an absent queue, its first authorized `work_queue_submit` publishes Policy
+and the daily cohort together. No administrator-seeding command or separate
+queue authentication step is supported.
 
-```bash
-node actions/setup/js/daily_report_portfolio.cjs policy \
-  OWNER/REPO IMMUTABLE_SHA VERIFIED_PRODUCER_ID VERIFIED_WORKER_ID \
-  > daily-report-policy.json
-gh aw work-queue --repo OWNER/REPO policy \
-  --file daily-report-policy.json --epoch daily-reports-v1
-```
-
-These are authenticated deployment commands, not workflow prompt steps. The
-generator does not verify the supplied identities against GitHub or install
-anything. If the queue already serves other workflows, merge the portfolio
-pool, accounting keys and producer entitlements into its complete policy;
-preserve other pools and limits, and quiesce before installation. Never
-overwrite a shared queue with the dedicated example policy.
+If the queue already serves other workflows, merge the portfolio pool,
+accounting keys into shared `aw.json`. Preserve other pools and limits, and
+quiesce before an explicit `policy --from-config --epoch EPOCH` update.
+Config edits do not overwrite active queue state.
 
 When expanding an already installed ten-profile portfolio, pause admission and
 drain its original Claims before installing a new Policy epoch with all thirteen

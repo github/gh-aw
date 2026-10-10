@@ -116,6 +116,17 @@ function readWorkQueueState(snapshot, args = {}) {
       barrier: work.barrier,
       pool: work.pool,
       worker_profile: work.worker_profile,
+      ...(work.logical_contract ? { logical_contract: work.logical_contract } : {}),
+      ...(work.admission_contract ? { admission_contract: work.admission_contract } : {}),
+      ...(work.execution_ref ? { execution_ref: work.execution_ref } : {}),
+      ...(state.deployments?.get(work.pool)?.get(work.worker_profile)
+        ? {
+            deployment: (() => {
+              const deployment = state.deployments.get(work.pool).get(work.worker_profile);
+              return { current_ref: deployment.current_ref, current_contract: deployment.current_contract, available: deployment.revisions[deployment.current_ref].available };
+            })(),
+          }
+        : {}),
       enqueued: work.enqueued,
       claim_id: work.claim_id ?? null,
       retry_not_before: work.retry_not_before,
@@ -238,7 +249,7 @@ function createWorkQueueSubmitTool(snapshot, options = {}) {
   return {
     name: "work_queue_submit",
     description:
-      "Stage a bounded graph of immutable Work payloads and approved worker-profile requests. Omitted graph/node IDs default to the canonical payload hash and root; use explicit IDs for distinct nodes. Trusted ingestion resolves metadata, dependencies and policy; staging grants no authority.",
+      "Stage a bounded graph of immutable Work payloads and approved worker-profile requests. Optional execution_ref pins a registered immutable worker SHA; otherwise future compatible implementations may execute it. Omitted graph/node IDs default to the canonical payload hash and root; use explicit IDs for distinct nodes. Trusted ingestion resolves metadata, dependencies and policy; staging grants no authority.",
     inputSchema: {
       type: "object",
       properties: { nodes: { type: "array", minItems: 1, maxItems: 256, items: { type: "object" } }, claim_handle: { type: "string", minLength: 1, maxLength: 256 } },
@@ -249,9 +260,11 @@ function createWorkQueueSubmitTool(snapshot, options = {}) {
       closed(args, ["nodes"], ["claim_handle"], "work_queue_submit");
       if (!Array.isArray(args.nodes) || args.nodes.length < 1 || args.nodes.length > 256) throw new TypeError("submission must contain 1 to 256 nodes");
       for (const node of args.nodes) {
-        closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "depends_on", "subject", "backing_issue", "replacement_of"], "submitted Work");
+        closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "logical_contract", "execution_ref", "depends_on", "subject", "backing_issue", "replacement_of"], "submitted Work");
         if (Object.hasOwn(node, "graph_id")) identity(node.graph_id, "graph ID");
         if (Object.hasOwn(node, "node_key")) identity(node.node_key, "node key");
+        if (Object.hasOwn(node, "logical_contract") && !/^[a-f0-9]{64}$/.test(node.logical_contract)) throw new TypeError("logical_contract must be a compiler-derived SHA256 digest");
+        if (Object.hasOwn(node, "execution_ref") && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(node.execution_ref)) throw new TypeError("execution_ref must be an immutable registered worker SHA");
       }
       if (!snapshot.worker && Object.hasOwn(args, "claim_handle")) throw new Error("work_queue_claim_scope_invalid");
       return stageToolIntent(snapshot, "submit", args, options);

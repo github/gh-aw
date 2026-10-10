@@ -24,6 +24,7 @@ import "embed"
 //go:embed js/work_queue_mcp_server.cjs js/work_queue_replay.cjs js/work_queue_intents.cjs
 //go:embed js/work_queue_issue_contract.cjs
 //go:embed js/work_queue_binding.cjs js/work_queue_policy.cjs js/work_queue_store.cjs
+//go:embed js/work_queue_policy_config.cjs
 //go:embed js/work_queue_checked_transport.cjs
 //go:embed js/work_queue_summary_renderer.cjs
 //go:embed js/work_queue_memory.cjs js/work_queue_logging.cjs
@@ -31,6 +32,7 @@ import "embed"
 //go:embed js/work_queue_effect_resource.cjs js/work_queue_effect_client.cjs js/work_queue_claim_adapters.cjs
 //go:embed js/work_queue_declared_verification.cjs js/work_queue_dependency_resolver.cjs js/work_queue_dispatch.cjs
 //go:embed js/work_queue_dispatch_credential.cjs js/work_queue_provisioning.cjs js/work_queue_reconciler.cjs
+//go:embed js/work_queue_deployment.cjs js/work_queue_deployment_control.cjs
 //go:embed js/work_queue_git_tree_adapter.cjs js/work_queue_graphql_adapter.cjs js/work_queue_rest_adapter.cjs
 //go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_yaml.cjs
 //go:embed js/work_queue_indexes.cjs

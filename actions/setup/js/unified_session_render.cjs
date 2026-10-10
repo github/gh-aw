@@ -94,6 +94,16 @@ function eventDetail(event) {
     case "session.init":
     case "session.start":
       return fields(data, ["sourceEngine", "model", "sessionId"]);
+    case "session.error": {
+      const error = data.error && typeof data.error === "object" ? fields(data.error, ["code", "type", "message"]) : data.error === undefined ? "" : inline(data.error);
+      return `${fields(data, ["severity", "status", "code", "errorType", "statusCode", "model", "message", "exitCode"])}${error ? ` ${error}` : ""}`;
+    }
+    case "session.info":
+      return fields(data, ["status", "model", "message", "content"]);
+    case "session.shutdown":
+      return fields(data, ["shutdownType", "errorReason", "currentModel", "premiumRequests", "totalApiDurationMs"]);
+    case "session.task_complete":
+      return fields(data, ["success"]);
     case "user.message":
     case "prompt.system":
     case "prompt.user":
@@ -104,13 +114,15 @@ function eventDetail(event) {
     case "assistant.refusal":
       return `[Policy refusal: ${inline(data.reason)}] ${fields(data, ["policyCategory", "partial", "content", "explanation"])}`;
     case "tool.execution_start":
-      return fields(data, ["toolName", "mcpServerName", "toolCallId"]) + " [started]";
+      return fields(data, ["toolName", "mcpServerName", "toolCallId", "stepIndex"]) + " [started]";
+    case "tool.execution_update":
+      return fields(data, ["toolName", "mcpServerName", "toolCallId", "stepIndex", "partial"]) + " [updated]";
     case "tool.execution_complete": {
       const outcome = data.success === false || data.error != null || data.is_error === true || data.isError === true ? "failed" : data.success === true ? "succeeded" : "outcome unknown";
       if (data.workflowRunId !== undefined && data.status === "async_launched") {
         return `${fields(data, ["toolName", "toolCallId", "taskId", "workflowName", "workflowRunId"])} [launch ${outcome}; workflow outcome pending]`;
       }
-      return `${fields(data, ["toolName", "mcpServerName", "toolCallId", "durationMs"])} [${outcome}]`;
+      return `${fields(data, ["toolName", "mcpServerName", "toolCallId", "stepIndex", "durationMs"])} [${outcome}]`;
     }
     case "session.result":
       return fields(data, ["numTurns", "durationMs", "totalCostUsd"]);
@@ -137,6 +149,7 @@ function eventDetail(event) {
     case "model_routing.outcome":
       return fields(data, ["status", "wireModel", "effectiveEndpoint", "selectedEndpoint", "effort", "appliedEffort", "failureCode"]);
     case "mcp.event":
+      return fields(data, ["event", "serverName", "level", "status"]);
     case "firewall.event":
       return fields(data, ["event", "level", "status"]);
     case "safe_output.request":

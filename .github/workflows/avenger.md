@@ -20,7 +20,7 @@ tracker-id: avenger-ci
 max-turns: 50
 model: copilot/gpt-6-astra
 engine:
-  id: codex
+  id: copilot
   model-provider: github
 network:
   allowed:

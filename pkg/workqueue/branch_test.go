@@ -20,30 +20,44 @@ type gitQueueCommit struct {
 }
 
 type queueAPI struct {
-	head          string
-	logs          map[string]string
-	bases         map[string]string
-	commits       map[string]gitQueueCommit
-	refWrites     int
-	conflicts     int
-	ambiguous     bool
-	concurrent    func()
-	mode          string
-	truncated     bool
-	missingLog    bool
-	nativeRun     *NativeRun
-	nativeReads   int
-	issue         any
-	issueStatus   int
-	resourceReads int
-	resourceRead  func()
-	userID        json.Number
-	workerStatus  int
-	workerContent string
-	workerPath    string
-	workerState   string
-	workerReads   int
-	workerRef     string
+	head                 string
+	logs                 map[string]string
+	bases                map[string]string
+	commits              map[string]gitQueueCommit
+	refWrites            int
+	conflicts            int
+	ambiguous            bool
+	concurrent           func()
+	mode                 string
+	truncated            bool
+	missingLog           bool
+	nativeRun            *NativeRun
+	nativeReads          int
+	issue                any
+	issueStatus          int
+	resourceReads        int
+	resourceRead         func()
+	userID               json.Number
+	workerStatus         int
+	workerContent        string
+	workerPath           string
+	workerState          string
+	workerReads          int
+	workerRef            string
+	noAdmin              bool
+	settings             string
+	settingsStatus       int
+	sources              map[string]string
+	workerRoutes         map[string]string
+	workerStatuses       map[string]int
+	workerStates         map[string]string
+	defaultRef           string
+	defaultRevision      string
+	configRefs           []string
+	routeReads           map[string]int
+	registrationReads    map[string]int
+	sourceStatuses       map[string]int
+	registrationStatuses map[string]int
 }
 
 type queueTransport struct{ url string }
@@ -56,6 +70,7 @@ func TestBranchAuthenticatesCanonicalRepositoryAndRejectsForeignLedger(t *testin
 		t.Fatalf("operator selected repository spelling became authority: %+v %v", actor, err)
 	}
 	control := mustOp(t, map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "operator"})
+	installMockLog(t, mock, testGenesis(t, nil))
 	request, _ := NewRequest("pause", "control", actor, OperationsParameters{Operations: []Operation{control}})
 	if _, err := branch.Publish(context.Background(), actor, request); err != nil {
 		t.Fatal(err)
@@ -122,7 +137,7 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		}
 		respond(map[string]any{"id": id, "login": "operator"})
 	case r.Method == http.MethodGet && r.URL.Path == "/repos/"+testRepository:
-		respond(map[string]any{"id": 1, "full_name": testRepository, "default_branch": "main", "permissions": map[string]bool{"push": true, "admin": true}})
+		respond(map[string]any{"id": 1, "full_name": testRepository, "default_branch": "main", "permissions": map[string]bool{"push": true, "admin": !mock.noAdmin}})
 	case r.Method == http.MethodGet && path == "issues/7":
 		mock.resourceReads++
 		if mock.resourceRead != nil {
@@ -138,7 +153,51 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		mock.nativeReads++
 		respond(mock.nativeRun)
 	case r.Method == http.MethodGet && path == "git/ref/heads/main":
-		respond(map[string]any{"object": map[string]string{"sha": strings.Repeat("f", 40)}})
+		ref := mock.defaultRef
+		if ref == "" {
+			ref = "refs/heads/main"
+		}
+		revision := mock.defaultRevision
+		if revision == "" {
+			revision = strings.Repeat("f", 40)
+		}
+		respond(map[string]any{"ref": ref, "object": map[string]string{"sha": revision}})
+	case r.Method == http.MethodGet && path == "contents/.github/workflows/aw.json":
+		mock.configRefs = append(mock.configRefs, r.URL.Query().Get("ref"))
+		if mock.settingsStatus != 0 {
+			fail(mock.settingsStatus)
+		} else if mock.settings == "" {
+			fail(http.StatusNotFound)
+		} else {
+			respond(map[string]any{"type": "file", "path": repositorySettingsPath, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(mock.settings))})
+		}
+	case r.Method == http.MethodGet && path == "contents/.github/workflows":
+		mock.configRefs = append(mock.configRefs, r.URL.Query().Get("ref"))
+		sources := mock.sources
+		if sources == nil {
+			sources = map[string]string{"worker": "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker"}
+		}
+		entries := []map[string]string{}
+		for name := range sources {
+			entries = append(entries, map[string]string{"type": "file", "path": ".github/workflows/" + name + ".md"})
+		}
+		respond(entries)
+	case r.Method == http.MethodGet && strings.HasPrefix(path, "contents/.github/workflows/") && strings.HasSuffix(path, ".md"):
+		mock.configRefs = append(mock.configRefs, r.URL.Query().Get("ref"))
+		name := strings.TrimSuffix(strings.TrimPrefix(path, "contents/.github/workflows/"), ".md")
+		if status := mock.sourceStatuses[name]; status != 0 {
+			fail(status)
+			break
+		}
+		content, exists := mock.sources[name]
+		if mock.sources == nil && name == "worker" {
+			content, exists = "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker", true
+		}
+		if !exists {
+			fail(http.StatusNotFound)
+		} else {
+			respond(map[string]any{"type": "file", "path": strings.TrimPrefix(path, "contents/"), "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
+		}
 	case r.Method == http.MethodGet && strings.HasPrefix(path, "contents/.github/workflows/"):
 		mock.workerReads++
 		mock.workerRef = r.URL.Query().Get("ref")
@@ -147,20 +206,42 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 			break
 		}
 		workerPath := strings.TrimPrefix(path, "contents/")
+		if status := mock.workerStatuses[workerPath]; status != 0 {
+			fail(status)
+			break
+		}
+		if mock.routeReads == nil {
+			mock.routeReads = map[string]int{}
+		}
+		mock.routeReads[workerPath]++
 		if mock.workerPath != "" {
 			workerPath = mock.workerPath
 		}
 		content := mock.workerContent
+		if route, exists := mock.workerRoutes[workerPath]; exists {
+			content = route
+		}
 		if content == "" {
 			content = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n"
 		}
 		respond(map[string]any{"type": "file", "path": workerPath, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
 	case r.Method == http.MethodGet && strings.HasPrefix(path, "actions/workflows/"):
 		workerPath := ".github/workflows/" + strings.TrimPrefix(path, "actions/workflows/")
+		if mock.registrationReads == nil {
+			mock.registrationReads = map[string]int{}
+		}
+		mock.registrationReads[workerPath]++
+		if status := mock.registrationStatuses[workerPath]; status != 0 {
+			fail(status)
+			break
+		}
 		if mock.workerPath != "" {
 			workerPath = mock.workerPath
 		}
 		state := mock.workerState
+		if configured, exists := mock.workerStates[workerPath]; exists {
+			state = configured
+		}
 		if state == "" {
 			state = "active"
 		}
@@ -321,6 +402,7 @@ func TestBranchVerifiesCheckpointChainsBeyondFormerDepthLimit(t *testing.T) {
 
 func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 	branch, mock := newQueueAPI(t)
+	mock.noAdmin = true
 	actor, err := branch.Authenticate(context.Background(), "producer")
 	if err != nil {
 		t.Fatal(err)
@@ -328,7 +410,11 @@ func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 	if _, err := branch.Read(context.Background()); err == nil || !strings.Contains(err.Error(), "queue_missing") {
 		t.Fatalf("missing queue is not an existing empty policy-less ledger: %v", err)
 	}
-	node, err := NewWork([]byte(`{"task":"a"}`), "graph", "a", "default", DefaultPolicy(testPrincipal, testRepository), 1000)
+	policy, err := branch.PolicyFromConfig(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := NewWork([]byte(`{"task":"a"}`), "graph", "a", "default", policy, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,13 +424,13 @@ func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 		t.Fatalf("new queue initialization: %+v %v", published, err)
 	}
 	commits, err := branch.Read(context.Background())
-	if err != nil || len(commits) != 2 || mustOperationKind(t, commits[0].Operations[0]) != "Policy" {
+	if err != nil || len(commits) != 1 || mustOperationKind(t, commits[0].Operations[0]) != "Policy" {
 		t.Fatalf("mandatory policy genesis absent: %v", err)
 	}
-	if commits[0].Request.ID != "init_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
+	if commits[0].Request.ID != "submit" ||
 		commits[0].PolicyEpoch != "epoch_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
-		commits[0].ID != "q_50ddbfa08f7148bbb21046bd6c12fed643985baa93ecc09ae9a6d1c6366d1be7" ||
-		commits[1].ID != "q_55c9db94408bb38dd5f1731f2adc022fcca54ea724b4b1f4db2424d7194d9294" {
+		commits[0].ID != "q_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
+		commits[0].Actor.Role != "producer" || len(commits[0].Operations) != 2 {
 		t.Fatal("default publisher identities differ from the independent canonical bootstrap example")
 	}
 	writes := mock.refWrites

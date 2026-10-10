@@ -401,7 +401,8 @@ function selectSessionResult(events, { includeNested = false } = {}) {
   let result;
   for (const event of normalized) {
     if (event.type !== "session.result") continue;
-    if (!includeNested && event.data.sourceEngine === "claude" && sessionContext(event).parentToolUseId) continue;
+    const context = sessionContext(event);
+    if (!includeNested && (context.parentToolUseId || context.agentId !== undefined)) continue;
     result ??= {};
     const data = event.data;
     for (const [key, value] of Object.entries(data)) {
@@ -571,7 +572,12 @@ function observedSessionModel(events, { includeNested = false } = {}) {
   let model;
   for (const event of events) {
     if (!includeNested && sessionContext(event).parentToolUseId) continue;
-    const value = event?.type === "system" && event.subtype === "init" ? event.model : ["session.init", "session.start", "pi.message_snapshot"].includes(event?.type) ? event.data?.model : undefined;
+    const value =
+      event?.type === "system" && event.subtype === "init"
+        ? event.model
+        : ["session.init", "session.start", "pi.message_snapshot"].includes(event?.type) || (event?.type === "session.info" && event.data?.sourceType === "message_snapshot")
+          ? event.data?.model
+          : undefined;
     if (typeof value === "string" && value.length) model = value;
   }
   return model;

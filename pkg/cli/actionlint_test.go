@@ -448,12 +448,13 @@ func TestBuildActionlintCompilerError(t *testing.T) {
 	assert.Contains(t, compilerErr.Message, getActionlintDocsURL("warning-test"))
 }
 
-func TestBuildActionlintDockerCommand(t *testing.T) {
+func TestFormatActionlintCommand(t *testing.T) {
 	t.Parallel()
-	command := buildActionlintDockerCommand("/tmp/repo root", []string{"a.lock.yml"}, actionlintRunOptions{
+	args := buildActionlintDockerArgs("/tmp/repo root", []string{"a.lock.yml"}, actionlintRunOptions{
 		IncludeShellcheck: false,
 		IgnorePatterns:    []string{"foo bar"},
 	})
+	command := formatActionlintCommand(append([]string{"docker"}, args...))
 
 	assert.Contains(t, command, `"/tmp/repo root:/workdir"`)
 	assert.Contains(t, command, `-shellcheck=`)

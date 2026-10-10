@@ -3,13 +3,13 @@
 const fs = require("fs");
 const path = require("path");
 const { isSessionEvent } = require("./agent_session.cjs");
-const { hasCopilotConversation, normalizeCopilotSession } = require("./copilot_session.cjs");
+const { hasCopilotConversation, deduplicateCopilotFallback, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAgentExecution, parseAgentExitCode, validateAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
-const { normalizeEngineLogEntries } = require("./engine_log_parser.cjs");
+const { normalizeEngineLogEntries, normalizeEngineSessionEvents, parseEngineLog } = require("./engine_log_parser.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -127,26 +127,11 @@ function normalizeRuntimeEvent(component, record) {
  * @returns {SessionEvent[]}
  */
 function parseEngineSession(content, engine) {
-  const parsers = {
-    agy: ["parse_agy_log.cjs", "parseAgyLog"],
-    claude: ["parse_claude_log.cjs", "parseClaudeLog"],
-    copilot: ["parse_copilot_log.cjs", "parseCopilotLog"],
-    codex: ["parse_codex_log.cjs", "parseCodexLog"],
-    gemini: ["parse_gemini_log.cjs", "parseGeminiLog"],
-    pi: ["parse_pi_log.cjs", "parsePiLog"],
-    kiro: ["parse_kiro_log.cjs", "parseKiroLog"],
-    "deepseek-harness": ["parse_deepseek_log.cjs", "parseDeepSeekLog"],
-    "pydantic-ai": ["parse_pydantic_log.cjs", "parsePydanticLog"],
-    opencode: ["parse_opencode_log.cjs", "parseOpenCodeLog"],
-    goose: ["parse_goose_log.cjs", "parseGooseLog"],
-    custom: ["parse_custom_log.cjs", "parseCustomLog"],
-  };
-  const [moduleName, functionName] = Object.hasOwn(parsers, engine) ? parsers[engine] : parsers.custom;
-  const parsed = Object.hasOwn(parsers, engine) ? require(`./${moduleName}`)[functionName](content) : require(`./${moduleName}`)[functionName](content, engine);
+  const parsed = parseEngineLog(content, engine);
   const events = parsed.logEntries ?? [];
   const observations = events.filter(isAgentExecutionEvent).map(event => event.data);
   if (observations.length) return events;
-  const execution = collectAgentExecution({ content, events, observations });
+  const execution = collectAgentExecution({ content, events, observations, ...(engine === "aider" ? { rawSourceEngine: "aider" } : {}) });
   return [...events.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
 }
 
@@ -189,14 +174,19 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       throw new Error(`${ERR_SYSTEM}: Failed to read unified session source ${path.relative(rootDir, file)}: ${getErrorMessage(error)}`, { cause: error });
     }
   };
+  const recordCache = new Map();
   const records = file => {
+    if (recordCache.has(file)) return recordCache.get(file);
     const content = read(file);
     if (file.endsWith(".json")) {
       try {
         const value = JSON.parse(content);
-        return Array.isArray(value) ? value : [value];
+        const values = Array.isArray(value) ? value : [value];
+        recordCache.set(file, values);
+        return values;
       } catch {
         report(file, "malformed_json", undefined);
+        recordCache.set(file, []);
         return [];
       }
     }
@@ -210,6 +200,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
         report(file, "malformed_jsonl", index + 1);
       }
     }
+    recordCache.set(file, values);
     return values;
   };
   /**
@@ -222,7 +213,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const add = (file, component, phase, type, timestampUnit = "milliseconds") => {
     if (!exists(file)) return 0;
     const events = [];
-    const input = records(file);
+    const input = component === "agent" ? normalizeEngineSessionEvents(records(file), engine ?? "custom") : records(file);
     const normalized = component === "agent" ? normalizeEngineLogEntries(input, engine ?? "custom") : [];
     const hasLegacyContent = normalized.some(event => ["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message", "tool.execution_start", "tool.execution_complete"].includes(event.type));
     for (const record of input) {
@@ -382,9 +373,8 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const events = normalizeCopilotSession(snapshot.records);
     const source = { component: "agent", phase: "agent", path: path.relative(rootDir, snapshot.file), events };
     sources.push(source);
-    if (incompleteSources.has(snapshot.file) || !hasCopilotConversation(events)) {
+    if (!hasCopilotConversation(events)) {
       if (!incompleteSources.has(snapshot.file)) report(snapshot.file, "native_session_unusable", undefined);
-      source.events = [];
       continue;
     }
     copilotSources.set(source, { id, start: snapshot.start });
@@ -401,11 +391,10 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       const source = sources.at(-1);
       if (source?.path === path.relative(rootDir, file)) {
         source.events = normalizeCopilotSession(source.events);
-        if (!incompleteSources.has(file) && hasCopilotConversation(source.events)) {
+        if (hasCopilotConversation(source.events)) {
           agentEvents += source.events.length;
         } else {
           if (!incompleteSources.has(file)) report(file, "native_session_unusable", undefined);
-          source.events = [];
         }
       }
     }
@@ -414,8 +403,15 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const file = choose(["pi-streaming.jsonl", "agent-stdio.log"]);
     if (file) {
       const content = read(file);
-      const events = parseEngineSession(content, engine ?? (file.endsWith("pi-streaming.jsonl") ? "pi" : "custom"));
-      if (!events.length && content.trim()) report(file, "unrecognized_engine_log", undefined);
+      const parsed = parseEngineSession(content, engine ?? (file.endsWith("pi-streaming.jsonl") ? "pi" : "custom"));
+      const events =
+        engine === "copilot" || native.length
+          ? deduplicateCopilotFallback(
+              parsed,
+              sources.filter(source => source.component === "agent").map(source => source.events)
+            )
+          : parsed;
+      if (!parsed.length && content.trim()) report(file, "unrecognized_engine_log", undefined);
       sources.push({ component: "agent", phase: "agent", path: path.relative(rootDir, file), events });
     }
   }
@@ -497,6 +493,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const exitCode = observedExit ?? nativeExit?.exitCode ?? nativeExit?.exit_code;
   const execution = collectAgentExecution({
     content: stdioContent,
+    ...(engine === "aider" ? { rawSourceEngine: "aider" } : {}),
     events: executionAgentSources.flatMap(source => source.events),
     observations: executionObservations,
     ...(exists(exitFile) ? { exitCode: parseAgentExitCode(read(exitFile)) } : exitCode !== undefined ? { exitCode: validateAgentExitCode(exitCode) } : {}),
@@ -527,12 +524,19 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     }
     sources.push({ component: "guardrail", phase: "activation", path: "usage/aw_session.jsonl", events: [{ type: "guardrail.daily_aic", data }] });
   }
+  const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
+  const coverageWarnings = [...warnings];
+  for (const event of persistedWarnings) {
+    const data = event.data;
+    const matching = warnings.filter(warning => warning.data.path === data.path && warning.data.code === data.code);
+    if (!matching.some(warning => data.line === undefined || warning.data.line === data.line)) coverageWarnings.push(event);
+  }
   /** @type {SessionEvent} */
   const summary = {
     type: "session.collection",
     data: {
       sources: sources.map(({ events, ...source }) => ({ ...source, events: events.length })),
-      warnings: warnings.length,
+      warnings: coverageWarnings.length,
       untimedEvents: sources.reduce((total, source) => total + source.events.filter(event => sessionTimestamp(event, source.timestampUnit) === undefined).length, 0),
       absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval", "workflow"].filter(component => !sources.some(source => source.component === component)),
     },

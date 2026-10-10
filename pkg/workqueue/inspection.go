@@ -216,32 +216,43 @@ type TraceOptions struct {
 }
 
 type TraceEvent struct {
-	Position      Position        `json:"position"`
-	CommitID      string          `json:"commit_id"`
-	Previous      *string         `json:"previous"`
-	RequestID     string          `json:"request_id"`
-	RequestKind   string          `json:"request_kind"`
-	PolicyEpoch   string          `json:"policy_epoch"`
-	At            int64           `json:"at"`
-	Actor         Actor           `json:"actor"`
-	Kind          string          `json:"kind"`
-	WorkID        string          `json:"work_id,omitempty"`
-	ClaimID       string          `json:"claim_id,omitempty"`
-	DispatchID    string          `json:"dispatch_id,omitempty"`
-	ClaimHandle   string          `json:"claim_handle,omitempty"`
-	CompletionID  string          `json:"completion_id,omitempty"`
-	State         string          `json:"state,omitempty"`
-	Reason        string          `json:"reason,omitempty"`
-	Disposition   string          `json:"disposition,omitempty"`
-	Control       string          `json:"control,omitempty"`
-	Value         json.RawMessage `json:"value,omitempty"`
-	ObservationID string          `json:"observation_id,omitempty"`
-	Observations  []string        `json:"observations,omitempty"`
-	Run           *RunBinding     `json:"run,omitempty"`
-	RunID         string          `json:"run_id,omitempty"`
-	RunAttempt    int             `json:"run_attempt,omitempty"`
-	Evidence      *TraceEvidence  `json:"evidence,omitempty"`
-	Trace         *Trace          `json:"trace,omitempty"`
+	Position            Position        `json:"position"`
+	CommitID            string          `json:"commit_id"`
+	Previous            *string         `json:"previous"`
+	RequestID           string          `json:"request_id"`
+	RequestKind         string          `json:"request_kind"`
+	PolicyEpoch         string          `json:"policy_epoch"`
+	At                  int64           `json:"at"`
+	Actor               Actor           `json:"actor"`
+	Kind                string          `json:"kind"`
+	Pool                string          `json:"pool,omitempty"`
+	WorkerProfile       string          `json:"worker_profile,omitempty"`
+	Profile             *WorkerProfile  `json:"profile,omitempty"`
+	ExpectedRef         string          `json:"expected_ref,omitempty"`
+	ExpectedContract    string          `json:"expected_contract,omitempty"`
+	Available           *bool           `json:"available,omitempty"`
+	Activate            *bool           `json:"activate,omitempty"`
+	LogicalContract     string          `json:"logical_contract,omitempty"`
+	AdmissionContract   string          `json:"admission_contract,omitempty"`
+	ExecutionRef        string          `json:"execution_ref,omitempty"`
+	WorkID              string          `json:"work_id,omitempty"`
+	ClaimID             string          `json:"claim_id,omitempty"`
+	DispatchID          string          `json:"dispatch_id,omitempty"`
+	CredentialPrincipal string          `json:"credential_principal,omitempty"`
+	ClaimHandle         string          `json:"claim_handle,omitempty"`
+	CompletionID        string          `json:"completion_id,omitempty"`
+	State               string          `json:"state,omitempty"`
+	Reason              string          `json:"reason,omitempty"`
+	Disposition         string          `json:"disposition,omitempty"`
+	Control             string          `json:"control,omitempty"`
+	Value               json.RawMessage `json:"value,omitempty"`
+	ObservationID       string          `json:"observation_id,omitempty"`
+	Observations        []string        `json:"observations,omitempty"`
+	Run                 *RunBinding     `json:"run,omitempty"`
+	RunID               string          `json:"run_id,omitempty"`
+	RunAttempt          int             `json:"run_attempt,omitempty"`
+	Evidence            *TraceEvidence  `json:"evidence,omitempty"`
+	Trace               *Trace          `json:"trace,omitempty"`
 }
 
 type TraceEvidence struct {
@@ -491,6 +502,16 @@ func (scope traceScope) matches(event TraceEvent, commit QueueCommit, options Tr
 }
 
 func annotateTraceEvent(event *TraceEvent, state Projection, commit QueueCommit, position Position) {
+	if work := state.Works[event.WorkID]; work != nil {
+		event.AdmissionContract = work.AdmissionContract
+		event.Pool, event.WorkerProfile = work.Pool, work.WorkerProfile
+	}
+	if event.Kind == "Dispatch" || event.Kind == "Claim" {
+		if dispatch := state.Dispatches[event.DispatchID]; dispatch != nil && dispatch.Profile.LogicalContract != "" {
+			profile := dispatch.Profile
+			event.Profile = &profile
+		}
+	}
 	if event.ClaimID != "" {
 		event.DispatchID = state.Claims[event.ClaimID].DispatchID
 		event.ClaimHandle = state.Claims[event.ClaimID].Handle
