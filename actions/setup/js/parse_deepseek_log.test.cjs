@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseDeepSeekLog, isDeepSeekLog } from "./parse_deepseek_log.cjs";
 import { startupFailure, timedOut } from "./fixtures/deepseek_ci_logs.cjs";
-import { normalizeAgentSession, projectSessionResult } from "./agent_session.cjs";
+import { projectSessionResult } from "./agent_session.cjs";
 import { serializeSessionArtifact, writeSessionArtifact } from "./session_artifact.cjs";
 import { collectUnifiedSession, parseEngineSession, writeUnifiedSession } from "./unified_session.cjs";
 import { parseCustomLog } from "./parse_custom_log.cjs";
@@ -156,6 +156,12 @@ describe("parseDeepSeekLog", () => {
     expect(parseEngineSession(startupFailure, "deepseek-harness")).toEqual(result.logEntries);
   });
 
+  it("preserves Node startup errors when the header includes a column", () => {
+    const raw = startupFailure.replace("lib/index.js:764\n", "lib/index.js:764:28\n");
+
+    expect(parseDeepSeekLog(raw).logEntries).toEqual(parseDeepSeekLog(startupFailure).logEntries);
+  });
+
   it("retains a harness failure even without a Node stack or AWF shutdown", () => {
     const result = parseDeepSeekLog(`${timedOut}[deepseek-harness] DeepSeek Harness execution failed with exit code 137 (signal=SIGKILL)\n`);
 
@@ -172,6 +178,34 @@ describe("parseDeepSeekLog", () => {
     expect(quoted.logEntries[1].data.content).toBe(text);
     expect(quoted.logEntries.some(event => event.type === "session.error")).toBe(false);
     expect(parseDeepSeekLog(fixture).logEntries.some(event => event.type === "session.error")).toBe(false);
+  });
+
+  it.each(["Here is the fix.\n[deepseek-harness] DeepSeek Harness execution failed with exit code 1\nApply it.", "[deepseek-harness] DeepSeek Harness execution failed with exit code 1"])(
+    "preserves a quoted harness failure in completed assistant text",
+    text => {
+      const result = parseDeepSeekLog(fixture.replace(answer, text));
+
+      expect(result.logEntries).toEqual([
+        { type: "session.init", data: { sourceEngine: "deepseek-harness", provider: "github", model: "claude-sonnet-4.5" } },
+        { type: "assistant.message", data: { content: text } },
+      ]);
+      expect(parseEngineSession(fixture.replace(answer, text), "deepseek-harness").some(event => event.type === "session.error")).toBe(false);
+    }
+  );
+
+  it.each(["Here is the fix.\n[deepseek-harness] DeepSeek Harness execution failed with exit code 1", "[deepseek-harness] DeepSeek Harness execution failed with exit code 1\nApply it."])(
+    "does not turn an unframed partial quote into an execution failure",
+    text => {
+      const result = parseDeepSeekLog(`${timedOut}${text}\n`);
+
+      expect(result.logEntries).toEqual([{ type: "session.init", data: { sourceEngine: "deepseek-harness", provider: "github", model: "auto" } }]);
+    }
+  );
+
+  it("does not accept quoted Node crash framing before a successful wrapper exit", () => {
+    const raw = startupFailure.replace("[WARN] Command completed with exit code: 1", "[SUCCESS] Command completed successfully").replace("Process exiting with code: 1", "Process exiting with code: 0");
+
+    expect(parseDeepSeekLog(raw).logEntries.map(event => event.type)).toEqual(["session.init"]);
   });
 
   it("allows the observed post-command permission cleanup without including it in assistant content", () => {
@@ -205,54 +239,23 @@ describe("parseDeepSeekLog", () => {
     expect(JSON.stringify(result)).not.toContain("fixture-secret");
     expect(JSON.stringify(result)).not.toContain("::add-mask::");
   });
-});
-
-// Canonical contract fixtures are synthetic; the captured dsh headless runs do
-// not expose native structured messages, tool lifecycles, refusals, or usage.
-describe("DeepSeek direct canonical session inputs", () => {
-  const events = [
-    { type: "session.init", id: "native-0", parentId: null, timestamp: "2026-10-07T00:00:00Z", data: { sourceEngine: "deepseek-harness", model: "fixture-model", sessionId: "native-session", cwd: "/fixture" } },
-    { type: "user.message", id: "native-1", parentId: "native-0", timestamp: 1, data: { content: "" } },
-    { type: "assistant.reasoning", id: "native-2", data: { content: "hello", partial: true, messageId: "message-1", channel: "reasoning" } },
-    { type: "assistant.reasoning", id: "native-3", data: { content: " \n", partial: true, messageId: "message-1", channel: "reasoning" } },
-    { type: "tool.execution_start", id: "native-4", custom: { nested: false }, data: { toolCallId: "call-1", toolName: "fixture-tool", input: { empty: "", zero: 0, null: null, array: [], object: {} } } },
-    { type: "tool.execution_complete", id: "native-5", parentId: "native-4", data: { toolCallId: "call-1", success: false, output: false, durationMs: 0, exitCode: 1, error: { code: "fixture-failure" } } },
-    { type: "assistant.refusal", id: "native-6", data: { reason: "content_filter", content: null, policyCategory: null, explanation: "", partial: true } },
-    { type: "session.error", id: "native-7", data: { error: { code: 0, message: "" } } },
-    { type: "session.result", id: "native-8", data: { usage: { input_tokens: 2, output_tokens: 3 }, numTurns: 0, durationMs: 0, totalCostUsd: 0 } },
-    { type: "session.result", id: "native-9", data: { usage: { total_tokens: 5 }, status: "failed", errors: [] } },
-    { type: "vendor.unknown", id: "native-10", parentId: null, metadata: [false, 0, ""], data: { deep: { null: null, false: false, zero: 0, empty: [], object: {} } } },
-    { type: "tool.execution_complete", data: { toolCallId: "orphan", output: 0 } },
-    { type: "tool.execution_start", data: { toolCallId: "dangling", input: null } },
-  ];
-
-  it.each(["jsonl", "array", "pretty-array"])("retains exact canonical content, metadata, values and order from %s", format => {
-    const raw = format === "jsonl" ? events.map(JSON.stringify).join("\n") : JSON.stringify(events, null, format === "pretty-array" ? 2 : undefined);
+  it("rejects unobserved canonical stdout even when interleaved with mask commands", () => {
+    const raw = '::add-mask::fixture-secret\n{"type":"assistant.message","data":{"content":"fixture-secret"}}\n';
     const result = parseDeepSeekLog(raw);
 
-    expect(result.logEntries).toEqual(events);
-    expect(normalizeAgentSession(result.logEntries)).toEqual(events);
-    expect(parseDeepSeekLog(serializeSessionArtifact(result.logEntries)).logEntries).toEqual(events);
-    expect(isDeepSeekLog(raw)).toBe(false);
-    expect(projectSessionResult(result.logEntries)).toMatchObject({ num_turns: 0, duration_ms: 0, total_cost_usd: 0, usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 } });
-    expect(projectSessionResult(result.logEntries).usage.total_tokens).toBe(5);
+    expect(result.logEntries).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain("fixture-secret");
+    expect(result.markdown).toContain("Raw content is omitted");
   });
 
-  it("retains a single canonical record and valid records adjacent to a malformed partial line", () => {
-    expect(parseDeepSeekLog(JSON.stringify(events[10], null, 2)).logEntries).toEqual([events[10]]);
-    const result = parseDeepSeekLog(`${JSON.stringify(events[2])}\n{"partial":\n${JSON.stringify(events[4])}\n`);
-
-    expect(result.logEntries).toEqual([events[2], events[4]]);
-    expect(result.markdown).toContain("coverage is partial");
-  });
-
-  it.each([fixture, startupFailure, timedOut, events.map(JSON.stringify).join("\n")])("persists the engine-owned trace through canonical and unified artifacts", raw => {
+  it.each([fixture, startupFailure, timedOut])("persists the observed headless trace through canonical and unified artifacts", raw => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "deepseek-session-audit-"));
     try {
       const parsed = parseDeepSeekLog(raw).logEntries;
       fs.writeFileSync(path.join(root, "agent-stdio.log"), raw);
       writeSessionArtifact(path.join(root, "agent-session.jsonl"), parsed);
       expect(fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8")).toBe(serializeSessionArtifact(parsed));
+      expect(JSON.parse(fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8").split("\n")[0]).data.provider).toBe("github");
       const warnings = [];
       const canonical = collectUnifiedSession({ rootDir: root, engine: "deepseek-harness", dailyAIC: {}, warn: warning => warnings.push(warning) }).events;
       fs.unlinkSync(path.join(root, "agent-session.jsonl"));
@@ -270,16 +273,8 @@ describe("DeepSeek direct canonical session inputs", () => {
         expect(event.provenance.path).toBe("agent-stdio.log");
         expect(event.provenance.phase).toBe("agent");
       }
-      if (parsed.some(event => event.type === "vendor.unknown")) {
-        const { metadata, ...essentialExtension } = events[10];
-        expect(persisted.find(event => event.type === "vendor.unknown")).toMatchObject(essentialExtension);
-        expect(persisted.find(event => event.type === "tool.execution_start" && event.data.toolCallId === "call-1").data.input).toEqual(events[4].data.input);
-        expect(persisted.find(event => event.type === "assistant.refusal").data).toEqual(events[6].data);
-        expect(persisted.filter(event => event.type === "assistant.reasoning").map(event => event.data.content)).toEqual(["hello", " \n"]);
-        expect(persisted.filter(event => event.type === "session.result").map(event => event.data.usage)).toEqual([{ inputTokens: 2, outputTokens: 3 }, { totalTokens: 5 }]);
-      } else {
-        expect(persisted.some(event => event.type === "session.result" || event.type === "assistant.refusal" || event.type.startsWith("tool.") || event.type === "assistant.reasoning")).toBe(false);
-      }
+      expect(persisted.find(event => event.type === "session.init").data).toEqual({ sourceEngine: "deepseek-harness", model: parsed[0].data.model });
+      expect(persisted.some(event => event.type === "session.result" || event.type === "assistant.refusal" || event.type.startsWith("tool.") || event.type === "assistant.reasoning")).toBe(false);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
