@@ -178,11 +178,12 @@ describe("Copilot dynamic workflow sessions", () => {
     expect(canonical.filter(event => event.type === "subagent.started")).toMatchObject([{ agentId: "smoke-child", data: { workflowRunId: runId } }]);
   });
 
-  it("serializes ephemeral SDK workflow signals and preserves child message metadata, while ignoring unrelated streaming deltas", async () => {
+  it("serializes ephemeral SDK workflow signals, child metadata and observed message deltas", async () => {
     const root = temporaryRoot();
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.stubEnv("GH_AW_SDK_IDLE_MS", "1234");
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const delta = { type: "assistant.message_delta", ephemeral: true, data: { deltaContent: "  observed delta\n" } };
     let onEvent = () => {};
     const session = {
       sessionId: "sdk-workflow",
@@ -191,7 +192,7 @@ describe("Copilot dynamic workflow sessions", () => {
       },
       sendAndWait: async () => {
         for (const event of lifecycle) onEvent(event);
-        onEvent({ type: "assistant.message_delta", ephemeral: true, data: { deltaContent: "ignored" } });
+        onEvent(delta);
         return { data: { content: "done" } };
       },
       disconnect: async () => {},
@@ -208,7 +209,7 @@ describe("Copilot dynamic workflow sessions", () => {
       sessionStateBaseDir: root,
       sdkModule: { CopilotClient: FakeClient, RuntimeConnection: { forUri: () => ({}) }, approveAll: () => "allow" },
     });
-    expect(result.exitCode).toBe(0);
+    expect(result).toMatchObject({ exitCode: 0, output: "done", hasOutput: true });
     const events = fs
       .readFileSync(path.join(root, session.sessionId, "events.jsonl"), "utf8")
       .trim()
@@ -217,7 +218,7 @@ describe("Copilot dynamic workflow sessions", () => {
     expect(events.filter(event => event.type.startsWith("workflow.run_"))).toEqual(lifecycle.filter(event => event.type.startsWith("workflow.run_")));
     expect(events.find(event => event.type === "subagent.started")).toEqual(lifecycle[3]);
     expect(events.find(event => event.type === "assistant.message")).toEqual(lifecycle[5]);
-    expect(events.some(event => event.type === "assistant.message_delta")).toBe(false);
-    expect(setTimeoutSpy.mock.calls.filter(([, timeout]) => timeout === 1234)).toHaveLength(2);
+    expect(events.filter(event => event.type === "assistant.message_delta")).toEqual([delta]);
+    expect(setTimeoutSpy.mock.calls.filter(([, timeout]) => timeout === 1234)).toHaveLength(0);
   });
 });

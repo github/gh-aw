@@ -117,6 +117,21 @@ A conforming implementation MUST execute the following sequence:
 
 A complete implementation (Level 3) SHOULD serialize non-ephemeral session events to a JSON Lines stream compatible with downstream timeline rendering.
 
+The built-in driver retains native event envelopes and payloads, including user
+messages, reasoning, errors, tool outcomes, and unknown non-ephemeral extensions.
+It also captures the ephemeral `assistant.usage`, `assistant.message_delta`,
+`assistant.reasoning_delta`, `model.call_failure`, and workflow lifecycle observations needed to
+recover accounting and interrupted conversations. Other ephemeral events are
+not persisted. Canonical conversion happens in the Copilot session adapter;
+missing timestamps, tool outcomes, and metrics are not synthesized by the driver.
+Default summaries continue to omit user prompts.
+
+Bootstrap and collection retain independently parseable native observations
+from malformed JSONL and record an explicit collection warning. A usable partial
+native trace is not replayed together with fallback stdio. When fallback is
+needed, exact identified copies are deduplicated within their observed session;
+conflicting payloads and independent retry or child observations remain available.
+
 ### 3.4 Harness Connection Token Flow
 
 When SDK mode is enabled (`COPILOT_SDK_URI` is set), the harness MUST generate a per-run `COPILOT_CONNECTION_TOKEN` and MUST pass the same token value to both:
@@ -477,7 +492,9 @@ A conforming implementation SHOULD:
 - Treat connection tokens as secrets and avoid logging raw token values.
 - Apply least-privilege permission rules and avoid broad allow-all configurations unless operationally justified.
 - Preserve auditable denial logs for policy and incident review.
-- Restrict event persistence to non-ephemeral events (as defined above) and avoid writing sensitive transient state to durable storage.
+- Restrict event persistence to non-ephemeral events and the explicit accounting,
+  conversation-delta, and workflow lifecycle exceptions in Section 3.3; avoid
+  writing other sensitive transient state to durable storage.
 - Not attempt to read, fall back to, or check for platform authentication tokens (`GITHUB_TOKEN`, `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`). These tokens are not present in the driver subprocess environment by design. Attempting to use them would fail silently or cause unexpected behavior.
 
 ---

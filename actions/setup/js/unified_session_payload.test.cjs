@@ -14,6 +14,18 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it.each([401, 503, 0, null])("retains observed session-error status codes through projection and schema validation (%s)", statusCode => {
+    const source = { type: "session.error", data: { errorType: "provider", message: "Observed failure.", statusCode, opaque: "PRIVATE_ERROR_CONTEXT" } };
+    const original = structuredClone(source);
+    const [event] = mergeSessionSources([{ component: "agent", phase: "agent", path: "errors.jsonl", events: [source] }]);
+    expect(event.data).toEqual({ errorType: "provider", message: "Observed failure.", statusCode });
+    expect(normalizeUnifiedSessionEvent(event).data).toEqual(event.data);
+    const validate = createSessionValidator("unified").event;
+    expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    expect(normalizeUnifiedSessionEvent({ type: "session.error", data: { message: "No status observed." } }).data).not.toHaveProperty("statusCode");
+    expect(source).toEqual(original);
+  });
+
   it("retains declared partial-input and per-step usage evidence", () => {
     const events = [
       { type: "tool.execution_start", data: { sessionId: "session", stepIndex: 0, toolName: "bash", input: { command: "preview..." }, inputTruncated: true } },
@@ -249,7 +261,7 @@ describe("essential unified session payloads", () => {
   it.each([
     ["tool.execution_start", { toolCallId: "call", parameters: false, input: 0, command: "", text: "duplicate" }, { toolCallId: "call", input: 0, command: "" }],
     ["tool.execution_start", { toolName: "bash", arguments: { command: "cat restricted-file" } }, { toolName: "bash", input: { command: "cat restricted-file" } }],
-    ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, isError: true, durationMs: 0, exitCode: 1 }],
+    ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, result: false, isError: true, durationMs: 0, exitCode: 1 }],
     ["tool.execution_complete", { toolCallId: "declined", status: "declined", exit_code: null }, { toolCallId: "declined", status: "declined", exitCode: null }],
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
     ["firewall.http_access", { domain: "example.com", http_status: 0, squid_request_status: "DENIED", credentials: "omit" }, { host: "example.com", status: 0, decision: "DENIED" }],
