@@ -114,7 +114,7 @@ function normalizeSubmitParameters(parameters, policy, at, state) {
   integer(at, 0, Number.MAX_SAFE_INTEGER, "submission timestamp");
   return {
     nodes: parameters.nodes.map(node => {
-      closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "depends_on", "subject", "backing_issue", "replacement_of"], "submitted Work");
+      closed(node, ["payload"], ["graph_id", "node_key", "work_id", "pool", "priority", "fairness_key", "worker_profile", "logical_contract", "execution_ref", "depends_on", "subject", "backing_issue", "replacement_of"], "submitted Work");
       const graphId = Object.hasOwn(node, "graph_id") ? identity(node.graph_id, "graph ID") : digest(node.payload);
       const nodeKey = Object.hasOwn(node, "node_key") ? identity(node.node_key, "node key") : "root";
       const poolName = node.pool === undefined ? "default" : node.pool;
@@ -123,6 +123,10 @@ function normalizeSubmitParameters(parameters, policy, at, state) {
       const profile = pool.profiles[profileName];
       if (!profile) throw new Error("work_queue_profile_not_approved");
       const workId = nodeId(graphId, nodeKey);
+      const existing = state?.works.get(workId);
+      const revision = node.execution_ref === undefined || node.execution_ref === profile.ref ? profile : state?.deployments?.get(poolName)?.get(profileName)?.revisions[node.execution_ref]?.profile;
+      if (!revision) throw new Error("work_queue_execution_pin_not_registered");
+      const contract = node.logical_contract ?? existing?.logical_contract ?? revision.logical_contract;
       if (node.work_id !== undefined && node.work_id !== workId) throw new Error("work_queue_work_identity_invalid");
       return {
         kind: "Work",
@@ -134,6 +138,8 @@ function normalizeSubmitParameters(parameters, policy, at, state) {
         fairness_key: node.fairness_key === undefined ? "" : node.fairness_key,
         worker_profile: profileName,
         batch_trust_domain: profile.trust_domain,
+        ...(contract ? { logical_contract: contract } : {}),
+        ...(node.execution_ref === undefined ? {} : { execution_ref: node.execution_ref }),
         payload: node.payload,
         depends_on: node.depends_on === undefined ? [] : node.depends_on,
         enqueued: state?.works.get(workId)?.enqueued ?? at,

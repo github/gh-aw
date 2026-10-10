@@ -4,5 +4,46 @@
     "action_failure_issue_expires": 12,
     "label_triggers": true
   },
-  "utc": "-08:00"
+  "utc": "-08:00",
+  "work_queue": {
+    "concurrency": 3,
+    "pending_limit": 30,
+    "retry": { "max_attempts": 3, "backoff_seconds": 30 },
+    "issues": { "label": "work" },
+    "accounting_weights": {
+      "": 1,
+      "daily-compiler-quality": 1,
+      "daily-evals-report": 1,
+      "daily-firewall-report": 1,
+      "daily-issues-report": 1,
+      "daily-observability-report": 1,
+      "daily-regulatory": 1,
+      "daily-repo-chronicle": 1,
+      "daily-secrets-analysis": 1,
+      "daily-team-evolution-insights": 1,
+      "daily-token-consumption-report": 1,
+      "deep-report": 1,
+      "artifacts-summary": 1,
+      "repo-tree-map": 1,
+      "agy": 1,
+      "aider": 1,
+      "claude": 1,
+      "codex": 1,
+      "copilot": 1,
+      "crush": 1,
+      "cursor": 1,
+      "deepseek-harness": 1,
+      "gemini": 1,
+      "goose": 1,
+      "kiro": 1,
+      "opencode": 1,
+      "pi": 1,
+      "pydantic-ai": 1
+    },
+    "pools": {
+      "default": {},
+      "daily-reports": { "concurrency": 3, "per_account_limit": 1 },
+      "engine-conformance": { "concurrency": 3, "per_account_limit": 1 }
+    }
+  }
 }

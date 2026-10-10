@@ -1,0 +1,102 @@
+{
+  "$defs": {
+    "ClaimBound": {
+      "maximum": 16,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "DeploymentOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "activate": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "expected_contract": {
+          "$ref": "#/$defs/Digest"
+        },
+        "expected_ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "kind": {
+          "const": "Deployment"
+        },
+        "pool": {
+          "$ref": "#/$defs/Identity"
+        },
+        "profile": {
+          "$ref": "#/$defs/WorkerProfile"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "worker_profile": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "pool", "worker_profile", "expected_ref", "expected_contract", "profile", "available", "reason"],
+      "type": "object"
+    },
+    "Digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "ReasonCode": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+      "type": "string"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "WorkerProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effect_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "logical_contract": {
+          "$ref": "#/$defs/Digest"
+        },
+        "max_claims": {
+          "$ref": "#/$defs/ClaimBound"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "share_keys": {
+          "type": "boolean"
+        },
+        "trust_domain": {
+          "$ref": "#/$defs/Identity"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["workflow", "ref", "trust_domain", "credential_scope", "effect_scope", "max_claims", "share_keys"],
+      "type": "object"
+    }
+  },
+  "$id": "DeploymentOperation.json",
+  "$ref": "#/$defs/DeploymentOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeploymentOperation"
+}

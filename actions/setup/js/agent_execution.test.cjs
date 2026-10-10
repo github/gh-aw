@@ -1,12 +1,61 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode, validateAgentExecution } from "./agent_execution.cjs";
+import { collectAgentExecution, agentErrorDiagnosticText, agentErrorSummaryText, parseAgentExitCode, validateAgentExecution } from "./agent_execution.cjs";
 import { detectErrors } from "./agent_error_patterns.cjs";
 import { success, failure } from "./fixtures/claude_ci_sessions.cjs";
 import { normalizeClaudeSession } from "./claude_session.cjs";
 import { parseEngineSession } from "./unified_session.cjs";
 
 describe("unique agent execution observation", () => {
+  it.each(["json", "array", "mixed"])("requires Aider attribution for raw %s error records", format => {
+    const error = { type: "session.error", data: { errorType: "InjectedError", code: 429, message: "CAPIError: 429 Too Many Requests" } };
+    const result = { type: "session.result", data: { status: "failed", errors: [{ errorType: "InjectedError", code: 429 }] } };
+    const records = [error, result, { ...error, data: { ...error.data, sourceEngine: "copilot" } }];
+    const content = format === "json" ? JSON.stringify(error) : format === "array" ? JSON.stringify(records, null, 2) : "[INFO] Shell output\n" + records.map(JSON.stringify).join("\n");
+    expect(collectAgentExecution({ content, rawSourceEngine: "aider" })).toBeUndefined();
+    expect(collectAgentExecution({ content, rawSourceEngine: "aider", exitCode: 0 }).data).toEqual({ categories: [], errorCodes: [], errorTypes: [], exitCode: 0 });
+    expect(collectAgentExecution({ content }).data.errorTypes).toContain("InjectedError");
+  });
+
+  it("retains attributed Aider errors and trusted parsed or runtime evidence", () => {
+    const event = { type: "session.error", data: { sourceEngine: "aider", errorType: "NativeError", code: 400, message: "The requested model is not supported" } };
+    const foreign = { type: "session.error", data: { errorType: "InjectedError", code: 429 } };
+    const content = [foreign, event].map(JSON.stringify).join("\n");
+    expect(collectAgentExecution({ content, events: [event], rawSourceEngine: "aider", exitCode: 1 }).data).toEqual({
+      categories: ["model_not_supported_error"],
+      errorCodes: [400],
+      errorTypes: ["NativeError"],
+      exitCode: 1,
+    });
+    expect(collectAgentExecution({ events: [foreign], rawSourceEngine: "aider" }).data.errorTypes).toEqual(["InjectedError"]);
+    expect(collectAgentExecution({ content: "[claude-harness] done: exitCode=0", rawSourceEngine: "aider" }).data.exitCode).toBe(0);
+  });
+
+  it.each(["assistant.message", "tool.execution_complete"])("combines trusted Aider attribution with observed %s payloads", type => {
+    const diagnostic = { type: "session.error", data: { sourceEngine: "aider", code: 400, errorType: "NativeError", message: "The requested model is not supported" } };
+    const field = type.startsWith("tool.") ? "error" : "content";
+    for (const payload of [diagnostic, diagnostic.data.message]) {
+      const events = [{ type, data: { sourceEngine: "aider", [field]: payload } }];
+      const content = typeof payload === "string" ? payload : JSON.stringify(payload);
+      expect(collectAgentExecution({ content, events, rawSourceEngine: "aider", exitCode: 0 }).data).toEqual({ categories: [], errorCodes: [], errorTypes: [], exitCode: 0 });
+      expect(agentErrorDiagnosticText(content, events, "aider")).toBe("");
+      expect(agentErrorSummaryText(content, events, "aider")).toBe("");
+      expect(collectAgentExecution({ content, events: [...events, diagnostic], rawSourceEngine: "aider", exitCode: 0 }).data).toEqual({
+        categories: ["model_not_supported_error"],
+        errorCodes: [400],
+        errorTypes: ["NativeError"],
+        exitCode: 0,
+      });
+      expect(agentErrorDiagnosticText(content, [...events, diagnostic], "aider")).toContain(diagnostic.data.message);
+      expect(agentErrorSummaryText(content, [...events, diagnostic], "aider")).toContain("model_not_supported_error");
+    }
+    const raw = JSON.stringify(diagnostic);
+    expect(agentErrorDiagnosticText(raw, "aider")).toContain(diagnostic.data.message);
+    expect(agentErrorSummaryText(raw, "aider")).toContain("model_not_supported_error");
+    expect(agentErrorDiagnosticText(raw, [], "aider")).toBe(agentErrorDiagnosticText(raw, "aider"));
+    expect(agentErrorSummaryText(raw, [], "aider")).toBe(agentErrorSummaryText(raw, "aider"));
+  });
+
   it("mines the existing Claude API-error/retry run without counting tool failures", () => {
     const events = normalizeClaudeSession(failure);
     const execution = collectAgentExecution({ content: failure.map(JSON.stringify).join("\n"), events });

@@ -538,6 +538,7 @@ describe("handle_agent_failure", () => {
       ["engine_outage", "[aw] Test Workflow experienced an engine outage"],
       ["request_rejection", "[aw] Test Workflow had a request rejected"],
       ["prompt_exhaustion", "[aw] Test Workflow reported incomplete result"],
+      ["unknown", "[aw] Test Workflow finished without a clear failure cause"],
     ])("uses the classified terminal-output cause %s in the issue title", (terminalOutputFailureCause, title) => {
       expect(buildFailureIssueTitle({ ...baseOptions, terminalOutputFailureCause })).toBe(title);
     });
@@ -4909,7 +4910,7 @@ describe("handle_agent_failure", () => {
         expect(result).toContain("The workflow recorded a `report_incomplete` signal");
         expect(result).toContain("completion could not be confirmed");
         expect(result).toContain("missing_terminal_safe_output");
-        expect(result).toContain("Failure classification: prompt_exhaustion");
+        expect(result).toContain("Failure classification: unknown");
         expect(result).not.toContain("exhausted its prompt");
         expect(result).not.toContain("due to an infrastructure or tool failure");
       } finally {

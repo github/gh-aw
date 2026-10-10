@@ -16,7 +16,11 @@ function transactionAt(state, ordinal) {
 function assertProjectionAuthority(state, actor, workId, ref, repository, claimId) {
   const work = state.works.get(workId);
   if (!work || actor.role !== "projector" || !actor.workflow || !actor.run_id || !actor.run_attempt) throw queueError("projection_unauthorized", "projection requires an authenticated originating run");
+  const awOwned = state.policy.authorization === "aw" && !work.backing_issue && repository === state.repository && actor.repository === state.repository;
+  if (awOwned && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(ref) || !actor.workflow.startsWith(".github/workflows/") || !actor.workflow.endsWith(".lock.yml") || actor.workflow.includes("..")))
+    throw queueError("projection_unauthorized", "AW Issue projection requires an immutable compiled originating workflow");
   if (
+    !awOwned &&
     !state.policy.projectors?.some(
       rule =>
         rule.principal === actor.principal &&
@@ -50,7 +54,8 @@ function assertProjectionAuthority(state, actor, workId, ref, repository, claimI
       throw queueError("projection_unauthorized", "projection is outside the original authenticated Claims");
   } else {
     const admission = state.workCreators?.get(workId);
-    if (!admission || ["principal", "repository", "workflow", "run_id", "run_attempt"].some(field => admission[field] !== actor[field])) throw queueError("projection_unauthorized", "projection is outside this run's checked admissions");
+    if (!admission || (awOwned && !["producer", "dispatcher", "worker"].includes(admission.role)) || ["principal", "repository", "workflow", "run_id", "run_attempt"].some(field => admission[field] !== actor[field]))
+      throw queueError("projection_unauthorized", "projection is outside this run's checked admissions");
   }
   return work;
 }

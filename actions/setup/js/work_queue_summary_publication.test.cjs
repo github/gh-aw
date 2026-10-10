@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 const { fakeGitHub, options } = require("./work_queue_store_checks.cjs");
-const { initializeWorkQueue, publishWorkQueueRequest } = require("./work_queue_store.cjs");
+const { publishWorkQueueRequest } = require("./work_queue_store.cjs");
+const { defaultPolicy } = require("./work_queue_policy.cjs");
 const { newRequest, replayTransactions } = require("./work_queue_replay.cjs");
-const { administrator, context, dispatcher, genesis, operationCommit, producer, submission } = require("./work_queue_test_helpers.cjs");
+const { administrator, dispatcher, genesis, operationCommit, producer, submission } = require("./work_queue_test_helpers.cjs");
 
 function summaryCore() {
   const summary = { addRaw: vi.fn(), write: vi.fn().mockResolvedValue(undefined) };
@@ -24,17 +25,17 @@ describe("queue publication step summaries", () => {
       expect(markdown).toContain(replayTransactions(fake.log()).tip.slice(0, 24));
       return core.summary;
     });
-    await initializeWorkQueue({ githubClient: fake.githubClient, owner: "owner", repo: "repo", context: context(administrator), core });
-    const nodes = submission(fake.log(), ["admitted-node"]).operations;
-    const admitted = await publishWorkQueueRequest(options(fake, newRequest("admit-summary", "submit", producer, { nodes }), producer, { core }));
+    const policy = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: fake.state.defaultRevision });
+    const nodes = submission([genesis(policy)], ["admitted-node"]).operations;
+    const admitted = await publishWorkQueueRequest(options(fake, newRequest("admit-summary", "submit", producer, { nodes }), producer, { core, policyProposal: policy }));
     expect(admitted.publishedNow).toBe(true);
-    expect(core.summary.addRaw.mock.calls[1][0]).toContain("### Work queue admission");
-    expect(core.summary.addRaw.mock.calls[1][0]).toContain("<code>admitted-node</code>");
+    expect(core.summary.addRaw.mock.calls[0][0]).toContain("### Work queue admission");
+    expect(core.summary.addRaw.mock.calls[0][0]).toContain("<code>admitted-node</code>");
     const control = newRequest("control-summary", "control", administrator, { operations: [{ kind: "Control", control: "grants_paused", value: true, reason: "maintenance" }] });
     const updated = await publishWorkQueueRequest(options(fake, control, administrator, { core }));
     expect(updated.publishedNow).toBe(true);
-    expect(core.summary.addRaw.mock.calls[2][0]).toContain("<code>control</code>");
-    expect(core.summary.write).toHaveBeenCalledTimes(3);
+    expect(core.summary.addRaw.mock.calls[1][0]).toContain("<code>control</code>");
+    expect(core.summary.write).toHaveBeenCalledTimes(2);
     expect(core.warning).not.toHaveBeenCalled();
   });
 

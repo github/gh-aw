@@ -16,8 +16,8 @@ if [[ ! "$TRACE_DEPTH" =~ ^[1-9][0-9]*$ || ! "$TRACE_COUNT" =~ ^[1-9][0-9]*$ ]];
 fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RESULTS_DIR="${TLC_RESULTS_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/work-queue-traces.XXXXXX")}"
-mkdir -p "$RESULTS_DIR"
+RESULTS_DIR="${TLC_RESULTS_DIR:-$SPEC_DIR/../../.queue-validation-cache/traces-$(date +%Y%m%d-%H%M%S)-$$}"
+mkdir -p "$RESULTS_DIR/java"
 RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 
 hash_file() {
@@ -32,13 +32,17 @@ hash_file() {
 }
 
 capture_sources() {
-    for model in WorkQueue FairWorkQueue ClaimScopedWorker QueueService QueueLifecycle; do
+    for model in WorkQueue FairWorkQueue ClaimScopedWorker QueueService QueueLifecycle QueueBootstrap WorkerEvolution; do
         hash_file "$SPEC_DIR/$model.tla"
     done
     for config in WorkQueue FairBatch FairDAGGitHub ClaimScopeMixed ServiceDynamic LifecyclePacked \
                   CompetingClaimsWitness RecoveryWitness ExternalEffectWitness WeakOrderingWitness \
                   PartialCompletionWitness MixedClaimDAGWitness LifecycleMixedDAGWitness \
-                  LifecycleActivationWitness LifecycleConflictWitness; do
+                  LifecycleActivationWitness LifecycleConflictWitness \
+                  BootstrapEmpty BootstrapTrustedAWWitness WorkerEvolution \
+                  EvolutionCompatibleWitness EvolutionPinWitness \
+                  EvolutionIncompatibleWitness EvolutionUnavailableWitness \
+                  EvolutionCompletionWitness EvolutionRaceWitness; do
         hash_file "$SPEC_DIR/$config.cfg"
     done
     hash_file "$SPEC_DIR/check.sh"
@@ -55,9 +59,11 @@ for entry in "WorkQueue WorkQueue simulation" \
              "FairWorkQueue FairDAGGitHub FairDAGGitHub" \
              "ClaimScopedWorker ClaimScopeMixed ClaimScopeMixed" \
              "QueueService ServiceDynamic ServiceDynamic" \
-             "QueueLifecycle LifecyclePacked LifecyclePacked"; do
+             "QueueLifecycle LifecyclePacked LifecyclePacked" \
+             "QueueBootstrap BootstrapEmpty BootstrapEmpty" \
+             "WorkerEvolution WorkerEvolution WorkerEvolution"; do
     read -r model config prefix <<<"$entry"
-    "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
+    "$JAVA_BIN" -Djava.io.tmpdir="$RESULTS_DIR/java" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
         -workers 1 -seed 1 -fp 0 -simulate "file=$RESULTS_DIR/$prefix,num=$TRACE_COUNT" \
         -depth "$TRACE_DEPTH" -config "$SPEC_DIR/$config.cfg" \
         -metadir "$RESULTS_DIR/$prefix-meta" "$SPEC_DIR/$model.tla" \
@@ -80,7 +86,7 @@ for entry in "CompetingClaimsWitness NoCompetingClaims" \
              "WeakOrderingWitness NoOutOfOrderClaim"; do
     read -r config invariant <<<"$entry"
     status=0
-    "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
+    "$JAVA_BIN" -Djava.io.tmpdir="$RESULTS_DIR/java" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
         -workers 1 -seed 1 -fp 0 -config "$SPEC_DIR/$config.cfg" \
         -metadir "$RESULTS_DIR/$config" "$SPEC_DIR/WorkQueue.tla" \
         >"$RESULTS_DIR/$config.log" 2>&1 || status=$?
@@ -96,7 +102,14 @@ for entry in "FairWorkQueue PartialCompletionWitness" \
              "ClaimScopedWorker MixedClaimDAGWitness" \
              "QueueLifecycle LifecycleMixedDAGWitness" \
              "QueueLifecycle LifecycleActivationWitness" \
-             "QueueLifecycle LifecycleConflictWitness"; do
+             "QueueLifecycle LifecycleConflictWitness" \
+             "QueueBootstrap BootstrapTrustedAWWitness" \
+             "WorkerEvolution EvolutionCompatibleWitness" \
+             "WorkerEvolution EvolutionPinWitness" \
+             "WorkerEvolution EvolutionIncompatibleWitness" \
+             "WorkerEvolution EvolutionUnavailableWitness" \
+             "WorkerEvolution EvolutionCompletionWitness" \
+             "WorkerEvolution EvolutionRaceWitness"; do
     read -r model config <<<"$entry"
     TLC_MODEL_FILTER="$model" TLC_CONFIG_FILTER="$config" \
         TLC_RESULTS_DIR="$RESULTS_DIR/current-witnesses" \
@@ -110,7 +123,7 @@ if ! cmp -s "$RESULTS_DIR/sources-before.sha256" "$RESULTS_DIR/sources-after.sha
 fi
 
 echo "Historical simulation traces (at most $TRACE_DEPTH states, $TRACE_COUNT traces): $RESULTS_DIR/simulation_*"
-echo "Current abstraction traces: $RESULTS_DIR/{FairBatch,FairDAGGitHub,ClaimScopeMixed,ServiceDynamic,LifecyclePacked}_*"
+echo "Current abstraction traces: $RESULTS_DIR/{FairBatch,FairDAGGitHub,ClaimScopeMixed,ServiceDynamic,LifecyclePacked,BootstrapEmpty,WorkerEvolution}_*"
 echo "Textual counterexample reports: $RESULTS_DIR/*Witness.log"
 echo "Current guarded witness reports: $RESULTS_DIR/current-witnesses/*Witness.log"
 echo "Source/tool hashes and execution settings: $RESULTS_DIR"

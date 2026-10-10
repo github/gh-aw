@@ -7,7 +7,8 @@ import { normalizeSubmitParameters, normalizeDispatchParameters } from "./work_q
 import { newState, newRequest, generateRequestOperations, replayTransactions } from "./work_queue_replay.cjs";
 
 const options = { repository: "owner/repo", repositoryId: "7", date: "2026-10-09" };
-const policyOptions = { repository: options.repository, ref: "a".repeat(40), producerPrincipal: "11", workerPrincipal: "12" };
+const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
+const policyOptions = { repository: options.repository, ref: "a".repeat(40), settings };
 
 describe("engine conformance queue portfolio", () => {
   it("selects supported engines first, recent changes next and eventually covers every engine", () => {
@@ -39,10 +40,12 @@ describe("engine conformance queue portfolio", () => {
     const plan = buildEngineConformancePlan(options);
     const policy = buildEngineConformancePolicy(policyOptions);
     expect(validatePolicy(policy)).toEqual(policy);
-    expect(Object.keys(policy.pools[POOL].profiles)).toEqual(ENGINES);
+    expect(Object.keys(policy.pools[POOL].profiles).sort()).toEqual(ENGINES.map(engine => `engine-conformance-${engine}`).sort());
+    expect(policy.authorization).toBe("aw");
+    expect(policy.producers).toEqual({});
     expect(policy.pools[POOL]).toMatchObject({ logical_limit: 3, native_limit: 3, per_account_limit: 1 });
     expect(plan.dispatch).toEqual({ pool: POOL, max_claims: 3, max_dispatches: 3 });
-    expect(plan.nodes.every(node => node.payload.effect_contract.kind === "none" && node.worker_profile === node.payload.engine)).toBe(true);
+    expect(plan.nodes.every(node => node.payload.effect_contract.kind === "none" && node.worker_profile === `engine-conformance-${node.payload.engine}`)).toBe(true);
     let state = newState();
     const transactions = [];
     let at = 1000;

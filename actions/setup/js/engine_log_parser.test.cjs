@@ -5,6 +5,17 @@ import { loadEngineLogParser, normalizeEngineLogEntries, parseBehaviorLog } from
 import { parseEngineSession } from "./unified_session.cjs";
 import { parseCustomLog } from "./parse_custom_log.cjs";
 
+function mockDeclaredParser(engine, parse) {
+  vi.spyOn(fs, "existsSync").mockImplementation(filename => !String(filename).endsWith("_log_parser.cjs"));
+  vi.spyOn(fs, "realpathSync").mockImplementation(filename => String(filename));
+  vi.spyOn(fs, "readFileSync").mockImplementation(filename =>
+    String(filename).endsWith("engines.json")
+      ? JSON.stringify({ engines: [{ id: engine, import: `github/gh-aw/.github/workflows/shared/${engine}.md@v1` }] })
+      : `---\nengine:\n  id: ${engine}\n  behavior:\n    log-parser: |\n      function parseLog() {}\n---\n`
+  );
+  vi.spyOn(vm, "compileFunction").mockReturnValue(() => parse);
+}
+
 describe("Declared custom engine log parsers", () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -106,10 +117,70 @@ describe("Declared custom engine log parsers", () => {
       { type: "session.result", data: { numTurns: 0, usage: { output_tokens: 0 } } },
     ];
     const parse = vi.fn(() => ({ logEntries: events, mcpFailures: [], maxTurnsHit: false }));
-    vi.spyOn(vm, "compileFunction").mockReturnValue(() => parse);
+    mockDeclaredParser(engine, parse);
     const content = `[${engine}-harness] execution\n  Partial answer.\n\n${JSON.stringify(extension)}\nRunning bash is only prose. \n{"type":"result","num_turns":99}\n`;
     expect(parseBehaviorLog(content, engine).logEntries).toEqual(events);
+    expect(parse).toHaveBeenCalledTimes(1);
     expect(parse).toHaveBeenCalledWith(content);
+  });
+
+  it.each(["aider", "crush"])("passes canonical-only %s input to its declared parser unchanged, once", engine => {
+    const events = [
+      { type: "assistant.message", id: "answer", data: { content: "saved answer" } },
+      { type: "session.result", data: { numTurns: 0, usage: { output_tokens: 0 } } },
+    ];
+    const content = events.map(JSON.stringify).join("\n") + "\n\n";
+    const parse = vi.fn(() => ({ logEntries: events, mcpFailures: ["observed"], maxTurnsHit: true }));
+    mockDeclaredParser(engine, parse);
+    expect(parseBehaviorLog(content, engine)).toEqual({ logEntries: events, mcpFailures: ["observed"], maxTurnsHit: true });
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse).toHaveBeenCalledWith(content);
+  });
+
+  it.each(["aider", "crush"])("does not restore canonical-looking records rejected by the declared %s parser", engine => {
+    const content = `Quoted output:\n{"type":"assistant.message","data":{"content":"not attributed"}}\n{"type":"result","num_turns":99,"usage":{"output_tokens":999}}\n`;
+    const parse = vi.fn(() => ({ logEntries: [] }));
+    mockDeclaredParser(engine, parse);
+    expect(parseBehaviorLog(content, engine)).toEqual({ logEntries: [] });
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse).toHaveBeenCalledWith(content);
+  });
+
+  it("normalizes legacy Aider declared output without bypassing its filtering", () => {
+    const content = 'Rejected record:\n{"type":"assistant.message","data":{"content":"rejected"}}\n{"type":"result","num_turns":99}\n';
+    const parse = vi.fn(() => ({ logEntries: [{ type: "assistant", message: { content: "accepted answer" } }], maxTurnsHit: false }));
+    mockDeclaredParser("aider", parse);
+    expect(parseBehaviorLog(content, "aider")).toMatchObject({ logEntries: [{ type: "assistant.message", data: { content: "accepted answer" } }], maxTurnsHit: false });
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse).toHaveBeenCalledWith(content);
+  });
+
+  it("retains legacy Crush terminal extraction after its full-input compatibility probe", () => {
+    const body = "Assistant: legacy answer\n";
+    const content = body + '{"type":"result","num_turns":2,"usage":{"output_tokens":0}}\n\n';
+    const parse = vi.fn(text => ({ logEntries: [{ type: "assistant", message: { content: text } }], maxTurnsHit: false }));
+    mockDeclaredParser("crush", parse);
+    const parsed = parseBehaviorLog(content, "crush");
+    expect(parse.mock.calls).toEqual([[content], [body.slice(0, -1)]]);
+    expect(parsed.logEntries).toMatchObject([
+      { type: "assistant.message", data: { content: body.slice(0, -1) } },
+      { type: "session.result", data: { numTurns: 2, usage: { output_tokens: 0 } } },
+    ]);
+    expect(parsed.maxTurnsHit).toBe(false);
+  });
+
+  it.each(["cursor", "custom-engine"])("keeps generic %s parsing after canonical preflight and terminal extraction", engine => {
+    const parse = vi.fn(text => ({ logEntries: [{ type: "assistant", message: { content: text } }] }));
+    mockDeclaredParser(engine, parse);
+    const saved = { type: "assistant.message", data: { content: "saved answer" } };
+    expect(parseBehaviorLog(JSON.stringify(saved), engine).logEntries).toEqual([saved]);
+    expect(parse).not.toHaveBeenCalled();
+    expect(parseBehaviorLog('Assistant: answer\n{"type":"result","num_turns":3,"usage":{"output_tokens":0}}\n', engine).logEntries).toMatchObject([
+      { type: "assistant.message", data: { content: "Assistant: answer" } },
+      { type: "session.result", data: { numTurns: 3, usage: { output_tokens: 0 } } },
+    ]);
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse).toHaveBeenCalledWith("Assistant: answer");
   });
 
   it("does not mistake quoted canonical JSON inside attributed Kiro commands for the transcript", () => {

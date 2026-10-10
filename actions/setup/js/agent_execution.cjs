@@ -83,9 +83,10 @@ function isAgentDiagnosticLine(line) {
  * an error signature. A source-prefixed runtime line restores attribution.
  * @param {string} content
  * @param {SessionEvent[]} [events]
+ * @param {string} [rawSourceEngine] Required attribution for raw structured errors.
  * @returns {{diagnostics: string[], errors: any[]}}
  */
-function collectAgentErrorEvidence(content, events = []) {
+function collectAgentErrorEvidence(content, events = [], rawSourceEngine) {
   const diagnostics = [];
   const errors = [];
   let conversationEvents = events;
@@ -131,6 +132,11 @@ function collectAgentErrorEvidence(content, events = []) {
   if (conversationTexts.has(conversationKey(content))) return { diagnostics, errors };
   /** @param {unknown} record */
   const recordEvidence = record => {
+    if (rawSourceEngine !== undefined) {
+      if (!record || typeof record !== "object" || !("data" in record)) return [];
+      const data = record.data;
+      if (!data || typeof data !== "object" || !("sourceEngine" in data) || data.sourceEngine !== rawSourceEngine) return [];
+    }
     const evidence = recordErrors(record);
     return evidence.length && conversationDocuments.size && conversationDocuments.has(conversationDocumentKey(record)) ? [] : evidence;
   };
@@ -180,9 +186,16 @@ function collectAgentErrorEvidence(content, events = []) {
   return { diagnostics, errors };
 }
 
-/** @param {string} content @param {SessionEvent[]} [events] @returns {string} */
-function agentErrorDiagnosticText(content, events = []) {
-  const { diagnostics, errors } = collectAgentErrorEvidence(content, events);
+/**
+ * @param {string} content
+ * @param {SessionEvent[] | string} [eventsOrSourceEngine]
+ * @param {string} [rawSourceEngine]
+ * @returns {string}
+ */
+function agentErrorDiagnosticText(content, eventsOrSourceEngine = [], rawSourceEngine) {
+  const events = Array.isArray(eventsOrSourceEngine) ? eventsOrSourceEngine : [];
+  const sourceEngine = typeof eventsOrSourceEngine === "string" ? eventsOrSourceEngine : rawSourceEngine;
+  const { diagnostics, errors } = collectAgentErrorEvidence(content, events, sourceEngine);
   return [...diagnostics, ...collectNativeErrorEvidence([...events.flatMap(recordErrors), ...errors]).diagnostics].join("\n");
 }
 
@@ -211,11 +224,14 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
 /**
  * Preserve actionable error classes without publishing raw log lines or payloads.
  * @param {string} content
- * @param {SessionEvent[]} [events]
+ * @param {SessionEvent[] | string} [eventsOrSourceEngine]
+ * @param {string} [rawSourceEngine]
  * @returns {string}
  */
-function agentErrorSummaryText(content, events = []) {
-  const execution = collectAgentExecution({ content, events });
+function agentErrorSummaryText(content, eventsOrSourceEngine = [], rawSourceEngine) {
+  const events = Array.isArray(eventsOrSourceEngine) ? eventsOrSourceEngine : [];
+  const sourceEngine = typeof eventsOrSourceEngine === "string" ? eventsOrSourceEngine : rawSourceEngine;
+  const execution = collectAgentExecution({ content, events, rawSourceEngine: sourceEngine });
   return (execution?.data.categories || [])
     .filter(category => Object.hasOwn(ENGINE_ERROR_SUMMARIES, category))
     .map(category => `Engine error: ${ENGINE_ERROR_SUMMARIES[category]} (${category})`)
@@ -267,12 +283,12 @@ function collectNativeErrorEvidence(errors) {
 /**
  * One observation summarizes all attempts; it is not a claim of final failure.
  * Persisted detector categories are authoritative, including timeout-only evidence.
- * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[]}} [options]
+ * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[], rawSourceEngine?: string}} [options]
  * @returns {import("./types/agent_session").AgentExecutionEvent | undefined}
  */
-function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [] } = {}) {
+function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [], rawSourceEngine } = {}) {
   const categorySet = new Set(categories);
-  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content, events);
+  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content, events, rawSourceEngine);
   const errors = [...events.flatMap(recordErrors), ...rawErrors];
   const { diagnostics: nativeDiagnostics, codes, types } = collectNativeErrorEvidence(errors);
   let observedExit = exitCode;
