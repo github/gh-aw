@@ -11,6 +11,27 @@ const scheduler = require("../../actions/setup/js/work_queue_scheduler.cjs");
 const policy = require("../../actions/setup/js/work_queue_policy.cjs");
 const limits = require("../../actions/setup/js/work_queue_limits.cjs");
 
+function readLedgerFile(file) {
+  const maxBytes = 80 * 1024 * 1024;
+  const fd = fs.openSync(file, "r");
+  try {
+    if (fs.fstatSync(fd).size > maxBytes) throw new Error("resource_limit: adapter input exceeds 80 MiB");
+    const chunks = [];
+    let total = 0;
+    while (total <= maxBytes) {
+      const buffer = Buffer.alloc(Math.min(64 * 1024, maxBytes + 1 - total));
+      const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, total);
+      if (bytesRead === 0) break;
+      total += bytesRead;
+      if (total > maxBytes) throw new Error("resource_limit: adapter input exceeds 80 MiB");
+      chunks.push(buffer.subarray(0, bytesRead));
+    }
+    return Buffer.concat(chunks, total).toString("utf8");
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function execute(input) {
   if (input.action === "typed_number_literal") {
     if (typeof input.literal !== "string" || !/^(?:NaN|[+-]Infinity|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$/.test(input.literal)) {
@@ -63,8 +84,7 @@ function execute(input) {
   }
   let data = input.data;
   if (input.ledger_file) {
-    if (fs.statSync(input.ledger_file).size > 80 * 1024 * 1024) throw new Error("resource_limit: adapter input exceeds 80 MiB");
-    data = fs.readFileSync(input.ledger_file, "utf8");
+    data = readLedgerFile(input.ledger_file);
   }
   let start = performance.now();
   const commits = queue.parseTransactionLog(data);
@@ -104,11 +124,15 @@ function execute(input) {
   return result;
 }
 
-const lines = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-lines.on("line", line => {
-  try {
-    process.stdout.write(`${JSON.stringify(execute(JSON.parse(line)))}\n`);
-  } catch (error) {
-    process.stdout.write(`${JSON.stringify({ error: error.message })}\n`);
-  }
-});
+if (require.main === module) {
+  const lines = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+  lines.on("line", line => {
+    try {
+      process.stdout.write(`${JSON.stringify(execute(JSON.parse(line)))}\n`);
+    } catch (error) {
+      process.stdout.write(`${JSON.stringify({ error: error.message })}\n`);
+    }
+  });
+}
+
+module.exports = { readLedgerFile };

@@ -15,6 +15,36 @@ function writeJSON(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function readFileDescriptor(fd, expectedPath) {
+  const { size } = fs.fstatSync(fd);
+  const buffer = Buffer.alloc(size);
+  let offset = 0;
+  while (offset < size) {
+    const bytesRead = fs.readSync(fd, buffer, offset, size - offset, offset);
+    if (bytesRead === 0) break;
+    offset += bytesRead;
+  }
+  if (expectedPath !== undefined) {
+    const original = fs.fstatSync(fd);
+    const current = fs.lstatSync(expectedPath);
+    if (!current.isFile() || current.dev !== original.dev || current.ino !== original.ino) {
+      throw new Error("TLC log path no longer identifies the opened evidence file");
+    }
+  }
+  return buffer.subarray(0, offset).toString("utf8");
+}
+
+function writeJSONToFileDescriptor(fd, value) {
+  const buffer = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+  fs.ftruncateSync(fd, 0);
+  let offset = 0;
+  while (offset < buffer.length) {
+    const bytesWritten = fs.writeSync(fd, buffer, offset, buffer.length - offset, offset);
+    if (bytesWritten === 0) throw new Error("Unable to make progress writing JSON evidence");
+    offset += bytesWritten;
+  }
+}
+
 function classify(exitCode, signal, timedOut, log) {
   if (timedOut) return "timed_out";
   if (exitCode === 0 && !signal && log.includes("Model checking completed. No error has been found.") && /(?:^|\n)\d+ states generated, \d+ distinct states found, 0 states left on queue\.(?:\r?\n|$)/.test(log)) return "passed";
@@ -162,8 +192,8 @@ async function runVerification(options) {
   fs.writeFileSync(path.join(bundleDir, "java-version.txt"), `${version.stdout || ""}${version.stderr || ""}`);
   const logPath = path.join(bundleDir, "tlc.log");
   const reservePath = path.join(outputDir, "result-space.reserve");
-  fs.writeFileSync(reservePath, Buffer.alloc(1024 * 1024));
-  const fd = fs.openSync(logPath, "w");
+  fs.writeFileSync(reservePath, Buffer.alloc(1024 * 1024), { flag: "wx", mode: 0o600 });
+  const fd = fs.openSync(logPath, "wx+", 0o600);
   let timedOut = false;
   let spawnError = null;
   /** @type {NodeJS.Timeout | undefined} */
@@ -191,14 +221,17 @@ async function runVerification(options) {
   });
   clearTimeout(timer);
   clearTimeout(killTimer);
-  fs.closeSync(fd);
   let log;
   let checkpoints;
   try {
-    log = fs.readFileSync(logPath, "utf8");
+    log = readFileDescriptor(fd, logPath);
     checkpoints = checkpointBundle(stateDir, bundleDir, options.checkpointMaxBytes ?? CHECKPOINT_MAX_BYTES, log.includes("Checkpointing completed"), env);
   } finally {
-    fs.unlinkSync(reservePath);
+    try {
+      fs.closeSync(fd);
+    } finally {
+      fs.unlinkSync(reservePath);
+    }
   }
   const finished = lastMatch(log, /(\d+) states generated, (\d+) distinct states found, (\d+) states left on queue\./g);
   const progress = lastMatch(log, /Progress\((\d+)\).*?: ([\d,]+) states generated.*?, ([\d,]+) distinct states found.*?, ([\d,]+) states left on queue\./g);
@@ -261,12 +294,30 @@ if (require.main === module) {
       console.error(`Formal verification collection failed: ${error.message}`);
       const outputDir = process.env.RESULTS_DIR || "";
       const resultPath = path.join(outputDir, "bundle", "result.json");
-      if (path.isAbsolute(outputDir) && path.resolve(outputDir) !== path.parse(outputDir).root && fs.existsSync(resultPath)) {
-        const result = JSON.parse(fs.readFileSync(resultPath, "utf8"));
-        writeJSON(resultPath, { ...result, status: "tool_error", exhausted: false, error: error.message, finished_at: new Date().toISOString() });
+      if (path.isAbsolute(outputDir) && path.resolve(outputDir) !== path.parse(outputDir).root) {
+        let resultFd;
+        try {
+          resultFd = fs.openSync(resultPath, "r+");
+        } catch (openError) {
+          if (!openError || openError.code !== "ENOENT") throw openError;
+        }
+        if (resultFd !== undefined) {
+          try {
+            const result = JSON.parse(readFileDescriptor(resultFd));
+            writeJSONToFileDescriptor(resultFd, {
+              ...result,
+              status: "tool_error",
+              exhausted: false,
+              error: error.message,
+              finished_at: new Date().toISOString(),
+            });
+          } finally {
+            fs.closeSync(resultFd);
+          }
+        }
       }
       process.exitCode = 1;
     });
 }
 
-module.exports = { TLC_SHA256, classify, inventory, checkpointBundle, runVerification };
+module.exports = { TLC_SHA256, classify, inventory, checkpointBundle, runVerification, readFileDescriptor, writeJSONToFileDescriptor };
