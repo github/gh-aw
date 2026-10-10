@@ -49,12 +49,14 @@ models:
 		engine, model, provider, overlay, input string
 	}{
 		{"codex", "gpt-6.1-sol", "openai", "", "2e-06"},
+		{"codex", "gpt-6-1-sol", "openai", "", "2e-06"},
 		{"codex", "openai/gpt-6.1-sol", "openai", "", "2e-06"},
 		{"copilot", "copilot/gpt-6.1-sol", "github-copilot", "", "2e-06"},
 		{"codex", "gpt-6.1-sol?effort=high", "openai", "", "2e-06"},
 		{"codex", "openai/gpt-6.1-sol?effort=high&temperature=0.2", "openai", "", "2e-06"},
 		{"copilot", "gpt-6.1-sol?temperature=0.2", "github-copilot", "", "2e-06"},
 		{"copilot", "copilot/gpt-6.1-sol?effort=high", "github-copilot", "", "2e-06"},
+		{"copilot", "copilot/gpt-6-1-sol?effort=high", "github-copilot", "", "2e-06"},
 		{"copilot", "github-copilot/gpt-6.1-sol?effort=high", "github-copilot", "", "2e-06"},
 		{"codex", "GPT_6_1_SOL", "openai", "", "2e-06"},
 		{"copilot", "copilot/GPT_6.1_SOL?effort=high", "github-copilot", "", "2e-06"},
