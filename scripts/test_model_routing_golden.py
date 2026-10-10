@@ -202,7 +202,7 @@ class ModelRoutingGoldenCaptureTest(unittest.TestCase):
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             for key, leaked in (
-                ("agentDescription", "PRIVATE_AGENT_DESCRIPTION"),
+                ("agentDescription", "prefix PRIVATE_AGENT_DESCRIPTION suffix"),
                 ("arguments", {"name": identifiers["name"], "description": "PRIVATE_TASK_DESCRIPTION"}),
                 ("codeChanges", {"filesModified": ["/tmp/PRIVATE_WORKSPACE.py"]}),
                 ("message", "gh-aw-router"),

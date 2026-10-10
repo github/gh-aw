@@ -239,7 +239,7 @@ def verify_sensitive_content_redacted(source, destination):
             records = [json.loads(source_path.read_text(encoding="utf-8"))]
         for record in records:
             for sensitive_content in collect_sensitive_content(record):
-                if sensitive_content in fixture_content:
+                if any(sensitive_content in content for content in fixture_content):
                     raise ValueError(f"fixture contains unredacted content from {relative}")
 
 
