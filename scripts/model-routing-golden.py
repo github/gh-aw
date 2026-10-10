@@ -27,10 +27,13 @@ ALLOWED_FILES = (
     "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
 )
 CONTENT_KEYS = {
+    "agentdescription",
     "arguments",
     "body",
     "command",
     "content",
+    "description",
+    "filesmodified",
     "input",
     "message",
     "output",
@@ -45,8 +48,11 @@ TOOL_IDENTIFIER_KEYS = {
     "agent",
     "agentid",
     "agentname",
+    "agenttype",
     "invocationid",
     "model",
+    "mode",
+    "name",
     "requestedmodel",
     "resolvedmodel",
     "toolcallid",
@@ -171,6 +177,8 @@ def redact(value, identities, key="", parent_key=""):
             for child_key, child in value.items()
         }
     if sensitive_key(key):
+        if key.lower() == "filesmodified" and isinstance(value, list):
+            return ["[redacted]" for _ in value]
         return "[redacted]"
     if isinstance(value, dict):
         return {child_key: redact(child, identities, child_key, re.sub(r"[^a-z]", "", key.lower())) for child_key, child in value.items()}
@@ -214,11 +222,13 @@ def collect_sensitive_content(value, key="", in_arguments=False):
 
 
 def verify_sensitive_content_redacted(source, destination):
-    fixture_content = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in destination.rglob("*")
-        if path.is_file()
-    )
+    fixture_content = []
+    for path in destination.rglob("*"):
+        if not path.is_file():
+            continue
+        records = read_jsonl(path) if path.suffix == ".jsonl" else [json.loads(path.read_text(encoding="utf-8"))]
+        for record in records:
+            fixture_content.extend(collect_sensitive_content(record))
     for relative in ALLOWED_FILES:
         source_path = safe_source_file(source, relative)
         if source_path is None:
