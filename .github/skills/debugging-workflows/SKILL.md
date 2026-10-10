@@ -455,10 +455,29 @@ network:
 - Workflow exceeds time limit
 - Agent loops or hangs
 
-**Solution**: Increase timeout or optimize prompt:
+**Diagnose before fixing.** A timeout is a symptom, not the root cause. Use
+`gh aw audit <run-id> --json` to inspect `tool_usage`, `metrics.turns`, and
+`agentic_assessments` (e.g. `resource_heavy_for_domain`) across several failing
+runs, then extract the actual tool calls from `agent-session.jsonl` to see what
+the agent spent its time on. Common underlying causes:
+
+- The workflow (or an imported skill) is being invoked on content it has no
+  applicable mode/skill for, so it falls back to open-ended manual exploration
+  — check trigger `paths`/`paths-ignore` for mismatch against the skill's
+  actual domain.
+- Missing or stale pre-fetched context forces repeated ad-hoc `gh`/`grep`
+  round-trips that a DataOps pre-step could batch once.
+- No bound on exploration depth, so a genuinely complex diff triggers
+  unbounded tracing through the codebase.
+
+**Solution**: Fix the underlying inefficiency first — see the
+`optimize-agentic-workflow` skill for the measure → diagnose → trim workflow.
+Only increase `timeout-minutes` as a bounded safety margin once the workload is
+understood to genuinely need the extra budget (or while the efficiency fix is
+validated against live traffic), not as the primary or first fix:
 
 ```yaml
-timeout-minutes: 30  # Increase from default
+timeout-minutes: 30  # Safety margin only - pair with an efficiency fix, don't substitute for one
 ```
 
 ## Advanced Debugging Techniques

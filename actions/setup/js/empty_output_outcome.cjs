@@ -20,7 +20,7 @@ const EMPTY_OUTPUT_CAUSES = Object.freeze({
 const EMPTY_OUTPUT_FAILURE_CAUSES = Object.freeze({
   engine_outage: "experienced an engine outage",
   request_rejection: "had a request rejected",
-  prompt_exhaustion: "exhausted its prompt",
+  prompt_exhaustion: "reported incomplete result",
   unknown: "finished without a clear failure cause",
 });
 
