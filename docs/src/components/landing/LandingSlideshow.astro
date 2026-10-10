@@ -180,7 +180,18 @@ import SlideshowSnippet from './SlideshowSnippet.astro';
     margin: 0;
     padding-block: 2rem;
   }
-  :global([data-slideshow-slides] > .aw-title-slide) { display: none; }
+  :global([data-slideshow-slides] > .aw-title-slide) {
+    display: none;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  dialog :global(.aw-title-slide-bg) {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
   dialog[open] :global([data-slideshow-slides] > .aw-title-slide:not([hidden])) {
     display: flex;
     align-items: center;
