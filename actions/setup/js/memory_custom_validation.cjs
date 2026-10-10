@@ -238,15 +238,72 @@ function validateSchemaFilePath(file) {
     typeof file !== "string" ||
     file === "" ||
     file.includes("\\") ||
-    /[*?[\]]/.test(file) ||
+    /[?[\]]/.test(file) ||
     path.posix.isAbsolute(file) ||
     path.win32.isAbsolute(file) ||
     /^[A-Za-z]:/.test(file) ||
     path.posix.normalize(file) !== file ||
     file.split("/").some(segment => segment === "" || segment === "." || segment === "..")
   ) {
-    throw new TypeError("file must be a non-empty relative path without traversal or glob characters");
+    throw new TypeError("file must be a non-empty relative path or glob without traversal");
   }
+}
+
+/**
+ * @param {string} file
+ * @param {string} pattern
+ */
+function memorySchemaFileMatchesGlob(file, pattern) {
+  let expression = "^";
+  for (let index = 0; index < pattern.length;) {
+    if (pattern.startsWith("**/", index)) {
+      expression += "(?:.*/)?";
+      index += 3;
+    } else if (pattern.startsWith("**", index)) {
+      expression += ".*";
+      index += 2;
+    } else if (pattern[index] === "*") {
+      expression += "[^/]*";
+      index++;
+    } else {
+      expression += pattern[index].replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+      index++;
+    }
+  }
+  return new RegExp(expression + "$").test(file);
+}
+
+/**
+ * @param {string} memoryDir
+ * @param {string} pattern
+ * @returns {string[]}
+ */
+function findMemorySchemaFiles(memoryDir, pattern) {
+  /** @type {string[]} */
+  const matches = [];
+  /**
+   * @param {string} directory
+   * @param {string} relativeDirectory
+   */
+  function visit(directory, relativeDirectory) {
+    let entries;
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch (error) {
+      throw new Error(`Unable to search for schema files in '${relativeDirectory || "."}': ${getErrorMessage(error)}`, { cause: error });
+    }
+    for (const entry of entries) {
+      const relativePath = relativeDirectory ? `${relativeDirectory}/${entry.name}` : entry.name;
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath, relativePath);
+      } else if ((entry.isFile() || entry.isSymbolicLink()) && memorySchemaFileMatchesGlob(relativePath, pattern)) {
+        matches.push(relativePath);
+      }
+    }
+  }
+  visit(memoryDir, "");
+  return matches.sort();
 }
 
 /**
@@ -416,70 +473,84 @@ function validateMemoryJSONSchemas(memoryDir, schemas, kind, memoryId) {
       throw new TypeError(`file '${declaration.file}' has unsupported format`);
     }
     validateSchemaContract(declaration.schema, "Memory");
-
-    const relativeFile = declaration.file.split("/").join(path.sep);
-    const lexicalPath = path.resolve(memoryDir, relativeFile);
-    const lexicalRelative = path.relative(path.resolve(memoryDir), lexicalPath);
-    if (lexicalRelative === ".." || lexicalRelative.startsWith(`..${path.sep}`) || path.isAbsolute(lexicalRelative)) {
-      throw new TypeError(`file '${declaration.file}' escapes the memory directory`);
+    const matchedFiles = declaration.file.includes("*") ? findMemorySchemaFiles(memoryDir, declaration.file) : [declaration.file];
+    if (matchedFiles.length === 0) {
+      throw new Error(`file pattern '${declaration.file}' matched no files`);
     }
-    let root;
-    let resolvedFile;
-    try {
-      root = fs.realpathSync(memoryDir);
-      resolvedFile = fs.realpathSync(lexicalPath);
-    } catch (error) {
-      throw new Error(`file '${declaration.file}' is missing or unreadable: ${getErrorMessage(error)}`, { cause: error });
-    }
-    const relativeResolved = path.relative(root, resolvedFile);
-    if (relativeResolved === ".." || relativeResolved.startsWith(`..${path.sep}`) || path.isAbsolute(relativeResolved)) {
-      throw new Error(`file '${declaration.file}' resolves outside the memory directory`);
-    }
-    let stats;
-    try {
-      stats = fs.statSync(resolvedFile);
-    } catch (error) {
-      throw new Error(`file '${declaration.file}' is unreadable: ${getErrorMessage(error)}`, { cause: error });
-    }
-    if (!stats.isFile()) {
-      throw new Error(`file '${declaration.file}' must be a regular file`);
-    }
-    if (stats.size > MAX_SCHEMA_FILE_BYTES) {
-      throw new Error(`file '${declaration.file}' exceeds the schema validation size limit`);
-    }
-    if (declaration.format === "jsonl") {
-      validateJSONLFile(resolvedFile, declaration.file, declaration.schema);
-      continue;
-    }
-    let contents;
-    try {
-      contents = fs.readFileSync(resolvedFile, "utf8");
-    } catch (error) {
-      throw new Error(`file '${declaration.file}' is unreadable: ${getErrorMessage(error)}`, { cause: error });
-    }
-    if (declaration.format === "json") {
-      if (!contents.trim()) throw new Error(`file '${declaration.file}' contains empty JSON`);
-      if (schemaContainsNumericEnum(declaration.schema)) {
-        try {
-          assertJSONNumbersExactlyRepresentable(contents);
-        } catch (error) {
-          throw new Error(`file '${declaration.file}' ${getErrorMessage(error)}`, { cause: error });
-        }
-      }
-      let value;
-      try {
-        value = JSON.parse(contents);
-      } catch (error) {
-        throw new Error(`file '${declaration.file}' contains malformed JSON: ${getErrorMessage(error)}`, { cause: error });
-      }
-      const validationError = validateValueAgainstSchema(value, declaration.schema);
-      if (validationError) {
-        throw new Error(`file '${declaration.file}' at ${validationError.path || "(root)"} ${validationError.message}`);
-      }
-      continue;
+    for (const file of matchedFiles) {
+      validateMemoryJSONSchemaFile(memoryDir, file, declaration);
     }
   }
   return `Declarative ${kind}-memory schemas passed for '${memoryId}'`;
+}
+
+/**
+ * @param {string} memoryDir
+ * @param {string} file
+ * @param {{file: string, format: string, schema: Record<string, any>}} declaration
+ */
+function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
+  const relativeFile = file.split("/").join(path.sep);
+  const lexicalPath = path.resolve(memoryDir, relativeFile);
+  const lexicalRelative = path.relative(path.resolve(memoryDir), lexicalPath);
+  if (lexicalRelative === ".." || lexicalRelative.startsWith(`..${path.sep}`) || path.isAbsolute(lexicalRelative)) {
+    throw new TypeError(`file '${file}' escapes the memory directory`);
+  }
+  let root;
+  let resolvedFile;
+  try {
+    root = fs.realpathSync(memoryDir);
+    resolvedFile = fs.realpathSync(lexicalPath);
+  } catch (error) {
+    throw new Error(`file '${file}' is missing or unreadable: ${getErrorMessage(error)}`, { cause: error });
+  }
+  const relativeResolved = path.relative(root, resolvedFile);
+  if (relativeResolved === ".." || relativeResolved.startsWith(`..${path.sep}`) || path.isAbsolute(relativeResolved)) {
+    throw new Error(`file '${file}' resolves outside the memory directory`);
+  }
+  let stats;
+  try {
+    stats = fs.statSync(resolvedFile);
+  } catch (error) {
+    throw new Error(`file '${file}' is unreadable: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (!stats.isFile()) {
+    throw new Error(`file '${file}' must be a regular file`);
+  }
+  if (stats.size > MAX_SCHEMA_FILE_BYTES) {
+    throw new Error(`file '${file}' exceeds the schema validation size limit`);
+  }
+  if (declaration.format === "jsonl") {
+    validateJSONLFile(resolvedFile, file, declaration.schema);
+    return;
+  }
+  let contents;
+  try {
+    contents = fs.readFileSync(resolvedFile, "utf8");
+  } catch (error) {
+    throw new Error(`file '${file}' is unreadable: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (declaration.format === "json") {
+    if (!contents.trim()) throw new Error(`file '${file}' contains empty JSON`);
+    if (schemaContainsNumericEnum(declaration.schema)) {
+      try {
+        assertJSONNumbersExactlyRepresentable(contents);
+      } catch (error) {
+        throw new Error(`file '${file}' ${getErrorMessage(error)}`, { cause: error });
+      }
+    }
+    let value;
+    try {
+      value = JSON.parse(contents);
+    } catch (error) {
+      throw new Error(`file '${file}' contains malformed JSON: ${getErrorMessage(error)}`, { cause: error });
+    }
+    const validationError = validateValueAgainstSchema(value, declaration.schema);
+    if (validationError) {
+      throw new Error(`file '${file}' at ${validationError.path || "(root)"} ${validationError.message}`);
+    }
+    return;
+  }
 }
 
 /**

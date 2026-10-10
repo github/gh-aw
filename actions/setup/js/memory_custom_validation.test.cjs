@@ -113,6 +113,38 @@ describe("memory_custom_validation", () => {
     expect(fs.readFileSync(file, "utf8")).toBe(contents);
   });
 
+  it("validates every file matched by a recursive schema glob", () => {
+    fs.mkdirSync(path.join(tempDir, "events", "nested"), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, "events", "first.json"), '{"ok":true}');
+    fs.writeFileSync(path.join(tempDir, "events", "nested", "second.json"), '{"ok":true}');
+    const jsonSchemas = [
+      {
+        file: "events/**/*.json",
+        format: "json",
+        schema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } },
+      },
+    ];
+    expect(runCustomMemoryValidation({ jsonSchemas, memoryDir: tempDir, kind: "repo" }).ok).toBe(true);
+
+    fs.writeFileSync(path.join(tempDir, "events", "nested", "second.json"), '{"ok":"no"}');
+    const result = runCustomMemoryValidation({ jsonSchemas, memoryDir: tempDir, kind: "repo" });
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("events/nested/second.json");
+    expect(result.stderr).toContain("ok");
+  });
+
+  it("fails when a schema glob matches no files", () => {
+    const result = runCustomMemoryValidation({
+      jsonSchemas: [{ file: "events/**/*.json", format: "json", schema: { type: "object" } }],
+      memoryDir: tempDir,
+      kind: "repo",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("events/**/*.json");
+    expect(result.stderr).toContain("matched no files");
+  });
+
   it("reports nested schema paths and checks schemas before custom scripts", () => {
     fs.writeFileSync(path.join(tempDir, "state.json"), '{"items":[1]}');
     const result = runCustomMemoryValidation({
@@ -223,6 +255,14 @@ describe("memory_custom_validation", () => {
         expect(result.ok).toBe(false);
         expect(result.stderr).toContain(file);
       }
+      const wildcardResult = runCustomMemoryValidation({
+        jsonSchemas: [{ file: "external-*.json", format: "json", schema: { type: "object" } }],
+        memoryDir: tempDir,
+        kind: "repo",
+      });
+      expect(wildcardResult.ok).toBe(false);
+      expect(wildcardResult.stderr).toContain("external-link.json");
+      expect(wildcardResult.stderr).toContain("outside the memory directory");
     } finally {
       fs.rmSync(outsideDir, { recursive: true, force: true });
     }

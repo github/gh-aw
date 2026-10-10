@@ -196,7 +196,7 @@ func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig
 		}
 		file, ok := entry["file"].(string)
 		if !ok || !validMemorySchemaFilePath(file) {
-			return nil, fmt.Errorf("%s.file must be a non-empty relative file path without traversal or glob characters", entryPath)
+			return nil, fmt.Errorf("%s.file must be a non-empty relative file path or glob without traversal", entryPath)
 		}
 		if _, exists := seenFiles[file]; exists {
 			return nil, fmt.Errorf("%s contains duplicate file target %q", fieldPath, file)
@@ -219,7 +219,7 @@ func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig
 }
 
 func validMemorySchemaFilePath(file string) bool {
-	if file == "" || strings.ContainsAny(file, "\\*?[]") || path.IsAbs(file) ||
+	if file == "" || strings.ContainsAny(file, "\\?[]") || path.IsAbs(file) ||
 		memorySchemaDrivePattern.MatchString(file) || path.Clean(file) != file {
 		return false
 	}
@@ -424,9 +424,9 @@ func validateMemorySchemaTargets(config *MemoryValidationConfig, allowedExtensio
 
 func memorySchemaFileMatchesGlob(file, glob string) bool {
 	pattern := regexp.QuoteMeta(glob)
-	pattern = strings.ReplaceAll(pattern, `\*\*`, "<!DOUBLESTAR>")
+	pattern = strings.ReplaceAll(pattern, `\*\*/`, `(?:.*/)?`)
+	pattern = strings.ReplaceAll(pattern, `\*\*`, `.*`)
 	pattern = strings.ReplaceAll(pattern, `\*`, `[^/]*`)
-	pattern = strings.ReplaceAll(pattern, "<!DOUBLESTAR>", ".*")
 	matched, err := regexp.MatchString("^"+pattern+"$", file)
 	return err == nil && matched
 }

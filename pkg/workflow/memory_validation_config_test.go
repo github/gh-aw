@@ -132,6 +132,7 @@ func TestParseMemoryJSONSchemasRejectsInvalidDeclarations(t *testing.T) {
 		{name: "empty declaration list", entries: []any{}, want: "non-empty list"},
 		{name: "absolute path", entries: []any{valid("/state.json", "json", map[string]any{})}, want: "relative file path"},
 		{name: "traversal path", entries: []any{valid("../state.json", "json", map[string]any{})}, want: "relative file path"},
+		{name: "unsupported wildcard", entries: []any{valid("state?.json", "json", map[string]any{})}, want: "relative file path"},
 		{name: "invalid format", entries: []any{valid("state.json", "yaml", map[string]any{})}, want: "format"},
 		{name: "unknown entry field", entries: []any{map[string]any{"file": "state.json", "format": "json", "schema": map[string]any{}, "optional": true}}, want: "unknown property"},
 		{name: "unsupported keyword", entries: []any{valid("state.json", "json", map[string]any{"type": "string", "format": "date-time"})}, want: "unsupported schema keyword"},
@@ -147,6 +148,20 @@ func TestParseMemoryJSONSchemasRejectsInvalidDeclarations(t *testing.T) {
 			assert.Contains(t, err.Error(), test.want)
 		})
 	}
+}
+
+func TestParseMemoryJSONSchemasAcceptsWildcards(t *testing.T) {
+	config, err := parseMemoryValidationConfig(map[string]any{
+		"validation": map[string]any{
+			"json-schemas": []any{
+				map[string]any{"file": "events/**/*.jsonl", "format": "jsonl", "schema": map[string]any{"type": "object"}},
+			},
+		},
+	}, "tools.repo-memory.validation")
+
+	require.NoError(t, err)
+	require.Len(t, config.JSONSchemas, 1)
+	assert.Equal(t, "events/**/*.jsonl", config.JSONSchemas[0].File)
 }
 
 func TestParseMemoryValidationConfigRejectsUnknownFieldsAndMissingValidation(t *testing.T) {
@@ -166,6 +181,16 @@ func TestValidateMemorySchemaTargetsHonorsFilePolicies(t *testing.T) {
 	require.NoError(t, validateMemorySchemaTargets(config, []string{".JSON"}, []string{"data/**"}, "tools.repo-memory.validation"))
 	require.ErrorContains(t, validateMemorySchemaTargets(config, []string{".md"}, nil, "tools.repo-memory.validation"), "allowed-extensions")
 	require.ErrorContains(t, validateMemorySchemaTargets(config, nil, []string{"*.json"}, "tools.repo-memory.validation"), "file-glob")
+
+	globConfig := &MemoryValidationConfig{JSONSchemas: []MemoryJSONSchemaConfig{{File: "data/**/*.json", Format: "json", Schema: map[string]any{}}}}
+	require.NoError(t, validateMemorySchemaTargets(globConfig, []string{".json"}, []string{"data/**"}, "tools.repo-memory.validation"))
+}
+
+func TestMemorySchemaFileMatchesGlob(t *testing.T) {
+	for _, file := range []string{"state.json", "nested/state.json", "nested/deep/state.json"} {
+		assert.True(t, memorySchemaFileMatchesGlob(file, "**/*.json"), file)
+	}
+	assert.False(t, memorySchemaFileMatchesGlob("state.jsonl", "**/*.json"))
 }
 
 func TestMemorySchemaContractFixtures(t *testing.T) {

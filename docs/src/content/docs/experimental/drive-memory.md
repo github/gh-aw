@@ -22,7 +22,7 @@ Drive names are repository-wide and branch-aware according to the preview servic
 
 ## Validation
 
-Drive-memory supports the same `validation.json-schemas` declarations as repo-memory and cache-memory. Declare exact relative file paths with `format: json` or `format: jsonl` and an inline `schema`; each declared file is required and must pass validation before the drive accepts or persists the candidate.
+Drive-memory supports the same `validation.json-schemas` declarations as repo-memory and cache-memory. Declare relative file paths or globs (with `*` within a path segment and `**` across segments) with `format: json` or `format: jsonl` and an inline `schema`; each path must exist, each glob must match at least one file, and every matched file must pass validation before the drive accepts or persists the candidate.
 
 JSON requires one non-empty document. JSONL validates each physical record independently, accepts LF/CRLF and an optional final newline, permits an existing empty file, and rejects blank or malformed records with a line number. Schema validation runs after filtering and configured normalization, before an optional `validation.script`, and gates drive persistence. The supported vocabulary is `type`, primitive `enum`, `required`, nested `properties`, `additionalProperties: false`, `items`, and standalone `oneOf`/`anyOf` (maximum depth 32); this is not full JSON Schema. Numeric enum integers must be exactly representable by JavaScript, and values checked against numeric enums must not lose precision during JSON parsing. Unsupported keywords are rejected at compile time. A script remains useful for cross-file or domain-specific rules. See [Cache Memory](../reference/cache-memory/) for a complete example and details.
 
