@@ -60,7 +60,9 @@ safe-outputs:
     run-success: "🧵 [{workflow_name}]({run_url}) has completed the skills-based review. ✅"
     run-failure: "🧵 [{workflow_name}]({run_url}) {status} during the skills-based review."
 max-daily-ai-credits: 10000
-timeout-minutes: 15
+# Raised from 15m: skill-driven PR reviews on larger diffs were hitting the
+# engine step's hard timeout mid-review (not a hang) - see #66819.
+timeout-minutes: 30
 
 ---
 

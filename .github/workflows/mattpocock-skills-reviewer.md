@@ -65,7 +65,9 @@ skills:
 - mattpocock/skills/improve-codebase-architecture@801dca688564c529fa84f247f64472520d9ebe28
 - mattpocock/skills/grill-with-docs@801dca688564c529fa84f247f64472520d9ebe28
 - mattpocock/skills/codebase-design@801dca688564c529fa84f247f64472520d9ebe28
-timeout-minutes: 15
+# Raised from 15m: skill-driven PR reviews on larger diffs were hitting the
+# engine step's hard timeout mid-review (not a hang) - see #66819.
+timeout-minutes: 30
 tools:
   cli-proxy: true
   github:
