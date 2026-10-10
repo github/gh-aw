@@ -116,6 +116,30 @@ function buildWorkflowCallId(runId, runAttempt, workflowRef) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} awContext
+ * @returns {string}
+ */
+function readHopId(awContext) {
+  const hopId = typeof awContext?.hop_id === "string" ? awContext.hop_id.trim() : "";
+  return hopId || (typeof awContext?.workflow_call_id === "string" ? awContext.workflow_call_id.trim() : "");
+}
+
+/**
+ * Inbound context describes the caller. Context already describing this hop
+ * retains its recorded parent instead of creating a self-parent relationship.
+ *
+ * @param {Record<string, unknown> | null | undefined} awContext
+ * @param {string} currentHopId
+ * @returns {string}
+ */
+function resolveParentHopId(awContext, currentHopId) {
+  const inheritedHopId = readHopId(awContext);
+  const recordedParent = typeof awContext?.parent_hop_id === "string" ? awContext.parent_hop_id.trim() : "";
+  const parentHopId = inheritedHopId && inheritedHopId !== currentHopId ? inheritedHopId : recordedParent;
+  return parentHopId !== currentHopId ? parentHopId : "";
+}
+
+/**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
  */
@@ -330,8 +354,8 @@ function buildAwContext() {
   const currentRunAttempt = String(process.env.GITHUB_RUN_ATTEMPT ?? "1");
   const currentHopId = buildWorkflowCallId(currentRunId, currentRunAttempt, workflowRef);
   const inheritedContext = readInboundAwContext(context.payload);
-  const inheritedHopId = typeof inheritedContext?.hop_id === "string" ? inheritedContext.hop_id.trim() : typeof inheritedContext?.workflow_call_id === "string" ? inheritedContext.workflow_call_id.trim() : "";
-  const parentHopId = typeof inheritedContext?.parent_hop_id === "string" && inheritedContext.parent_hop_id.trim() ? inheritedContext.parent_hop_id.trim() : inheritedHopId;
+  const inheritedHopId = readHopId(inheritedContext);
+  const parentHopId = resolveParentHopId(inheritedContext, currentHopId);
   const episodeId = typeof inheritedContext?.episode_id === "string" && inheritedContext.episode_id.trim() ? inheritedContext.episode_id.trim() : inheritedHopId || currentHopId;
   const originEvent =
     typeof inheritedContext?.origin_event === "string" && inheritedContext.origin_event.trim()
@@ -437,6 +461,7 @@ function buildAwContext() {
 module.exports = {
   buildAwContext,
   buildWorkflowCallId,
+  resolveParentHopId,
   resolveItemContext,
   parseInboundAwContext,
   readInboundAwContext,

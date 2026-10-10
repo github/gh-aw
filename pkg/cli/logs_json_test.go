@@ -310,6 +310,30 @@ func writeTestAwInfo(t *testing.T, runDir string, payload map[string]any) {
 	}
 }
 
+func TestBuildLogsDataPreservesCanonicalContextFromAwInfo(t *testing.T) {
+	t.Parallel()
+
+	runDir := filepath.Join(t.TempDir(), "run-200")
+	expected := &AwContext{
+		Repo: "org/repo", RunID: "100", WorkflowID: "org/repo/.github/workflows/caller.yml@refs/heads/main",
+		WorkflowCallID: "100-1:caller", EpisodeID: "root-episode", HopID: "100-1:caller", ParentHopID: "50-1:root",
+		OriginEvent: "issues", RootRepo: "org/repo", RootWorkflowID: "org/repo/.github/workflows/root.yml@refs/heads/main", RootRunID: "50",
+	}
+	writeTestAwInfo(t, runDir, map[string]any{"engine_id": "copilot", "context": expected})
+	data := buildLogsData([]ProcessedRun{{Run: WorkflowRun{DatabaseID: 200, LogsPath: runDir}}}, runDir, nil)
+	require.Len(t, data.Runs, 1)
+	assert.Equal(t, expected, data.Runs[0].AwContext)
+	require.Len(t, data.Episodes, 1)
+	assert.Equal(t, expected.EpisodeID, data.Episodes[0].EpisodeID)
+
+	raw, err := json.Marshal(data)
+	require.NoError(t, err)
+	var decoded LogsData
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	assert.Equal(t, expected, decoded.Runs[0].AwContext)
+	assert.Equal(t, expected.EpisodeID, decoded.Episodes[0].EpisodeID)
+}
+
 func TestBuildLogsDataAggregatesDispatchEpisode(t *testing.T) {
 	t.Parallel()
 	tmpDir := testutil.TempDir(t, "test-episode-*")

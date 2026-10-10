@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/logger"
-	"github.com/github/gh-aw/pkg/timeutil"
 )
 
 var logsEpisodeLog = logger.New("cli:logs_episode")
@@ -98,6 +97,7 @@ type episodeSeed struct {
 	Kind       string
 	Confidence string
 	Reasons    []string
+	Canonical  bool
 }
 
 func buildEpisodeData(runs []RunData, processedRuns []ProcessedRun) ([]EpisodeData, []EpisodeEdge) {
@@ -109,22 +109,80 @@ func buildEpisodeData(runs []RunData, processedRuns []ProcessedRun) ([]EpisodeDa
 	for _, run := range runs {
 		runsByID[run.RunID] = run
 		episodeID, kind, confidence, reasons := classifyEpisode(run)
-		seedsByRunID[run.RunID] = episodeSeed{EpisodeID: episodeID, Kind: kind, Confidence: confidence, Reasons: append([]string(nil), reasons...)}
+		seedsByRunID[run.RunID] = episodeSeed{
+			EpisodeID: episodeID, Kind: kind, Confidence: confidence,
+			Reasons: append([]string(nil), reasons...), Canonical: canonicalEpisodeID(run) != "",
+		}
 		parents[run.RunID] = run.RunID
 	}
 	for _, processedRun := range processedRuns {
 		processedByID[processedRun.Run.DatabaseID] = processedRun
 	}
 
+	canonicalByRoot := groupCanonicalEpisodes(runs, parents)
+	edges := buildEpisodeEdges(runs, runsByID, parents, canonicalByRoot)
+	rootMetadata := selectEpisodeSeeds(runs, parents, seedsByRunID)
+	episodes := rollupEpisodes(runs, processedByID, parents, rootMetadata)
+	for index, edge := range edges {
+		root := findEpisodeParent(parents, edge.TargetRunID)
+		if selectedSeed, ok := rootMetadata[root]; ok {
+			edges[index].EpisodeID = selectedSeed.EpisodeID
+		}
+	}
+	slices.SortFunc(episodes, func(a, b EpisodeData) int {
+		if a.RootRunID != b.RootRunID {
+			return cmp.Compare(a.RootRunID, b.RootRunID)
+		}
+		return cmp.Compare(a.EpisodeID, b.EpisodeID)
+	})
+	slices.SortFunc(edges, func(a, b EpisodeEdge) int {
+		if a.SourceRunID != b.SourceRunID {
+			return cmp.Compare(a.SourceRunID, b.SourceRunID)
+		}
+		return cmp.Compare(a.TargetRunID, b.TargetRunID)
+	})
+	logsEpisodeLog.Printf("Built %d episodes and %d edges from %d runs", len(episodes), len(edges), len(runs))
+	return episodes, edges
+}
+
+func groupCanonicalEpisodes(runs []RunData, parents map[int64]int64) map[int64]string {
+	canonicalByRoot := make(map[int64]string)
+	runByEpisodeID := make(map[string]int64)
+	for _, run := range runs {
+		if episodeID := canonicalEpisodeID(run); episodeID != "" {
+			if previous, ok := runByEpisodeID[episodeID]; ok {
+				unionEpisodes(parents, previous, run.RunID)
+			}
+			runByEpisodeID[episodeID] = run.RunID
+			canonicalByRoot[findEpisodeParent(parents, run.RunID)] = episodeID
+		}
+	}
+	return canonicalByRoot
+}
+
+func buildEpisodeEdges(runs []RunData, runsByID map[int64]RunData, parents map[int64]int64, canonicalByRoot map[int64]string) []EpisodeEdge {
 	edges := make([]EpisodeEdge, 0)
 	for _, run := range runs {
 		if edge, ok := buildEpisodeEdge(run, runs, runsByID); ok {
+			sourceRoot := findEpisodeParent(parents, edge.SourceRunID)
+			targetRoot := findEpisodeParent(parents, edge.TargetRunID)
+			sourceID, targetID := canonicalByRoot[sourceRoot], canonicalByRoot[targetRoot]
+			if sourceID != "" && targetID != "" && sourceID != targetID {
+				logsEpisodeLog.Printf("Ignoring conflicting episode edge: source_run=%d target_run=%d", edge.SourceRunID, edge.TargetRunID)
+				continue
+			}
 			edges = append(edges, edge)
 			unionEpisodes(parents, edge.SourceRunID, edge.TargetRunID)
+			if targetID == "" {
+				targetID = sourceID
+			}
+			canonicalByRoot[findEpisodeParent(parents, edge.TargetRunID)] = targetID
 		}
 	}
+	return edges
+}
 
-	episodeMap := make(map[string]*episodeAccumulator)
+func selectEpisodeSeeds(runs []RunData, parents map[int64]int64, seedsByRunID map[int64]episodeSeed) map[int64]episodeSeed {
 	rootMetadata := make(map[int64]episodeSeed)
 	for _, run := range runs {
 		root := findEpisodeParent(parents, run.RunID)
@@ -134,7 +192,11 @@ func buildEpisodeData(runs []RunData, processedRuns []ProcessedRun) ([]EpisodeDa
 			rootMetadata[root] = seed
 		}
 	}
+	return rootMetadata
+}
 
+func rollupEpisodes(runs []RunData, processedByID map[int64]ProcessedRun, parents map[int64]int64, rootMetadata map[int64]episodeSeed) []EpisodeData {
+	episodeMap := make(map[string]*episodeAccumulator)
 	for _, run := range runs {
 		root := findEpisodeParent(parents, run.RunID)
 		selectedSeed := rootMetadata[root]
@@ -158,145 +220,18 @@ func buildEpisodeData(runs []RunData, processedRuns []ProcessedRun) ([]EpisodeDa
 			episodeMap[episodeID] = acc
 		}
 
-		if !acc.runSet[run.RunID] {
-			acc.runSet[run.RunID] = true
-			acc.metadata.RunIDs = append(acc.metadata.RunIDs, run.RunID)
-		}
-		if run.WorkflowName != "" && !acc.nameSet[run.WorkflowName] {
-			acc.nameSet[run.WorkflowName] = true
-			acc.metadata.WorkflowNames = append(acc.metadata.WorkflowNames, run.WorkflowName)
-		}
-
-		acc.metadata.TotalRuns++
-		acc.metadata.TotalTokens += run.TokenUsage
-		acc.metadata.TotalAIC += run.AIC
-		acc.metadata.ManifestEntryCount += run.ManifestEntryCount
-		acc.metadata.TemporaryIDMappings += run.TemporaryIDMappings
-		acc.metadata.ChainedTargetCount += run.ChainedTargetCount
-		acc.metadata.ChainedFollowupActionCount += run.ChainedFollowupActionCount
-		acc.metadata.DelegatedTempTargetCount += run.DelegatedTempTargetCount
-		acc.metadata.ClosedTempTargetCount += run.ClosedTempTargetCount
-		if run.Comparison != nil && run.Comparison.Classification != nil && run.Comparison.Classification.Label == "risky" {
-			acc.metadata.RiskyNodeCount++
-		}
-		if run.Comparison != nil && run.Comparison.Classification != nil && run.Comparison.Classification.Label == "changed" {
-			acc.metadata.ChangedNodeCount++
-		}
-		if run.BehaviorFingerprint != nil && run.BehaviorFingerprint.ActuationStyle != "read_only" {
-			acc.metadata.WriteCapableNodeCount++
-		}
-		if run.Comparison != nil && run.Comparison.Baseline != nil && run.Comparison.Baseline.Selection == "latest_success" {
-			acc.metadata.LatestSuccessFallbackCount++
-		}
-		if hasComparisonReasonCode(run.Comparison, "new_mcp_failure") {
-			acc.metadata.NewMCPFailureRunCount++
-		}
-		if hasComparisonReasonCode(run.Comparison, "blocked_requests_increase") {
-			acc.metadata.BlockedRequestIncreaseRunCount++
-		}
-		if hasAssessmentKindAtLeast(run.AgenticAssessments, "resource_heavy_for_domain", "medium") {
-			acc.metadata.ResourceHeavyNodeCount++
-		}
-		if hasAssessmentKindAtLeast(run.AgenticAssessments, "poor_agentic_control", "medium") {
-			acc.metadata.PoorControlNodeCount++
-		}
-		acc.metadata.MissingToolCount += run.MissingToolCount
-		if pr, ok := processedByID[run.RunID]; ok {
-			acc.metadata.MCPFailureCount += len(pr.MCPFailures)
-			if pr.FirewallAnalysis != nil {
-				acc.metadata.BlockedRequestCount += pr.FirewallAnalysis.BlockedRequests
-				if pr.FirewallAnalysis.BlockedRequests >= firewallBlockedRequestCap {
-					acc.metadata.BlockedRequestAtCap = true
-				}
-			}
-			// Collect per-tool-call metrics for this run.
-			if pr.MCPToolUsage != nil {
-				for _, tc := range pr.MCPToolUsage.ToolCalls {
-					acc.toolCalls = append(acc.toolCalls, mcpToolCallToEpisodeToolCall(tc))
-				}
-			}
-		}
-		if !run.CreatedAt.IsZero() && (acc.metadata.RootRunID == 0 || run.CreatedAt.Before(acc.rootTime)) {
-			acc.rootTime = run.CreatedAt
-			acc.metadata.RootRunID = run.RunID
-			acc.metadata.PrimaryWorkflow = run.WorkflowName
-		}
-		if acc.metadata.PrimaryWorkflow == "" && run.WorkflowName != "" {
-			acc.metadata.PrimaryWorkflow = run.WorkflowName
-		}
-		if acc.metadata.Repository == "" && run.Repository != "" {
-			acc.metadata.Repository = run.Repository
-			if parts := strings.SplitN(run.Repository, "/", 2); len(parts) == 2 {
-				acc.metadata.Organization = parts[0]
-			}
-		}
-		if run.StartedAt.IsZero() && run.UpdatedAt.IsZero() {
-			acc.duration += run.CreatedAt.Sub(run.CreatedAt)
-		} else if !run.StartedAt.IsZero() && !run.UpdatedAt.IsZero() && run.UpdatedAt.After(run.StartedAt) {
-			acc.duration += run.UpdatedAt.Sub(run.StartedAt)
-		} else if pr, ok := processedByID[run.RunID]; ok && pr.Run.Duration > 0 {
-			acc.duration += pr.Run.Duration
-		}
-	}
-
-	for index := range edges {
-		root := findEpisodeParent(parents, edges[index].TargetRunID)
-		if selectedSeed, ok := rootMetadata[root]; ok {
-			edges[index].EpisodeID = selectedSeed.EpisodeID
-		}
+		acc.addRun(run)
+		acc.addSignals(run)
+		acc.addProcessedRun(processedByID[run.RunID])
+		acc.addIdentity(run)
+		acc.addDuration(run, processedByID[run.RunID])
 	}
 
 	episodes := make([]EpisodeData, 0, len(episodeMap))
 	for _, acc := range episodeMap {
-		slices.Sort(acc.metadata.RunIDs)
-		slices.Sort(acc.metadata.WorkflowNames)
-		if acc.duration > 0 {
-			acc.metadata.TotalDuration = timeutil.FormatDuration(acc.duration)
-		}
-		if acc.metadata.PrimaryWorkflow == "" && len(acc.metadata.WorkflowNames) > 0 {
-			acc.metadata.PrimaryWorkflow = acc.metadata.WorkflowNames[0]
-		}
-		switch acc.metadata.RiskyNodeCount {
-		case 0:
-			acc.metadata.RiskDistribution = "none"
-		case 1:
-			acc.metadata.RiskDistribution = "concentrated"
-		default:
-			acc.metadata.RiskDistribution = "distributed"
-		}
-		acc.metadata.EscalationEligible, acc.metadata.EscalationReason = classifyEpisodeEscalation(acc.metadata)
-		acc.metadata.SuggestedRoute = buildSuggestedRoute(acc.metadata)
-		if len(acc.toolCalls) > 0 {
-			// Sort tool calls for deterministic output (server, then tool name, then status).
-			slices.SortFunc(acc.toolCalls, func(a, b EpisodeToolCall) int {
-				if a.Server != b.Server {
-					return cmp.Compare(a.Server, b.Server)
-				}
-				if a.Tool != b.Tool {
-					return cmp.Compare(a.Tool, b.Tool)
-				}
-				return cmp.Compare(a.Status, b.Status)
-			})
-			acc.metadata.ToolCalls = acc.toolCalls
-		}
-		episodes = append(episodes, acc.metadata)
+		episodes = append(episodes, acc.finalize())
 	}
-
-	slices.SortFunc(episodes, func(a, b EpisodeData) int {
-		if a.RootRunID != b.RootRunID {
-			return cmp.Compare(a.RootRunID, b.RootRunID)
-		}
-		return cmp.Compare(a.EpisodeID, b.EpisodeID)
-	})
-	slices.SortFunc(edges, func(a, b EpisodeEdge) int {
-		if a.SourceRunID != b.SourceRunID {
-			return cmp.Compare(a.SourceRunID, b.SourceRunID)
-		}
-		return cmp.Compare(a.TargetRunID, b.TargetRunID)
-	})
-
-	logsEpisodeLog.Printf("Built %d episodes and %d edges from %d runs", len(episodes), len(edges), len(runs))
-	return episodes, edges
+	return episodes
 }
 
 // mcpToolCallToEpisodeToolCall converts an MCPToolCall record to the lightweight
@@ -339,6 +274,12 @@ func unionEpisodes(parents map[int64]int64, leftRunID, rightRunID int64) {
 }
 
 func compareEpisodeSeeds(left, right episodeSeed) int {
+	if left.Canonical != right.Canonical {
+		if left.Canonical {
+			return 1
+		}
+		return -1
+	}
 	if left.Kind != right.Kind {
 		return cmp.Compare(seedKindRank(left.Kind), seedKindRank(right.Kind))
 	}
@@ -374,6 +315,15 @@ func seedConfidenceRank(confidence string) int {
 
 func classifyEpisode(run RunData) (string, string, string, []string) {
 	logsEpisodeLog.Printf("Classifying episode for run: id=%d event=%s", run.RunID, run.Event)
+	if episodeID := canonicalEpisodeID(run); episodeID != "" {
+		kind := "dispatch_workflow"
+		if run.Event == "workflow_call" {
+			kind = "workflow_call"
+		} else if run.AwContext.RunID == strconv.FormatInt(run.RunID, 10) && run.AwContext.ParentHopID == "" {
+			kind = "standalone"
+		}
+		return episodeID, kind, "high", []string{"context.episode_id"}
+	}
 	if run.AwContext != nil {
 		if run.AwContext.WorkflowCallID != "" {
 			return "dispatch:" + run.AwContext.WorkflowCallID, "dispatch_workflow", "high", []string{"context.workflow_call_id"}
@@ -391,9 +341,21 @@ func classifyEpisode(run RunData) (string, string, string, []string) {
 	return fmt.Sprintf("standalone:%d", run.RunID), "standalone", "high", []string{"no_shared_lineage_markers"}
 }
 
+func canonicalEpisodeID(run RunData) string {
+	if run.AwContext == nil {
+		return ""
+	}
+	return strings.TrimSpace(run.AwContext.EpisodeID)
+}
+
 func buildEpisodeEdge(run RunData, runs []RunData, runsByID map[int64]RunData) (EpisodeEdge, bool) {
 	if edge, ok := buildDispatchEpisodeEdge(run, runsByID); ok {
 		return edge, true
+	}
+	// Canonical context is authoritative; missing or same-run callers are not
+	// evidence for an inferred edge to a different run.
+	if canonicalEpisodeID(run) != "" || (run.AwContext != nil && run.AwContext.RunID == strconv.FormatInt(run.RunID, 10)) {
+		return EpisodeEdge{}, false
 	}
 	if edge, ok := buildWorkflowCallEpisodeEdge(run, runs); ok {
 		return edge, true
@@ -413,8 +375,16 @@ func buildDispatchEpisodeEdge(run RunData, runsByID map[int64]RunData) (EpisodeE
 		logsEpisodeLog.Printf("Failed to parse dispatch source run ID for run %d: %v", run.RunID, err)
 		return EpisodeEdge{}, false
 	}
-	if _, ok := runsByID[sourceRunID]; !ok {
+	source, ok := runsByID[sourceRunID]
+	if !ok {
 		logsEpisodeLog.Printf("Dispatch source run %d not found in run set for run %d", sourceRunID, run.RunID)
+		return EpisodeEdge{}, false
+	}
+	if sourceRunID == run.RunID {
+		return EpisodeEdge{}, false
+	}
+	if run.AwContext.Repo != "" && source.Repository != "" && run.AwContext.Repo != source.Repository {
+		logsEpisodeLog.Printf("Ignoring dispatch source repository mismatch: source_run=%d target_run=%d", sourceRunID, run.RunID)
 		return EpisodeEdge{}, false
 	}
 	logsEpisodeLog.Printf("Building dispatch episode edge: target_run=%d source_run=%d", run.RunID, sourceRunID)
@@ -427,10 +397,18 @@ func buildDispatchEpisodeEdge(run RunData, runsByID map[int64]RunData) (EpisodeE
 	if run.AwContext.WorkflowID != "" {
 		reasons = append(reasons, "context.workflow_id")
 	}
+	edgeType := "dispatch_workflow"
+	if canonicalEpisodeID(run) != "" {
+		confidence = "high"
+		reasons = append(reasons, "context.episode_id")
+		if run.Event == "workflow_call" {
+			edgeType = "workflow_call"
+		}
+	}
 	return EpisodeEdge{
 		SourceRunID: sourceRunID,
 		TargetRunID: run.RunID,
-		EdgeType:    "dispatch_workflow",
+		EdgeType:    edgeType,
 		Confidence:  confidence,
 		Reasons:     reasons,
 		SourceRepo:  run.AwContext.Repo,
@@ -556,17 +534,19 @@ func buildUniqueCandidateEdge(run RunData, candidates []RunData, edgeType, confi
 	if len(candidates) != 1 {
 		return EpisodeEdge{}, false
 	}
-	parent := candidates[0]
-	return EpisodeEdge{
-		SourceRunID: parent.RunID,
-		TargetRunID: run.RunID,
-		EdgeType:    edgeType,
-		Confidence:  confidence,
-		Reasons:     append([]string(nil), reasons...),
-		SourceRepo:  parent.Repository,
-		SourceRef:   parent.WorkflowPath,
-		EventType:   parent.Event,
-	}, true
+	for _, parent := range candidates {
+		return EpisodeEdge{
+			SourceRunID: parent.RunID,
+			TargetRunID: run.RunID,
+			EdgeType:    edgeType,
+			Confidence:  confidence,
+			Reasons:     append([]string(nil), reasons...),
+			SourceRepo:  parent.Repository,
+			SourceRef:   parent.WorkflowPath,
+			EventType:   parent.Event,
+		}, true
+	}
+	return EpisodeEdge{}, false
 }
 
 func hasComparisonReasonCode(comparison *AuditComparisonData, code string) bool {

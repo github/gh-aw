@@ -212,6 +212,123 @@ func TestBuildEpisodeDataAggregatesAIC(t *testing.T) {
 	assert.InDelta(t, 0.345, byRunID[502].TotalAIC, 1e-9, "episode should preserve AIC from run 502")
 }
 
+func TestBuildEpisodeDataPreservesCanonicalIdentityAcrossSelections(t *testing.T) {
+	t.Parallel()
+
+	const episodeID = "100-1:org/repo/.github/workflows/root.yml@refs/heads/main"
+	root := RunData{
+		RunID: 100, Repository: "org/repo", TokenUsage: 10, AIC: 0.1,
+		AwContext: &AwContext{RunID: "100", EpisodeID: episodeID},
+	}
+	legacyRoot := root
+	legacyRoot.AwContext = nil
+	child := RunData{
+		RunID: 200, Repository: "org/repo", TokenUsage: 20, AIC: 0.2,
+		AwContext: &AwContext{Repo: "org/repo", RunID: "100", WorkflowCallID: episodeID, EpisodeID: episodeID},
+	}
+	grandchild := RunData{
+		RunID: 300, Repository: "org/repo", TokenUsage: 30, AIC: 0.3,
+		AwContext: &AwContext{Repo: "org/repo", RunID: "200", WorkflowCallID: "200-1:worker", EpisodeID: episodeID},
+	}
+
+	tests := []struct {
+		name      string
+		runs      []RunData
+		edgeCount int
+		tokens    int
+		aic       float64
+	}{
+		{"full chain", []RunData{root, child, grandchild}, 2, 60, 0.6},
+		{"legacy root", []RunData{legacyRoot, child, grandchild}, 2, 60, 0.6},
+		{"reversed chain", []RunData{grandchild, child, root}, 2, 60, 0.6},
+		{"missing root", []RunData{child, grandchild}, 1, 50, 0.5},
+		{"missing middle", []RunData{root, grandchild}, 0, 40, 0.4},
+		{"single descendant", []RunData{grandchild}, 0, 30, 0.3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			episodes, edges := buildEpisodeData(tt.runs, nil)
+			require.Len(t, episodes, 1)
+			assert.Equal(t, episodeID, episodes[0].EpisodeID)
+			assert.Equal(t, len(tt.runs), episodes[0].TotalRuns)
+			assert.Equal(t, tt.tokens, episodes[0].TotalTokens)
+			assert.InDelta(t, tt.aic, episodes[0].TotalAIC, 1e-9)
+			require.Len(t, edges, tt.edgeCount)
+			for _, edge := range edges {
+				assert.Equal(t, episodeID, edge.EpisodeID)
+				assert.NotEqual(t, edge.SourceRunID, edge.TargetRunID)
+			}
+		})
+	}
+}
+
+func TestBuildEpisodeDataRejectsConflictingCanonicalLineage(t *testing.T) {
+	t.Parallel()
+
+	for _, runs := range [][]RunData{
+		{
+			{RunID: 100, AwContext: &AwContext{EpisodeID: "episode-a"}},
+			{RunID: 200, AwContext: &AwContext{RunID: "100", EpisodeID: "episode-b"}},
+		},
+		{
+			{RunID: 100, AwContext: &AwContext{EpisodeID: "episode-a"}},
+			{RunID: 150, AwContext: &AwContext{RunID: "100"}},
+			{RunID: 200, AwContext: &AwContext{RunID: "150", EpisodeID: "episode-b"}},
+		},
+	} {
+		episodes, edges := buildEpisodeData(runs, nil)
+		require.Len(t, episodes, 2)
+		for _, edge := range edges {
+			assert.NotEqual(t, int64(200), edge.TargetRunID, "a legacy bridge must not merge different canonical episodes")
+		}
+		ids := []string{episodes[0].EpisodeID, episodes[1].EpisodeID}
+		assert.ElementsMatch(t, []string{"episode-a", "episode-b"}, ids)
+	}
+}
+
+func TestBuildEpisodeDataCanonicalContextDoesNotInferMissingCaller(t *testing.T) {
+	t.Parallel()
+
+	created := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	runs := []RunData{
+		{RunID: 100, Event: "push", Repository: "org/repo", HeadSHA: "abc", Branch: "main", CreatedAt: created},
+		{
+			RunID: 200, Event: "workflow_run", Repository: "org/repo", HeadSHA: "abc", Branch: "main", CreatedAt: created.Add(time.Minute),
+			AwContext: &AwContext{RunID: "999", EpisodeID: "canonical-episode"},
+		},
+	}
+	episodes, edges := buildEpisodeData(runs, nil)
+	assert.Len(t, episodes, 2)
+	assert.Empty(t, edges, "a matching SHA is not a substitute for the absent canonical caller")
+}
+
+func TestBuildEpisodeDataSharedRunDoesNotCreateSelfEdge(t *testing.T) {
+	t.Parallel()
+
+	run := RunData{
+		RunID: 100, Event: "workflow_call", TokenUsage: 20,
+		AwContext: &AwContext{
+			RunID: "100", EpisodeID: "root-episode",
+			HopID: "100-1:caller", ParentHopID: "100-1:root",
+		},
+	}
+	episodes, edges := buildEpisodeData([]RunData{run}, nil)
+	require.Len(t, episodes, 1)
+	assert.Equal(t, "root-episode", episodes[0].EpisodeID)
+	assert.Equal(t, 1, episodes[0].TotalRuns)
+	assert.Equal(t, 20, episodes[0].TotalTokens)
+	assert.Empty(t, edges, "hop relationships within a shared run are not run-to-run edges")
+}
+
+func TestBuildDispatchEpisodeEdgeRejectsRepositoryMismatch(t *testing.T) {
+	t.Parallel()
+
+	run := RunData{RunID: 200, AwContext: &AwContext{RunID: "100", Repo: "other/repo"}}
+	_, ok := buildDispatchEpisodeEdge(run, map[int64]RunData{100: {RunID: 100, Repository: "org/repo"}})
+	assert.False(t, ok)
+}
+
 func TestBuildEpisodeDataAggregatesToolCallsAcrossRuns(t *testing.T) {
 	t.Parallel()
 

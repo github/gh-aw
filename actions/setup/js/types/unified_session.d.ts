@@ -274,6 +274,17 @@ export interface DailyAICDecisionData {
   threshold?: number;
 }
 
+/** Observed lineage from aw_info.context; hopId identifies the recorded caller. */
+export interface EpisodeLineageData {
+  episodeId?: JsonValue;
+  hopId?: JsonValue;
+  parentHopId?: JsonValue;
+  originEvent?: JsonValue;
+  rootRepo?: JsonValue;
+  rootWorkflowId?: JsonValue;
+  rootRunId?: JsonValue;
+}
+
 export interface WorkflowInfoData {
   engineId?: JsonValue;
   agentVersion?: JsonValue;
@@ -288,6 +299,7 @@ export interface WorkflowInfoData {
   workflow?: JsonValue;
   repository?: JsonValue;
   runId?: JsonValue;
+  episode?: EpisodeLineageData | null;
 }
 
 export interface GitHubApiRateLimitData {
