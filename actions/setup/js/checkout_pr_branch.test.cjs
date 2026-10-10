@@ -120,6 +120,7 @@ describe("checkout_pr_branch.cjs", () => {
 
     process.env.GITHUB_TOKEN = "test-token";
     process.env.GITHUB_SERVER_URL = "https://github.com";
+    delete process.env.GH_AW_ALLOWED_BOTS;
   });
 
   afterEach(() => {
@@ -129,6 +130,7 @@ describe("checkout_pr_branch.cjs", () => {
     delete global.github;
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITHUB_SERVER_URL;
+    delete process.env.GH_AW_ALLOWED_BOTS;
     vi.clearAllMocks();
   });
 
@@ -205,6 +207,9 @@ If the pull request is still open, verify that:
       }
       if (module === "./error_codes.cjs") {
         return require("./error_codes.cjs");
+      }
+      if (module === "./check_permissions_utils.cjs") {
+        return require("./check_permissions_utils.cjs");
       }
       throw new Error(`Module ${module} not mocked in test`);
     };
@@ -456,6 +461,233 @@ If the pull request is still open, verify that:
         expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
+
+      it.each(["issue_comment", "pull_request_review_comment"].flatMap(eventName => ["my-app", "my-app[bot]"].flatMap(actor => ["my-app", "my-app[bot]"].map(login => [eventName, actor, login]))))(
+        "should allow an allow-listed App comment on a same-repository PR for %s with actor %s and login %s",
+        async (eventName, actor, login) => {
+          mockContext.eventName = eventName;
+          mockContext.actor = actor;
+          mockContext.payload.sender = { login, type: "Bot" };
+          mockContext.payload.comment = { user: { login } };
+          mockContext.payload.repository.id = 42;
+          mockContext.payload.pull_request = { number: 123, state: "open" };
+          if (eventName === "issue_comment") {
+            mockContext.payload.issue = { number: 123, state: "open", pull_request: {} };
+            delete mockContext.payload.pull_request;
+          }
+          mockGithub.rest.pulls.get.mockResolvedValue({
+            data: {
+              commits: 1,
+              head: { ref: "feature-branch", repo: { id: 42, full_name: "test-owner/test-repo" } },
+              base: { repo: { id: 42, full_name: "test-owner/test-repo" } },
+            },
+          });
+          process.env.GH_AW_ALLOWED_BOTS = "other-bot,my-app";
+          mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+          await runScript();
+
+          expect(mockGithub.rest.pulls.get).toHaveBeenCalledTimes(1);
+          expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+          expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+          expect(mockExec.exec).toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin"]));
+        }
+      );
+
+      it.each([
+        ["bot not allow-listed", "", "my-app[bot]", "Bot", 42, 42, 42],
+        ["different comment author", "my-app[bot]", "other[bot]", "Bot", 42, 42, 42],
+        ["different author login form", "my-app[bot]", "my-app", "Bot", 42, 42, 42],
+        ["missing comment author", "my-app[bot]", undefined, "Bot", 42, 42, 42],
+        ["non-bot sender", "my-app[bot]", "my-app[bot]", "User", 42, 42, 42],
+        ["fork PR", "my-app[bot]", "my-app[bot]", "Bot", 43, 42, 42],
+        ["missing head ID", "my-app[bot]", "my-app[bot]", "Bot", undefined, 42, 42],
+        ["mismatched base ID", "my-app[bot]", "my-app[bot]", "Bot", 42, 43, 42],
+        ["missing runtime ID", "my-app[bot]", "my-app[bot]", "Bot", 42, 42, undefined],
+      ])("should require collaborator permission for %s on a comment", async (_reason, bots, author, senderType, headId, baseId, repositoryId) => {
+        mockContext.eventName = "issue_comment";
+        mockContext.actor = "my-app[bot]";
+        mockContext.payload.sender = { login: "my-app[bot]", type: senderType };
+        mockContext.payload.comment = { user: { login: author } };
+        mockContext.payload.repository.id = repositoryId;
+        mockContext.payload.issue = { number: 123, state: "open", pull_request: {} };
+        delete mockContext.payload.pull_request;
+        mockGithub.rest.pulls.get.mockResolvedValue({
+          data: {
+            commits: 1,
+            head: { ref: "feature-branch", repo: { id: headId, full_name: "test-owner/test-repo" } },
+            base: { repo: { id: baseId, full_name: "test-owner/test-repo" } },
+          },
+        });
+        process.env.GH_AW_ALLOWED_BOTS = bots;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      });
+
+      it.each(["issue_comment", "pull_request_review_comment"])("should reject an allow-listed comment sender that differs from the runtime actor for %s", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.actor = "other-app";
+        mockContext.payload.sender = { login: "my-app[bot]", type: "Bot" };
+        mockContext.payload.comment = { user: { login: "my-app[bot]" } };
+        mockContext.payload.repository.id = 42;
+        mockContext.payload.issue = { number: 123, state: "open", pull_request: {} };
+        process.env.GH_AW_ALLOWED_BOTS = "my-app,other-app";
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "other-app" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      });
+
+      const commentCheckoutConformanceCases = [
+        {
+          name: "allow-listed App slug matches its bot-form sender",
+          actor: "my-app",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app[bot]",
+          allowListed: true,
+          senderType: "Bot",
+          repositoryRelation: "same",
+          permission: "none",
+          expectedBypass: true,
+        },
+        {
+          name: "allow-listed App bot identity matches its slug-form sender",
+          actor: "my-app[bot]",
+          sender: "my-app",
+          commentAuthor: "my-app",
+          allowListed: true,
+          senderType: "Bot",
+          repositoryRelation: "same",
+          permission: "none",
+          expectedBypass: true,
+        },
+        {
+          name: "sender and comment author must match exactly",
+          actor: "my-app",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app",
+          allowListed: true,
+          senderType: "Bot",
+          repositoryRelation: "same",
+          permission: "none",
+          expectedBypass: false,
+        },
+        {
+          name: "runtime actor must canonically match the sender",
+          actor: "other",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app[bot]",
+          allowListed: true,
+          senderType: "Bot",
+          repositoryRelation: "same",
+          permission: "none",
+          expectedBypass: false,
+        },
+        {
+          name: "sender must be allow-listed",
+          actor: "my-app",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app[bot]",
+          allowListed: false,
+          senderType: "Bot",
+          repositoryRelation: "same",
+          permission: "none",
+          expectedBypass: false,
+        },
+        {
+          name: "both PR repositories must match the workflow repository",
+          actor: "my-app",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app[bot]",
+          allowListed: true,
+          senderType: "Bot",
+          repositoryRelation: "fork",
+          permission: "none",
+          expectedBypass: false,
+        },
+        {
+          name: "head repository identity must be present",
+          actor: "my-app",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app[bot]",
+          allowListed: true,
+          senderType: "Bot",
+          repositoryRelation: "missing-head",
+          permission: "none",
+          expectedBypass: false,
+        },
+        {
+          name: "base repository identity must be present",
+          actor: "my-app",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app[bot]",
+          allowListed: true,
+          senderType: "Bot",
+          repositoryRelation: "missing-base",
+          permission: "none",
+          expectedBypass: false,
+        },
+        {
+          name: "sender must be a bot",
+          actor: "my-app",
+          sender: "my-app[bot]",
+          commentAuthor: "my-app[bot]",
+          allowListed: true,
+          senderType: "User",
+          repositoryRelation: "same",
+          permission: "none",
+          expectedBypass: false,
+        },
+      ];
+
+      it.each(["issue_comment", "pull_request_review_comment"].flatMap(eventName => commentCheckoutConformanceCases.map(testCase => ({ eventName, ...testCase }))))(
+        "conforms to the comment checkout policy for $eventName: $name",
+        async testCase => {
+          mockContext.eventName = testCase.eventName;
+          mockContext.actor = testCase.actor;
+          mockContext.payload.sender = { login: testCase.sender, type: testCase.senderType };
+          mockContext.payload.comment = { user: { login: testCase.commentAuthor } };
+          mockContext.payload.repository.id = 42;
+          mockContext.payload.pull_request = { number: 123, state: "open" };
+          if (testCase.eventName === "issue_comment") {
+            mockContext.payload.issue = { number: 123, state: "open", pull_request: {} };
+            delete mockContext.payload.pull_request;
+          }
+          const headId = testCase.repositoryRelation === "same" || testCase.repositoryRelation === "missing-base" ? 42 : testCase.repositoryRelation === "missing-head" ? undefined : 43;
+          const baseId = testCase.repositoryRelation === "missing-base" ? undefined : 42;
+          mockGithub.rest.pulls.get.mockResolvedValue({
+            data: {
+              commits: 1,
+              head: { ref: "feature-branch", repo: { id: headId, full_name: "test-owner/test-repo" } },
+              base: { repo: { id: baseId, full_name: "test-owner/test-repo" } },
+            },
+          });
+          process.env.GH_AW_ALLOWED_BOTS = testCase.allowListed ? "my-app" : "";
+          mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
+            data: { permission: testCase.permission },
+          });
+
+          await runScript();
+
+          if (testCase.expectedBypass) {
+            expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+            expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+            expect(mockExec.exec).toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin"]));
+          } else {
+            expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
+            expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+            expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin"]));
+          }
+        }
+      );
 
       it("should validate centralized workflow_dispatch using the originating aw_context actor", async () => {
         mockContext.eventName = "workflow_dispatch";

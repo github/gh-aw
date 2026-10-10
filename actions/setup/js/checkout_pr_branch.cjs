@@ -33,6 +33,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
 const { detectForkPR } = require("./pr_helpers.cjs");
+const { parseAllowedBots, isAllowedBot, canonicalizeBotIdentifier } = require("./check_permissions_utils.cjs");
 const { ERR_API, ERR_PERMISSION } = require("./error_codes.cjs");
 const TRUSTED_CHECKOUT_PERMISSIONS = ["write", "maintain", "admin"];
 // Centralized command/label routing uses the repository GITHUB_TOKEN, whose
@@ -305,7 +306,26 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
     pullRequest?.base?.repo?.id === context.payload.repository.id
   ) {
     core.info(`Runtime safety check passed for same-repository bot PR actor '${actor}'`);
-    return;
+    return undefined;
+  }
+
+  const runtimeRepositoryId = context.payload.repository?.id;
+  const senderLogin = context.payload.sender?.login;
+  if (
+    (context.eventName === "issue_comment" || context.eventName === "pull_request_review_comment") &&
+    senderType === "Bot" &&
+    typeof senderLogin === "string" &&
+    context.payload.comment?.user?.login === senderLogin &&
+    canonicalizeBotIdentifier(senderLogin) === canonicalizeBotIdentifier(actor) &&
+    isAllowedBot(actor, parseAllowedBots()) &&
+    Number.isSafeInteger(runtimeRepositoryId) &&
+    runtimeRepositoryId > 0
+  ) {
+    const details = await fetchPRDetails(pullRequest.number);
+    if (details.pullRequest.head?.repo?.id === runtimeRepositoryId && details.pullRequest.base?.repo?.id === runtimeRepositoryId) {
+      core.info(`Runtime safety check passed for same-repository allowed bot comment actor '${actor}'`);
+      return details;
+    }
   }
 
   // All other actors must satisfy the collaborator permission floor.
@@ -343,6 +363,7 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
     }
     throw err;
   }
+  return undefined;
 }
 
 async function main() {
@@ -413,7 +434,7 @@ async function main() {
   }
 
   try {
-    await assertTrustedCheckoutRuntime(workflowDispatchAwContext, pullRequest);
+    const trustedPRDetails = await assertTrustedCheckoutRuntime(workflowDispatchAwContext, pullRequest);
 
     // Log detailed context for debugging
     const { isFork } = logPRContext(eventName, pullRequest);
@@ -455,7 +476,7 @@ async function main() {
       // Get PR details from API to determine head ref name and commit count.
       // This also gives us the full PR object for accurate fork detection
       // when the event payload only had a minimal PR (e.g. issue_comment).
-      const { commitCount, headRef, pullRequest: fullPR } = await fetchPRDetails(prNumber);
+      const { commitCount, headRef, pullRequest: fullPR } = trustedPRDetails || (await fetchPRDetails(prNumber));
 
       // Re-evaluate fork status with full PR data when it was unknown
       const fullPRForkDetection = detectForkPR(fullPR);

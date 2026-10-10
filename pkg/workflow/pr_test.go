@@ -553,6 +553,17 @@ func TestGeneratePRReadyForReviewCheckout_IncludesWorkflowDispatchIssueCommentCo
 	assert.Contains(t, rendered, "github.event_name == 'workflow_dispatch'")
 	assert.NotContains(t, rendered, "fromJSON(")
 	assert.Contains(t, rendered, "github.event.pull_request || github.event.issue.pull_request || github.event_name == 'workflow_dispatch'")
+	assert.NotContains(t, rendered, "GH_AW_ALLOWED_BOTS:")
+}
+
+func TestGeneratePRReadyForReviewCheckout_PassesAllowedBots(t *testing.T) {
+	compiler := NewCompiler()
+	var yaml strings.Builder
+	compiler.generatePRReadyForReviewCheckout(&yaml, &WorkflowData{
+		Permissions: "contents: read",
+		Bots:        []string{"my-app[bot]", "other-app"},
+	})
+	assert.Contains(t, yaml.String(), `GH_AW_ALLOWED_BOTS: "my-app[bot],other-app"`)
 }
 
 func TestFrontmatterHasTrigger(t *testing.T) {

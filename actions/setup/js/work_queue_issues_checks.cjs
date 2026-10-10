@@ -121,12 +121,18 @@ function mock(f, { labelMissing = false } = {}) {
       },
       git: {
         getRef: async ({ ref }) => {
+          calls.push(["ledger-ref"]);
           if (ref === "heads/main") return { data: { object: { sha: "b".repeat(40) } } };
           if (ref === "heads/work-queue") return { data: { object: { sha } } };
           throw Object.assign(new Error("Not found"), { status: 404 });
         },
-        getCommit: async () => ({ data: { tree: { sha: "c".repeat(40) }, parents: [] } }),
+        getCommit: async ({ commit_sha }) => {
+          calls.push(["ledger-commit"]);
+          assert.equal(typeof commit_sha, "string");
+          return { data: { tree: { sha: "c".repeat(40) }, parents: [] } };
+        },
         getTree: async () => {
+          calls.push(["ledger-tree"]);
           restBlobs.clear();
           const files = [["work-queue.jsonl", transactions.map(commit => canonical(commit)).join("\n") + "\n"], ...[...journals].map(([file, value]) => [file, canonical(value) + "\n"])];
           const tree = files.map(([file, content]) => {
@@ -137,6 +143,7 @@ function mock(f, { labelMissing = false } = {}) {
           return { data: { truncated: false, tree } };
         },
         getBlob: async ({ file_sha }) => {
+          calls.push(["ledger-blob"]);
           const content = restBlobs.get(file_sha);
           assert.equal(typeof content, "string");
           return { data: { encoding: "base64", content: Buffer.from(content, "utf8").toString("base64"), size: Buffer.byteLength(content) } };
