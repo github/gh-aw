@@ -296,13 +296,17 @@ func collectRedirectViolations(manifest *GHAWManifest, currentRedirect string) (
 }
 
 func collectMemoryValidationScriptChanges(manifest *GHAWManifest, current []GHAWManifestMemoryValidationScript) []string {
-	previous := make(map[string]string, len(manifest.MemoryValidationScripts))
-	for _, script := range manifest.MemoryValidationScripts {
-		previous[script.Memory] = script.SHA256
+	type hashes struct {
+		script      string
+		jsonSchemas string
 	}
-	currentByMemory := make(map[string]string, len(current))
+	previous := make(map[string]hashes, len(manifest.MemoryValidationScripts))
+	for _, script := range manifest.MemoryValidationScripts {
+		previous[script.Memory] = hashes{script: script.SHA256, jsonSchemas: script.JSONSchemasSHA256}
+	}
+	currentByMemory := make(map[string]hashes, len(current))
 	for _, script := range current {
-		currentByMemory[script.Memory] = script.SHA256
+		currentByMemory[script.Memory] = hashes{script: script.SHA256, jsonSchemas: script.JSONSchemasSHA256}
 	}
 	var changes []string
 	for memory, hash := range currentByMemory {

@@ -9,6 +9,7 @@ const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs")
  *   kind: "repo" | "cache" | "drive",
  *   formatJSON?: boolean,
  *   requireValidationScript?: boolean,
+ *   requireJSONSchemas?: boolean,
  *   writeMarker?: boolean,
  * }} options
  */
@@ -36,9 +37,37 @@ function validateMemoryStep(core, options) {
     }
   }
 
-  if (options.requireValidationScript || process.env.VALIDATION_SCRIPT_B64) {
+  let jsonSchemas;
+  const schemaConfigRequired = options.requireJSONSchemas || process.env.MEMORY_JSON_SCHEMAS_REQUIRED === "true";
+  const scriptRequired = options.requireValidationScript || process.env.VALIDATION_SCRIPT_REQUIRED === "true";
+  try {
+    if (process.env.MEMORY_JSON_SCHEMAS_B64) {
+      const encoded = process.env.MEMORY_JSON_SCHEMAS_B64;
+      const decodedBytes = Buffer.from(encoded, "base64");
+      if (decodedBytes.toString("base64") !== encoded) throw new TypeError("json-schemas configuration is not valid base64");
+      const decoded = decodedBytes.toString("utf8");
+      jsonSchemas = JSON.parse(decoded);
+      if (!Array.isArray(jsonSchemas) || jsonSchemas.length === 0) {
+        throw new TypeError("json-schemas must be a non-empty array");
+      }
+    } else if (schemaConfigRequired) {
+      throw new TypeError("json-schemas configuration is missing");
+    }
+  } catch (error) {
+    core.setFailed(`Memory validation configuration is invalid for '${memoryId}': ${error instanceof Error ? error.message : String(error)}`);
+    failed = true;
+  }
+
+  if (scriptRequired && !process.env.VALIDATION_SCRIPT_B64) {
+    core.setFailed(`Custom ${options.kind}-memory validation script is missing for '${memoryId}'.`);
+    failed = true;
+  }
+
+  if (!failed && (scriptRequired || process.env.VALIDATION_SCRIPT_B64 || jsonSchemas)) {
     const result = runCustomMemoryValidation({
       scriptBase64: process.env.VALIDATION_SCRIPT_B64,
+      jsonSchemas,
+      requireJSONSchemas: schemaConfigRequired,
       memoryDir,
       memoryId,
       kind: options.kind,
@@ -48,10 +77,10 @@ function validateMemoryStep(core, options) {
       core.info(`Custom ${options.kind}-memory validation stdout:\n${result.stdout}`);
     }
     if (result.stderr) {
-      core.info(`Custom ${options.kind}-memory validation stderr:\n${result.stderr}`);
+      core.info(`${jsonSchemas ? "Memory" : "Custom"} ${options.kind}-memory validation stderr:\n${result.stderr}`);
     }
     if (!result.ok) {
-      core.setFailed(`Custom ${options.kind}-memory validation failed for '${memoryId}': ${result.timedOut ? "timed out" : `exited with code ${result.exitCode}`}.`);
+      core.setFailed(`${jsonSchemas ? "Memory" : "Custom"} ${options.kind}-memory validation failed for '${memoryId}': ${result.timedOut ? "timed out" : `exited with code ${result.exitCode}`}.${result.stderr ? ` ${result.stderr}` : ""}`);
       failed = true;
     }
   }

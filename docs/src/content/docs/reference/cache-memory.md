@@ -29,6 +29,17 @@ tools:
     allowed-extensions: [".json", ".txt", ".md"]  # Restrict file types (default: .json, .jsonl, .txt, .md, .csv)
     validation:
       timeout-minutes: 1
+      json-schemas:
+        - file: index.json
+          format: json
+          schema:
+            type: object
+            required: [entries]
+            additionalProperties: false
+            properties:
+              entries:
+                type: array
+                items: { type: string }
       script: |
         const index = JSON.parse(fs.readFileSync(path.join(memoryRoot, "index.json"), "utf8"));
         if (!Array.isArray(index.entries)) throw new Error("index.json entries must be an array");
@@ -56,7 +67,11 @@ When a cache is restored for agent execution, gh-aw also strips execute bits fro
 
 ### Custom validation
 
-Use `validation.script` for domain-specific constraints such as schema checks, cross-file uniqueness, or timestamp policies. The script is a JavaScript body executed with Node.js over the complete configured cache-memory directory after agent execution and before the cache is saved. When threat detection is enabled, the validator also runs again in the `update_cache_memory` job before `actions/cache/save`.
+Use `validation.json-schemas` for required per-file JSON/JSONL structure checks. Every declared exact relative path must match the configured `allowed-extensions` policy and exist in the candidate; missing files fail validation. JSON must contain one non-empty document. JSONL validates each record independently, accepts LF/CRLF and an optional final newline, permits an existing empty file, and rejects blank physical lines or malformed records with a line number. Validation does not rewrite data. Schemas run after filtering and configured normalization, before any optional `validation.script`, and before cache save; when threat detection is enabled, they also run in the `update_cache_memory` job before `actions/cache/save`.
+
+The supported vocabulary is limited to `type` (including type lists and `null`), primitive `enum`, `required`, nested `properties`, `additionalProperties: false`, object-schema `items`, and standalone `oneOf`/`anyOf`, with a maximum nesting depth of 32 and no sibling constraints beside alternatives. Numeric enum integers must be exactly representable by JavaScript, and values checked against numeric enums must not lose precision during JSON parsing. This is not full JSON Schema: `$ref`, `const`, schema `format`, `pattern`, numeric/string/array bounds, and `uniqueItems` are rejected. Use `validation.script` for domain-specific constraints such as cross-file uniqueness, positive-ID checks, or timestamp policies.
+
+The optional JavaScript body is executed with Node.js over the complete configured cache-memory directory after agent execution and before the cache is saved. When threat detection is enabled, it also runs again in the `update_cache_memory` job before `actions/cache/save`. Schemas always run first when both mechanisms are configured.
 
 Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, and `memoryKind` (`"cache"`). The working directory is the cache root. Environment variables available to the validator are intentionally limited to basic runner paths plus `GH_AW_MEMORY_ROOT`, `GH_AW_MEMORY_DIR`, `GH_AW_MEMORY_ID`, and `GH_AW_MEMORY_KIND`; GitHub tokens and write credentials are not passed to the validator subprocess. Network access follows the workflow runner's normal network policy. The default timeout is 1 minute and may be set with `validation.timeout-minutes` (1-5 minutes).
 

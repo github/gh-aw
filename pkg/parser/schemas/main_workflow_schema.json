@@ -5485,9 +5485,24 @@
                       "maximum": 5,
                       "default": 1,
                       "description": "Maximum validator runtime in minutes (default: 1, max: 5)"
+                    },
+                    "json-schemas": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "file": { "type": "string", "minLength": 1 },
+                          "format": { "type": "string", "enum": ["json", "jsonl"] },
+                          "schema": { "type": "object", "additionalProperties": true }
+                        },
+                        "required": ["file", "format", "schema"],
+                        "additionalProperties": false
+                      },
+                      "description": "Inline schemas enforced for required memory files before persistence"
                     }
                   },
-                  "required": ["script"],
+                  "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
                   "additionalProperties": false,
                   "description": "Custom domain validation hook for this cache-memory entry"
                 }
@@ -5557,9 +5572,24 @@
                         "maximum": 5,
                         "default": 1,
                         "description": "Maximum validator runtime in minutes (default: 1, max: 5)"
+                      },
+                      "json-schemas": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "file": { "type": "string", "minLength": 1 },
+                            "format": { "type": "string", "enum": ["json", "jsonl"] },
+                            "schema": { "type": "object", "additionalProperties": true }
+                          },
+                          "required": ["file", "format", "schema"],
+                          "additionalProperties": false
+                        },
+                        "description": "Inline schemas enforced for required memory files before persistence"
                       }
                     },
-                    "required": ["script"],
+                    "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
                     "additionalProperties": false,
                     "description": "Custom domain validation hook for this cache-memory entry"
                   }
@@ -5658,9 +5688,24 @@
                       "maximum": 5,
                       "default": 1,
                       "description": "Maximum validator runtime in minutes"
+                    },
+                    "json-schemas": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "file": { "type": "string", "minLength": 1 },
+                          "format": { "type": "string", "enum": ["json", "jsonl"] },
+                          "schema": { "type": "object", "additionalProperties": true }
+                        },
+                        "required": ["file", "format", "schema"],
+                        "additionalProperties": false
+                      },
+                      "description": "Inline schemas enforced for required memory files before persistence"
                     }
                   },
-                  "required": ["script"],
+                  "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
                   "additionalProperties": false
                 }
               },
@@ -5719,9 +5764,24 @@
                         "maximum": 5,
                         "default": 1,
                         "description": "Maximum validator runtime in minutes"
+                      },
+                      "json-schemas": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "file": { "type": "string", "minLength": 1 },
+                            "format": { "type": "string", "enum": ["json", "jsonl"] },
+                            "schema": { "type": "object", "additionalProperties": true }
+                          },
+                          "required": ["file", "format", "schema"],
+                          "additionalProperties": false
+                        },
+                        "description": "Inline schemas enforced for required memory files before persistence"
                       }
                     },
-                    "required": ["script"],
+                    "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
                     "additionalProperties": false
                   }
                 },
@@ -6021,9 +6081,24 @@
                       "maximum": 5,
                       "default": 1,
                       "description": "Maximum validator runtime in minutes (default: 1, max: 5)"
+                    },
+                    "json-schemas": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "file": { "type": "string", "minLength": 1 },
+                          "format": { "type": "string", "enum": ["json", "jsonl"] },
+                          "schema": { "type": "object", "additionalProperties": true }
+                        },
+                        "required": ["file", "format", "schema"],
+                        "additionalProperties": false
+                      },
+                      "description": "Inline schemas enforced for required memory files before persistence"
                     }
                   },
-                  "required": ["script"],
+                  "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
                   "additionalProperties": false,
                   "description": "Custom domain validation hook for this repo-memory entry"
                 }
@@ -6138,9 +6213,24 @@
                         "maximum": 5,
                         "default": 1,
                         "description": "Maximum validator runtime in minutes (default: 1, max: 5)"
+                      },
+                      "json-schemas": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "file": { "type": "string", "minLength": 1 },
+                            "format": { "type": "string", "enum": ["json", "jsonl"] },
+                            "schema": { "type": "object", "additionalProperties": true }
+                          },
+                          "required": ["file", "format", "schema"],
+                          "additionalProperties": false
+                        },
+                        "description": "Inline schemas enforced for required memory files before persistence"
                       }
                     },
-                    "required": ["script"],
+                    "anyOf": [{ "required": ["script"] }, { "required": ["json-schemas"] }],
                     "additionalProperties": false,
                     "description": "Custom domain validation hook for this repo-memory entry"
                   }

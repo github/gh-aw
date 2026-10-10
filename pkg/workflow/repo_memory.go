@@ -270,6 +270,9 @@ func parseRepoMemoryEntry(memoryMap map[string]any, workflowID, branchPrefix str
 		}
 		entry.Ledger = config
 	}
+	if err := validateMemorySchemaTargets(entry.Validation, entry.AllowedExtensions, entry.FileGlob, "tools.repo-memory.validation"); err != nil {
+		return RepoMemoryEntry{}, err
+	}
 	finalizeRepoMemoryEntry(&entry, explicitBranchName)
 	return entry, nil
 }
@@ -509,8 +512,7 @@ func generateRepoMemoryCustomValidationStep(builder *strings.Builder, memory Rep
 	builder.WriteString("        env:\n")
 	fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)
 	fmt.Fprintf(builder, "          MEMORY_ID: %s\n", memory.ID)
-	fmt.Fprintf(builder, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(memory.Validation))
-	fmt.Fprintf(builder, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(memory.Validation))
+	appendMemoryValidationEnvironment(builder, memory.Validation)
 	if memory.FormatJSON {
 		builder.WriteString("          FORMAT_JSON: 'true'\n")
 	}
@@ -519,7 +521,7 @@ func generateRepoMemoryCustomValidationStep(builder *strings.Builder, memory Rep
 	builder.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
 	builder.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	builder.WriteString("            const { validateMemoryStep } = require('${{ runner.temp }}/gh-aw/actions/validate_memory_step.cjs');\n")
-	builder.WriteString("            validateMemoryStep(core, { kind: 'repo', formatJSON: process.env.FORMAT_JSON === 'true', requireValidationScript: true });\n")
+	builder.WriteString("            validateMemoryStep(core, { kind: 'repo', formatJSON: process.env.FORMAT_JSON === 'true', requireValidationScript: process.env.VALIDATION_SCRIPT_REQUIRED === 'true' });\n")
 	return validationStepID
 }
 
@@ -762,10 +764,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	if memory.FormatJSON {
 		step.WriteString("          FORMAT_JSON: 'true'\n")
 	}
-	if memory.Validation != nil {
-		fmt.Fprintf(&step, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(memory.Validation))
-		fmt.Fprintf(&step, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(memory.Validation))
-	}
+	appendMemoryValidationEnvironment(&step, memory.Validation)
 	appendRepoMemoryLedgerLimitsEnv(&step, memory.Ledger)
 	step.WriteString("        with:\n")
 	step.WriteString("          script: |\n")

@@ -70,13 +70,25 @@ tools:
     format-json: true       # Pretty-print .json files (default: false)
     validation:
       timeout-minutes: 1
+      json-schemas:
+        - file: state.json
+          format: json
+          schema:
+            type: object
+            required: [version, items]
+            additionalProperties: false
+            properties:
+              version: { enum: [1] }
+              items:
+                type: array
+                items: { type: string }
       script: |
         const data = JSON.parse(fs.readFileSync(path.join(memoryRoot, "state.json"), "utf8"));
         if (!Array.isArray(data.items)) throw new Error("state.json must contain an items array");
 ---
 ```
 
-`branch-prefix` changes the default `memory` prefix and must be 4-32 alphanumeric, hyphen, or underscore characters; it cannot be `copilot`. `allowed-extensions` limits which file types can be stored, `format-json: true` pretty-prints `.json` files before commit, `validation.script` runs a custom JavaScript domain validator before persistence, and `max-patch-size` caps the total diff size for one push (default 10KB, max 1MB) to prevent oversized updates.
+`branch-prefix` changes the default `memory` prefix and must be 4-32 alphanumeric, hyphen, or underscore characters; it cannot be `copilot`. `allowed-extensions` limits which file types can be stored, `format-json: true` pretty-prints `.json` files before commit, `validation.json-schemas` declares mandatory per-file JSON/JSONL validation, `validation.script` runs an optional custom JavaScript domain validator, and `max-patch-size` caps the total diff size for one push (default 10KB, max 1MB) to prevent oversized updates.
 
 ## Structured Ledger
 
@@ -182,7 +194,11 @@ On a shared memory branch, `file-glob` and `allowed-extensions` scope normalizat
 
 ### Custom validation
 
-Use `validation.script` when generic storage limits are not enough. The script is a JavaScript body executed with Node.js over the complete configured memory directory after `format-json` normalization and before artifact upload or branch commit. It runs in the agent job and is re-run in the repo-memory push job as defense in depth.
+Use `validation.json-schemas` for required per-file structural checks. Every declared exact relative path must match the configured `file-glob` and `allowed-extensions` policies and exist in the candidate; missing files fail validation. A `json` file must contain one non-empty valid JSON document. A `jsonl` file is checked record by record: LF and CRLF are accepted, a final newline is optional, an existing empty file has zero records, and blank physical lines or malformed records fail with a line number. Schema checks do not coerce, default, strip, or rewrite values. They run after configured filtering and `format-json` normalization, before an optional `validation.script`, and are repeated before upload/commit and in the repo-memory push job.
+
+The supported schema vocabulary is deliberately limited to `type` (including type lists and `null`), primitive `enum`, `required`, nested `properties`, `additionalProperties: false`, object-schema `items`, and standalone `oneOf` or `anyOf`. Schemas are limited to 32 levels; alternatives cannot have sibling constraints. Numeric enum integers must be exactly representable by JavaScript, and values checked against numeric enums must not lose precision during JSON parsing. This is not full JSON Schema support: keywords such as `$ref`, `const`, `format`, `pattern`, numeric/string/array bounds, and `uniqueItems` are rejected at compile time. Use a script for cross-file rules, uniqueness, positive-ID checks, timestamps, or other unsupported constraints.
+
+Use `validation.script` when generic storage and schema checks are not enough. The script is a JavaScript body executed with Node.js over the complete configured memory directory after `format-json` normalization and before artifact upload or branch commit. It runs in the agent job and is re-run in the repo-memory push job as defense in depth.
 
 Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, and `memoryKind` (`"repo"`). These paths and the working directory point to a temporary copy of the eligible memory files, excluding the checkout's `.git` directory. Changes to this copy are not persisted and do not modify the original memory directory. This copy is not a sandbox: validators remain trusted code with the runner's filesystem permissions.
 

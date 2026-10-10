@@ -51,6 +51,31 @@ describe("validateMemoryStep", () => {
     expect(validateMemoryStep(core, { kind: "drive" })).toBe(true);
   });
 
+  it("runs required schema-only validation and fails when transported schemas are missing", () => {
+    delete process.env.VALIDATION_SCRIPT_B64;
+    fs.writeFileSync(path.join(tempDir, "state.json"), '{"version":1}');
+    const messages = [];
+    const core = {
+      info: message => messages.push(message),
+      warning: message => messages.push(`warning: ${message}`),
+      error: message => messages.push(`error: ${message}`),
+      setFailed: message => messages.push(`failed: ${message}`),
+    };
+    const schemas = [{ file: "state.json", format: "json", schema: { type: "object", required: ["version"], properties: { version: { enum: [1] } } } }];
+    process.env.MEMORY_JSON_SCHEMAS_B64 = Buffer.from(JSON.stringify(schemas)).toString("base64");
+    process.env.MEMORY_JSON_SCHEMAS_REQUIRED = "true";
+
+    expect(validateMemoryStep(core, { kind: "cache", writeMarker: true })).toBe(true);
+    expect(messages.some(message => message.includes("Declarative cache-memory schemas passed"))).toBe(true);
+    expect(fs.existsSync(getValidationMarkerPath("cache", "default"))).toBe(true);
+
+    delete process.env.MEMORY_JSON_SCHEMAS_B64;
+    fs.rmSync(getValidationMarkerPath("cache", "default"), { force: true });
+    expect(validateMemoryStep(core, { kind: "cache", writeMarker: true })).toBe(false);
+    expect(messages.some(message => message.includes("json-schemas configuration is missing"))).toBe(true);
+    expect(fs.existsSync(getValidationMarkerPath("cache", "default"))).toBe(false);
+  });
+
   it("filters (never hard-fails) disallowed-extension files uniformly across memory kinds", () => {
     delete process.env.VALIDATION_SCRIPT_B64;
     fs.writeFileSync(path.join(tempDir, "notes.json"), "{}");

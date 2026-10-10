@@ -96,18 +96,32 @@ tools:
 
 ### Custom validation
 
-For domain-specific constraints beyond `allowed-extensions` (schema checks, cross-file uniqueness, timestamp policies), add `validation.script` — a Node.js script body (globals: `fs`, `path`, `memoryRoot`, `memoryId`, `memoryKind`) run over the memory directory after agent execution and before persistence. Throwing, returning `false`, timing out, or exiting nonzero rejects the save. Default timeout 1 minute (`validation.timeout-minutes`, max 5). Same mechanism for `repo-memory`. See [cache-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/cache-memory.md#custom-validation) and [repo-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/repo-memory.md#custom-validation).
+Declare required per-file JSON and JSONL schemas with `validation.json-schemas`; this runs without a custom script for cache-memory, repo-memory, and drive-memory:
 
 ```yaml
 tools:
   cache-memory:
     validation:
+      json-schemas:
+        - file: state.json
+          format: json
+          schema:
+            type: object
+            required: [version, items]
+            additionalProperties: false
+            properties:
+              version: { enum: [1] }
+              items:
+                type: array
+                items: { type: string }
       timeout-minutes: 1
       script: |
-        const index = JSON.parse(fs.readFileSync(path.join(memoryRoot, "index.json"), "utf8"));
-        if (!Array.isArray(index.entries)) throw new Error("index.json entries must be an array");
+        if (memoryKind !== "cache") throw new Error("unexpected memory kind");
 ```
 
+Each declaration has an exact relative `file`, explicit `format` (`json` or `jsonl`), and inline schema object. A declared file must match configured file filters and exist. JSON is one non-empty document; JSONL validates records individually, accepts LF/CRLF and an optional final newline, allows an existing empty file, and rejects blank lines or malformed records with physical line numbers. Schemas validate without coercion or rewriting and run after filtering/normalization, before an optional `validation.script`; schema and script failures both reject persistence.
+
+Supported schema keywords are `type` (including arrays of types and `null`), primitive `enum`, `required`, nested `properties`, `additionalProperties: false`, object-schema `items`, and standalone `oneOf`/`anyOf`, up to 32 levels. Numeric enum integers must be exactly representable by JavaScript, and values checked against numeric enums must not lose precision during JSON parsing. This is not full JSON Schema: `$ref`, `const`, `format`, patterns, bounds, `uniqueItems`, and other unsupported keywords are rejected. Use the optional Node.js script (globals: `fs`, `path`, `memoryRoot`, `memoryId`, `memoryKind`) for cross-file uniqueness, timestamps, positive-ID checks, and other domain rules. Its timeout defaults to 1 minute (`validation.timeout-minutes`, max 5). See [cache-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/cache-memory.md#custom-validation), [repo-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/repo-memory.md#custom-validation), and [drive-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/experimental/drive-memory.md#validation).
 ### Storage path
 
 - Single cache: `/tmp/gh-aw/cache-memory/`
