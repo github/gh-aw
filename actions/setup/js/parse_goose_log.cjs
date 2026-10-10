@@ -1,5 +1,6 @@
 // @ts-check
 
+const { isDeepStrictEqual } = require("node:util");
 const { createEngineLogParser, generateCopilotCliStyleSummary, buildStepSummaryDetailsSection } = require("./log_parser_shared.cjs");
 const { createSessionEvent, isSessionEvent, isTokenCount, isMetric, reconcileSessionUsage } = require("./agent_session.cjs");
 
@@ -13,14 +14,26 @@ function isGooseEvent(event) {
   return event.type === "complete" && ["input_tokens", "output_tokens", "total_tokens"].some(key => Object.hasOwn(event, key));
 }
 
-/** @param {any} event @returns {Record<string, any>} */
+/** @param {any} event @returns {{source: Record<string, any>, invalidFields: string[]}} */
 function sourceMetadata(event) {
   const source = { ...event };
-  if (!Object.hasOwn(source, "id") && typeof event.message?.id === "string") source.id = event.message.id;
+  const invalidFields = [];
+  const validators = {
+    id: value => typeof value === "string",
+    timestamp: value => typeof value === "string" || (typeof value === "number" && Number.isFinite(value)),
+    parentId: value => value === null || typeof value === "string",
+  };
+  for (const [field, valid] of Object.entries(validators)) {
+    if (Object.hasOwn(source, field) && !valid(source[field])) {
+      invalidFields.push(field);
+      delete source[field];
+    }
+  }
+  if (source.id === undefined && typeof event.message?.id === "string") source.id = event.message.id;
   // Goose's Message.created is Unix seconds, not milliseconds.
   const seconds = event.message?.created;
   if (!Object.hasOwn(source, "timestamp") && typeof seconds === "number" && Number.isFinite(seconds) && Math.abs(seconds * 1000) <= 8640000000000000) source.timestamp = new Date(seconds * 1000).toISOString();
-  return source;
+  return { source, invalidFields };
 }
 
 /** @param {unknown} error @returns {boolean} */
@@ -71,8 +84,9 @@ function parseGooseLog(content) {
       continue;
     }
     if (!isGooseEvent(raw)) continue;
-    const source = sourceMetadata(raw);
+    const { source, invalidFields } = sourceMetadata(raw);
     const emit = (type, data) => logEntries.push(createSessionEvent(source, type, data));
+    for (const field of invalidFields) emit("session.collection_warning", { code: "invalid_source_metadata", field });
     if (raw.type === "message") {
       if (!initialized) {
         const model = raw.message.metadata?.inference?.requestedModel;
@@ -80,6 +94,8 @@ function parseGooseLog(content) {
         initialized = true;
       }
       if (raw.message.role === "assistant") turns.add(raw.message.id);
+      const envelopeMetadata = Object.fromEntries(Object.entries(source).filter(([key]) => key !== "type" && key !== "message"));
+      const messageMetadata = Object.fromEntries(Object.entries(raw.message).filter(([key]) => key !== "content"));
       for (const item of raw.message.content) {
         if (!item || typeof item !== "object" || Array.isArray(item)) {
           emit("session.collection_warning", { code: "malformed_message_content" });
@@ -91,11 +107,12 @@ function parseGooseLog(content) {
           const type = item.type === "thinking" ? "assistant.reasoning" : raw.message.role === "assistant" ? "assistant.message" : "user.message";
           const key = JSON.stringify([type, raw.message.id]);
           const previous = messages.get(key);
-          const metadataKey = JSON.stringify({ ...source, type: undefined, message: { ...raw.message, content: undefined }, contentMetadata: { ...item, text: undefined, thinking: undefined } });
-          if (previous && logEntries.at(-1) === previous.event && previous.metadataKey === metadataKey) previous.event.data.content += text;
+          const contentMetadata = Object.fromEntries(Object.entries(item).filter(([key]) => key !== "text" && key !== "thinking"));
+          const metadata = { envelopeMetadata, messageMetadata, contentMetadata };
+          if (previous && logEntries.at(-1) === previous.event && isDeepStrictEqual(previous.metadata, metadata)) previous.event.data.content += text;
           else {
             const event = createSessionEvent(source, type, { content: text });
-            messages.set(key, { event, metadataKey });
+            messages.set(key, { event, metadata });
             logEntries.push(event);
           }
         } else if (item.type === "toolRequest") {
@@ -124,10 +141,9 @@ function parseGooseLog(content) {
             continue;
           }
           if (toolCompletions.has(item.id)) continue;
-          const success = result?.status === "success" && result.value?.isError !== true;
           const start = toolStarts.get(item.id);
-          // Developer shell results expose the process outcome independently of MCP status.
-          const exitCode = start?.toolName === "shell" ? value?.structuredContent?.exit_code : undefined;
+          const exitCode = value?.structuredContent?.exit_code;
+          const success = result?.status === "success" && result.value?.isError !== true && (!Number.isSafeInteger(exitCode) || exitCode === 0);
           emit("tool.execution_complete", {
             toolCallId: item.id,
             ...(start?.toolName !== undefined ? { toolName: start.toolName } : {}),
