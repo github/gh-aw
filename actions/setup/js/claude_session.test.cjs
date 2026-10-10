@@ -246,7 +246,8 @@ describe("Claude partial streaming transport", () => {
     expect(events.filter(event => event.type === "tool.execution_start")).toHaveLength(1);
     expect(events.filter(event => event.type === "tool.execution_complete")).toHaveLength(0);
     expect(events.find(event => event.uuid === "reasoning-chunk" && event.type === "assistant.reasoning").timestamp).toBe("2026-10-01T03:56:00.000Z");
-    expect(events.find(event => event.type === "claude.assistant_snapshot").data.message.content[1].text).toBe(" Answer 😀\r\n");
+    expect(start.data.snapshots[0].message.content[1].text).toBe(" Answer 😀\r\n");
+    expect(events.some(event => event.type === "claude.assistant_snapshot")).toBe(false);
     expect(projectSessionResult(events).usage).toMatchObject({ input_tokens: 2, output_tokens: 9, cache_read_input_tokens: 4 });
   });
 
