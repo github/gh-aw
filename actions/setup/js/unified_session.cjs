@@ -9,7 +9,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAgentExecution, parseAgentExitCode, validateAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
-const { normalizeEngineLogEntries } = require("./engine_log_parser.cjs");
+const { normalizeEngineLogEntries, normalizeEngineSessionEvents, parseEngineLog } = require("./engine_log_parser.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -127,22 +127,7 @@ function normalizeRuntimeEvent(component, record) {
  * @returns {SessionEvent[]}
  */
 function parseEngineSession(content, engine) {
-  const parsers = {
-    agy: ["parse_agy_log.cjs", "parseAgyLog"],
-    claude: ["parse_claude_log.cjs", "parseClaudeLog"],
-    copilot: ["parse_copilot_log.cjs", "parseCopilotLog"],
-    codex: ["parse_codex_log.cjs", "parseCodexLog"],
-    gemini: ["parse_gemini_log.cjs", "parseGeminiLog"],
-    pi: ["parse_pi_log.cjs", "parsePiLog"],
-    kiro: ["parse_kiro_log.cjs", "parseKiroLog"],
-    "deepseek-harness": ["parse_deepseek_log.cjs", "parseDeepSeekLog"],
-    "pydantic-ai": ["parse_pydantic_log.cjs", "parsePydanticLog"],
-    opencode: ["parse_opencode_log.cjs", "parseOpenCodeLog"],
-    goose: ["parse_goose_log.cjs", "parseGooseLog"],
-    custom: ["parse_custom_log.cjs", "parseCustomLog"],
-  };
-  const [moduleName, functionName] = Object.hasOwn(parsers, engine) ? parsers[engine] : parsers.custom;
-  const parsed = Object.hasOwn(parsers, engine) ? require(`./${moduleName}`)[functionName](content) : require(`./${moduleName}`)[functionName](content, engine);
+  const parsed = parseEngineLog(content, engine);
   const events = parsed.logEntries ?? [];
   const observations = events.filter(isAgentExecutionEvent).map(event => event.data);
   if (observations.length) return events;
@@ -228,7 +213,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const add = (file, component, phase, type, timestampUnit = "milliseconds") => {
     if (!exists(file)) return 0;
     const events = [];
-    const input = records(file);
+    const input = component === "agent" ? normalizeEngineSessionEvents(records(file), engine ?? "custom") : records(file);
     const normalized = component === "agent" ? normalizeEngineLogEntries(input, engine ?? "custom") : [];
     const hasLegacyContent = normalized.some(event => ["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message", "tool.execution_start", "tool.execution_complete"].includes(event.type));
     for (const record of input) {

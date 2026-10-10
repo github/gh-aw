@@ -3,11 +3,57 @@ import { parsePiLog } from "./parse_pi_log.cjs";
 import { transformPiV3Entries, computePiV3Stats } from "./pi_session.cjs";
 import { success, failure } from "./fixtures/pi_ci_stream.cjs";
 import { normalizeAgentSession, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
+import { mergeSessionSources } from "./unified_session.cjs";
+import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
+import { createSessionValidator } from "./scripts/validate_session.cjs";
 
 const parse = records => parsePiLog(records.map(record => JSON.stringify(record)).join("\n"));
 const byType = (events, type) => events.filter(event => event.type === type);
 
 describe("Pi CI stream regressions", () => {
+  it.each([
+    ["success", success],
+    ["provider failure", failure],
+  ])("projects the sampled %s stream into standard session events", (_, records) => {
+    const events = parse(records).logEntries;
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "pi-streaming.jsonl", events }]);
+    expect(unified.some(event => event.type.startsWith("pi."))).toBe(false);
+    expect(byType(unified, "assistant.message").map(event => event.data.content)).toEqual(byType(events, "assistant.message").map(event => event.data.content));
+    expect(byType(unified, "tool.execution_update").map(event => event.data.output)).toEqual(byType(events, "tool.execution_update").map(event => event.data.output));
+    const validate = createSessionValidator("unified").event;
+    for (const event of unified) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    expect(normalizeAgentSession(events)).toEqual(events);
+  });
+
+  it("preserves interrupted arguments, orphan deltas and partial tool results in the compact format", () => {
+    const records = [
+      { type: "message_update", id: "start", assistantMessageEvent: { type: "toolcall_start", contentIndex: 1, id: "call", toolName: "lookup" } },
+      { type: "message_update", assistantMessageEvent: { type: "toolcall_delta", contentIndex: 1, delta: '{"query":' } },
+      { type: "tool_execution_update", id: "progress", parentId: "start", timestamp: 0, toolCallId: "call", parentToolCallId: "parent", toolName: "lookup", args: false, partialResult: 0 },
+      { type: "message_update", id: "orphan", assistantMessageEvent: { type: "toolcall_delta", contentIndex: 2, delta: "false" } },
+    ];
+    const events = transformPiV3Entries(records).map(event => normalizeUnifiedSessionEvent(event));
+    expect(events).toEqual([
+      { type: "tool.execution_start", id: "start", data: { toolCallId: "call", toolName: "lookup", input: '{"query":' } },
+      { type: "tool.execution_update", id: "progress", parentId: "start", timestamp: 0, data: { toolCallId: "call", parentToolCallId: "parent", toolName: "lookup", input: false, output: 0, partial: true } },
+      { type: "tool.execution_update", id: "orphan", data: { input: "false", delta: true, partial: true, contentIndex: 2 } },
+    ]);
+  });
+
+  it.each(["done", "error"])("maps a %s update without duplicating later finalized message observations", type => {
+    const message = { role: "assistant", content: [{ type: "text", text: "exact\n" }], usage: { input: 3, output: 1 }, ...(type === "error" ? { errorMessage: { code: "interrupted" } } : {}) };
+    const records = [
+      { type: "message_update", assistantMessageEvent: { type, [type === "error" ? "error" : "message"]: message } },
+      { type: "message_end", message },
+      { type: "turn_end", message },
+      { type: "agent_end", messages: [message] },
+    ];
+    const events = parse(records).logEntries;
+    expect(byType(events, "assistant.message").map(event => event.data.content)).toEqual(["exact\n"]);
+    expect(byType(events, "session.error")).toHaveLength(type === "error" ? 1 : 0);
+    expect(selectSessionResult(events)).toMatchObject({ numTurns: 1, usage: { input_tokens: 3, output_tokens: 1 } });
+  });
+
   it("preserves child model evidence without counting child answers as parent messages or usage", () => {
     const parent = { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Parent answer" }], usage: { input: 10, output: 3 } } };
     const child = {
@@ -91,8 +137,11 @@ describe("Pi CI stream regressions", () => {
     expect(byType(logEntries, "user.message").map(e => e.data.content)).toEqual(["SANITIZED PRIVATE PROMPT"]);
     expect(markdown).not.toContain("SANITIZED PRIVATE PROMPT");
     expect(markdown).not.toContain("SANITIZED SYSTEM PROMPT");
-    expect(byType(logEntries, "pi.tool_execution_update")[0].data.partialResult).toEqual(success[14].partialResult);
-    expect(selectSessionResult(logEntries)).toMatchObject({ numTurns: 2, totalCostUsd: 0, usage: { input_tokens: 6427, output_tokens: 145, cache_read_input_tokens: 1540, cache_creation_input_tokens: 1 } });
+    expect(byType(logEntries, "tool.execution_update")[0].data).toMatchObject({ output: success[14].partialResult, partial: true });
+    expect(logEntries.some(event => event.type.startsWith("pi."))).toBe(false);
+    expect(byType(logEntries, "assistant.message")[0].data).toMatchObject({ model: "gpt-5.4", messageId: "sanitized-response-2", messageMetadata: { stopReason: "stop" } });
+    expect(byType(logEntries, "tool.execution_start")[0].data).toMatchObject({ model: "gpt-5.4", messageId: "sanitized-response-1", messageMetadata: { stopReason: "toolUse" } });
+    expect(selectSessionResult(logEntries)).toMatchObject({ sourceEngine: "pi", numTurns: 2, totalCostUsd: 0, usage: { input_tokens: 6427, output_tokens: 145, cache_read_input_tokens: 1540, cache_creation_input_tokens: 1 } });
     expect(selectSessionResult(logEntries).usage.input_tokens_include_cache).toBe(false);
     expect(sessionTokenTotal(selectSessionResult(logEntries).usage)).toBe(8113);
     expect(logEntries.some(e => e.type === "result")).toBe(false);
@@ -110,6 +159,8 @@ describe("Pi CI stream regressions", () => {
     });
     expect(markdown).toContain("model_not_supported");
     expect(byType(logEntries, "assistant.message")).toEqual([]);
+    expect(byType(logEntries, "session.error")).toHaveLength(1);
+    expect(byType(logEntries, "session.error")[0].data.error).toContain("model_not_supported");
     expect(byType(logEntries, "tool.execution_complete")).toEqual([]);
   });
 
@@ -125,7 +176,7 @@ describe("Pi CI stream regressions", () => {
       { type: "turn_end", message },
       { type: "agent_end", messages: [message] },
     ]);
-    expect(events.filter(e => !e.type.startsWith("pi.")).map(e => e.type)).toEqual(["assistant.message", "tool.execution_start", "tool.execution_complete", "assistant.message"]);
+    expect(events.map(e => e.type)).toEqual(["assistant.message", "tool.execution_start", "tool.execution_complete", "assistant.message"]);
     expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual([" before", " after!\n"]);
     expect(
       byType(events, "assistant.message")
@@ -147,7 +198,7 @@ describe("Pi CI stream regressions", () => {
       { type: "turn_end", message },
       { type: "agent_end", messages: [message] },
     ]);
-    const ordered = events.filter(e => !e.type.startsWith("pi."));
+    const ordered = events;
     expect(ordered.map(e => e.type)).toEqual(["assistant.message", "tool.execution_start", "tool.execution_complete", "assistant.message"]);
     expect(ordered[0]).toMatchObject({ id: "before", data: { content: " before\n" } });
     expect(ordered[3]).toMatchObject({ id: "after", data: { content: "\nafter\n" } });
@@ -167,7 +218,7 @@ describe("Pi CI stream regressions", () => {
       { type: "message_end", message },
       { type: "agent_end", messages: [message] },
     ]);
-    expect(events.filter(e => !e.type.startsWith("pi.")).map(e => e.type)).toEqual(["assistant.message", "vendor.progress", "assistant.message"]);
+    expect(events.map(e => e.type)).toEqual(["assistant.message", "vendor.progress", "assistant.message"]);
     const text = byType(events, "assistant.message");
     expect(text.map(e => e.id)).toEqual(["first", "second"]);
     expect(text.map(e => e.data.content).join("")).toBe("right\n");
@@ -207,7 +258,7 @@ describe("Pi CI stream regressions", () => {
       { type: "error", error: "interrupted" },
     ];
     const events = transformPiV3Entries(records);
-    expect(events.map(e => e.type)).toEqual(["assistant.reasoning", "vendor.progress", "assistant.reasoning", "assistant.message", "tool.execution_start", "assistant.message", "pi.error"]);
+    expect(events.map(e => e.type)).toEqual(["assistant.reasoning", "vendor.progress", "assistant.reasoning", "assistant.message", "tool.execution_start", "assistant.message", "session.error"]);
     expect(events[0]).toMatchObject({ id: "reasoning", timestamp: 1, data: { content: " why\n" } });
     expect(events[3]).toMatchObject({ id: "answer", timestamp: 2, data: { content: " first\n" } });
     expect(
@@ -305,7 +356,8 @@ describe("Pi CI stream regressions", () => {
     expect(byType(result.logEntries, "tool.execution_start")[0].data).toMatchObject({ toolCallId: "dangling", toolName: "bash" });
     expect(byType(result.logEntries, "tool.execution_complete")).toHaveLength(1);
     expect(byType(result.logEntries, "tool.execution_complete")[0].data).toMatchObject({ toolCallId: "orphan", success: false });
-    expect(byType(result.logEntries, "pi.message_update").at(-1).data.delta).toBe('{"command":');
+    expect(byType(result.logEntries, "tool.execution_start")[0].data.argumentText).toBe('{"command":');
+    expect(result.logEntries.some(event => event.type.startsWith("pi."))).toBe(false);
     expect(selectSessionResult(result.logEntries).errors).toContainEqual({ code: "interrupted" });
   });
 
@@ -319,7 +371,7 @@ describe("Pi CI stream regressions", () => {
     ];
     const original = structuredClone(records);
     const events = transformPiV3Entries(records);
-    expect(events.map(event => event.type)).toEqual(["pi.message_update", "tool.execution_start", "pi.message_update", "vendor.interleaved", "pi.message_update"]);
+    expect(events.map(event => event.type)).toEqual(["tool.execution_start", "vendor.interleaved"]);
     const start = byType(events, "tool.execution_start")[0];
     expect(start.id).toBe("start");
     expect(start.data).toMatchObject({ toolCallId: "call", toolName: "bash", argumentText: '{"command":', input: { command: "echo exact" } });
@@ -452,7 +504,7 @@ describe("Pi CI stream regressions", () => {
       { type: "result", errors: ["terminal diagnostic"] },
     ]).logEntries;
     expect(byType(events, "session.result")).toHaveLength(1);
-    expect(byType(events, "pi.error")).toHaveLength(1);
+    expect(byType(events, "session.error")).toHaveLength(2);
     expect(selectSessionResult(events).errors).toEqual(["terminal diagnostic", "same diagnostic", "same diagnostic"]);
   });
 
@@ -513,8 +565,8 @@ describe("Pi CI stream regressions", () => {
     ]);
     expect(events[0].data.parentToolCallId).toBe("outer");
     expect(events[1].data.parentToolCallId).toBe("outer");
-    expect(events.map(event => event.type)).toContain("pi.agent_settled");
-    expect(events.map(event => event.type)).toContain("pi.auto_retry_start");
+    expect(events.map(event => event.type)).toContain("session.idle");
+    expect(events.map(event => event.type)).toContain("session.retry_start");
   });
 
   it("deduplicates snapshots and diagnostics independently of object key insertion order", () => {
