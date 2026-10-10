@@ -150,10 +150,6 @@ func subagentObservedModels(summary *TokenUsageSummary) map[string]*ModelTokenUs
 	return summary.ByModel
 }
 
-func matchesDeclaredModel(pattern, observed, provider string) bool {
-	return newModelIdentityResolver("").matches(pattern, observed, provider)
-}
-
 func generateSubagentModelFindings(summary *TokenUsageSummary) []AuditFinding {
 	if summary == nil {
 		return nil
