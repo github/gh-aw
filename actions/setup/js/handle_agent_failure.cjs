@@ -32,6 +32,7 @@ const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
+const { spawnSync } = require("child_process");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -39,6 +40,7 @@ const path = require("path");
 
 const DEFAULT_ACTION_FAILURE_ISSUE_EXPIRES_HOURS = 24 * 7;
 const ALLOWED_AGENT_CONCLUSIONS = new Set(["success", "failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale"]);
+const MAX_JOB_LOG_ARCHIVE_SIZE = 64 * 1024 * 1024;
 /** Claude Code error emitted when a `--continue` resume finds no deferred tool marker. */
 const NO_DEFERRED_MARKER_LINE_RE = /No deferred tool marker found/i;
 /** Claude harness line reporting that the no-deferred-marker error was recovered by a fresh retry. */
@@ -1752,6 +1754,56 @@ function buildReportIncompleteContext(items) {
 }
 
 /**
+ * Decode an Actions job log response, including the ZIP archive returned by the REST API.
+ * @param {unknown} data
+ * @returns {string|null}
+ */
+function decodeJobLogResponse(data) {
+  if (typeof data === "string") {
+    return data;
+  }
+  if (!(data instanceof ArrayBuffer) && !(data instanceof Uint8Array)) {
+    return null;
+  }
+
+  const bytes = data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)) : Buffer.from(data);
+  const signature = bytes.subarray(0, 4);
+  const isZip = signature.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) || signature.equals(Buffer.from([0x50, 0x4b, 0x05, 0x06])) || signature.equals(Buffer.from([0x50, 0x4b, 0x07, 0x08]));
+  if (!isZip) {
+    return bytes.toString("utf8");
+  }
+  if (bytes.length > MAX_JOB_LOG_ARCHIVE_SIZE) {
+    throw new Error("Actions job log archive exceeds the size limit");
+  }
+
+  let tempDir;
+  try {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-job-logs-"));
+  } catch (error) {
+    throw new Error("Unable to extract Actions job log archive", { cause: error });
+  }
+  const archivePath = path.join(tempDir, "logs.zip");
+  try {
+    try {
+      fs.writeFileSync(archivePath, bytes, { mode: 0o600 });
+    } catch (error) {
+      throw new Error("Unable to extract Actions job log archive", { cause: error });
+    }
+    const result = spawnSync("unzip", ["-p", archivePath], { maxBuffer: MAX_JOB_LOG_ARCHIVE_SIZE, timeout: 30_000 });
+    if (result.error || result.status !== 0) {
+      throw new Error("Unable to extract Actions job log archive");
+    }
+    return result.stdout.toString("utf8");
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      core.debug("Unable to clean up the temporary Actions job log directory");
+    }
+  }
+}
+
+/**
  * Find the failed agent step and collect bounded diagnostics for generic failure reports.
  * @returns {Promise<{failingStep: string, agentConclusion?: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string}>}
  */
@@ -1812,15 +1864,8 @@ async function getFailedAgentDiagnostics() {
       ...context.repo,
       job_id: agentJob.id,
     });
-    const data = response.data;
-    let log;
-    if (typeof data === "string") {
-      log = data;
-    } else if (data instanceof ArrayBuffer) {
-      log = Buffer.from(new Uint8Array(data)).toString("utf8");
-    } else if (data instanceof Uint8Array) {
-      log = Buffer.from(data).toString("utf8");
-    } else {
+    const log = decodeJobLogResponse(response.data);
+    if (log === null) {
       return { failingStep, agentConclusion, logUnavailable: "The Actions logs API returned an unsupported log format." };
     }
     const lines = log.split(/\r?\n/).filter(line => {
@@ -1838,7 +1883,13 @@ async function getFailedAgentDiagnostics() {
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
     const reason =
-      status === 403 ? "The Actions logs API denied access; ensure the conclusion job grants actions: read." : status === 404 || status === 410 ? "The Actions job log was unavailable or expired." : "The Actions job log request failed.";
+      status === 403
+        ? "The Actions logs API denied access; ensure the conclusion job grants actions: read."
+        : status === 404 || status === 410
+          ? "The Actions job log was unavailable or expired."
+          : error instanceof Error && error.message === "Unable to extract Actions job log archive"
+            ? "The Actions job log archive could not be extracted."
+            : "The Actions job log request failed.";
     core.warning(reason);
     return { failingStep, agentConclusion, logUnavailable: reason };
   }

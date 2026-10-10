@@ -2,8 +2,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { createRequire } from "module";
+import { execFileSync } from "node:child_process";
 import { syncRuntimePromptTemplates } from "./test_prompt_templates.js";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -78,6 +79,7 @@ describe("handle_agent_failure", () => {
     delete process.env.GITHUB_SHA;
     delete process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF;
     delete process.env.GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS;
+    delete process.env.GH_AW_AGENT_CONCLUSION;
     delete process.env.GH_AW_GROUP_REPORTS;
   });
 
@@ -436,6 +438,28 @@ describe("handle_agent_failure", () => {
       const diagnostics = await getFailedAgentDiagnostics();
       expect(diagnostics.logExcerpt.length).toBeLessThanOrEqual(8000);
       expect(diagnostics.logExcerpt).toContain("final error");
+    });
+
+    it("extracts ZIP job logs before redacting and selecting the failed step", async () => {
+      const tempDir = mkdtempSync(join(require("os").tmpdir(), "gh-aw-job-logs-test-"));
+      const archivePath = join(tempDir, "logs.zip");
+      try {
+        writeFileSync(join(tempDir, "1_Set up job.txt"), "2026-10-10T10:00:00.000Z ::add-mask::zip-private-value\n");
+        writeFileSync(join(tempDir, "2_Run agent.txt"), "2026-10-10T10:00:01.500Z failure zip-private-value\n");
+        writeFileSync(join(tempDir, "3_Cleanup.txt"), "2026-10-10T10:00:02.500Z cleanup output\n");
+        execFileSync("zip", ["-q", archivePath, "1_Set up job.txt", "2_Run agent.txt", "3_Cleanup.txt"], { cwd: tempDir });
+        mockFailedStepLog("");
+        const jobs = await global.github.paginate();
+        jobs[0].steps.push({ name: "Cleanup", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:03Z" });
+        global.github.request.mockResolvedValue({ data: readFileSync(archivePath) });
+
+        const diagnostics = await getFailedAgentDiagnostics();
+        expect(diagnostics.logExcerpt).toContain("failure");
+        expect(diagnostics.logExcerpt).not.toContain("zip-private-value");
+        expect(diagnostics.logExcerpt).not.toContain("cleanup output");
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
     });
 
     it.each([Buffer.from("2026-10-10T10:00:01.000Z binary log"), new TextEncoder().encode("2026-10-10T10:00:01.000Z binary log").buffer])("accepts binary log responses", async data => {
