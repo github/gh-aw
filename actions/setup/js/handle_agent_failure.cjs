@@ -1751,7 +1751,7 @@ function buildReportIncompleteContext(items, { includeAgentText = true } = {}) {
   if (includeAgentText) {
     context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
   } else {
-    context += "\nAgent-provided reasons and details are omitted from generic failure diagnostics.\n\n";
+    return context + "\nA comment or other safe output does not confirm that the requested task was completed.\n\n";
   }
   context +=
     "\nThis is a structured incompletion signal (`report_incomplete`), not confirmation of a completed task. Do not treat accompanying safe outputs (e.g., comments) as evidence that the requested review or action was completed.\n\n";
@@ -1823,22 +1823,31 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
   }
 
   let context = "\n### Failure Diagnostics\n\n";
-  if (failingStep) {
-    context += `**Failing step:** ${renderSafeInlineCodeSpan(failingStep)}\n\n`;
-  }
+  context += "**Agent job:** `agent`  \n";
   if (agentConclusion) {
     const validatedConclusion = ALLOWED_AGENT_CONCLUSIONS.has(agentConclusion) ? agentConclusion : "unknown";
-    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(validatedConclusion)}\n\n`;
-  }
-  if (attributionUnavailable) {
-    context += `**Job attribution unavailable:** ${attributionUnavailable}\n\n`;
+    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(validatedConclusion)}  \n`;
+  } else if (attributionUnavailable) {
     const rawConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
     const conclusion = ALLOWED_AGENT_CONCLUSIONS.has(rawConclusion) ? rawConclusion : "unknown";
-    context += `**Job fallback:** \`agent\` reported ${renderSafeInlineCodeSpan(conclusion)} via workflow dependency results; the failing step could not be attributed.\n\n`;
+    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(conclusion)} (from workflow dependency results)  \n`;
   }
-  if (!engineFailureContext.trim()) {
-    context += "No root cause was captured from structured runtime metadata.\n\n";
+  if (failingStep) {
+    context += `**Failing step:** ${renderSafeInlineCodeSpan(failingStep)}\n\n`;
+  } else if (attributionUnavailable) {
+    context += "**Failing step:** Unavailable\n\n";
+  } else {
+    context += "\n";
   }
+  if (engineFailureContext.trim()) {
+    context += engineFailureContext.trim() + "\n\n";
+  } else {
+    context += "The runtime did not record a specific cause. Check the linked run for failure details.\n\n";
+  }
+  if (attributionUnavailable) {
+    context += `<details>\n<summary>Why step details are unavailable</summary>\n\n${attributionUnavailable}\n\n</details>\n\n`;
+  }
+  context += "_Only runtime metadata is shown; agent-generated text is excluded._\n\n";
 
   return context;
 }
@@ -3154,7 +3163,7 @@ function buildEngineFailureContext(options = {}) {
     const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
     const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : "";
     if (options.metadataOnly === true) {
-      return exitDetails ? buildWarningAlertLine("Engine Failure", "The engine terminated with a nonzero driver exit code.") + "\n" + exitDetails : "";
+      return exitDetails ? `**Driver exit code:** \`${exitCodeText}\`\n\n` : "";
     }
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
@@ -4690,7 +4699,7 @@ async function main() {
           report_incomplete_context: reportIncompleteContext,
           failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
-          engine_failure_context: engineFailureContext,
+          engine_failure_context: needsFailureDiagnostics ? "" : engineFailureContext,
           timeout_context: timeoutContext,
           fork_context: forkContext,
           inference_access_error_context: inferenceAccessErrorContext,
@@ -4936,7 +4945,7 @@ async function main() {
           report_incomplete_context: reportIncompleteContext,
           failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
-          engine_failure_context: engineFailureContext,
+          engine_failure_context: needsFailureDiagnostics ? "" : engineFailureContext,
           timeout_context: timeoutContext,
           fork_context: forkContext,
           inference_access_error_context: inferenceAccessErrorContext,

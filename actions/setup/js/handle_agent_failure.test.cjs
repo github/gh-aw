@@ -412,7 +412,7 @@ describe("handle_agent_failure", () => {
       expect(rendered).toContain("Failing step:** `Run agent`");
       expect(rendered).not.toContain("agent-generated root cause");
       expect(rendered).not.toContain("log excerpt");
-      expect(rendered).toContain("No root cause was captured from structured runtime metadata.");
+      expect(rendered).toContain("The runtime did not record a specific cause.");
     });
 
     it("uses dependency results as the job fallback when the jobs API returns nothing", async () => {
@@ -425,9 +425,10 @@ describe("handle_agent_failure", () => {
       try {
         const diagnostics = await getFailedAgentDiagnostics();
         const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_failure"], engineFailureContext: "" });
-        expect(rendered).toContain("Job attribution unavailable:");
+        expect(rendered).toContain("**Failing step:** Unavailable");
         expect(rendered).toContain("The Actions jobs API returned no jobs for this run.");
-        expect(rendered).toContain("`agent` reported `failure` via workflow dependency results");
+        expect(rendered).toContain("**Agent job conclusion:** `failure` (from workflow dependency results)");
+        expect(rendered).toContain("<summary>Why step details are unavailable</summary>");
       } finally {
         if (previousConclusion === undefined) delete process.env.GH_AW_AGENT_CONCLUSION;
         else process.env.GH_AW_AGENT_CONCLUSION = previousConclusion;
@@ -494,11 +495,12 @@ describe("handle_agent_failure", () => {
       const result = buildFailureDiagnosticsContext({
         failureCategories: ["agent_failure"],
         failingStep: "Run agent",
-        engineFailureContext: "Driver exit code: 1",
+        engineFailureContext: "**Driver exit code:** `1`",
       });
 
       expect(result).toContain("Failing step:** `Run agent`");
-      expect(result).not.toContain("No root cause was captured");
+      expect(result).toContain("**Driver exit code:** `1`");
+      expect(result).not.toContain("The runtime did not record a specific cause.");
     });
 
     it("states when no cause was captured", () => {
@@ -508,7 +510,34 @@ describe("handle_agent_failure", () => {
         engineFailureContext: "",
       });
 
-      expect(result).toContain("No root cause was captured from structured runtime metadata.");
+      expect(result).toContain("The runtime did not record a specific cause.");
+    });
+
+    it("keeps the job, step, and exit code together in one compact section", () => {
+      expect(
+        buildFailureDiagnosticsContext({
+          failureCategories: ["agent_failure"],
+          failingStep: "Run agent",
+          agentConclusion: "failure",
+          engineFailureContext: "**Driver exit code:** `1`\n\n",
+        })
+      ).toBe(
+        "\n### Failure Diagnostics\n\n" +
+          "**Agent job:** `agent`  \n" +
+          "**Agent job conclusion:** `failure`  \n" +
+          "**Failing step:** `Run agent`\n\n" +
+          "**Driver exit code:** `1`\n\n" +
+          "_Only runtime metadata is shown; agent-generated text is excluded._\n\n"
+      );
+    });
+
+    it("keeps the incompletion notice concise without repeating diagnostic policy", () => {
+      const context = buildReportIncompleteContext([{ type: "report_incomplete", reason: "infrastructure_error", details: "agent-generated diagnostic" }], { includeAgentText: false });
+      expect(context).toContain("completion could not be confirmed");
+      expect(context).toContain("A comment or other safe output does not confirm that the requested task was completed.");
+      expect(context).not.toContain("See the reported reason");
+      expect(context).not.toContain("agent-generated");
+      expect(context).not.toContain("infrastructure_error");
     });
   });
 
@@ -1323,14 +1352,18 @@ describe("handle_agent_failure", () => {
       expect(postMock).toHaveBeenCalledOnce();
       expect(existingIssue ? createIssueMock : createCommentMock).not.toHaveBeenCalled();
       const body = postMock.mock.calls[0][0].body;
-      expect(body).toContain("Driver exit code: 1");
+      expect(body).toContain("**Driver exit code:** `1`");
+      expect(body.match(/\*\*Driver exit code:\*\*/g)).toHaveLength(1);
+      expect(body.match(/### Failure Diagnostics/g)).toHaveLength(1);
+      expect(body).not.toContain("<summary>Error details:</summary>");
+      expect(body).toContain("_Only runtime metadata is shown; agent-generated text is excluded._");
       expect(body).toContain("The workflow recorded a `report_incomplete` signal");
       expect(body).not.toContain("agent-generated diagnostic");
       expect(body).not.toContain("infrastructure_error");
       if (missingJobs) {
-        expect(body).toContain("Job attribution unavailable:");
+        expect(body).toContain("**Failing step:** Unavailable");
         expect(body).toContain("The Actions jobs API returned no jobs for this run.");
-        expect(body).toContain("`agent` reported `failure` via workflow dependency results");
+        expect(body).toContain("**Agent job conclusion:** `failure` (from workflow dependency results)");
         expect(global.github.request).not.toHaveBeenCalled();
       } else {
         expect(body).toContain("Failing step:** `Run agent`");
@@ -3389,7 +3422,7 @@ describe("handle_agent_failure", () => {
       const readSpy = vi.spyOn(fs, "readFileSync");
       try {
         const result = buildEngineFailureContext({ metadataOnly: true });
-        expect(result).toContain(`Driver exit code: ${exitCode}`);
+        expect(result).toBe(`**Driver exit code:** \`${exitCode}\`\n\n`);
         expect(result).not.toContain("agent-generated diagnostic");
         expect(readSpy.mock.calls.some(([file]) => file === stdioLogPath)).toBe(false);
       } finally {
