@@ -447,7 +447,7 @@ function validateJSONLFile(filePath, file, schema) {
 
 /**
  * @param {string} memoryDir
- * @param {Array<{file: string, format: string, schema: Record<string, any>}>} schemas
+ * @param {Array<{file: string, format?: string, schema: Record<string, any>}>} schemas
  * @param {string} kind
  * @param {string} memoryId
  */
@@ -469,7 +469,7 @@ function validateMemoryJSONSchemas(memoryDir, schemas, kind, memoryId) {
       throw new TypeError(`json-schemas contains duplicate file target '${declaration.file}'`);
     }
     seen.add(declaration.file);
-    if (declaration.format !== "json" && declaration.format !== "jsonl") {
+    if (Object.hasOwn(declaration, "format") && declaration.format !== "json" && declaration.format !== "jsonl") {
       throw new TypeError(`file '${declaration.file}' has unsupported format`);
     }
     validateSchemaContract(declaration.schema, "Memory");
@@ -487,9 +487,13 @@ function validateMemoryJSONSchemas(memoryDir, schemas, kind, memoryId) {
 /**
  * @param {string} memoryDir
  * @param {string} file
- * @param {{file: string, format: string, schema: Record<string, any>}} declaration
+ * @param {{file: string, format?: string, schema: Record<string, any>}} declaration
  */
 function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
+  const format = declaration.format ?? path.extname(file).slice(1).toLowerCase();
+  if (format !== "json" && format !== "jsonl") {
+    throw new TypeError(`file '${file}' has an unsupported extension; set format to json or jsonl`);
+  }
   const relativeFile = file.split("/").join(path.sep);
   const lexicalPath = path.resolve(memoryDir, relativeFile);
   const lexicalRelative = path.relative(path.resolve(memoryDir), lexicalPath);
@@ -520,7 +524,7 @@ function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
   if (stats.size > MAX_SCHEMA_FILE_BYTES) {
     throw new Error(`file '${file}' exceeds the schema validation size limit`);
   }
-  if (declaration.format === "jsonl") {
+  if (format === "jsonl") {
     validateJSONLFile(resolvedFile, file, declaration.schema);
     return;
   }
@@ -530,7 +534,7 @@ function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
   } catch (error) {
     throw new Error(`file '${file}' is unreadable: ${getErrorMessage(error)}`, { cause: error });
   }
-  if (declaration.format === "json") {
+  if (format === "json") {
     if (!contents.trim()) throw new Error(`file '${file}' contains empty JSON`);
     if (schemaContainsNumericEnum(declaration.schema)) {
       try {
@@ -557,7 +561,7 @@ function validateMemoryJSONSchemaFile(memoryDir, file, declaration) {
  * @param {{
  *   script?: string,
  *   scriptBase64?: string,
- *   jsonSchemas?: Array<{file: string, format: string, schema: Record<string, any>}>,
+ *   jsonSchemas?: Array<{file: string, format?: string, schema: Record<string, any>}>,
  *   requireJSONSchemas?: boolean,
  *   memoryDir: string,
  *   memoryId?: string,

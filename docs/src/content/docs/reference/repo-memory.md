@@ -72,7 +72,6 @@ tools:
       timeout-minutes: 1
       json-schemas:
         - file: state.json
-          format: json
           schema:
             type: object
             required: [version, items]
@@ -195,6 +194,8 @@ On a shared memory branch, `file-glob` and `allowed-extensions` scope normalizat
 ### Custom validation
 
 Use `validation.json-schemas` for required per-file structural checks. Each `file` may be a relative path or glob (`*` matches within a path segment; `**` spans segments). Paths must match the configured `file-glob` and `allowed-extensions` policies and exist in the candidate; globs must match at least one file, and every match is validated. A `json` file must contain one non-empty valid JSON document. A `jsonl` file is checked record by record: LF and CRLF are accepted, a final newline is optional, an existing empty file has zero records, and blank physical lines or malformed records fail with a line number. Schema checks do not coerce, default, strip, or rewrite values. They run after configured filtering and `format-json` normalization, before an optional `validation.script`, and are repeated before upload/commit and in the repo-memory push job.
+
+The file format is inferred from each matched file's `.json` or `.jsonl` extension (case-insensitive), so a glob may match both formats. Optional `format: json` or `format: jsonl` overrides inference and is required for other extensions.
 
 The supported schema vocabulary is deliberately limited to `type` (including type lists and `null`), primitive `enum`, `required`, nested `properties`, `additionalProperties: false`, object-schema `items`, and standalone `oneOf` or `anyOf`. Schemas are limited to 32 levels; alternatives cannot have sibling constraints. Numeric enum integers must be exactly representable by JavaScript, and values checked against numeric enums must not lose precision during JSON parsing. This is not full JSON Schema support: keywords such as `$ref`, `const`, `format`, `pattern`, numeric/string/array bounds, and `uniqueItems` are rejected at compile time. Use a script for cross-file rules, uniqueness, positive-ID checks, timestamps, or other unsupported constraints.
 

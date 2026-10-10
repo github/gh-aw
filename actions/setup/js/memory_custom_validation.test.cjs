@@ -145,6 +145,52 @@ describe("memory_custom_validation", () => {
     expect(result.stderr).toContain("matched no files");
   });
 
+  it("infers formats independently for JSON and JSONL wildcard matches", () => {
+    fs.mkdirSync(path.join(tempDir, "nested"));
+    fs.writeFileSync(path.join(tempDir, "state.JSON"), '{"ok":true}');
+    fs.writeFileSync(path.join(tempDir, "nested", "events.JSONL"), '{"ok":true}\n{"ok":false}\n');
+    const jsonSchemas = [{ file: "**/*", schema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } } }];
+    expect(runCustomMemoryValidation({ jsonSchemas, memoryDir: tempDir, kind: "repo" }).ok).toBe(true);
+
+    fs.writeFileSync(path.join(tempDir, "nested", "events.JSONL"), '{"ok":true}\n{"ok":"bad"}\n');
+    const result = runCustomMemoryValidation({ jsonSchemas, memoryDir: tempDir, kind: "repo" });
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("nested/events.JSONL");
+    expect(result.stderr).toContain("line 2");
+    expect(result.stderr).toContain("ok");
+  });
+
+  it.each(["state.json", "events.jsonl"])("infers the format of an exact %s target", file => {
+    fs.writeFileSync(path.join(tempDir, file), file.endsWith(".jsonl") ? "{}\n{}\n" : "{}");
+    const result = runCustomMemoryValidation({
+      jsonSchemas: [{ file, schema: { type: "object" } }],
+      memoryDir: tempDir,
+      kind: "cache",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("requires an explicit format for unknown extensions", () => {
+    fs.writeFileSync(path.join(tempDir, "state.txt"), "{}");
+    const declaration = { file: "state.txt", schema: { type: "object" } };
+    const result = runCustomMemoryValidation({ jsonSchemas: [declaration], memoryDir: tempDir, kind: "repo" });
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("state.txt");
+    expect(result.stderr).toContain("set format to json or jsonl");
+    expect(runCustomMemoryValidation({ jsonSchemas: [{ ...declaration, format: "json" }], memoryDir: tempDir, kind: "repo" }).ok).toBe(true);
+  });
+
+  it.each(["", null, "yaml"])("rejects an invalid explicit format %s rather than inferring it", format => {
+    fs.writeFileSync(path.join(tempDir, "state.json"), "{}");
+    const result = runCustomMemoryValidation({
+      jsonSchemas: [{ file: "state.json", format, schema: { type: "object" } }],
+      memoryDir: tempDir,
+      kind: "repo",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("unsupported format");
+  });
+
   it("reports nested schema paths and checks schemas before custom scripts", () => {
     fs.writeFileSync(path.join(tempDir, "state.json"), '{"items":[1]}');
     const result = runCustomMemoryValidation({

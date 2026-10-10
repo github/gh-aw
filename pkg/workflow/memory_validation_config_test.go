@@ -25,7 +25,6 @@ tools:
     validation:
       json-schemas:
         - file: state.json
-          format: json
           schema:
             type: object
             required: [version, items]
@@ -38,7 +37,6 @@ tools:
                 items:
                   type: string
         - file: archive/events.jsonl
-          format: jsonl
           schema:
             type: object
             required: [id, status]
@@ -53,7 +51,6 @@ tools:
     validation:
       json-schemas:
         - file: state.json
-          format: json
           schema:
             type: object
   drive-memory:
@@ -61,7 +58,6 @@ tools:
     validation:
       json-schemas:
         - file: state.json
-          format: json
           schema:
             type: object
 ---
@@ -134,6 +130,8 @@ func TestParseMemoryJSONSchemasRejectsInvalidDeclarations(t *testing.T) {
 		{name: "traversal path", entries: []any{valid("../state.json", "json", map[string]any{})}, want: "relative file path"},
 		{name: "unsupported wildcard", entries: []any{valid("state?.json", "json", map[string]any{})}, want: "relative file path"},
 		{name: "invalid format", entries: []any{valid("state.json", "yaml", map[string]any{})}, want: "format"},
+		{name: "empty format", entries: []any{valid("state.json", "", map[string]any{})}, want: "format"},
+		{name: "null format", entries: []any{map[string]any{"file": "state.json", "format": nil, "schema": map[string]any{}}}, want: "format"},
 		{name: "unknown entry field", entries: []any{map[string]any{"file": "state.json", "format": "json", "schema": map[string]any{}, "optional": true}}, want: "unknown property"},
 		{name: "unsupported keyword", entries: []any{valid("state.json", "json", map[string]any{"type": "string", "format": "date-time"})}, want: "unsupported schema keyword"},
 		{name: "inexact integer enum", entries: []any{valid("state.json", "json", map[string]any{"enum": []any{uint64(9007199254740992)}})}, want: "exactly representable"},
@@ -162,6 +160,22 @@ func TestParseMemoryJSONSchemasAcceptsWildcards(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, config.JSONSchemas, 1)
 	assert.Equal(t, "events/**/*.jsonl", config.JSONSchemas[0].File)
+}
+
+func TestParseMemoryJSONSchemasAcceptsInferredFormats(t *testing.T) {
+	for _, file := range []string{"state.json", "events.jsonl", "events/**/*.json*"} {
+		t.Run(file, func(t *testing.T) {
+			schemas, err := parseMemoryJSONSchemas([]any{
+				map[string]any{"file": file, "schema": map[string]any{"type": "object"}},
+			}, "validation.json-schemas")
+			require.NoError(t, err)
+			require.Len(t, schemas, 1)
+			assert.Empty(t, schemas[0].Format)
+			encoded, err := json.Marshal(schemas)
+			require.NoError(t, err)
+			assert.NotContains(t, string(encoded), `"format"`)
+		})
+	}
 }
 
 func TestParseMemoryValidationConfigRejectsUnknownFieldsAndMissingValidation(t *testing.T) {

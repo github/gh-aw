@@ -104,7 +104,6 @@ tools:
     validation:
       json-schemas:
         - file: state.json
-          format: json
           schema:
             type: object
             required: [version, items]
@@ -119,7 +118,7 @@ tools:
         if (memoryKind !== "cache") throw new Error("unexpected memory kind");
 ```
 
-Each declaration has a relative `file` path or glob (using `*` within a path segment and `**` across segments), explicit `format` (`json` or `jsonl`), and inline schema object. A path must match configured file filters and exist; a glob must match at least one file, and every match is validated. JSON is one non-empty document; JSONL validates records individually, accepts LF/CRLF and an optional final newline, allows an existing empty file, and rejects blank lines or malformed records with physical line numbers. Schemas validate without coercion or rewriting and run after filtering/normalization, before an optional `validation.script`; schema and script failures both reject persistence.
+Each declaration has a relative `file` path or glob (using `*` within a path segment and `**` across segments) and inline schema object. The format is inferred from each matched file's `.json` or `.jsonl` extension (case-insensitive); optional `format: json` or `format: jsonl` overrides inference and is required for other extensions. A path must match configured file filters and exist; a glob must match at least one file, and every match is validated. JSON is one non-empty document; JSONL validates records individually, accepts LF/CRLF and an optional final newline, allows an existing empty file, and rejects blank lines or malformed records with physical line numbers. Schemas validate without coercion or rewriting and run after filtering/normalization, before an optional `validation.script`; schema and script failures both reject persistence.
 
 Supported schema keywords are `type` (including arrays of types and `null`), primitive `enum`, `required`, nested `properties`, `additionalProperties: false`, object-schema `items`, and standalone `oneOf`/`anyOf`, up to 32 levels. Numeric enum integers must be exactly representable by JavaScript, and values checked against numeric enums must not lose precision during JSON parsing. This is not full JSON Schema: `$ref`, `const`, `format`, patterns, bounds, `uniqueItems`, and other unsupported keywords are rejected. Use the optional Node.js script (globals: `fs`, `path`, `memoryRoot`, `memoryId`, `memoryKind`) for cross-file uniqueness, timestamps, positive-ID checks, and other domain rules. Its timeout defaults to 1 minute (`validation.timeout-minutes`, max 5). See [cache-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/cache-memory.md#custom-validation), [repo-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/repo-memory.md#custom-validation), and [drive-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/experimental/drive-memory.md#validation).
 ### Storage path

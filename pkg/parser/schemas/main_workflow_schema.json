@@ -5496,7 +5496,7 @@
                           "format": { "type": "string", "enum": ["json", "jsonl"] },
                           "schema": { "type": "object", "additionalProperties": true }
                         },
-                        "required": ["file", "format", "schema"],
+                        "required": ["file", "schema"],
                         "additionalProperties": false
                       },
                       "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
@@ -5583,7 +5583,7 @@
                             "format": { "type": "string", "enum": ["json", "jsonl"] },
                             "schema": { "type": "object", "additionalProperties": true }
                           },
-                          "required": ["file", "format", "schema"],
+                          "required": ["file", "schema"],
                           "additionalProperties": false
                         },
                         "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
@@ -5699,7 +5699,7 @@
                           "format": { "type": "string", "enum": ["json", "jsonl"] },
                           "schema": { "type": "object", "additionalProperties": true }
                         },
-                        "required": ["file", "format", "schema"],
+                        "required": ["file", "schema"],
                         "additionalProperties": false
                       },
                       "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
@@ -5775,7 +5775,7 @@
                             "format": { "type": "string", "enum": ["json", "jsonl"] },
                             "schema": { "type": "object", "additionalProperties": true }
                           },
-                          "required": ["file", "format", "schema"],
+                          "required": ["file", "schema"],
                           "additionalProperties": false
                         },
                         "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
@@ -6092,7 +6092,7 @@
                           "format": { "type": "string", "enum": ["json", "jsonl"] },
                           "schema": { "type": "object", "additionalProperties": true }
                         },
-                        "required": ["file", "format", "schema"],
+                        "required": ["file", "schema"],
                         "additionalProperties": false
                       },
                       "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"
@@ -6224,7 +6224,7 @@
                             "format": { "type": "string", "enum": ["json", "jsonl"] },
                             "schema": { "type": "object", "additionalProperties": true }
                           },
-                          "required": ["file", "format", "schema"],
+                          "required": ["file", "schema"],
                           "additionalProperties": false
                         },
                         "description": "Inline schemas enforced for required memory files matched by relative paths or glob patterns before persistence"

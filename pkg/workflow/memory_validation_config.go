@@ -28,7 +28,7 @@ type MemoryValidationConfig struct {
 
 type MemoryJSONSchemaConfig struct {
 	File   string         `yaml:"file" json:"file"`
-	Format string         `yaml:"format" json:"format"`
+	Format string         `yaml:"format,omitempty" json:"format,omitempty"`
 	Schema map[string]any `yaml:"schema" json:"schema"`
 }
 
@@ -179,7 +179,7 @@ func memoryValidationSchemasBase64(config *MemoryValidationConfig) string {
 func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig, error) {
 	entries, ok := raw.([]any)
 	if !ok || len(entries) == 0 {
-		return nil, fmt.Errorf("%s must be a non-empty list of file, format, and schema declarations", fieldPath)
+		return nil, fmt.Errorf("%s must be a non-empty list of file and schema declarations with optional format", fieldPath)
 	}
 	schemas := make([]MemoryJSONSchemaConfig, 0, len(entries))
 	seenFiles := make(map[string]struct{}, len(entries))
@@ -202,9 +202,12 @@ func parseMemoryJSONSchemas(raw any, fieldPath string) ([]MemoryJSONSchemaConfig
 			return nil, fmt.Errorf("%s contains duplicate file target %q", fieldPath, file)
 		}
 		seenFiles[file] = struct{}{}
-		format, ok := entry["format"].(string)
-		if !ok || (format != "json" && format != "jsonl") {
-			return nil, fmt.Errorf("%s.format must be either json or jsonl", entryPath)
+		var format string
+		if rawFormat, exists := entry["format"]; exists {
+			format, ok = rawFormat.(string)
+			if !ok || (format != "json" && format != "jsonl") {
+				return nil, fmt.Errorf("%s.format must be either json or jsonl", entryPath)
+			}
 		}
 		schema, ok := entry["schema"].(map[string]any)
 		if !ok {
