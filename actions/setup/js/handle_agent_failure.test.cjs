@@ -344,7 +344,7 @@ describe("handle_agent_failure", () => {
         rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
       };
 
-      await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep: "", attributionUnavailable: "The Actions jobs API returned no failed agent job." });
+      await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep: "", attributionUnavailable: "The Actions jobs API returned no agent job." });
     });
 
     it("explains when the agent job has no failed steps", async () => {
@@ -353,7 +353,7 @@ describe("handle_agent_failure", () => {
         rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
       };
 
-      await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep: "", attributionUnavailable: "The failed agent job had no failed step metadata." });
+      await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep: "", agentConclusion: "failure", attributionUnavailable: "The failed agent job had no failed step metadata." });
     });
 
     it("warns when the workflow run jobs API is inaccessible", async () => {
@@ -403,7 +403,7 @@ describe("handle_agent_failure", () => {
       const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_failure"], engineFailureContext: "" });
       expect(global.github.request).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs", { owner: "owner", repo: "repo", job_id: 456 });
       expect(global.github.paginate).toHaveBeenCalledWith(global.github.rest.actions.listJobsForWorkflowRun, expect.objectContaining({ run_id: 123, filter: "latest" }));
-      expect(rendered).toContain("Failing step:** Run agent");
+      expect(rendered).toContain("Failing step:** `Run agent`");
       expect(rendered).toContain("Failing step log excerpt (tail)");
       expect(rendered).toContain("final error");
       expect(rendered).not.toContain("failure line 10\n");
@@ -455,7 +455,7 @@ describe("handle_agent_failure", () => {
       global.github.request.mockRejectedValue(Object.assign(new Error("private API response"), { status }));
       const diagnostics = await getFailedAgentDiagnostics();
       const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_failure"], engineFailureContext: "" });
-      expect(rendered).toContain("Failing step:** Run agent");
+      expect(rendered).toContain("Failing step:** `Run agent`");
       expect(rendered).toContain("Log excerpt unavailable:");
       expect(rendered).not.toContain("private API response");
       expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("private API response");
@@ -485,6 +485,56 @@ describe("handle_agent_failure", () => {
       }
     });
 
+    it("does not report attribution unavailable when the visible agent job succeeded", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([{ name: "agent", conclusion: "success", steps: [] }]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      const diagnostics = await getFailedAgentDiagnostics();
+      const rendered = buildFailureDiagnosticsContext({
+        ...diagnostics,
+        failureCategories: [],
+        engineFailureContext: "",
+        items: [{ type: "report_incomplete", reason: "infrastructure_error" }],
+      });
+      expect(diagnostics).toEqual({ failingStep: "", agentConclusion: "success" });
+      expect(rendered).toContain("**Agent job conclusion:** `success`");
+      expect(rendered).not.toContain("attribution unavailable");
+      expect(rendered).not.toContain("failing step could not be attributed");
+    });
+
+    it("validates conclusions and safely renders agent-provided step names", async () => {
+      mockFailedStepLog("");
+      global.github.paginate.mockResolvedValue([
+        {
+          id: 456,
+          name: "agent",
+          conclusion: "failure",
+          steps: [
+            {
+              name: "Run agent\n\n# injected heading",
+              conclusion: "failure",
+              started_at: "2026-10-10T10:00:01Z",
+              completed_at: "2026-10-10T10:00:02Z",
+            },
+          ],
+        },
+      ]);
+      const diagnostics = await getFailedAgentDiagnostics();
+      const rendered = buildFailureDiagnosticsContext({
+        ...diagnostics,
+        agentConclusion: "failure` \n\n# injected",
+        failureCategories: ["agent_failure"],
+        engineFailureContext: "",
+      });
+
+      expect(rendered).toContain("**Failing step:** `Run agent # injected heading`");
+      expect(rendered).not.toContain("\n\n# injected heading");
+      expect(rendered).toContain("**Agent job conclusion:** `unknown`");
+      expect(rendered).not.toContain("failure`");
+    });
+
     it("renders diagnostics for driver failures without changing classified failure reports", () => {
       const options = { failingStep: "Run agent", logExcerpt: "driver error", engineFailureContext: "" };
       expect(buildFailureDiagnosticsContext({ ...options, failureCategories: ["engine_driver_failure"] })).toContain("driver error");
@@ -498,7 +548,7 @@ describe("handle_agent_failure", () => {
         engineFailureContext: "Driver exit code: 1\nLast error: engine failed",
       });
 
-      expect(result).toContain("Failing step:** Run agent");
+      expect(result).toContain("Failing step:** `Run agent`");
       expect(result).not.toContain("No cause was captured");
     });
 
@@ -1306,7 +1356,7 @@ describe("handle_agent_failure", () => {
         expect(body).toContain("`agent` reported `failure` via workflow dependency results");
         expect(global.github.request).not.toHaveBeenCalled();
       } else {
-        expect(body).toContain("Failing step:** Run agent");
+        expect(body).toContain("Failing step:** `Run agent`");
         expect(body).toContain("Failing step log excerpt (tail)");
         expect(body).toContain("actionable root cause");
       }
@@ -2313,7 +2363,7 @@ describe("handle_agent_failure", () => {
       }
       expect(reportIncompleteContext).toContain("infrastructure_error");
       expect(reportIncompleteContext).toContain(reportIncompleteMarker);
-      expect(failureDiagnosticsContext).toContain("Failing step:** Run agent");
+      expect(failureDiagnosticsContext).toContain("Failing step:** `Run agent`");
     });
 
     it("renders denied commands and missing capability names from an empty-output outcome", () => {

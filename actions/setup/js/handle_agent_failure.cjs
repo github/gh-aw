@@ -38,6 +38,7 @@ const os = require("os");
 const path = require("path");
 
 const DEFAULT_ACTION_FAILURE_ISSUE_EXPIRES_HOURS = 24 * 7;
+const ALLOWED_AGENT_CONCLUSIONS = new Set(["success", "failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale"]);
 /** Claude Code error emitted when a `--continue` resume finds no deferred tool marker. */
 const NO_DEFERRED_MARKER_LINE_RE = /No deferred tool marker found/i;
 /** Claude harness line reporting that the no-deferred-marker error was recovered by a fresh retry. */
@@ -1752,7 +1753,7 @@ function buildReportIncompleteContext(items) {
 
 /**
  * Find the failed agent step and collect bounded diagnostics for generic failure reports.
- * @returns {Promise<{failingStep: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string}>}
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string}>}
  */
 async function getFailedAgentDiagnostics() {
   let jobs;
@@ -1772,26 +1773,36 @@ async function getFailedAgentDiagnostics() {
     return { failingStep: "", attributionUnavailable: reason };
   }
 
-  const agentJob = jobs.find(job => job.name === "agent" && job.conclusion === "failure");
+  const agentJob = jobs.find(job => job.name === "agent");
   if (!agentJob) {
     return {
       failingStep: "",
-      attributionUnavailable: jobs.length === 0 ? "The Actions jobs API returned no jobs for this run." : "The Actions jobs API returned no failed agent job.",
+      attributionUnavailable: jobs.length === 0 ? "The Actions jobs API returned no jobs for this run." : "The Actions jobs API returned no agent job.",
     };
+  }
+  const agentConclusion = ALLOWED_AGENT_CONCLUSIONS.has(agentJob.conclusion) ? agentJob.conclusion : "";
+  if (!agentConclusion) {
+    return { failingStep: "", attributionUnavailable: "The Actions jobs API returned an invalid agent job conclusion." };
+  }
+  if (agentConclusion !== "failure" && agentConclusion !== "timed_out") {
+    return { failingStep: "", agentConclusion };
   }
   const failedStep = agentJob.steps
     ?.slice()
     .reverse()
-    .find(step => step.conclusion === "failure" && typeof step.name === "string");
+    .find(step => ["failure", "timed_out"].includes(step.conclusion) && typeof step.name === "string");
   if (!failedStep) {
-    return { failingStep: "", attributionUnavailable: "The failed agent job had no failed step metadata." };
+    return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no failed step metadata." };
   }
 
-  const failingStep = sanitizeContent(failedStep.name, 200);
+  const failingStep = sanitizeContent(failedStep.name, 200).replace(/\s+/g, " ").trim();
+  if (!failingStep) {
+    return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no valid failed step name." };
+  }
   const start = Date.parse(failedStep.started_at);
   const end = Date.parse(failedStep.completed_at);
   if (!Number.isFinite(start) || !Number.isFinite(end) || !agentJob.id) {
-    return { failingStep, logUnavailable: "The failed step's timestamps or job ID were unavailable." };
+    return { failingStep, agentConclusion, logUnavailable: "The failed step's timestamps or job ID were unavailable." };
   }
   const nextStep = agentJob.steps.slice(agentJob.steps.indexOf(failedStep) + 1).find(step => step.started_at);
   const nextStart = Date.parse(nextStep?.started_at);
@@ -1810,7 +1821,7 @@ async function getFailedAgentDiagnostics() {
     } else if (data instanceof Uint8Array) {
       log = Buffer.from(data).toString("utf8");
     } else {
-      return { failingStep, logUnavailable: "The Actions logs API returned an unsupported log format." };
+      return { failingStep, agentConclusion, logUnavailable: "The Actions logs API returned an unsupported log format." };
     }
     const lines = log.split(/\r?\n/).filter(line => {
       const timestamp = Date.parse(line.split(" ", 1)[0]);
@@ -1818,27 +1829,27 @@ async function getFailedAgentDiagnostics() {
       return Number.isFinite(timestamp) && Number.isFinite(start) && timestamp >= start && timestamp < logEnd && !isAddMaskCommandLine(line);
     });
     if (lines.length === 0) {
-      return { failingStep, logUnavailable: "The job log contained no lines for the failed step's time range." };
+      return { failingStep, agentConclusion, logUnavailable: "The job log contained no lines for the failed step's time range." };
     }
     const maskedValues = collectAddMaskedValues(log);
     const normalized = redactAndBoundDiagnostics(lines.join("\n"), { maskedValues, maxLength: log.length });
     const logExcerpt = redactAndBoundDiagnostics(normalized.split("\n").slice(-50).join("\n").slice(-8000), { maskedValues });
-    return { failingStep, logExcerpt };
+    return { failingStep, agentConclusion, logExcerpt };
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
     const reason =
       status === 403 ? "The Actions logs API denied access; ensure the conclusion job grants actions: read." : status === 404 || status === 410 ? "The Actions job log was unavailable or expired." : "The Actions job log request failed.";
     core.warning(reason);
-    return { failingStep, logUnavailable: reason };
+    return { failingStep, agentConclusion, logUnavailable: reason };
   }
 }
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string, engineFailureContext: string, items?: Array<any>}} options
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string, engineFailureContext: string, items?: Array<any>}} options
  * @returns {string}
  */
-function buildFailureDiagnosticsContext({ failureCategories, failingStep, logExcerpt = "", attributionUnavailable = "", logUnavailable = "", engineFailureContext, items = [] }) {
+function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", logExcerpt = "", attributionUnavailable = "", logUnavailable = "", engineFailureContext, items = [] }) {
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
   const isGenericFailure = failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || infrastructureMessages.length > 0;
   if (!isGenericFailure) {
@@ -1847,12 +1858,17 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, logExc
 
   let context = "\n### Failure Diagnostics\n\n";
   if (failingStep) {
-    context += `**Failing step:** ${failingStep}\n\n`;
+    context += `**Failing step:** ${renderSafeInlineCodeSpan(failingStep)}\n\n`;
+  }
+  if (agentConclusion) {
+    const validatedConclusion = ALLOWED_AGENT_CONCLUSIONS.has(agentConclusion) ? agentConclusion : "unknown";
+    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(validatedConclusion)}\n\n`;
   }
   if (attributionUnavailable) {
     context += `**Job attribution unavailable:** ${attributionUnavailable}\n\n`;
-    const conclusion = sanitizeContent(process.env.GH_AW_AGENT_CONCLUSION || "unknown", 100);
-    context += `**Job fallback:** \`agent\` reported \`${conclusion}\` via workflow dependency results; the failing step could not be attributed.\n\n`;
+    const rawConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
+    const conclusion = ALLOWED_AGENT_CONCLUSIONS.has(rawConclusion) ? rawConclusion : "unknown";
+    context += `**Job fallback:** \`agent\` reported ${renderSafeInlineCodeSpan(conclusion)} via workflow dependency results; the failing step could not be attributed.\n\n`;
   }
   if (logExcerpt) {
     context += `**Failing step log excerpt (tail):**${renderErrorDetails(logExcerpt)}`;
