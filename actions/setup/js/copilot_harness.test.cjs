@@ -3689,7 +3689,7 @@ process.exit(1);`
       const logs = [];
       applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([[model, ["/responses"]]]), logger: message => logs.push(message) });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
-      expect(logs.join("\n")).toContain("AWF /reflect");
+      expect(logs.join("\n")).toContain(model.startsWith("gpt-5") ? "source=model-name rule" : "source=AWF /reflect");
     });
 
     it("resolves auto to a utility model before selecting its advertised endpoint", async () => {
@@ -3710,8 +3710,11 @@ process.exit(1);`
 
     it("retains the CLI completions default when both endpoints are supported without a preference", () => {
       process.env.COPILOT_MODEL = "new-model";
-      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["new-model", ["/responses", "/chat/completions"]]]) });
+      const logs = [];
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["new-model", ["/responses", "/chat/completions"]]]), logger: message => logs.push(message) });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("completions");
+      expect(logs.join("\n")).toContain("source=CLI default");
+      expect(logs.join("\n")).not.toContain("source=AWF /reflect");
     });
 
     it("looks up endpoint metadata without model effort query parameters", () => {
@@ -3728,8 +3731,33 @@ process.exit(1);`
 
     it("keeps the catalog preference when both endpoints are supported", () => {
       process.env.COPILOT_MODEL = "gpt-5-mini";
-      applyCopilotWireAPI({ modelsJson: makeModelsJson(), awfReflectData: reflectModels([["gpt-5-mini", ["/chat/completions", "/responses"]]]) });
+      const logs = [];
+      applyCopilotWireAPI({ modelsJson: makeModelsJson(), awfReflectData: reflectModels([["gpt-5-mini", ["/chat/completions", "/responses"]]]), logger: message => logs.push(message) });
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+      expect(logs.join("\n")).toContain("source=catalog");
+      expect(logs.join("\n")).not.toContain("source=AWF /reflect");
+    });
+
+    it("preserves a model-name preference when both endpoints are supported", () => {
+      process.env.COPILOT_MODEL = "gpt-5-unknown";
+      const logs = [];
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["gpt-5-unknown", ["/chat/completions", "/responses"]]]), logger: message => logs.push(message) });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+      expect(logs.join("\n")).toContain("source=model-name rule");
+      expect(logs.join("\n")).not.toContain("source=AWF /reflect");
+    });
+
+    it("labels a routing-selected endpoint as routing rather than an override", () => {
+      process.env.COPILOT_MODEL = "new-model";
+      process.env.COPILOT_PROVIDER_WIRE_API = "responses";
+      const logs = [];
+      applyCopilotWireAPI({
+        modelsJson: null,
+        awfReflectData: reflectModels([["new-model", ["/responses", "/chat/completions"]]]),
+        overrideSource: "routing",
+        logger: message => logs.push(message),
+      });
+      expect(logs.join("\n")).toContain("source=routing (verified against AWF /reflect)");
     });
 
     it("rejects a model with no CLI-compatible endpoints", () => {

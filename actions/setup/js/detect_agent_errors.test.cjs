@@ -93,6 +93,40 @@ describe("detect_agent_errors.cjs", () => {
         else process.env.GH_AW_ENGINE_INTERNAL_LOGS_DIR = previousInternalLogs;
       }
     });
+
+    it("persists startup mismatch evidence when the harness never starts a session", async () => {
+      const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-startup-model-mismatch-"));
+      const outputFile = path.join(rootDir, "github-output");
+      const record = {
+        category: "model_endpoint_mismatch",
+        phase: "startup",
+        configured_model: "gpt-5.6-luna",
+        resolved_model: "gpt-5.6-luna",
+        wire_api: "completions",
+        wire_api_source: "override",
+        supported_endpoints: ["/responses"],
+        detail: "Configured model does not support the selected endpoint",
+        fix: "Select a compatible model",
+      };
+      const previousOutput = process.env.GITHUB_OUTPUT;
+      try {
+        fs.mkdirSync(path.join(rootDir, "agent"), { recursive: true });
+        fs.writeFileSync(path.join(rootDir, "agent", "model-endpoint-mismatch.json"), JSON.stringify(record));
+        process.env.GITHUB_OUTPUT = outputFile;
+
+        await main({ rootDir });
+
+        expect(fs.readFileSync(outputFile, "utf8")).toContain("model_endpoint_mismatch_error=true");
+        expect(fs.existsSync(path.join(rootDir, "agent-session.jsonl"))).toBe(false);
+        expect(fs.readFileSync(path.join(rootDir, "agent-errors.jsonl"), "utf8")).toContain('"model_endpoint_mismatch_error"');
+        const { writeUnifiedSession } = require("./unified_session.cjs");
+        expect(writeUnifiedSession({ rootDir, engine: "copilot" }).some(event => event.type === "model_endpoint.mismatch")).toBe(true);
+      } finally {
+        if (previousOutput === undefined) delete process.env.GITHUB_OUTPUT;
+        else process.env.GITHUB_OUTPUT = previousOutput;
+        fs.rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
   });
 
   it("does not persist rejected Aider JSON errors through live detection", () => {

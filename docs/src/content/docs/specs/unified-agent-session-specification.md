@@ -733,7 +733,7 @@ codes/types without requiring a closed enumeration.
 
 | Origin | Observed categories |
 | --- | --- |
-| Compiler error-detection outputs | `inference_access_error`, `mcp_policy_error`, `agentic_engine_timeout`, `model_not_supported_error`, `http_400_response_error`, `capi_quota_exceeded_error`, `invocation_cap_exceeded`, `max_cache_misses_exceeded`, `missing_model_pricing_error`, `shell_expansion_guard_rejected` |
+| Compiler error-detection outputs | `inference_access_error`, `mcp_policy_error`, `agentic_engine_timeout`, `model_not_supported_error`, `model_endpoint_mismatch_error`, `http_400_response_error`, `capi_quota_exceeded_error`, `invocation_cap_exceeded`, `max_cache_misses_exceeded`, `missing_model_pricing_error`, `shell_expansion_guard_rejected` |
 | Harness retry and proxy guards | `capi_server_error`, `authentication_failed`, `max_ai_credits_exceeded`, `effective_tokens_limit_exceeded`, `permission_denied_limit_exceeded`, `model_policy_violation`, `awf_api_proxy_blocking_requests`, `goal_already_active` |
 | Harness failure reasons and fatal signals | Observed `failure_reason` identifiers such as `harness_retry_path_invalid`, `cancelled_or_timed_out`, and `sandbox_runtime_crash`; crash exit codes preserve the corresponding native signal name. |
 

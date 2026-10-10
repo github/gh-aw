@@ -34,9 +34,9 @@ function recordModelEndpointMismatch(record, env = process.env) {
 /**
  * Prefer complete AWF endpoint metadata, retaining the catalog/name preference
  * only when supported or when endpoint metadata is unavailable.
- * @param {{modelsJson: Record<string, unknown>|null, awfReflectData?: any, configuredModel?: string, logger?: (msg: string) => void}} options
+ * @param {{modelsJson: Record<string, unknown>|null, awfReflectData?: any, configuredModel?: string, overrideSource?: string, logger?: (msg: string) => void}} options
  */
-function applyCopilotWireAPI({ modelsJson, awfReflectData = null, configuredModel = process.env.COPILOT_MODEL || "", logger = () => {} }) {
+function applyCopilotWireAPI({ modelsJson, awfReflectData = null, configuredModel = process.env.COPILOT_MODEL || "", overrideSource = "override", logger = () => {} }) {
   const model = (process.env.COPILOT_MODEL || "").trim();
   const override = process.env.COPILOT_PROVIDER_WIRE_API;
   const supported = getSupportedEndpoints(awfReflectData, model);
@@ -44,13 +44,17 @@ function applyCopilotWireAPI({ modelsJson, awfReflectData = null, configuredMode
   const catalogAPI = typeof catalog?.wire_api === "string" ? catalog.wire_api : null;
   const nameAPI = /^gpt-(?:[5-9]|\d{2,})(?:[.-]|$)/i.test(model.split("?")[0]) ? "responses" : null;
   let wireAPI = override || catalogAPI || nameAPI;
-  let source = override ? "override" : catalogAPI ? "catalog" : nameAPI ? "model-name rule" : "CLI default";
+  let source = override ? overrideSource : catalogAPI ? "catalog" : nameAPI ? "model-name rule" : "CLI default";
   if (supported !== null) {
     const usable = Object.keys(WIRE_ENDPOINTS).filter(api => supported.includes(WIRE_ENDPOINTS[api]));
     if (!override) {
       const preferred = wireAPI || "completions";
-      wireAPI = usable.includes(preferred) ? preferred : usable[0];
-      source = "AWF /reflect";
+      if (usable.includes(preferred)) {
+        wireAPI = preferred;
+      } else {
+        wireAPI = usable[0];
+        source = "AWF /reflect";
+      }
     }
     if (!wireAPI || !supported.includes(WIRE_ENDPOINTS[wireAPI])) {
       const detail = redactDiagnosticText(
@@ -61,7 +65,7 @@ function applyCopilotWireAPI({ modelsJson, awfReflectData = null, configuredMode
     }
   }
   if (override) {
-    logger(`COPILOT_PROVIDER_WIRE_API already set to ${override} — source=override${supported !== null ? " (verified against AWF /reflect)" : ""}`);
+    logger(`COPILOT_PROVIDER_WIRE_API already set to ${override} — source=${source}${supported !== null ? " (verified against AWF /reflect)" : ""}`);
   } else if (wireAPI && model) {
     process.env.COPILOT_PROVIDER_WIRE_API = wireAPI;
     logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireAPI} for model ${model} — source=${source}`);

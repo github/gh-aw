@@ -383,7 +383,7 @@ function readModelEndpointMismatch() {
 }
 
 /** @param {import("./types/unified_session").ModelEndpointMismatchData | undefined} mismatch @returns {string} */
-function buildModelEndpointMismatchContext(mismatch) {
+function buildModelEndpointMismatchContext(mismatch, detectionJobResult = process.env.GH_AW_DETECTION_JOB_RESULT) {
   if (!mismatch || !isModelEndpointMismatchData(mismatch)) return "";
   const text = redactAndBoundDiagnostics(
     [
@@ -396,6 +396,7 @@ function buildModelEndpointMismatchContext(mismatch) {
       ...(mismatch.endpoint !== undefined ? [`Endpoint: ${mismatch.endpoint}`] : []),
       `Cause: ${redactAndBoundDiagnostics(mismatch.detail, { maxLength: 2500 })}`,
       `Fix: ${redactAndBoundDiagnostics(mismatch.fix, { maxLength: 2500 })}`,
+      ...(detectionJobResult === "failure" ? ["Threat detection also failed while using this engine configuration; its missing result may be a consequence of the same model/endpoint mismatch."] : []),
     ].join("\n")
   );
   const fence = safeMarkdownCodeFence([text]);
@@ -429,6 +430,7 @@ function buildModelEndpointMismatchContext(mismatch) {
  * @param {boolean} options.maxAICreditsExceeded
  * @param {boolean} options.hasAssignmentErrors
  * @param {boolean} options.http400ResponseError
+ * @param {boolean} [options.hasModelEndpointMismatch]
  * @param {boolean} options.unknownModelAICredits
  * @param {boolean} [options.copilotOrgBillingError]
  * @param {string} [options.copilotAgentNotFound] - Requested agent identifier if a "No such agent" failure was detected
@@ -452,6 +454,7 @@ function buildFailureIssueTitle(options) {
     const modelSuffix = options.missingModelPricingModelName ? ` (${options.missingModelPricingModelName})` : "";
     return `[aw] ${workflowName} has no AI credits pricing for model${modelSuffix}`;
   }
+  if (options.hasModelEndpointMismatch) return `[aw] ${workflowName} has model/endpoint mismatch`;
   // Keep HTTP 400 below AI-credits signals: quota/rate-limit indicates an account-level
   // budget state that should take precedence when both classes are detected.
   if (options.http400ResponseError) return `[aw] ${workflowName} hit HTTP 400 bad request`;
@@ -3939,6 +3942,7 @@ async function main() {
     const { aiCredits, maxAICredits, aiCreditsRateLimitError: detectedAICreditsRateLimitError, maxAICreditsExceeded } = resolveAICreditsFailureState();
     const aiCreditsRateLimitError = agentConclusion === "failure" && detectedAICreditsRateLimitError;
     const inferenceAccessError = process.env.GH_AW_INFERENCE_ACCESS_ERROR === "true";
+    const modelEndpointMismatchError = process.env.GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR === "true";
     const copilotOrgBillingError = !maxAICreditsExceeded && detectCopilotOrgBillingErrorFromLog();
     const copilotAgentNotFound = detectCopilotAgentNotFoundFromLog();
     const mcpPolicyError = process.env.GH_AW_MCP_POLICY_ERROR === "true";
@@ -4285,7 +4289,8 @@ async function main() {
       !maxAICreditsExceeded &&
       !hasMissingTool &&
       !hasMissingData &&
-      !hasToolDenialsExceeded
+      !hasToolDenialsExceeded &&
+      !modelEndpointMismatchError
     ) {
       core.info(
         `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
@@ -4294,7 +4299,7 @@ async function main() {
     }
 
     // If we only have noop outputs (and no report_incomplete/cache-miss/missing-tool/data/tool-denials-exceeded), skip failure handling
-    if (hasOnlyNoopOutputs && !hasReportIncomplete && !hasCacheMissMisconfiguration && !hasMissingTool && !hasMissingData && !hasToolDenialsExceeded) {
+    if (hasOnlyNoopOutputs && !hasReportIncomplete && !hasCacheMissMisconfiguration && !hasMissingTool && !hasMissingData && !hasToolDenialsExceeded && !modelEndpointMismatchError) {
       core.info("Agent completed with only noop outputs - skipping failure handling");
       return;
     }
@@ -4304,7 +4309,7 @@ async function main() {
     // This prevents false-positive failure issues when a transient AI model error occurs
     // after the agent has already finished its task (e.g., create_discussion produced but
     // the server returned a spurious error on teardown).
-    if (hasCompletedDespiteJobFailure && !hasReportIncomplete && !hasCacheMissMisconfiguration) {
+    if (hasCompletedDespiteJobFailure && !hasReportIncomplete && !hasCacheMissMisconfiguration && !modelEndpointMismatchError) {
       core.info("Agent completed with valid safe outputs despite job failure (terminal_reason: completed) — skipping failure handling");
       return;
     }
@@ -4390,9 +4395,11 @@ async function main() {
     const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
     const terminalOutputFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
     const modelEndpointMismatch = readModelEndpointMismatch();
+    const hasModelEndpointMismatch = modelEndpointMismatchError || Boolean(modelEndpointMismatch);
     const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
+      hasModelEndpointMismatch,
       transportWedge,
       emptyOutputCause,
       terminalOutputFailureCause,
@@ -4445,7 +4452,7 @@ async function main() {
       copilotAgentNotFound: Boolean(copilotAgentNotFound),
       mcpPolicyError,
       modelNotSupportedError,
-      modelEndpointMismatch: Boolean(modelEndpointMismatch),
+      modelEndpointMismatch: hasModelEndpointMismatch,
       http400ResponseError,
       aiCreditsRateLimitError,
       hasEngineRateLimit429,

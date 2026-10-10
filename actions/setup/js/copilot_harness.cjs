@@ -462,6 +462,7 @@ async function applyCopilotModelAliasResolution(options) {
  *   modelsJson: Record<string, unknown> | null,
  *   awfReflectData?: any,
  *   configuredModel?: string,
+ *   overrideSource?: string,
  *   logger?: (msg: string) => void,
  * }} options
  */
@@ -1229,7 +1230,13 @@ async function main() {
   }
   if (!copilotSDKMode) {
     try {
-      applyCopilotWireAPI({ modelsJson: loadModelsJson(), awfReflectData, configuredModel: configuredCopilotModel, logger: log });
+      applyCopilotWireAPI({
+        modelsJson: loadModelsJson(),
+        awfReflectData,
+        configuredModel: configuredCopilotModel,
+        overrideSource: modelRoutingSelection && !configuredWireAPI ? "routing" : "override",
+        logger: log,
+      });
     } catch (err) {
       log(getErrorMessage(err));
       process.exit(1);

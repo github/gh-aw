@@ -46,7 +46,10 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 		paths = append(paths, constants.TmpGhAwDirSlash+"agent/awf-routing-outcome.json")
 	}
 	if engine.GetID() == string(constants.CopilotEngine) {
-		paths = append(paths, constants.TmpGhAwDirSlash+"agent_usage.jsonl")
+		paths = append(paths,
+			constants.TmpGhAwDirSlash+"agent_usage.jsonl",
+			constants.TmpGhAwDirSlash+"agent/model-endpoint-mismatch.json",
+		)
 	}
 
 	// Collect agent stdio logs path for unified upload

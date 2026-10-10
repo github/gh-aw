@@ -54,6 +54,9 @@ Test workflow`)
 			if !strings.Contains(lockStr, "model_not_supported_error: ${{ steps.detect-agent-errors.outputs.model_not_supported_error || 'false' }}") {
 				t.Error("Expected agent job to have model_not_supported_error output from detect-agent-errors step")
 			}
+			if !strings.Contains(lockStr, "model_endpoint_mismatch_error: ${{ steps.detect-agent-errors.outputs.model_endpoint_mismatch_error || 'false' }}") {
+				t.Error("Expected agent job to have model_endpoint_mismatch_error output from detect-agent-errors step")
+			}
 		})
 	}
 }
@@ -77,6 +80,9 @@ safe-outputs:
 Test workflow`)
 			if !strings.Contains(lockStr, "GH_AW_MODEL_NOT_SUPPORTED_ERROR: ${{ needs.agent.outputs.model_not_supported_error }}") {
 				t.Error("Expected conclusion job to receive model_not_supported_error from agent job")
+			}
+			if !strings.Contains(lockStr, "GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR: ${{ needs.agent.outputs.model_endpoint_mismatch_error }}") {
+				t.Error("Expected conclusion job to receive model_endpoint_mismatch_error from agent job")
 			}
 		})
 	}

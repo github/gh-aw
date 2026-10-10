@@ -114,6 +114,9 @@ describe("handle_agent_failure", () => {
         expect(context).toContain("Configured model: model-alias");
         expect(context).toContain("Endpoint: /responses");
         expect(buildFailureMatchCategories({ agentConclusion: "failure", modelEndpointMismatch: true })).toEqual(["model_endpoint_mismatch"]);
+        expect(buildModelEndpointMismatchContext(mismatch, "failure")).toContain("same model/endpoint mismatch");
+        expect(buildModelEndpointMismatchContext(mismatch, "success")).not.toContain("Threat detection also failed");
+        expect(require("./handle_agent_failure.cjs").buildFailureIssueTitle({ workflowName: "Test", hasModelEndpointMismatch: true })).toContain("model/endpoint mismatch");
       } finally {
         read.mockRestore();
         vi.unstubAllEnvs();
