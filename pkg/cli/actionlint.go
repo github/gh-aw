@@ -185,9 +185,11 @@ func getActionlintVersion(ctx context.Context) (string, error) {
 	versionCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(versionCtx, "docker", "run", "--rm", ActionlintImage, "--version")
+	var cmd *exec.Cmd
 	if localPath := localScannerPath(versionCtx, "actionlint"); localPath != "" {
 		cmd = exec.CommandContext(versionCtx, localPath, "--version")
+	} else {
+		cmd = exec.CommandContext(versionCtx, "docker", "run", "--rm", ActionlintImage, "--version")
 	}
 
 	output, err := cmd.Output()

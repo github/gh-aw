@@ -4,9 +4,11 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/gitutil"
@@ -15,11 +17,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func actionlintTestDir(t *testing.T) string {
+	t.Helper()
+	root, err := gitutil.FindGitRoot()
+	require.NoError(t, err)
+	dir, err := os.MkdirTemp(root, ".actionlint-test-")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, os.RemoveAll(dir)) })
+	resolvedDir, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	return resolvedDir
+}
+
 func TestRunLocalActionlint(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test binaries use a POSIX shell")
 	}
-	dir := t.TempDir()
+	dir := actionlintTestDir(t)
 	script := `#!/bin/sh
 if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
   printf '1.7.12\n'
@@ -38,20 +52,29 @@ exit "$ACTIONLINT_TEST_EXIT"
 	originalVersion, originalStats := actionlintVersion, actionlintStats
 	actionlintVersion, actionlintStats = "", nil
 	t.Cleanup(func() { actionlintVersion, actionlintStats = originalVersion, originalStats })
-	files := []string{filepath.Join(root, ".github/workflows/test space.lock.yml")}
+	files := []string{filepath.Join(dir, "test space.lock.yml")}
+	require.NoError(t, os.WriteFile(files[0], []byte("on: push\njobs: {}\n"), 0o600))
+	relPath, err := filepath.Rel(root, files[0])
+	require.NoError(t, err)
 	for _, tt := range []struct {
 		name, exit, output, wantErr string
+		defaultIntegrations         bool
 	}{
-		{"clean", "0", "[]", ""},
-		{"findings", "1", `[{"message":"invalid syntax","kind":"syntax-check","filepath":".github/workflows/test space.lock.yml","line":1,"column":1}]`, "strict mode: actionlint found 1 errors"},
-		{"tooling failure", "2", "", "actionlint failed with exit code 2"},
+		{"clean", "0", "[]", "", false},
+		{"default integrations", "0", "[]", "", true},
+		{"findings", "1", fmt.Sprintf(`[{"message":"invalid syntax","kind":"syntax-check","filepath":%q,"line":1,"column":1}]`, relPath), "strict mode: actionlint found 1 errors", false},
+		{"tooling failure", "2", "", "actionlint failed with exit code 2", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("ACTIONLINT_TEST_EXIT", tt.exit)
 			t.Setenv("ACTIONLINT_TEST_OUTPUT", tt.output)
 			var runErr error
 			output := testutil.CaptureStderr(t, func() {
-				runErr = runActionlintOnFilesWithOptions(context.Background(), files, true, true, actionlintRunOptions{})
+				if tt.defaultIntegrations {
+					runErr = runActionlintOnFiles(context.Background(), files, true, true)
+				} else {
+					runErr = runActionlintOnFilesWithOptions(context.Background(), files, true, true, actionlintRunOptions{})
+				}
 			})
 			if tt.wantErr == "" {
 				require.NoError(t, runErr)
@@ -60,7 +83,15 @@ exit "$ACTIONLINT_TEST_EXIT"
 			}
 			args, err := os.ReadFile(argsPath)
 			require.NoError(t, err)
-			want := root + "\n-format\n{{json .}}\n-shellcheck=\n-pyflakes=\n.github/workflows/test space.lock.yml\n"
+			wantArgs := []string{"-format", "{{json .}}"}
+			if tt.defaultIntegrations {
+				for _, pattern := range defaultGhAwActionlintIgnorePatterns {
+					wantArgs = append(wantArgs, "-ignore", pattern)
+				}
+			} else {
+				wantArgs = append(wantArgs, "-shellcheck=", "-pyflakes=")
+			}
+			want := root + "\n" + strings.Join(append(wantArgs, relPath), "\n") + "\n"
 			assert.Equal(t, want, string(args))
 			assert.NotContains(t, output, "Run actionlint directly: docker")
 		})

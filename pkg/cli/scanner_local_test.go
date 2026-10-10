@@ -168,13 +168,21 @@ func TestLocalActionlintCommandAndDockerFallback(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test binaries use a POSIX shell")
 	}
-	dir := t.TempDir()
+	dir := actionlintTestDir(t)
 	actionlint := installTestScanner(t, dir, "actionlint", "1.7.12")
-	installTestScanner(t, dir, "docker", "docker")
-	docker := filepath.Join(dir, "docker")
+	docker := installTestScanner(t, dir, "docker", "docker")
 	t.Setenv("PATH", dir)
-	root := t.TempDir()
+	root := dir
 	files := []string{".github/workflows/a.lock.yml", ".github/workflows/b space.lock.yml"}
+	for _, file := range files {
+		path := filepath.Join(root, file)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("on: push\njobs: {}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	options := actionlintRunOptions{IgnorePatterns: []string{"foo bar", "baz"}}
 	cmd := buildActionlintCommand(context.Background(), root, files, options)
 	if cmd.Path != actionlint || cmd.Dir != root {
