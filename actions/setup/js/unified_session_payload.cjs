@@ -197,6 +197,7 @@ const EVENT_FIELDS = {
     message: ["message"],
     content: ["content"],
     code: ["code"],
+    statusCode: ["statusCode"],
     errorType: ["errorType"],
     model: ["model"],
     severity: ["severity"],
@@ -386,8 +387,12 @@ function normalizeUnifiedSessionEvent(event, phase) {
     }
   }
   if (SCOPED_AGENT_TYPES.has(event.type) || (Object.hasOwn(COPILOT_WORKFLOW_EVENT_FIELDS, event.type) && event.type.startsWith("subagent."))) {
-    for (const [key, value] of Object.entries(sessionContext(event))) if (!Object.hasOwn(data, key)) data[key] = value;
     const parentToolCallId = Object.hasOwn(source, "parentToolCallId") ? source.parentToolCallId : event.parentToolCallId;
+    const hasParentToolUseId = ["parentToolUseId", "parent_tool_use_id"].some(key => Object.hasOwn(source, key) || Object.hasOwn(event, key));
+    for (const [key, value] of Object.entries(sessionContext(event))) {
+      if (key === "parentToolUseId" && parentToolCallId !== undefined && !hasParentToolUseId) continue;
+      if (!Object.hasOwn(data, key)) data[key] = value;
+    }
     if (parentToolCallId !== undefined && !Object.hasOwn(data, "parentToolCallId")) data.parentToolCallId = structuredClone(parentToolCallId);
   }
   if (event.type === "session.task_complete" && Object.hasOwn(source, "summary") && typeof source.summary !== "string") data.summary = structuredClone(source.summary);

@@ -118,6 +118,43 @@ describe("unique agent execution observation", () => {
     expect(agentErrorDiagnosticText(JSON.stringify(event))).toBe("");
   });
 
+  it.each([{ agentId: "child" }, { data: { agentId: "child" } }, { parentToolUseId: "parent-tool" }, { parent_tool_use_id: "parent-tool" }, { data: { parentToolUseId: "parent-tool" } }, { data: { parent_tool_use_id: "parent-tool" } }])(
+    "excludes child-emitted diagnostics from the main execution: %j",
+    scope => {
+      const error = { code: 503, errorType: "child_provider", message: "CAPIError: 503 Service Unavailable" };
+      const events = [
+        { type: "session.error", ...scope, data: { ...error, ...scope.data } },
+        { type: "session.result", ...scope, data: { status: "failed", errors: [error], ...scope.data } },
+        { type: "error", ...error, ...scope },
+        { type: "result", is_error: true, error, ...scope },
+      ];
+      expect(collectAgentExecution({ events, content: events.map(JSON.stringify).join("\n") })).toBeUndefined();
+      expect(collectAgentExecution({ content: JSON.stringify(events, null, 2) })).toBeUndefined();
+      expect(agentErrorDiagnosticText(events.map(JSON.stringify).join("\n"))).toBe("");
+      expect(events[0].data.message).toBe(error.message);
+      const rootError = { type: "session.error", data: { code: 400, errorType: "root_provider", message: "Synthetic main-agent failure", parentToolUseId: null } };
+      const mixed = [...events, rootError];
+      expect(collectAgentExecution({ events: mixed, content: mixed.map(JSON.stringify).join("\n"), exitCode: 0 }).data).toEqual({
+        categories: [],
+        errorCodes: [400],
+        errorTypes: ["root_provider"],
+        exitCode: 0,
+      });
+    }
+  );
+
+  it("keeps main diagnostics beside target-only subagent lifecycle IDs", () => {
+    const events = [
+      { type: "subagent.failed", agentId: "child", data: { errorCode: "SUBAGENT_MODEL_UNAVAILABLE" } },
+      { type: "session.error", data: { code: 429, errorType: "root_provider", parentToolUseId: null } },
+    ];
+    expect(collectAgentExecution({ events, content: JSON.stringify(events) }).data).toEqual({
+      categories: [],
+      errorCodes: [429],
+      errorTypes: ["root_provider"],
+    });
+  });
+
   it("ignores errors quoted in conversation and tool output", () => {
     const records = [
       { type: "assistant.message", data: { content: "CAPIError: 429 Too Many Requests" } },

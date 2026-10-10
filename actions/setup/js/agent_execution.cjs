@@ -4,6 +4,7 @@ const { detectErrors, buildOutputLines, isCAPIServerError } = require("./agent_e
 const { detectNonRetryableHarnessGuard, isAuthenticationFailedError } = require("./harness_error_patterns.cjs");
 const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { sessionContext } = require("./agent_session.cjs");
 
 /** @typedef {import("./types/agent_session").AgentExecutionData} AgentExecutionData */
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
@@ -47,6 +48,8 @@ function isAgentExecutionEvent(event) {
  */
 function recordErrors(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return [];
+  const { agentId, parentToolUseId } = sessionContext(record);
+  if (agentId || parentToolUseId) return [];
   const data = record.data ?? record;
   if (["error", "session.error"].includes(record.type) && ["warning", "info"].includes(data.severity)) return [];
   if (["session.error", "claude.assistant_error", "claude.api_retry", "error", "turn.failed"].includes(record.type)) return [data];
