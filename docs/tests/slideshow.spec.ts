@@ -165,6 +165,46 @@ test("presents all landing sections with bounded button and keyboard navigation"
   await expect(dialog.locator("[data-slideshow-status]")).toContainText("1 / 12");
 });
 
+test("renders the hero background on the presentation-only title slide", async ({ page }) => {
+  const titleSlide = page.locator("[data-slideshow-slides] > .aw-title-slide");
+  await expect(titleSlide).not.toBeVisible();
+  await startSlideshow(page);
+  const background = titleSlide.locator("[data-hero-bg-a]");
+  const canvas = background.locator("canvas");
+  await expect(background).toHaveAttribute("data-placement", "hero");
+  await expect(background.locator("..")).toHaveAttribute("aria-hidden", "true");
+  await expect(background.locator("..")).toHaveCSS("pointer-events", "none");
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate(value => (document.documentElement.dataset.theme = value), theme);
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveClass(/is-ready/);
+    await expect(canvas).toHaveCSS("opacity", "1");
+    await expect
+      .poll(async () => {
+        const slideBounds = await titleSlide.boundingBox();
+        const backgroundBounds = await background.boundingBox();
+        return (
+          !!slideBounds &&
+          !!backgroundBounds &&
+          Math.abs(slideBounds.x - backgroundBounds.x) < 1 &&
+          Math.abs(slideBounds.y - backgroundBounds.y) < 1 &&
+          Math.abs(slideBounds.width - backgroundBounds.width) < 1 &&
+          Math.abs(slideBounds.height - backgroundBounds.height) < 1
+        );
+      })
+      .toBe(true);
+  }
+  await page.keyboard.press("PageDown");
+  await expect(titleSlide).not.toBeVisible();
+  await page.keyboard.press("Home");
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(titleSlide).not.toBeVisible();
+  await startSlideshow(page);
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveCSS("opacity", "1");
+});
+
 test("presents the security diagram and layers, then cost dashboard and guardrails, on separate slides", async ({ page }) => {
   const deck = page.locator("main [data-slideshow-slides]");
   await expect(deck.locator("#safety .tri-fig")).toBeVisible();
