@@ -495,8 +495,9 @@ The words **MUST**, **SHOULD**, and **MAY** below describe the proposed feature,
 **Workflow-evolution revision: 2026-10-09.** Routine workflow updates MUST NOT
 require queue-wide draining or invalidate admitted Work. Section 7.10 supersedes
 the earlier drain-only deployment design. The existing wire schema, runtime,
-and formal models still implement that earlier design; the coordinated changes
-and new acceptance evidence remain required under section 9.1. No legacy
+and earlier formal models still implement that earlier design. A separate
+`QueueEvolution` refinement models the revised behavior; composition/runtime
+changes and acceptance evidence remain required under section 9.1. No legacy
 compatibility reader or migration layer is required for this revision.
 
 ### 7.1 Mandatory scheduling and policy modes
@@ -2834,7 +2835,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 
 | Requirement | Implementation/evidence status |
 |---|---|
-| Rolling workflow evolution and prospective Policy revisions | **Specified 2026-10-09; not implemented or verified.** The current TypeSpec/JSON contracts, Go/JavaScript replay, compiler/provisioning, dispatch/evidence/Claim authorization, indexes/checkpoints, diagnostics and formal models still assume SHA-pinned profiles and drain-only Policy replacement. Update these surfaces together for trusted deployment resolution, immutable Work contracts/optional pins, retained dispatch authority and debt-preserving configuration revisions. Add the rolling/race/local-blocking/compaction acceptance cases above; earlier conformance and model results do not establish these semantics |
+| Rolling workflow evolution and prospective Policy revisions | **Specified 2026-10-09; runtime not implemented or verified.** The separate [QueueEvolution model](../../../../../specs/work-queue/README.md#bounded-workflow-evolution-refinement) covers bounded deployment/configuration interleavings, frozen authority, local incompatibility, retained debt/capacity and abstract restart. The current TypeSpec/JSON contracts, Go/JavaScript replay, compiler/provisioning, dispatch/evidence/Claim authorization, indexes/checkpoints and diagnostics still assume SHA-pinned profiles and drain-only Policy replacement. Update these surfaces together and compose the earlier models; finite refinement checks do not establish full runtime, host or serialized-log correctness |
 | Git-authoritative backing Issue mirrors | Implemented in existing activation/conclusion hooks with installed projector rules, original run/Claim scope, immutable lossless bindings and comment handles, checked expected-head publication, per-Work/Issue coordination, repository status labels and summary status, mandatory generated-by templates, and conservative partial/ambiguous recovery. Local authenticated mocks cover concurrency, reruns, shared queues, staged behavior, drift repair and total request budgets; Go/JavaScript binding parity passes. No live intended-token Issue writes or hosted workflow runs are claimed |
 | Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented. An earlier combined-source local capture passed 286 independent cases with 136 dependency hashes unchanged during that capture. Safe-output changes invalidate its claim to match the current source; regenerate the capture before using it as current release evidence. Typed Go canonicalization rejects invalid Unicode before JSON encoding repairs it; checked operation-construction errors propagate through CLI and delivery consumers. Conformance does not prove arbitrary runtime/host refinement |
 | Exact fairness, FIFO defaults, deterministic fair-prefix packing and CAS recovery | Implemented in both engines, with exact integer passes, causal FIFO positions, literal shared expectations and mocked CAS/ambiguous-acknowledgment regressions. Charges are durable Claims, not CPU time or successful completions. Live Git/network contention remains unverified |

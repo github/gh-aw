@@ -15,10 +15,10 @@ enforcement. Do not infer deployment-security completion from functional tests.
 
 The [2026-10-09 workflow-evolution revision](../../docs/src/content/docs/specs/work-queue-specification.md#710-policy-changes-and-breaking-deployment)
 requires rolling compatible deployments and prospective configuration changes
-without queue-wide draining. The TypeSpec wire contract, native implementations,
-and models in this directory have not yet been updated for that revision.
-Their existing conformance/proof results do not cover deployment resolution,
-retained execution authority across configuration updates, or evolution races.
+without queue-wide draining. `QueueEvolution.tla` provides a separate bounded
+refinement of that design. The TypeSpec wire contract, native implementations,
+and earlier models have not been updated/composed for that revision; their
+existing conformance/proof results do not establish rolling-update correctness.
 
 The original `WorkQueue.tla` is retained as historical model evidence for
 [issue #64852](https://github.com/github/gh-aw/issues/64852). Its best-effort
@@ -891,6 +891,72 @@ wire codecs, arbitrary graphs, the native scheduler, all handler types or a
 liveness theorem. These checks do not complete the two interrupted large
 searches or the supported-host integration gate.
 
+### Bounded workflow-evolution refinement
+
+[`QueueEvolution.tla`](QueueEvolution.tla) models the
+[rolling-deployment protocol](../../docs/src/content/docs/specs/work-queue-specification.md#710-policy-changes-and-breaking-deployment)
+separately from scheduling epochs and the original launch lifecycle. Moving an
+approved deployment source or updating configuration does not require draining.
+A tentative proposal captures the causal tip, resolved SHA and configuration;
+a stale proposal is discarded, and reservation freezes execution authority.
+Native binding and verified delivery use that authority after later updates.
+`MoveDeployment` abstracts a deployment observation in the causal ledger, not
+an atomic transaction across real Git refs.
+
+| Configuration | Bounded coverage | Exhausted states / depth |
+|---|---|---|
+| `EvolutionRolling` | Old/new dispatch overlap, optional revision pin, prospective configuration, ambiguous acknowledgment and restart | 541,620 / 33 |
+| `EvolutionLocal` | Incompatible contracts block affected Work; pinned and independent workflows remain usable, and a new-contract node can become eligible | 6,667,918 / 42 |
+| `EvolutionUnverified` | An unverified new deployment blocks new unpinned Claims, not original authority or independent execution | 648,534 / 33 |
+| `EvolutionCapacity` | Lowered capacity retains existing reservations and charges; new reservations wait for occupancy to fall | 18,708 / 24 |
+
+`Safety` checks frozen execution records, trusted deployment/scope, exact native
+binding, authority retained across configuration revisions, Claim accounting,
+local blocking, verified Results, delivery availability and online deployment
+update availability. `EvolutionSafety` checks prospective capacity admission,
+no deployment/configuration debt reset, terminal-only release, and persistence
+of existing Results as action properties.
+
+Fourteen deliberate controls require exact violations for stale CAS,
+reservation rewriting, moving-ref launch, epoch-based Claim retirement,
+debt reset/double charge, global blocking, untrusted sources, scope expansion,
+latest-deployment delivery checks, forgotten checkpoint bindings, premature
+capacity eviction, mandatory drains, and Result invalidation. Six guarded
+witnesses reach old/new overlap, a pinned dispatch granted after evolution,
+independent progress with incompatible Work, original-revision delivery verified
+after new configuration and restart, stale deployment-proposal recovery, and
+retained over-limit occupancy. Witness flags are observations, not authority.
+
+The 2026-10-09 check exhausted **7,876,780 distinct states** across these four
+configurations; all fourteen negative controls and six witnesses matched their
+exact expected diagnostic/status. Three seeded simulations also completed with
+unchanged source/tool settings. These counts are sums of separate bounded
+searches, not a combined-state-space proof. The checked model SHA-256 is
+`c2ea7975e907a8799743c340fe4bebba203402c2b28e5d897be7e79f8762cf1e`.
+The manifest SHA-256 for all 24 configuration files is
+`bc4b8c50cb49404611d1bbbaa0a8d9663c1c60bbc266376dbf003b5266824168`,
+computed from basename-sorted lines of `<sha256>  <basename>\n`.
+Checks used Java 21, official TLC 2.19, two workers, seed 1, fingerprint 0,
+and a 1 GiB heap; simulations used one worker, depth 24 and three traces.
+
+Reproduce the focused suite with the official Java/jar settings above:
+
+```bash
+TLC_MODEL_FILTER=QueueEvolution bash specs/work-queue/check.sh
+```
+
+This is a finite safety/refinement model, not an unbounded or eventual-progress
+proof. Each configured Work has at most one single-Claim dispatch, one deployment
+move, one configuration update and one abstract checkpoint/restart. Compatibility
+is a finite input-contract predicate, not behavioral equivalence. Deployment
+trust, native evidence and receipt verification are assumptions. The round-trip
+models retained normalized execution records, not byte-level serialization or
+full causal-log replay. Weights, scheduling-epoch transformations, arbitrary DAGs,
+shared assignments, cancellation/uncertain launches, delivery failures, security
+revocation and real host/credential behavior remain separate composition/runtime
+obligations. Existing `QueueLifecycle` results are not retroactively a proof of
+the combined evolution protocol.
+
 ### Bounded backing-Issue projection evidence
 
 [`IssueProjection.tla`](IssueProjection.tla) is a bounded authority/recovery
@@ -978,7 +1044,7 @@ JAVA_BIN=/path/to/java \
 bash specs/work-queue/check.sh
 ```
 
-The runner checks every registered configuration across the seven models,
+The runner checks every registered configuration across the eight models,
 including the historical configurations below. Positive configurations require
 exhaustive successful termination; negative controls and guarded witnesses
 require their exact named diagnostic and exit status, not a parse/tooling failure.
@@ -1012,7 +1078,7 @@ counts, to identify exhausted versus unfinished searches.
 
 ## Inspect execution traces
 
-Generate bounded textual simulations of six configurations and nine reachable
+Generate bounded textual simulations of seven configurations and fifteen reachable
 counterexamples to deliberately false *witness* invariants. `WorkQueue` is
 historical; the other models abstract parts of the current protocol:
 
@@ -1026,7 +1092,7 @@ bash specs/work-queue/traces.sh
 The script prints a temporary results directory (or uses `TLC_RESULTS_DIR` when
 set). `simulation_*` files are historical `WorkQueue` traces; current abstraction
 traces use prefixes `FairBatch`, `FairDAGGitHub`, `ClaimScopeMixed`,
-`ServiceDynamic` and `LifecyclePacked`. Each has at most `TLC_TRACE_DEPTH` states;
+`ServiceDynamic`, `LifecyclePacked` and `EvolutionRolling`. Each has at most `TLC_TRACE_DEPTH` states;
 `TLC_TRACE_COUNT` sets the number of seeded random simulations per configuration.
 The runner requires emitted traces and successful TLC termination, records
 Java identity/settings and SHA-256 hashes, and rejects source/tool drift.
@@ -1050,6 +1116,12 @@ counterexamples below. Current guarded witnesses are in `current-witnesses/`:
 | `LifecycleMixedDAGWitness` | Mixed lifecycle and delivery outcomes settle independent successors |
 | `LifecycleActivationWitness` | Checked activation recovers an uncertain launch binding |
 | `LifecycleConflictWitness` | Conflicting activation retains the native reservation |
+| `EvolutionOverlapWitness` | Old/new workflow revisions run concurrently after configuration changes |
+| `EvolutionPinnedWitness` | A new reservation after deployment evolution still honors an explicit old-revision pin |
+| `EvolutionLocalWitness` | Incompatible Work remains queued while an independent workflow obtains a verified Result |
+| `EvolutionDeliveryWitness` | Old-revision delivery is verified after deployment/configuration changes and restart |
+| `EvolutionCASWitness` | A stale deployment proposal is discarded and the new revision is reserved |
+| `EvolutionCapacityWitness` | Lowering capacity retains above-limit reservations without resetting charges |
 
 Each witness configuration also checks `Safety`; the script accepts only its
 named witness violation, not a safety violation or a TLC failure.

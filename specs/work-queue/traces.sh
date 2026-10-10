@@ -32,13 +32,15 @@ hash_file() {
 }
 
 capture_sources() {
-    for model in WorkQueue FairWorkQueue ClaimScopedWorker QueueService QueueLifecycle; do
+    for model in WorkQueue FairWorkQueue ClaimScopedWorker QueueService QueueLifecycle QueueEvolution; do
         hash_file "$SPEC_DIR/$model.tla"
     done
-    for config in WorkQueue FairBatch FairDAGGitHub ClaimScopeMixed ServiceDynamic LifecyclePacked \
+    for config in WorkQueue FairBatch FairDAGGitHub ClaimScopeMixed ServiceDynamic LifecyclePacked EvolutionRolling \
                   CompetingClaimsWitness RecoveryWitness ExternalEffectWitness WeakOrderingWitness \
                   PartialCompletionWitness MixedClaimDAGWitness LifecycleMixedDAGWitness \
-                  LifecycleActivationWitness LifecycleConflictWitness; do
+                  LifecycleActivationWitness LifecycleConflictWitness \
+                  EvolutionOverlapWitness EvolutionPinnedWitness EvolutionLocalWitness \
+                  EvolutionDeliveryWitness EvolutionCASWitness EvolutionCapacityWitness; do
         hash_file "$SPEC_DIR/$config.cfg"
     done
     hash_file "$SPEC_DIR/check.sh"
@@ -55,7 +57,8 @@ for entry in "WorkQueue WorkQueue simulation" \
              "FairWorkQueue FairDAGGitHub FairDAGGitHub" \
              "ClaimScopedWorker ClaimScopeMixed ClaimScopeMixed" \
              "QueueService ServiceDynamic ServiceDynamic" \
-             "QueueLifecycle LifecyclePacked LifecyclePacked"; do
+             "QueueLifecycle LifecyclePacked LifecyclePacked" \
+             "QueueEvolution EvolutionRolling EvolutionRolling"; do
     read -r model config prefix <<<"$entry"
     "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
         -workers 1 -seed 1 -fp 0 -simulate "file=$RESULTS_DIR/$prefix,num=$TRACE_COUNT" \
@@ -96,7 +99,13 @@ for entry in "FairWorkQueue PartialCompletionWitness" \
              "ClaimScopedWorker MixedClaimDAGWitness" \
              "QueueLifecycle LifecycleMixedDAGWitness" \
              "QueueLifecycle LifecycleActivationWitness" \
-             "QueueLifecycle LifecycleConflictWitness"; do
+             "QueueLifecycle LifecycleConflictWitness" \
+             "QueueEvolution EvolutionOverlapWitness" \
+             "QueueEvolution EvolutionPinnedWitness" \
+             "QueueEvolution EvolutionLocalWitness" \
+             "QueueEvolution EvolutionDeliveryWitness" \
+             "QueueEvolution EvolutionCASWitness" \
+             "QueueEvolution EvolutionCapacityWitness"; do
     read -r model config <<<"$entry"
     TLC_MODEL_FILTER="$model" TLC_CONFIG_FILTER="$config" \
         TLC_RESULTS_DIR="$RESULTS_DIR/current-witnesses" \
@@ -110,7 +119,7 @@ if ! cmp -s "$RESULTS_DIR/sources-before.sha256" "$RESULTS_DIR/sources-after.sha
 fi
 
 echo "Historical simulation traces (at most $TRACE_DEPTH states, $TRACE_COUNT traces): $RESULTS_DIR/simulation_*"
-echo "Current abstraction traces: $RESULTS_DIR/{FairBatch,FairDAGGitHub,ClaimScopeMixed,ServiceDynamic,LifecyclePacked}_*"
+echo "Current abstraction traces: $RESULTS_DIR/{FairBatch,FairDAGGitHub,ClaimScopeMixed,ServiceDynamic,LifecyclePacked,EvolutionRolling}_*"
 echo "Textual counterexample reports: $RESULTS_DIR/*Witness.log"
 echo "Current guarded witness reports: $RESULTS_DIR/current-witnesses/*Witness.log"
 echo "Source/tool hashes and execution settings: $RESULTS_DIR"

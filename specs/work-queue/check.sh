@@ -10,9 +10,9 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle|IssueProjection|QueueBootstrap) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle|QueueEvolution|IssueProjection|QueueBootstrap) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, QueueLifecycle, IssueProjection, or QueueBootstrap when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, QueueLifecycle, QueueEvolution, IssueProjection, or QueueBootstrap when set." >&2
         exit 1
         ;;
 esac
@@ -119,6 +119,30 @@ run_model BrokenLifecycleVerificationBudget DeliveryFailureBudget Invariant 12 Q
 run_model LifecycleMixedDAGWitness NoMixedLifecycleWitness Invariant 12 QueueLifecycle
 run_model LifecycleActivationWitness NoActivationRecoveryWitness Invariant 12 QueueLifecycle
 run_model LifecycleConflictWitness NoConflictReservationWitness Invariant 12 QueueLifecycle
+run_model EvolutionRolling "" Invariant 0 QueueEvolution
+run_model EvolutionLocal "" Invariant 0 QueueEvolution
+run_model EvolutionUnverified "" Invariant 0 QueueEvolution
+run_model EvolutionCapacity "" Invariant 0 QueueEvolution
+run_model BrokenEvolutionReservation FrozenExecution Invariant 12 QueueEvolution
+run_model BrokenEvolutionCAS FrozenExecution Invariant 12 QueueEvolution
+run_model BrokenEvolutionLaunch BindingAuthority Invariant 12 QueueEvolution
+run_model BrokenEvolutionRetirement RetainedAuthority Invariant 12 QueueEvolution
+run_model BrokenEvolutionDebt Accounting Invariant 12 QueueEvolution
+run_model BrokenEvolutionAdmission LocalBlocking Invariant 12 QueueEvolution
+run_model BrokenEvolutionSource DeploymentAuthority Invariant 12 QueueEvolution
+run_model BrokenEvolutionScope DeploymentAuthority Invariant 12 QueueEvolution
+run_model BrokenEvolutionDelivery DeliveryAvailable Invariant 12 QueueEvolution
+run_model BrokenEvolutionCheckpoint BindingAuthority Invariant 12 QueueEvolution
+run_model BrokenEvolutionAck Accounting Invariant 12 QueueEvolution
+run_model BrokenEvolutionCapacity NativeReleaseAuthority "Action property" 13 QueueEvolution
+run_model BrokenEvolutionDrain DeploymentUpdateAvailable Invariant 12 QueueEvolution
+run_model BrokenEvolutionResults ResultPersistence "Action property" 13 QueueEvolution
+run_model EvolutionOverlapWitness NoRollingOverlap Invariant 12 QueueEvolution
+run_model EvolutionPinnedWitness NoPinnedEvolution Invariant 12 QueueEvolution
+run_model EvolutionLocalWitness NoLocalProgress Invariant 12 QueueEvolution
+run_model EvolutionDeliveryWitness NoRetainedDelivery Invariant 12 QueueEvolution
+run_model EvolutionCASWitness NoStaleRecovery Invariant 12 QueueEvolution
+run_model EvolutionCapacityWitness NoOverLimitRetention Invariant 12 QueueEvolution
 run_model IssueExisting "" Invariant 0 IssueProjection
 run_model IssueCreated "" Invariant 0 IssueProjection
 run_model IssueDefaultOpen "" Invariant 0 IssueProjection
