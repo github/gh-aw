@@ -214,12 +214,10 @@ func runJavaScriptGrader(ctx context.Context, grader graderRunDefinition, payloa
 	scriptPath := script.Name()
 	defer os.Remove(scriptPath)
 	if err := script.Chmod(constants.FilePermSensitive); err != nil {
-		_ = script.Close()
-		return fmt.Errorf("failed to secure grader runtime: %w", err)
+		return fmt.Errorf("failed to secure grader runtime: %w", errors.Join(err, script.Close()))
 	}
 	if _, err := script.Write(gradersRunScript); err != nil {
-		_ = script.Close()
-		return fmt.Errorf("failed to stage grader runtime: %w", err)
+		return fmt.Errorf("failed to stage grader runtime: %w", errors.Join(err, script.Close()))
 	}
 	if err := script.Close(); err != nil {
 		return fmt.Errorf("failed to stage grader runtime: %w", err)
@@ -393,7 +391,9 @@ func (buffer *boundedCommandBuffer) Write(data []byte) (int, error) {
 	remaining := buffer.limit - buffer.Len()
 	if remaining > 0 {
 		remaining = min(len(data), remaining)
-		_, _ = buffer.Buffer.Write(data[:remaining])
+		if _, err := buffer.Buffer.Write(data[:remaining]); err != nil {
+			return 0, err
+		}
 	}
 	if written > remaining {
 		buffer.exceeded = true
