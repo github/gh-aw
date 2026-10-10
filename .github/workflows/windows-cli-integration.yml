@@ -205,10 +205,13 @@ jobs:
 
           # Dimension pair 2: env-shape x path-style, every environment variant
           # exercised across every PATH arrangement via a fixed representative
-          # shell/launch (already covered above for env=default/path=default).
+          # shell/launch. Dimension pair 1 already generates
+          # $representativeShell/path/default/workspace-first (its "path"
+          # launch mode always resolves to the workspace-first PATH style),
+          # so that exact combination is skipped here to avoid a duplicate.
           foreach ($env in $envShapes) {
             foreach ($path in $pathStyles) {
-              if ($env -eq "default" -and $path -eq "default") { continue }
+              if ($env -eq "default" -and $path -eq "workspace-first") { continue }
               $scenarioMatrix.Add(@{ name = "$representativeShell/path/$env/$path"; shell = $representativeShell; launch = "path"; env = $env; path = $path })
             }
           }
