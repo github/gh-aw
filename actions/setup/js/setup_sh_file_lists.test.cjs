@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, copyFileSync, writeFileSync, rmSync } from "fs";
+import { spawnSync } from "child_process";
+import { tmpdir } from "os";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -151,6 +153,80 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
       // The entry point itself is copied separately, not in the list
       .filter(f => f !== "safe-outputs-mcp-server.cjs");
     expect(missing).toEqual([]);
+  });
+
+  it("loads the isolated runtime bundle and records a safe output through MCP", () => {
+    // Do not run setup.sh here: its /tmp/gh-aw cleanup can affect other sessions.
+    const runnerTemp = mkdtempSync(resolve(tmpdir(), "safe-outputs-bundle-"));
+    const bundleDir = resolve(runnerTemp, "gh-aw/safeoutputs");
+    try {
+      mkdirSync(bundleDir, { recursive: true });
+      for (const file of safeOutputsFiles) {
+        copyFileSync(resolve(__dirname, file), resolve(bundleDir, file));
+      }
+      copyFileSync(resolve(__dirname, "safe-outputs-mcp-server.cjs"), resolve(bundleDir, "mcp-server.cjs"));
+      for (const file of ["safe_outputs_tools.json", "tools.json"]) {
+        copyFileSync(resolve(__dirname, "safe_outputs_tools.json"), resolve(bundleDir, file));
+      }
+      writeFileSync(resolve(bundleDir, "config.json"), JSON.stringify({ create_issue: { max: 1 } }));
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          "-e",
+          `
+            const assert = require("node:assert/strict");
+            require("./mcp-server.cjs");
+            require("./safe_outputs_mcp_server.cjs");
+            require("./ledger_store.cjs");
+            const { createMCPServer } = require("./safe_outputs_mcp_server_http.cjs");
+            const { server } = createMCPServer();
+            (async () => {
+              const listed = await server.handleRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" });
+              assert.equal(listed.error, undefined);
+              assert.deepEqual(listed.result.tools.map(tool => tool.name), ["create_issue"]);
+              const called = await server.handleRequest({
+                jsonrpc: "2.0", id: 2, method: "tools/call",
+                params: {
+                  name: "create_issue",
+                  arguments: {
+                    title: "Restore missing safe-output runtime dependency",
+                    body: "The isolated safe-output bundle must load its memory schema validator."
+                  }
+                }
+              });
+              assert.equal(called.error, undefined);
+              assert.equal(called.result.isError, false, JSON.stringify(called.result));
+              assert.deepEqual(JSON.parse(called.result.content[0].text), { result: "success" });
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          `,
+        ],
+        {
+          cwd: bundleDir,
+          env: {
+            PATH: process.env.PATH,
+            SystemRoot: process.env.SystemRoot,
+            HOME: runnerTemp,
+            RUNNER_TEMP: runnerTemp,
+            GITHUB_REPOSITORY: "fixture/safe-outputs",
+          },
+          encoding: "utf8",
+          timeout: 10000,
+        }
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      const output = readFileSync(resolve(bundleDir, "outputs.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+      expect(output).toEqual([
+        {
+          type: "create_issue",
+          title: "Restore missing safe-output runtime dependency",
+          body: "The isolated safe-output bundle must load its memory schema validator.",
+        },
+      ]);
+    } finally {
+      rmSync(runnerTemp, { recursive: true, force: true });
+    }
   });
 
   it("all listed files exist in js/", () => {
