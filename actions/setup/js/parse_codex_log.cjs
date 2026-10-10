@@ -15,7 +15,20 @@ const {
 } = require("./log_parser_shared.cjs");
 const { normalizeCodexSession, isCodexRecord } = require("./codex_session.cjs");
 const { projectSessionResult, createSessionEvent, sessionToolSuccess } = require("./agent_session.cjs");
-const { CODEX_LEGACY_OUTCOME, codexLegacyPayload, codexLegacyResultEnd } = require("./codex_log_framing.cjs");
+const {
+  CODEX_LEGACY_OUTCOME,
+  CODEX_LEGACY_METADATA,
+  CODEX_LEGACY_TOOL,
+  CODEX_LEGACY_OLD_TOOL,
+  CODEX_LEGACY_EXEC,
+  codexLegacyPayload,
+  codexLegacyBoundary,
+  codexLegacyStartupLines,
+  codexLegacyMessageEnd,
+  codexLegacyResultEnd,
+  extractCodexLegacyTokens,
+  collectCodexJSONRecords,
+} = require("./codex_log_framing.cjs");
 
 const main = createEngineLogParser({
   parserName: "Codex",
@@ -26,7 +39,7 @@ const main = createEngineLogParser({
 /**
  * Extract MCP server initialization information from Codex logs
  * @param {string[]} lines - Array of log lines
- * @returns {{hasInfo: boolean, markdown: string, servers: Array<{name: string, status: string, error?: string}>}} MCP initialization info
+ * @returns {{hasInfo: boolean, markdown: string, servers: Array<{name: string, status: string, error?: string}>, tools?: string[]}} MCP initialization info
  */
 function extractMCPInitialization(lines) {
   const mcpServers = new Map(); // Map server name to status/error info
@@ -133,6 +146,7 @@ function extractMCPInitialization(lines) {
     hasInfo,
     markdown,
     servers: Array.from(mcpServers.values()),
+    tools: availableTools.length > 0 ? availableTools : undefined,
   };
 }
 
@@ -179,14 +193,16 @@ function extractCodexErrorMessages(lines) {
  * @returns {string|null} The model name, or null if not found
  */
 function extractCodexModel(logContent) {
-  const match = logContent.match(/^model:\s*(.+)$/m);
+  const match = codexLegacyStartupLines(logContent.split("\n"))
+    .join("\n")
+    .match(/^model:\s*(.+)$/m);
   if (match) {
     return match[1].trim();
   }
   // Fallback for the experimental JSONL format, which has no "model:" header line.
   // The codex harness logs the resolved spawn command, e.g.
   //   [codex-harness] ... spawning: codex exec --model gpt-5.4 -c ...
-  const spawnMatch = logContent.match(/spawning:\s*codex\s+exec\s+--model\s+(\S+)/);
+  const spawnMatch = logContent.match(/^\[codex-harness\][^\n]*spawning:\s*codex\s+exec\s+--model\s+(\S+)/m);
   if (spawnMatch) {
     return spawnMatch[1].trim();
   }
@@ -203,7 +219,7 @@ function extractCodexModel(logContent) {
  * @param {Array<any>} [entries] - Already parsed records, when available
  * @returns {boolean} True if at least one Codex JSONL event line is present
  */
-function isCodexJsonlFormat(lines, entries = parseLogEntries(lines.join("\n")) ?? []) {
+function isCodexJsonlFormat(lines, entries = collectCodexJSONRecords(lines.join("\n"))) {
   return entries.some(entry => isCodexRecord(entry) || normalizeCodexSession([entry]).length > 0);
 }
 
@@ -214,7 +230,7 @@ function isCodexJsonlFormat(lines, entries = parseLogEntries(lines.join("\n")) ?
  * @param {Array<any>} [entries] - Already parsed records, when available
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parseCodexJsonl(logContent, entries = parseLogEntries(logContent) ?? []) {
+function parseCodexJsonl(logContent, entries = collectCodexJSONRecords(logContent)) {
   const canonicalLogEntries = normalizeCodexSession(collectCodexMixedRecords(logContent, entries), extractCodexModel(logContent));
   const conversation = generateConversationMarkdown(canonicalLogEntries, {
     includeInformation: false,
@@ -238,7 +254,7 @@ function parseCodexJsonl(logContent, entries = parseLogEntries(logContent) ?? []
  * @param {Array<any>} [entries]
  * @returns {Array<any>}
  */
-function collectCodexMixedRecords(logContent, entries = parseLogEntries(logContent) ?? []) {
+function collectCodexMixedRecords(logContent, entries = collectCodexJSONRecords(logContent)) {
   try {
     if (Array.isArray(JSON.parse(logContent))) return entries;
   } catch {
@@ -256,10 +272,16 @@ function collectCodexMixedRecords(logContent, entries = parseLogEntries(logConte
   const lines = logContent.split("\n");
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
+    const messageEnd = codexLegacyMessageEnd(lines, index);
+    if (messageEnd !== null) {
+      for (const messageLine of lines.slice(index, messageEnd + 1)) text.push(messageLine);
+      index = messageEnd;
+      continue;
+    }
     const resultEnd = codexLegacyResultEnd(lines, index);
     if (resultEnd !== null) {
       hasFramedResult = true;
-      text.push(...lines.slice(index, resultEnd + 1));
+      for (const resultLine of lines.slice(index, resultEnd + 1)) text.push(resultLine);
       index = resultEnd;
       continue;
     }
@@ -273,17 +295,6 @@ function collectCodexMixedRecords(logContent, entries = parseLogEntries(logConte
   return records.length > 0 || hasFramedResult ? records : entries;
 }
 
-/** @param {string} line @returns {number|undefined} */
-function extractCodexLegacyTokens(line) {
-  const payload = codexLegacyPayload(line);
-  const totalMatch = payload.startsWith("total_tokens:") || payload.includes("TokenCount") ? payload.match(/\btotal_tokens:\s*([\d,]+)/) : null;
-  const match = payload.match(/^tokens\s+used:\s*([\d,]+)\s*$/i) ?? totalMatch;
-  if (!match) return undefined;
-  if (!/^\d+(?:,\d{3})*$/.test(match[1])) return undefined;
-  const count = Number(match[1].replace(/,/g, ""));
-  return Number.isSafeInteger(count) && count >= 0 ? count : undefined;
-}
-
 /**
  * Legacy presentation uses lookahead; canonical observations must instead remain
  * at their source positions, including orphan outcomes and dangling invocations.
@@ -295,28 +306,19 @@ function extractCodexLegacyTokens(line) {
 function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, hasTokenSnapshot: false }) {
   /** @type {import("./types/agent_session").AgentSession} */
   const events = [];
-  const metadata = /^(?:OpenAI Codex|--------|workdir:|model:|provider:|approval:|sandbox:|reasoning effort:|reasoning summaries:|DEBUG codex|INFO codex|\d{4}-\d{2}-\d{2}T[\d:.]+Z\s+(?:DEBUG|INFO|WARN|ERROR))/;
-  const tool = /^tool\s+([\w-]+)\.([\w-]+)\((.*)\)$/;
-  const oldTool = /^ToolCall:\s+([\w-]+)__([\w-]+)\s+(.*)$/;
-  const exec = /^exec\s+(?:bash\s+-lc\s+'([^']*)'|(.+?)(?: in \/.*)?)$/;
+  const metadata = CODEX_LEGACY_METADATA;
+  const tool = CODEX_LEGACY_TOOL;
+  const oldTool = CODEX_LEGACY_OLD_TOOL;
+  const exec = CODEX_LEGACY_EXEC;
   const outcome = CODEX_LEGACY_OUTCOME;
-  const boundary = line => {
-    const payload = codexLegacyPayload(line);
-    return (
-      /^(?:thinking|codex|user|tokens used)$/.test(payload) ||
-      metadata.test(line) ||
-      tool.test(payload) ||
-      oldTool.test(payload) ||
-      exec.test(payload) ||
-      outcome.test(payload) ||
-      /^(?:ERROR:|Reconnecting\.\.\.)/.test(payload) ||
-      extractCodexLegacyTokens(line) !== undefined
-    );
-  };
+  const boundary = codexLegacyBoundary;
   const emit = (source, type, data) => events.push(createSessionEvent(source, type, data));
-  const cwd = lines.find(line => line.startsWith("workdir: "))?.slice("workdir: ".length);
-  if (model !== null || cwd !== undefined || lines.some(line => line.startsWith("OpenAI Codex"))) {
-    emit({}, "session.init", { sourceEngine: "codex", model: model ?? undefined, cwd });
+  const startup = codexLegacyStartupLines(lines);
+  const cwd = startup.find(line => line.startsWith("workdir: "))?.slice("workdir: ".length);
+  if (model !== null || cwd !== undefined || startup.some(line => line.startsWith("OpenAI Codex"))) {
+    const mcp = extractMCPInitialization(startup);
+    const reasoningEffort = startup.find(line => line.startsWith("reasoning effort: "))?.slice("reasoning effort: ".length);
+    emit({}, "session.init", { sourceEngine: "codex", model: model ?? undefined, cwd, reasoningEffort, mcpServers: mcp.servers.length ? mcp.servers : undefined, tools: mcp.tools });
   }
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -327,7 +329,7 @@ function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, h
     if (tokens !== undefined) {
       if (/^tokens\s+used:/i.test(payload)) {
         accounting.inlineTokens += tokens;
-        if (!accounting.hasTokenSnapshot && Number.isSafeInteger(accounting.inlineTokens)) emit(source, "session.result", { usage: { total_tokens: accounting.inlineTokens } });
+        if (!accounting.hasTokenSnapshot) emit(source, "session.result", { usage: Number.isSafeInteger(accounting.inlineTokens) ? { total_tokens: accounting.inlineTokens } : { overflowed_tokens: ["total_tokens"] } });
       } else {
         accounting.hasTokenSnapshot = true;
         emit(source, "session.result", { usage: { total_tokens: tokens } });
@@ -346,9 +348,9 @@ function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, h
     )
       continue;
     if (["thinking", "codex", "user"].includes(payload)) {
-      const text = [];
-      while (i + 1 < lines.length && !boundary(lines[i + 1])) text.push(lines[++i]);
-      emit(source, payload === "thinking" ? "assistant.reasoning" : payload === "user" ? "user.message" : "assistant.message", { content: text.join("\n") });
+      const end = codexLegacyMessageEnd(lines, i) ?? i;
+      emit(source, payload === "thinking" ? "assistant.reasoning" : payload === "user" ? "user.message" : "assistant.message", { content: lines.slice(i + 1, end + 1).join("\n") });
+      i = end;
       continue;
     }
     const invocation = payload.match(tool) ?? payload.match(oldTool);
@@ -412,7 +414,7 @@ function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, h
  * @param {Array<any>} [parsed] - Already parsed records, when available
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parseCodexLog(logContent, parsed = parseLogEntries(logContent) ?? []) {
+function parseCodexLog(logContent, parsed = collectCodexJSONRecords(logContent)) {
   // Newer Codex CLI versions emit a structured JSONL event stream rather than the
   // legacy pretty-printed format. Route those to the dedicated JSONL parser.
   if (logContent && isCodexJsonlFormat([], parsed)) {

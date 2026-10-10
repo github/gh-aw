@@ -110,7 +110,7 @@ describe("streamed conversation display projection", () => {
       ])
     );
     const projected = collapseStreamedMessages(events);
-    expect(projected.filter(event => event.type === "claude.stream_event")).toHaveLength(6);
+    expect(projected.filter(event => event.type === "claude.stream_event").map(event => event.data.event.type)).toEqual(["message_start", "message_stop"]);
     expect(projected.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello world."]);
     for (const output of render(events)) expect(output).toContain("Hello world.");
   });

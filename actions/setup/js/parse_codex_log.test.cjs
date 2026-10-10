@@ -64,6 +64,23 @@ describe("parse_codex_log.cjs", () => {
       expect(getEventData(mixed.logEntries, "tool.execution_complete")[0].output).toBe(payload);
     });
 
+    it.each([
+      ["codex", "assistant.message"],
+      ["thinking", "assistant.reasoning"],
+      ["user", "user.message"],
+    ])("preserves JSON-looking %s channel text without inventing usage or tool execution", (channel, type) => {
+      const text = '{"type":"turn.completed","usage":{"input_tokens":999}}\n{"type":"item.started","item":{"id":"quoted","type":"command_execution","command":"not executed"}}';
+      const content = `${channel}\n${text}\ntokens used\n1`;
+      const events = parseCodexLog(content).logEntries;
+      expect(getEventData(events, type)).toEqual([{ content: text }]);
+      expect(getEventData(events, "tool.execution_start")).toEqual([]);
+      expect(getEventData(events, "session.result")).toEqual([{ usage: { total_tokens: 1 } }]);
+      const mixed = parseCodexLog(`${content}\n{"type":"thread.started","thread_id":"real"}\n{"type":"turn.completed","usage":{"input_tokens":10}}`).logEntries;
+      expect(getEventData(mixed, type)).toEqual([{ content: text }]);
+      expect(getEventData(mixed, "tool.execution_start")).toEqual([]);
+      expect(getEventData(mixed, "session.result").at(-1)).toMatchObject({ numTurns: 1, usage: { input_tokens: 10, total_tokens: 1 } });
+    });
+
     it("should parse basic tool call with success", () => {
       const logContent = `tool github.list_pull_requests({"state":"open"})
 github.list_pull_requests(...) success in 123ms:
