@@ -73,7 +73,12 @@ describe("unified session publication views", () => {
   it.each(['{"query":"PRIVATE_TOOL_ARGUMENT_DELTA"}', { query: "PRIVATE_TOOL_ARGUMENT_DELTA" }])("renders standard diagnostics without dumping tool delta %j, inputs or error context", delta => {
     const events = [
       header,
-      event("session.error", { severity: "warning", message: "Temporary diagnostic", code: 0, error: { code: "provider_error", message: "Provider unavailable", context: "PRIVATE_ERROR_CONTEXT" }, stack: "PRIVATE_STACK" }, "agent", 0),
+      event(
+        "session.error",
+        { severity: "warning", message: "Temporary diagnostic", code: 0, statusCode: 503, error: { code: "provider_error", message: "Provider unavailable", context: "PRIVATE_ERROR_CONTEXT" }, stack: "PRIVATE_STACK" },
+        "agent",
+        0
+      ),
       event("session.info", { status: "retrying", message: "Retry scheduled" }, "agent", 1),
       event("tool.execution_update", { toolName: "lookup", stepIndex: 0, partial: true, delta, input: "PRIVATE_TOOL_INPUT", output: "PRIVATE_TOOL_OUTPUT" }, "agent", 2),
       event("mcp.event", { event: "extension_start_failure", serverName: "github", status: "error" }, "mcp", 0),
@@ -81,6 +86,7 @@ describe("unified session publication views", () => {
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       expect(output).toContain("severity=warning");
       expect(output).toContain("Temporary diagnostic");
+      expect(output).toContain("statusCode=503");
       expect(output).toContain("Provider unavailable");
       expect(output).toContain("status=retrying");
       expect(output).toContain("toolName=lookup stepIndex=0 partial=true [updated]");

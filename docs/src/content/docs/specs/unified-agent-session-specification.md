@@ -235,6 +235,7 @@ opaque because its essential fields are not defined by this specification.
 | --- | --- |
 | Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
+| Agent session errors | Observed diagnostic fields, including `errorType`, `code`, and `statusCode`; absent status codes remain absent, and unrelated native error context is omitted. |
 | Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
 | Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |

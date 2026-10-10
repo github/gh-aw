@@ -337,6 +337,7 @@ export interface UnifiedSessionEventDataMap {
     content?: JsonValue;
     code?: JsonValue;
     errorType?: JsonValue;
+    statusCode?: JsonValue;
     model?: JsonValue;
     severity?: JsonValue;
     status?: JsonValue;

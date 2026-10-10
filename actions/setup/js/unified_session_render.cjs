@@ -96,7 +96,7 @@ function eventDetail(event) {
       return fields(data, ["sourceEngine", "model", "sessionId"]);
     case "session.error": {
       const error = data.error && typeof data.error === "object" ? fields(data.error, ["code", "type", "message"]) : data.error === undefined ? "" : inline(data.error);
-      return `${fields(data, ["severity", "status", "code", "errorType", "model", "message", "exitCode"])}${error ? ` ${error}` : ""}`;
+      return `${fields(data, ["severity", "status", "code", "errorType", "statusCode", "model", "message", "exitCode"])}${error ? ` ${error}` : ""}`;
     }
     case "session.info":
       return fields(data, ["status", "model", "message", "content"]);
