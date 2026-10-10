@@ -3,7 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
+const { redactDiagnosticText, redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 const { getDetectionCautionAlert, getFooterAgentFailureIssueMessage, getFooterAgentFailureCommentMessage, generateXMLMarker } = require("./messages.cjs");
 const { renderTemplate, renderTemplateFromFile, getPromptPath, renderFilesList } = require("./messages_core.cjs");
 const { getCurrentBranch } = require("./get_current_branch.cjs");
@@ -1751,51 +1751,82 @@ function buildReportIncompleteContext(items) {
 }
 
 /**
- * Find the failed step in the agent job for generic failure reports.
- * @returns {Promise<string>} The failed step name, or an empty string when unavailable
+ * Find the failed agent step and collect bounded diagnostics for generic failure reports.
+ * @returns {Promise<{failingStep: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string}>}
  */
-async function getFailedAgentStep() {
+async function getFailedAgentDiagnostics() {
+  let jobs;
   try {
     const { owner, repo } = context.repo;
-    const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+    jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
       owner,
       repo,
       run_id: context.runId,
       per_page: 100,
+      filter: "latest",
     });
-    const agentJob = jobs.find(job => job.name === "agent" && job.conclusion === "failure");
-    if (!agentJob) {
-      core.debug("No failed agent job found when looking up the failed agent step");
-      return "";
-    }
-    const failedStep = agentJob?.steps
-      ?.slice()
-      .reverse()
-      .find(step => step.conclusion === "failure" && typeof step.name === "string");
-    if (!failedStep) {
-      core.debug("No failed step found in the agent job");
-      return "";
-    }
-    return sanitizeContent(failedStep.name, 200);
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-    if (status === 403) {
-      core.warning("Could not identify the failed agent step; ensure the conclusion job grants actions: read.");
-    } else {
-      core.warning("Could not identify the failed agent step because the workflow run jobs API request failed.");
+    const reason = status === 403 ? "The Actions jobs API denied access; ensure the conclusion job grants actions: read." : "The Actions jobs API request failed.";
+    core.warning(reason);
+    return { failingStep: "", attributionUnavailable: reason };
+  }
+
+  const agentJob = jobs.find(job => job.name === "agent" && job.conclusion === "failure");
+  if (!agentJob) {
+    return {
+      failingStep: "",
+      attributionUnavailable: jobs.length === 0 ? "The Actions jobs API returned no jobs for this run." : "The Actions jobs API returned no failed agent job.",
+    };
+  }
+  const failedStep = agentJob.steps
+    ?.slice()
+    .reverse()
+    .find(step => step.conclusion === "failure" && typeof step.name === "string");
+  if (!failedStep) {
+    return { failingStep: "", attributionUnavailable: "The failed agent job had no failed step metadata." };
+  }
+
+  const failingStep = sanitizeContent(failedStep.name, 200);
+  const start = Date.parse(failedStep.started_at);
+  const end = Date.parse(failedStep.completed_at);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || !agentJob.id) {
+    return { failingStep, logUnavailable: "The failed step's timestamps or job ID were unavailable." };
+  }
+  try {
+    const response = await github.request("GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs", {
+      ...context.repo,
+      job_id: agentJob.id,
+    });
+    const log = typeof response.data === "string" ? response.data : Buffer.from(response.data).toString("utf8");
+    const lines = log.split(/\r?\n/).filter(line => {
+      const timestamp = Date.parse(line.split(" ", 1)[0]);
+      // Actions step metadata has second precision, while log timestamps include fractions.
+      return Number.isFinite(timestamp) && timestamp >= start && timestamp < end + 1000 && !isAddMaskCommandLine(line);
+    });
+    if (lines.length === 0) {
+      return { failingStep, logUnavailable: "The job log contained no lines for the failed step's time range." };
     }
-    return "";
+    const redacted = redactDiagnosticText(lines.join("\n"), { maskedValues: collectAddMaskedValues(log) });
+    const logExcerpt = redactAndBoundDiagnostics(redacted.split("\n").slice(-50).join("\n").slice(-8000));
+    return { failingStep, logExcerpt };
+  } catch (error) {
+    const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+    const reason =
+      status === 403 ? "The Actions logs API denied access; ensure the conclusion job grants actions: read." : status === 404 || status === 410 ? "The Actions job log was unavailable or expired." : "The Actions job log request failed.";
+    core.warning(reason);
+    return { failingStep, logUnavailable: reason };
   }
 }
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, engineFailureContext: string, items?: Array<any>}} options
+ * @param {{failureCategories: string[], failingStep: string, logExcerpt?: string, attributionUnavailable?: string, logUnavailable?: string, engineFailureContext: string, items?: Array<any>}} options
  * @returns {string}
  */
-function buildFailureDiagnosticsContext({ failureCategories, failingStep, engineFailureContext, items = [] }) {
+function buildFailureDiagnosticsContext({ failureCategories, failingStep, logExcerpt = "", attributionUnavailable = "", logUnavailable = "", engineFailureContext, items = [] }) {
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
-  const isGenericFailure = failureCategories.includes("agent_failure") || infrastructureMessages.length > 0;
+  const isGenericFailure = failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || infrastructureMessages.length > 0;
   if (!isGenericFailure) {
     return "";
   }
@@ -1803,6 +1834,16 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, engine
   let context = "\n### Failure Diagnostics\n\n";
   if (failingStep) {
     context += `**Failing step:** ${failingStep}\n\n`;
+  }
+  if (attributionUnavailable) {
+    context += `**Job attribution unavailable:** ${attributionUnavailable}\n\n`;
+    const conclusion = sanitizeContent(process.env.GH_AW_AGENT_CONCLUSION || "unknown", 100);
+    context += `**Job fallback:** \`agent\` reported \`${conclusion}\` via workflow dependency results; the failing step could not be attributed.\n\n`;
+  }
+  if (logExcerpt) {
+    context += `**Failing step log excerpt (tail):**${renderErrorDetails(logExcerpt)}`;
+  } else if (logUnavailable) {
+    context += `**Log excerpt unavailable:** ${logUnavailable}\n\n`;
   }
 
   const hasInfrastructureDetails = infrastructureMessages.some(item => typeof item.details === "string" && item.details.trim());
@@ -4465,7 +4506,7 @@ async function main() {
     const agentOutputItems = Array.isArray(agentOutputResult.items) ? agentOutputResult.items : [];
     const needsFailureDiagnostics =
       failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || agentOutputItems.some(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
-    const failingStep = needsFailureDiagnostics ? await getFailedAgentStep() : "";
+    const failureDiagnostics = needsFailureDiagnostics ? await getFailedAgentDiagnostics() : { failingStep: "" };
 
     // Check if parent issue creation is enabled (defaults to false)
     const groupReports = process.env.GH_AW_GROUP_REPORTS === "true";
@@ -4584,7 +4625,7 @@ async function main() {
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
           failureCategories,
-          failingStep,
+          ...failureDiagnostics,
           engineFailureContext,
           items: agentOutputItems,
         });
@@ -4825,7 +4866,7 @@ async function main() {
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
           failureCategories,
-          failingStep,
+          ...failureDiagnostics,
           engineFailureContext,
           items: agentOutputItems,
         });
@@ -5034,7 +5075,7 @@ module.exports = {
   isDroppedPipeSafeOutputsCommand,
   detectAWFFirewallStartupFailureFromLog,
   buildReportIncompleteContext,
-  getFailedAgentStep,
+  getFailedAgentDiagnostics,
   buildFailureDiagnosticsContext,
   buildMCPPolicyErrorContext,
   buildCopilotOrgBillingErrorContext,
