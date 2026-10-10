@@ -265,69 +265,60 @@ engine:
       });
     log-parser: |
       function parseLog(logContent) {
-        const lines = logContent.split("\n");
-        const logEntries = [];
-        const mcpFailures = [];
-        let maxTurnsHit = false;
+        const { isSessionEvent } = require("./agent_session.cjs");
+        const { normalizeEngineLogEntries } = require("./engine_log_parser.cjs");
+        const { generateCopilotCliStyleSummary, buildStepSummaryDetailsSection } = require("./log_parser_shared.cjs");
         const AWF_INFRA_RE = /^\[(INFO|WARN|SUCCESS|ERROR|entrypoint|health-check|crush-harness)\]|^ (?:Container|Network|Volume) |^Process exiting with code:/;
-        let toolCallIndex = 0;
-        let turnCount = 0;
-        let currentRole = null;
-        let currentText = [];
-
-        function flushEntry() {
-          if (!currentRole || currentText.length === 0) { currentText = []; return; }
-          const text = currentText.join("\n").trim();
-          if (!text) { currentText = []; return; }
-          if (currentRole === "tool_use") {
-            const toolId = `crush_tool_${toolCallIndex++}`;
-            const nameMatch = text.match(/^(?:Tool|Running|Executing|>\s*)(view|edit|bash|grep|ls|write|webfetch|websearch)\b/i);
-            const toolName = nameMatch ? nameMatch[1] : "unknown_tool";
-            logEntries.push({ type: "assistant", message: { content: [{ type: "tool_use", id: toolId, name: toolName, input: {} }] } });
-            logEntries.push({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: toolId, content: text }] } });
-          } else if (currentRole === "assistant") {
-            logEntries.push({ type: "assistant", message: { content: [{ type: "text", text }] } });
-            turnCount++;
-          }
-          currentText = [];
-        }
-
-        logEntries.push({ type: "system", subtype: "init", model: null, session_id: null });
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          if (AWF_INFRA_RE.test(line)) continue;
-          if (/max.?turns|maximum.*turns.*reached|turn limit/i.test(line)) maxTurnsHit = true;
-          if (/MCP server .* failed|MCP.*connection.*error|Failed to connect to MCP/i.test(line)) {
-            const serverMatch = line.match(/MCP server ['"]?([^\s'"]+)['"]?/i);
-            mcpFailures.push(serverMatch ? serverMatch[1] : line.trim());
-          }
-
-          if (/^(Tool|Running|Executing|>\s*(view|edit|bash|grep|ls|write|webfetch|websearch))\b/i.test(line.trim())) {
-            flushEntry();
-            currentRole = "tool_use";
-            currentText.push(line);
-            continue;
-          }
-          if (/^(Assistant|Response|Output)\s*[>:]/i.test(line.trim())) {
-            if (currentRole !== "assistant") { flushEntry(); currentRole = "assistant"; }
-            currentText.push(line);
-            continue;
-          }
-          if (currentRole) {
-            currentText.push(line);
-          } else {
-            currentText.push(line);
-            currentRole = "assistant";
+        const isStructured = record => isSessionEvent(record) ||
+          (record?.type === "system" && record.subtype === "init") ||
+          (["assistant", "user"].includes(record?.type) &&
+            (typeof record.message?.content === "string" || Array.isArray(record.message?.content))) ||
+          (record?.type === "result" && ["usage", "num_turns", "errors", "duration_ms", "total_cost_usd", "permission_denials", "status"].some(key => Object.hasOwn(record, key)));
+        const records = [];
+        let array;
+        if (logContent.trimStart().startsWith("[")) {
+          try {
+            array = JSON.parse(logContent);
+          } catch {
+            // Infrastructure prefixes and ordinary stdout need line framing.
           }
         }
-        flushEntry();
-
-        logEntries.push({ type: "result", num_turns: turnCount, usage: {} });
-        const parts = [`**Turns:** ${turnCount}`, `**Tool calls:** ${toolCallIndex}`];
-        if (mcpFailures.length) parts.push(`**MCP failures:** ${mcpFailures.length}`);
-        if (maxTurnsHit) parts.push("**Max turns reached**");
-        return { markdown: parts.join(" · "), logEntries, mcpFailures, maxTurnsHit };
+        const structuredArray = Array.isArray(array) && array.every(isStructured);
+        let text = "";
+        const flush = () => {
+          if (text.trim()) records.push({ type: "assistant.message", data: { content: text } });
+          text = "";
+        };
+        for (const line of structuredArray ? [] : logContent.match(/[^\n]*\n|[^\n]+$/g) || []) {
+          if (AWF_INFRA_RE.test(line)) {
+            flush();
+            continue;
+          }
+          let record;
+          if (line.trimStart().startsWith("{")) {
+            try {
+              record = JSON.parse(line);
+            } catch {
+              // Quiet stdout can contain ordinary or truncated JSON text.
+            }
+          }
+          if (isStructured(record)) {
+            flush();
+            records.push(record);
+          } else text += line;
+        }
+        flush();
+        const input = structuredArray ? array : records;
+        const logEntries = normalizeEngineLogEntries(input.map(record => record.type === "result" ? {
+          ...record,
+          data: { ...record.data, sourceEngine: "crush", sourceType: "result", ...(Object.hasOwn(record, "status") ? { status: record.status } : {}) },
+        } : record), "crush");
+        return {
+          markdown: logEntries.length ? generateCopilotCliStyleSummary(logEntries) : buildStepSummaryDetailsSection("Crush", "No captured Crush conversation; infrastructure output is not session evidence."),
+          logEntries,
+          mcpFailures: [],
+          maxTurnsHit: false,
+        };
       }
 ---
 
@@ -337,4 +328,18 @@ engine:
 Shared engine definition for the [Crush](https://github.com/charmbracelet/crush)
 coding agent. Import this file and set `engine.id: crush` with a
 `provider/model` model selection.
+
+The pinned CLI runs with `run --quiet`. Captured stdout is retained verbatim
+as assistant text, including whitespace and truncated JSON. Prose such as
+"Running bash" is not proof of a tool invocation, completion, or model turn.
+Initialization, reasoning, refusals, tool outcomes, and native accounting are
+unavailable unless structured records are supplied; the parser does not infer
+them or manufacture zero values. Canonical records and existing legacy
+compatibility records retain their observed fields and order. Runtime execution,
+firewall usage, and MCP observations remain separate evidence.
+
+The accessible smoke run 37866184524 (2026-10-09) timed out after fifteen
+minutes and captured only infrastructure output. Run 37553337234 succeeded
+overall but skipped the agent; it is not successful Crush execution evidence.
+These samples do not establish full-pipeline conformance.
 -->
