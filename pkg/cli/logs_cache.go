@@ -35,7 +35,7 @@ func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
 	if err != nil {
 		logsCacheLog.Printf("Failed to read run summary cache: %v", err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read run summary: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read run summary: %v", err)))
 		}
 		return nil, false
 	}
@@ -45,7 +45,7 @@ func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
 	if err := json.Unmarshal(data, &summary); err != nil {
 		logsCacheLog.Printf("Failed to parse run summary JSON: %v", err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse run summary: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse run summary: %v", err)))
 		}
 		return nil, false
 	}
@@ -55,14 +55,14 @@ func loadRunSummary(outputDir string, verbose bool) (*RunSummary, bool) {
 	if summary.CLIVersion != currentVersion {
 		logsCacheLog.Printf("CLI version mismatch: cached=%s, current=%s", summary.CLIVersion, currentVersion)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run summary version mismatch (cached: %s, current: %s), will reprocess", summary.CLIVersion, currentVersion)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Run summary version mismatch (cached: %s, current: %s), will reprocess", summary.CLIVersion, currentVersion)))
 		}
 		return nil, false
 	}
 
 	logsCacheLog.Printf("Successfully loaded cached run summary: run_id=%d", summary.RunID)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Loaded cached run summary for run %d (processed at %s)", summary.RunID, summary.ProcessedAt.Format(time.RFC3339))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Loaded cached run summary for run %d (processed at %s)", summary.RunID, summary.ProcessedAt.Format(time.RFC3339))))
 	}
 
 	return &summary, true
@@ -146,11 +146,11 @@ func cleanupOldRunFolders(outputDir string, cutoff time.Time, verbose bool) (int
 		if runDate.Before(cutoff) {
 			logsCacheLog.Printf("Removing old run folder: %s (run date: %s, cutoff: %s)", entry.Name(), runDate.Format(time.RFC3339), cutoff.Format(time.RFC3339))
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Removing old run folder: %s (run date: %s)", entry.Name(), runDate.Format("2006-01-02"))))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Removing old run folder: %s (run date: %s)", entry.Name(), runDate.Format("2006-01-02"))))
 			}
 			if removeErr := os.RemoveAll(runDir); removeErr != nil {
 				logsCacheLog.Printf("Failed to remove run folder %s: %v", entry.Name(), removeErr)
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to remove old run folder %s: %v", entry.Name(), removeErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to remove old run folder %s: %v", entry.Name(), removeErr)))
 				continue
 			}
 			removed++
@@ -181,7 +181,7 @@ func saveRunSummary(outputDir string, summary *RunSummary, verbose bool) error {
 
 	logsCacheLog.Printf("Successfully saved run summary cache: path=%s", summaryPath)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Saved run summary to "+summaryPath))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Saved run summary to "+summaryPath))
 	}
 
 	return nil

@@ -77,7 +77,7 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 		content, err := os.ReadFile(path)
 		if err != nil {
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read %s: %v", path, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read %s: %v", path, err)))
 			}
 			return nil
 		}
@@ -85,21 +85,21 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 		updatedActions, newContent, err := updateActionRefsInContentWithDeps(ctx, deps, string(content), cache, coolDownCache, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
 		if err != nil {
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update action refs in %s: %v", path, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update action refs in %s: %v", path, err)))
 			}
 			return nil
 		}
 		updatedSkills, newContent, err := updateSkillRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
 		if err != nil {
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update skill refs in %s: %v", path, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update skill refs in %s: %v", path, err)))
 			}
 			return nil
 		}
 		updatedPlugins, newContent, err := updatePluginRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
 		if err != nil {
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update plugin refs in %s: %v", path, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update plugin refs in %s: %v", path, err)))
 			}
 			return nil
 		}
@@ -112,7 +112,7 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 			return fmt.Errorf("unable to write updated workflow %s: %w", path, err)
 		}
 
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated action/skill/plugin references in "+d.Name()))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Updated action/skill/plugin references in "+d.Name()))
 		updatedFiles = append(updatedFiles, path)
 		return nil
 	})
@@ -127,7 +127,7 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 	}
 
 	if len(updatedFiles) == 0 && opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No action references needed updating in workflow files"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No action references needed updating in workflow files"))
 	}
 
 	return nil

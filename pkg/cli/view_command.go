@@ -134,8 +134,8 @@ func ViewWorkflowRun(ctx context.Context, runID int64, opts ViewOptions) error {
 	}
 
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Viewing run %d...", runID)))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Run directory: "+runDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Viewing run %d...", runID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Run directory: "+runDir))
 	}
 
 	// Download artifacts when the run directory does not yet contain the JSONL
@@ -149,7 +149,7 @@ func ViewWorkflowRun(ctx context.Context, runID int64, opts ViewOptions) error {
 		// No artifacts is non-fatal: the run may still have useful events in the
 		// workflow logs or the directory may have been populated by a previous run.
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No artifacts attached to this run; timeline may be empty."))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No artifacts attached to this run; timeline may be empty."))
 		}
 	}
 
@@ -160,8 +160,8 @@ func ViewWorkflowRun(ctx context.Context, runID int64, opts ViewOptions) error {
 	}
 
 	if len(events) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No timeline events found for run %d.", runID)))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Ensure the workflow has gateway.jsonl, audit.jsonl, or events.jsonl artifacts."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No timeline events found for run %d.", runID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Ensure the workflow has gateway.jsonl, audit.jsonl, or events.jsonl artifacts."))
 	} else {
 		output := renderUnifiedTimelineStream(events)
 		if output != "" {

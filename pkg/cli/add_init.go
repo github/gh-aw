@@ -77,11 +77,11 @@ func confirmAddRepositoryInitialization(ctx context.Context, engineOverride stri
 	addLog.Printf("Coding agent prompts and skills confirmation: confirmed=%t", confirmed)
 	if err != nil || !confirmed {
 		if err == nil {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Coding agent prompts and skills: skipped"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Coding agent prompts and skills: skipped"))
 		}
 		return addRepositoryInitializationPlan{}, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Coding agent prompts and skills: enabled"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Coding agent prompts and skills: enabled"))
 	return addRepositoryInitializationPlan{enabled: true, files: missingMarkers}, nil
 }
 

@@ -144,7 +144,7 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 		// the symlink-aware path validation below is the authoritative security control.
 		if strings.Contains(resourcePath, "..") {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping resource with unsafe path: %q", resourcePath)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping resource with unsafe path: %q", resourcePath)))
 			}
 			continue
 		}
@@ -198,7 +198,7 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 
 		if err := fileutil.ValidatePathWithinBase(targetBaseDir, targetPath); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write resource outside target directory: %q", resourcePath)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Refusing to write resource outside target directory: %q", resourcePath)))
 			}
 			continue
 		}
@@ -216,7 +216,7 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 					existingSourceRepo := readSourceRepoFromFile(targetPath)
 					if existingSourceRepo == spec.RepoSlug {
 						if verbose {
-							fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Resource file from same source already exists, skipping: "+targetPath))
+							fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Resource file from same source already exists, skipping: "+targetPath))
 						}
 						continue
 					}
@@ -237,7 +237,7 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 		fileContent, err := download(ctx, owner, repo, remoteFilePath, ref)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch resource %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch resource %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
@@ -263,7 +263,7 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 		// Create parent directory if needed
 		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for resource %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for resource %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
@@ -271,13 +271,13 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 		// Write the file
 		if err := os.WriteFile(targetPath, fileContent, constants.FilePermSensitive); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write resource %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write resource %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched resource: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched resource: "+targetPath))
 		}
 
 		// Track the file

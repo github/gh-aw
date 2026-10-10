@@ -456,32 +456,32 @@ func logsRunIDFromPath(path string) (int64, bool) {
 }
 
 func (l *logsStorageLimit) reportStartingUsage(size int64, folders []logsFolderSize, files []logsFileSize, fileCount int) {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 		"Logs cache starting size: %s (maximum %s)",
 		console.FormatFileSize(size), console.FormatFileSize(l.maxBytes),
 	)))
 	logsOrchestratorLog.Printf("Logs cache starting size: used=%d maximum=%d", size, l.maxBytes)
 	for _, folder := range folders {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 			"Logs cache folder %s: %s",
 			strconv.Quote(folder.name), console.FormatFileSize(folder.size),
 		)))
 		logsOrchestratorLog.Printf("Logs cache folder size: folder=%q size=%d", folder.name, folder.size)
 	}
 	if fileCount > len(files) {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 			"Logs cache files: showing %d largest of %d",
 			len(files), fileCount,
 		)))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 			"Logs cache files: %d",
 			fileCount,
 		)))
 	}
 	logsOrchestratorLog.Printf("Logs cache file count: total=%d reported=%d", fileCount, len(files))
 	for _, file := range files {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 			"Logs cache file %s: %s",
 			strconv.Quote(file.path), console.FormatFileSize(file.size),
 		)))
@@ -500,7 +500,7 @@ func (l *logsStorageLimit) recordPrunedUsage(freed int64) {
 	if l.usedBytes < l.maxBytes {
 		l.reached.Store(false)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 		"Pruned %s of non-essential logs cache data", console.FormatFileSize(freed),
 	)))
 	logsOrchestratorLog.Printf("Pruned non-essential logs cache data: freed=%d remaining=%d", freed, l.usedBytes)
@@ -517,7 +517,7 @@ func (l *logsStorageLimit) recordPrunedRunUsage(freed int64) {
 	if l.usedBytes < l.maxBytes {
 		l.reached.Store(false)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 		"Pruned %s by removing older logs runs", console.FormatFileSize(freed),
 	)))
 	logsOrchestratorLog.Printf("Pruned older logs runs: freed=%d remaining=%d", freed, l.usedBytes)
@@ -675,6 +675,6 @@ func (l *logsStorageLimit) markReached(size int64) {
 		"Logs storage limit reached (%s used; maximum %s). Stopping new downloads.",
 		console.FormatFileSize(size), console.FormatFileSize(l.maxBytes),
 	)
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(message))
 	logsOrchestratorLog.Printf("Logs storage limit reached: used=%d, maximum=%d", size, l.maxBytes)
 }

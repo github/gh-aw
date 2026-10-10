@@ -121,7 +121,7 @@ func startMCPScriptsHTTPServer(dir string, port int, verbose bool) (*exec.Cmd, e
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Started mcp-scripts server (PID: %d)", cmd.Process.Pid)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Started mcp-scripts server (PID: %d)", cmd.Process.Pid)))
 	}
 
 	return cmd, nil
@@ -139,7 +139,7 @@ func startMCPScriptsServer(ctx context.Context, mcpScriptsConfig *workflow.MCPSc
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d mcp-script tool(s) to configure", len(mcpScriptsConfig.Tools))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d mcp-script tool(s) to configure", len(mcpScriptsConfig.Tools))))
 	}
 
 	// Create temporary directory for mcp-scripts files
@@ -151,7 +151,7 @@ func startMCPScriptsServer(ctx context.Context, mcpScriptsConfig *workflow.MCPSc
 	}
 
 	if verbose {
-		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Created temporary directory: "+tmpDir)); err != nil {
+		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Created temporary directory: "+tmpDir)); err != nil {
 			mcpInspectLog.Printf("Warning: failed to write to stderr: %v", err)
 		}
 	}
@@ -179,7 +179,7 @@ func startMCPScriptsServer(ctx context.Context, mcpScriptsConfig *workflow.MCPSc
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Using port %d for mcp-scripts HTTP server", port)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Using port %d for mcp-scripts HTTP server", port)))
 	}
 
 	// Start the HTTP server
@@ -207,8 +207,8 @@ func startMCPScriptsServer(ctx context.Context, mcpScriptsConfig *workflow.MCPSc
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("MCP Scripts HTTP server started successfully"))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Server running on: http://localhost:%d", port)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("MCP Scripts HTTP server started successfully"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Server running on: http://localhost:%d", port)))
 	}
 
 	// Create MCP server config for the mcp-scripts server

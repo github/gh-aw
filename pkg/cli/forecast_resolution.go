@@ -127,7 +127,7 @@ func fetchWorkflowsWithBackoff(ctx context.Context, ids []string, repoOverride s
 
 		backoff := forecastRateLimitBackoffDuration(attempt)
 		forecastResolutionLog.Printf("Rate limited discovering workflows in %s; backing off %s before retry %d/%d", repoOverride, backoff, attempt+1, forecastRateLimitMaxAttempts)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 			fmt.Sprintf("GitHub API rate limit hit while discovering workflows in %s; backing off for %s before retry %d/%d",
 				repoOverride, backoff, attempt+1, forecastRateLimitMaxAttempts)))
 		if err := forecastRateLimitSleep(ctx, backoff); err != nil {
@@ -137,7 +137,7 @@ func fetchWorkflowsWithBackoff(ctx context.Context, ids []string, repoOverride s
 
 	if len(ids) > 0 {
 		forecastResolutionLog.Printf("Rate limit exhausted in %s; returning %d caller-supplied workflow IDs as partial results", repoOverride, len(ids))
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 			fmt.Sprintf("GitHub API rate limit exhausted while discovering workflows in %s; continuing with caller-supplied workflow IDs as partial results",
 				repoOverride)))
 
@@ -170,7 +170,7 @@ func listRunsWithBackoff(ctx context.Context, opts ListWorkflowRunsOptions, work
 		}
 
 		backoff := forecastRateLimitBackoffDuration(attempt)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 			fmt.Sprintf("GitHub API rate limit hit while sampling %s; backing off for %s before retry %d/%d",
 				workflowID, backoff, attempt+1, forecastRateLimitMaxAttempts)))
 		if err := forecastRateLimitSleep(ctx, backoff); err != nil {

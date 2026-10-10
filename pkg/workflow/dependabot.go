@@ -90,7 +90,7 @@ func (c *Compiler) GenerateDependabotManifests(ctx context.Context, workflowData
 	if len(ecosystems) == 0 {
 		dependabotLog.Print("No dependencies found, skipping manifest generation")
 		if c.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No dependencies detected in workflows, skipping Dependabot manifest generation"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No dependencies detected in workflows, skipping Dependabot manifest generation"))
 		}
 		return nil
 	}
@@ -104,7 +104,7 @@ func (c *Compiler) GenerateDependabotManifests(ctx context.Context, workflowData
 	}
 
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Successfully generated Dependabot manifests"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Successfully generated Dependabot manifests"))
 	}
 
 	return nil
@@ -117,6 +117,6 @@ func (c *Compiler) handleManifestGenerationError(manifestName string, err error)
 		return fmt.Errorf("failed to generate %s: %w", manifestName, err)
 	}
 	c.IncrementWarningCount()
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to generate %s: %v", manifestName, err)))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to generate %s: %v", manifestName, err)))
 	return nil
 }

@@ -53,7 +53,7 @@ func parseRPCMessages(logPath string, verbose bool) (*GatewayMetrics, error) {
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			gatewayLogsLog.Printf("Failed to parse rpc-messages.jsonl line %d: %v", lineNum, err)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 					fmt.Sprintf("Failed to parse rpc-messages.jsonl line %d: %v", lineNum, err)))
 			}
 			continue

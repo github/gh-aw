@@ -70,24 +70,24 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 		} else if hashMismatch {
 			runPushLog.Print("Lock file frontmatter hash changed (will recompile)")
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Frontmatter hash changed, recompiling workflow..."))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Frontmatter hash changed, recompiling workflow..."))
 			}
 		} else {
 			runPushLog.Print("Lock file frontmatter hash unchanged (will still recompile)")
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflow..."))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Recompiling workflow..."))
 			}
 		}
 	} else if os.IsNotExist(err) {
 		// Lock file doesn't exist
 		runPushLog.Printf("Lock file not found: %s", lockFilePath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Lock file not found, compiling workflow..."))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Lock file not found, compiling workflow..."))
 		}
 	} else {
 		runPushLog.Printf("Error checking lock file: %v", err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling workflow..."))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Compiling workflow..."))
 		}
 	}
 
@@ -98,7 +98,7 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 		return nil, fmt.Errorf("failed to recompile workflow: %w", err)
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow compiled successfully"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Workflow compiled successfully"))
 	}
 	runPushLog.Printf("Recompilation completed successfully")
 
@@ -109,7 +109,7 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 		runPushLog.Printf("Added lock file: %s", lockFilePath)
 	} else if verbose {
 		runPushLog.Printf("Lock file not found after compilation: %s", lockFilePath)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Lock file not found after compilation: "+lockFilePath))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Lock file not found after compilation: "+lockFilePath))
 	}
 
 	// Collect transitive closure of imported files
@@ -334,7 +334,7 @@ func collectImports(workflowPath string, files map[string]struct {
 		if resolvedPath == "" {
 			runPushLog.Printf("Could not resolve import path: %s", importPath)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not resolve import: "+importPath))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not resolve import: "+importPath))
 			}
 			continue
 		}
@@ -354,7 +354,7 @@ func collectImports(workflowPath string, files map[string]struct {
 		if _, err := os.Stat(absImportPath); err != nil {
 			runPushLog.Printf("Import file not found: %s (error: %v)", absImportPath, err)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Import file not found: "+absImportPath))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Import file not found: "+absImportPath))
 			}
 			continue
 		}
@@ -386,7 +386,7 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 	runPushLog.Printf("Files to push: %v", files)
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Staging %d files for commit", len(files))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Staging %d files for commit", len(files))))
 		for _, file := range files {
 			fmt.Fprintf(os.Stderr, "  - %s\n", file)
 		}
@@ -403,7 +403,7 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 	runPushLog.Printf("Successfully staged %d files", len(files))
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Files staged successfully"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Files staged successfully"))
 	}
 
 	// Check if there are any staged files in git (after we've staged our files)
@@ -420,7 +420,7 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 	if strings.TrimSpace(string(statusOutput)) == "" {
 		runPushLog.Printf("No staged changes detected")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No changes to commit"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No changes to commit"))
 		}
 		runPushLog.Print("No changes to commit")
 		return nil
@@ -444,7 +444,7 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 
 		runPushLog.Printf("Current branch matches --ref value: %s", currentBranch)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Verified current branch matches --ref: "+currentBranch))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Verified current branch matches --ref: "+currentBranch))
 		}
 	}
 
@@ -508,12 +508,12 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Cannot proceed: there are already staged files in git that are not part of this workflow"))
 		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Extra staged files:"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Extra staged files:"))
 		for _, file := range extraStagedFiles {
 			fmt.Fprintf(os.Stderr, "  - %s\n", file)
 		}
 		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Please commit or unstage these files before using --push"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Please commit or unstage these files before using --push"))
 		fmt.Fprintln(os.Stderr, "")
 
 		return errors.New("git has staged files not part of workflow - commit or unstage them before using --push")
@@ -526,12 +526,12 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 
 	// Show what will be committed and ask for confirmation using console helper
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Ready to commit and push the following files:"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Ready to commit and push the following files:"))
 	for _, file := range files {
 		fmt.Fprintf(os.Stderr, "  - %s\n", file)
 	}
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintf(os.Stderr, console.FormatInfoMessage("Commit message: %s\n"), commitMessage)
+	fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("Commit message: %s\n"), commitMessage)
 	fmt.Fprintln(os.Stderr, "")
 
 	// Ask for confirmation using console helper
@@ -562,7 +562,7 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 	runPushLog.Printf("Commit successful")
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Changes committed successfully"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Changes committed successfully"))
 	}
 
 	// Push the changes
@@ -576,7 +576,7 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 	runPushLog.Printf("Push to remote successful")
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Changes pushed to remote"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Changes pushed to remote"))
 	}
 
 	runPushLog.Print("Push completed successfully")

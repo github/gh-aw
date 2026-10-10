@@ -63,7 +63,7 @@ func getLatestActionReleaseWithDeps(ctx context.Context, deps actionUpdateDeps, 
 		// to use and the warning below is informational only.
 		updateLog.Printf("No releases found via GitHub API for %s, falling back to git ls-remote tag scan", baseRepo)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(baseRepo+": no GitHub Releases found, falling back to tag scanning (safe to ignore)"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(baseRepo+": no GitHub Releases found, falling back to tag scanning (safe to ignore)"))
 		}
 		latestRelease, latestSHA, gitErr := deps.getLatestReleaseViaGit(ctx, repo, currentVersion, allowMajor, verbose)
 		if gitErr != nil {
@@ -162,7 +162,7 @@ func getLatestActionReleaseWithDeps(ctx context.Context, deps actionUpdateDeps, 
 // getLatestActionReleaseViaGit gets the latest release using git ls-remote (fallback)
 func getLatestActionReleaseViaGit(ctx context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Fetching latest release for %s via git ls-remote (current: %s, allow major: %v)", repo, currentVersion, allowMajor)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Fetching latest release for %s via git ls-remote (current: %s, allow major: %v)", repo, currentVersion, allowMajor)))
 	}
 
 	// Extract base repository (e.g., "actions/cache/restore" -> "actions/cache")
@@ -230,7 +230,7 @@ func getLatestActionReleaseViaGit(ctx context.Context, repo, currentVersion stri
 		latestRelease := validReleases[0].tag
 		sha := tagToSHA[latestRelease]
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Current version is not valid, using highest semver release: %s (via git)", latestRelease)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Current version is not valid, using highest semver release: %s (via git)", latestRelease)))
 		}
 		return latestRelease, sha, nil
 	}
@@ -268,7 +268,7 @@ func getLatestActionReleaseViaGit(ctx context.Context, repo, currentVersion stri
 
 	sha := tagToSHA[latestCompatible]
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Latest compatible release: %s (via git)", latestCompatible)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Latest compatible release: %s (via git)", latestCompatible)))
 	}
 
 	return latestCompatible, sha, nil
@@ -344,7 +344,7 @@ func findCooledDownActionVersion(
 		if result.InCoolDown {
 			cooldownLog.Printf("Action fallback %s@%s: %s", repo, c.tag, result.Message)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping release candidate %s@%s: %s", repo, c.tag, result.Message)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping release candidate %s@%s: %s", repo, c.tag, result.Message)))
 			}
 			continue
 		}

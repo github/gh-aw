@@ -18,7 +18,7 @@ func warn(debugLog *logger.Logger, msg string) {
 		debugLog.Printf("WARNING: %s", msg)
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(msg))
 }
 
 // GetIntFromEnv is a generic helper that reads an integer value from an environment variable,

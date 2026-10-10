@@ -57,9 +57,9 @@ func (h *headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 func inspectMCPServer(config parser.RegistryMCPServerConfig, toolFilter string, verbose bool, useActionsSecrets bool) error {
 	mcpInspectServerLog.Printf("Inspecting MCP server: name=%s, type=%s", config.Name, config.Type)
 	fmt.Fprintf(os.Stderr, "%s %s (%s)\n",
-		console.FormatCommandMessage(config.Name),
-		console.FormatInfoMessage(config.Type),
-		console.FormatInfoMessage(buildConnectionString(config)))
+		console.FormatCommandMessageStderr(config.Name),
+		console.FormatInfoMessageStderr(config.Type),
+		console.FormatInfoMessageStderr(buildConnectionString(config)))
 
 	// Validate secrets/environment variables
 	mcpInspectServerLog.Print("Validating server secrets")
@@ -361,7 +361,7 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 	mcpInspectServerLog.Printf("Displaying server capabilities: tools=%d, resources=%d, prompts=%d, toolFilter=%q", len(info.Tools), len(info.Resources), len(info.Prompts), toolFilter)
 	if info.Error != nil {
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("MCP inspection returned partial results: %v", info.Error)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("MCP inspection returned partial results: %v", info.Error)))
 	}
 	// Display tools with allowed/not allowed status
 	if len(info.Tools) > 0 {

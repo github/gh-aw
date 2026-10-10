@@ -65,7 +65,7 @@ func getBashSingleQuotedArgsCodemod() Codemod {
 			}
 
 			for _, cmd := range unsafeCommands {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 					fmt.Sprintf("tools.bash entry %q contains an unclosed single-quoted segment and could not be safely rewritten; left unchanged", cmd)))
 			}
 

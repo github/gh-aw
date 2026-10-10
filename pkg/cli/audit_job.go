@@ -51,8 +51,8 @@ func fetchAuditJobLog(opts auditJobRunOptions) (string, string, error) {
 	}
 	args = append(args, "--job", strconv.FormatInt(opts.jobID, 10), "--log")
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Fetching logs for job %d...", opts.jobID)))
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Executing: gh "+strings.Join(args, " ")))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Fetching logs for job %d...", opts.jobID)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Executing: gh "+strings.Join(args, " ")))
 	}
 	cmd := workflow.ExecGH(args...)
 	workflow.SetGHHostEnv(cmd, opts.hostname)
@@ -65,7 +65,7 @@ func fetchAuditJobLog(opts auditJobRunOptions) (string, string, error) {
 		return "", "", fmt.Errorf("failed to write job log: %w", err)
 	}
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Job log saved to "+jobLogPath))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Job log saved to "+jobLogPath))
 	}
 	return string(output), jobLogPath, nil
 }
@@ -81,7 +81,7 @@ func extractRequestedStepOutput(opts auditJobRunOptions, jobLogContent string) e
 	stepOutput, err := extractStepOutput(jobLogContent, opts.stepNumber)
 	if err != nil {
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not extract step %d output: %v", opts.stepNumber, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not extract step %d output: %v", opts.stepNumber, err)))
 		}
 		return nil
 	}
@@ -90,7 +90,7 @@ func extractRequestedStepOutput(opts auditJobRunOptions, jobLogContent string) e
 		return fmt.Errorf("failed to write step log: %w", err)
 	}
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Step %d output saved to %s", opts.stepNumber, stepLogPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Step %d output saved to %s", opts.stepNumber, stepLogPath)))
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func extractFirstFailingStepOutput(opts auditJobRunOptions, jobLogContent string
 	failingStepNum, failingStepOutput := findFirstFailingStep(jobLogContent)
 	if failingStepNum == 0 {
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No failing steps found in job"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No failing steps found in job"))
 		}
 		return nil
 	}
@@ -108,7 +108,7 @@ func extractFirstFailingStepOutput(opts auditJobRunOptions, jobLogContent string
 		return fmt.Errorf("failed to write failing step log: %w", err)
 	}
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("First failing step %d output saved to %s", failingStepNum, stepLogPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("First failing step %d output saved to %s", failingStepNum, stepLogPath)))
 	}
 	return nil
 }
@@ -121,8 +121,8 @@ func renderAuditJobSummary(opts auditJobRunOptions, jobLogPath string) error {
 	if abs, err := filepath.Abs(opts.outputDir); err == nil {
 		absOutputDir = abs
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Job audit complete. Logs saved to "+absOutputDir))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("\nDownloaded files:"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Job audit complete. Logs saved to "+absOutputDir))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("\nDownloaded files:"))
 	fmt.Fprintf(os.Stderr, "  - %s (full job log)\n", jobLogPath)
 	if opts.stepNumber > 0 {
 		renderRequestedStepSummary(opts)

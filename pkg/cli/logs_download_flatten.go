@@ -39,7 +39,7 @@ func flattenSingleFileArtifact(outputDir string, entry os.DirEntry, verbose bool
 	if err != nil {
 		logsDownloadLog.Printf("Failed to read artifact directory %s: %v", artifactDir, err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read artifact directory %s: %v", artifactDir, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read artifact directory %s: %v", artifactDir, err)))
 		}
 		return
 	}
@@ -68,20 +68,20 @@ func flattenSingleFileArtifact(outputDir string, entry os.DirEntry, verbose bool
 	if err := os.Rename(sourcePath, destPath); err != nil {
 		logsDownloadLog.Printf("Failed to move file %s to %s: %v", sourcePath, destPath, err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to move file %s to %s: %v", sourcePath, destPath, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to move file %s to %s: %v", sourcePath, destPath, err)))
 		}
 		return
 	}
 	if err := os.Remove(artifactDir); err != nil {
 		logsDownloadLog.Printf("Failed to remove empty directory %s: %v", artifactDir, err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to remove empty directory %s: %v", artifactDir, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to remove empty directory %s: %v", artifactDir, err)))
 		}
 		return
 	}
 	logsDownloadLog.Printf("Successfully flattened: %s/%s → %s", entry.Name(), singleEntry.Name(), singleEntry.Name())
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Unfolded single-file artifact: %s → %s", filepath.Join(entry.Name(), singleEntry.Name()), singleEntry.Name())))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Unfolded single-file artifact: %s → %s", filepath.Join(entry.Name(), singleEntry.Name()), singleEntry.Name())))
 	}
 }
 
@@ -146,12 +146,12 @@ func flattenArtifactTree(sourceDir, artifactDir, outputDir, label string, verbos
 	if err := os.RemoveAll(artifactDir); err != nil {
 		logsDownloadLog.Printf("Failed to remove %s directory %s: %v", label, artifactDir, err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to remove %s directory: %v", label, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to remove %s directory: %v", label, err)))
 		}
 	} else {
 		logsDownloadLog.Printf("Removed %s directory: %s", label, artifactDir)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Flattened %s and removed nested structure", label)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Flattened %s and removed nested structure", label)))
 		}
 	}
 
@@ -177,7 +177,7 @@ func flattenArtifactPath(sourceDir, path string, info os.FileInfo, outputDir, la
 	if fileutil.FileExists(destPath) {
 		logsDownloadLog.Printf("Skipping duplicate flattened file %s from %s; destination already exists", relPath, label)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipped duplicate flattened file: "+relPath))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Skipped duplicate flattened file: "+relPath))
 		}
 		return nil
 	}
@@ -186,7 +186,7 @@ func flattenArtifactPath(sourceDir, path string, info os.FileInfo, outputDir, la
 	}
 	logsDownloadLog.Printf("Moved file: %s → %s", path, destPath)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Flattened: %s → %s", relPath, relPath)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Flattened: %s → %s", relPath, relPath)))
 	}
 	return nil
 }

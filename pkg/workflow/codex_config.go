@@ -346,7 +346,7 @@ func (c *Compiler) validateCodexCompatibility(workflowData *WorkflowData) error 
 	}
 	if workflowData.Tools["web-fetch"] == false {
 		if search, enabled := workflowData.Tools["web-search"]; enabled && search != false {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Codex web-search includes page fetching; tools.web-fetch: false cannot disable browsing independently. Use network.hosted-web to restrict hosted retrieval."))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Codex web-search includes page fetching; tools.web-fetch: false cannot disable browsing independently. Use network.hosted-web to restrict hosted retrieval."))
 			c.IncrementWarningCount()
 		}
 	}

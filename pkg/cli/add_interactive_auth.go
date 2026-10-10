@@ -27,7 +27,7 @@ func (c *AddInteractiveConfig) checkGitRepository() error {
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Please navigate to a git repository or initialize one with:")
 		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, console.FormatCommandMessage("  git init"))
+		fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr("  git init"))
 		fmt.Fprintln(os.Stderr, "")
 		return errors.New("not in a git repository")
 	}
@@ -38,7 +38,7 @@ func (c *AddInteractiveConfig) checkGitRepository() error {
 		addInteractiveLog.Printf("Could not determine repository automatically: %v", err)
 
 		// Ask the user for the repository (interactive-only feature)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not determine the repository automatically."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not determine the repository automatically."))
 
 		var userRepo string
 		form := console.NewInputForm(
@@ -65,7 +65,7 @@ func (c *AddInteractiveConfig) checkGitRepository() error {
 		c.RepoOverride = repoSlug
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Target repository: "+repoSlug))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Target repository: "+repoSlug))
 	addInteractiveLog.Printf("Target repository: %s", repoSlug)
 
 	c.repositoryVisibility = getRepoVisibilityShared(c.RepoOverride)

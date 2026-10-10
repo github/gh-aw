@@ -121,7 +121,7 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 			// This could happen due to network issues or auth problems
 			repositoryFeaturesLog.Printf("Warning: Could not check if discussions are enabled: %v", err)
 			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 					fmt.Sprintf("Could not verify if discussions are enabled: %v", err)))
 			}
 			// Continue checking other features even if this check fails
@@ -132,7 +132,7 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 			warningMsg := fmt.Sprintf("Repository %s may not have discussions enabled. The workflow will attempt to create discussions at runtime. If creation fails, enable discussions in repository settings.", repo)
 			repositoryFeaturesLog.Printf("Warning: %s", warningMsg)
 			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
 			}
 			// Don't add to error collector - this is a warning, not an error
 		}
@@ -146,7 +146,7 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 			// If we can't check, log but don't fail
 			repositoryFeaturesLog.Printf("Warning: Could not check if issues are enabled: %v", err)
 			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 					fmt.Sprintf("Could not verify if issues are enabled: %v", err)))
 			}
 			// Continue to return aggregated errors even if this check fails
@@ -282,11 +282,11 @@ func getRepositoryFeatures(repo string, verbose bool) (*RepositoryFeatures, erro
 		// Log success messages only if we haven't logged them before
 		if _, alreadyLogged := repositoryFeaturesLoggedCache.LoadOrStore(repo, true); !alreadyLogged && verbose {
 			if actualFeatures.HasDiscussions {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 					fmt.Sprintf("✓ Repository %s has discussions enabled", repo)))
 			}
 			if actualFeatures.HasIssues {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 					fmt.Sprintf("✓ Repository %s has issues enabled", repo)))
 			}
 		}

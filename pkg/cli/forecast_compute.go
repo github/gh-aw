@@ -61,7 +61,7 @@ func forecastWorkflow(ctx context.Context, workflowName, startDate string, confi
 	sampledRuns, err := loadForecastSampleRuns(ctx, workflowName, startDate, config, result.WorkflowID)
 	if err != nil {
 		if errorutil.IsRateLimitError(err.Error()) {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 				fmt.Sprintf("Skipping %s: GitHub API rate limit exceeded", result.WorkflowID)))
 			return result, nil
 		}
@@ -298,7 +298,7 @@ func loadRunAICObservation(ctx context.Context, runID int64, verbose bool) (floa
 
 	forecastRunLog.Printf("AIC cache miss for run %d; downloading usage artifact to %s", runID, dir)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Downloading usage artifact for run %d…", runID)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Downloading usage artifact for run %d…", runID)))
 	}
 
 	if err := downloadForecastUsageForAIC(ctx, runID, dir, verbose); err != nil {
@@ -334,7 +334,7 @@ func downloadForecastUsageForAIC(ctx context.Context, runID int64, dir string, v
 	}
 	forecastRunLog.Printf("Usage artifact download for run %d failed: %v", runID, err)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Usage artifact download for run %d failed: %v", runID, err)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Usage artifact download for run %d failed: %v", runID, err)))
 	}
 	return err
 }
@@ -391,7 +391,7 @@ func forecastDownloadUsageArtifact(ctx context.Context, runID int64, outputDir s
 		return errNoMatchingArtifact
 	}
 	if shouldLogProgress {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 			fmt.Sprintf("Downloading usage artifact(s) for run %d: %v", runID, downloadableNames)))
 	}
 
@@ -416,7 +416,7 @@ func existingForecastArtifactFilter(runID int64, outputDir string, artifactFilte
 	if len(missing) == 0 {
 		forecastRunLog.Printf("Usage artifact already on disk for run %d, skipping download", runID)
 		if shouldLogProgress {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 				fmt.Sprintf("Usage artifact already present for run %d, skipping download", runID)))
 		}
 		return nil, true
@@ -459,7 +459,7 @@ func emitPartialForecastResults(results []ForecastWorkflowResult, config Forecas
 		return
 	}
 	forecastRunLog.Printf("Emitting %d partial forecast result(s) before early exit", len(results))
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 		fmt.Sprintf("Forecast interrupted; emitting partial results for %d workflow(s) processed so far.", len(results))))
 
 	// Sort partial results by Monte Carlo P50 descending (mirrors the full-results sort).

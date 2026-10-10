@@ -177,14 +177,14 @@ func runGrypeOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 	images := collectContainerImagesFromLockFiles(lockFiles)
 	if len(images) == 0 {
 		grypeLog.Print("No container images found in lock files")
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running grype vulnerability scanner (0 container images found in lock files)"))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running grype vulnerability scanner (0 container images found in lock files)"))
 		return nil
 	}
 
 	if len(images) == 1 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running grype vulnerability scanner on 1 container image"))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running grype vulnerability scanner on 1 container image"))
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(
 			fmt.Sprintf("Running grype vulnerability scanner on %d container images", len(images))))
 	}
 
@@ -220,7 +220,7 @@ func runGrypeOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 		if strict {
 			return errors.New(errMsg)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(errMsg))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(errMsg))
 	}
 
 	if strict && totalFindings > 0 {
@@ -365,7 +365,7 @@ func grypeRunOnImage(imageRef, configFile string, verbose bool) (*grypeOutput, e
 
 	if verbose {
 		dockerCmd := shellJoinArgs(append([]string{"docker"}, dockerArgs...))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Run grype directly: "+dockerCmd))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Run grype directly: "+dockerCmd))
 	}
 
 	var stdout, stderr bytes.Buffer

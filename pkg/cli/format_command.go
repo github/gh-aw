@@ -58,7 +58,7 @@ func runFormatCommand(workflowIDs []string, workflowDir string, verbose bool) er
 		return err
 	}
 	if len(files) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow files found."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflow files found."))
 		return nil
 	}
 
@@ -118,7 +118,7 @@ func formatWorkflowFile(filePath string, codemods []Codemod, verbose bool) error
 	if err := scaffoldSerenaSharedWorkflowIfNeeded(filePath, appliedCodemods, formatted, verbose); err != nil {
 		return fmt.Errorf("failed to scaffold shared Serena workflow: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(filepath.Base(filePath)))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(filepath.Base(filePath)))
 	return nil
 }
 

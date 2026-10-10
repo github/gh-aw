@@ -31,7 +31,7 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 	mcpAddLog.Printf("Resolved workflow path: %s", workflowPath)
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Adding MCP tool '%s' to workflow: %s", mcpServerID, console.ToRelativePath(workflowPath))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Adding MCP tool '%s' to workflow: %s", mcpServerID, console.ToRelativePath(workflowPath))))
 	}
 
 	// Create registry client
@@ -39,7 +39,7 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 
 	// Search for the MCP server in the registry
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Searching for MCP server '%s' in registry: %s", mcpServerID, registryClient.registryURL)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Searching for MCP server '%s' in registry: %s", mcpServerID, registryClient.registryURL)))
 	}
 
 	mcpAddLog.Printf("Searching MCP registry for server: %s", mcpServerID)
@@ -78,7 +78,7 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 	if selectedServer == nil && len(servers) > 0 {
 		selectedServer = &servers[0]
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No exact match for '%s', using closest match: %s", mcpServerID, selectedServer.Name)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No exact match for '%s', using closest match: %s", mcpServerID, selectedServer.Name)))
 		}
 	}
 
@@ -93,8 +93,8 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Selected server: %s (Transport: %s)", selectedServer.Name, selectedServer.Transport)))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Will add as tool ID: "+toolID))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Selected server: %s (Transport: %s)", selectedServer.Name, selectedServer.Transport)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Will add as tool ID: "+toolID))
 	}
 
 	// Read the workflow file
@@ -129,19 +129,19 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 		return fmt.Errorf("failed to add tool to workflow: %w", err)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Added MCP tool '%s' to workflow %s", toolID, console.ToRelativePath(workflowPath))))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Added MCP tool '%s' to workflow %s", toolID, console.ToRelativePath(workflowPath))))
 
 	// Check for required secrets and provide CLI commands if missing
 	if err := checkAndSuggestSecrets(mcpConfig, verbose); err != nil {
 		// Don't fail the command if secret checking fails, just log a warning
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not check repository secrets: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not check repository secrets: %v", err)))
 		}
 	}
 
 	// Compile the workflow
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling workflow..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Compiling workflow..."))
 	}
 
 	mcpAddLog.Print("Compiling workflow after adding MCP tool")
@@ -153,11 +153,11 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 		// Security fix for CWE-312, CWE-315, CWE-359: Avoid logging detailed error messages
 		// that could contain sensitive information from secret references
 		mcpAddLog.Print("Workflow compilation failed")
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Workflow compilation failed. Please check your workflow configuration."))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("You can fix the issues and run 'gh aw compile' manually"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Workflow compilation failed. Please check your workflow configuration."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("You can fix the issues and run 'gh aw compile' manually"))
 	} else {
 		mcpAddLog.Print("Workflow compiled successfully")
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow compiled successfully"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Workflow compiled successfully"))
 	}
 
 	return nil
@@ -174,7 +174,7 @@ func createMCPToolConfig(server *MCPRegistryServerForProcessing, preferredTransp
 		case "stdio", "http", "docker":
 			transport = preferredTransport
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Using preferred transport: "+transport))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Using preferred transport: "+transport))
 			}
 		default:
 			return nil, fmt.Errorf("unsupported transport type: %s (supported: stdio, http, docker)", preferredTransport)

@@ -48,7 +48,7 @@ func parseLogFileWithEngine(filePath string, detectedEngine workflow.CodingAgent
 	// No aw_info.json metadata available - use fallback parser with common error patterns
 	logsParsingEnginesLog.Print("No engine detected, using fallback parser with common error patterns")
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No aw_info.json found, using fallback parser"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No aw_info.json found, using fallback parser"))
 	}
 
 	// Use empty metrics for fallback case

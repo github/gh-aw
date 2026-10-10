@@ -125,13 +125,13 @@ func RunOutcomes(ctx context.Context, config OutcomesConfig) error {
 		// Enrich with data from raw agent output (has issue_number etc.)
 		items = enrichItemsFromAgentOutput(items, runDir, repo)
 		if config.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Loaded %d safe output items from cache", len(items))))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Loaded %d safe output items from cache", len(items))))
 		}
 	}
 
 	if len(items) == 0 {
 		if config.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloading artifacts for run %d...", config.RunID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Downloading artifacts for run %d...", config.RunID)))
 		}
 		err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: config.RunID, outputDir: runDir, verbose: config.Verbose, owner: owner, repo: repoName, hostname: hostname})
 		if err != nil {
@@ -145,7 +145,7 @@ func RunOutcomes(ctx context.Context, config OutcomesConfig) error {
 	}
 
 	if len(items) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No safe output items found for this run"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No safe output items found for this run"))
 		if config.JSONOutput {
 			data := OutcomesData{
 				RunID:   config.RunID,
@@ -162,7 +162,7 @@ func RunOutcomes(ctx context.Context, config OutcomesConfig) error {
 	}
 
 	if config.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Evaluating outcomes for %d safe output items...", len(items))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Evaluating outcomes for %d safe output items...", len(items))))
 	}
 
 	// Run the evaluations
@@ -203,9 +203,9 @@ func RunOutcomes(ctx context.Context, config OutcomesConfig) error {
 
 	// Console output
 	if workflowName != "" {
-		fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatInfoMessage(fmt.Sprintf("Outcomes for %s (run %d)", workflowName, config.RunID)))
+		fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Outcomes for %s (run %d)", workflowName, config.RunID)))
 	} else {
-		fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatInfoMessage(fmt.Sprintf("Outcomes for run %d", config.RunID)))
+		fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Outcomes for run %d", config.RunID)))
 	}
 
 	// Render the items

@@ -53,7 +53,7 @@ func compileWorkflowWithRefreshAndActionRef(ctx context.Context, filePath string
 	if _, err := ensureGitAttributes(); err != nil {
 		addWorkflowCompilationLog.Printf("Failed to update .gitattributes: %v", err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update .gitattributes: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update .gitattributes: %v", err)))
 		}
 	}
 
@@ -115,7 +115,7 @@ func compileWorkflowWithTrackingAndRefreshAndActionRef(ctx context.Context, file
 	// compiled workflow from being usable.
 	if updated, err := ensureGitAttributes(); err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update .gitattributes: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update .gitattributes: %v", err)))
 		}
 	} else if updated && gitRootErr == nil {
 		if gitAttributesExisted {
@@ -193,7 +193,7 @@ func compileSafeOutputsWorkflowDependencies(ctx context.Context, workflowFile, l
 
 		addWorkflowCompilationLog.Printf("Compiling %s: %s", label, mdPath)
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Compiling %s: %s", label, mdPath)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Compiling %s: %s", label, mdPath)))
 		}
 
 		var compileErr error
@@ -208,7 +208,7 @@ func compileSafeOutputsWorkflowDependencies(ctx context.Context, workflowFile, l
 			}
 			// Best-effort: log and continue so the main workflow can still give a clear error.
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile %s %s: %v", label, mdPath, compileErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to compile %s %s: %v", label, mdPath, compileErr)))
 			}
 		}
 	}

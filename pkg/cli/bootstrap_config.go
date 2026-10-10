@@ -83,7 +83,7 @@ func executeBootstrapConfigForAdd(ctx context.Context, repo string, sources []st
 
 	bootstrapLog.Printf("Applying bootstrap config for add: repo=%s, package=%s, actions=%d, useCopilotRequests=%t", repo, profile.PackageID, len(profile.Profile.Config), useCopilotRequests)
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Applying setup steps from "+profile.PackageID+"..."))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Applying setup steps from "+profile.PackageID+"..."))
 	repoDir, err := gitutil.FindGitRoot()
 	if err != nil {
 		bootstrapLog.Printf("Could not determine git root for add bootstrap config: %v", err)

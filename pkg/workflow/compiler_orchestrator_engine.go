@@ -210,7 +210,7 @@ func (c *Compiler) applyEngineOverride(engineSetting string, engineConfig *Engin
 		return engineSetting, engineConfig
 	}
 	if engineSetting != "" && engineSetting != c.engineOverride {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Command line --engine %s overrides markdown file engine: %s", c.engineOverride, engineSetting)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Command line --engine %s overrides markdown file engine: %s", c.engineOverride, engineSetting)))
 		c.IncrementWarningCount()
 	}
 	if engineConfig != nil {
@@ -677,7 +677,7 @@ func (c *Compiler) resolveEngineRuntimeConfig(engineSetting string, engineConfig
 	if agenticEngine.GetID() == string(constants.AgyEngine) {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Using experimental engine: "+agenticEngine.GetDisplayName()+" (Gemini API key only; retain engine: gemini for WIF)"))
 	} else if agenticEngine.IsExperimental() && c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Using experimental engine: "+agenticEngine.GetDisplayName()))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Using experimental engine: "+agenticEngine.GetDisplayName()))
 		c.IncrementWarningCount()
 	}
 	return agenticEngine, configSteps, nil

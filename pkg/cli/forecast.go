@@ -54,7 +54,7 @@ func RunForecast(config ForecastConfig) error {
 		return normalizeForecastRunError(err, config)
 	}
 	if len(workflowIDs) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No agentic workflows found to forecast"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No agentic workflows found to forecast"))
 		return nil
 	}
 
@@ -75,7 +75,7 @@ func RunForecast(config ForecastConfig) error {
 		anchor = now.AddDate(0, 0, -periodDays)
 		validationStartDate = anchor.Format("2006-01-02")
 		validationEndDate = now.Format("2006-01-02")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 			fmt.Sprintf("Eval mode: training window ends %s; validation window %s → %s",
 				anchor.Format("2006-01-02"), validationStartDate, validationEndDate)))
 	}
@@ -89,7 +89,7 @@ func RunForecast(config ForecastConfig) error {
 	if !config.Verbose && !config.JSONOutput {
 		label := fmt.Sprintf("Forecasting %d workflow(s) using %d-day history → projecting per %s",
 			len(workflowIDs), config.Days, config.Period)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(label))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(label))
 	}
 
 	spinner := console.NewSpinner("Sampling workflow run history…")
@@ -126,7 +126,7 @@ func RunForecast(config ForecastConfig) error {
 			if !config.Verbose {
 				spinner.Stop()
 			}
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 				fmt.Sprintf("Skipping %s: %v", wfID, err)))
 			if !config.Verbose {
 				spinner.Start()

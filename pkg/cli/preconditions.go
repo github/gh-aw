@@ -26,13 +26,13 @@ func checkGHAuthStatusShared(verbose bool) error {
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Please run the following command to authenticate:")
 		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, console.FormatCommandMessage("  gh auth login"))
+		fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr("  gh auth login"))
 		fmt.Fprintln(os.Stderr, "")
 		return errors.New("not authenticated with GitHub CLI")
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub CLI authenticated"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("GitHub CLI authenticated"))
 		preconditionsLog.Printf("gh auth status output: %s", string(output))
 	}
 
@@ -49,7 +49,7 @@ func checkActionsEnabledShared(repoSlug string, verbose bool) error {
 	if err != nil {
 		preconditionsLog.Printf("Failed to check Actions status: %v", err)
 		// If we can't check, warn but continue - actual operations will fail if Actions is disabled
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not verify GitHub Actions status. Proceeding anyway..."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not verify GitHub Actions status. Proceeding anyway..."))
 		return nil
 	}
 
@@ -61,13 +61,13 @@ func checkActionsEnabledShared(repoSlug string, verbose bool) error {
 	}
 	if err := parseJSON(output, &permissions); err != nil {
 		preconditionsLog.Printf("Failed to parse Actions permissions: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not parse GitHub Actions settings. Proceeding anyway..."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not parse GitHub Actions settings. Proceeding anyway..."))
 		return nil
 	}
 
 	// Check if Actions is enabled
 	if !permissions.Enabled {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("GitHub Actions appears to be disabled for this repository."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("GitHub Actions appears to be disabled for this repository."))
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "You can still add workflows, but they won't run until Actions is enabled.")
 		fmt.Fprintln(os.Stderr, "To enable GitHub Actions, go to Settings → Actions → General.")
@@ -80,7 +80,7 @@ func checkActionsEnabledShared(repoSlug string, verbose bool) error {
 	case "all":
 		// All actions allowed - good to go
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub Actions is enabled (all actions allowed)"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("GitHub Actions is enabled (all actions allowed)"))
 		}
 	case "local_only":
 		// Only local actions allowed - this won't work for agentic workflows
@@ -101,7 +101,7 @@ func checkActionsEnabledShared(repoSlug string, verbose bool) error {
 		}
 	default:
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub Actions is enabled"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("GitHub Actions is enabled"))
 		}
 	}
 
@@ -111,7 +111,7 @@ func checkActionsEnabledShared(repoSlug string, verbose bool) error {
 // checkSelectedActionsPermissions checks if GitHub-owned actions are allowed when using selected actions
 func checkSelectedActionsPermissions(selectedActionsURL string, verbose bool) error {
 	if selectedActionsURL == "" {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not verify selected actions settings. Proceeding anyway..."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not verify selected actions settings. Proceeding anyway..."))
 		return nil
 	}
 
@@ -120,7 +120,7 @@ func checkSelectedActionsPermissions(selectedActionsURL string, verbose bool) er
 	output, err := workflow.RunGH("Checking selected actions...", "api", selectedActionsURL)
 	if err != nil {
 		preconditionsLog.Printf("Failed to check selected actions: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not verify selected actions settings. Proceeding anyway..."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not verify selected actions settings. Proceeding anyway..."))
 		return nil
 	}
 
@@ -131,7 +131,7 @@ func checkSelectedActionsPermissions(selectedActionsURL string, verbose bool) er
 	}
 	if err := parseJSON(output, &selectedActions); err != nil {
 		preconditionsLog.Printf("Failed to parse selected actions: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not parse selected actions settings. Proceeding anyway..."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not parse selected actions settings. Proceeding anyway..."))
 		return nil
 	}
 
@@ -149,7 +149,7 @@ func checkSelectedActionsPermissions(selectedActionsURL string, verbose bool) er
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub Actions is enabled (GitHub-owned actions allowed)"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("GitHub Actions is enabled (GitHub-owned actions allowed)"))
 	}
 
 	return nil
@@ -176,17 +176,17 @@ func checkUserPermissionsShared(repoSlug string, verbose bool) (bool, error) {
 		// If we can't verify permissions, assume no write access to avoid
 		// prompting users for secrets they cannot configure. Users can always
 		// set secrets manually later with: gh aw secrets set <SECRET> --repo <REPO>
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not verify repository permissions. Proceeding anyway..."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not verify repository permissions. Proceeding anyway..."))
 		return false, nil
 	}
 
 	if !hasAccess {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("You do not have write access to %s/%s.", owner, repo)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("You do not have write access to %s/%s.", owner, repo)))
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "You can still add workflows, but you'll need to propose changes via pull requests.")
 		fmt.Fprintln(os.Stderr, "")
 	} else if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Repository permissions verified"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Repository permissions verified"))
 	}
 
 	return hasAccess, nil

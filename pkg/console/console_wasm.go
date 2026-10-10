@@ -90,14 +90,16 @@ func FormatProgressMessage(message string) string      { return "▸ " + message
 func FormatProgressMessageStderr(message string) string {
 	return "▸ " + message
 }
-func FormatPromptMessage(message string) string      { return "? " + message }
-func FormatCountMessage(message string) string       { return "# " + message }
-func FormatVerboseMessage(message string) string     { return "» " + message }
-func FormatListHeader(header string) string          { return header }
-func FormatListItem(item string) string              { return "  • " + item }
-func FormatListItemStderr(item string) string        { return "  • " + item }
-func FormatSectionHeader(header string) string       { return header }
-func FormatSectionHeaderStderr(header string) string { return header }
+func FormatPromptMessage(message string) string        { return "? " + message }
+func FormatPromptMessageStderr(message string) string  { return "? " + message }
+func FormatCountMessage(message string) string         { return "# " + message }
+func FormatVerboseMessage(message string) string       { return "» " + message }
+func FormatVerboseMessageStderr(message string) string { return "» " + message }
+func FormatListHeader(header string) string            { return header }
+func FormatListItem(item string) string                { return "  • " + item }
+func FormatListItemStderr(item string) string          { return "  • " + item }
+func FormatSectionHeader(header string) string         { return header }
+func FormatSectionHeaderStderr(header string) string   { return header }
 
 // FormatErrorChain formats an error and its full unwrapped chain.
 // In the WASM build there is no rich terminal styling; the top-level error
@@ -131,6 +133,9 @@ func RenderTable(config TableConfig) string {
 	}
 	return output.String()
 }
+
+// RenderTableStderr preserves the WASM tab-separated table representation.
+func RenderTableStderr(config TableConfig) string { return RenderTable(config) }
 
 func RenderTitleBox(title string, width int) []string {
 	separator := strings.Repeat("=", width)

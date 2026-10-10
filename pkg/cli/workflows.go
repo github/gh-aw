@@ -221,7 +221,7 @@ func getWorkflowStatus(ctx context.Context, workflowIdOrName string, repoOverrid
 // restoreWorkflowState restores a workflow to disabled state if it was previously disabled
 func restoreWorkflowState(workflowIdOrName string, workflowID int64, repoOverride string, verbose bool) {
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Restoring workflow '%s' to disabled state...", workflowIdOrName)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Restoring workflow '%s' to disabled state...", workflowIdOrName)))
 	}
 
 	args := []string{"workflow", "disable", strconv.FormatInt(workflowID, 10)}
@@ -239,13 +239,13 @@ func restoreWorkflowState(workflowIdOrName string, workflowID int64, repoOverrid
 			stderr = string(exitErr.Stderr)
 			workflowsLog.Printf("gh workflow disable command failed with exit code %d. Command: gh %v", exitCode, args)
 			workflowsLog.Printf("stderr output: %s", stderr)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to restore workflow '%s' to disabled state (exit code %d): %v. stderr: %s", workflowIdOrName, exitCode, err, stderr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to restore workflow '%s' to disabled state (exit code %d): %v. stderr: %s", workflowIdOrName, exitCode, err, stderr)))
 		} else {
 			workflowsLog.Printf("gh workflow disable command failed with error (not ExitError): %v. Command: gh %v", err, args)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to restore workflow '%s' to disabled state: %v", workflowIdOrName, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to restore workflow '%s' to disabled state: %v", workflowIdOrName, err)))
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Restored workflow to disabled state: "+workflowIdOrName))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Restored workflow to disabled state: "+workflowIdOrName))
 	}
 }
 

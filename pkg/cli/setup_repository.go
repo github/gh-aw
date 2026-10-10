@@ -323,7 +323,7 @@ func runSetupAuthWithRuntime(opts SetupAuthOptions, runtime setupRepositoryRunti
 		return renderSetupJSON(SetupAuthResult{Authenticated: true})
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub CLI authentication verified"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("GitHub CLI authentication verified"))
 	return nil
 }
 
@@ -424,17 +424,17 @@ func runSetupRepositoryCheckWithRuntime(opts SetupRepositoryCheckOptions, runtim
 		return renderSetupJSON(result)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Setup repository check for "+opts.Repo))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("- GitHub CLI authenticated"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("- repository exists"))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("- owner type: "+ownerType))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Setup repository check for "+opts.Repo))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("- GitHub CLI authenticated"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("- repository exists"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("- owner type: "+ownerType))
 	if inspection.attached {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("- attached checkout at "+dir))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("- working tree is clean"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("- attached checkout at "+dir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("- working tree is clean"))
 	} else if inspection.cloneNeeded {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("- no checkout at %s; directory is ready for clone", dir)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("- no checkout at %s; directory is ready for clone", dir)))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Setup repository checks passed"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Setup repository checks passed"))
 	return nil
 }
 

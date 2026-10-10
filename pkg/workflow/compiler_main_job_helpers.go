@@ -134,7 +134,7 @@ func (c *Compiler) warnBuiltinJobEnvReferences(depends []string, engineEnvConten
 					"this expression will silently evaluate to an empty string at runtime.",
 				builtinJobName,
 			)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
 			c.IncrementWarningCount()
 		}
 	}

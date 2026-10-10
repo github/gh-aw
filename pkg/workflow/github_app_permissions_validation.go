@@ -221,7 +221,7 @@ func warnGitHubAppPermissionsUnsupportedContexts(workflowData *WorkflowData) {
 					"Extra GitHub App permissions apply to tools.github.github-app and safe-outputs.github-app.",
 				ctx.label,
 			)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(msg))
 		}
 	}
 }

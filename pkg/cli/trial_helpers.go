@@ -56,7 +56,7 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 	trialLog.Printf("Cloned repository to: %s", tempDir)
 	defer func() {
 		if err := os.RemoveAll(tempDir); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cleanup local temp directory: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to cleanup local temp directory: %v", err)))
 		}
 	}()
 
@@ -69,7 +69,7 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 	var workflowResults []WorkflowTrialResult
 
 	for _, parsedSpec := range parsedSpecs {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Running trial for workflow: %s ===", parsedSpec.WorkflowName)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("=== Running trial for workflow: %s ===", parsedSpec.WorkflowName)))
 
 		// Install workflow with trial mode compilation
 		if err := installWorkflowInTrialMode(ctx, tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, directTrialMode, &opts); err != nil {
@@ -80,7 +80,7 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 		workflowPath := filepath.Join(tempDir, constants.GetWorkflowDir(), parsedSpec.WorkflowName+".md")
 		if description := ExtractWorkflowDescriptionFromFile(workflowPath); description != "" {
 			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(description))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(description))
 			fmt.Fprintln(os.Stderr, "")
 		}
 
@@ -94,7 +94,7 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 		// Generate workflow run URL
 		githubHost := getGitHubHost()
 		workflowRunURL := fmt.Sprintf("%s/%s/actions/runs/%s", githubHost, hostRepoSlug, runID)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow run started with ID: %s (%s)", runID, workflowRunURL)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Workflow run started with ID: %s (%s)", runID, workflowRunURL)))
 
 		// Wait for workflow completion
 		if err := WaitForWorkflowCompletion(ctx, hostRepoSlug, runID, opts.TimeoutMinutes, opts.Verbose); err != nil {
@@ -111,7 +111,7 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 		// Auto-merge PRs if requested
 		if opts.AutoMergePRs {
 			if err := AutoMergePullRequestsLegacy(hostRepoSlug, opts.Verbose); err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to auto-merge pull requests: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to auto-merge pull requests: %v", err)))
 			}
 		}
 
@@ -140,7 +140,7 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 		sanitizedTargetRepo := stringutil.SanitizeForFilename(targetRepoForFilename)
 		individualFilename := fmt.Sprintf("trials/%s-%s.%s.json", parsedSpec.WorkflowName, sanitizedTargetRepo, dateTimeID)
 		if err := saveTrialResult(individualFilename, result, opts.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to save individual trial result: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to save individual trial result: %v", err)))
 		}
 
 		// Display results to stdout. In JSON mode, emit the full WorkflowTrialResult
@@ -150,30 +150,30 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 		if opts.JSONOutput {
 			resultBytes, err := json.MarshalIndent(result, "", "  ")
 			if err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to marshal trial result for '%s': %v", parsedSpec.WorkflowName, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to marshal trial result for '%s': %v", parsedSpec.WorkflowName, err)))
 			} else {
 				fmt.Fprintln(os.Stdout, string(resultBytes))
 			}
 		} else if len(artifacts.SafeOutputs) > 0 {
 			outputBytes, err := json.MarshalIndent(artifacts.SafeOutputs, "", "  ")
 			if err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to marshal safe outputs for '%s': %v", parsedSpec.WorkflowName, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to marshal safe outputs for '%s': %v", parsedSpec.WorkflowName, err)))
 			} else {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("=== Safe Outputs from %s ===", parsedSpec.WorkflowName)))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("=== Safe Outputs from %s ===", parsedSpec.WorkflowName)))
 				fmt.Fprintln(os.Stdout, string(outputBytes))
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("=== End of Safe Outputs ==="))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("=== End of Safe Outputs ==="))
 			}
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== No Safe Outputs Generated by %s ===", parsedSpec.WorkflowName)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("=== No Safe Outputs Generated by %s ===", parsedSpec.WorkflowName)))
 		}
 
 		// Report rejected safe-output messages, if any. Messages may contain
 		// agent-controlled content, so control characters are sanitized before being
 		// written to the terminal/CI logs to avoid escape-sequence injection.
 		if len(safeOutputErrors) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("=== %d Safe Output Message(s) Rejected from %s ===", len(safeOutputErrors), parsedSpec.WorkflowName)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("=== %d Safe Output Message(s) Rejected from %s ===", len(safeOutputErrors), parsedSpec.WorkflowName)))
 			for _, msg := range safeOutputErrors {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(sanitizeControlChars(msg)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(sanitizeControlChars(msg)))
 			}
 		}
 
@@ -182,13 +182,13 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 		// 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Agent Stdio Logs Available from %s (%d files) ===", parsedSpec.WorkflowName, len(artifacts.AgentStdioLogs))))
 		// }
 		if len(artifacts.AgenticRunInfo) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Agentic Run Information Available from %s ===", parsedSpec.WorkflowName)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("=== Agentic Run Information Available from %s ===", parsedSpec.WorkflowName)))
 		}
 		if len(artifacts.AdditionalArtifacts) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Additional Artifacts Available from %s (%d files) ===", parsedSpec.WorkflowName, len(artifacts.AdditionalArtifacts))))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("=== Additional Artifacts Available from %s (%d files) ===", parsedSpec.WorkflowName, len(artifacts.AdditionalArtifacts))))
 		}
 
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Trial completed for workflow: "+parsedSpec.WorkflowName))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Trial completed for workflow: "+parsedSpec.WorkflowName))
 	}
 
 	// Step 6: Save combined results for multi-workflow trials
@@ -206,14 +206,14 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 			Success:       overallSuccess,
 		}
 		if err := saveTrialResult(combinedFilename, combinedResult, opts.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to save combined trial result: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to save combined trial result: %v", err)))
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Combined results saved to: "+combinedFilename))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Combined results saved to: "+combinedFilename))
 
 		if opts.JSONOutput {
 			combinedBytes, err := json.MarshalIndent(combinedResult, "", "  ")
 			if err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to marshal combined trial result: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to marshal combined trial result: %v", err)))
 			} else {
 				fmt.Fprintln(os.Stdout, string(combinedBytes))
 			}
@@ -223,7 +223,7 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 	// Step 6.5: Copy trial results to host repository and commit them
 	workflowNames := sliceutil.Map(parsedSpecs, func(spec *WorkflowSpec) string { return spec.WorkflowName })
 	if err := copyTrialResultsToHostRepo(tempDir, dateTimeID, workflowNames, targetRepoForFilename, opts.Verbose); err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to copy trial results to repository: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to copy trial results to repository: %v", err)))
 	}
 
 	if !overallSuccess {
@@ -232,14 +232,14 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 		return fmt.Errorf("trial completed with %d rejected safe-output message(s); first error: %s", totalRejected, sanitizedFirstError)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("All trials completed successfully"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("All trials completed successfully"))
 	return nil
 }
 
 func triggerWorkflowRun(repoSlug, workflowName, lockFilePath string, triggerContext string, verbose bool) (string, error) {
 	trialLog.Printf("Triggering workflow run: workflow=%s, repo=%s, hasTriggerContext=%v", workflowName, repoSlug, triggerContext != "")
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Triggering workflow run for: "+workflowName))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Triggering workflow run for: "+workflowName))
 	}
 
 	// Trigger workflow using gh CLI.
@@ -259,13 +259,13 @@ func triggerWorkflowRun(repoSlug, workflowName, lockFilePath string, triggerCont
 			if workflowDeclaresDispatchInput(lockFilePath, "issue_number") {
 				args = append(args, "--field", "issue_number="+issueNumber)
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Using issue number %s from trigger context", issueNumber)))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Using issue number %s from trigger context", issueNumber)))
 				}
 			} else if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow '%s' does not declare an issue_number input, running without trigger context", workflowName)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Workflow '%s' does not declare an issue_number input, running without trigger context", workflowName)))
 			}
 		} else if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Could not extract issue number from trigger context, running without inputs"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Could not extract issue number from trigger context, running without inputs"))
 		}
 	}
 
@@ -284,7 +284,7 @@ func triggerWorkflowRun(repoSlug, workflowName, lockFilePath string, triggerCont
 	runID := strconv.FormatInt(runInfo.DatabaseID, 10)
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Workflow run started with ID: %s (status: %s)", runID, runInfo.Status)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Workflow run started with ID: %s (status: %s)", runID, runInfo.Status)))
 	}
 
 	return runID, nil
@@ -334,7 +334,7 @@ func workflowDeclaresDispatchInput(lockFilePath, inputName string) bool {
 	content, err := os.ReadFile(lockFilePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read lock file %s: %v", lockFilePath, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not read lock file %s: %v", lockFilePath, err)))
 		}
 		trialLog.Printf("Failed to read lock file %s: %v", lockFilePath, err)
 		return false
@@ -348,7 +348,7 @@ func workflowDeclaresDispatchInput(lockFilePath, inputName string) bool {
 		} `yaml:"on"`
 	}
 	if err := yaml.Unmarshal(content, &parsed); err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not parse lock file %s: %v", lockFilePath, err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not parse lock file %s: %v", lockFilePath, err)))
 		trialLog.Printf("Failed to parse lock file %s: %v", lockFilePath, err)
 		return false
 	}
@@ -369,7 +369,7 @@ func saveTrialResult(filename string, result any, verbose bool) error {
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Saved trial result to: "+filename))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Saved trial result to: "+filename))
 	}
 
 	return nil
@@ -379,7 +379,7 @@ func saveTrialResult(filename string, result any, verbose bool) error {
 func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []string, targetRepoSlug string, verbose bool) error {
 	trialLog.Printf("Copying trial results to host repo: workflows=%d, dateTimeID=%s, targetRepo=%s", len(workflowNames), dateTimeID, targetRepoSlug)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Copying trial results to host repository"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Copying trial results to host repository"))
 	}
 
 	// Create trials directory in the host repository
@@ -396,13 +396,13 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 
 		if err := fileutil.CopyFile(sourceFile, destFile); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to copy %s: %v", sourceFile, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to copy %s: %v", sourceFile, err)))
 			}
 			continue
 		}
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Copied %s to repository", sourceFile)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Copied %s to repository", sourceFile)))
 		}
 	}
 
@@ -414,10 +414,10 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 
 		if err := fileutil.CopyFile(combinedSourceFile, combinedDestFile); err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to copy combined results: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to copy combined results: %v", err)))
 			}
 		} else if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Copied %s to repository", combinedSourceFile)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Copied %s to repository", combinedSourceFile)))
 		}
 	}
 
@@ -449,7 +449,7 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 	if strings.TrimSpace(string(statusOutput)) == "" {
 		trialLog.Print("No new trial results to commit, skipping push")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No new trial results to commit"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No new trial results to commit"))
 		}
 		return nil
 	}
@@ -468,7 +468,7 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 	}
 	// Pull latest changes before pushing to avoid conflicts
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Pulling latest changes from "+branch+" branch"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Pulling latest changes from "+branch+" branch"))
 	}
 	cmd = exec.Command("git", "pull", "--rebase", "origin", branch)
 	cmd.Dir = tempDir
@@ -483,7 +483,7 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 		return fmt.Errorf("failed to push trial results: %w (output: %s)", err, string(output))
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Trial results copied to repository and pushed"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Trial results copied to repository and pushed"))
 
 	return nil
 }

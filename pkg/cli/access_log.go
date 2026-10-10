@@ -128,7 +128,7 @@ func processSquidAccessLogLine(line string, verbose bool, analysis *DomainAnalys
 	entry, err := parseSquidLogLine(line)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log line: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse log line: %v", err)))
 		}
 		return
 	}
@@ -209,7 +209,7 @@ func analyzeAccessLogs(runDir string, verbose bool) (*DomainAnalysis, error) {
 	// No access logs found
 	accessLogLog.Printf("No access logs directory found in: %s", runDir)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No access logs found in "+runDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No access logs found in "+runDir))
 	}
 	return nil, nil
 }

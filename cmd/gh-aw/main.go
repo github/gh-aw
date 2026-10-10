@@ -686,20 +686,20 @@ func rootUsageFunc(cmd *cobra.Command) error {
 
 func customHelpRunE(c *cobra.Command, args []string) error {
 	if len(args) == 1 && args[0] == "all" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("GitHub Agentic Workflows CLI - Complete Command Reference"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("GitHub Agentic Workflows CLI - Complete Command Reference"))
 		fmt.Fprintln(os.Stderr, "")
 		for _, subCmd := range rootCmd.Commands() {
 			if subCmd.Hidden || subCmd.Name() == "help" {
 				continue
 			}
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("═══════════════════════════════════════════════════════════════"))
-			fmt.Fprintf(os.Stderr, "\n%s\n\n", console.FormatInfoMessage(fmt.Sprintf("Command: %s %s", string(constants.CLIExtensionPrefix), subCmd.Name())))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("═══════════════════════════════════════════════════════════════"))
+			fmt.Fprintf(os.Stderr, "\n%s\n\n", console.FormatInfoMessageStderr(fmt.Sprintf("Command: %s %s", string(constants.CLIExtensionPrefix), subCmd.Name())))
 			_ = subCmd.Help()
 			fmt.Fprintln(os.Stderr, "")
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("═══════════════════════════════════════════════════════════════"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("═══════════════════════════════════════════════════════════════"))
 		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("For more information, visit: https://github.github.com/gh-aw/"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("For more information, visit: https://github.github.com/gh-aw/"))
 		return nil
 	}
 	cmd, _, e := rootCmd.Find(args)

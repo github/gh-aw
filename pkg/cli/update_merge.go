@@ -36,7 +36,7 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	parsedSourceSpec, err := parseSourceSpec(sourceSpec)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Failed to parse source spec: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Failed to parse source spec: %v", err)))
 		}
 		// Fall back to simple comparison
 		return sourceNormalized != localNormalized
@@ -46,7 +46,7 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	sourceWithSource, err := UpdateFieldInFrontmatter(sourceNormalized, "source", sourceSpec)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Failed to add source field to remote content: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Failed to add source field to remote content: %v", err)))
 		}
 		// Fall back to simple comparison
 		return sourceNormalized != localNormalized
@@ -64,7 +64,7 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	sourceResolved, err := processIncludesInContent(sourceWithSource, workflow, parsedSourceSpec.Ref, localWorkflowDir, verbose)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Failed to process imports on remote content: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Failed to process imports on remote content: %v", err)))
 		}
 		// Use the version with source field but without resolved imports
 		sourceResolved = sourceWithSource
@@ -91,7 +91,7 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 	updateMergeLog.Printf("Local modifications detected: %v", hasModifications)
 
 	if verbose && hasModifications {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Local modifications detected"))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Local modifications detected"))
 	}
 
 	return hasModifications
@@ -106,7 +106,7 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 	updateMergeLog.Printf("Starting 3-way merge: old_source=%s, new_ref_or_source=%s", oldSourceSpec, newRefOrSourceSpec)
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Performing 3-way merge using git merge-file"))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Performing 3-way merge using git merge-file"))
 	}
 
 	// Parse the old source spec to get the current ref
@@ -205,7 +205,7 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 				hasConflicts = true
 				updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", exitCode)
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", exitCode)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Merge conflicts detected (exit code: %d)", exitCode)))
 				}
 			} else {
 				// Real error (exit code >= 128)
@@ -245,7 +245,7 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 		processedContent, err := processIncludesInContent(mergedStr, workflow, newRef, localWorkflowDir, verbose)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to process includes: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to process includes: %v", err)))
 			}
 			// Return unprocessed content on error
 		} else {

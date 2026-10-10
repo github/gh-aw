@@ -97,7 +97,7 @@ func (d *CopilotCodingAgentDetector) hasAgentWorkflowPath() bool {
 	// GitHub Copilot coding agent runs always use "copilot-swe-agent" as the workflow ID
 	if workflowID == "copilot-swe-agent" {
 		if d.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 				fmt.Sprintf("Detected GitHub Copilot coding agent from workflow path: %s (ID: %s)", d.workflowPath, workflowID)))
 		}
 		return true
@@ -130,7 +130,7 @@ func (d *CopilotCodingAgentDetector) hasAgentLogPatterns() bool {
 			for _, pattern := range agentLogPatterns {
 				if pattern.MatchString(content) {
 					if d.verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 							fmt.Sprintf("Found agent pattern in %s: %s", filepath.Base(path), pattern.String())))
 					}
 					found = true
@@ -141,7 +141,7 @@ func (d *CopilotCodingAgentDetector) hasAgentLogPatterns() bool {
 
 		return nil
 	}); walkErr != nil && !errors.Is(walkErr, filepath.SkipAll) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", d.runDir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", d.runDir, walkErr)))
 	}
 
 	return found
@@ -160,7 +160,7 @@ func (d *CopilotCodingAgentDetector) hasAgentArtifacts() bool {
 		artifactPath := filepath.Join(d.runDir, artifactName)
 		if _, err := os.Stat(artifactPath); err == nil {
 			if d.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 					"Found agent artifact: "+artifactName))
 			}
 			return true

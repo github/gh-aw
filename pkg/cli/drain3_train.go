@@ -22,11 +22,11 @@ const drain3WeightsFilename = "drain3_weights.json"
 
 func trainDrain3Weights(processedRuns []ProcessedRun, outputDir, weightsPath string, verbose bool) error {
 	if len(processedRuns) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No processed runs available for log pattern training"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No processed runs available for log pattern training"))
 		return nil
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Training log pattern weights from %d run(s)...", len(processedRuns))))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Training log pattern weights from %d run(s)...", len(processedRuns))))
 
 	cfg := agentdrain.DefaultConfig()
 	coordinator, err := agentdrain.NewCoordinator(cfg, defaultAgentDrainStages)
@@ -41,7 +41,7 @@ func trainDrain3Weights(processedRuns []ProcessedRun, outputDir, weightsPath str
 		if err := coordinator.LoadWeightsJSON(weightsData); err != nil {
 			return fmt.Errorf("log pattern training: load weights file: %w", err)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Loaded log pattern weights from: "+weightsPath))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Loaded log pattern weights from: "+weightsPath))
 	}
 
 	var totalEvents atomic.Int64
@@ -83,7 +83,7 @@ func renderDrain3TrainingSummary(coordinator *agentdrain.Coordinator, totalEvent
 	for _, cs := range allClusters {
 		total += len(cs)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 		"Trained %d events → %d clusters across %d stages",
 		totalEvents, total, len(allClusters),
 	)))
@@ -106,6 +106,6 @@ func writeDrain3Weights(coordinator *agentdrain.Coordinator, outputDir string) e
 	if err := os.WriteFile(outputPath, weightsData, constants.FilePermPublic); err != nil {
 		return fmt.Errorf("log pattern training: write weights file: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Log pattern weights written to: "+outputPath))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Log pattern weights written to: "+outputPath))
 	return nil
 }

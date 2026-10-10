@@ -64,7 +64,7 @@ func extractZipFile(f *zip.File, destDir string, verbose bool) (extractErr error
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Extracting: "+cleanName))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Extracting: "+cleanName))
 	}
 
 	// Create directory if it's a directory entry

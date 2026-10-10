@@ -40,7 +40,7 @@ func parseAwInfo(infoFilePath string, verbose bool) (*AwInfo, error) {
 	if statErr != nil {
 		logsParsingCoreLog.Printf("Failed to stat aw_info.json: %v", statErr)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to stat aw_info.json: %v", statErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to stat aw_info.json: %v", statErr)))
 		}
 		return nil, statErr
 	}
@@ -49,7 +49,7 @@ func parseAwInfo(infoFilePath string, verbose bool) (*AwInfo, error) {
 		// It's a directory - look for nested aw_info.json
 		nestedPath := filepath.Join(cleanPath, "aw_info.json")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("aw_info.json is a directory, trying nested file: "+nestedPath))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("aw_info.json is a directory, trying nested file: "+nestedPath))
 		}
 		data, err = os.ReadFile(nestedPath)
 	} else {
@@ -59,7 +59,7 @@ func parseAwInfo(infoFilePath string, verbose bool) (*AwInfo, error) {
 
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read aw_info.json: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read aw_info.json: %v", err)))
 		}
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func parseAwInfo(infoFilePath string, verbose bool) (*AwInfo, error) {
 	if err := json.Unmarshal(data, &info); err != nil {
 		logsParsingCoreLog.Printf("Failed to unmarshal aw_info.json: %v", err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse aw_info.json: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse aw_info.json: %v", err)))
 		}
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func extractEngineFromAwInfo(infoFilePath string, verbose bool) workflow.CodingA
 	if info.EngineID == "" {
 		logsParsingCoreLog.Print("No engine_id found in aw_info.json")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No engine_id found in aw_info.json"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No engine_id found in aw_info.json"))
 		}
 		return nil
 	}
@@ -104,7 +104,7 @@ func extractEngineFromAwInfo(infoFilePath string, verbose bool) workflow.CodingA
 		}
 		logsParsingCoreLog.Printf("Unknown engine: %s", info.EngineID)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Unknown engine in aw_info.json: "+info.EngineID))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Unknown engine in aw_info.json: "+info.EngineID))
 		}
 		return nil
 	}

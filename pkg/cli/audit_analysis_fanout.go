@@ -36,7 +36,7 @@ func collectAuditAnalysisResults(ctx context.Context, run WorkflowRun, runOutput
 	}
 	usageSummary, usageErr := loadUsageActivitySummary(runOutputDir)
 	if usageErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to load usage activity summary for run %d: %v", run.DatabaseID, usageErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to load usage activity summary for run %d: %v", run.DatabaseID, usageErr)))
 	}
 	if usageSummary != nil {
 		applyUsageSummaryToAuditResults(usageSummary, &results)
@@ -114,7 +114,7 @@ func launchMetricsAnalysis(g *errgroup.Group, gctx context.Context, results *aud
 		metrics, err := extractLogMetrics(runOutputDir, verbose, workflowPath)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract metrics: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract metrics: %v", err)))
 			}
 			results.metrics = LogMetrics{}
 			return nil
@@ -140,7 +140,7 @@ func launchJobDetailsAnalysis(g *errgroup.Group, gctx context.Context, results *
 			}
 			auditLog.Printf("fetchJobDetailsWithCounts failed: %v", err)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch job details: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch job details: %v", err)))
 			}
 			return nil
 		}
@@ -188,7 +188,7 @@ func launchFirewallAnalysis(g *errgroup.Group, gctx context.Context, results *au
 		if err != nil {
 			auditLog.Printf("analyzeFirewallLogs failed: %v", err)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze firewall logs: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to analyze firewall logs: %v", err)))
 			}
 		}
 		if agentLogFirewall := extractFirewallFromAgentLog(runOutputDir, verbose); agentLogFirewall != nil {
@@ -251,7 +251,7 @@ func runAuditAnalysis[T any](g *errgroup.Group, gctx context.Context, verbose bo
 			}
 			auditLog.Printf("%s failed: %v", name, err)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%s: %v", warning, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("%s: %v", warning, err)))
 			}
 			return nil
 		}

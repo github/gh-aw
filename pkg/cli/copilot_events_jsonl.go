@@ -138,7 +138,7 @@ func findEventsJSONLFile(logDir string) string {
 		}
 		return nil
 	}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
 	}
 
 	if foundPath != "" {
@@ -167,7 +167,7 @@ func findFileInDir(dir, name string) string {
 		}
 		return nil
 	}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", dir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", dir, walkErr)))
 	}
 	return found
 }
@@ -338,7 +338,7 @@ func parseEventsJSONLMetrics(path string, verbose bool) (workflow.LogMetrics, er
 		turns, totalTokens, len(toolCallMap), len(metrics.ToolSequences))
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(
 			fmt.Sprintf("Parsed events.jsonl: %d turns, %d tokens, %d tool calls",
 				turns, totalTokens, len(toolCallMap))))
 	}

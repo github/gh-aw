@@ -121,7 +121,7 @@ func emitIncludeDirectiveDeprecationWarning(directive *ImportDirectiveMatch) {
 			optionalMarker,
 			directive.Path)
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Deprecated syntax: %q. %s",
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Deprecated syntax: %q. %s",
 		directive.Original,
 		suggestion)))
 }
@@ -138,7 +138,7 @@ func resolveDirectiveWithVisited(
 		includeLog.Printf("Failed to resolve include path '%s': %v", filePath, err)
 		if directive.IsOptional {
 			if !extractTools {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Optional include file not found: %s. You can create this file to configure the workflow.", filePath)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Optional include file not found: %s. You can create this file to configure the workflow.", filePath)))
 			}
 			return includeDirectiveResolution{}, true, nil
 		}
@@ -148,7 +148,7 @@ func resolveDirectiveWithVisited(
 	if setutil.Contains(visited, fullPath) {
 		includeLog.Printf("Skipping already included file: %s", fullPath)
 		if !extractTools {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Already included: %s, skipping", filePath)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Already included: %s, skipping", filePath)))
 		}
 		return includeDirectiveResolution{}, true, nil
 	}
@@ -228,7 +228,7 @@ func applyRelaxedIncludedFrontmatterValidation(filePath string, frontmatter map[
 	}
 	unexpectedFields := collectUnexpectedIncludedFrontmatterFields(frontmatter)
 	if len(unexpectedFields) > 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(
 			fmt.Sprintf("Ignoring unexpected frontmatter fields in %s: %s",
 				filePath, strings.Join(unexpectedFields, ", "))))
 	}
@@ -236,7 +236,7 @@ func applyRelaxedIncludedFrontmatterValidation(filePath string, frontmatter map[
 	filteredFrontmatter := filterIncludedFrontmatterForRelaxedValidation(frontmatter, isAgentFile)
 	if len(filteredFrontmatter) > 0 {
 		if err := ValidateIncludedFileFrontmatterWithSchemaAndLocation(filteredFrontmatter, filePath); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(
 				fmt.Sprintf("Invalid configuration in %s: %v", filePath, err)))
 		}
 	}

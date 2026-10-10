@@ -115,7 +115,7 @@ func (c *Compiler) validateStepsSectionSecrets(frontmatter map[string]any, secti
 			"Consider moving operations requiring secrets to a separate job outside the agent job.",
 		sectionName, strings.Join(allSecretRefs, ", "),
 	)
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
 	c.IncrementWarningCount()
 
 	return nil

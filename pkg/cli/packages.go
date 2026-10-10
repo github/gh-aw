@@ -32,7 +32,7 @@ func collectLocalIncludeDependencies(content, packagePath string, verbose bool) 
 	})
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Collecting package dependencies from: "+packagePath))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Collecting package dependencies from: "+packagePath))
 	}
 
 	err := collectLocalIncludeDependenciesRecursive(content, packagePath, &dependencies, seen, verbose)
@@ -78,14 +78,14 @@ func collectLocalIncludeDependenciesRecursive(content, baseDir string, dependenc
 			*dependencies = append(*dependencies, dep)
 
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found include dependency: %s -> %s", fullSourcePath, filePath)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found include dependency: %s -> %s", fullSourcePath, filePath)))
 			}
 
 			// Read the included file and process its includes recursively
 			includedContent, err := os.ReadFile(fullSourcePath)
 			if err != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read include file %s: %v", fullSourcePath, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not read include file %s: %v", fullSourcePath, err)))
 				}
 				continue
 			}
@@ -94,7 +94,7 @@ func collectLocalIncludeDependenciesRecursive(content, baseDir string, dependenc
 			markdownContent, err := parser.ExtractMarkdownContent(string(includedContent))
 			if err != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not extract markdown from %s: %v", fullSourcePath, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not extract markdown from %s: %v", fullSourcePath, err)))
 				}
 				continue
 			}
@@ -103,7 +103,7 @@ func collectLocalIncludeDependenciesRecursive(content, baseDir string, dependenc
 			includedDir := filepath.Dir(fullSourcePath)
 			if err := collectLocalIncludeDependenciesRecursive(markdownContent, includedDir, dependencies, seen, verbose); err != nil {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Error processing includes in %s: %v", fullSourcePath, err)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Error processing includes in %s: %v", fullSourcePath, err)))
 				}
 			}
 		}
@@ -131,11 +131,11 @@ func copyIncludeDependenciesFromPackageWithForce(dependencies []IncludeDependenc
 			if dep.IsOptional {
 				// For optional includes, just show an informational message and skip
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Optional include file not found: %s (you can create this file to configure the workflow)", dep.TargetPath)))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Optional include file not found: %s (you can create this file to configure the workflow)", dep.TargetPath)))
 				}
 				continue
 			}
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read include file %s: %v", dep.SourcePath, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read include file %s: %v", dep.SourcePath, err)))
 			continue
 		}
 
@@ -147,19 +147,19 @@ func copyIncludeDependenciesFromPackageWithForce(dependencies []IncludeDependenc
 			if bytes.Equal(existingContent, sourceContent) {
 				// Contents are the same, skip
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Include file %s already exists with same content, skipping", dep.TargetPath)))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Include file %s already exists with same content, skipping", dep.TargetPath)))
 				}
 				continue
 			}
 
 			// Contents are different
 			if !force {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Include file %s already exists with different content, skipping (use --force to overwrite)", dep.TargetPath)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Include file %s already exists with different content, skipping (use --force to overwrite)", dep.TargetPath)))
 				continue
 			}
 
 			// Force is enabled, overwrite
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Overwriting existing include file: "+dep.TargetPath))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Overwriting existing include file: "+dep.TargetPath))
 		}
 
 		// Track the file based on whether it existed before (if tracker is available)
@@ -177,7 +177,7 @@ func copyIncludeDependenciesFromPackageWithForce(dependencies []IncludeDependenc
 		}
 
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Copied include file: %s -> %s", dep.SourcePath, targetPath)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Copied include file: %s -> %s", dep.SourcePath, targetPath)))
 		}
 	}
 

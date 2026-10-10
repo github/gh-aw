@@ -185,7 +185,7 @@ func generateToolGraph(processedRuns []ProcessedRun, verbose bool) {
 			for _, seq := range sequences {
 				totalTools += len(seq)
 			}
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run %d contributed %d tool sequences with %d total tools",
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Run %d contributed %d tool sequences with %d total tools",
 				run.Run.DatabaseID, len(sequences), totalTools)))
 		}
 		for _, sequence := range sequences {
@@ -218,7 +218,7 @@ func extractToolSequencesFromRun(run ProcessedRun, verbose bool) [][]string {
 			for _, seq := range metrics.ToolSequences {
 				totalTools += len(seq)
 			}
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Extracted %d tool sequences with %d total tool calls from run %d",
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Extracted %d tool sequences with %d total tool calls from run %d",
 				len(metrics.ToolSequences), totalTools, run.Run.DatabaseID)))
 		}
 	} else if len(metrics.ToolCalls) > 0 {
@@ -237,7 +237,7 @@ func extractToolSequencesFromRun(run ProcessedRun, verbose bool) [][]string {
 		}
 
 		if verbose && len(tools) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No tool sequences found, using fallback with %d tool calls from run %d",
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No tool sequences found, using fallback with %d tool calls from run %d",
 				len(tools), run.Run.DatabaseID)))
 		}
 	}

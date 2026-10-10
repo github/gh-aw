@@ -41,13 +41,13 @@ func downloadAllArtifacts(hostRepoSlug, runID string, verbose bool) (*TrialArtif
 	if err != nil {
 		// If no artifacts exist, that's okay - some workflows don't generate artifacts
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No artifacts found for run %s: %s", runID, string(output))))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No artifacts found for run %s: %s", runID, string(output))))
 		}
 		return &TrialArtifacts{}, nil
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloaded all artifacts for run %s to %s", runID, tempDir)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Downloaded all artifacts for run %s to %s", runID, tempDir)))
 	}
 
 	artifacts := &TrialArtifacts{
@@ -68,7 +68,7 @@ func downloadAllArtifacts(hostRepoSlug, runID string, verbose bool) (*TrialArtif
 		relPath, err := filepath.Rel(tempDir, path)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to get relative path for %s: %v", path, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to get relative path for %s: %v", path, err)))
 			}
 			return nil
 		}
@@ -113,7 +113,7 @@ func downloadAllArtifacts(hostRepoSlug, runID string, verbose bool) (*TrialArtif
 
 	if walkErr != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Error walking artifact directory: %v", walkErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Error walking artifact directory: %v", walkErr)))
 		}
 	}
 
@@ -126,7 +126,7 @@ func parseJSONArtifact(filePath string, verbose bool) map[string]any {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read JSON artifact %s: %v", filePath, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read JSON artifact %s: %v", filePath, err)))
 		}
 		return nil
 	}
@@ -134,13 +134,13 @@ func parseJSONArtifact(filePath string, verbose bool) map[string]any {
 	var parsed map[string]any
 	if err := json.Unmarshal(content, &parsed); err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse JSON artifact %s: %v", filePath, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse JSON artifact %s: %v", filePath, err)))
 		}
 		return nil
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Parsed JSON artifact: "+filepath.Base(filePath)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Parsed JSON artifact: "+filepath.Base(filePath)))
 	}
 
 	return parsed
@@ -151,13 +151,13 @@ func readTextArtifact(filePath string, verbose bool) string {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read text artifact %s: %v", filePath, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read text artifact %s: %v", filePath, err)))
 		}
 		return ""
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Read text artifact: %s (%d bytes)", filepath.Base(filePath), len(content))))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Read text artifact: %s (%d bytes)", filepath.Base(filePath), len(content))))
 	}
 
 	return string(content)

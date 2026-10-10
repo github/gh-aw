@@ -73,7 +73,7 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, write
 	if strings.TrimSpace(existingContent) == expectedContent {
 		copilotAgentsLog.Printf("Dispatcher skill is up-to-date: %s", targetPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dispatcher skill is up-to-date: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dispatcher skill is up-to-date: "+targetPath))
 		}
 		return nil
 	}
@@ -83,7 +83,7 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, write
 		if !fileExists {
 			action = "create"
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Would %s dispatcher skill: %s", action, targetPath)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Would %s dispatcher skill: %s", action, targetPath)))
 		return nil
 	}
 
@@ -95,12 +95,12 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, write
 	if !fileExists {
 		copilotAgentsLog.Printf("Created dispatcher skill: %s", targetPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created dispatcher skill: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created dispatcher skill: "+targetPath))
 		}
 	} else {
 		copilotAgentsLog.Printf("Updated dispatcher skill: %s", targetPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated dispatcher skill: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Updated dispatcher skill: "+targetPath))
 		}
 	}
 
@@ -133,7 +133,7 @@ func ensureAgenticWorkflowsAgent(verbose bool, write bool) error {
 	if strings.TrimSpace(existingContent) == expectedContent {
 		copilotAgentsLog.Printf("Agentic Workflows custom agent is up-to-date: %s", targetPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Agentic Workflows custom agent is up-to-date: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Agentic Workflows custom agent is up-to-date: "+targetPath))
 		}
 		return nil
 	}
@@ -143,7 +143,7 @@ func ensureAgenticWorkflowsAgent(verbose bool, write bool) error {
 		if !fileExists {
 			action = "create"
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Would %s Agentic Workflows custom agent: %s", action, targetPath)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Would %s Agentic Workflows custom agent: %s", action, targetPath)))
 		return nil
 	}
 
@@ -154,12 +154,12 @@ func ensureAgenticWorkflowsAgent(verbose bool, write bool) error {
 	if !fileExists {
 		copilotAgentsLog.Printf("Created Agentic Workflows custom agent: %s", targetPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created Agentic Workflows custom agent: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created Agentic Workflows custom agent: "+targetPath))
 		}
 	} else {
 		copilotAgentsLog.Printf("Updated Agentic Workflows custom agent: %s", targetPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated Agentic Workflows custom agent: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Updated Agentic Workflows custom agent: "+targetPath))
 		}
 	}
 
@@ -201,7 +201,7 @@ func buildAgenticWorkflowsAgentContent(gitRoot string) (string, error) {
 func buildAgenticWorkflowsSkillContent() (string, error) {
 	awFiles, err := listAgenticWorkflowsMarkdownFiles(context.Background())
 	if err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch .github/aw markdown file list from github/gh-aw: %v. Falling back to embedded list.", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch .github/aw markdown file list from github/gh-aw: %v. Falling back to embedded list.", err)))
 		awFiles = embeddedFallbackAWMarkdownFiles()
 	}
 	sort.Strings(awFiles)
@@ -277,7 +277,7 @@ func fetchAgenticWorkflowsMarkdownFiles(ctx context.Context) ([]string, error) {
 func embeddedFallbackAWMarkdownFiles() []string {
 	var awFiles []string
 	if err := json.Unmarshal([]byte(agenticWorkflowsFallbackAWFiles), &awFiles); err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse embedded .github/aw fallback markdown file list: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse embedded .github/aw fallback markdown file list: %v", err)))
 		return nil
 	}
 	sort.Strings(awFiles)
@@ -299,7 +299,7 @@ func cleanupOldPromptFile(promptFileName string, verbose bool) error {
 			return fmt.Errorf("failed to remove old prompt file: %w", err)
 		}
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed old prompt file: "+oldPath))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Removed old prompt file: "+oldPath))
 		}
 	}
 
@@ -326,7 +326,7 @@ func deleteAgenticWorkflowDesignerSkillDir(verbose bool) error {
 		return fmt.Errorf("failed to remove legacy agentic-workflow-designer skill directory: %w", err)
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed legacy skill directory: "+designerDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Removed legacy skill directory: "+designerDir))
 	}
 	return nil
 }
@@ -391,7 +391,7 @@ func deleteOldTemplateFiles(verbose bool) error {
 			}
 			removedCount++
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed old template file: "+path))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Removed old template file: "+path))
 			}
 		}
 	}
@@ -404,7 +404,7 @@ func deleteOldTemplateFiles(verbose bool) error {
 				return fmt.Errorf("failed to remove empty templates directory: %w", err)
 			}
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed empty templates directory: "+templatesDir))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Removed empty templates directory: "+templatesDir))
 			}
 		}
 	}

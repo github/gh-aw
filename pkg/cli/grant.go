@@ -72,7 +72,7 @@ func runGrantOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 	if len(images) == 0 {
 		grantLog.Print("No container images found in lock files")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("No container images found in lock files to scan with grant"))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("No container images found in lock files to scan with grant"))
 		}
 		return nil
 	}
@@ -96,7 +96,7 @@ func runGrantOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 			}
 			grantLog.Printf("Skipping license scan for ignored image %s", name)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(
 					fmt.Sprintf("Skipping grant license scan for %s (ignore-images in %s)", name, grantPolicyFilename)))
 			}
 			continue
@@ -111,9 +111,9 @@ func runGrantOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 	}
 
 	if len(images) == 1 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running grant license scanner on 1 container image"))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running grant license scanner on 1 container image"))
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(
 			fmt.Sprintf("Running grant license scanner on %d container images", len(images))))
 	}
 
@@ -152,7 +152,7 @@ func runGrantOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 		if strict {
 			return errors.New(errMsg)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(errMsg))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(errMsg))
 	}
 
 	if strict && totalFindings > 0 {
@@ -286,7 +286,7 @@ func grantRunOnImage(imageRef, policyFile string, verbose bool) (*grantOutput, e
 			"check",
 			imageRef,
 		})
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Run grant directly: "+dockerCmd))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Run grant directly: "+dockerCmd))
 	}
 
 	var stdout, stderr bytes.Buffer

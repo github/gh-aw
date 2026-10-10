@@ -121,7 +121,7 @@ func logConcurrentDownloadSummary(results []DownloadResult) {
 			successCount++
 		}
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(
 		fmt.Sprintf("Completed parallel processing: %d successful, %d total", successCount, len(results))))
 }
 
@@ -138,7 +138,7 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, opt
 	// filter passes are counted correctly.
 	totalRuns := len(runs)
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Processing %d runs in parallel...", totalRuns)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Processing %d runs in parallel...", totalRuns)))
 	}
 
 	progressBar := initDownloadProgressBar(opts.verbose, totalRuns)
@@ -207,7 +207,7 @@ func runConcurrentArtifactDownloads(
 	if err := ctx.Err(); err != nil {
 		fillCanceledDownloadResults(runs, results, completed, err)
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Download interrupted: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Download interrupted: %v", err)))
 		}
 	}
 	return results
@@ -369,7 +369,7 @@ func processSingleRunDownload(
 	default:
 	}
 	if params.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Processing run %d (%s)...", run.DatabaseID, run.Status)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Processing run %d (%s)...", run.DatabaseID, run.Status)))
 	}
 
 	runOutputDir := filepath.Join(params.outputDir, fmt.Sprintf("run-%d", run.DatabaseID))
@@ -494,7 +494,7 @@ func skipNonAgenticWorkflowRun(result *DownloadResult, verbose bool) {
 	result.Skipped = true
 	logsOrchestratorLog.Printf("Skipping non-agentic workflow run: run=%d, workflow_path=%s", result.Run.DatabaseID, result.Run.WorkflowPath)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d because workflow path %q is not an agentic .lock.yml workflow", result.Run.DatabaseID, result.Run.WorkflowPath)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping run %d because workflow path %q is not an agentic .lock.yml workflow", result.Run.DatabaseID, result.Run.WorkflowPath)))
 	}
 }
 
@@ -519,7 +519,7 @@ func writeWorkflowRunFolderLocation(runID int64, runOutputDir string) {
 	if err != nil {
 		runFolder = runOutputDir
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow run %d folder: %s", runID, runFolder)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Workflow run %d folder: %s", runID, runFolder)))
 }
 
 func prepareRunDownload(
@@ -559,7 +559,7 @@ func tryDownloadEvalsArtifactFallback(ctx context.Context, runID int64, runOutpu
 	if err != nil {
 		logsOrchestratorLog.Printf("Fallback evals artifact download failed for run %d: %v", runID, err)
 		if params.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Evals not found in usage artifact for run %d and fallback download failed: %v", runID, err)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Evals not found in usage artifact for run %d and fallback download failed: %v", runID, err)))
 		}
 
 	} else {
@@ -698,7 +698,7 @@ func analyzeRunArtifacts(ctx context.Context, result *DownloadResult, runOutputD
 
 	usageActivitySummary, usageActivityErr := loadUsageActivitySummary(runOutputDir)
 	if usageActivityErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read usage activity summary for run %d: %v", result.Run.DatabaseID, usageActivityErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read usage activity summary for run %d: %v", result.Run.DatabaseID, usageActivityErr)))
 	}
 
 	// Firewall artifact gating: firewall/gateway logs live in the agent artifact.
@@ -724,7 +724,7 @@ func extractRunMetricsAndMetadata(result *DownloadResult, runOutputDir string, v
 	metrics, metricsErr := extractLogMetrics(runOutputDir, verbose)
 	if metricsErr != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract metrics for run %d: %v", result.Run.DatabaseID, metricsErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract metrics for run %d: %v", result.Run.DatabaseID, metricsErr)))
 		}
 		metrics = LogMetrics{}
 	}
@@ -762,7 +762,7 @@ func inferMissingWorkflowPath(result *DownloadResult, runOutputDir string) {
 func applyRunSecurityAnalysis(result *DownloadResult, runOutputDir string, verbose bool, hasFirewallArtifact bool) {
 	accessAnalysis, accessErr := analyzeAccessLogs(runOutputDir, verbose)
 	if accessErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze access logs for run %d: %v", result.Run.DatabaseID, accessErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to analyze access logs for run %d: %v", result.Run.DatabaseID, accessErr)))
 	}
 	result.AccessAnalysis = accessAnalysis
 
@@ -771,14 +771,14 @@ func applyRunSecurityAnalysis(result *DownloadResult, runOutputDir string, verbo
 		var firewallErr error
 		firewallAnalysis, firewallErr = analyzeFirewallLogs(runOutputDir, verbose)
 		if firewallErr != nil && verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze firewall logs for run %d: %v", result.Run.DatabaseID, firewallErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to analyze firewall logs for run %d: %v", result.Run.DatabaseID, firewallErr)))
 		}
 	}
 	result.FirewallAnalysis = firewallAnalysis
 
 	redactedDomainsAnalysis, redactedErr := analyzeRedactedDomains(runOutputDir, verbose)
 	if redactedErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze redacted domains for run %d: %v", result.Run.DatabaseID, redactedErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to analyze redacted domains for run %d: %v", result.Run.DatabaseID, redactedErr)))
 	}
 	result.RedactedDomainsAnalysis = redactedDomainsAnalysis
 }
@@ -788,31 +788,31 @@ func applyRunSecurityAnalysis(result *DownloadResult, runOutputDir string, verbo
 func applyRunBehavioralSignals(result *DownloadResult, runOutputDir string, verbose bool, hasFirewallArtifact bool, expName, expVariant string) {
 	missingTools, missingErr := extractMissingToolsFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if missingErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract missing tools for run %d: %v", result.Run.DatabaseID, missingErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract missing tools for run %d: %v", result.Run.DatabaseID, missingErr)))
 	}
 	result.MissingTools = missingTools
 
 	missingData, missingDataErr := extractMissingDataFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if missingDataErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract missing data for run %d: %v", result.Run.DatabaseID, missingDataErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract missing data for run %d: %v", result.Run.DatabaseID, missingDataErr)))
 	}
 	result.MissingData = missingData
 
 	noops, noopErr := extractNoopsFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if noopErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract noops for run %d: %v", result.Run.DatabaseID, noopErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract noops for run %d: %v", result.Run.DatabaseID, noopErr)))
 	}
 	result.Noops = noops
 
 	mcpFailures, mcpErr := extractMCPFailuresFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if mcpErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract MCP failures for run %d: %v", result.Run.DatabaseID, mcpErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract MCP failures for run %d: %v", result.Run.DatabaseID, mcpErr)))
 	}
 	result.MCPFailures = mcpFailures
 
 	skillActivations, skillErr := extractSkillActivationsFromRun(runOutputDir, result.Run, verbose, expName, expVariant)
 	if skillErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract skill activations for run %d: %v", result.Run.DatabaseID, skillErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract skill activations for run %d: %v", result.Run.DatabaseID, skillErr)))
 	}
 	result.SkillActivations = skillActivations
 
@@ -822,7 +822,7 @@ func applyRunBehavioralSignals(result *DownloadResult, runOutputDir string, verb
 		var mcpToolErr error
 		mcpToolUsage, mcpToolErr = extractMCPToolUsageData(runOutputDir, verbose)
 		if mcpToolErr != nil && verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract MCP tool usage for run %d: %v", result.Run.DatabaseID, mcpToolErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract MCP tool usage for run %d: %v", result.Run.DatabaseID, mcpToolErr)))
 		}
 	}
 	result.MCPToolUsage = mcpToolUsage
@@ -835,19 +835,19 @@ func applyRunUsageMetrics(result *DownloadResult, metrics *LogMetrics, runOutput
 	// token-usage.jsonl is also available in the compact usage artifact.
 	tokenUsage, tokenErr := analyzeTokenUsage(runOutputDir, verbose)
 	if tokenErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze token usage for run %d: %v", result.Run.DatabaseID, tokenErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to analyze token usage for run %d: %v", result.Run.DatabaseID, tokenErr)))
 	}
 	result.TokenUsage = tokenUsage
 	result.ModelRouting = analyzeModelRouting(runOutputDir)
 	backfillRunTokenUsageFromFirewall(metrics, result, tokenUsage)
 	steeringEvents, steeringErr := extractGatewaySteeringEvents(runOutputDir)
 	if steeringErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract gateway steering events for run %d: %v", result.Run.DatabaseID, steeringErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to extract gateway steering events for run %d: %v", result.Run.DatabaseID, steeringErr)))
 	}
 	result.GatewaySteeringEvents = steeringEvents
 	rateLimitUsage, rlErr := analyzeGitHubRateLimits(runOutputDir, verbose)
 	if rlErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze GitHub rate limit usage for run %d: %v", result.Run.DatabaseID, rlErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to analyze GitHub rate limit usage for run %d: %v", result.Run.DatabaseID, rlErr)))
 	}
 	result.GitHubRateLimitUsage = rateLimitUsage
 
@@ -868,7 +868,7 @@ func applyRunUsageMetrics(result *DownloadResult, metrics *LogMetrics, runOutput
 func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runOutputDir string, metrics LogMetrics, verbose bool) {
 	jobDetails, jobErr := fetchJobDetails(ctx, result.Run.DatabaseID, runOutputDir, verbose)
 	if jobErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch job details for run %d: %v", result.Run.DatabaseID, jobErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch job details for run %d: %v", result.Run.DatabaseID, jobErr)))
 	}
 	if jobDetails != nil {
 		result.JobDetails = jobDetails
@@ -876,7 +876,7 @@ func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runO
 
 	artifacts, listErr := listArtifacts(runOutputDir)
 	if listErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to list artifacts for run %d: %v", result.Run.DatabaseID, listErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to list artifacts for run %d: %v", result.Run.DatabaseID, listErr)))
 	}
 
 	processedRun := ProcessedRun{
@@ -909,7 +909,7 @@ func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runO
 
 	summary := newRunSummary(result, metrics, jobDetails, artifacts)
 	if saveErr := saveRunSummary(runOutputDir, summary, verbose); saveErr != nil && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to save run summary for run %d: %v", result.Run.DatabaseID, saveErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to save run summary for run %d: %v", result.Run.DatabaseID, saveErr)))
 	}
 }
 
@@ -977,7 +977,7 @@ func backfillGatewaySteeringEventsIfNeeded(result *DownloadResult, runOutputDir 
 	if err != nil {
 		logsOrchestratorLog.Printf("Warning: failed to backfill gateway steering events for run %d: %v", result.Run.DatabaseID, err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to backfill gateway steering events for run %d: %v", result.Run.DatabaseID, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to backfill gateway steering events for run %d: %v", result.Run.DatabaseID, err)))
 		}
 		return false
 	}

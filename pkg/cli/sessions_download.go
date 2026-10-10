@@ -70,7 +70,7 @@ func downloadSession(ctx context.Context, run *parser.GitHubURLComponents, forma
 func reconstructSession(ctx context.Context, run *parser.GitHubURLComponents, hostname string, names []string, root string, verbose bool) ([]byte, error) {
 	sessionsDownloadLog.Printf("No published unified session for run %d; reconstructing from agent", run.Number)
 	if verbose {
-		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No aw_session.jsonl in usage; reconstructing from the agent artifact")); err != nil {
+		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No aw_session.jsonl in usage; reconstructing from the agent artifact")); err != nil {
 			return nil, fmt.Errorf("failed to write session reconstruction diagnostic: %w", err)
 		}
 	}
@@ -153,7 +153,7 @@ func downloadSessionArtifact(ctx context.Context, run *parser.GitHubURLComponent
 	}
 	sessionsDownloadLog.Printf("Downloading session artifact: gh %s", strings.Join(args, " "))
 	if verbose {
-		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Downloading artifact: "+name)); err != nil {
+		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Downloading artifact: "+name)); err != nil {
 			return fmt.Errorf("failed to write session artifact diagnostic: %w", err)
 		}
 	}

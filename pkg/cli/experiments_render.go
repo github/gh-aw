@@ -13,7 +13,7 @@ import (
 )
 
 func printExperimentDetails(d *ExperimentDetails) {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Experiment workflow: "+d.WorkflowID))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Experiment workflow: "+d.WorkflowID))
 	fmt.Fprintf(os.Stderr, "  Branch:     %s\n", d.Branch)
 	fmt.Fprintf(os.Stderr, "  Total runs: %d\n", d.TotalRuns)
 
@@ -40,11 +40,12 @@ func printExperimentDetails(d *ExperimentDetails) {
 				rows = append(rows, []string{p.k, strconv.Itoa(p.v), strconv.Itoa(pct) + "%"})
 			}
 			if len(rows) > 0 {
-				fmt.Fprintf(os.Stderr, "\n%s", console.RenderTable(console.TableConfig{
-					Title:   fmt.Sprintf("%s (total: %d)", exp.Name, exp.Total),
-					Headers: []string{"Variant", "Count", "Percent"},
-					Rows:    rows,
-					TTYFunc: tty.IsStderrTerminal,
+				fmt.Fprintf(os.Stderr, "\n%s", console.RenderTableStderr(console.TableConfig{
+					Title:    fmt.Sprintf("%s (total: %d)", exp.Name, exp.Total),
+					Headers:  []string{"Variant", "Count", "Percent"},
+					Rows:     rows,
+					MaxWidth: console.DefaultTableWidth,
+					TTYFunc:  tty.IsStderrTerminal,
 				}))
 			}
 		}
@@ -63,11 +64,12 @@ func printExperimentDetails(d *ExperimentDetails) {
 			}
 			rows = append(rows, []string{date, run.RunID, formatAssignments(run.Assignments)})
 		}
-		fmt.Fprintf(os.Stderr, "\n%s", console.RenderTable(console.TableConfig{
-			Title:   "Recent runs",
-			Headers: []string{"Date", "Run ID", "Assignments"},
-			Rows:    rows,
-			TTYFunc: tty.IsStderrTerminal,
+		fmt.Fprintf(os.Stderr, "\n%s", console.RenderTableStderr(console.TableConfig{
+			Title:    "Recent runs",
+			Headers:  []string{"Date", "Run ID", "Assignments"},
+			Rows:     rows,
+			MaxWidth: console.DefaultTableWidth,
+			TTYFunc:  tty.IsStderrTerminal,
 		}))
 	}
 }

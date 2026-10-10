@@ -169,7 +169,7 @@ func RunOutcomesHistory(config OutcomesHistoryConfig) error {
 		return nil
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader(fmt.Sprintf("Objective history for %s (limit %d)", repo, config.Limit)))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr(fmt.Sprintf("Objective history for %s (limit %d)", repo, config.Limit)))
 	if data.Issues != nil {
 		renderHistoricalObjectiveReport(*data.Issues)
 	}
@@ -304,10 +304,10 @@ func buildHistoricalObjectiveReport(source string, items []historicalGitHubItem,
 }
 
 func renderHistoricalObjectiveReport(report historicalObjectiveReport) {
-	fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatSectionHeader(strings.ToUpper(report.Source)))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Sample size: %d", report.SampleSize)))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Scored items: %d", report.ScoredItems)))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Total objective value: %d", report.TotalObjectiveValue)))
+	fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatSectionHeaderStderr(strings.ToUpper(report.Source)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Sample size: %d", report.SampleSize)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Scored items: %d", report.ScoredItems)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Total objective value: %d", report.TotalObjectiveValue)))
 
 	if len(report.ObjectiveBuckets) > 0 {
 		bucketRows := make([][]string, 0, min(len(report.ObjectiveBuckets), 8))
@@ -319,7 +319,7 @@ func renderHistoricalObjectiveReport(report historicalObjectiveReport) {
 				strconv.Itoa(bucket.ContributedValue),
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(console.TableConfig{
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(console.TableConfig{
 			Title:   "Top objective buckets",
 			Headers: []string{"Bucket", "Count", "Mapped Value", "Contributed Value"},
 			Rows:    bucketRows,
@@ -335,7 +335,7 @@ func renderHistoricalObjectiveReport(report historicalObjectiveReport) {
 				item.Title,
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(console.TableConfig{
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(console.TableConfig{
 			Title:   "Representative items",
 			Headers: []string{"Number", "Value", "Title"},
 			Rows:    itemRows,

@@ -80,7 +80,7 @@ func ValidateActionSHAsInLockFile(ctx context.Context, lockFilePath string, cach
 	if len(actions) == 0 {
 		actionSHACheckerLog.Print("No pinned actions found in lock file")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No pinned actions to validate"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No pinned actions to validate"))
 		}
 		return nil
 	}
@@ -102,7 +102,7 @@ func ValidateActionSHAsInLockFile(ctx context.Context, lockFilePath string, cach
 				check.Action.Version,
 				check.Action.SHA[:7],
 				check.LatestSHA[:7])
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
 
 			// Show full SHA in verbose mode
 			if verbose {
@@ -121,9 +121,9 @@ func ValidateActionSHAsInLockFile(ctx context.Context, lockFilePath string, cach
 			actionSHACheckerLog.Print("Saved updated action cache")
 		}
 		// Provide suggestion to fix the issue
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("To apply updated action SHAs, recompile with: gh aw compile"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("To apply updated action SHAs, recompile with: gh aw compile"))
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d action(s) with available updates", updateCount)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d action(s) with available updates", updateCount)))
 		}
 	} else {
 		actionSHACheckerLog.Print("All actions are up to date")

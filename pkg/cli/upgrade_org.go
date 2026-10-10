@@ -91,7 +91,7 @@ func scanUpgradeRepo(ctx context.Context, repo string, verbose bool) (orgRepoPre
 	if mdCount == 0 {
 		upgradeOrgLog.Printf("Skipping %s: no agentic workflow files found", repo)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipping "+repo+": no agentic workflow files found"))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Skipping "+repo+": no agentic workflow files found"))
 		}
 		return orgRepoPreview{}, false, nil
 	}
@@ -100,7 +100,7 @@ func scanUpgradeRepo(ctx context.Context, repo string, verbose bool) (orgRepoPre
 	currentVersion := extractCompilerVersionFromWorkflowsDir(workflowsDir)
 	upgradeOrgLog.Printf("Scanned %s: workflows=%d, currentVersion=%s", repo, mdCount, currentVersion)
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 		fmt.Sprintf("%s: %d workflow(s)%s", repo, mdCount, formatCurrentVersionSuffix(currentVersion)),
 	))
 
@@ -116,9 +116,9 @@ func scanUpgradeRepo(ctx context.Context, repo string, verbose bool) (orgRepoPre
 func renderOrgUpgradeReport(results []orgRepoPreview, applying bool) {
 	targetVersion := normalizeDisplayVersion(GetVersion())
 	if applying {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Repositories with agentic workflows (%d):", len(results))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Repositories with agentic workflows (%d):", len(results))))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dry-run preview of upgrade pull requests:"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dry-run preview of upgrade pull requests:"))
 	}
 	for _, r := range results {
 		versionPart := ""
@@ -237,7 +237,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checked out "+repo+" at "+checkoutDir))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Checked out "+repo+" at "+checkoutDir))
 	}
 
 	originalDir, err := os.Getwd()
@@ -282,7 +282,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	if !changed {
 		upgradeOrgLog.Printf("Skipping PR for %s: no pending changes after upgrade", repo)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipping PR for "+repo+": already up to date"))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Skipping PR for "+repo+": already up to date"))
 		}
 		return nil
 	}
@@ -354,13 +354,13 @@ func createIssueForUpgradeOrgRepo(ctx context.Context, repo string, verbose bool
 		xmlMarker + "\n"
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Creating upgrade issue in "+repo+"..."))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Creating upgrade issue in "+repo+"..."))
 	}
 
 	if err := createOrgIssue(ctx, repo, title, body, agenticWorkflowsLabel); err != nil {
 		return fmt.Errorf("failed to create issue in %s: %w", repo, err)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created issue in "+repo))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created issue in "+repo))
 	return nil
 }

@@ -28,7 +28,7 @@ func renderForecastJSON(output ForecastResult) error {
 func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 	forecastRenderLog.Printf("Rendering forecast table: workflows=%d, days=%d, eval_mode=%v", len(output.Workflows), config.Days, output.EvalMode)
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 		fmt.Sprintf("Workflow Forecast — weekly & monthly projections (based on last %d days of history)", config.Days)))
 	fmt.Fprintln(os.Stderr, "")
 
@@ -84,7 +84,7 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 		})
 	}
 
-	fmt.Fprint(os.Stderr, console.RenderStruct(rows))
+	fmt.Fprint(os.Stderr, console.RenderStructStderr(rows))
 	fmt.Fprintln(os.Stderr, "")
 
 	// Show detailed per-run samples section only when specific workflows were requested.
@@ -104,17 +104,17 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 		printEvalBreakdown(output.Workflows)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 		"Cost/projection figures are AI Credits (AIC) — the gh-aw cost metric."))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 		"AIC = AI Credits. P50 AIC/Run = per-run median AIC; P95 AIC/Run = 95th-percentile per-run AIC; Weekly/Monthly AIC = projected P50 usage."))
 	if anyUnreliable {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 			fmt.Sprintf("* Fewer than %d sampled runs — projections may be unreliable.", minObservationsForReliableForecast)))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 		"All forecasts are estimates derived from historical samples and may be inaccurate."))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 		fmt.Sprintf("Run '%s forecast --json' for full output including P10/P90 confidence intervals.", string(constants.CLIExtensionPrefix))))
 	return nil
 }
@@ -139,7 +139,7 @@ func printRunSamplesSection(workflows []ForecastWorkflowResult) {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Sampled runs used in computation:"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Sampled runs used in computation:"))
 	for _, wf := range workflows {
 		if len(wf.RunSamples) == 0 {
 			continue
@@ -153,7 +153,7 @@ func printRunSamplesSection(workflows []ForecastWorkflowResult) {
 				AIC:   formatForecastAIC(s.AIC),
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderStruct(rows))
+		fmt.Fprint(os.Stderr, console.RenderStructStderr(rows))
 		fmt.Fprintln(os.Stderr, "")
 	}
 }
@@ -170,7 +170,7 @@ func printEvalBreakdown(workflows []ForecastWorkflowResult) {
 		InCI        string `json:"in_ci"          console:"header:In 80% CI?"`
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Backtesting evaluation (actual vs forecasted):"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Backtesting evaluation (actual vs forecasted):"))
 	var rows []evalRow
 	for _, wf := range workflows {
 		ev := wf.Evaluation
@@ -195,9 +195,9 @@ func printEvalBreakdown(workflows []ForecastWorkflowResult) {
 			InCI:        inCI,
 		})
 	}
-	fmt.Fprint(os.Stderr, console.RenderStruct(rows))
+	fmt.Fprint(os.Stderr, console.RenderStructStderr(rows))
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 		"Training window ended at the forecast anchor; validation window is the following projection period."))
 }
 
@@ -219,7 +219,7 @@ func printVariantBreakdown(wf ForecastWorkflowResult) {
 			Fraction:   formatForecastPercent(v.Fraction, wf.SampledRuns > 0),
 		})
 	}
-	fmt.Fprint(os.Stderr, console.RenderStruct(varRows))
+	fmt.Fprint(os.Stderr, console.RenderStructStderr(varRows))
 	fmt.Fprintln(os.Stderr, "")
 }
 

@@ -82,7 +82,7 @@ func buildCreatedFilter(startDate, endDate, beforeDate string) string {
 func fetchJobDetailsWithCounts(ctx context.Context, runID int64, outputDir string, verbose bool) ([]JobInfoWithDuration, int, error) {
 	logsGitHubAPILog.Printf("Fetching job details: runID=%d", runID)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Fetching job details for run %d", runID)))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Fetching job details for run %d", runID)))
 	}
 
 	output, err := workflow.RunGHCombinedContext(ctx, "Fetching job details...", "api",
@@ -90,7 +90,7 @@ func fetchJobDetailsWithCounts(ctx context.Context, runID int64, outputDir strin
 		"--paginate", "--slurp")
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Failed to fetch job details for run %d: %v", runID, err)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Failed to fetch job details for run %d: %v", runID, err)))
 		}
 		return nil, 0, err
 	}
@@ -143,7 +143,7 @@ func parseJobsAPIResponses(output []byte, runID int64, verbose bool) ([]JobInfoW
 				failedJobs++
 				logsGitHubAPILog.Printf("Found failed job: name=%s, conclusion=%s", job.Name, job.Conclusion)
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Found failed job '%s' with conclusion '%s'", job.Name, job.Conclusion)))
+					fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Found failed job '%s' with conclusion '%s'", job.Name, job.Conclusion)))
 				}
 			}
 		}
@@ -292,7 +292,7 @@ func fetchAndCacheWorkflowRunMetadata(ctx context.Context, currentRun WorkflowRu
 
 	args := buildWorkflowRunAPIArgs(currentRun.DatabaseID, owner, repo, hostname)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Executing: gh "+strings.Join(args, " ")))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Executing: gh "+strings.Join(args, " ")))
 	}
 	output, err := workflow.RunGHCombinedContext(ctx, "Fetching run metadata...", args...)
 	if err != nil {
@@ -462,7 +462,7 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 		logsGitHubAPILog.Printf("Using cached workflow runs payload: repository=%s", request.Repository)
 	} else {
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Executing: gh "+strings.Join(args, " ")))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Executing: gh "+strings.Join(args, " ")))
 		}
 
 		spinnerMsg := workflowRunsSpinnerMessage(opts)
@@ -502,7 +502,7 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 			outputMsg := string(output)
 			combinedMsg := errMsg + " " + outputMsg
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(outputMsg))
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(outputMsg))
 			}
 			combinedMsgLower := strings.ToLower(combinedMsg)
 			if strings.Contains(combinedMsgLower, "invalid field") ||
@@ -529,7 +529,7 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 	}
 	if !cacheHit {
 		if err := opts.CachedJSONLWriter.AppendWorkflowRuns(request, output); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()))
 		}
 	}
 

@@ -255,7 +255,7 @@ func markdownPerRunFields(run PerRunFirewallBreakdown) (string, string, string, 
 func renderCrossRunReportPretty(report *CrossRunAuditReport) {
 	crossRunRenderLog.Printf("Rendering cross-run report as pretty output: runs_analyzed=%d, runs_with_data=%d, deny_rate=%.1f%%",
 		report.RunsAnalyzed, report.RunsWithData, report.Summary.OverallDenyRate*100)
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Audit Report — Cross-Run Analysis"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Audit Report — Cross-Run Analysis"))
 	fmt.Fprintln(os.Stderr)
 
 	renderPrettyExecutiveSummary(report)
@@ -287,7 +287,7 @@ func renderPrettyModelRouting(routing *ModelRoutingLogsSummary) {
 }
 
 func renderPrettyExecutiveSummary(report *CrossRunAuditReport) {
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Executive Summary"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Executive Summary"))
 	fmt.Fprintf(os.Stderr, "  Runs analyzed:              %d\n", report.RunsAnalyzed)
 	fmt.Fprintf(os.Stderr, "  Runs with firewall data:    %d\n", report.RunsWithData)
 	fmt.Fprintf(os.Stderr, "  Runs without firewall data: %d\n", report.RunsWithoutData)
@@ -302,7 +302,7 @@ func renderPrettyMetricsTrend(mt MetricsTrendData) {
 	if mt.TotalTokens == 0 && mt.TotalTurns == 0 && mt.AvgDurationNs == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Metrics Trends"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Metrics Trends"))
 	renderPrettyTokenTrend(mt)
 	renderPrettyTurnTrend(mt)
 	renderPrettyDurationTrend(mt)
@@ -344,7 +344,7 @@ func renderPrettyMCPHealth(report *CrossRunAuditReport) {
 	if len(report.MCPHealth) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("MCP Server Health (%d runs)", report.RunsAnalyzed)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("MCP Server Health (%d runs)", report.RunsAnalyzed)))
 	for _, h := range report.MCPHealth {
 		statusIcon := "✅"
 		if h.Unreliable {
@@ -362,7 +362,7 @@ func renderPrettyErrorTrend(report *CrossRunAuditReport) {
 	if et.TotalErrors == 0 && et.TotalWarnings == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Error Trend"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Error Trend"))
 	fmt.Fprintf(os.Stderr, "  Runs with errors:  %d/%d (%.0f%%)\n",
 		et.RunsWithErrors, report.RunsAnalyzed,
 		safePercent(et.RunsWithErrors, report.RunsAnalyzed))
@@ -377,7 +377,7 @@ func renderPrettyDomainInventory(report *CrossRunAuditReport) {
 	if len(report.DomainInventory) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Domain Inventory (%d domains)", len(report.DomainInventory))))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Domain Inventory (%d domains)", len(report.DomainInventory))))
 	for _, entry := range report.DomainInventory {
 		fmt.Fprintf(os.Stderr, "  %s %-45s  %s  seen=%d/%d  allowed=%d  blocked=%d\n",
 			firewallStatusEmoji(entry.OverallStatus), entry.Domain, entry.OverallStatus,
@@ -390,7 +390,7 @@ func renderPrettyDrain3Insights(insights []ObservabilityInsight) {
 	if len(insights) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Agent Event Pattern Analysis (%d insights)", len(insights))))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Agent Event Pattern Analysis (%d insights)", len(insights))))
 	for _, insight := range insights {
 		fmt.Fprintf(os.Stderr, "  %s [%s/%s] %s\n", renderSeverityIcon(insight.Severity), insight.Category, insight.Severity, insight.Title)
 		fmt.Fprintf(os.Stderr, "     %s\n", insight.Summary)
@@ -418,7 +418,7 @@ func renderPrettyPerRunBreakdown(runs []PerRunFirewallBreakdown) {
 	if len(runs) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Per-Run Breakdown"))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Per-Run Breakdown"))
 	for _, run := range runs {
 		fmt.Fprintln(os.Stderr, prettyPerRunLine(run))
 	}
@@ -455,7 +455,7 @@ func prettyPerRunOptionalFields(run PerRunFirewallBreakdown) string {
 func renderPrettyFinalStatus(report *CrossRunAuditReport) {
 	if report.RunsWithData == 0 && len(report.MCPHealth) == 0 && report.MetricsTrend.TotalTokens == 0 {
 		crossRunRenderLog.Printf("No data found in any analyzed runs: runs_analyzed=%d", report.RunsAnalyzed)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No data found in any of the analyzed runs."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No data found in any of the analyzed runs."))
 		return
 	}
 
@@ -464,7 +464,7 @@ func renderPrettyFinalStatus(report *CrossRunAuditReport) {
 		parts = append(parts, fmt.Sprintf("%d unique domains", report.Summary.UniqueDomains))
 		parts = append(parts, fmt.Sprintf("%.1f%% overall denial rate", report.Summary.OverallDenyRate*100))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Report complete: "+strings.Join(parts, ", ")))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Report complete: "+strings.Join(parts, ", ")))
 }
 
 // formatRunIDs formats a slice of run IDs as a comma-separated string.

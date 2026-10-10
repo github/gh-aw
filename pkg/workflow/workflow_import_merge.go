@@ -70,7 +70,7 @@ func (c *Compiler) processAndMergeServices(frontmatter map[string]any, workflowD
 		workflowData.ServicePortExpressions = expressions
 		for _, w := range warnings {
 			workflowImportMergeLog.Printf("Warning: %s", w)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(w))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(w))
 			c.IncrementWarningCount()
 		}
 		if expressions != "" {

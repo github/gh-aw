@@ -122,12 +122,12 @@ func displayActionlintSummary() {
 	separator := strings.Repeat("━", 60)
 
 	fmt.Fprintf(os.Stderr, "\n%s\n", separator)
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Actionlint Summary"))
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Actionlint Summary"))
 	fmt.Fprintf(os.Stderr, "%s\n\n", separator)
 
 	// Show total workflows checked
 	fmt.Fprintf(os.Stderr, "%s\n",
-		console.FormatSuccessMessage(fmt.Sprintf("Checked %d workflow(s)", actionlintStats.TotalWorkflows)))
+		console.FormatSuccessMessageStderr(fmt.Sprintf("Checked %d workflow(s)", actionlintStats.TotalWorkflows)))
 
 	// Show total issues found
 	totalIssues := actionlintStats.TotalErrors + actionlintStats.TotalWarnings
@@ -140,11 +140,11 @@ func displayActionlintSummary() {
 		} else if actionlintStats.TotalWarnings > 0 {
 			issueText += fmt.Sprintf(" (%d warning(s))", actionlintStats.TotalWarnings)
 		}
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(issueText))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(issueText))
 
 		// Break down by error kind if we have multiple kinds
 		if len(actionlintStats.ErrorsByKind) > 0 {
-			fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatInfoMessage("Issues by type:"))
+			fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatInfoMessageStderr("Issues by type:"))
 			for kind, count := range actionlintStats.ErrorsByKind {
 				fmt.Fprintf(os.Stderr, "  • %s: %d\n", kind, count)
 			}
@@ -155,17 +155,17 @@ func displayActionlintSummary() {
 		msg := fmt.Sprintf("No lint issues found, but %d actionlint invocation(s) failed. "+
 			"This likely indicates a tooling or integration error, not a workflow problem.",
 			actionlintStats.IntegrationErrors)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(msg))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessageStderr(msg))
 	} else {
 		fmt.Fprintf(os.Stderr, "%s\n",
-			console.FormatSuccessMessage("No issues found"))
+			console.FormatSuccessMessageStderr("No issues found"))
 	}
 
 	// Report any integration failures alongside lint findings
 	if totalIssues > 0 && actionlintStats.IntegrationErrors > 0 {
 		msg := fmt.Sprintf("%d actionlint invocation(s) also failed with tooling errors (not workflow validation failures)",
 			actionlintStats.IntegrationErrors)
-		fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatWarningMessage(msg))
+		fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatWarningMessageStderr(msg))
 	}
 
 	fmt.Fprintf(os.Stderr, "\n%s\n", separator)
@@ -236,7 +236,7 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 		return nil
 	}
 	actionlintLog.Printf("Running actionlint on %d file(s): %v (verbose=%t, strict=%t)", len(lockFiles), lockFiles, verbose, strict)
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running actionlint on %d file(s)", len(lockFiles))))
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Running actionlint on %d file(s)", len(lockFiles))))
 	maybePrintActionlintVersion(ctx)
 
 	gitRoot, relPaths, err := resolveActionlintPaths(lockFiles)
@@ -263,7 +263,7 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 			if actionlintStats != nil {
 				actionlintStats.IntegrationErrors++
 			}
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 				"actionlint output could not be parsed — this is a tooling error, not a workflow validation failure: "+parseErr.Error()))
 			// Fall back to showing raw output.
 			if runResult.stdout != "" {
@@ -297,7 +297,7 @@ func maybePrintActionlintVersion(ctx context.Context) {
 		actionlintLog.Printf("Could not fetch actionlint version: %v", err)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Using actionlint "+version))
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Using actionlint "+version))
 }
 
 func resolveActionlintPaths(lockFiles []string) (string, []string, error) {
@@ -382,14 +382,14 @@ func actionlintShellQuoteArg(arg string) string {
 func printActionlintRunMessage(lockFiles, relPaths []string, verboseHint string, options actionlintRunOptions) {
 	integrationStatus := buildActionlintIntegrationStatus(options.IncludeShellcheck, options.IncludePyflakes)
 	if len(lockFiles) == 1 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running actionlint ("+integrationStatus+") on "+relPaths[0]))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running actionlint ("+integrationStatus+") on "+relPaths[0]))
 	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running actionlint (%s) on %d files", integrationStatus, len(lockFiles))))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(fmt.Sprintf("Running actionlint (%s) on %d files", integrationStatus, len(lockFiles))))
 	}
 	if verboseHint == "" {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run actionlint directly: "+verboseHint))
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Run actionlint directly: "+verboseHint))
 }
 
 func actionlintShouldParseOutput(err error) bool {
@@ -423,7 +423,7 @@ func handleActionlintExecutionError(err error, strict bool, lockFiles []string, 
 		if actionlintStats != nil {
 			actionlintStats.IntegrationErrors++
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 			"actionlint could not be invoked — this is a tooling error, not a workflow validation failure: "+err.Error()))
 		return fmt.Errorf("actionlint failed: %w", err)
 	}
@@ -438,7 +438,7 @@ func handleActionlintExecutionError(err error, strict bool, lockFiles []string, 
 	if actionlintStats != nil {
 		actionlintStats.IntegrationErrors++
 	}
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 		fmt.Sprintf("actionlint failed with exit code %d on %s — this is a tooling error, not a workflow validation failure", exitCode, fileDescription)))
 	return fmt.Errorf("actionlint failed with exit code %d on %s", exitCode, fileDescription)
 }
@@ -496,7 +496,7 @@ func parseAndDisplayActionlintOutput(stdout string, verbose bool) (int, map[stri
 		if err.Kind != "" {
 			errorsByKind[err.Kind]++
 		}
-		fmt.Fprint(os.Stderr, console.FormatError(buildActionlintCompilerError(err)))
+		fmt.Fprint(os.Stderr, console.FormatErrorStderr(buildActionlintCompilerError(err)))
 	}
 
 	return totalErrors, errorsByKind, nil

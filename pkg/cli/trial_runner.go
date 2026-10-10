@@ -33,15 +33,15 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 	}
 
 	if opts.DryRun {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Showing what would be done without making changes"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("[DRY RUN] Showing what would be done without making changes"))
 	}
 
 	if len(parsedSpecs) == 1 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Starting trial of workflow '%s' from '%s'", parsedSpecs[0].WorkflowName, parsedSpecs[0].RepoSlug)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Starting trial of workflow '%s' from '%s'", parsedSpecs[0].WorkflowName, parsedSpecs[0].RepoSlug)))
 	} else {
 		workflowNames := sliceutil.Map(parsedSpecs, func(spec *WorkflowSpec) string { return spec.WorkflowName })
 		joinedNames := strings.Join(workflowNames, ", ")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Starting trial of %d workflows (%s)", len(parsedSpecs), joinedNames)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Starting trial of %d workflows (%s)", len(parsedSpecs), joinedNames)))
 	}
 
 	// Step 0: Determine workflow mode (mutual exclusion is enforced by Cobra)
@@ -62,7 +62,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		logicalRepoSlug = "" // Empty string means skip logical repo simulation
 		directTrialMode = false
 		trialLog.Printf("Using clone-repo mode: %s (version=%s)", cloneRepoSlug, cloneRepoVersion)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Clone mode: Will clone contents from %s into host repository", cloneRepoSlug)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Clone mode: Will clone contents from %s into host repository", cloneRepoSlug)))
 	} else if opts.Repos.LogicalRepo != "" {
 		// Use logical-repo mode: simulate the workflow running against the specified repo
 		logicalRepo, err := parseRepoSpec(opts.Repos.LogicalRepo)
@@ -73,7 +73,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		logicalRepoSlug = logicalRepo.RepoSlug
 		directTrialMode = false
 		trialLog.Printf("Using logical-repo mode: %s", logicalRepoSlug)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Target repository (specified): "+logicalRepoSlug))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Target repository (specified): "+logicalRepoSlug))
 	} else {
 		// No --clone-repo or --logical-repo specified
 		// If --repo is specified without simulation flags, it's direct trial mode
@@ -84,7 +84,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 			cloneRepoSlug = ""
 			directTrialMode = true
 			trialLog.Print("Using direct trial mode (no simulation)")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Direct trial mode: Workflows will be installed and run directly in the specified repository"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Direct trial mode: Workflows will be installed and run directly in the specified repository"))
 		} else {
 			// Fall back to current repository for logical-repo mode
 			var err error
@@ -93,7 +93,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 				return fmt.Errorf("failed to determine simulated host repository: %w", err)
 			}
 			directTrialMode = false
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Target repository (current): "+logicalRepoSlug))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Target repository (current): "+logicalRepoSlug))
 		}
 	}
 
@@ -114,7 +114,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		}
 		hostRepoSlug = username + "/gh-aw-trial"
 		trialLog.Printf("Using default host repository: %s", hostRepoSlug)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Host repository (default): "+hostRepoSlug))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Host repository (default): "+hostRepoSlug))
 	}
 
 	// Step 1.5: Show confirmation unless quiet mode
@@ -143,7 +143,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 
 	// In dry-run mode, stop here after showing what would be done
 	if opts.DryRun {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Stopping here. No actual changes were made."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("[DRY RUN] Stopping here. No actual changes were made."))
 		return nil
 	}
 
@@ -177,7 +177,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 	if opts.DeleteHostRepo {
 		defer func() {
 			if err := cleanupTrialRepository(hostRepoSlug, opts.Verbose); err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cleanup host repository: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to cleanup host repository: %v", err)))
 			}
 		}()
 	}
@@ -198,7 +198,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		}
 
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Disabling workflows in cloned repository (keeping: %s)", strings.Join(workflowsToKeep, ", "))))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Disabling workflows in cloned repository (keeping: %s)", strings.Join(workflowsToKeep, ", "))))
 		}
 
 		// Clone host repository temporarily to access workflows
@@ -233,7 +233,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		// Check for disable errors after changing back
 		if disableErr != nil {
 			// Log warning but don't fail the trial - workflow disabling is not critical
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to disable workflows: %v", disableErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to disable workflows: %v", disableErr)))
 		}
 	}
 
@@ -246,10 +246,10 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		},
 		CleanupFunc: func() {
 			if opts.DeleteHostRepo {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Host repository will be cleaned up"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Host repository will be cleaned up"))
 			} else {
 				githubHost := getGitHubHost()
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Host repository preserved: %s/%s", githubHost, hostRepoSlug)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Host repository preserved: %s/%s", githubHost, hostRepoSlug)))
 			}
 		},
 		UseStderr: true,

@@ -74,7 +74,7 @@ func (c *Compiler) validatePythonPackagesWithPip(packages []string, packageType 
 		// Validate the package name against PyPI naming rules (PEP 508).
 		// pip does not universally honour '--', so we validate upfront.
 		if err := validatePipCommandPackageArg(pkgName); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%s package name '%s' is invalid: %v", packageType, pkg, err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("%s package name '%s' is invalid: %v", packageType, pkg, err)))
 			continue
 		}
 
@@ -93,14 +93,14 @@ func (c *Compiler) validatePythonPackagesWithPip(packages []string, packageType 
 			pipValidationLog.Printf("Package validation failed for %s: %v", pkg, err)
 			// Treat all pip validation errors as warnings, not compilation failures
 			// The package may be experimental, not yet published, or will be installed at runtime
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%s package '%s' validation failed - skipping verification. Package may or may not exist on PyPI.", packageType, pkg)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("%s package '%s' validation failed - skipping verification. Package may or may not exist on PyPI.", packageType, pkg)))
 			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("  Details: "+outputStr))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("  Details: "+outputStr))
 			}
 		} else {
 			pipValidationLog.Printf("Package validated successfully: %s", pkg)
 			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("✓ %s package validated: %s", packageType, pkg)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("✓ %s package validated: %s", packageType, pkg)))
 			}
 		}
 	}
@@ -123,7 +123,7 @@ func (c *Compiler) validatePipPackages(workflowData *WorkflowData) error {
 		pipPath, err = fileutil.ResolveExecutablePath("pip3")
 		if err != nil {
 			pipValidationLog.Print("pip command not found, skipping validation")
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("pip command not found - skipping pip package validation. Install Python/pip for full validation"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("pip command not found - skipping pip package validation. Install Python/pip for full validation"))
 			return nil
 		}
 		pipValidationLog.Print("Using pip3 command for validation")
@@ -243,7 +243,7 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 			// Package not installed, try to check if it's available
 			errors = append(errors, fmt.Sprintf("uv package '%s' validation requires network access or local cache", pkg))
 		} else if c.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("✓ uv package validated: "+pkg))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("✓ uv package validated: "+pkg))
 		}
 	}
 

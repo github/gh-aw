@@ -78,7 +78,7 @@ func (c *Compiler) extractStopAfterFromOn(frontmatter map[string]any, workflowDa
 func (c *Compiler) logStopAfterExpressionPassthrough(stopTime string) {
 	stopAfterLog.Printf("Stop-after value is a GitHub Actions expression, passing through verbatim: %s", stopTime)
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Stop-after is a GitHub Actions expression, resolved at runtime: "+stopTime))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Stop-after is a GitHub Actions expression, resolved at runtime: "+stopTime))
 	}
 }
 
@@ -126,9 +126,9 @@ func (c *Compiler) resolveAndApplyStopTime(workflowData *WorkflowData, markdownP
 		stopAfterLog.Printf("Resolved stop time from %s to %s", originalStopTime, resolvedStopTime)
 
 		if c.verbose && isRelativeStopTime(originalStopTime) {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Refreshed relative stop-after to: "+resolvedStopTime))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Refreshed relative stop-after to: "+resolvedStopTime))
 		} else if c.verbose && originalStopTime != resolvedStopTime {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Refreshed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Refreshed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
 		}
 		return nil
 	}
@@ -138,7 +138,7 @@ func (c *Compiler) resolveAndApplyStopTime(workflowData *WorkflowData, markdownP
 		stopAfterLog.Printf("Preserving existing stop time from lock file: %s", existingStopTime)
 		workflowData.StopTime = existingStopTime
 		if c.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Preserving existing stop time from lock file: "+existingStopTime))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Preserving existing stop time from lock file: "+existingStopTime))
 		}
 		return nil
 	}
@@ -152,9 +152,9 @@ func (c *Compiler) resolveAndApplyStopTime(workflowData *WorkflowData, markdownP
 	workflowData.StopTime = resolvedStopTime
 
 	if c.verbose && isRelativeStopTime(originalStopTime) {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Resolved relative stop-after to: "+resolvedStopTime))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Resolved relative stop-after to: "+resolvedStopTime))
 	} else if c.verbose && originalStopTime != resolvedStopTime {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Parsed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Parsed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
 	}
 	return nil
 }

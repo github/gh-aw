@@ -74,11 +74,11 @@ func renderSingleAuditDiffMarkdown(diff *AuditDiff) {
 // renderSingleAuditDiffPretty outputs a single audit diff as formatted console output to stderr
 func renderSingleAuditDiffPretty(diff *AuditDiff) {
 	auditDiffRenderLog.Printf("Rendering audit diff as pretty output: run1=%d, run2=%d", diff.Run1ID, diff.Run2ID)
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Audit Diff: Run #%d → Run #%d", diff.Run1ID, diff.Run2ID)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Audit Diff: Run #%d → Run #%d", diff.Run1ID, diff.Run2ID)))
 	fmt.Fprintln(os.Stderr)
 
 	if isEmptyAuditDiff(diff) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("No behavioral changes detected between the two runs."))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("No behavioral changes detected between the two runs."))
 		return
 	}
 
@@ -124,10 +124,10 @@ func renderSingleAuditDiffPretty(diff *AuditDiff) {
 	}
 
 	if len(summaryParts) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Changes: "+strings.Join(summaryParts, " | ")))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Changes: "+strings.Join(summaryParts, " | ")))
 	}
 	if anomalyCount > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("⚠️  %d anomalies detected", anomalyCount)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("%d anomalies detected", anomalyCount)))
 	}
 	fmt.Fprintln(os.Stderr)
 
@@ -310,11 +310,11 @@ func renderFirewallDiffPrettySection(diff *FirewallDiff) {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Firewall Changes"))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("Firewall Changes"))
 	fmt.Fprintln(os.Stderr)
 
 	if len(diff.NewDomains) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("New Domains (%d)", len(diff.NewDomains))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("New Domains (%d)", len(diff.NewDomains))))
 		config := console.TableConfig{
 			Headers: []string{"Domain", "Status", "Requests", "Anomaly"},
 			Rows:    make([][]string, 0, len(diff.NewDomains)),
@@ -329,11 +329,11 @@ func renderFirewallDiffPrettySection(diff *FirewallDiff) {
 				anomalyNote,
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 
 	if len(diff.RemovedDomains) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Removed Domains (%d)", len(diff.RemovedDomains))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Removed Domains (%d)", len(diff.RemovedDomains))))
 		config := console.TableConfig{
 			Headers: []string{"Domain", "Previous Status", "Previous Requests"},
 			Rows:    make([][]string, 0, len(diff.RemovedDomains)),
@@ -346,11 +346,11 @@ func renderFirewallDiffPrettySection(diff *FirewallDiff) {
 				strconv.Itoa(total),
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 
 	if len(diff.StatusChanges) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Status Changes (%d)", len(diff.StatusChanges))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Status Changes (%d)", len(diff.StatusChanges))))
 		config := console.TableConfig{
 			Headers: []string{"Domain", "Before", "After", "Anomaly"},
 			Rows:    make([][]string, 0, len(diff.StatusChanges)),
@@ -364,11 +364,11 @@ func renderFirewallDiffPrettySection(diff *FirewallDiff) {
 				anomalyNote,
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 
 	if len(diff.VolumeChanges) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Volume Changes"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Volume Changes"))
 		config := console.TableConfig{
 			Headers: []string{"Domain", "Requests (before)", "Requests (after)", "Change"},
 			Rows:    make([][]string, 0, len(diff.VolumeChanges)),
@@ -383,7 +383,7 @@ func renderFirewallDiffPrettySection(diff *FirewallDiff) {
 				entry.VolumeChange,
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 }
 
@@ -393,11 +393,11 @@ func renderMCPToolsDiffPrettySection(diff *MCPToolsDiff) {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader("MCP Tool Changes"))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("MCP Tool Changes"))
 	fmt.Fprintln(os.Stderr)
 
 	if len(diff.NewTools) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("New Tools (%d)", len(diff.NewTools))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("New Tools (%d)", len(diff.NewTools))))
 		config := console.TableConfig{
 			Headers: []string{"Server", "Tool", "Calls", "Anomaly"},
 			Rows:    make([][]string, 0, len(diff.NewTools)),
@@ -411,11 +411,11 @@ func renderMCPToolsDiffPrettySection(diff *MCPToolsDiff) {
 				anomalyNote,
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 
 	if len(diff.RemovedTools) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Removed Tools (%d)", len(diff.RemovedTools))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Removed Tools (%d)", len(diff.RemovedTools))))
 		config := console.TableConfig{
 			Headers: []string{"Server", "Tool", "Previous Calls"},
 			Rows:    make([][]string, 0, len(diff.RemovedTools)),
@@ -427,11 +427,11 @@ func renderMCPToolsDiffPrettySection(diff *MCPToolsDiff) {
 				strconv.Itoa(entry.Run1CallCount),
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 
 	if len(diff.ChangedTools) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Changed Tools (%d)", len(diff.ChangedTools))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Changed Tools (%d)", len(diff.ChangedTools))))
 		config := console.TableConfig{
 			Headers: []string{"Server", "Tool", "Calls (before)", "Calls (after)", "Change", "Errors (before)", "Errors (after)", "Anomaly"},
 			Rows:    make([][]string, 0, len(diff.ChangedTools)),
@@ -449,7 +449,7 @@ func renderMCPToolsDiffPrettySection(diff *MCPToolsDiff) {
 				anomalyNote,
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 }
 
@@ -459,7 +459,7 @@ func renderRunMetricsDiffPrettySection(run1ID, run2ID int64, diff *RunMetricsDif
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader(fmt.Sprintf("Run Metrics (Run #%d → Run #%d)", run1ID, run2ID)))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr(fmt.Sprintf("Run Metrics (Run #%d → Run #%d)", run1ID, run2ID)))
 	fmt.Fprintln(os.Stderr)
 
 	config := console.TableConfig{
@@ -509,7 +509,7 @@ func renderRunMetricsDiffPrettySection(run1ID, run2ID int64, diff *RunMetricsDif
 	}
 
 	if len(config.Rows) > 0 {
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 
 	if diff.TokenUsageDetails != nil {
@@ -535,7 +535,7 @@ func formatOptionalRebuildFactor(value *float64) string {
 
 // renderTokenUsageDiffPrettySection renders detailed token usage as a pretty console sub-section
 func renderTokenUsageDiffPrettySection(run1ID, run2ID int64, diff *TokenUsageDiff) {
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Token Usage Details"))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("Token Usage Details"))
 	fmt.Fprintln(os.Stderr)
 
 	config := console.TableConfig{
@@ -601,7 +601,7 @@ func renderTokenUsageDiffPrettySection(run1ID, run2ID int64, diff *TokenUsageDif
 	}
 
 	if len(config.Rows) > 0 {
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 }
 
@@ -629,7 +629,7 @@ func renderGitHubRateLimitDiffMarkdownSection(run1ID, run2ID int64, diff *GitHub
 
 // renderGitHubRateLimitDiffPrettySection renders the GitHub API rate limit diff as a pretty console sub-section
 func renderGitHubRateLimitDiffPrettySection(run1ID, run2ID int64, diff *GitHubRateLimitDiff) {
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader("🐙 GitHub API Usage"))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("🐙 GitHub API Usage"))
 	fmt.Fprintln(os.Stderr)
 
 	config := console.TableConfig{
@@ -671,7 +671,7 @@ func renderGitHubRateLimitDiffPrettySection(run1ID, run2ID int64, diff *GitHubRa
 	}
 
 	if len(config.Rows) > 0 {
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 }
 
@@ -682,7 +682,7 @@ func renderToolCallsDiffPrettySection(run1ID, run2ID int64, diff *ToolCallsDiff)
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Tool Call Breakdown"))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("Tool Call Breakdown"))
 	fmt.Fprintln(os.Stderr)
 
 	// All-tools overview table
@@ -703,7 +703,7 @@ func renderToolCallsDiffPrettySection(run1ID, run2ID int64, diff *ToolCallsDiff)
 				change,
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 
 	// Bash-specific breakdown
@@ -715,11 +715,11 @@ func renderToolCallsDiffPrettySection(run1ID, run2ID int64, diff *ToolCallsDiff)
 
 // renderBashCommandsDiffPrettySection renders the bash commands breakdown as a pretty console sub-section.
 func renderBashCommandsDiffPrettySection(run1ID, run2ID int64, diff *BashCommandsDiff) {
-	fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Bash Commands"))
+	fmt.Fprintln(os.Stderr, console.FormatSectionHeaderStderr("Bash Commands"))
 	fmt.Fprintln(os.Stderr)
 
 	// Summary line
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 		fmt.Sprintf("Total bash calls: Run #%d=%d, Run #%d=%d (%s)",
 			run1ID, diff.Run1TotalCalls,
 			run2ID, diff.Run2TotalCalls,
@@ -746,7 +746,7 @@ func renderBashCommandsDiffPrettySection(run1ID, run2ID int64, diff *BashCommand
 				formatMaxSizeCell(cmd.Run1MaxOutputSize, cmd.Run2MaxOutputSize),
 			})
 		}
-		fmt.Fprint(os.Stderr, console.RenderTable(config))
+		fmt.Fprint(os.Stderr, console.RenderTableStderr(config))
 	}
 }
 

@@ -103,7 +103,7 @@ func renderLogsCollectionStats(stats *logsCollectionStats) {
 	if stats == nil {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 		"Runs: %d discovered; reports: %d downloaded, %d skipped because cached analyses were reused",
 		stats.discoveredRuns.Load(), stats.downloadedReports.Load(), stats.cachedReports.Load(),
 	)))
@@ -173,7 +173,7 @@ func renderLogsDownloadStatsSummary(stats *logsCollectionStats, reports ...*GitH
 	if calls, ok := gitHubAPIRateLimitCostEstimate(reports); ok {
 		msg += fmt.Sprintf("; GitHub API cost estimate: ~%.1f requests/run", float64(calls)/float64(count))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(msg))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(msg))
 }
 
 type processWorkflowRunBatchOptions struct {
@@ -267,7 +267,7 @@ func resolveLogsArtifactFilter(artifactSets []string, verbose bool) ([]string, e
 	if len(artifactFilter) > 0 {
 		logsOrchestratorLog.Printf("Artifact filter active: %v", artifactFilter)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Artifact filter: downloading only "+strings.Join(artifactFilter, ", ")))
 		}
 	}
 	return artifactFilter, nil
@@ -286,7 +286,7 @@ func prepareLogsDownloadOutput(ctx context.Context, opts LogsDownloadOptions) er
 		return err
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Fetching workflow runs from GitHub Actions..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Fetching workflow runs from GitHub Actions..."))
 	}
 	return nil
 }
@@ -295,7 +295,7 @@ func ensureLogsGitignoreWithWarning(verbose bool) error {
 	if err := ensureLogsGitignore(); err != nil {
 		logsOrchestratorLog.Printf("Failed to ensure logs .gitignore: %v", err)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to ensure .github/aw/logs/.gitignore: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to ensure .github/aw/logs/.gitignore: %v", err)))
 		}
 	}
 	return nil
@@ -304,7 +304,7 @@ func ensureLogsGitignoreWithWarning(verbose bool) error {
 func checkLogsDownloadContext(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
 		return ctx.Err()
 	default:
 		return nil
@@ -324,14 +324,14 @@ func cleanupLogsOutputDir(opts LogsDownloadOptions) error {
 	if cleanErr != nil {
 		logsOrchestratorLog.Printf("Failed to clean up old run folders: %v", cleanErr)
 		if !opts.JSONOutput {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to clean up old run folders: %v", cleanErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to clean up old run folders: %v", cleanErr)))
 		}
 		return nil
 	}
 	if removed > 0 && !opts.JSONOutput {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Removed %d cached run folder(s) older than %s", removed, opts.After)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Removed %d cached run folder(s) older than %s", removed, opts.After)))
 	} else if removed == 0 && opts.Verbose && !opts.JSONOutput {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No cached run folders older than %s found", opts.After)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No cached run folders older than %s found", opts.After)))
 	}
 	return nil
 }
@@ -351,7 +351,7 @@ func buildLogsDownloadContext(ctx context.Context, timeoutMinutes, timeoutSecond
 	startTime := time.Now()
 	activeCtx, timeoutCancel := context.WithTimeout(ctx, timeoutDuration)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Timeout set to "+timeoutLabel))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Timeout set to "+timeoutLabel))
 	}
 	return activeCtx, timeoutCancel, startTime, timeoutDuration
 }
@@ -655,7 +655,7 @@ func shouldStopLogsIteration(runtime logsDownloadRuntime, opts LogsDownloadOptio
 	case <-runtime.activeCtx.Done():
 		if isDeadlineExceeded(runtime.activeCtx) {
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Timeout reached, stopping download"))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Timeout reached, stopping download"))
 			}
 			return true, true, nil
 		}
@@ -671,13 +671,13 @@ func shouldStopLogsIteration(runtime logsDownloadRuntime, opts LogsDownloadOptio
 		if opts.rateLimitState.isReached() {
 			return true, false, errLogsAPIRateLimitReached
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
 		return true, false, runtime.activeCtx.Err()
 	default:
 	}
 	if !runtime.startTime.IsZero() && runtime.timeoutDuration > 0 && time.Since(runtime.startTime) >= runtime.timeoutDuration {
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Timeout reached after %.1f seconds, stopping download", time.Since(runtime.startTime).Seconds())))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Timeout reached after %.1f seconds, stopping download", time.Since(runtime.startTime).Seconds())))
 		}
 		return true, true, nil
 	}
@@ -719,10 +719,10 @@ func logLogsIterationFetch(opts LogsDownloadOptions, fetchAllInRange bool, itera
 		return
 	}
 	if fetchAllInRange {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Iteration %d: Fetching more runs in date range...", iteration)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Iteration %d: Fetching more runs in date range...", iteration)))
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Iteration %d: Need %d more runs with artifacts, fetching more...", iteration, opts.Count-processedCount)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Iteration %d: Need %d more runs with artifacts, fetching more...", iteration, opts.Count-processedCount)))
 }
 
 func fetchWorkflowRunBatch(ctx context.Context, opts LogsDownloadOptions, beforeDate string, processedCount int, fetchAllInRange bool) (workflowRunBatch, error) {
@@ -775,26 +775,26 @@ func handleEmptyWorkflowRunBatch(batch workflowRunBatch, verbose bool) (string, 
 	}
 	if shouldStopPagination(batch.totalFetched, batch.batchSize) {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No more workflow runs found, stopping iteration"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No more workflow runs found, stopping iteration"))
 		}
 		return "", false, true
 	}
 	cursor, ok := selectPaginationCursorDate(nil, batch.oldestFetchedCreatedAt)
 	if !ok {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Workflow batch filtered to zero runs but no pagination cursor was found, stopping iteration"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Workflow batch filtered to zero runs but no pagination cursor was found, stopping iteration"))
 		}
 		return "", false, true
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Batch filtered to zero runs; advancing pagination cursor and continuing"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Batch filtered to zero runs; advancing pagination cursor and continuing"))
 	}
 	return cursor, true, false
 }
 
 func logWorkflowRunBatchFound(batch workflowRunBatch, iteration int, verbose bool) {
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d workflow runs in batch %d", len(batch.runs), iteration)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d workflow runs in batch %d", len(batch.runs), iteration)))
 	}
 }
 
@@ -892,7 +892,7 @@ func (c *orderedLogsRunCollector) recordResult(index int, result DownloadResult)
 	if index < 0 || index >= c.chunkSize {
 		message := fmt.Sprintf("Ordered run result index %d is out of range (chunk size %d); processing result without ordering guarantees.", index, c.chunkSize)
 		logsOrchestratorLog.Print(message)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(message))
 		c.opts.collectionStats.recordResult(result)
 		finalizeLogsRunDownload(c.opts.storageLimit, result)
 		closed := make(chan struct{})
@@ -951,7 +951,7 @@ func (c *orderedLogsRunCollector) appendAccepted(processedRuns []ProcessedRun, b
 		processedRuns = append(processedRuns, candidate)
 		batchProcessed++
 		if err := writer.Append(candidate); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()))
 		}
 	}
 	return processedRuns, batchProcessed
@@ -997,12 +997,12 @@ func finalizeLogsRunDownload(storageLimit *logsStorageLimit, result DownloadResu
 func shouldSkipProcessedWorkflowRun(result DownloadResult, verbose bool) bool {
 	if result.Skipped {
 		if verbose && result.Error != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping run %d: %v", result.Run.DatabaseID, result.Error)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping run %d: %v", result.Run.DatabaseID, result.Error)))
 		}
 		return true
 	}
 	if result.Error != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to download artifacts for run %d: %v", result.Run.DatabaseID, result.Error)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to download artifacts for run %d: %v", result.Run.DatabaseID, result.Error)))
 		return true
 	}
 	return false
@@ -1015,14 +1015,14 @@ func parseWorkflowRunArtifacts(result DownloadResult, processedRun ProcessedRun,
 	awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 	detectedEngine := extractEngineFromAwInfo(awInfoPath, verbose)
 	if err := parseAgentLog(result.LogsPath, detectedEngine, verbose); err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse log for run %d: %v", processedRun.Run.DatabaseID, err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse log for run %d: %v", processedRun.Run.DatabaseID, err)))
 	} else if logMdPath := filepath.Join(result.LogsPath, "log.md"); fileutil.FileExists(logMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Parsed log for run %d → %s", processedRun.Run.DatabaseID, logMdPath)))
 	}
 	if err := parseFirewallLogs(result.LogsPath, verbose); err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", processedRun.Run.DatabaseID, err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse firewall logs for run %d: %v", processedRun.Run.DatabaseID, err)))
 	} else if firewallMdPath := filepath.Join(result.LogsPath, "firewall.md"); fileutil.FileExists(firewallMdPath) {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Parsed firewall logs for run %d → %s", processedRun.Run.DatabaseID, firewallMdPath)))
 	}
 }
 
@@ -1031,10 +1031,10 @@ func logProcessedWorkflowRunBatch(opts LogsDownloadOptions, fetchAllInRange bool
 		return
 	}
 	if fetchAllInRange {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Processed %d runs with artifacts in batch %d (total: %d)", batchProcessed, iteration, processedCount)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Processed %d runs with artifacts in batch %d (total: %d)", batchProcessed, iteration, processedCount)))
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Processed %d runs with artifacts in batch %d (total: %d/%d)", batchProcessed, iteration, processedCount, opts.Count)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Processed %d runs with artifacts in batch %d (total: %d/%d)", batchProcessed, iteration, processedCount, opts.Count)))
 }
 
 func shouldStopAfterWorkflowRunBatch(batch workflowRunBatch, verbose bool) bool {
@@ -1042,7 +1042,7 @@ func shouldStopAfterWorkflowRunBatch(batch workflowRunBatch, verbose bool) bool 
 		return false
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Received fewer runs than requested, likely reached end of available runs"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Received fewer runs than requested, likely reached end of available runs"))
 	}
 	return true
 }
@@ -1052,23 +1052,23 @@ func logLogsIterationLimit(fetchAllInRange bool, iteration, processedCount, coun
 		return
 	}
 	if fetchAllInRange {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Reached maximum iterations (%d), collected %d runs with artifacts", MaxIterations, processedCount)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Reached maximum iterations (%d), collected %d runs with artifacts", MaxIterations, processedCount)))
 		return
 	}
 	if processedCount < count {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Reached maximum iterations (%d), collected %d runs with artifacts out of %d requested", MaxIterations, processedCount, count)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Reached maximum iterations (%d), collected %d runs with artifacts out of %d requested", MaxIterations, processedCount, count)))
 	}
 }
 
 func logLogsTimeoutResult(timeoutReached bool, processedCount int) {
 	if timeoutReached && processedCount > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Timeout reached, returning %d processed runs", processedCount)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Timeout reached, returning %d processed runs", processedCount)))
 	}
 }
 
 func logLogsStorageLimitResult(storageLimitReached bool, processedCount int) {
 	if storageLimitReached && processedCount > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Storage limit reached, returning %d processed runs", processedCount)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Storage limit reached, returning %d processed runs", processedCount)))
 	}
 }
 
@@ -1097,11 +1097,11 @@ func handleEmptyProcessedRuns(
 		}
 	}
 	if timeoutReached {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Timeout reached before any runs could be downloaded"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Timeout reached before any runs could be downloaded"))
 	} else if storageLimitReached {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Storage limit reached before any new runs could be downloaded"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Storage limit reached before any new runs could be downloaded"))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No workflow runs with artifacts found matching the specified criteria"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No workflow runs with artifacts found matching the specified criteria"))
 	}
 	return true, nil
 }
@@ -1111,7 +1111,7 @@ func limitProcessedRuns(processedRuns []ProcessedRun, count int, verbose bool) [
 		return processedRuns
 	}
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Limiting output to %d most recent runs (fetched %d total)", count, len(processedRuns))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Limiting output to %d most recent runs (fetched %d total)", count, len(processedRuns))))
 	}
 	return processedRuns[:count]
 }

@@ -92,7 +92,7 @@ func (c *Compiler) generateDependabotConfig(path string, ecosystems map[string]s
 
 	dependabotLog.Print("Successfully wrote dependabot.yml")
 	if c.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated .github/dependabot.yml"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Updated .github/dependabot.yml"))
 	}
 
 	// Track the created file

@@ -218,13 +218,13 @@ func (c *Compiler) generateGitHubMCPAppTokenMintingSteps(data *WorkflowData) []s
 			scope := convertStringToPermissionScope(key)
 			if scope == "" {
 				msg := fmt.Sprintf("Unknown permission scope %q in tools.github.github-app.permissions. Valid scopes include: members, organization-administration, team-discussions, organization-members, administration, etc.", key)
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(msg))
 				continue
 			}
 			level := strings.ToLower(strings.TrimSpace(val))
 			if level != string(PermissionRead) && level != string(PermissionNone) {
 				msg := fmt.Sprintf("Unknown permission level %q for scope %q in tools.github.github-app.permissions. Valid levels are: read, none.", val, key)
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(msg))
 				continue
 			}
 			permissions.Set(scope, PermissionLevel(level))

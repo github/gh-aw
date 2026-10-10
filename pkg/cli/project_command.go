@@ -145,7 +145,7 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	}
 
 	// Create project
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Creating project '%s' for %s %s...", config.Title, config.OwnerType, config.Owner)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Creating project '%s' for %s %s...", config.Title, config.OwnerType, config.Owner)))
 
 	project, err := createProject(ctx, ownerId, config.Title, config.Verbose)
 	if err != nil {
@@ -159,11 +159,11 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 
 	// Link to repository if specified
 	if config.Repo != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Linking project to repository %s...", config.Repo)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Linking project to repository %s...", config.Repo)))
 		if err := linkProjectToRepo(ctx, projectID, config.Repo, config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to link project to repository: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to link project to repository: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Project linked to repository"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Project linked to repository"))
 		}
 	}
 
@@ -180,33 +180,33 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	projectNumber := int(projectNumberFloat)
 
 	if config.WithProjectSetup {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating standard project views..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Creating standard project views..."))
 		if err := createStandardViews(ctx, projectURL, config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create views: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create views: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created standard views"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created standard views"))
 		}
 
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating custom fields..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Creating custom fields..."))
 		if err := createStandardFields(ctx, projectURL, projectNumber, config.Owner, config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create fields: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create fields: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created custom fields"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Created custom fields"))
 		}
 	}
 
 	if config.WithProjectSetup {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Enhancing Status field..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Enhancing Status field..."))
 		if err := ensureStatusOption(ctx, projectURL, "Review Required", config.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update Status field: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update Status field: %v", err)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Added 'Review Required' status option"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Added 'Review Required' status option"))
 		}
 	}
 
 	// Output success
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Created project #%v: %s", project["number"], config.Title)))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("  URL: %s", project["url"])))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Created project #%v: %s", project["number"], config.Title)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("  URL: %s", project["url"])))
 
 	return nil
 }

@@ -36,7 +36,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 	updateLog.Print("Starting action updates")
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checking for GitHub Actions updates..."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Checking for GitHub Actions updates..."))
 	}
 
 	// Load the action cache (actions-lock.json) using the shared ActionCache helpers
@@ -44,7 +44,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 	actionsLockPath := filepath.Join(".github", "aw", "actions-lock.json")
 	if _, err := os.Stat(actionsLockPath); os.IsNotExist(err) {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Actions lock file not found: "+actionsLockPath))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Actions lock file not found: "+actionsLockPath))
 		}
 		return nil // Not an error, just skip
 	}
@@ -87,7 +87,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		latestVersion, latestSHA, err := deps.getLatestRelease(ctx, entry.Repo, entry.Version, effectiveAllowMajor, verbose)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check %s: %v", entry.Repo, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to check %s: %v", entry.Repo, err)))
 			}
 			failedActions = append(failedActions, actionUpdateFailure{name: entry.Repo, err: err.Error()})
 			continue
@@ -105,12 +105,12 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 				cappedVersion := semverutil.EnsureVPrefix(cliVersion)
 				updateLog.Printf("Capping %s update to CLI version %s (latest available %s exceeds running CLI)", entry.Repo, cappedVersion, latestVersion)
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("%s: capping update target to CLI version %s (latest %s is newer than running CLI)", entry.Repo, cappedVersion, latestVersion)))
+					fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("%s: capping update target to CLI version %s (latest %s is newer than running CLI)", entry.Repo, cappedVersion, latestVersion)))
 				}
 				cappedSHA, shaErr := deps.getActionSHAForTag(ctx, gitutil.ExtractBaseRepo(entry.Repo), cappedVersion)
 				if shaErr != nil {
 					updateLog.Printf("Cannot resolve SHA for %s@%s (CLI version cap): %v; skipping update", entry.Repo, cappedVersion, shaErr)
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: cannot resolve SHA for CLI version %s: %v", entry.Repo, cappedVersion, shaErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s: cannot resolve SHA for CLI version %s: %v", entry.Repo, cappedVersion, shaErr)))
 					failedActions = append(failedActions, actionUpdateFailure{
 						name: entry.Repo,
 						err:  fmt.Sprintf("cannot resolve SHA for CLI version %s: %v", cappedVersion, shaErr),
@@ -134,7 +134,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 			if shaErr != nil {
 				skipErr := fmt.Sprintf("cannot refresh current tag %s: %v", entry.Version, shaErr)
 				updateLog.Printf("Skipping %s: %s", entry.Repo, skipErr)
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %s", entry.Repo, skipErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s: %s", entry.Repo, skipErr)))
 				failedActions = append(failedActions, actionUpdateFailure{name: entry.Repo, err: skipErr})
 				continue
 			}
@@ -146,7 +146,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		// Check if update is available
 		if latestVersion == entry.Version && latestSHA == entry.SHA {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("%s@%s is up to date", entry.Repo, entry.Version)))
+				fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("%s@%s is up to date", entry.Repo, entry.Version)))
 			}
 			skippedActions = append(skippedActions, entry.Repo)
 			continue
@@ -171,12 +171,12 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 				// Try to find an older release that has passed the cooldown period.
 				olderVersion, olderSHA, findErr := findCooledDownActionVersion(ctx, deps, entry.Repo, entry.Version, effectiveAllowMajor, verbose, coolDown, latestVersion)
 				if findErr != nil || olderVersion == "" || olderSHA == "" {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping release candidate %s@%s: %s", entry.Repo, latestVersion, coolDownResult.Message)))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Skipping release candidate %s@%s: %s", entry.Repo, latestVersion, coolDownResult.Message)))
 					skippedActions = append(skippedActions, entry.Repo)
 					continue
 				}
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Falling back to %s for %s (latest release candidate is still in cooldown)", olderVersion, entry.Repo)))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Falling back to %s for %s (latest release candidate is still in cooldown)", olderVersion, entry.Repo)))
 				}
 				// Use the older, cooled-down release instead.
 				latestVersion = olderVersion
@@ -186,7 +186,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		if latestSHA == "" {
 			skipErr := "could not resolve SHA for " + latestVersion
 			updateLog.Printf("Skipping update for %s: %s", entry.Repo, skipErr)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %s", entry.Repo, skipErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s: %s", entry.Repo, skipErr)))
 			failedActions = append(failedActions, actionUpdateFailure{
 				name: entry.Repo,
 				err:  skipErr,
@@ -208,10 +208,10 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		}
 		if refreshingCurrentVersion {
 			updateLog.Printf("Refreshing %s@%s SHA from %s to %s", entry.Repo, entry.Version, oldSHAStr, newSHAStr)
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Refreshed %s@%s SHA", entry.Repo, entry.Version)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Refreshed %s@%s SHA", entry.Repo, entry.Version)))
 		} else {
 			updateLog.Printf("Updating %s from %s (%s) to %s (%s)", entry.Repo, entry.Version, oldSHAStr, latestVersion, newSHAStr)
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %s from %s to %s", entry.Repo, entry.Version, latestVersion)))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Updated %s from %s to %s", entry.Repo, entry.Version, latestVersion)))
 		}
 
 		// Set the new entry first; ActionCache.Set handles inputs/description preservation.
@@ -219,7 +219,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		if !actionCache.Set(entry.Repo, latestVersion, latestSHA) {
 			skipErr := fmt.Sprintf("failed to write action cache entry for %s@%s (resolved SHA may be empty)", entry.Repo, latestVersion)
 			updateLog.Printf("Skipping update for %s: %s", entry.Repo, skipErr)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s: %s", entry.Repo, skipErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping %s: %s", entry.Repo, skipErr)))
 			failedActions = append(failedActions, actionUpdateFailure{
 				name: entry.Repo,
 				err:  skipErr,
@@ -239,20 +239,20 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 	fmt.Fprintln(os.Stderr, "")
 
 	if len(updatedActions) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %d action(s):", len(updatedActions))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Updated %d action(s):", len(updatedActions))))
 		for _, action := range updatedActions {
-			fmt.Fprintln(os.Stderr, console.FormatListItem(action))
+			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(action))
 		}
 		fmt.Fprintln(os.Stderr, "")
 	}
 
 	if len(skippedActions) > 0 && verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("%d action(s) already up to date", len(skippedActions))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("%d action(s) already up to date", len(skippedActions))))
 		fmt.Fprintln(os.Stderr, "")
 	}
 
 	if len(failedActions) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check %d action(s):", len(failedActions))))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to check %d action(s):", len(failedActions))))
 		for _, f := range failedActions {
 			fmt.Fprintf(os.Stderr, "  %s: %s\n", f.name, f.err)
 		}
@@ -267,7 +267,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		}
 
 		updateLog.Printf("Successfully wrote updated actions-lock.json with %d updates", len(updatedActions))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updated actions-lock.json file"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Updated actions-lock.json file"))
 	}
 
 	return nil

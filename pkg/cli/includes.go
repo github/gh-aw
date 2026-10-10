@@ -443,7 +443,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 				return fmt.Errorf("import path %q escapes repository root", importPath)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping import with unsafe path: %q", importPath)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping import with unsafe path: %q", importPath)))
 			}
 			continue
 		}
@@ -497,7 +497,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 				return fmt.Errorf("refusing to write import outside target directory: %q", importPath)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside target directory: %q", importPath)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Refusing to write import outside target directory: %q", importPath)))
 			}
 			continue
 		}
@@ -511,7 +511,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 			fileExists = true
 			if !opts.force {
 				if opts.verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Import file already exists, skipping: "+targetPath))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Import file already exists, skipping: "+targetPath))
 				}
 				// Read the existing file so we can recurse into its own imports.
 				// If the read fails, log it and skip — the compiler will report
@@ -543,7 +543,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 			}
 			remoteWorkflowLog.Printf("Failed to download import %s from %s/%s@%s: %v", remoteFilePath, opts.owner, opts.repo, opts.ref, err)
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch import %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch import %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
@@ -554,7 +554,7 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 				return fmt.Errorf("failed to create directory for import %s: %w", remoteFilePath, err)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for import %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to create directory for import %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
@@ -565,13 +565,13 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 				return fmt.Errorf("failed to write import %s: %w", remoteFilePath, err)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write import %s: %v", remoteFilePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to write import %s: %v", remoteFilePath, err)))
 			}
 			continue
 		}
 
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched import: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched import: "+targetPath))
 		}
 
 		// Track the file for git staging and potential rollback
@@ -650,7 +650,7 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 		if err != nil {
 			if isOptional {
 				if opts.verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Optional include not found: "+includePath))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Optional include not found: "+includePath))
 				}
 				continue
 			}
@@ -690,7 +690,7 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 			fileExists = true
 			if !opts.force {
 				if opts.verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Include file already exists, skipping: "+targetPath))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Include file already exists, skipping: "+targetPath))
 				}
 				continue
 			}
@@ -702,7 +702,7 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 		}
 
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched include: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Fetched include: "+targetPath))
 		}
 
 		// Track the file
@@ -720,7 +720,7 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 				return fmt.Errorf("failed to fetch nested includes from %s: %w", filePath, err)
 			}
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch nested includes from %s: %v", filePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch nested includes from %s: %v", filePath, err)))
 			}
 		}
 	}
@@ -759,7 +759,7 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 			return fmt.Errorf("failed to fetch include dependencies: %w", err)
 		}
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch include dependencies: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch include dependencies: %v", err)))
 		}
 	}
 	// Fetch and save frontmatter 'imports:' dependencies so they are available
@@ -771,7 +771,7 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 			return fmt.Errorf("failed to fetch frontmatter import dependencies: %w", err)
 		}
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch frontmatter import dependencies: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch frontmatter import dependencies: %v", err)))
 		}
 	}
 	// Fetch and save required runtime-import dependencies so installs include the
@@ -780,16 +780,16 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 		if strict {
 			return fmt.Errorf("failed to fetch runtime-import dependencies: %w", err)
 		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Failed to fetch runtime-import dependencies; activation may fail"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Failed to fetch runtime-import dependencies; activation may fail"))
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()))
 		}
 	}
 	// Fetch and save workflows referenced in safe-outputs.dispatch-workflow so they are
 	// available locally. Workflow names using GitHub Actions expression syntax are skipped.
 	if err := fetchAndSaveRemoteDispatchWorkflows(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch dispatch workflow dependencies: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch dispatch workflow dependencies: %v", err)))
 		}
 		return fmt.Errorf("failed to fetch dispatch workflow dependencies: %w", err)
 	}
@@ -797,7 +797,7 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 	// available locally. Workflow names using GitHub Actions expression syntax are skipped.
 	if err := fetchAndSaveRemoteCallWorkflows(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker dependencies: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch call-workflow worker dependencies: %v", err)))
 		}
 		return fmt.Errorf("failed to fetch call-workflow worker dependencies: %w", err)
 	}
@@ -805,7 +805,7 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 	// action files that should be present alongside this workflow).
 	if err := fetchAndSaveRemoteResources(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch resource dependencies: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to fetch resource dependencies: %v", err)))
 		}
 		return fmt.Errorf("failed to fetch resource dependencies: %w", err)
 	}

@@ -256,7 +256,7 @@ func (c *Compiler) validateMainWorkflowSchemaAndEventFilters(cleanPath string, f
 			return err
 		}
 		orchestratorFrontmatterLog.Printf("Push branch/tag scope warning (non-strict mode): %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(err.Error()))
 		c.IncrementWarningCount()
 	}
 

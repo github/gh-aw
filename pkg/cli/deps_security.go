@@ -58,7 +58,7 @@ func CheckSecurityAdvisories(ctx context.Context, verbose bool) ([]SecurityAdvis
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Reading go.mod from: "+goModPath))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Reading go.mod from: "+goModPath))
 	}
 
 	// Parse go.mod to get dependencies
@@ -88,7 +88,7 @@ func CheckSecurityAdvisories(ctx context.Context, verbose bool) ([]SecurityAdvis
 // DisplaySecurityAdvisories shows security advisories in a formatted output
 func DisplaySecurityAdvisories(advisories []SecurityAdvisory) {
 	if len(advisories) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✅ No known security vulnerabilities"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("No known security vulnerabilities"))
 		return
 	}
 
@@ -120,7 +120,7 @@ func DisplaySecurityAdvisories(advisories []SecurityAdvisory) {
 		if adv.Severity == "critical" || adv.Severity == "high" {
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(header))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(header))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(header))
 		}
 
 		fmt.Fprintf(os.Stderr, "    %s", adv.Summary)
@@ -204,7 +204,7 @@ func querySecurityAdvisories(ctx context.Context, depVersions map[string]string,
 					matchingAdvisories = append(matchingAdvisories, adv)
 
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(
+						fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(
 							fmt.Sprintf("Found advisory for %s: %s", vuln.Package.Name, apiAdv.GHSAID)))
 					}
 				}

@@ -136,7 +136,7 @@ func fetchWorkflowRunLogsArchive(ctx context.Context, runID int64, verbose bool,
 		// Also treat HTTP 410 Gone as non-critical (logs may be expired).
 		if errorutil.IsNotFoundError(err) || errorutil.IsNotFoundOutput(string(output)) || errorutil.IsGoneError(err) {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No logs found for run %d (may be expired or unavailable)", runID)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No logs found for run %d (may be expired or unavailable)", runID)))
 			}
 			return nil, false, nil
 		}
@@ -150,7 +150,7 @@ func downloadWorkflowRunLogs(ctx context.Context, runID int64, outputDir string,
 	logsDownloadLog.Printf("Downloading workflow run logs: run_id=%d, output_dir=%s, owner=%s, repo=%s", runID, outputDir, owner, repo)
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloading workflow run logs for run %d...", runID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Downloading workflow run logs for run %d...", runID)))
 	}
 
 	output, ok, err := fetchWorkflowRunLogsArchive(ctx, runID, verbose, owner, repo, hostname)
@@ -166,7 +166,7 @@ func downloadWorkflowRunLogs(ctx context.Context, runID int64, outputDir string,
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Downloaded and extracted workflow run logs to "+filepath.Join(outputDir, "workflow-logs")))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Downloaded and extracted workflow run logs to "+filepath.Join(outputDir, "workflow-logs")))
 	}
 
 	return nil
@@ -192,7 +192,7 @@ func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) er
 		return fmt.Errorf("failed to create run output directory: %w", err)
 	}
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Created output directory "+opts.outputDir))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Created output directory "+opts.outputDir))
 	}
 
 	downloadableNames, individualDownload, done, err := planArtifactDownload(ctx, opts, shouldLogProgress)
@@ -289,7 +289,7 @@ func finalizeArtifactDownload(ctx context.Context, opts downloadArtifactsOptions
 			// Log the error but don't fail the entire download process
 			// Logs may not be available for all runs (e.g., expired or deleted)
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to download workflow run logs: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to download workflow run logs: %v", err)))
 			}
 		}
 	}
@@ -317,7 +317,7 @@ func resolveCachedArtifacts(ctx context.Context, opts downloadArtifactsOptions, 
 		if len(missing) == 0 {
 			logsDownloadLog.Printf("All requested artifacts already on disk for run %d", opts.runID)
 			if shouldLogProgress {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("All requested artifacts already present for run %d, skipping download", opts.runID)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("All requested artifacts already present for run %d, skipping download", opts.runID)))
 			}
 			ensureUsageAwInfoFallback(ctx, opts)
 			return opts.artifactFilter, true
@@ -325,7 +325,7 @@ func resolveCachedArtifacts(ctx context.Context, opts downloadArtifactsOptions, 
 		// Restrict the download to only the artifacts that are not yet on disk.
 		logsDownloadLog.Printf("Downloading missing artifacts for run %d: %v (already have: %v)", opts.runID, missing, opts.artifactFilter)
 		if shouldLogProgress {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloading missing artifacts for run %d: %v", opts.runID, missing)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Downloading missing artifacts for run %d: %v", opts.runID, missing)))
 		}
 		// Fall through to the download code (MkdirAll is a no-op for existing dir).
 		return missing, false
@@ -337,12 +337,12 @@ func resolveCachedArtifacts(ctx context.Context, opts downloadArtifactsOptions, 
 	if len(findMissingFilterEntries([]string{string(ArtifactSetAll)}, opts.outputDir)) == 0 {
 		logsDownloadLog.Printf("Using cached artifacts for run %d", opts.runID)
 		if shouldLogProgress {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("All artifacts already present for run %d, skipping download", opts.runID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("All artifacts already present for run %d, skipping download", opts.runID)))
 		}
 		return opts.artifactFilter, true
 	}
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run folder for %d is missing the complete artifact marker; downloading all artifacts", opts.runID)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Run folder for %d is missing the complete artifact marker; downloading all artifacts", opts.runID)))
 	}
 	return opts.artifactFilter, false
 }
@@ -350,7 +350,7 @@ func resolveCachedArtifacts(ctx context.Context, opts downloadArtifactsOptions, 
 func downloadActivationAwInfoFallback(ctx context.Context, opts downloadArtifactsOptions) error {
 	logsDownloadLog.Printf("aw_info.json missing from info artifact, downloading activation artifact as fallback")
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("aw_info.json missing from info artifact; downloading activation artifact as fallback"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("aw_info.json missing from info artifact; downloading activation artifact as fallback"))
 	}
 
 	activationNames := resolveActivationArtifactNames(ctx, opts)
@@ -392,7 +392,7 @@ func enumerateDownloadableArtifacts(ctx context.Context, opts downloadArtifactsO
 		skipDockerBuildMessage := fmt.Sprintf("Skipping %d .dockerbuild artifact(s) (not valid zip archives): %s", len(dockerBuildArtifacts), strings.Join(dockerBuildArtifacts, ", "))
 		logsDownloadLog.Printf("Found %d .dockerbuild artifact(s) that will be skipped: %v", len(dockerBuildArtifacts), dockerBuildArtifacts)
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(skipDockerBuildMessage))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(skipDockerBuildMessage))
 		}
 	}
 	return downloadableNames, len(dockerBuildArtifacts), nil
@@ -407,7 +407,7 @@ func planIncrementalDownload(opts downloadArtifactsOptions, downloadableNames []
 		// so that future unfiltered requests benefit from the fast-path check above.
 		logsDownloadLog.Printf("All %d artifacts already present for run %d (incremental check)", len(downloadableNames), opts.runID)
 		if shouldLogProgress {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("All artifacts already present for run %d, skipping download", opts.runID)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("All artifacts already present for run %d, skipping download", opts.runID)))
 		}
 		if markerErr := markArtifactDownloaded(opts.outputDir, string(ArtifactSetAll)); markerErr != nil {
 			return nil, false, true, markerErr
@@ -419,7 +419,7 @@ func planIncrementalDownload(opts downloadArtifactsOptions, downloadableNames []
 		logsDownloadLog.Printf("Incremental download for run %d: %d/%d artifacts missing: %v",
 			opts.runID, len(missingNames), len(downloadableNames), missingNames)
 		if shouldLogProgress {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf(
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf(
 				"Incremental download for run %d: fetching %d missing artifact(s): %v",
 				opts.runID, len(missingNames), missingNames)))
 		}
@@ -476,12 +476,12 @@ func downloadWorkflowRunLogsForDiagnostics(ctx context.Context, opts downloadArt
 		return
 	}
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to download workflow run logs: %v", logErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to download workflow run logs: %v", logErr)))
 	}
 	// Clean up empty directory only if logs download also produced nothing
 	if fileutil.IsDirEmpty(opts.outputDir) {
 		if removeErr := os.RemoveAll(opts.outputDir); removeErr != nil && opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to clean up empty directory %s: %v", opts.outputDir, removeErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to clean up empty directory %s: %v", opts.outputDir, removeErr)))
 		}
 	}
 }
@@ -502,7 +502,7 @@ func bulkDownloadArtifacts(ctx context.Context, opts downloadArtifactsOptions, s
 	ghArgs := buildBulkDownloadArgs(opts)
 
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Executing: gh "+strings.Join(ghArgs, " ")))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Executing: gh "+strings.Join(ghArgs, " ")))
 	}
 
 	cmd := workflow.ExecGHContext(ctx, ghArgs...)
@@ -521,7 +521,7 @@ func bulkDownloadArtifacts(ctx context.Context, opts downloadArtifactsOptions, s
 			spinner.Stop()
 		}
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(string(output)))
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(string(output)))
 		}
 
 		skippedNonZipArtifacts, skippedCaseCollisionArtifacts, err = classifyBulkDownloadError(ctx, opts, output, err)
@@ -583,7 +583,7 @@ func classifyBulkDownloadError(ctx context.Context, opts downloadArtifactsOption
 	// Check if it's because there are no artifacts
 	if strings.Contains(string(output), "no valid artifacts") || strings.Contains(string(output), "not found") {
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No artifacts found for run %d (gh run download reported none)", opts.runID)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No artifacts found for run %d (gh run download reported none)", opts.runID)))
 		}
 		// Even with no artifacts, attempt to download workflow run logs so that
 		// pre-agent step failures (e.g., activation job errors) can be diagnosed.
@@ -600,11 +600,11 @@ func classifyBulkDownloadError(ctx context.Context, opts downloadArtifactsOption
 	if isNonZipArtifactError(output) {
 		// Show a concise warning; preserve legacy behavior of 200 chars + "...".
 		msg := stringutil.Truncate(string(output), 203)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Some artifacts could not be extracted (not a valid zip archive) and were skipped: "+msg))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Some artifacts could not be extracted (not a valid zip archive) and were skipped: "+msg))
 		return true, false, nil
 	}
 	if isCaseCollisionArtifactError(output) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Some artifacts could not be fully extracted due to case-colliding file paths. Retrying artifacts individually and continuing."))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Some artifacts could not be fully extracted due to case-colliding file paths. Retrying artifacts individually and continuing."))
 		return false, true, nil
 	}
 	return false, false, fmt.Errorf("failed to download artifacts for run %d: %w (output: %s)", opts.runID, err, string(output))
@@ -652,7 +652,7 @@ func ensureUsageAwInfoFallback(ctx context.Context, opts downloadArtifactsOption
 
 	logsDownloadLog.Printf("aw_info.json missing from usage artifact, downloading activation artifact as fallback")
 	if opts.verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("aw_info.json missing from usage artifact; downloading activation artifact as fallback"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("aw_info.json missing from usage artifact; downloading activation artifact as fallback"))
 	}
 
 	activationNames := resolveActivationArtifactNames(ctx, opts)
@@ -660,14 +660,14 @@ func ensureUsageAwInfoFallback(ctx context.Context, opts downloadArtifactsOption
 	if err := downloadArtifactsByName(ctx, opts, activationNames); err != nil {
 		logsDownloadLog.Printf("Activation artifact fallback download failed: %v", err)
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not download activation artifact fallback: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not download activation artifact fallback: %v", err)))
 		}
 	}
 	flattenActivationFallback(opts, activationNames)
 	if _, err := os.Stat(awInfoPath); os.IsNotExist(err) {
 		logsDownloadLog.Print("aw_info.json still absent after activation artifact fallback")
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("aw_info.json still absent after activation artifact fallback"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("aw_info.json still absent after activation artifact fallback"))
 		}
 	}
 }
@@ -728,7 +728,7 @@ func flattenActivationFallback(opts downloadArtifactsOptions, activationNames []
 		if err := flattenActivationArtifact(opts.outputDir, opts.verbose); err != nil {
 			logsDownloadLog.Printf("Failed to flatten fallback activation artifact: %v", err)
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to flatten activation artifact fallback: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to flatten activation artifact fallback: %v", err)))
 			}
 		}
 		return

@@ -92,7 +92,7 @@ func RunListDomains(jsonOutput bool) error {
 			fmt.Fprintln(os.Stdout, "[]")
 			return nil
 		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow files found."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No workflow files found."))
 		return nil
 	}
 
@@ -123,11 +123,11 @@ func RunListDomains(jsonOutput bool) error {
 	}
 
 	if len(summaries) == 1 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Found 1 workflow"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Found 1 workflow"))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Found %d workflows", len(summaries))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Found %d workflows", len(summaries))))
 	}
-	fmt.Fprint(os.Stderr, console.RenderStruct(summaries))
+	fmt.Fprint(os.Stderr, console.RenderStructStderr(summaries))
 
 	return nil
 }
@@ -163,14 +163,14 @@ func RunWorkflowDomains(workflowArg string, jsonOutput bool) error {
 	}
 
 	// Console output: show domain items grouped by allowed/blocked
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(
 		fmt.Sprintf("Network domains for %s (engine: %s)", name, engineID),
 	))
 
 	items := buildDomainItems(allowedDomains, blockedDomains)
 
 	if len(items) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No domains configured."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No domains configured."))
 		return nil
 	}
 
@@ -186,7 +186,7 @@ func RunWorkflowDomains(workflowArg string, jsonOutput bool) error {
 		Headers: headers,
 		Rows:    rows,
 	}
-	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
+	fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
 
 	fmt.Fprintf(os.Stderr, "\n%d allowed, %d blocked\n", len(allowedDomains), len(blockedDomains))
 

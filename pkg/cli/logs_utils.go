@@ -33,7 +33,7 @@ func getAgenticWorkflowNames(verbose bool) ([]string, error) {
 	workflowsDir := constants.GetWorkflowDir()
 	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No .github/workflows directory found"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No .github/workflows directory found"))
 		}
 		return workflowNames, nil
 	}
@@ -47,13 +47,13 @@ func getAgenticWorkflowNames(verbose bool) ([]string, error) {
 
 	for _, file := range files {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Reading workflow file: "+file))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Reading workflow file: "+file))
 		}
 
 		content, err := os.ReadFile(file)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read %s: %v", file, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to read %s: %v", file, err)))
 			}
 			continue
 		}
@@ -73,7 +73,7 @@ func getAgenticWorkflowNames(verbose bool) ([]string, error) {
 						workflowNames = append(workflowNames, name)
 						logsUtilsLog.Printf("Discovered workflow name: %s (from %s)", name, file)
 						if verbose {
-							fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found agentic workflow: "+name))
+							fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found agentic workflow: "+name))
 						}
 						break
 					}
@@ -83,7 +83,7 @@ func getAgenticWorkflowNames(verbose bool) ([]string, error) {
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d agentic workflows", len(workflowNames))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d agentic workflows", len(workflowNames))))
 	}
 
 	return workflowNames, nil
@@ -107,7 +107,7 @@ func findAgentOutputFile(logDir string) (string, bool) {
 		}
 		return nil
 	}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
 	}
 	if foundPath == "" {
 		return "", false
@@ -149,7 +149,7 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 				}
 				return nil
 			}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", agentOutputDir, walkErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", agentOutputDir, walkErr)))
 			}
 			if foundFile != "" {
 				return foundFile, true
@@ -197,7 +197,7 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 					}
 					return nil
 				}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", flattenedPath, walkErr)))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", flattenedPath, walkErr)))
 				}
 				if foundEventsJsonl != "" {
 					return foundEventsJsonl, true
@@ -225,7 +225,7 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 				}
 				return nil
 			}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
 			}
 			if foundByBase != "" {
 				logsUtilsLog.Printf("Found engine log file by base name: %s", foundByBase)
@@ -259,7 +259,7 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 			}
 			return nil
 		}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
 		}
 		if foundEventsJsonl != "" {
 			return foundEventsJsonl, true
@@ -291,7 +291,7 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 		}
 		return nil
 	}); walkErr != nil && !errors.Is(walkErr, errWalkStop) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("filesystem error walking %s: %v", logDir, walkErr)))
 	}
 	if foundPath != "" {
 		return foundPath, true

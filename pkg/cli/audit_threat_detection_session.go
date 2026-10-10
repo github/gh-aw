@@ -69,14 +69,14 @@ func parseUnifiedDetectionResult(input io.Reader) (*unifiedDetectionResult, erro
 	for lineNumber := 1; ; lineNumber++ {
 		line, oversized, readErr := readUnifiedSessionLine(reader)
 		if oversized {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping oversized unified session record on line %d", lineNumber)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping oversized unified session record on line %d", lineNumber)))
 		} else if line = bytes.TrimSpace(line); len(line) > 0 {
 			var event unifiedDetectionEvent
 			if err := json.Unmarshal(line, &event); err != nil {
 				if !headerSeen {
 					return nil, fmt.Errorf("invalid unified session header on line %d", lineNumber)
 				}
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping malformed unified session event on line %d", lineNumber)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping malformed unified session event on line %d", lineNumber)))
 			} else if !headerSeen {
 				if err := validateUnifiedDetectionHeader(event); err != nil {
 					return nil, err
@@ -150,7 +150,7 @@ func unifiedDetectionEventResult(event unifiedDetectionEvent, lineNumber int) (*
 	}
 	var result unifiedDetectionResult
 	if !bytes.HasPrefix(bytes.TrimSpace(event.Data), []byte("{")) || json.Unmarshal(event.Data, &result) != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping malformed unified detection result on line %d", lineNumber)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Skipping malformed unified detection result on line %d", lineNumber)))
 		return nil, nil
 	}
 	return &result, nil
@@ -166,7 +166,7 @@ type threatDetectionEvidence struct {
 func readThreatDetectionEvidence(runDir string) threatDetectionEvidence {
 	unified, err := readUnifiedDetectionResult(runDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse unified threat detection results: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to parse unified threat detection results: %v", err)))
 	}
 	var evidence threatDetectionEvidence
 	if unified != nil {

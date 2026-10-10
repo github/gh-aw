@@ -351,7 +351,7 @@ func analyzeFirewallLogs(runDir string, verbose bool) (*FirewallAnalysis, error)
 		if fileutil.DirExists(squidSubDir) {
 			firewallLogLog.Printf("Found firewall logs directory: sandbox/firewall/logs/squid-logs")
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found firewall logs directory: sandbox/firewall/logs/squid-logs"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found firewall logs directory: sandbox/firewall/logs/squid-logs"))
 			}
 			analysis, err := analyzeMultipleFirewallLogs(squidSubDir, verbose)
 			if err != nil {
@@ -364,7 +364,7 @@ func analyzeFirewallLogs(runDir string, verbose bool) (*FirewallAnalysis, error)
 		// Fall back to direct *.log files at the sandbox/firewall/logs/ level (older AWF layout).
 		firewallLogLog.Printf("Found firewall logs directory: sandbox/firewall/logs")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found firewall logs directory: sandbox/firewall/logs"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found firewall logs directory: sandbox/firewall/logs"))
 		}
 		return analyzeMultipleFirewallLogs(sandboxFirewallLogsDir, verbose)
 	}
@@ -389,7 +389,7 @@ func analyzeFirewallLogs(runDir string, verbose bool) (*FirewallAnalysis, error)
 			logsDir := filepath.Join(runDir, name)
 			firewallLogLog.Printf("Found firewall logs directory: %s", name)
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found firewall logs directory: "+name))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Found firewall logs directory: "+name))
 			}
 			return analyzeMultipleFirewallLogs(logsDir, verbose)
 		}
@@ -411,7 +411,7 @@ func analyzeFirewallLogs(runDir string, verbose bool) (*FirewallAnalysis, error)
 	if len(firewallLogs) == 0 {
 		firewallLogLog.Print("No firewall logs found")
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No firewall logs found in "+runDir))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("No firewall logs found in "+runDir))
 		}
 		return nil, nil
 	}
@@ -419,7 +419,7 @@ func analyzeFirewallLogs(runDir string, verbose bool) (*FirewallAnalysis, error)
 	// Parse the first firewall log file found
 	firewallLogLog.Printf("Found %d firewall log files, analyzing first: %s", len(firewallLogs), filepath.Base(firewallLogs[0]))
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Analyzing firewall log: "+filepath.Base(firewallLogs[0])))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Analyzing firewall log: "+filepath.Base(firewallLogs[0])))
 	}
 
 	return parseFirewallLog(firewallLogs[0], verbose)
@@ -494,7 +494,7 @@ func extractFirewallFromAgentLog(logsPath string, verbose bool) *FirewallAnalysi
 
 	firewallLogLog.Printf("Extracted %d firewall-blocked domain(s) from agent-stdio.log: %s", len(blockedDomains), strings.Join(blockedDomains, ", "))
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
 			"Found %d firewall-blocked domain(s) in agent log: %s",
 			len(blockedDomains), strings.Join(blockedDomains, ", "),
 		)))

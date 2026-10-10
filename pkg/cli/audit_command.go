@@ -178,7 +178,7 @@ func resolveAuditCommandArgs(args []string, stdin bool) ([]string, bool, error) 
 			return nil, false, fmt.Errorf("failed to read run IDs from stdin: %w", err)
 		}
 		if len(stdinURLs) == 0 {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No run IDs or URLs provided on stdin"))
 			return nil, true, nil
 		}
 		auditCommandLog.Printf("Read %d run ID(s)/URL(s) from stdin", len(stdinURLs))

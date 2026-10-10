@@ -20,7 +20,7 @@ func listAvailableServers(ctx context.Context, registryURL string, verbose bool)
 
 	// Search for all servers (empty query)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Fetching available MCP servers from registry: "+registryClient.registryURL))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Fetching available MCP servers from registry: "+registryClient.registryURL))
 	}
 
 	servers, err := registryClient.SearchServers(ctx, "")
@@ -32,15 +32,15 @@ func listAvailableServers(ctx context.Context, registryURL string, verbose bool)
 	mcpRegistryListLog.Printf("Retrieved %d servers from registry", len(servers))
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Retrieved %d servers from registry", len(servers))))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("Retrieved %d servers from registry", len(servers))))
 		if len(servers) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("First server example - Name: '%s', Description: '%s'",
+			fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr(fmt.Sprintf("First server example - Name: '%s', Description: '%s'",
 				servers[0].Name, servers[0].Description)))
 		}
 	}
 
 	if len(servers) == 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No MCP servers found in the registry"))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("No MCP servers found in the registry"))
 		return nil
 	}
 
@@ -76,8 +76,8 @@ func listAvailableServers(ctx context.Context, registryURL string, verbose bool)
 		TotalRow:  []string{fmt.Sprintf("Total: %d servers", len(servers)), ""},
 	}
 
-	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Usage: gh aw mcp add <workflow-file> <server-name>"))
+	fmt.Fprint(os.Stderr, console.RenderTableStderr(tableConfig))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Usage: gh aw mcp add <workflow-file> <server-name>"))
 
 	return nil
 }

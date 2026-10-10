@@ -72,11 +72,11 @@ func runBootstrapGitHubAppAction(ctx context.Context, repo string, action reposi
 	if err := bootstrapUpsertVariable(ctx, repo, action.AppIDVariable, createdApp.ClientID); err != nil {
 		return nil, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Set repository variable "+action.AppIDVariable))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Set repository variable "+action.AppIDVariable))
 	if err := bootstrapSetSecret(ctx, repo, action.PrivateKeySecret, createdApp.PEM); err != nil {
 		return nil, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Set repository secret "+action.PrivateKeySecret))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Set repository secret "+action.PrivateKeySecret))
 	if createdApp.InstallURL != "" {
 		if err := waitForBootstrapGitHubAppInstallation(ctx, repo, createdApp); err != nil {
 			return nil, err
@@ -101,11 +101,11 @@ func handleBootstrapGitHubAppExistingFlow(ctx context.Context, repo string, acti
 	if err := bootstrapUpsertVariable(ctx, repo, action.AppIDVariable, resolvedClientID); err != nil {
 		return false, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Set repository variable "+action.AppIDVariable))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Set repository variable "+action.AppIDVariable))
 	if err := bootstrapSetSecret(ctx, repo, action.PrivateKeySecret, resolvedPrivateKey); err != nil {
 		return false, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Set repository secret "+action.PrivateKeySecret))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Set repository secret "+action.PrivateKeySecret))
 	return true, nil
 }
 
@@ -137,7 +137,7 @@ func handleBootstrapGitHubAppCreateOrExistingChoice(ctx context.Context, repo st
 	if err := bootstrapSetSecret(ctx, repo, action.PrivateKeySecret, resolvedPrivateKey); err != nil {
 		return false, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Configured existing GitHub App credentials"))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Configured existing GitHub App credentials"))
 	return true, nil
 }
 
@@ -232,7 +232,7 @@ func createBootstrapGitHubApp(ctx context.Context, repo, owner, repoName, ownerT
 	openURL := fmt.Sprintf("http://%s/register", listener.Addr().String())
 	opened := overrides.OpenBrowser && openBootstrapBrowser(openURL)
 	if !opened {
-		fmt.Fprintln(os.Stderr, console.FormatCommandMessage(openURL))
+		fmt.Fprintln(os.Stderr, console.FormatCommandMessageStderr(openURL))
 	}
 
 	timeout := time.NewTimer(bootstrapProfileManifestTimeout)
@@ -410,7 +410,7 @@ func waitForBootstrapGitHubAppInstallation(ctx context.Context, repo string, cre
 	for {
 		installed, err := bootstrapGitHubAppInstalled(ctx, repo, createdApp)
 		if err == nil && installed {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub App installation detected for "+repo))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("GitHub App installation detected for "+repo))
 			return nil
 		}
 		if err != nil {

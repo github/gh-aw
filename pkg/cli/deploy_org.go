@@ -38,9 +38,9 @@ func runDeployForOrg(ctx context.Context, org string, repoGlobs []string, workfl
 func renderOrgDeployReport(results []orgRepoPreview, applying bool) {
 	deployOrgLog.Printf("Rendering deploy report: repos=%d, applying=%v", len(results), applying)
 	if applying {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Repositories selected for deploy (%d):", len(results))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Repositories selected for deploy (%d):", len(results))))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dry-run preview of deploy pull requests:"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Dry-run preview of deploy pull requests:"))
 	}
 	for _, result := range results {
 		fmt.Fprintf(os.Stderr, "- %s\n", result.Repo)

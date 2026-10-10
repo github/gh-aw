@@ -22,11 +22,11 @@ func reportAddWorkflowStart(workflowSpec *WorkflowSpec, sourceContent []byte, op
 	if !opts.Verbose {
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Adding workflow: "+workflowSpec.String()))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Adding workflow: "+workflowSpec.String()))
 	if opts.Force {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Force flag enabled: will overwrite existing files"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Force flag enabled: will overwrite existing files"))
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Using pre-fetched workflow content (%d bytes)", len(sourceContent))))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Using pre-fetched workflow content (%d bytes)", len(sourceContent))))
 }
 
 func validateWorkflowDestination(githubWorkflowsDir, workflowName, sourceRepo string, opts AddOptions) (bool, error) {
@@ -38,13 +38,13 @@ func validateWorkflowDestination(githubWorkflowsDir, workflowName, sourceRepo st
 		existingSourceRepo := readSourceRepoFromFile(existingFile)
 		if existingSourceRepo == sourceRepo {
 			addLog.Printf("Destination %s already exists from same source repo %s, skipping", existingFile, sourceRepo)
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Workflow from same source already exists, skipping: "+existingFile))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Workflow from same source already exists, skipping: "+existingFile))
 			return true, nil
 		}
 	}
 	if opts.FromWildcard {
 		addLog.Printf("Destination %s already exists, skipping due to wildcard add", existingFile)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Workflow '%s' already exists in .github/workflows/. Skipping.", workflowName)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Workflow '%s' already exists in .github/workflows/. Skipping.", workflowName)))
 		return true, nil
 	}
 	addLog.Printf("Destination %s already exists and force/wildcard not set, rejecting", existingFile)
@@ -105,12 +105,12 @@ func validateWorkflowSecurity(resolved *ResolvedWorkflow, opts AddOptions) error
 			return fmt.Errorf("file '%s' failed security scan: %d issue(s) detected", resolved.Spec.WorkflowPath, len(findings))
 		}
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Security scan passed"))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Security scan passed"))
 		}
 	} else {
 		addLog.Print("Security scanning disabled for this add")
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Security scanning disabled"))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Security scanning disabled"))
 		}
 	}
 	return nil
@@ -155,10 +155,10 @@ func fetchWorkflowDependencies(ctx context.Context, workflowSpec *WorkflowSpec, 
 	sourceDir := filepath.Dir(workflowSpec.WorkflowPath)
 	includeDeps, err := collectLocalIncludeDependencies(string(sourceContent), sourceDir, opts.Verbose)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to collect include dependencies: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to collect include dependencies: %v", err)))
 	}
 	if err := copyIncludeDependenciesFromPackageWithForce(includeDeps, githubWorkflowsDir, opts.Verbose, opts.Force, tracker); err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to copy include dependencies: %v", err)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to copy include dependencies: %v", err)))
 	}
 	return nil
 }
@@ -211,12 +211,12 @@ func applyEngineAndPermissionModifications(content string, opts AddOptions) (str
 		updatedContent, err := addEngineToWorkflow(content, opts.EngineOverride)
 		if err != nil {
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to set engine field: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to set engine field: %v", err)))
 			}
 		} else {
 			content = updatedContent
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Set engine field to: "+opts.EngineOverride))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Set engine field to: "+opts.EngineOverride))
 			}
 		}
 	}
@@ -229,22 +229,22 @@ func applyEngineAndPermissionModifications(content string, opts AddOptions) (str
 		if err != nil {
 			// Always warn: user explicitly chose copilot-requests auth; a silent failure
 			// means the deployed workflow will lack the required permission.
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to add copilot-requests permission: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to add copilot-requests permission: %v", err)))
 		} else {
 			content = updatedContent
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Added permissions.copilot-requests: write to workflow"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Added permissions.copilot-requests: write to workflow"))
 			}
 		}
 	}
 	if opts.AddCopilotRequestsNonePermission && isCopilotWorkflowContent(content) {
 		updatedContent, err := addCopilotRequestsNonePermissionToContent(content)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to disable copilot-requests permission: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to disable copilot-requests permission: %v", err)))
 		} else {
 			content = updatedContent
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Added permissions.copilot-requests: none to workflow"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Added permissions.copilot-requests: none to workflow"))
 			}
 		}
 	}
@@ -262,7 +262,7 @@ func applySourceAndIncludeModifications(content string, workflowSpec *WorkflowSp
 		updatedContent, err := addSourceToWorkflow(content, sourceString)
 		if err != nil {
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to add source field: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to add source field: %v", err)))
 			}
 		} else {
 			content = updatedContent
@@ -288,7 +288,7 @@ func applySourceAndIncludeModifications(content string, workflowSpec *WorkflowSp
 	processedContent, err := processIncludesWithWorkflowSpec(content, workflowSpec, commitSHA, includeSourceDir, githubWorkflowsDir, opts.Verbose)
 	if err != nil {
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to process includes: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to process includes: %v", err)))
 		}
 		return content, nil
 	}
@@ -301,12 +301,12 @@ func applyStopAfterModifications(content string, opts AddOptions) (string, error
 		cleanedContent, err := RemoveFieldFromOnTrigger(content, "stop-after")
 		if err != nil {
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to remove stop-after field: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to remove stop-after field: %v", err)))
 			}
 			return content, nil
 		}
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed stop-after field from workflow"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Removed stop-after field from workflow"))
 		}
 		return cleanedContent, nil
 	}
@@ -317,12 +317,12 @@ func applyStopAfterModifications(content string, opts AddOptions) (string, error
 	updatedContent, err := SetFieldInOnTrigger(content, "stop-after", opts.StopAfter)
 	if err != nil {
 		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to set stop-after field: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to set stop-after field: %v", err)))
 		}
 		return content, nil
 	}
 	if opts.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Set stop-after field to: "+opts.StopAfter))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Set stop-after field to: "+opts.StopAfter))
 	}
 	return updatedContent, nil
 }
@@ -347,11 +347,11 @@ func trackAndWriteWorkflowFile(destFile string, content string, fileExists bool,
 	}
 	addLog.Printf("Wrote workflow file %s (%d bytes, existed=%t)", destFile, len(writtenContent), fileExists)
 	if !opts.Quiet {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added workflow: "+filepath.Base(destFile)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Added workflow: "+filepath.Base(destFile)))
 		if opts.Verbose {
 			if description := ExtractWorkflowDescription(string(writtenContent)); description != "" {
 				fmt.Fprintln(os.Stderr, "")
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(description))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(description))
 				fmt.Fprintln(os.Stderr, "")
 			}
 		}

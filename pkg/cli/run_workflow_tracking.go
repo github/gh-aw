@@ -129,7 +129,7 @@ func getLatestWorkflowRunWithRetry(lockFileName string, repo string, verbose boo
 			if parsedTime, err := time.Parse(time.RFC3339, run.CreatedAt); err == nil {
 				createdAt = parsedTime
 			} else if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not parse creation time '%s': %v", run.CreatedAt, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not parse creation time '%s': %v", run.CreatedAt, err)))
 			}
 		}
 

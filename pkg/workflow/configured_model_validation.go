@@ -31,7 +31,7 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 		"Codex with model %q may fail because Codex relies on capabilities that general-purpose Copilot models do not provide. Select a supported Codex model such as copilot/gpt-6.1-sol",
 		data.Model,
 	)
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 		formatCompilerMessage(markdownPath, "warning", message)))
 	c.IncrementWarningCount()
 }
@@ -54,7 +54,7 @@ func (c *Compiler) warnUnknownConfiguredModels(data *WorkflowData, markdownPath 
 		return
 	}
 	for _, warning := range c.configuredModelValidator(data) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 			formatCompilerMessage(markdownPath, "warning", warning)))
 		c.IncrementWarningCount()
 	}

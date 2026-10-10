@@ -122,12 +122,12 @@ func runRunnerGuardOnDirectory(workflowDir string, verbose bool, strict bool) er
 	cmd := exec.Command(dockerPath, dockerArgs...)
 
 	// Always show that runner-guard is running (regular verbosity)
-	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running runner-guard taint analysis scanner"))
+	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Running runner-guard taint analysis scanner"))
 
 	// In verbose mode, also show the command that users can run directly
 	if verbose {
 		dockerCmd := shellJoinArgs(append([]string{"docker"}, dockerArgs...))
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Run runner-guard directly: "+dockerCmd))
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr("Run runner-guard directly: "+dockerCmd))
 	}
 
 	// Capture output
@@ -246,7 +246,7 @@ func parseAndDisplayRunnerGuardOutput(stdout string, verbose bool, gitRoot strin
 
 	// Display score/grade if present
 	if output.Score > 0 || output.Grade != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessageStderr(
 			fmt.Sprintf("Runner-Guard Score: %d/100 (Grade: %s)", output.Score, output.Grade),
 		))
 	}

@@ -47,7 +47,7 @@ func AddResolvedWorkflows(ctx context.Context, workflowStrings []string, resolve
 	result := &AddWorkflowsResult{}
 
 	for _, warning := range resolved.Warnings {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
 	}
 
 	// If creating a PR, check prerequisites
@@ -135,25 +135,25 @@ func addWorkflowsWithTracking(ctx context.Context, workflows []*ResolvedWorkflow
 		if updated, err := ensureGitAttributes(); err != nil {
 			addLog.Printf("Failed to configure .gitattributes: %v", err)
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update .gitattributes: %v", err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to update .gitattributes: %v", err)))
 			}
 			// Don't fail the entire operation if gitattributes update fails
 		} else if updated {
 			trackGitAttributesIfCreated(tracker, gitAttributesPath, gitAttributesExisted, updated)
 			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Configured .gitattributes"))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Configured .gitattributes"))
 			}
 		}
 	}
 
 	if !opts.Quiet && len(workflows) > 1 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Adding %d workflow(s)...", len(workflows))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Adding %d workflow(s)...", len(workflows))))
 	}
 
 	// Add each workflow using pre-fetched content
 	for i, resolved := range workflows {
 		if !opts.Quiet && len(workflows) > 1 {
-			fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Adding workflow %d/%d: %s", i+1, len(workflows), resolved.Spec.WorkflowName)))
+			fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Adding workflow %d/%d: %s", i+1, len(workflows), resolved.Spec.WorkflowName)))
 		}
 
 		if err := addWorkflowWithTracking(ctx, resolved, tracker, opts); err != nil {
@@ -176,7 +176,7 @@ func addWorkflowsWithTracking(ctx context.Context, workflows []*ResolvedWorkflow
 	}
 
 	if !opts.Quiet && len(workflows) > 1 {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully added all %d workflows", len(workflows))))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Successfully added all %d workflows", len(workflows))))
 	}
 
 	return nil
@@ -225,7 +225,7 @@ func addWorkflowWithTracking(ctx context.Context, resolved *ResolvedWorkflow, tr
 	destFile := filepath.Join(githubWorkflowsDir, workflowName+".md")
 	fileExists := fileutil.FileExists(destFile)
 	if fileExists && !opts.showInteractiveProgress() {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Overwriting existing file: "+destFile))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Overwriting existing file: "+destFile))
 	}
 	stopProgress := startAddInteractiveProgress(opts, "Preparing workflow files...")
 	defer stopProgress()

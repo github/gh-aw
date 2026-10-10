@@ -40,7 +40,7 @@ func buildWorkflowSpecRef(repoSlug, path, commitSHA, version string) string {
 func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, commitSHA string, localWorkflowDir string, verbose bool) (string, error) {
 	importsLog.Printf("Processing imports with workflowspec: repo=%s, sha=%s, localWorkflowDir=%s", workflow.RepoSlug, commitSHA, localWorkflowDir)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Processing imports field to replace with workflowspec"))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Processing imports field to replace with workflowspec"))
 	}
 
 	// Extract frontmatter from content
@@ -174,7 +174,7 @@ func reconstructWorkflowFileFromMap(frontmatter map[string]any, markdown string)
 func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, commitSHA, packagePath, localWorkflowDir string, verbose bool) (string, error) {
 	importsLog.Printf("Processing @include directives: repo=%s, sha=%s, package=%s, localWorkflowDir=%s", workflow.RepoSlug, commitSHA, packagePath, localWorkflowDir)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Processing @include directives to replace with workflowspec"))
+		fmt.Fprintln(os.Stderr, console.FormatVerboseMessageStderr("Processing @include directives to replace with workflowspec"))
 	}
 
 	// Track visited includes to prevent cycles
@@ -209,7 +209,7 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 			// Skip if filePath is empty (e.g., section-only reference like "#Section")
 			if filePath == "" {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping include with empty file path: "+line))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Skipping include with empty file path: "+line))
 				}
 				result.WriteString(line + "\n")
 				continue
@@ -274,7 +274,7 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 		includedContent, err := os.ReadFile(fullSourcePath)
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read include file %s: %v", fullSourcePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not read include file %s: %v", fullSourcePath, err)))
 			}
 			continue
 		}
@@ -283,7 +283,7 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 		markdownContent, err := parser.ExtractMarkdownContent(string(includedContent))
 		if err != nil {
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not extract markdown from %s: %v", fullSourcePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Could not extract markdown from %s: %v", fullSourcePath, err)))
 			}
 			continue
 		}
@@ -303,7 +303,7 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 				// Check for cycle detection
 				if setutil.Contains(visited, nestedFilePath) {
 					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Cycle detected for include: %s, skipping", nestedFilePath)))
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Cycle detected for include: %s, skipping", nestedFilePath)))
 					}
 					continue
 				}
@@ -328,7 +328,7 @@ func processIncludesInContent(content string, workflow *WorkflowSpec, commitSHA 
 	processedImportsContent, err := processImportsWithWorkflowSpec(content, workflow, commitSHA, localWorkflowDir, verbose)
 	if err != nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to process imports: %v", err)))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to process imports: %v", err)))
 		}
 		// Continue with original content on error
 		processedImportsContent = content
@@ -359,7 +359,7 @@ func processIncludesInContent(content string, workflow *WorkflowSpec, commitSHA 
 			// Skip if filePath is empty (e.g., section-only reference like "#Section")
 			if filePath == "" {
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping include with empty file path: "+line))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Skipping include with empty file path: "+line))
 				}
 				result.WriteString(line + "\n")
 				continue

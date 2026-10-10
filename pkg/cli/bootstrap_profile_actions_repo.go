@@ -38,7 +38,7 @@ func runBootstrapRepoVariableAction(ctx context.Context, repo string, action rep
 	if err := bootstrapUpsertVariable(ctx, repo, action.Name, value); err != nil {
 		return false, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Set repository variable "+action.Name))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Set repository variable "+action.Name))
 	return true, nil
 }
 
@@ -58,7 +58,7 @@ func runBootstrapRepoSecretAction(ctx context.Context, repo string, action repos
 	if err := bootstrapSetSecret(ctx, repo, action.Name, value); err != nil {
 		return false, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Set repository secret "+action.Name))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Set repository secret "+action.Name))
 	return true, nil
 }
 
@@ -66,7 +66,7 @@ func runBootstrapCopilotAuthAction(ctx context.Context, repo string, action repo
 	bootstrapActionsRepoLog.Printf("Running Copilot auth action: repo=%s, usesActionsToken=%v", repo, usesActionsToken)
 	if usesActionsToken {
 		bootstrapActionsRepoLog.Print("Skipping Copilot PAT setup: workflows already support Actions token auth")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping Copilot PAT setup because selected workflows already support GitHub Actions token auth."))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Skipping Copilot PAT setup because selected workflows already support GitHub Actions token auth."))
 		return false, nil
 	}
 	if _, exists := state.secrets[action.Secret]; exists {
@@ -85,7 +85,7 @@ func runBootstrapCopilotAuthAction(ctx context.Context, repo string, action repo
 	if err := bootstrapSetSecret(ctx, repo, action.Secret, value); err != nil {
 		return false, err
 	}
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Set repository secret "+action.Secret))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr("Set repository secret "+action.Secret))
 	return true, nil
 }
 

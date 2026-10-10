@@ -120,7 +120,7 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) {
 							"this expression will silently evaluate to an empty string at runtime.",
 						builtinJobName,
 					)
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
 					c.IncrementWarningCount()
 				}
 			}

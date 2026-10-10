@@ -85,7 +85,7 @@ func (c *Compiler) validateRunInstallScripts(workflowData *WorkflowData) error {
 		return fmt.Errorf("strict mode: %s", warningMsg)
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warningMsg))
 	c.IncrementWarningCount()
 	return nil
 }

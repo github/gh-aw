@@ -34,7 +34,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 	// Determine which parser script to use based on the engine
 	if engine == nil {
 		logsParsingJsLog.Print("No engine detected, skipping log parsing")
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No engine detected in %s, skipping log parsing", filepath.Base(runDir))))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("No engine detected in %s, skipping log parsing", filepath.Base(runDir))))
 		return nil
 	}
 	if rendered, err := parseUnifiedAgentLog(runDir, engine.GetID()); rendered || err != nil {
@@ -45,7 +45,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 	agentLogPath, found := findAgentLogFile(runDir, engine)
 	if !found {
 		logsParsingJsLog.Print("No agent log file found")
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No agent logs found in %s, skipping log parsing", filepath.Base(runDir))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No agent logs found in %s, skipping log parsing", filepath.Base(runDir))))
 		return nil
 	}
 
@@ -53,7 +53,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 
 	parserScriptName := engine.GetLogParserScriptId()
 	if parserScriptName == "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("No log parser available for engine %s in %s, skipping", engine.GetID(), filepath.Base(runDir))))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("No log parser available for engine %s in %s, skipping", engine.GetID(), filepath.Base(runDir))))
 		return nil
 	}
 

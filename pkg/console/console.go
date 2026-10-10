@@ -262,6 +262,14 @@ func RenderTable(config TableConfig) string {
 	return renderTableWithTTY(config, ttyCheck, stdoutEnviron(), stdoutOutput)
 }
 
+// RenderTableStderr renders a table using stderr terminal and color detection.
+func RenderTableStderr(config TableConfig) string {
+	if len(config.Headers) == 0 {
+		return ""
+	}
+	return renderTableWithTTY(config, isStderrTTY, stderrEnviron(), true)
+}
+
 // buildTableStyleFunc returns the lipgloss style function used by RenderTable.
 // config supplies the ShowTotal/TotalRow flags; ttyCheck detects terminal output;
 // dataRowCount is the number of data rows (excluding any total row).
@@ -322,14 +330,15 @@ func renderTableWithTTY(config TableConfig, ttyCheck func() bool, environ []stri
 		BorderStyle(borderStyle).
 		StyleFunc(styleFunc)
 
-	output.WriteString(t.String())
+	output.WriteString(renderBoundedTable(t, config, allRows, ttyCheck()))
 	output.WriteString("\n")
+	result := wrapConsoleText(output.String(), config.MaxWidth)
 
 	if degradeStdout && ttyCheck() {
-		return colorwriter.Degrade(output.String(), environ)
+		return colorwriter.Degrade(result, environ)
 	}
 
-	return output.String()
+	return result
 }
 
 // FormatCommandMessage formats a command execution message
@@ -357,9 +366,19 @@ func FormatPromptMessage(message string) string {
 	return applyStyle(styles.Prompt, "? ") + message
 }
 
+// FormatPromptMessageStderr formats a prompt for stderr output.
+func FormatPromptMessageStderr(message string) string {
+	return applyStderrStyle(styles.Prompt, "? ") + message
+}
+
 // FormatVerboseMessage formats verbose debugging output
 func FormatVerboseMessage(message string) string {
 	return applyStyle(styles.Verbose, "» ") + message
+}
+
+// FormatVerboseMessageStderr formats verbose output for stderr.
+func FormatVerboseMessageStderr(message string) string {
+	return applyStderrStyle(styles.Verbose, "» ") + message
 }
 
 // FormatListItem formats an item in a list
@@ -401,7 +420,7 @@ func FormatErrorChain(err error) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(applyStyle(styles.Error, "✗ "))
+	sb.WriteString(applyStderrStyle(styles.Error, "✗ "))
 	sb.WriteString(chain[0])
 	for _, msg := range chain[1:] {
 		// Each message in the chain may itself contain newlines (e.g. from errors.Join
@@ -455,7 +474,7 @@ func formatMultilineError(msg string) string {
 	}
 	lines := strings.Split(msg, "\n")
 	var sb strings.Builder
-	sb.WriteString(applyStyle(styles.Error, "✗ "))
+	sb.WriteString(applyStderrStyle(styles.Error, "✗ "))
 	sb.WriteString(lines[0])
 	for _, line := range lines[1:] {
 		if line != "" {
