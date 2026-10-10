@@ -11,6 +11,7 @@ const { parseAllowedRepos, validateRepo, resolveTargetRepoConfig, resolveAndVali
 const { resolvePullRequestRepo } = require("./pr_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
+const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
 
 /**
  * Create a dedicated GitHub client for assign-to-agent operations.
@@ -47,10 +48,7 @@ function describeAssignmentCredentialFailure(config, errorMessage) {
     : process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN
       ? "GH_AW_ASSIGN_TO_AGENT_TOKEN (GH_AW_AGENT_TOKEN, GH_AW_GITHUB_TOKEN, or GITHUB_TOKEN)"
       : "the step-level GitHub token";
-  const remedy =
-    "Configure GH_AW_AGENT_TOKEN or assign-to-agent.github-token with a valid user token: a fine-grained PAT with metadata: read and actions, contents, issues, and pull requests: write, or a classic PAT with repo scope. " +
-    "Check token expiry, repository access, and organization approval/SSO. GitHub App installation tokens, including GITHUB_TOKEN, cannot assign Copilot. " +
-    "See https://github.github.com/gh-aw/reference/copilot-cloud-agent/#authentication";
+  const remedy = renderTemplateFromFile(getPromptPath("copilot_assignment_credential_remedy.md"), {}).trim();
   const installationToken = typeof token === "string" && token.startsWith("ghs_") ? " The selected credential is a GitHub App installation token." : "";
   return `${errorMessage}. Agent assignment credential source: ${source}.${installationToken} ${remedy}`;
 }

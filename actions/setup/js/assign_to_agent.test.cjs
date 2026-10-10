@@ -108,6 +108,7 @@ describe("assign_to_agent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSleep.mockClear();
+    vi.stubEnv("GH_AW_PROMPTS_DIR", path.join(process.cwd(), "../md"));
 
     // Reset REST mocks to default implementations (vi.clearAllMocks() cleared them)
     mockGithub.request.mockResolvedValue({ data: { id: "task-123" } });
@@ -162,6 +163,16 @@ describe("assign_to_agent", () => {
   });
 
   describe("failure-only credential diagnostics", () => {
+    it("renders the credential remedy from its markdown template", async () => {
+      const diagnostic = await eval(`(async () => {
+        ${assignToAgentScript};
+        return describeAssignmentCredentialFailure({}, "Bad credentials");
+      })()`);
+      const template = fs.readFileSync(path.join(process.cwd(), "../md/copilot_assignment_credential_remedy.md"), "utf8").trim();
+      expect(diagnostic.endsWith(template)).toBe(true);
+      expect(mockGithub.request).not.toHaveBeenCalled();
+    });
+
     it("preserves explicit token, dedicated token, and step client precedence", async () => {
       vi.stubEnv("GH_AW_ASSIGN_TO_AGENT_TOKEN", "github_pat_dedicated");
       const getOctokit = vi.fn().mockReturnValue(mockGithub);
