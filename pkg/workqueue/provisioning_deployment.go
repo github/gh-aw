@@ -100,22 +100,30 @@ func (builder *nativeDeploymentBuilder) checkedRoute(ctx context.Context, profil
 	return result, nil
 }
 
-func (builder *nativeDeploymentBuilder) updateTarget(ctx context.Context, target Assignment, current WorkerProfile, revision string) error {
-	result, err := builder.checkedRoute(ctx, current, revision, current.Workflow)
+func (builder *nativeDeploymentBuilder) resolvedProfile(ctx context.Context, current WorkerProfile, revision string) (WorkerProfile, bool, error) {
+	result, err := builder.checkedRoute(ctx, current, revision, current.Workflow+"\n"+revision)
 	if err != nil {
-		return err
+		return WorkerProfile{}, false, err
 	}
 	profile := current
 	if result.contract != "" {
 		profile.Ref, profile.LogicalContract = revision, result.contract
+	}
+	return profile, result.available, nil
+}
+
+func (builder *nativeDeploymentBuilder) updateTarget(ctx context.Context, target Assignment, current WorkerProfile, revision string) error {
+	profile, available, err := builder.resolvedProfile(ctx, current, revision)
+	if err != nil {
+		return err
 	}
 	deployment := builder.state.Deployments[target.Pool][target.WorkerProfile]
 	prior := deployment.Revisions[deployment.CurrentRef]
 	cursor := nativeDeploymentCursor{
 		target: target, expectedRef: deployment.CurrentRef, expectedContract: deployment.CurrentContract,
 	}
-	if profile != prior.Profile || result.available != prior.Available {
-		if err := builder.appendUpdate(&cursor, profile, result.available, true); err != nil {
+	if profile != prior.Profile || available != prior.Available {
+		if err := builder.appendUpdate(&cursor, profile, available, true); err != nil {
 			return err
 		}
 	}
@@ -247,11 +255,12 @@ func (b Branch) verifyNativeDeploymentEvidence(ctx context.Context, state Projec
 	if err := json.Unmarshal(request.Parameters, &parameters); err != nil {
 		return err
 	}
-	type routeResult struct {
-		contract  string
-		available bool
+	repository, defaultRevision, err := b.verifiedDefaultReference(ctx)
+	if err != nil {
+		return err
 	}
-	routes := map[string]routeResult{}
+	b.Remote = repository
+	builder := nativeDeploymentBuilder{branch: b, routes: map[string]nativeDeploymentRoute{}}
 	expected := map[string][2]string{}
 	for _, operation := range parameters.Operations {
 		var update DeploymentOperation
@@ -276,27 +285,43 @@ func (b Branch) verifyNativeDeploymentEvidence(ctx context.Context, state Projec
 			!checkpointDigestPattern.MatchString(profile.LogicalContract) {
 			return queueError("deployment_invalid", "deployment cannot change scope, identity or scheduling economics")
 		}
-		revision, exists := deployment.Revisions[update.Profile.Ref]
-		if update.Available || !exists || update.Profile != revision.Profile {
-			route := profile.Workflow + "\n" + profile.Ref
-			result, checked := routes[route]
-			if !checked {
-				var err error
-				result.contract, result.available, err = b.configuredWorkerDeployment(ctx, profile, profile.Ref)
-				if err != nil {
-					return err
-				}
-				routes[route] = result
-			}
-			if result.contract != profile.LogicalContract || update.Available && !result.available {
-				return queueError("deployment_invalid", "deployment requires the approved immutable worker's compiler contract and native availability")
-			}
+		current := profile
+		current.Ref, current.LogicalContract = prior[0], prior[1]
+		if err := builder.verifyUpdate(ctx, deployment, current, update, defaultRevision); err != nil {
+			return err
 		}
 		if update.Activate == nil || *update.Activate {
 			expected[key] = [2]string{profile.Ref, profile.LogicalContract}
 		} else {
 			expected[key] = prior
 		}
+	}
+	return nil
+}
+
+func (builder *nativeDeploymentBuilder) verifyUpdate(ctx context.Context, deployment *WorkerDeployment, current WorkerProfile, update DeploymentOperation, defaultRevision string) error {
+	if update.Activate == nil || *update.Activate {
+		profile, available, err := builder.resolvedProfile(ctx, current, defaultRevision)
+		if err != nil {
+			return err
+		}
+		if update.Profile != profile || update.Available != available {
+			return queueError("deployment_invalid", "activation requires the verified default revision's AW worker contract and exact native availability; refresh with deploy --from-config")
+		}
+		return nil
+	}
+	revision, exists := deployment.Revisions[update.Profile.Ref]
+	if !exists || revision.Profile != update.Profile {
+		return queueError("deployment_invalid", "availability-only updates require an already registered immutable worker revision")
+	}
+	profile := revision.Profile
+	result, err := builder.checkedRoute(ctx, profile, profile.Ref, profile.Workflow+"\n"+profile.Ref)
+	if err != nil {
+		return err
+	}
+	available := result.available && result.contract == profile.LogicalContract
+	if update.Available != available {
+		return queueError("deployment_invalid", "historical availability must match the registered immutable worker's compiler contract and native availability")
 	}
 	return nil
 }

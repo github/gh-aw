@@ -276,7 +276,7 @@ func (b Branch) verifyRegisteredWorker(ctx context.Context, profile WorkerProfil
 }
 
 func (b Branch) initialSubmissionCommit(ctx context.Context, actor Actor, request Request) (QueueCommit, error) {
-	if request.Kind != "submit" || actor.Role != "producer" {
+	if request.Kind != "submit" || (actor.Role != "producer" && actor.Role != "dispatcher") {
 		return QueueCommit{}, queueError("queue_missing", "submit Work to bootstrap an absent queue; standalone Policy seeding is unsupported")
 	}
 	policy := b.PolicyProposal

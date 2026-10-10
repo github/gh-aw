@@ -127,6 +127,43 @@ func TestFirstSubmitBootstrapWithoutAdministratorPermission(t *testing.T) {
 	}
 }
 
+func TestNativeDispatcherFirstSubmissionMatchesJavaScriptBootstrap(t *testing.T) {
+	branch, mock := newQueueAPI(t)
+	mock.noAdmin = true
+	policy, err := branch.PolicyFromConfig(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := testActor("dispatcher")
+	node, err := NewWork([]byte(`{"task":"dispatcher first use"}`), "dispatcher-first-use", "root", "default", policy, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := NewRequest("dispatcher-first-use", "submit", actor, SubmitParameters{Nodes: []WorkDefinition{node}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, err := branch.initialSubmissionCommit(context.Background(), actor, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, err := bootstrapSubmit(actor, policy, request, commit.At)
+	if err != nil || !sameJSON(commit, expected) || len(commit.Operations) != 2 ||
+		mock.refWrites != 0 || len(mock.logs) != 0 {
+		t.Fatalf("verified dispatcher bootstrap differs from the shared atomic genesis: %v", err)
+	}
+	if _, err := branch.publish(context.Background(), branchSnapshot{}, []QueueCommit{commit}); err != nil {
+		t.Fatal(err)
+	}
+	commits, err := branch.Read(context.Background())
+	if err != nil || len(commits) != 1 || !sameJSON(commits[0], commit) || mock.refWrites != 1 {
+		t.Fatalf("dispatcher Policy and Work were not published atomically: %v", err)
+	}
+	if _, _, _, err := BuildCandidate(commits, actor, request, commit.At+1); err != nil {
+		t.Fatalf("dispatcher bootstrap could not recover its accepted request: %v", err)
+	}
+}
+
 func TestBootstrapProposalCannotReplaceInstalledPolicy(t *testing.T) {
 	branch, mock := newQueueAPI(t)
 	commits := testGenesis(t, nil)

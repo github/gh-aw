@@ -1247,6 +1247,14 @@ frozen in the accepted request for deterministic replay. Excluded targets
 remain globally unchanged; this local restriction neither expands permissions
 nor resets service debt.
 
+Native publication MUST re-derive active worker code and its contract from the
+repository's verified immutable default revision. A matching logical contract
+alone is compatibility evidence, not approval of caller-selected code.
+Availability in either direction MUST match native source/artifact and workflow
+registration checks; `activate: false` MUST reference an already registered
+exact immutable profile. Revalidate these host facts before new publication,
+but accepted-request recovery MUST NOT revalidate or revoke old authority.
+
 #### Operational controls are not policy resets
 
 Keep a closed `Control` union with `admission_paused`, `grants_paused`, and

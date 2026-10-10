@@ -52,6 +52,7 @@ type queueAPI struct {
 	workerStatuses       map[string]int
 	workerStates         map[string]string
 	defaultRef           string
+	defaultRevision      string
 	configRefs           []string
 	routeReads           map[string]int
 	registrationReads    map[string]int
@@ -156,7 +157,11 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		if ref == "" {
 			ref = "refs/heads/main"
 		}
-		respond(map[string]any{"ref": ref, "object": map[string]string{"sha": strings.Repeat("f", 40)}})
+		revision := mock.defaultRevision
+		if revision == "" {
+			revision = strings.Repeat("f", 40)
+		}
+		respond(map[string]any{"ref": ref, "object": map[string]string{"sha": revision}})
 	case r.Method == http.MethodGet && path == "contents/.github/workflows/aw.json":
 		mock.configRefs = append(mock.configRefs, r.URL.Query().Get("ref"))
 		if mock.settingsStatus != 0 {

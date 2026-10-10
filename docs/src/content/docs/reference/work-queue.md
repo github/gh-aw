@@ -139,6 +139,12 @@ Native operators use `deploy --from-config`, optionally selecting `--pool` or
 pinned availability updates use `activate: false` and never promote an old
 revision as the current route.
 
+Native publication re-derives activation from the repository's verified
+immutable default revision, not a caller-selected ref with a matching contract
+stamp. Both available and unavailable proposals must match native worker
+approval, artifacts and registration. Historical availability-only updates
+require an already registered exact revision and the same native checks.
+
 > [!WARNING]
 > Direct repository writers can replace or delete the ledger. A missing queue
 > branch is fresh genesis and may lose prior request identities, reservations
