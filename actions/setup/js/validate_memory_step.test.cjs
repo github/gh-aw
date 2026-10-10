@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { getValidationMarkerPath } from "./memory_custom_validation.cjs";
-import { validateMemoryStep } from "./validate_memory_step.cjs";
+import { getRepoMemoryBaselinePath, getValidationMarkerPath } from "./memory_custom_validation.cjs";
+import { checkRepoMemoryBaseline, validateMemoryStep, validateRepoMemoryBaseline } from "./validate_memory_step.cjs";
 
 describe("validateMemoryStep", () => {
   let tempDir;
@@ -21,7 +21,53 @@ describe("validateMemoryStep", () => {
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
     fs.rmSync(getValidationMarkerPath("cache", "default"), { force: true });
+    fs.rmSync(getRepoMemoryBaselinePath(process.env.MEMORY_ID), { force: true });
     process.env = originalEnv;
+  });
+
+  it.each([
+    ["valid baseline", '"valid"', false, '"invalid"', true],
+    ["invalid baseline repaired", '"invalid"', true, '"valid"', false],
+    ["invalid baseline unchanged", '"invalid"', true, '"invalid"', true],
+  ])("%s: validates the baseline and only skips unchanged invalid memory", (_name, initial, invalidBaseline, candidate, invalidCandidate) => {
+    process.env.MEMORY_ID = path.basename(tempDir);
+    process.env.VALIDATION_SCRIPT_B64 = Buffer.from('if (fs.readFileSync(path.join(memoryDir, "state.json"), "utf8") !== \'"valid"\') throw new Error("invalid state");').toString("base64");
+    const statePath = path.join(tempDir, "state.json");
+    fs.writeFileSync(statePath, initial);
+    fs.mkdirSync(path.join(tempDir, ".git"));
+    fs.writeFileSync(path.join(tempDir, ".git", "HEAD"), "original");
+    const warnings = [];
+    const outputs = [];
+    const core = {
+      info: () => {},
+      warning: message => warnings.push(message),
+      error: () => {},
+      setFailed: message => warnings.push(message),
+      setOutput: (key, value) => outputs.push([key, value]),
+    };
+
+    validateRepoMemoryBaseline(core);
+    const baseline = JSON.parse(fs.readFileSync(getRepoMemoryBaselinePath(process.env.MEMORY_ID), "utf8"));
+    expect(baseline.ok).toBe(!invalidBaseline);
+    expect(baseline.stderr.includes("invalid state")).toBe(invalidBaseline);
+    fs.writeFileSync(path.join(tempDir, ".git", "HEAD"), "updated");
+    fs.writeFileSync(statePath, candidate);
+    checkRepoMemoryBaseline(core);
+    expect(outputs).toEqual(invalidBaseline && initial === candidate ? [["skip", "true"]] : []);
+    if (outputs.length === 0) {
+      expect(validateMemoryStep(core, { kind: "repo", requireValidationScript: true })).toBe(!invalidCandidate);
+    }
+    expect(warnings.some(message => message.includes("remains identical"))).toBe(outputs.length > 0);
+  });
+
+  it("does not allow baseline validation to migrate the actual checkout", () => {
+    process.env.MEMORY_ID = path.basename(tempDir);
+    process.env.VALIDATION_SCRIPT_B64 = Buffer.from('fs.writeFileSync(path.join(memoryDir, "state.json"), "migrated");').toString("base64");
+    fs.writeFileSync(path.join(tempDir, "state.json"), "original");
+    const warnings = [];
+    validateRepoMemoryBaseline({ info: () => {}, warning: message => warnings.push(message) });
+    expect(fs.readFileSync(path.join(tempDir, "state.json"), "utf8")).toBe("original");
+    expect(warnings.join("\n")).toContain("must not modify memory files");
   });
 
   it("validates cache content and writes its marker after success", () => {

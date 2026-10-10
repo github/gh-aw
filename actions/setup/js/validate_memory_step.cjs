@@ -1,6 +1,9 @@
 // @ts-check
 
-const { formatJSONFiles, runCustomMemoryValidation, writeValidationMarker, clearValidationMarker } = require("./memory_custom_validation.cjs");
+const fs = require("fs");
+const path = require("path");
+const { getErrorMessage } = require("./error_helpers.cjs");
+const { formatJSONFiles, runCustomMemoryValidation, writeValidationMarker, clearValidationMarker, memoryTreeDigest, getRepoMemoryBaselinePath } = require("./memory_custom_validation.cjs");
 const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
 
 /**
@@ -63,4 +66,50 @@ function validateMemoryStep(core, options) {
   return !failed;
 }
 
-module.exports = { validateMemoryStep };
+function validateRepoMemoryBaseline(core) {
+  const memoryDir = process.env.MEMORY_DIR || "";
+  const memoryId = process.env.MEMORY_ID || "default";
+  const baselinePath = getRepoMemoryBaselinePath(memoryId);
+  const digest = memoryTreeDigest(memoryDir);
+  let result;
+  try {
+    result = runCustomMemoryValidation({
+      scriptBase64: process.env.VALIDATION_SCRIPT_B64,
+      memoryDir,
+      memoryId,
+      kind: "repo",
+      timeoutSeconds: Number(process.env.VALIDATION_TIMEOUT_SECONDS || "30"),
+    });
+  } catch (error) {
+    result = { ok: false, stdout: "", stderr: String(error), exitCode: null, timedOut: false };
+  }
+  try {
+    fs.mkdirSync(path.dirname(baselinePath), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(baselinePath, JSON.stringify({ digest, ...result }), { mode: 0o600 });
+  } catch (error) {
+    throw new Error(`Unable to record repo-memory baseline '${memoryId}': ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (result.ok) {
+    core.info(`Repo-memory baseline '${memoryId}' is valid.`);
+  } else {
+    core.warning(`Repo-memory baseline '${memoryId}' is invalid; the agent can repair it. ${result.stderr || result.stdout}`);
+  }
+}
+
+function checkRepoMemoryBaseline(core) {
+  const memoryId = process.env.MEMORY_ID || "default";
+  const baselinePath = getRepoMemoryBaselinePath(memoryId);
+  if (!fs.existsSync(baselinePath)) return;
+  let baseline;
+  try {
+    baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
+  } catch (error) {
+    throw new Error(`Unable to read repo-memory baseline '${memoryId}': ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (baseline.ok === false && baseline.digest === memoryTreeDigest(process.env.MEMORY_DIR || "")) {
+    core.warning(`Repo-memory '${memoryId}' remains identical to its invalid baseline; skipping memory upload. Repair it in a later run to persist changes.`);
+    core.setOutput("skip", "true");
+  }
+}
+
+module.exports = { validateMemoryStep, validateRepoMemoryBaseline, checkRepoMemoryBaseline };

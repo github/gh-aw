@@ -399,7 +399,7 @@ func TestRepoMemoryFilterStepEmptyBothFieldsSkipsFilter(t *testing.T) {
 		ID:                "default",
 		AllowedExtensions: []string{},
 		FileGlob:          []string{},
-	}, "/tmp/gh-aw/repo-memory/default", "repo-memory")
+	}, "/tmp/gh-aw/repo-memory/default", "repo-memory", "")
 
 	assert.Empty(t, stepID, "No filter step id should be returned when both fields are empty slices")
 	assert.Empty(t, builder.String(), "No filter step should be emitted when both fields are empty slices")
@@ -1625,6 +1625,13 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	assert.Contains(t, config.Memories[0].Validation.Script, "missing state")
 
 	data := &WorkflowData{RepoMemoryConfig: config}
+	var restore strings.Builder
+	generateRepoMemorySteps(&restore, data)
+	restoreYAML := restore.String()
+	assert.Less(t, strings.Index(restoreYAML, "Clone repo-memory branch (default)"), strings.Index(restoreYAML, "Validate repo-memory baseline (default)"))
+	assert.Contains(t, restoreYAML, "validateRepoMemoryBaseline(core)")
+	assert.NotContains(t, restoreYAML, "continue-on-error")
+
 	var upload strings.Builder
 	generateRepoMemoryArtifactUpload(&upload, data, getActionPin)
 	uploadYAML := upload.String()
@@ -1632,6 +1639,9 @@ func TestRepoMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
 	assert.Contains(t, uploadYAML, "VALIDATION_SCRIPT_B64:")
 	assert.Contains(t, uploadYAML, "validate_memory_step.cjs")
 	assert.Contains(t, uploadYAML, "steps."+repoMemoryValidationStepID("default")+".outcome == 'success'")
+	skipCondition := "steps." + memoryValidationStepID("check_repo_memory_baseline", "default") + ".outputs.skip != 'true'"
+	assert.Contains(t, uploadYAML, "checkRepoMemoryBaseline(core)")
+	assert.Equal(t, 3, strings.Count(uploadYAML, skipCondition), "unchanged invalid memory must skip sanitize, validation, and upload")
 
 	pushJob, err := compiler.buildPushRepoMemoryJob(data, false)
 	require.NoError(t, err)

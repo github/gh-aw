@@ -425,9 +425,25 @@ func generateRepoMemoryArtifactUpload(builder *strings.Builder, data *WorkflowDa
 			memoryLabel = "wiki-memory"
 		}
 
-		generateRepoMemorySanitizeFilenamesStep(builder, memory, memoryDir, memoryLabel)
-		filterStepID := generateRepoMemoryFilterFilesStep(builder, memory, memoryDir, memoryLabel)
-		validationStepID := generateRepoMemoryCustomValidationStep(builder, memory, memoryDir, memoryLabel, filterStepID)
+		skipCondition := ""
+		if memory.Validation != nil {
+			checkID := memoryValidationStepID("check_repo_memory_baseline", memory.ID)
+			fmt.Fprintf(builder, "      - name: Check repo-memory baseline (%s)\n", memory.ID)
+			fmt.Fprintf(builder, "        id: %s\n", checkID)
+			builder.WriteString("        if: always()\n")
+			fmt.Fprintf(builder, "        uses: %s\n", getActionPin("actions/github-script"))
+			builder.WriteString("        env:\n")
+			fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)
+			fmt.Fprintf(builder, "          MEMORY_ID: %s\n", memory.ID)
+			builder.WriteString("        with:\n")
+			builder.WriteString("          script: |\n")
+			builder.WriteString("            const { checkRepoMemoryBaseline } = require('${{ runner.temp }}/gh-aw/actions/validate_memory_step.cjs');\n")
+			builder.WriteString("            checkRepoMemoryBaseline(core);\n")
+			skipCondition = fmt.Sprintf("steps.%s.outputs.skip != 'true'", checkID)
+		}
+		generateRepoMemorySanitizeFilenamesStep(builder, memory, memoryDir, memoryLabel, skipCondition)
+		filterStepID := generateRepoMemoryFilterFilesStep(builder, memory, memoryDir, memoryLabel, skipCondition)
+		validationStepID := generateRepoMemoryCustomValidationStep(builder, memory, memoryDir, memoryLabel, filterStepID, skipCondition)
 		generateRepoMemoryUploadArtifactStep(builder, repoMemoryUploadStepParams{
 			memory:           memory,
 			memoryDir:        memoryDir,
@@ -436,6 +452,7 @@ func generateRepoMemoryArtifactUpload(builder *strings.Builder, data *WorkflowDa
 			prefix:           prefix,
 			filterStepID:     filterStepID,
 			validationStepID: validationStepID,
+			skipCondition:    skipCondition,
 			pinAction:        pinAction,
 		})
 	}
@@ -449,9 +466,9 @@ func generateRepoMemoryArtifactUpload(builder *strings.Builder, data *WorkflowDa
 // which causes the upload-artifact action to fail with a hard error.
 // The script uses git commands (git mv for tracked files, mv for untracked) since
 // repo-memory is backed by a git working tree.
-func generateRepoMemorySanitizeFilenamesStep(builder *strings.Builder, memory RepoMemoryEntry, memoryDir, memoryLabel string) {
+func generateRepoMemorySanitizeFilenamesStep(builder *strings.Builder, memory RepoMemoryEntry, memoryDir, memoryLabel, skipCondition string) {
 	fmt.Fprintf(builder, "      - name: Sanitize %s filenames (%s)\n", memoryLabel, memory.ID)
-	builder.WriteString("        if: always()\n")
+	fmt.Fprintf(builder, "        if: always()%s\n", repoMemorySkipClause(skipCondition))
 	builder.WriteString("        continue-on-error: true\n")
 	builder.WriteString("        env:\n")
 	fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)
@@ -465,7 +482,7 @@ func generateRepoMemorySanitizeFilenamesStep(builder *strings.Builder, memory Re
 // downstream push all see the same effective file set.
 // It returns the step's ID (used to gate subsequent validation/upload steps on its
 // successful outcome), or "" when no filter is configured for this memory.
-func generateRepoMemoryFilterFilesStep(builder *strings.Builder, memory RepoMemoryEntry, memoryDir, memoryLabel string) string {
+func generateRepoMemoryFilterFilesStep(builder *strings.Builder, memory RepoMemoryEntry, memoryDir, memoryLabel, skipCondition string) string {
 	if len(memory.AllowedExtensions) == 0 && len(memory.FileGlob) == 0 {
 		return ""
 	}
@@ -473,7 +490,7 @@ func generateRepoMemoryFilterFilesStep(builder *strings.Builder, memory RepoMemo
 	allowedExtsJSON, _ := json.Marshal(memory.AllowedExtensions) //nolint:jsonmarshalignoredeerror // marshaling a string slice cannot fail
 	fmt.Fprintf(builder, "      - name: Filter %s files (%s)\n", memoryLabel, memory.ID)
 	fmt.Fprintf(builder, "        id: %s\n", filterStepID)
-	builder.WriteString("        if: always()\n")
+	fmt.Fprintf(builder, "        if: always()%s\n", repoMemorySkipClause(skipCondition))
 	fmt.Fprintf(builder, "        uses: %s\n", getActionPin("actions/github-script"))
 	builder.WriteString("        env:\n")
 	fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)
@@ -493,7 +510,7 @@ func generateRepoMemoryFilterFilesStep(builder *strings.Builder, memory RepoMemo
 // skipped unless the filter step completed successfully, so a filter failure (e.g. an
 // fs error while removing ineligible files) can never result in the unfiltered directory
 // being validated.
-func generateRepoMemoryCustomValidationStep(builder *strings.Builder, memory RepoMemoryEntry, memoryDir, memoryLabel, filterStepID string) string {
+func generateRepoMemoryCustomValidationStep(builder *strings.Builder, memory RepoMemoryEntry, memoryDir, memoryLabel, filterStepID, skipCondition string) string {
 	if memory.Validation == nil {
 		return ""
 	}
@@ -501,9 +518,9 @@ func generateRepoMemoryCustomValidationStep(builder *strings.Builder, memory Rep
 	fmt.Fprintf(builder, "      - name: Validate %s domain content (%s)\n", memoryLabel, memory.ID)
 	fmt.Fprintf(builder, "        id: %s\n", validationStepID)
 	if filterStepID != "" {
-		fmt.Fprintf(builder, "        if: always() && steps.%s.outcome == 'success'\n", filterStepID)
+		fmt.Fprintf(builder, "        if: always()%s && steps.%s.outcome == 'success'\n", repoMemorySkipClause(skipCondition), filterStepID)
 	} else {
-		builder.WriteString("        if: always()\n")
+		fmt.Fprintf(builder, "        if: always()%s\n", repoMemorySkipClause(skipCondition))
 	}
 	fmt.Fprintf(builder, "        uses: %s\n", getActionPin("actions/github-script"))
 	builder.WriteString("        env:\n")
@@ -534,6 +551,7 @@ type repoMemoryUploadStepParams struct {
 	prefix           string
 	filterStepID     string
 	validationStepID string
+	skipCondition    string
 	pinAction        func(string) string
 }
 
@@ -544,6 +562,9 @@ type repoMemoryUploadStepParams struct {
 func generateRepoMemoryUploadArtifactStep(builder *strings.Builder, p repoMemoryUploadStepParams) {
 	fmt.Fprintf(builder, "      - name: Upload %s artifact (%s)\n", p.memoryLabel, p.memory.ID)
 	var conditions []string
+	if p.skipCondition != "" {
+		conditions = append(conditions, p.skipCondition)
+	}
 	if p.filterStepID != "" {
 		conditions = append(conditions, fmt.Sprintf("steps.%s.outcome == 'success'", p.filterStepID))
 	}
@@ -561,6 +582,13 @@ func generateRepoMemoryUploadArtifactStep(builder *strings.Builder, p repoMemory
 	fmt.Fprintf(builder, "          path: %s\n", p.memoryDir)
 	builder.WriteString("          retention-days: 1\n")
 	builder.WriteString("          if-no-files-found: ignore\n")
+}
+
+func repoMemorySkipClause(condition string) string {
+	if condition == "" {
+		return ""
+	}
+	return " && " + condition
 }
 
 func repoMemoryFilterStepID(memoryID string) string {
@@ -609,6 +637,19 @@ func generateRepoMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)
 		fmt.Fprintf(builder, "          CREATE_ORPHAN: %t\n", memory.CreateOrphan)
 		builder.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh\"\n")
+		if memory.Validation != nil {
+			fmt.Fprintf(builder, "      - name: Validate repo-memory baseline (%s)\n", memory.ID)
+			fmt.Fprintf(builder, "        uses: %s\n", getActionPin("actions/github-script"))
+			builder.WriteString("        env:\n")
+			fmt.Fprintf(builder, "          MEMORY_DIR: %s\n", memoryDir)
+			fmt.Fprintf(builder, "          MEMORY_ID: %s\n", memory.ID)
+			fmt.Fprintf(builder, "          VALIDATION_SCRIPT_B64: %s\n", memoryValidationScriptBase64(memory.Validation))
+			fmt.Fprintf(builder, "          VALIDATION_TIMEOUT_SECONDS: %d\n", memoryValidationTimeoutSeconds(memory.Validation))
+			builder.WriteString("        with:\n")
+			builder.WriteString("          script: |\n")
+			builder.WriteString("            const { validateRepoMemoryBaseline } = require('${{ runner.temp }}/gh-aw/actions/validate_memory_step.cjs');\n")
+			builder.WriteString("            validateRepoMemoryBaseline(core);\n")
+		}
 
 	}
 }

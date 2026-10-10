@@ -687,6 +687,35 @@ func TestGenerateUnifiedPromptCreationStep_CacheAndRepoMemory(t *testing.T) {
 	assert.Less(t, systemClosePos, userPos, "User task should be after system tag closes")
 }
 
+func TestGenerateUnifiedPromptCreationStep_RepoMemoryBaselineDiagnostic(t *testing.T) {
+	compiler := &Compiler{}
+	data := &WorkflowData{
+		ParsedTools: NewTools(map[string]any{}),
+		RepoMemoryConfig: &RepoMemoryConfig{Memories: []RepoMemoryEntry{
+			{ID: "validated", Validation: &MemoryValidationConfig{Script: "return true"}},
+			{ID: "unvalidated"},
+		}},
+	}
+	var output strings.Builder
+	compiler.generateUnifiedPromptCreationStep(&output, compiler.collectPromptSections(data), nil, nil, data)
+	configLine := strings.SplitN(strings.SplitN(output.String(), "GH_AW_PROMPT_CONFIG: ", 2)[1], "\n", 2)[0]
+	configJSON, err := strconv.Unquote(configLine)
+	require.NoError(t, err)
+	var config struct {
+		Items []struct {
+			Baseline string `json:"repo_memory_baseline"`
+		} `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+	var baselines []string
+	for _, item := range config.Items {
+		if item.Baseline != "" {
+			baselines = append(baselines, item.Baseline)
+		}
+	}
+	assert.Equal(t, []string{"validated"}, baselines)
+}
+
 // TestGenerateUnifiedPromptCreationStep_PRContextConditional tests that PR context uses data-only conditions
 func TestGenerateUnifiedPromptCreationStep_PRContextConditional(t *testing.T) {
 	compiler := &Compiler{
