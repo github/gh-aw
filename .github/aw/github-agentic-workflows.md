@@ -26,6 +26,15 @@ Persona-lens view of the same facts as the canonical [Decision Matrix](triggers.
 | Designer | PR review is metadata/content-aware via GitHub reads only | Add `playwright` for screenshot/visual checks; add `cache-memory` when baselines or snapshot history are required |
 | Legal / Compliance | Policy/dependency review is repo-state and metadata driven | Add `cache-memory` when recurring audits need prior-run evidence/comparison state |
 
+## Replace Previous Results
+
+When a recurring digest or PR-reactive update is superseded by the newest result, prefer replacing the prior output instead of accumulating stale results:
+
+- For recurring issue digests, use `create-issue` with `close-older-issues: true`.
+- For rolling PR comments, use `add-comment` with `hide-older-comments: true`.
+
+Wait for the previous result when only one active issue or PR should exist; keep prior outputs when each result is intentionally distinct or history is required.
+
 ## File Format
 
 Agentic workflows are markdown files with YAML frontmatter.

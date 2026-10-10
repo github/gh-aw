@@ -13,6 +13,7 @@ const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs")
  *   kind: "repo" | "cache" | "drive",
  *   formatJSON?: boolean,
  *   requireValidationScript?: boolean,
+ *   requireJSONSchemas?: boolean,
  *   writeMarker?: boolean,
  * }} options
  */
@@ -20,7 +21,6 @@ function validateMemoryStep(core, options) {
   const memoryDir = process.env.MEMORY_DIR || "";
   const memoryId = process.env.MEMORY_ID || "default";
   const allowedExtensions = JSON.parse(process.env.ALLOWED_EXTENSIONS || "[]");
-  let failed = false;
 
   if (options.writeMarker) {
     clearValidationMarker(options.kind, memoryId);
@@ -40,9 +40,26 @@ function validateMemoryStep(core, options) {
     }
   }
 
-  if (options.requireValidationScript || process.env.VALIDATION_SCRIPT_B64) {
+  let jsonSchemas;
+  const schemaConfigRequired = options.requireJSONSchemas || process.env.MEMORY_JSON_SCHEMAS_REQUIRED === "true";
+  const scriptRequired = options.requireValidationScript || process.env.VALIDATION_SCRIPT_REQUIRED === "true";
+  try {
+    jsonSchemas = readMemoryJSONSchemasFromEnv(schemaConfigRequired);
+  } catch (error) {
+    core.setFailed(`Memory validation configuration is invalid for '${memoryId}': ${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
+
+  if (scriptRequired && !process.env.VALIDATION_SCRIPT_B64) {
+    core.setFailed(`Custom ${options.kind}-memory validation script is missing for '${memoryId}'.`);
+    return false;
+  }
+
+  if (scriptRequired || process.env.VALIDATION_SCRIPT_B64 || jsonSchemas) {
     const result = runCustomMemoryValidation({
       scriptBase64: process.env.VALIDATION_SCRIPT_B64,
+      jsonSchemas,
+      requireJSONSchemas: schemaConfigRequired,
       memoryDir,
       memoryId,
       kind: options.kind,
@@ -52,19 +69,19 @@ function validateMemoryStep(core, options) {
       core.info(`Custom ${options.kind}-memory validation stdout:\n${result.stdout}`);
     }
     if (result.stderr) {
-      core.info(`Custom ${options.kind}-memory validation stderr:\n${result.stderr}`);
+      core.info(`${jsonSchemas ? "Memory" : "Custom"} ${options.kind}-memory validation stderr:\n${result.stderr}`);
     }
     if (!result.ok) {
-      core.setFailed(`Custom ${options.kind}-memory validation failed for '${memoryId}': ${result.timedOut ? "timed out" : `exited with code ${result.exitCode}`}.`);
-      failed = true;
+      core.setFailed(`${jsonSchemas ? "Memory" : "Custom"} ${options.kind}-memory validation failed for '${memoryId}': ${result.timedOut ? "timed out" : `exited with code ${result.exitCode}`}.${result.stderr ? ` ${result.stderr}` : ""}`);
+      return false;
     }
   }
 
-  if (options.writeMarker && !failed) {
+  if (options.writeMarker) {
     writeValidationMarker(options.kind, memoryId);
   }
 
-  return !failed;
+  return true;
 }
 
 function validateRepoMemoryBaseline(core) {
@@ -74,8 +91,11 @@ function validateRepoMemoryBaseline(core) {
   const digest = memoryTreeDigest(memoryDir);
   let result;
   try {
+    const schemaConfigRequired = process.env.MEMORY_JSON_SCHEMAS_REQUIRED === "true";
     result = runCustomMemoryValidation({
       scriptBase64: process.env.VALIDATION_SCRIPT_B64,
+      jsonSchemas: readMemoryJSONSchemasFromEnv(schemaConfigRequired),
+      requireJSONSchemas: schemaConfigRequired,
       memoryDir,
       memoryId,
       kind: "repo",
@@ -135,6 +155,21 @@ function checkRepoMemoryBaseline(core) {
     core.warning(`Repo-memory '${memoryId}' remains identical to its invalid baseline; skipping memory upload. Repair it in a later run to persist changes.`);
     core.setOutput("skip", "true");
   }
+}
+
+function readMemoryJSONSchemasFromEnv(required) {
+  const encoded = process.env.MEMORY_JSON_SCHEMAS_B64;
+  if (!encoded) {
+    if (required) throw new TypeError("json-schemas configuration is missing");
+    return undefined;
+  }
+  const decodedBytes = Buffer.from(encoded, "base64");
+  if (decodedBytes.toString("base64") !== encoded) throw new TypeError("json-schemas configuration is not valid base64");
+  const jsonSchemas = JSON.parse(decodedBytes.toString("utf8"));
+  if (!Array.isArray(jsonSchemas) || jsonSchemas.length === 0) {
+    throw new TypeError("json-schemas must be a non-empty array");
+  }
+  return jsonSchemas;
 }
 
 module.exports = { validateMemoryStep, validateRepoMemoryBaseline, checkRepoMemoryBaseline };

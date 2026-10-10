@@ -20,6 +20,7 @@ const {
   TOKEN_USAGE_PATH,
   TOKEN_USAGE_AWF_AUDIT_PATH,
   TOKEN_USAGE_PATHS,
+  persistAgentAwInfoCopy,
   AGENT_USAGE_PATH,
   AGENT_USAGE_JSONL_PATH,
   COPILOT_SESSION_STATE_DIR,
@@ -336,6 +337,18 @@ describe("parse_token_usage", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("model", "gpt-5.6-luna");
       expect(mockCore.setOutput).toHaveBeenCalledWith("model_effort", "off");
       expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "selected");
+    });
+
+    test("overwrites the agent aw_info artifact with runner metadata without routing", () => {
+      const runnerInfo = { engine_id: "claude", model: "runner-model" };
+      const agentInfoPath = path.join(tmpDir, "agent/aw_info.json");
+      fs.writeFileSync(path.join(tmpDir, "aw_info.json"), JSON.stringify(runnerInfo));
+      fs.mkdirSync(path.dirname(agentInfoPath), { recursive: true });
+      fs.writeFileSync(agentInfoPath, JSON.stringify({ model_routing: { status: "selected", wire_model: "forged-model" } }));
+
+      persistAgentAwInfoCopy(tmpDir);
+
+      expect(JSON.parse(originalReadFileSync(agentInfoPath, "utf8"))).toEqual(runnerInfo);
     });
 
     test("does not trust selected routing from sandbox-writable reflect data", async () => {

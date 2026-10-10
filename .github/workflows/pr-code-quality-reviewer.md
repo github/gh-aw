@@ -58,6 +58,7 @@ tools:
     - pwd
     - sed
     - sort
+    - safeoutputs
     - tail
     - uniq
     - wc
@@ -154,7 +155,13 @@ You may use compact pseudo-language/encoding during private reasoning (examples:
 
 ### Step 4: Write Review Comments
 
-For each significant issue, create a `create-pull-request-review-comment` with the file path and line number. Each comment: one visible sentence stating the issue and its impact, then a `<details><summary>💡 …</summary>` block with explanation, fix snippet, and rationale.
+For each significant issue, create a `create-pull-request-review-comment` with the file path and line number using the `safeoutputs` CLI from bash (do not call the safeoutputs MCP tool directly). Send the JSON arguments on stdin, for example:
+
+```bash
+printf '%s' '{"path":"FILE","line":42,"pull_request_number":123,"body":"COMMENT"}' | safeoutputs create_pull_request_review_comment .
+```
+
+Each comment must contain one visible sentence stating the issue and its impact, then a `<details><summary>💡 …</summary>` block with explanation, fix snippet, and rationale.
 
 **Prioritization** (use your 10-comment budget aggressively):
 1. Correctness, concurrency, and security-adjacent bugs (highest priority, up to 6 comments)
@@ -171,9 +178,15 @@ For each significant issue, create a `create-pull-request-review-comment` with t
 
 ### Step 5: Submit the Overall Review
 
-Always call `submit-pull-request-review` before the 15-minute timeout, including when there are zero findings. At about 10 minutes elapsed, stop analyzing and submit; do not replace the review with another output.
+Always submit a review before the 15-minute timeout, including when there are zero findings. At about 10 minutes elapsed, stop analyzing and submit; do not replace the review with another output. Use the `safeoutputs` CLI from bash, not its MCP tool directly:
 
-Call `submit-pull-request-review` with:
+```bash
+printf '%s' '{"pull_request_number":123,"event":"COMMENT","body":"Review summary"}' | safeoutputs submit_pull_request_review .
+```
+
+If the CLI is unavailable, keep the denial text and name the exact allowlist entry needed: `tools.bash: - safeoutputs`.
+
+Set `event` to:
 - `COMMENT` if there are no actionable blocking issues
 - `REQUEST_CHANGES` if there are issues that must be fixed before merging
 

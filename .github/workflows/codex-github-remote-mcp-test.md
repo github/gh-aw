@@ -42,12 +42,16 @@ Test that the GitHub remote MCP server works with Codex engine by listing 3 open
 2. Filter for `state: OPEN`
 3. Extract issue numbers and titles
 
+If the MCP response confirms that issues were found but their contents were filtered by the integrity policy, treat this as an expected policy result. Report the number found, state that titles were withheld by the policy, and do not lower trust requirements or retry through another API/tool.
+
 ### Expected Output
 
 Output a brief message with:
-- ✅ Test passed
+- ✅ Test passed (or, when issue contents are filtered, test passed for MCP access and integrity-policy enforcement)
 - Number of issues retrieved
 - Sample issue numbers and titles
+
+When contents are filtered, say that sample titles are unavailable rather than inventing or bypassing the filter.
 
 Example:
 ```
