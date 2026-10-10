@@ -4,7 +4,7 @@
 const childProcess = require("child_process");
 const { randomBytes } = require("crypto");
 const fs = require("fs");
-const { buildWorkflowCallId } = require("./aw_context.cjs");
+const { buildWorkflowCallId, resolveParentHopId } = require("./aw_context.cjs");
 const path = require("path");
 const { nowMs } = require("./performance_now.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
@@ -244,7 +244,7 @@ function buildEpisodeAttributesFromContext(awInfo, runId, runAttempt) {
   const currentHopId = buildCurrentWorkflowCallId(runId, runAttempt);
   const inheritedHopId = readContextString(awInfo.context?.hop_id) || readContextString(awInfo.context?.workflow_call_id);
   const episodeId = readContextString(awInfo.context?.episode_id) || inheritedHopId || currentHopId;
-  const parentHopId = readContextString(awInfo.context?.parent_hop_id) || (inheritedHopId && inheritedHopId !== currentHopId ? inheritedHopId : "");
+  const parentHopId = resolveParentHopId(awInfo.context, currentHopId);
   const originEvent = readContextString(awInfo.context?.origin_event) || readContextString(awInfo.context?.event_type);
   const rootRepo = readContextString(awInfo.context?.root_repo) || readContextString(awInfo.context?.repo);
   const rootWorkflowId = readContextString(awInfo.context?.root_workflow_id) || readContextString(awInfo.context?.workflow_id);
