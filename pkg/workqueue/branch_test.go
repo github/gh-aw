@@ -20,31 +20,43 @@ type gitQueueCommit struct {
 }
 
 type queueAPI struct {
-	head          string
-	logs          map[string]string
-	bases         map[string]string
-	commits       map[string]gitQueueCommit
-	refWrites     int
-	conflicts     int
-	ambiguous     bool
-	concurrent    func()
-	mode          string
-	truncated     bool
-	missingLog    bool
-	nativeRun     *NativeRun
-	nativeReads   int
-	issue         any
-	issueStatus   int
-	resourceReads int
-	resourceRead  func()
-	userID        json.Number
-	workerStatus  int
-	workerContent string
-	workerPath    string
-	workerState   string
-	workerReads   int
-	workerRef     string
-	noAdmin       bool
+	head                 string
+	logs                 map[string]string
+	bases                map[string]string
+	commits              map[string]gitQueueCommit
+	refWrites            int
+	conflicts            int
+	ambiguous            bool
+	concurrent           func()
+	mode                 string
+	truncated            bool
+	missingLog           bool
+	nativeRun            *NativeRun
+	nativeReads          int
+	issue                any
+	issueStatus          int
+	resourceReads        int
+	resourceRead         func()
+	userID               json.Number
+	workerStatus         int
+	workerContent        string
+	workerPath           string
+	workerState          string
+	workerReads          int
+	workerRef            string
+	noAdmin              bool
+	settings             string
+	settingsStatus       int
+	sources              map[string]string
+	workerRoutes         map[string]string
+	workerStatuses       map[string]int
+	workerStates         map[string]string
+	defaultRef           string
+	configRefs           []string
+	routeReads           map[string]int
+	registrationReads    map[string]int
+	sourceStatuses       map[string]int
+	registrationStatuses map[string]int
 }
 
 type queueTransport struct{ url string }
@@ -140,7 +152,47 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		mock.nativeReads++
 		respond(mock.nativeRun)
 	case r.Method == http.MethodGet && path == "git/ref/heads/main":
-		respond(map[string]any{"object": map[string]string{"sha": strings.Repeat("f", 40)}})
+		ref := mock.defaultRef
+		if ref == "" {
+			ref = "refs/heads/main"
+		}
+		respond(map[string]any{"ref": ref, "object": map[string]string{"sha": strings.Repeat("f", 40)}})
+	case r.Method == http.MethodGet && path == "contents/.github/workflows/aw.json":
+		mock.configRefs = append(mock.configRefs, r.URL.Query().Get("ref"))
+		if mock.settingsStatus != 0 {
+			fail(mock.settingsStatus)
+		} else if mock.settings == "" {
+			fail(http.StatusNotFound)
+		} else {
+			respond(map[string]any{"type": "file", "path": repositorySettingsPath, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(mock.settings))})
+		}
+	case r.Method == http.MethodGet && path == "contents/.github/workflows":
+		mock.configRefs = append(mock.configRefs, r.URL.Query().Get("ref"))
+		sources := mock.sources
+		if sources == nil {
+			sources = map[string]string{"worker": "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker"}
+		}
+		entries := []map[string]string{}
+		for name := range sources {
+			entries = append(entries, map[string]string{"type": "file", "path": ".github/workflows/" + name + ".md"})
+		}
+		respond(entries)
+	case r.Method == http.MethodGet && strings.HasPrefix(path, "contents/.github/workflows/") && strings.HasSuffix(path, ".md"):
+		mock.configRefs = append(mock.configRefs, r.URL.Query().Get("ref"))
+		name := strings.TrimSuffix(strings.TrimPrefix(path, "contents/.github/workflows/"), ".md")
+		if status := mock.sourceStatuses[name]; status != 0 {
+			fail(status)
+			break
+		}
+		content, exists := mock.sources[name]
+		if mock.sources == nil && name == "worker" {
+			content, exists = "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker", true
+		}
+		if !exists {
+			fail(http.StatusNotFound)
+		} else {
+			respond(map[string]any{"type": "file", "path": strings.TrimPrefix(path, "contents/"), "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
+		}
 	case r.Method == http.MethodGet && strings.HasPrefix(path, "contents/.github/workflows/"):
 		mock.workerReads++
 		mock.workerRef = r.URL.Query().Get("ref")
@@ -149,20 +201,42 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 			break
 		}
 		workerPath := strings.TrimPrefix(path, "contents/")
+		if status := mock.workerStatuses[workerPath]; status != 0 {
+			fail(status)
+			break
+		}
+		if mock.routeReads == nil {
+			mock.routeReads = map[string]int{}
+		}
+		mock.routeReads[workerPath]++
 		if mock.workerPath != "" {
 			workerPath = mock.workerPath
 		}
 		content := mock.workerContent
+		if route, exists := mock.workerRoutes[workerPath]; exists {
+			content = route
+		}
 		if content == "" {
 			content = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n"
 		}
 		respond(map[string]any{"type": "file", "path": workerPath, "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))})
 	case r.Method == http.MethodGet && strings.HasPrefix(path, "actions/workflows/"):
 		workerPath := ".github/workflows/" + strings.TrimPrefix(path, "actions/workflows/")
+		if mock.registrationReads == nil {
+			mock.registrationReads = map[string]int{}
+		}
+		mock.registrationReads[workerPath]++
+		if status := mock.registrationStatuses[workerPath]; status != 0 {
+			fail(status)
+			break
+		}
 		if mock.workerPath != "" {
 			workerPath = mock.workerPath
 		}
 		state := mock.workerState
+		if configured, exists := mock.workerStates[workerPath]; exists {
+			state = configured
+		}
 		if state == "" {
 			state = "active"
 		}
@@ -331,7 +405,11 @@ func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 	if _, err := branch.Read(context.Background()); err == nil || !strings.Contains(err.Error(), "queue_missing") {
 		t.Fatalf("missing queue is not an existing empty policy-less ledger: %v", err)
 	}
-	node, err := NewWork([]byte(`{"task":"a"}`), "graph", "a", "default", DefaultPolicy(testPrincipal, testRepository), 1000)
+	policy, err := branch.PolicyFromConfig(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := NewWork([]byte(`{"task":"a"}`), "graph", "a", "default", policy, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -99,6 +99,7 @@ jobs:
     permissions:
       actions: read
       contents: write
+      issues: write
     env:
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
@@ -379,7 +380,11 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
+          GH_AW_WORK_QUEUE_CONTRACT: "fc7778a0e306f5146f12582578216bf4ac999e5ff8b1e0e361102a2baad72bfb"
         with:
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
@@ -1913,16 +1918,13 @@ jobs:
       - evals
       - push_evals_state
       - safe_outputs
-    if: >
-      always() && (needs.agent.result != 'skipped' || needs.activation.outputs.lockdown_check_failed == 'true' ||
-      needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' ||
-      needs.activation.outputs.secret_verification_result == 'failed' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' ||
-      needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
+    if: always()
     runs-on: ubuntu-slim
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
-      contents: read
+      contents: write
+      issues: write
     concurrency:
       group: "gh-aw-conclusion-daily-regulatory"
       cancel-in-progress: false
@@ -2004,6 +2006,24 @@ jobs:
           pattern: evals
           merge-multiple: true
           path: /tmp/gh-aw/evals/
+      - name: Project this run's work queue Issues
+        id: work_queue_issues
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_WORK_QUEUE_ENABLED: "true"
+          GH_AW_WORK_QUEUE_ROLE: "worker"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
+          GH_AW_WORK_QUEUE_CONTRACT: "fc7778a0e306f5146f12582578216bf4ac999e5ff8b1e0e361102a2baad72bfb"
+          GH_AW_WORK_QUEUE_JOB_RESULTS: ${{ toJSON(needs) }}
+        with:
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'work_queue_issues.cjs'));
+            await main({ core, githubClient: github, context });
       - name: Download activation artifact for work queue summary
         if: always()
         continue-on-error: true
@@ -2866,6 +2886,9 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
+          GH_AW_WORK_QUEUE_CONTRACT: "fc7778a0e306f5146f12582578216bf4ac999e5ff8b1e0e361102a2baad72bfb"
           GH_AW_WORK_QUEUE_FINISH_INTENT: /tmp/gh-aw/work-queue.finish.jsonl
         with:
           script: |
@@ -2881,8 +2904,11 @@ jobs:
         env:
           GH_AW_WORK_QUEUE_ENABLED: "true"
           GH_AW_WORK_QUEUE_ROLE: "worker"
+          GH_AW_WORK_QUEUE_ISSUES: "{\"label\":\"work\"}"
+          GH_AW_WORK_QUEUE_CHECKED_TRANSPORT: "graphql"
+          GH_AW_WORK_QUEUE_CONTRACT: "fc7778a0e306f5146f12582578216bf4ac999e5ff8b1e0e361102a2baad72bfb"
           GH_AW_WORK_QUEUE_INTENTS: /tmp/gh-aw/work-queue.intents.jsonl
-          GH_AW_WORK_QUEUE_CONTROL_CONFIG: "{\"aw_context_workflows\":[\"daily-regulatory\"],\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"daily-regulatory\"]}"
+          GH_AW_WORK_QUEUE_CONTROL_CONFIG: "{\"aw_context_workflows\":null,\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":null}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

@@ -265,7 +265,7 @@ The earlier specification had the right trust boundary, but too much protocol ma
 | Tracing risked becoming a second authority or a new observability subsystem | Reuse existing OTLP/context plumbing; correlate by request/commit/Claim IDs and derive receipts from the canonical log |
 | Packing restrictions could silently change who competes | Select from scheduling eligibility first; admit only a packable fair prefix, without advancing debt for a rejected winner |
 | Completion without delivered outputs could strand a DAG indefinitely | Diagnose unresolved delivery, reconcile within bounds, then publish Result or an explicit terminal DeliveryFailure; replacements get new immutable nodes |
-| Drain-only policy changes could prevent operational recovery | Keep entitlement/routing changes drain-only; allow separately authorized pause/resume and equivalent-scope credential rotation without resetting debt |
+| Drain-only changes could strand ordinary worker evolution | Keep scheduling economics quiescent; evolve compatible worker deployments prospectively without resetting debt or revoking outstanding Claims |
 | Per-Claim handles could be mistaken for tenant isolation | Batch only within an approved common trust domain; validate credential, data, and effect scopes before grouping |
 | Full-history replay and daily partial searches could look like scalable guarantees | Bound admission and replay costs; label algorithmic, protocol, runtime, and evidence-collection results separately |
 
@@ -500,16 +500,17 @@ An absent queue ref denotes an empty queue. On the first safe-output `submit` by
 an authenticated producer or dispatcher, if the compiler supplies a validated
 Policy proposal, publication MUST atomically create the queue branch
 with one genesis commit containing that Policy followed by the submitted Work.
-The proposal MUST authorize the submitting principal and the Work's pool,
-priority, and accounting keys; the runtime MUST validate its immutable worker
+AW MUST authorize the submitting participant. The installed scheduling MUST
+validate the Work's pool, priority and accounting key without producer enrollment
+or entitlement tables in AW-managed queues; the runtime MUST validate immutable worker
 routes before queue publication. Standalone administrator seeding MUST NOT be
 supported by publishers or activation: authorization supplied by Agentic Workflows
 and Actions already authorizes the trusted submission. Reads, controls and
 dispatch-only requests MUST NOT initialize an
 absent queue. Existing nonempty ledgers without a valid Policy, empty or
 malformed logs, and unsupported histories MUST fail closed rather than being
-overwritten. Later Policy epochs remain administrator-only and require a drained
-queue.
+overwritten. Later scheduling Policy epochs require an authorized, quiescent
+update; compatible worker deployments use the separate prospective transition.
 
 Automatic first-use bootstrap MUST NOT require repository-administration access
 or administrator seeding. GitHub enforces repository access rules independently;
@@ -517,12 +518,37 @@ an actual Git write denial remains an error.
 
 Native operator submissions use the same combined genesis envelope. An embedding
 host MAY supply an approved Policy proposal. Otherwise the native publisher
-resolves its bounded default Policy using the submitting operator's identity and
-the verified default-branch revision of `.github/workflows/worker.lock.yml`.
+resolves scheduling from `.github/workflows/aw.json` and declared AW worker
+routes at the verified repository revision.
 This default resolution MUST NOT request administrator authority. Replay MUST
 validate the submitted Work against that Policy before publication, and the
-publisher MUST verify worker routes and submission resource evidence. Existing
+publisher MUST verify submitted worker routes at bootstrap and submission resource evidence. Unrelated unavailable routes MUST NOT block bootstrap. Existing
 Policy MUST NOT be replaced by a first-use proposal.
+
+For AW-managed queues, `aw.json.work_queue` MUST contain only global scheduling
+and backing Issue/label settings, never producer allowlists, worker principals,
+trust domains or credentials. Missing file, missing section and an empty object
+MUST resolve to weighted-priority, one default pool, concurrency 16, pending
+limit 4,096, singleton assignments and three attempts with 30-second backoff.
+Invalid settings MUST produce property-specific errors. Optional advanced pools
+and fairness MUST remain scheduling, not identity authorization.
+`work_queue.issues` MUST configure projection globally; a boolean selects
+defaults or disables it, and an object MAY supply `label`.
+Workflow-level `work-queue-policy` and `tools.work-queue.issues` are deprecated;
+conflicting global/local definitions MUST fail.
+Concurrent first submissions MUST use the winning installed Policy and retry
+their original Work without losses or duplicates. Configuration edits MUST NOT
+rewrite installed Policy. An explicit `policy --from-config` update MUST require
+quiescence and preserve accepted obligations and historical evidence; its new
+economic epoch explicitly initializes new scheduling clocks. Compatible worker
+deployment changes MUST NOT create an economic epoch or reset existing debt.
+Historical Policies without the AW-managed marker MUST remain readable with
+their historical interpretation.
+
+The compiler MAY transport a large protected Policy proposal in bounded
+environment chunks below Actions' per-value limit. Runtime reconstruction MUST
+be exact and reject missing, conflicting or malformed chunk metadata; transport
+chunking MUST NOT alter Policy, select a subset of routes or weaken validation.
 
 The bootstrap QueueCommit MUST retain the original submission request ID,
 fingerprint and Actor; it MUST NOT introduce a synthetic administrator request.
@@ -822,7 +848,8 @@ Use a small operation union:
 
 | Operation | Durable responsibility |
 |---|---|
-| `Policy` | Install a policy epoch and bounded approved routing/producer rules |
+| `Policy` | Install scheduling economics and approved worker contracts; historical non-AW Policies retain their original producer rules |
+| `Deployment` | Compare-and-set a prospective worker revision/availability without changing scheduling economics, admitted authority or frozen Dispatch bindings |
 | `Control` | Pause/resume new Work admission or new grants, or record an equivalent-scope credential generation; never alter shares, ownership, or debt |
 | `Work` | Admit immutable task metadata/payload; its first commit/operation position is its FIFO position |
 | `Claim` | Record selected Work, Claim, `dispatch_id`, and local assignment handle; charge/reserve a logical Work slot and create the group's native reservation on its first Claim |
@@ -963,8 +990,8 @@ Every queue MUST refuse unscheduled new Claims and old writers. There is no lega
 #### Runtime identity and queue authorization
 
 Authentication is provided by AW, outside the work-queue protocol. The queue
-consumes runtime-supplied identity to enforce Policy entitlements, operation
-roles and Claim ownership; it defines no authentication or enrollment mechanism.
+consumes runtime-supplied identity for operation roles and Claim ownership, not
+queue-specific producer entitlements. It defines no authentication or enrollment mechanism.
 Publication credentials remain outside agent jobs and untrusted workflow code.
 Queue use MUST NOT require repository-administration permission.
 Publishers MUST use checked append-only publication with
@@ -1055,7 +1082,8 @@ receives the immutable assignment/claim-commit reference. Its **trusted
 activation step** may recover a missing binding: read the latest ledger, verify
 the recorded launch marker, exact assignment membership and approved execution
 scope, and authenticate its native run through the run API and trusted job
-context. Only the configured launch principal may originate that run. The run
+context. AW's selected dispatch credential establishes the actual launch
+principal, which MUST match the native run and original Claim binding. The run
 name/assignment alone is not authentication.
 
 Activation then proposes `Dispatch(bound)` through the same checked publisher.
@@ -1116,34 +1144,26 @@ Replace the scalar assignment with one fixed inbound Claim array. Preserve admis
 
 Do not overload read-only sorting with mutation authority. Use staged `work_queue_submit` and `work_queue_dispatch_next` intents, processed in trusted safe outputs. Store task-specific preparation on Work and select Work/target at publication, rather than requiring an agent to supply the winning Work identity. The agentic lifecycle is specified in section 7.12.
 
-Illustrative policy:
+Repository configuration:
 
-```yaml
-work-queue-policy:
-  mode: weighted-priority
-  class-weights: [8, 4, 2, 1, 1]
-  accounting-weights:
-    project-a: 2
-    project-b: 1
-  outstanding:
-    claims: 8
-    per-account-claims: 2
-    dispatches: 4
-  worker-profiles:
-    analysis:
-      max-claims-per-dispatch: 3
-  dependencies:
-    repositories: [example/design, example/library]
-    max-observation-age: 60s
+```json title=".github/workflows/aw.json"
+{
+  "work_queue": {
+    "concurrency": 8,
+    "pending_limit": 30,
+    "accounting_weights": {"": 1, "project-a": 2, "project-b": 1},
+    "retry": {"max_attempts": 3, "backoff_seconds": 30},
+    "issues": {"label": "work"},
+    "pools": {"default": {"per_account_limit": 2}}
+  }
+}
 ```
 
-This is **not currently valid gh-aw frontmatter**. The example explicitly configures
-tenant weights, a smaller per-account cap, and allowed foreign dependency reads;
-these are not implicit defaults. The 60-second observation age is an example
-policy bound, not a measured SLA. Credentials must be bound separately by trusted
-compiler configuration. The installed policy epoch in the log is authoritative.
-Omitting the block gives queue-like defaults and no foreign-repository grant;
-it does not disable scheduling.
+This valid scheduling configuration explicitly selects fairness weights and a
+smaller per-account cap. AW declares worker targets and handles credentials
+separately; they are not global queue configuration. The installed Policy epoch
+in the log is authoritative. Omitting the object gives defaults and does not
+disable scheduling or add a foreign-repository grant.
 
 Suggested behavior:
 
@@ -1161,13 +1181,18 @@ Suggested behavior:
 | Audit/logs | Expose policy epoch, selection reason, blocked reason, grants, launch outcomes, and reservations without leaking submitted identifiers |
 | Operator CLI | Use the same QueueCommit codec, selector, and publisher on its configured queue; no direct-claim, legacy-format, or unscheduled bypass |
 
-Pools must define complete target eligibility. Letting each caller restrict the selection to its preferred tenant or worker subset would defeat a queue-wide entitlement policy. If workers have incompatible capabilities, either define separate fairness domains or design resource-aware arbitration across them explicitly.
+Pools define scheduling competition. Agents MUST NOT supply arbitrary tenant or
+worker filters. Trusted AW dispatch permissions and durable deployment readiness
+constrain executability before selection; unavailable, incompatible or locally
+unapproved workers pause only affected Work without charging it. Dispatchers
+with different approved targets MAY share a pool without broadening one another's
+authority. Fairness is measured among executable Work, not unavailable routes.
 
 ### 7.10 Policy changes and breaking deployment
 
 In the current protocol, **scheduling policy** is immutable while the queue contains any
 nonterminal Work, outstanding reservation, or unresolved completed-node delivery
-barrier. To change weights, mode, routing, trust domains, entitlement, or admission
+barrier. To change weights, mode, conflicting shared-resource boundaries, or admission
 limits, pause new admission/grants, drain/cancel and reconcile existing work,
 settle delivery barriers with Result or DeliveryFailure, then append a `Policy`
 operation establishing a new epoch. Old terminal history remains unchanged.
@@ -1175,6 +1200,52 @@ operation establishing a new epoch. Old terminal history remains unchanged.
 Initialize the new epoch's derived clocks/passes at zero and compute its integer tick scales from its weights. Epoch transitions are explicit prospective reset boundaries, not hidden resets during competition. Reject a policy change on a non-drained queue with `policy_not_quiescent`.
 
 This deliberately removes live weight rebasing, mid-backlog mode changes, and hierarchy edits from the first release. If such features are later required, they need separately specified service-debt and in-flight semantics; do not grow them into the initial scheduler.
+
+#### Stable obligations and evolving execution
+
+Routine compatible workflow evolution MUST be drain-free. A deployment changes
+how future Work executes, not the queue's existing promises. Preserve Work
+identities, dependency edges, completed Results, accepted request receipts,
+fairness debt and outstanding reservations. Existing Dispatch records retain
+their immutable profile and credential/run binding for completion, delivery and
+reconciliation; a newer deployment MUST NOT revoke or reinterpret that authority.
+
+AW supplies compiler-derived logical worker contracts covering declared
+assignment inputs, permissions, tools and output/resource capabilities,
+including imports. Prompt or engine changes do not by themselves change the
+logical contract. Compatibility is conservative: authority/interface changes
+produce a different contract, not an implicit permission expansion. Historical
+profiles without compatibility metadata retain exact-revision semantics.
+
+A separate durable deployment transition records prospective worker execution
+revisions and availability through the canonical log/CAS path. New admissions
+freeze their approved contract. Pending unpinned Work MAY follow only compatible
+deployments; explicit `execution_ref` pins MUST retain their approved revision.
+An unavailable or incompatible deployment pauses only affected Work and its
+dependent successors, not unrelated Work or the entire graph. Readiness failures
+MUST NOT consume Claims, attempts or fairness service. Recovery uses frozen
+assignments, never the current route's permissions.
+
+Worker evolution is not an economic Policy update. Changes to scheduling
+economics or genuinely conflicting shared resources remain explicit transitions
+that MAY require quiescence. Deployment and pin state MUST survive checkpoint
+restoration without rewriting earlier results or assignments.
+
+`Deployment` carries pool/profile, expected current ref/contract, immutable
+profile, availability and sanitized reason. A mismatch fails CAS; it cannot
+retarget a concurrent winner. `activate: false` updates a registered historical
+revision's availability without moving the current route. Admission freezes
+`admission_contract` from the approved logical contract when the caller omits
+an explicit contract. Retries retain it and any `execution_ref` pin.
+
+Only protected producer/dispatcher adapters or authorized operators may derive
+deployment operations; workers, reconcilers, projectors and agent wire intents
+cannot. Protected adapters synchronize their approved targets only before new
+submit/dispatch requests. The optional dispatch request `worker_profiles`
+comes from caller-local AW approval, never agent-selected filtering, and is
+frozen in the accepted request for deterministic replay. Excluded targets
+remain globally unchanged; this local restriction neither expands permissions
+nor resets service debt.
 
 #### Operational controls are not policy resets
 
@@ -1209,11 +1280,17 @@ Initial deployment is a breaking replacement, not a compatibility rollout:
 
 1. Stop old writers and terminate or reconcile old in-flight workers before deployment; do not mix protocols on one authority.
 2. Deploy current-only readers, closed schemas, mandatory scheduling, reservation recovery, and backend validation together.
-3. Initialize new current-protocol queues with a policy transaction in their canonical logs; do not convert or silently adopt old ledgers.
+3. Initialize new current-protocol queues with atomic Policy-and-Work first submission; do not convert or silently adopt unsupported ledgers.
 4. Recompile and deploy every dispatcher, operator client, and worker sharing each pool against the current protocol.
 5. Permit queue operation only when its backend, policy epoch, and transaction versions satisfy the complete contract.
 
-There is no runtime migration or backward-compatible reader for old queues. Encountering an old ledger MUST produce an explicit unsupported-protocol error and leave it unchanged; it must not erase, reset, reinterpret, or silently copy existing work. Do not rewrite committed current-protocol grants or retrospective fairness measurements. Missing policy, unsupported transaction/policy versions, and mismatched compiled policies MUST fail closed.
+Unsupported transaction protocols MUST produce an explicit error and remain
+unchanged; they must not be erased, reset, reinterpreted or silently copied.
+Historical supported version-3 Policy records remain readable with their
+original semantics. Different compiled deployment versions are not alone an
+error: installed economic Policy stays authoritative, and compatible deployment
+transitions are prospective. Missing Policy and unsupported protocol versions
+fail closed. Do not rewrite committed grants or retrospective fairness.
 
 Compaction must preserve the effects of the complete causal commit chain,
 including ownership, delivery outcomes, controls, fairness debt, request
@@ -1320,6 +1397,9 @@ Intent artifacts cannot supply or replace it. Keep that stable requester,
 the current authenticated START sender and the actual dispatch credential's
 worker principal distinct; a source run's human actor ID is not an implicit
 GITHUB_TOKEN/App worker-principal mapping.
+AW-managed profiles need no authored principal: record the actual authenticated
+launch `credential_principal` on Dispatch and retain it with the frozen profile
+for lifecycle proof, independently of later deployments.
 
 ```mermaid
 flowchart LR
@@ -2340,15 +2420,19 @@ Work definitions, revision-qualified node keys, and bounded diagnostic payload
 metadata. For example, graph `campaign-x` can contain `r1/prepare`,
 `r1/analyze`, and later `r2/analyze`. Keep the same authorized pool/accounting
 identity and existing service debt; a revision label is not a new entitlement.
-Pin each node's execution plan/ref at admission and obey the existing graph,
-byte, and batch-compatibility limits.
+Freeze each node's plan and approved logical contract at admission. Pin
+`execution_ref` only when reproducibility requires it; otherwise compatible
+deployment evolution remains prospective. Obey graph, byte and batch limits.
 
 **Default: let existing Claims finish their admitted revision.** Updating the
 dispatcher or campaign source does not update their payloads, append members
 to their assignments, or redirect their outputs to new-revision nodes. New
 revision nodes get new identities and FIFO positions and compete through
-normal scheduling. A revised worker/workflow ref outside the current approved
-Policy requires a drained Policy change before admission or launch.
+normal scheduling. A compatible worker revision uses the durable deployment
+transition without draining. An incompatible or unavailable revision pauses
+affected pending Work; it does not broaden authority or invalidate existing
+Dispatch records. Changes to shared-resource economics use the separate
+quiescent Policy transition.
 
 If old pending work is obsolete, an authorized operator must make that
 disposition explicit; trusted producers admit the new nodes:
@@ -2398,7 +2482,8 @@ cutover pending, not complete. Revision does not roll back effects already
 delivered.
 
 Any required Policy change needs **queue-wide** quiescence under section 7.10;
-draining only the revised campaign is insufficient.
+draining only the revised campaign is insufficient. Routine compatible worker
+deployment is not a Policy change and does not require this cutover.
 
 Overlapping revisions are safe only when their domain-specific resource/effect
 contracts permit it. Queue ownership does not serialize all writes to a shared
@@ -2512,7 +2597,8 @@ and runtime/host/deployment limitations remain explicit in the record.
 | Commit replay | Replaying each causal predecessor/operation prefix reconstructs the selection and explanation; forks/missing parents/invalid Claim choices fail |
 | Compaction | Permuting/deduplicating complete commit records preserves projection, request results, and future selections |
 | Backend gating | Any backend lacking scheduler serialization is rejected for queue operation; no advisory/unscheduled-FIFO fallback |
-| Policy epochs | Reject changes while nonterminal Work/reservations or unresolved delivery barriers exist; drained epoch transition resets derived ticks explicitly and preserves old history |
+| Policy epochs | Reject economic changes while nonterminal Work/reservations or unresolved delivery barriers exist; drained epoch transition resets derived ticks explicitly and preserves old history |
+| Worker evolution | Compatible deployment with pending Work and frozen old Dispatch preserves identities, edges, Results, debt and reservations; pins stay pinned, incompatible/unavailable workers block locally; old completion, delivery, reconciliation and checkpoint replay remain valid |
 | Operational controls | Pause/resume and equivalent-scope credential rotation work on a non-drained queue without resetting debt, freeing slots, or blocking trusted closure/recovery |
 | Platform outage recovery | Lost publication/dispatch responses resolve by request identity and trusted native evidence; unavailable APIs retain reservations and block unverified effects |
 | Accidental run cancellation | Dispatcher cancellation is not worker termination; worker-terminal recovery preserves completed siblings, cancels only open Claims, and rejects rerun authority |
@@ -2744,7 +2830,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 
 | Requirement | Implementation/evidence status |
 |---|---|
-| Git-authoritative backing Issue mirrors | Implemented in existing activation/conclusion hooks with installed projector rules, original run/Claim scope, immutable lossless bindings and comment handles, checked expected-head publication, per-Work/Issue coordination, repository status labels and summary status, mandatory generated-by templates, and conservative partial/ambiguous recovery. Local authenticated mocks cover concurrency, reruns, shared queues, staged behavior, drift repair and total request budgets; Go/JavaScript binding parity passes. No live intended-token Issue writes or hosted workflow runs are claimed |
+| Git-authoritative backing Issue mirrors | AW-managed activation/conclusion hooks project own authenticated admissions/original Claims without enrollment; automatic projection stays in the queue repository/pool scope and keeps Issues open. Exact pre-existing Issue grants, cross-repository projection and closure require explicit trusted projector rules. Immutable bindings, coordination and conservative ambiguous recovery remain enforced. Local mocks/parity cover these paths; no live intended-token Issue writes or hosted workflow runs are claimed |
 | Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented. An earlier combined-source local capture passed 286 independent cases with 136 dependency hashes unchanged during that capture. Safe-output changes invalidate its claim to match the current source; regenerate the capture before using it as current release evidence. Typed Go canonicalization rejects invalid Unicode before JSON encoding repairs it; checked operation-construction errors propagate through CLI and delivery consumers. Conformance does not prove arbitrary runtime/host refinement |
 | Exact fairness, FIFO defaults, deterministic fair-prefix packing and CAS recovery | Implemented in both engines, with exact integer passes, causal FIFO positions, literal shared expectations and mocked CAS/ambiguous-acknowledgment regressions. Charges are durable Claims, not CPU time or successful completions. Live Git/network contention remains unverified |
 | Work/Issue/PR DAG, observations, Result/DeliveryFailure and replacements | Implemented with atomic graph admission, typed bounded observations, immutable resource bindings and verified Result barriers. Native and runtime tests cover stale/error observations, mixed outcomes, delivery deadlines and safe replacements; actual external API availability/rate behavior is not established by injected clients |
@@ -2755,12 +2841,14 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Independent service-deviation and eventual-service evidence | Bounded sibling model: 30 fixed + 60,360 dynamic states exhausted; four exact negative controls; full hierarchy/runtime refinement still outstanding |
 | Complete lifecycle/runtime refinement and supported-host integration | Bounded lifecycle safety: 208,108 exhausted states, eleven exact negative controls and three witnesses; full runtime/host refinement remains unverified |
 | Retained-history, contention and recovery-headroom operating envelope | An earlier combined-source local capture passed 50 measurements/checks, including actual Go/JS cold replay and serialization at 1/16/64/80 MiB, bounded graph/assignment limits and recovery headroom, with 136 dependency hashes stable during that capture. It has not been regenerated after the safe-output review changes. These are historical shared-host samples and structural closure checks, not current-source release evidence, universal closure proof, live Git/network contention, supported-host/API measurements or deployment SLOs |
-| Current-source queue formal review and traces | All 61 registered configurations exercised; 16 positive searches exhausted and 34 negative controls plus nine guarded witnesses matched exactly. `FairDAGGitHub` exhausted 1,055,182 distinct states at depth 20 with unchanged bounds and original safety checks. Five union-graph comparisons and two exact mutations passed; 18 fresh seeded simulations emitted 309 sampled states and nine guarded witness traces matched. Local checkpoint restoration succeeded for `WorkQueue` and `QueueOrdering`, but both continuations remain unfinished, not passes; portable archives are unvalidated. Source identities still match after the main merge. Earlier captures are preserved. See the [refinement record](https://github.com/github/gh-aw/blob/main/specs/work-queue/verification-2026-10-07-refinement.json); runtime/host refinement remains unproved |
+| Historical queue formal review and traces | The 2026-10-07 capture exercised all 61 then-registered configurations, including 16 exhausted positive searches, 34 negative controls and nine guarded witnesses. It predates trusted-AW bootstrap and worker-evolution changes and is not current-source evidence for them. Earlier captures and unfinished continuation results remain preserved. See the [refinement record](https://github.com/github/gh-aw/blob/main/specs/work-queue/verification-2026-10-07-refinement.json) and [current model reproduction instructions](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md); full runtime/host refinement remains unproved |
 | ESLint factory formalization and actual-code comparison | Six bounded safety graphs exhaust 31,730 distinct states; nine deliberate controls, seven guarded witnesses and 16 independently replayed/tamper-checked traces cover factory lifecycle, scope, cardinality and exit-zero semantics. Executable observations cover all 66 registered/configured rules, actual ESLint warning/error exits, native Claim checks and collector per-Claim limits. Policy/producers/profile admission and whole-contract native readback remain assumptions. There is no automatic factory DAG; warning-only clean and prompt-only quality/global assignment bars are explicitly distinguished from runtime guarantees. See the [factory model](https://github.com/github/gh-aw/blob/main/specs/eslint-factory/README.md) |
 | Full JS typecheck/existing dependency-based tests | The earlier `create_project.cjs` SDK layout error is fixed in merge checkpoint `2dcce92c1c`, using validated literals and endpoint-derived request typing without unsafe casts. Genuine TypeScript 7.0.2 typecheck passes; 36 project tests include 12 layout/endpoint/invalid-input regressions. That merge's final component checks passed 2,122 setup-JavaScript tests in 52 files after correcting a stale workflow lock. The later `303b402810` merge ran 2,323 tests in 56 files: 2,322 passed and one real multi-repository fixture exceeded its 10-second deadline. A fixture-local 30-second deadline preserves all assertions and production retry behavior; all 109 repo-memory tests then passed. Impacted Go tests, build, typecheck, standard lint, schema freshness and JavaScript/shell lint passed. After committing the merge, change-scoped custom lint and full 328-workflow drift also passed; the initial custom-lint failures were confined to nine files byte-identical to main that the pre-merge base calculation included. Failed aggregate invocations remain failed records, not retrospectively green; global custom lint is not claimed clean. The approved feed does not supply pinned `@types/node` 26.6.4; existing 26.6.3 remains without changing pins. No dedicated hosted Actions run is claimed |
-| TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 45 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
+| TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 48 schemas, including Deployment, execution pins, validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
 | Protected launch credentials, immutable effect targets and native delivery verification | Implemented with exact selected-client/profile proofs, immutable Work/profile/ancestor target intersection and private native readback. Both public and compiler control entry points reject missing/invalid protected launch metadata before client construction or queue publication, while previews and submit-only controls remain credential-independent. Local positive and refusal regressions pass; writer deployment automation is separate |
-| First-submit Policy bootstrap and live native-dispatch host compatibility | JavaScript safe outputs and native Go submissions atomically create the absent queue branch with approved Policy and Work, without administrator seeding or repository-rule inventories. Native defaults resolve the submitting operator and verified worker revision; embedding hosts may supply an explicit proposal. Local tests cover non-admin bootstrap, whole-genesis Go/JavaScript parity, replay, proposal mismatch and non-submission refusal. Hosted Git publication, immutable-SHA dispatch, and the pinned run-details response remain unverified live compatibility gates |
+| Trusted AW settings and first-submit bootstrap | Compiler, JavaScript and native Go share optional global scheduling/Issue settings and default-only atomic Policy-and-Work bootstrap. AW authorizes participants and approved targets; no producer enrollment, worker-principal settings or administrator seeding is required. Installed economic Policy stays authoritative. Local tests cover defaults, overrides, malformed/conflicting settings, multiple participants, concurrent bootstrap, selective route validation and duplicate-free replay. Hosted Git publication and immutable-SHA dispatch remain unverified live gates |
+| Worker-evolution bounded model | Trusted-AW bootstrap and prospective worker-evolution models cover contract compatibility, explicit pins, local readiness, CAS races, frozen completion/credentials and preservation of debt, Results, reservations and scheduling economics. Focused positive, exact negative and guarded witness configurations are registered in the [formal reference](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md). These bounded models are not a proof of arbitrary Go/JavaScript or hosted API refinement; earlier captures are not rewritten |
+| Worker-evolution runtime and compiler integration | Go/JavaScript implement durable deployment CAS, frozen admission contracts, immutable execution pins, caller-local approval and readiness, historical availability updates, checkpoint replay and frozen completion/delivery/reconciliation. Compiler stamps use complete worker authority frontmatter and imports; chunked proposals reconstruct exactly below Actions' per-value limit. Actual compiled ESLint bootstrap admits three Work items and launches three mocked native workers without duplicate replay. Full native queue/setup, scoped CLI/compiler, 1,053 JavaScript tests, typecheck and 334-workflow drift checks pass. Hosted execution remains unverified; the aggregate publication gate retains independently baseline-confirmed custom Go lint findings |
 
 Authenticated ingestion, actual run/attempt binding, Claim/resource checks and
 credentials withheld from agent execution remain required. GitHub owns repository

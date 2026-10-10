@@ -8,7 +8,7 @@ const { canonical, identity, integer, queueError } = require("./work_queue_codec
 const { actorFromContext, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
 const { assignmentsForRequest } = require("./work_queue_scheduler.cjs");
 const { validateEffectResource } = require("./work_queue_resource_scope.cjs");
-const { verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
+const { verifyWorkerRoute, verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
 const { writeWorkQueueUpdateSummary } = require("./work_queue_summary_renderer.cjs");
 const {
   appendCommit,
@@ -477,7 +477,19 @@ async function publishWorkQueueRequest({
     const checked = appendCommit(current.transactions, candidate);
     log.debug("request.candidate.checked", { operations: checked.commit.operations.length });
     if (bootstrapOperation) await prepareEmptyRepository(githubClient, owner, repo, branch);
-    if (policyOp) await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
+    if (policyOp) {
+      if (policyOp.policy.authorization === "aw") {
+        const verified = new Set();
+        for (const operation of checked.commit.operations) {
+          if (operation.kind !== "Work") continue;
+          const profile = policyOp.policy.pools[operation.pool].profiles[operation.worker_profile];
+          const route = `${profile.workflow}@${profile.ref}`;
+          if (verified.has(route)) continue;
+          await verifyWorkerRoute({ githubClient, owner, repo, profile });
+          verified.add(route);
+        }
+      } else await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
+    }
     let sha;
     try {
       sha = await writeCandidate({ githubClient, owner, repo, current, transactions: checked.transactions });

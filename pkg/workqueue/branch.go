@@ -360,34 +360,27 @@ type Publication struct {
 	Changed  bool         `json:"changed"`
 }
 
-func (b Branch) defaultPolicy(ctx context.Context, principal string) (Policy, error) {
-	var repository struct {
-		DefaultBranch string `json:"default_branch"`
-	}
-	if err := b.request(ctx, http.MethodGet, "", nil, &repository); err != nil {
+func (b Branch) defaultPolicy(ctx context.Context, _ string) (Policy, error) {
+	return b.policyFromConfig(ctx)
+}
+
+// PolicyFromConfig resolves scheduling and AW worker approval from this target
+// repository's verified immutable default ref, never the current local checkout.
+func (b Branch) PolicyFromConfig(ctx context.Context) (Policy, error) {
+	b, err := b.withClient()
+	if err != nil {
 		return Policy{}, err
 	}
-	if repository.DefaultBranch == "" {
-		return Policy{}, queueError("policy_invalid", "new queue requires an immutable approved default worker revision")
-	}
-	var ref struct {
-		Object struct {
-			SHA string `json:"sha"`
-		} `json:"object"`
-	}
-	if err := b.request(ctx, http.MethodGet, "git/ref/heads/"+repository.DefaultBranch, nil, &ref); err != nil {
+	return b.policyFromConfig(ctx)
+}
+
+func (b Branch) policyFromConfig(ctx context.Context) (Policy, error) {
+	repository, revision, err := b.verifiedDefaultReference(ctx)
+	if err != nil {
 		return Policy{}, err
 	}
-	if !revisionPattern.MatchString(ref.Object.SHA) {
-		return Policy{}, queueError("policy_invalid", "default worker revision is not immutable")
-	}
-	policy := DefaultPolicy(principal, b.Remote)
-	pool := policy.Pools["default"]
-	profile := pool.Profiles["default"]
-	profile.Ref = ref.Object.SHA
-	pool.Profiles["default"] = profile
-	policy.Pools["default"] = pool
-	return policy, nil
+	b.Remote = repository
+	return b.approvedConfigPolicy(ctx, revision)
 }
 
 func extending(previous, current []QueueCommit) bool {
@@ -548,8 +541,14 @@ func (b Branch) preparePublicationCandidate(ctx context.Context, actor Actor, re
 		return publicationCandidate{}, pendingErr
 	}
 	if prefix.initial == nil {
-		if err := b.verifyRequestEvidence(ctx, prefix.state, actor, request); err != nil {
-			return publicationCandidate{}, err
+		var evidenceErr error
+		if request.Kind == "deployment" {
+			evidenceErr = b.verifyNativeDeploymentEvidence(ctx, prefix.state, request)
+		} else {
+			evidenceErr = b.verifyRequestEvidence(ctx, prefix.state, actor, request)
+		}
+		if evidenceErr != nil {
+			return publicationCandidate{}, evidenceErr
 		}
 	}
 	var observations []Observation

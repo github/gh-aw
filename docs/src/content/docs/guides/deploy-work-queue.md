@@ -10,11 +10,12 @@ use GitHub read tools and safe outputs, but do not provide native fair
 scheduling, Claim authority, or verified dependency graphs. Native version-3
 `tools.work-queue` always uses Git; no storage selector is available.
 
-Publish an approved worker and configure a compiler-approved Policy proposal
-(the queue's scheduling and authorization rules). Agentic Workflows and Actions
-supply the trusted submission identity; no separate queue authentication,
-enrollment or administrator seed is needed. The first accepted submission
-installs Policy and Work together. Compilation alone does not install Policy.
+Publish approved AW workers and enable work-queue. AW handles authorization,
+credentials and approved dispatch targets; work-queue handles scheduling and
+reliable delivery. No queue enrollment, producer allowlist, principal, trust
+domain, credential scope, branch-protection setup or administrator seed is
+required. The first accepted submission installs Policy and Work together.
+Compilation alone does not install Policy.
 
 ## Publish the worker and dispatcher
 
@@ -43,87 +44,35 @@ safe-outputs:
 ```
 
 The allowlist tells the compiler which workers are approved. It does not
-authorize a dispatch. Queue dispatch uses the fixed commit SHA and
-authenticated principal (the GitHub identity) in the installed worker profile,
-not the dispatcher's moving `target-ref`. Do not give the agent credentials
+authorize arbitrary dispatch. Queue dispatch uses the compatible approved
+execution revision (or explicit Work pin) and AW's selected credential, then binds the actual native run to its
+Claim, not the dispatcher's moving `target-ref`. Do not give the agent credentials
 that can write to the queue branch.
 
-## Define the Policy
+## Optionally override scheduling
 
-Create a complete `QueuePolicy` JSON file from the following template. Replace
-the repository, both actor IDs, and the worker revision. Verify that each actor
-ID is a positive decimal GitHub principal ID. Set the revision to the actual
-40- or 64-character commit SHA containing the worker workflow.
+Without `aw.json`, without `work_queue`, or with `"work_queue": {}`, bootstrap
+uses weighted-priority scheduling, one pool named `default`, concurrency 16,
+pending limit 4,096, singleton assignments, and three attempts with a
+30-second backoff. Override only the values needed:
 
-Add one producer entry for each trusted submission identity. Each entry grants
-that identity permission to submit to specific pools, priorities, and accounting
-keys. Pools group tasks with shared worker routes and capacity limits.
-Administrator status alone does not grant these producer entitlements.
-The producer ID must match the identity authenticated when it submits work.
-
-For the worker principal, use the identity verified by the dispatch credential
-and worker-run authentication. A display name or `github.actor` is not proof
-of that identity.
-
-```json title="queue-policy.json"
+```json title=".github/workflows/aw.json"
 {
-  "mode": "weighted-priority",
-  "class_weights": [8, 4, 2, 1, 1],
-  "accounting_weights": { "": 1 },
-  "producers": {
-    "REPLACE_WITH_PRODUCER_ACTOR_ID": {
-      "pools": ["default"],
-      "priorities": [1, 2, 3, 4, 5],
-      "fairness_keys": [""]
-    }
-  },
-  "pools": {
-    "default": {
-      "default_profile": "eslint-refiner",
-      "profiles": {
-        "eslint-refiner": {
-          "workflow": ".github/workflows/eslint-refiner.lock.yml",
-          "ref": "REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA",
-          "principal": "REPLACE_WITH_WORKER_CREDENTIAL_ACTOR_ID",
-          "trust_domain": "eslint-refiner",
-          "credential_scope": "repository",
-          "effect_scope": "github/gh-aw",
-          "max_claims": 1,
-          "share_keys": false
-        }
-      },
-      "logical_limit": 16,
-      "native_limit": 16,
-      "allowed_repositories": ["github/gh-aw"],
-      "max_observation_age_ms": 60000,
-      "retry": { "max_attempts": 3, "backoff_ms": 1000 },
-      "reconciliation": { "max_attempts": 5, "deadline_ms": 300000 }
-    }
-  },
-  "limits": {
-    "ledger_bytes": 67108864,
-    "recovery_bytes": 16777216,
-    "payload_bytes": 16384,
-    "graph_nodes": 4096,
-    "predecessors": 64,
-    "pending_nodes": 4096,
-    "operations": 256,
-    "assignment_bytes": 49152,
-    "result_bytes": 4096,
-    "evidence_bytes": 1024,
-    "observation_writes": 4096
+  "work_queue": {
+    "concurrency": 3,
+    "pending_limit": 30,
+    "retry": {"max_attempts": 3, "backoff_seconds": 30}
   }
 }
 ```
 
-The template uses the default empty accounting key (`""`) and the maximum
-supported native limits. Accounting keys group tasks for fairness accounting.
-Lower the limits if needed, but do not exceed the values in the template.
-
-The ledger is the queue's transaction log. Its 64 MiB ordinary budget and
-16 MiB recovery reserve are separate: you cannot set the ordinary ledger limit
-to 80 MiB. If you add accounting keys, retain `"": 1` and explicitly grant
-producers permission to use each additional key.
+Invalid settings fail with the property path and supported values. Advanced
+`pools`, `class_weights` and `accounting_weights` are optional scheduling
+settings; they never contain identities or worker routes. Global backing Issue
+projection and labels also belong in `work_queue.issues`, for example
+`"issues": {"label": "work"}`. All pools inherit
+the declared AW worker routes; a dispatcher's AW allowlist still limits its
+launches. See the [configuration reference](/gh-aw/reference/work-queue/#repository-scheduling-settings).
 
 ## Automatic first-use bootstrap
 
@@ -150,18 +99,12 @@ not provision the queue.
 Activation treats a genuinely absent branch as an uninitialized, empty queue,
 even when a compiled Policy proposal is present. It validates the proposal
 without installing it; the checked commit publication creates the branch.
-An existing ledger with missing or mismatched Policy still fails validation.
-
-In an explicit frontmatter pool, use
-`allowed-repositories: ["${{ github.repository }}"]` for the workflow's own
-repository. Only this repository expression is accepted; inputs and event
-payloads cannot choose dependency repositories. Literal foreign repositories
-require separately bound read credentials.
+An existing ledger with missing or invalid Policy still fails validation.
 
 Native `submit-work` and `submit-graph` also bootstrap on first submission
-without an administrator seed. Their default Policy binds the operator to
-`.github/workflows/worker.lock.yml` at the verified default-branch commit;
-publish that assignment-capable worker first. Embedding hosts can provide an
+without an administrator seed. They resolve scheduling and declared AW worker
+routes from the verified repository revision, not an unrelated local checkout.
+Publish assignment-capable AW workers first. Embedding hosts can provide an
 approved `Branch.PolicyProposal`.
 
 ```bash
@@ -174,28 +117,62 @@ publication. Recovery returns the accepted result without another admission.
 
 The default queue branch is `work-queue`. To use another queue branch, put
 `--branch QUEUE_BRANCH` before the submission command. Subsequent submissions
-must match the installed Policy proposal.
+use the installed Policy. Editing `aw.json` does not rewrite active queue state.
 
 Remove any setup calls to `initializeWorkQueue`, `initializationContext`, or
 pre-submission `policy`: standalone seeding is unsupported. Existing historical
 Policy-only genesis records remain readable and do not require migration.
 
-## Update an existing Policy
+## Evolve workers without draining
+
+Publish and compile a compatible worker update. Its compiler-derived logical
+contract preserves declared assignment inputs, permissions, tools and
+output/resource capabilities; prompt or engine changes alone do not change
+that contract. The trusted deployment transition affects future admissions
+and assignments, not existing Work identities, dependencies, Results, fairness
+debt or reservations. Explicit `execution_ref` pins retain their approved
+revision. Existing assignments complete and reconcile using their frozen
+original profile and native run/credential binding.
+
+An incompatible or unavailable worker pauses affected Work, not unrelated
+tasks or the entire graph. Do not delete the queue, rewrite completed results
+or revoke outstanding assignments to deploy new code. Historical workers
+without logical-contract metadata remain exact-ref routes.
+
+Protected producer/dispatcher processing automatically synchronizes its approved
+targets before new submit/dispatch requests. To refresh native operator routes:
+
+```bash
+gh aw work-queue --repo OWNER/REPO deploy --from-config
+```
+
+Use `--pool` or `--worker-profile` to limit this refresh. For reproducible Work,
+add `--execution-ref IMMUTABLE_SHA` to native `submit-work` or `execution_ref`
+to the submission node. Keep the same pin on retries; changing it requires new
+Work rather than rewriting an admitted obligation.
+
+Upgrade readers and runtimes before deploying contract-stamped workers. An
+existing historical unmarked Policy does not infer compatibility; migrate it
+through the explicit quiescent Policy path once, then use drain-free deployment
+updates.
+
+## Update scheduling economics
 
 Before changing Policy later, make the queue quiescent: settle all nonterminal
 (unfinished) Work, outstanding reservations, and unresolved delivery of
 completed Work. Cancellation alone does not stop a worker or release its
 reservation; reconcile exact termination or nonlaunch evidence separately.
-Frontmatter alone does not install or update Policy; the first accepted producer
-submission installs its compiled proposal, and later changes remain
-administrator-only.
+Configuration alone does not update Policy; later changes require an explicit,
+authorized update.
 
 ```bash
 gh aw work-queue --repo OWNER/REPO policy \
-  --file queue-policy.json --epoch revised-policy
+  --from-config --epoch revised-policy
 ```
 
-This command cannot initialize an absent queue.
+This command resolves scheduling and AW worker routes from repository
+configuration and cannot initialize an absent queue. `--file queue-policy.json`
+remains available for explicit historical Policy migrations.
 
 ## Enable backing Issue projection
 
@@ -203,17 +180,18 @@ Upgrade all queue readers and workflow runtime deployments first. Older
 version-3 closed-schema readers cannot read the new projector rules, Issue
 links, or comment handles; do not enable them during a mixed-reader rollout.
 
-Add `issues: true` under each participating `tools.work-queue` object to project
+Set `"issues": true` in `.github/workflows/aw.json` `work_queue` to project
 the `work` tracking label and purple `work:<status>` labels (for example,
 `work:queued`). Status names are lowercase and hyphenated, without spaces. To
-use a different prefix, configure `issues: {label: cookie}`. Labels are
+use a different prefix, configure `"issues": {"label": "cookie"}` there. Labels are
 provisioned as needed in each target repository; no organization field or
 Project is required. See the
 [backing Issue reference](/gh-aw/reference/work-queue/#backing-issues).
 
-Add an explicit `projectors` array to the installed Policy, using the actual
+Historical Policies use an explicit `projectors` array with the actual
 authenticated principal and immutable workflow revision for each producer and
-worker hook:
+worker hook. These legacy rules remain readable; they are not part of
+`aw.json.work_queue` or required enrollment for AW-managed queues:
 
 ```json
 {
@@ -244,14 +222,17 @@ Merge this property into the complete Policy, not a standalone policy file.
 Replace the resource placeholders with the existing Issue's exact decimal
 identities, kept as strings. Omit `backing_issues` entirely when only
 projector-created Issues are needed.
+AW-managed queues also require these explicit grants for pre-existing Issues,
+cross-repository projection or closure on Result. Ordinary same-repository
+Issue creation needs no projector rules and keeps Issues open.
 Install the amended Policy while the queue is quiescent. Scope the
 protected hook credential to queue contents writes, Actions reads, and Issue
 writes in its allowed backing repositories. If `safe-outputs.github-app` is
 configured, each hook mints its own scoped projector token; the runtime checks
 the actual token's field capability. Keep this credential out of agent execution.
-Protect both the queue branch and `gh-aw-issue-projection/*` coordination refs
-against unauthorized updates/deletion; hooks need permission to create/delete
-their own coordination refs.
+GitHub repository access rules govern queue and coordination refs; the queue
+requires no branch-protection setup. Hooks need permission to create/delete
+their own `gh-aw-issue-projection/*` coordination refs.
 
 Submit one independently tracked Work per Issue. Supply `backing_issue` for an
 existing Issue only after installing its full resource identity in each

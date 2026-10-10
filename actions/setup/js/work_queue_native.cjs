@@ -122,7 +122,7 @@ function validateNativeRun(run, expected) {
   const status = run.status;
   const terminal = status === "completed" && typeof run.conclusion === "string" && run.conclusion.length > 0;
   log.debug("run.validate.complete", { terminal });
-  return { run_id: runId, run_attempt: 1, repository: run.repository.full_name, terminal, status, conclusion: terminal ? run.conclusion : null };
+  return { run_id: runId, run_attempt: 1, repository: run.repository.full_name, principal: nativeId(run.actor.id), terminal, status, conclusion: terminal ? run.conclusion : null };
 }
 
 async function postQueueDispatch(githubClient, destination, inputs) {

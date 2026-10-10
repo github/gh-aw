@@ -302,7 +302,14 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 		case r.Method == http.MethodGet && path == "issues/7":
 			result = map[string]any{"id": 10, "number": 7, "state": "closed", "state_reason": "completed"}
 		case r.Method == http.MethodGet && path == "git/ref/heads/main":
-			result = map[string]any{"object": map[string]string{"sha": strings.Repeat("f", 40)}}
+			result = map[string]any{"ref": "refs/heads/main", "object": map[string]string{"sha": strings.Repeat("f", 40)}}
+		case r.Method == http.MethodGet && path == "contents/.github/workflows/aw.json":
+			status, result = http.StatusNotFound, map[string]string{"message": "Not Found"}
+		case r.Method == http.MethodGet && path == "contents/.github/workflows":
+			result = []map[string]string{{"type": "file", "path": ".github/workflows/worker.md"}}
+		case r.Method == http.MethodGet && path == "contents/.github/workflows/worker.md":
+			content := "---\non: workflow_dispatch\ntools:\n  work-queue:\n    worker: true\n---\nWorker"
+			result = map[string]any{"type": "file", "path": ".github/workflows/worker.md", "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))}
 		case r.Method == http.MethodGet && path == "contents/.github/workflows/worker.lock.yml":
 			if r.URL.Query().Get("ref") != strings.Repeat("f", 40) {
 				t.Error("worker provisioning did not use the independently resolved immutable default revision")
@@ -462,7 +469,9 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 		reject(string(invalid), "request_invalid", "submit-graph", "--file", "-")
 	}
 	actorID = 1002
-	reject(`{"task":"review"}`, "admission_unauthorized", "submit-work", "--file", "-")
+	if run(`{"task":"review"}`, "submit-work", "--file", "-")["created"] != false || log != before {
+		t.Fatal("AW-managed submission required authored producer identities or changed immutable Work")
+	}
 	reject(`{"task":"review"}`, "request_reuse", "submit-work", "--file", "-", "--request-id", "stable-submit")
 	actorID = 1001
 	replayed := run("", "replay")
@@ -624,8 +633,16 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	}
 	t.Run("human atomic observation counts only Claims", func(t *testing.T) {
 		run("", "control", "--name", "grants_paused", "--paused=false", "--reason", "resumed")
+		currentCommits, err := workqueue.Parse([]byte(log))
+		if err != nil {
+			t.Fatal(err)
+		}
+		current, err := workqueue.Replay(currentCommits)
+		if err != nil {
+			t.Fatal(err)
+		}
 		node, err := workqueue.NewWork([]byte(`{"task":"observed"}`), "observed", "root", "default",
-			workqueue.DefaultPolicy("1001", remote), 1000)
+			*current.Policy, 1000)
 		if err != nil {
 			t.Fatal(err)
 		}

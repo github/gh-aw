@@ -13,6 +13,14 @@ Its [implementation coverage table](../../docs/src/content/docs/specs/work-queue
 tracks unfinished runtime/verification work.
 Do not infer protection against direct Git writes from functional tests.
 
+`QueueBootstrap`, `WorkerEvolution` and `WorkerDeploymentBoundary` model
+AW-managed admission and deployment premises.
+`FairWorkQueue`, `QueueService` and `QueueLifecycle` retain bounded
+native scheduling/launch capabilities, including historical multi-Claim
+profiles; those configurations do not override AW's singleton default.
+`ClaimScopedWorker` and `IssueProjection` abstract already-trusted identity and
+effect/admission authority, not AW enrollment or authentication implementation.
+
 The original `WorkQueue.tla` is retained as historical model evidence for
 [issue #64852](https://github.com/github/gh-aw/issues/64852). Its best-effort
 oldest-first selection, competing Claim arbitration and scalar worker behavior
@@ -32,8 +40,12 @@ not supported deployment guidance.
 
 ## First-submit bootstrap model
 
-`QueueBootstrap.tla` is a separate bounded refinement of the first valid producer
-submission with a compiler-approved Policy and Work. It covers both initialized
+`QueueBootstrap.tla` is a separate bounded refinement of the first valid
+AW-host-authorized submission with a compiler-approved Policy and Work. The
+`producer` and `dispatcher` names describe operation roles, not enrollment.
+The model's independent `hostAuthorized` premise must hold before candidate
+validation or repository preparation; an empty producer map never blocks an
+otherwise valid submission. It covers both initialized
 repositories with an absent queue branch and repositories with no branches.
 Only a not-found ref or a conflict independently confirmed by matching repository
 identity and native `isEmpty` permits absence handling; generic conflicts,
@@ -61,6 +73,17 @@ submissions; standalone Policy initialization and activation seeding are
 unsupported. Historical Policy-only genesis records remain readable. This
 compatibility does not authorize new standalone seeding.
 
+AW-managed queues resolve global scheduling and backing Issue/label settings
+from `.github/workflows/aw.json`, with default-only automatic bootstrap.
+AW authorizes participants and approved worker targets; queue configuration
+contains no enrollment, producer allowlists, worker principals or credential
+scopes. Installed Policy remains authoritative until an explicit quiescent
+update. `AWPolicy` records the default concurrency 16, pending limit 4096,
+singleton assignment, three delivery attempts and 30-second retry interval.
+These are bootstrap constants, not a proof of optional-setting normalization.
+The older scheduling models retain their historical policy/authentication
+assumptions; no model proves AW host authorization or credential acquisition.
+
 Run the focused checks using the official jar documented below:
 
 ```bash
@@ -76,6 +99,9 @@ TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=QueueBootstrap \
 | `BrokenBootstrapBranch.cfg` | Initialize on the queue branch itself; `SeparateQueueBranch` fails. |
 | `BrokenBootstrapRoute.cfg` | Publish without a verified route; `PublicationAuthority` fails. |
 | `BrokenBootstrapAtomic.cfg` | Publish Policy without Work; `AtomicGenesis` fails. |
+| `BrokenBootstrapHost.cfg` | Accept a submission without independent AW host authorization; `TrustedAWAuthority` fails. |
+| `BrokenBootstrapEnrollment.cfg` | Require enrollment despite AW host authorization; `NoEnrollmentGate` fails. |
+| `BootstrapTrustedAWWitness.cfg` | Reach atomic default-only AW bootstrap with no producer enrollment. |
 | `BootstrapDeferredWitness.cfg` | Reach a prepared default branch with no queue publication and an unavailable worker. |
 | `BootstrapRetryWitness.cfg` | Reach atomic publication after preparation, route failure, worker deployment and retry. |
 | `BootstrapLostResponseWitness.cfg` | Reach publication after recovering a lost default-branch initialization response. |
@@ -87,6 +113,112 @@ success. This model abstracts one immutable request, native observations and
 publication; it does not prove GitHub API semantics, concurrent Git CAS, JSON
 parsing, optional-setting normalization or credential/writer restrictions.
 Scheduling and Claim authority remain covered by the other models.
+
+## Prospective worker evolution model
+
+`WorkerEvolution.tla` supplements the fixed-policy scheduling and launch models
+with bounded contract-marked AW deployment evolution. It models two independent
+workers, three pending Work items (one explicitly pinned), compatible and
+incompatible immutable revisions, per-revision availability, and two prospective
+updates. One prepared writer and another checked publisher expose stale
+`expected_ref` / `expected_contract` CAS rejection and refresh. Revision profiles
+remain immutable even when an existing revision's availability changes.
+
+Each Work keeps its admission contract and optional execution pin. Unpinned
+pending Work follows the current compatible revision; pinned Work keeps its
+registered revision. An incompatible or unavailable route excludes only affected
+pending Work. Eligibility checks do not consume a Claim or charge service debt.
+Unaffected Work can proceed independently. The model abstracts debt as one charge
+per accepted Claim; integer-pass ordering, batch packing and service-share
+guarantees remain the responsibility of `FairWorkQueue.tla` and `QueueService.tla`.
+
+An accepted Claim freezes its Dispatch revision and contract. Native start freezes
+the actual authenticated credential principal, with a separate configuration
+for an optional profile principal constraint. Completion uses the frozen
+Dispatch identity, not the newest route. Trusted delivery and terminal
+reconciliation can therefore finish and release an old reservation after an
+incompatible deployment. Deployment never changes existing Results,
+reservations, debt or installed economic Policy. Ghost copies check that
+noninterference; they are not serialized queue data.
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=WorkerEvolution \
+  bash specs/work-queue/check.sh
+```
+
+| Configuration | Scope / expected result |
+|---|---|
+| `WorkerEvolution.cfg`, `WorkerEvolutionPrincipal.cfg` | Exhaust `Safety` with two updates and optional/explicit profile principal constraints. |
+| `BrokenEvolutionCAS.cfg`, `BrokenEvolutionRevision.cfg` | Detect stale publication or mutation of an immutable revision contract. |
+| `BrokenEvolutionPin.cfg`, `BrokenEvolutionContract.cfg`, `BrokenEvolutionAvailability.cfg` | Detect repinning or granting locally incompatible/unavailable Work. |
+| `BrokenEvolutionGlobalPause.cfg`, `BrokenEvolutionDebt.cfg` | Detect queue-wide deployment blocking or charging pending Work without a Claim. |
+| `BrokenEvolutionResult.cfg`, `BrokenEvolutionReservation.cfg` | Detect retroactive Result or reservation mutation. |
+| `BrokenEvolutionDispatch.cfg`, `BrokenEvolutionCredential.cfg`, `BrokenEvolutionEconomics.cfg` | Detect rewriting frozen route, credential identity or economic Policy. |
+| `EvolutionCompatibleWitness.cfg`, `EvolutionPinWitness.cfg` | Reach a newest-compatible unpinned assignment and an old pinned assignment. |
+| `EvolutionIncompatibleWitness.cfg`, `EvolutionUnavailableWitness.cfg` | Reach affected Work paused without debt while unrelated Work runs. |
+| `EvolutionCompletionWitness.cfg` | Reach verified old-route completion and reservation release after incompatible deployment. |
+| `EvolutionRaceWitness.cfg` | Reach a stale prepared publisher after another Deployment advances the route. |
+
+The global-pause control changes the actual eligibility predicate and checks it
+against independent per-route readiness, not a liveness assertion. All witnesses
+first check `Safety`, then fail a deliberately false reachability invariant.
+This finite abstraction does not prove compiler SHA-256 contract derivation,
+durable Git/JSON encoding, arbitrary deployment histories, checkpoint replay,
+AW permissions, credential rotation or external run/receipt verification.
+Legacy unmarked profiles remain the fixed-profile cases in the older models;
+this deployment model does not reinterpret them as contract-marked workers.
+
+Focused checks on 2026-10-09 exhausted the three bootstrap safety configurations
+(108, 84 and 72 distinct states) and both deployment safety configurations
+(509,404 and 93,760 distinct states). All 35 registered bootstrap/deployment
+cases returned their exact expected result, including mutation controls and
+guarded witnesses. The extended trace runner emitted all 24 seeded traces and
+matched all 16 witness diagnostics with unchanged source/tool hashes. The seven
+runner unit tests also passed. This is focused finite evidence, not a new
+exhaustive verdict for the older large models or live Go/JavaScript integration.
+
+### Availability-only updates and protected caller approval
+
+`WorkerDeploymentBoundary.tla` supplements the unchanged bootstrap/evolution
+cases with the final deployment boundary. `activate: false` changes only an
+already-registered revision's availability. Its `expected_ref` and
+`expected_contract` name the **current** route, even when editing an old pin;
+it cannot silently promote that old revision. Another current-route update can
+invalidate the prepared CAS. An old pinned revision can become unavailable while
+new compatible unpinned Work remains locally ready.
+
+`callerProfiles` abstracts the protected `DispatchParameters.worker_profiles`
+allowlist for each new request. It is a profile-name filter, not a revision pin,
+new enrollment rule or durable Policy mutation. Changing a caller's approved
+profiles neither charges blocked Work nor resets previously earned service debt.
+Outstanding start/completion/delivery/release authority remains frozen even if
+a later caller excludes that worker. Only trusted administrator, producer and
+dispatcher roles can publish Deployment; workers cannot.
+
+The model assumes protected proposals and local caller approval come from AW.
+It does not prove `synchronizeDeployments` runs only before **new** submissions
+or dispatch requests, derive the compiler allowlist, or implement
+`futurePolicy`/`FuturePolicy`. Those are runtime integration obligations.
+The future-policy view does not mutate installed scheduling economics.
+
+Run `check.sh` with `TLC_MODEL_FILTER=WorkerDeploymentBoundary` for its safety
+case, five named mutation controls and three guarded witnesses:
+
+| Configuration | Scope / expected result |
+|---|---|
+| `WorkerDeploymentBoundary.cfg` | Exhaust `BoundarySafety` with two updates and changing caller approval. |
+| `BrokenBoundaryAvailabilityCAS.cfg`, `BrokenBoundaryAvailabilityRoute.cfg` | Detect stale historical-availability CAS or accidental old-route promotion. |
+| `BrokenBoundaryWorker.cfg`, `BrokenBoundaryApproval.cfg`, `BrokenBoundaryDebt.cfg` | Detect worker deployment, unapproved grants or caller-induced debt reset. |
+| `BoundaryPinnedAvailabilityWitness.cfg` | Reach unavailable old pinned Work while the newest compatible unpinned route stays ready. |
+| `BoundaryUnapprovedWitness.cfg` | Reach unapproved pending Work without debt while approved unrelated Work runs. |
+| `BoundaryCompletionWitness.cfg` | Reach old-route verified completion and release after incompatible deployment and caller exclusion. |
+
+The nine supplemental checks passed on 2026-10-09; `BoundarySafety` exhausted
+2,145,808 distinct states, and all five mutation controls and three guarded
+witnesses returned their exact named diagnostic. The original 35 cases and
+24-trace/16-witness capture were not rerun: their model sources are unchanged.
+This additional bounded result does not extend them into a live host or native
+implementation refinement proof.
 
 ## Local stress simulator
 
@@ -338,7 +470,8 @@ and fails on drift. A separate validation runs the genuine
 `file-type=json` and `seal-object-schemas=true` into a disposable output
 directory. The fail-closed comparison below resolves references and compares
 validation constraints for the supported schema subset, including custom
-identity bounds. The current 45-schema set passes this comparison; this is not
+identity bounds. The current 48-schema set passes this comparison, including
+Deployment and pinned Work contracts; this is not
 a general JSON Schema equivalence solver or a proof of runtime validation.
 Do not overwrite the checked-in schemas with the separate official output.
 
@@ -601,7 +734,8 @@ passed; the default `FairBatch` graph still has 13,662 distinct states at depth 
 To reproduce the comparison against the last unrefined source:
 
 ```bash
-baseline="$(mktemp -d)"
+baseline="$PWD/.queue-validation-cache/baseline-4ae415cc"
+mkdir -p "$baseline"
 git archive 4ae415cc7046e215b6056fed90c26e4b915ef06b specs/work-queue |
   tar -x -C "$baseline"
 export JAVA_BIN=/path/to/java
@@ -984,15 +1118,22 @@ JAVA_BIN=/path/to/java \
 bash specs/work-queue/check.sh
 ```
 
-The runner checks every registered configuration across the seven models,
+The runner checks every registered configuration across the nine models,
 including the historical configurations below. Positive configurations require
 exhaustive successful termination; negative controls and guarded witnesses
 require their exact named diagnostic and exit status, not a parse/tooling failure.
 Use `TLC_MODEL_FILTER` and `TLC_CONFIG_FILTER` to select a subset; unmatched
-filters fail. Full reports are saved under a printed temporary path; set
+filters fail. Full reports and Java's extracted modules are saved under a
+unique printed repository-local `.queue-validation-cache/` path; set
 `TLC_RESULTS_DIR` to retain them at a chosen location. The historical controls
 below deliberately bypass branch-version, terminal-state or selection protection;
 those are not reachable behaviors of the guarded historical protocol.
+
+`python3 -B specs/work-queue/verify_models_test.py` checks runner registration,
+exact success/counterexample diagnostics, rejection of tooling and safety
+failures as witnesses, unmatched filters, and repository-local evidence paths.
+Its fake TLC process tests the runner only; actual model verdicts require the
+official jar. Java's extraction directory is explicitly kept with the reports.
 
 | Configuration | Scope / expected result |
 |---|---|
@@ -1018,7 +1159,7 @@ counts, to identify exhausted versus unfinished searches.
 
 ## Inspect execution traces
 
-Generate bounded textual simulations of six configurations and nine reachable
+Generate bounded textual simulations of eight configurations and sixteen reachable
 counterexamples to deliberately false *witness* invariants. `WorkQueue` is
 historical; the other models abstract parts of the current protocol:
 
@@ -1029,10 +1170,11 @@ TLC_TRACE_DEPTH=16 TLC_TRACE_COUNT=3 \
 bash specs/work-queue/traces.sh
 ```
 
-The script prints a temporary results directory (or uses `TLC_RESULTS_DIR` when
+The script prints a repository-local results directory (or uses `TLC_RESULTS_DIR` when
 set). `simulation_*` files are historical `WorkQueue` traces; current abstraction
 traces use prefixes `FairBatch`, `FairDAGGitHub`, `ClaimScopeMixed`,
-`ServiceDynamic` and `LifecyclePacked`. Each has at most `TLC_TRACE_DEPTH` states;
+`ServiceDynamic`, `LifecyclePacked`, `BootstrapEmpty` and `WorkerEvolution`.
+Each has at most `TLC_TRACE_DEPTH` states;
 `TLC_TRACE_COUNT` sets the number of seeded random simulations per configuration.
 The runner requires emitted traces and successful TLC termination, records
 Java identity/settings and SHA-256 hashes, and rejects source/tool drift.

@@ -5,12 +5,13 @@ const queue = require("./work_queue_replay.cjs");
 const store = require("./work_queue_store.cjs");
 const { canonical, digest, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { normalizeAssignment } = require("./work_queue_claim_scope.cjs");
-const { actorFromContext, validatePolicy } = require("./work_queue_policy.cjs");
+const { actorFromContext, dispatchPrincipal, validatePolicy } = require("./work_queue_policy.cjs");
+const { readWorkQueuePolicyConfig } = require("./work_queue_policy_config.cjs");
 const { requestForIntent } = require("./work_queue_intents.cjs");
 const { authenticatePublisher, validateNativeRun } = require("./work_queue_native.cjs");
 
 function policyProposalFor(options) {
-  const raw = Object.hasOwn(options, "policyProposal") ? options.policyProposal : process.env.GH_AW_WORK_QUEUE_POLICY;
+  const raw = Object.hasOwn(options, "policyProposal") ? options.policyProposal : readWorkQueuePolicyConfig() || undefined;
   if (raw === undefined) return;
   if (typeof raw === "string" && Buffer.byteLength(raw, "utf8") > 4 * 1024 * 1024) throw new Error(`${SAFE_OUTPUT_E002}: work_queue_policy_proposal_limit`);
   const proposal = typeof raw === "string" ? parseStrictJSON(raw) : raw;
@@ -22,6 +23,7 @@ function assertPolicyProposal(state, options) {
   const proposal = policyProposalFor(options);
   if (proposal === undefined) return;
   if (!state.policy) throw new Error("work_queue_policy_missing");
+  if (proposal.authorization === "aw") return;
   if (canonical(proposal) !== canonical(state.policy)) throw new Error("work_queue_policy_proposal_mismatch");
 }
 
@@ -88,27 +90,29 @@ function validateStoredAssignment(state, supplied, { allowReleased = false } = {
   return { assignment: stored, dispatch, profile };
 }
 
-function expectedWorkerRun(assignment, profile, context, canonicalRepository = `${context.repo.owner}/${context.repo.repo}`) {
+function expectedWorkerRun(assignment, profile, context, canonicalRepository = `${context.repo.owner}/${context.repo.repo}`, principal = profile.principal) {
   return {
     repository: canonicalRepository,
     ...(context.payload?.repository?.id === undefined ? {} : { repository_id: context.payload.repository.id }),
     workflow: profile.workflow,
     ref: profile.ref,
-    principal_id: profile.principal,
+    principal_id: principal,
     dispatch_id: assignment.dispatch_id,
   };
 }
 
 function bindingForRun(proof, expected) {
+  if (proof.principal !== expected.principal_id) throw new Error("run_principal_mismatch");
   return { run_id: proof.run_id, run_attempt: 1, repository: proof.repository, workflow: expected.workflow, ref: expected.ref, principal: expected.principal_id, event: "workflow_dispatch" };
 }
 
 async function bindWorkerAssignment(options) {
   const initial = await loadQueue(options);
   const { assignment, dispatch, profile } = validateStoredAssignment(initial.projection, options.assignment);
+  if (profile.logical_contract && (options.logicalContract ?? process.env.GH_AW_WORK_QUEUE_CONTRACT) !== profile.logical_contract) throw new Error("work_queue_worker_contract_mismatch");
   if (!["started", "uncertain", "unresolved", "bound"].includes(dispatch.state)) throw new Error("work_queue_launch_marker_required");
   const trustedContext = await authenticatePublisher({ ...options, role: "worker", dispatch_id: assignment.dispatch_id });
-  const expected = expectedWorkerRun(assignment, profile, options.context, trustedContext.repository);
+  const expected = expectedWorkerRun(assignment, profile, options.context, trustedContext.repository, dispatchPrincipal(dispatch));
   const proof = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
   const binding = bindingForRun(proof, expected);
   if (dispatch.run && canonical(dispatch.run) !== canonical(binding)) throw new Error("run_binding_conflict");

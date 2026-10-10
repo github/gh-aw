@@ -14,64 +14,6 @@ tools:
   cli-proxy: true
   bash:
     - cat /tmp/gh-aw/agent/eslint-factory-plan.json
-work-queue-policy:
-  mode: weighted-priority
-  class-weights: [8, 4, 2, 1, 1]
-  accounting-weights: {"": 1}
-  producers:
-    "4175913":
-      pools: [default]
-      priorities: [3]
-      fairness-keys: [""]
-  pools:
-    default:
-      default-profile: eslint-miner
-      profiles:
-        eslint-miner:
-          workflow: .github/workflows/eslint-miner.lock.yml
-          ref: 6976a375a288e2ac4ca5102fd54bb9adafcf2f5e
-          principal: "4175913"
-          trust-domain: eslint-miner
-          credential-scope: repository
-          effect-scope: ${{ github.repository }}
-          max-claims-per-dispatch: 1
-          share-keys: false
-        eslint-refiner:
-          workflow: .github/workflows/eslint-refiner.lock.yml
-          ref: 6976a375a288e2ac4ca5102fd54bb9adafcf2f5e
-          principal: "4175913"
-          trust-domain: eslint-refiner
-          credential-scope: repository
-          effect-scope: ${{ github.repository }}
-          max-claims-per-dispatch: 1
-          share-keys: false
-        eslint-monster:
-          workflow: .github/workflows/eslint-monster.lock.yml
-          ref: 6976a375a288e2ac4ca5102fd54bb9adafcf2f5e
-          principal: "4175913"
-          trust-domain: eslint-monster
-          credential-scope: repository
-          effect-scope: ${{ github.repository }}
-          max-claims-per-dispatch: 1
-          share-keys: false
-      logical-limit: 3
-      native-limit: 3
-      allowed-repositories: ["${{ github.repository }}"]
-      max-observation-age-ms: 60000
-      retry: {max-attempts: 1, backoff-ms: 1000}
-      reconciliation: {max-attempts: 5, deadline-ms: 300000}
-  limits:
-    ledger-bytes: 67108864
-    recovery-bytes: 16777216
-    payload-bytes: 8192
-    graph-nodes: 3
-    predecessors: 64
-    pending-nodes: 30
-    operations: 32
-    assignment-bytes: 49152
-    result-bytes: 4096
-    evidence-bytes: 1024
-    observation-writes: 4096
 safe-outputs:
   dispatch-workflow:
     workflows: [eslint-miner, eslint-refiner, eslint-monster]
@@ -131,9 +73,9 @@ Call `work_queue_submit` once with
 `{"nodes": <the plan.nodes array>}` before requesting any grants. Date-keyed
 graph/node identities make repeated submissions on the same UTC day idempotent,
 including manual runs and reruns. Do not change stored task payloads on retries
-or replace admitted Work. Trusted processing enforces the authenticated
-dispatcher's installed producer entitlement for pool `default`, priority `3`,
-and accounting key `""`; a failed admission is not permission to bypass Policy.
+or replace admitted Work. AW authorizes trusted participants; the installed
+Policy controls scheduling for pool `default`, priority `3`, and accounting key
+`""`. A failed admission is not permission to bypass scheduling bounds.
 With CLI wrappers, use the `work-queue work_queue_submit` subcommand with one
 JSON argument containing the exact stored nodes. Submission is also a staged
 intent, not proof of durable admission.
@@ -156,22 +98,18 @@ The scheduler selects eligible Work and launches only the compatible worker
 profile at its installed immutable workflow revision. This workflow's
 `safe-outputs.dispatch-workflow.workflows` list is the compiler-approved
 worker-name allowlist; it does not replace the installed policy's profile,
-revision, or principal binding. Do not call ordinary `dispatch_workflow` or typed
+revision, or Claim/run ownership. Do not call ordinary `dispatch_workflow` or typed
 per-worker dispatch tools.
 
 Safe-output processing uses only the compiler-approved Policy proposal; never
-choose or modify Policy. The proposal must grant this dispatcher's principal
-producer entitlement. If bootstrap or admission fails, report the failure; do
+choose or modify Policy. If bootstrap or admission fails, report the failure; do
 not bypass it with `noop` or ordinary worker dispatch.
 
-The compiled proposal grants producer entitlement only to `pelikhan`
-(`4175913`), the authenticated actor of this dispatcher's scheduled runs.
-The selected `GH_AW_GITHUB_TOKEN` launch credential must authenticate as that
-same approved worker principal; runtime authentication verifies it before any
-launch. There is no fallback to the unrelated `GITHUB_TOKEN` bot identity.
-Worker routes are pinned to the published revision above, not the current
-default branch. The first accepted submission automatically creates the queue
-with compiled Policy and Work; no administrator seed is required.
-Changing identities or worker revisions after bootstrap requires a quiescent
+Scheduling overrides are shared in `.github/workflows/aw.json` under
+`work_queue`. AW selects the launch credential and pins declared worker routes
+to the immutable workflow revision; it binds each actual native run to its
+Claim. The first accepted submission automatically creates the queue with
+compiled Policy and Work; no administrator seed is required.
+Changing scheduling or worker revisions after bootstrap requires a quiescent
 queue and an administrator Policy update; editing this proposal alone cannot
 replace installed Policy.

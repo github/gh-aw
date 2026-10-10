@@ -3,8 +3,9 @@
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("scheduler");
 
 const { createHash } = require("node:crypto");
-const { canonicalBytes, closed, integer, utf8Compare, queueError } = require("./work_queue_codec.cjs");
+const { canonical, canonicalBytes, closed, identity, integer, utf8Compare, queueError } = require("./work_queue_codec.cjs");
 const { indexesFor, schedulingState, updateIndexes } = require("./work_queue_indexes.cjs");
+const { executionProfile } = require("./work_queue_deployment.cjs");
 
 function gcd(a, b) {
   while (b !== 0n) [a, b] = [b, a % b];
@@ -96,6 +97,9 @@ function eligibility(state, work, at, capacitySnapshot) {
   if (work.state !== "available") return { ready: false, reason: `ownership_${work.state}`, observations: [] };
   const policy = poolPolicy(state, work.pool);
   if (state.grants_paused) return { ready: false, reason: "grants_paused", observations: [] };
+  if (state.scheduling_profiles && !state.scheduling_profiles.includes(work.worker_profile)) return { ready: false, reason: "worker_not_approved", observations: [] };
+  const route = executionProfile(state, work);
+  if (route.reason !== "ready") return { ready: false, reason: route.reason, observations: [] };
   if (work.retry_not_before > at) return { ready: false, reason: "retry_delayed", observations: [] };
   if (work.attempts >= policy.retry.max_attempts) return { ready: false, reason: "retry_exhausted", observations: [] };
   const capacity = capacitySnapshot || reservationCounts(state, work.pool, work.fairness_key);
@@ -160,7 +164,12 @@ function planNext(state, pool, at) {
 }
 
 function validateDispatchParameters(parameters, state) {
-  closed(parameters, ["pool", "max_claims", "max_dispatches", "max_bytes"], [], "dispatch_next parameters");
+  closed(parameters, ["pool", "max_claims", "max_dispatches", "max_bytes"], ["worker_profiles"], "dispatch_next parameters");
+  if (parameters.worker_profiles !== undefined) {
+    if (!Array.isArray(parameters.worker_profiles) || parameters.worker_profiles.length > 256 || new Set(parameters.worker_profiles).size !== parameters.worker_profiles.length)
+      throw queueError("request_invalid", "dispatch requires a bounded unique worker allowlist");
+    for (const name of parameters.worker_profiles) identity(name, "worker profile");
+  }
   const { poolPolicy } = require("./work_queue_policy.cjs");
   poolPolicy(state, parameters.pool);
   integer(parameters.max_claims, 1, 256, "max_claims");
@@ -175,10 +184,12 @@ function assignmentClaim(state, work, claim) {
 
 function groupCompatible(state, dispatch, work) {
   if (dispatch.worker_profile !== work.worker_profile || dispatch.pool !== work.pool) return false;
-  const pool = state.policy.pools[work.pool];
-  const profile = pool.profiles[work.worker_profile];
+  const { profile, reason } = executionProfile(state, work);
+  if (reason !== "ready") return false;
   if (profile.trust_domain !== work.batch_trust_domain) return false;
   const first = state.works.get(dispatch.claims[0].work_id);
+  const firstProfile = dispatch.profile ?? executionProfile(state, first).profile;
+  if (canonical(firstProfile) !== canonical(profile)) return false;
   return first.batch_trust_domain === work.batch_trust_domain && (profile.share_keys || first.fairness_key === work.fairness_key);
 }
 
@@ -198,7 +209,7 @@ function applyScheduledClaim(state, operation, selection, commit) {
       pool: work.pool,
       worker_profile: work.worker_profile,
       claims: [],
-      profile: structuredClone(state.policy.pools[work.pool].profiles[work.worker_profile]),
+      profile: structuredClone(executionProfile(state, work).profile),
       state: "reserved",
       released: false,
       lifecycle_writes: 0,
@@ -219,6 +230,7 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
   validateDispatchParameters(parameters, state);
   integer(precedingOperations, 0, state.policy.limits.operations, "preceding operation count");
   const working = schedulingState(state);
+  working.scheduling_profiles = parameters.worker_profiles;
   const operations = [];
   const groups = [];
   const policy = state.policy.pools[parameters.pool];
@@ -230,7 +242,7 @@ function planDispatch(state, parameters, { requestId, commitId, at, precedingOpe
   let reason = next.reason;
   while (operations.length < limit && next.work_id) {
     const work = working.works.get(next.work_id);
-    const profile = policy.profiles[work.worker_profile];
+    const profile = executionProfile(working, work).profile;
     let group;
     let claim;
     const claimId = `c_${prefix}_${operations.length + 1}`;

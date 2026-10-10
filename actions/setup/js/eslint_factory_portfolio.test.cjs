@@ -12,10 +12,18 @@ import { main as processControls } from "./work_queue_control_adapter.cjs";
 import { main as snapshotQueue } from "./write_work_queue_snapshot.cjs";
 import { fakeGitHub } from "./work_queue_store_checks.cjs";
 import { queueFixture, DISPATCHER, REF, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
+import { readWorkQueuePolicyConfig } from "./work_queue_policy_config.cjs";
 
 const repository = "owner/repo";
 const planOptions = { date: "2026-10-08", repository, repositoryId: "7" };
-const policyOptions = { repository, ref: "a".repeat(40), producerPrincipal: "11", workerPrincipal: "12" };
+const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
+const policyOptions = { repository, ref: "a".repeat(40), settings };
+
+function compiledFactoryPolicyEnvironments(compiled) {
+  return [...compiled.matchAll(/(?:^ +GH_AW_WORK_QUEUE_POLICY(?:_PARTS|_[0-9]+)?: "[^\n]+"\n)+/gm)].map(([block]) =>
+    Object.fromEntries([...block.matchAll(/(GH_AW_WORK_QUEUE_POLICY(?:_PARTS|_[0-9]+)?): ("[^\n]+")/g)].map(([, name, value]) => [name, JSON.parse(value)]))
+  );
+}
 
 function ledger() {
   let state = newState();
@@ -58,16 +66,18 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(() => buildESLintFactoryPlan({ ...planOptions, date })).toThrow(/date/);
   });
 
-  it("requires canonical repository identity, immutable profiles and explicit producer entitlement", () => {
+  it("requires canonical repository identity and immutable AW routes without enrollment", () => {
     for (const repositoryId of ["0", "007", "github-actions[bot]"]) expect(() => buildESLintFactoryPlan({ ...planOptions, repositoryId })).toThrow(/identity/);
     expect(() => buildESLintFactoryPlan({ ...planOptions, repository: "not-a-repo" })).toThrow();
     expect(() => buildESLintFactoryPolicy({ ...policyOptions, ref: "main" })).toThrow();
-    expect(() => buildESLintFactoryPolicy({ ...policyOptions, producerPrincipal: "0" })).toThrow();
-    expect(() => buildESLintFactoryPolicy({ ...policyOptions, workerPrincipal: "github-actions[bot]" })).toThrow();
     const policy = buildESLintFactoryPolicy(policyOptions);
-    expect(policy.producers["11"]).toEqual({ pools: ["default"], priorities: [3], fairness_keys: [""] });
-    expect(policy.pools.default).toMatchObject({ logical_limit: 3, native_limit: 3, retry: { max_attempts: 1 } });
-    for (const profile of ESLINT_WORKERS) expect(policy.pools.default.profiles[profile]).toMatchObject({ ref: policyOptions.ref, principal: "12", max_claims: 1, share_keys: false });
+    expect(policy.authorization).toBe("aw");
+    expect(policy.producers).toEqual({});
+    expect(policy.pools.default).toMatchObject({ logical_limit: 3, native_limit: 3, retry: { max_attempts: 3, backoff_ms: 30000 } });
+    for (const profile of ESLINT_WORKERS) {
+      expect(policy.pools.default.profiles[profile]).toMatchObject({ ref: policyOptions.ref, max_claims: 1, share_keys: false });
+      expect(policy.pools.default.profiles[profile]).not.toHaveProperty("principal");
+    }
   });
 
   it("admits three tasks once per UTC day, then grants three singleton worker assignments", () => {
@@ -94,11 +104,11 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(queue.state().claims.size).toBe(3);
   });
 
-  it("rejects admission by an identity without producer entitlement", () => {
+  it("admits another trusted AW identity without producer enrollment", () => {
     const queue = ledger();
     const plan = buildESLintFactoryPlan(planOptions);
-    expect(() => queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 2000, queue.state()), { role: "producer", repository, principal: "13" })).toThrow(/entitle|producer/);
-    expect(queue.state().works.size).toBe(0);
+    queue.append("submit", normalizeSubmitParameters({ nodes: plan.nodes }, queue.policy, 2000, queue.state()), { role: "producer", repository, principal: "13" });
+    expect(queue.state().works.size).toBe(3);
   });
 
   it("wires trusted plan preparation, submission before dispatch, and immutable run dates", () => {
@@ -111,39 +121,52 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(source).toContain("will atomically bootstrap the branch with its compiler-approved Policy and Work.");
     expect(source).toContain("Safe-output processing uses only the compiler-approved Policy proposal; never");
     expect(source).toContain("no administrator seed is required.");
-    expect(source).not.toContain("authenticates participants");
+    expect(source).not.toContain("producers:");
+    expect(source).not.toContain("work-queue-policy:");
     expect(source).not.toMatch(/branch protection|queue-branch protections/i);
   });
 
   it("embeds the complete factory bootstrap Policy in activation and trusted control processing", () => {
     const source = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.md", import.meta.url), "utf8");
     const compiled = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.lock.yml", import.meta.url), "utf8");
-    const proposals = [...compiled.matchAll(/GH_AW_WORK_QUEUE_POLICY: ("[^\n]+")/g)].map(match => JSON.parse(JSON.parse(match[1]).replaceAll("${{ github.repository }}", "github/gh-aw")));
+    const environments = compiledFactoryPolicyEnvironments(compiled);
+    const proposals = environments.map(environment => JSON.parse(readWorkQueuePolicyConfig(environment).replaceAll("${{ github.repository }}", "github/gh-aw").replaceAll("${{ github.sha }}", policyOptions.ref)));
     expect(proposals.length).toBeGreaterThanOrEqual(2);
-    const expected = buildESLintFactoryPolicy({
-      repository: "github/gh-aw",
-      ref: "6976a375a288e2ac4ca5102fd54bb9adafcf2f5e",
-      producerPrincipal: "4175913",
-      workerPrincipal: "4175913",
-    });
-    for (const proposal of proposals) expect(proposal).toEqual(expected);
+    for (const environment of environments) {
+      expect(Object.values(environment).every(value => Buffer.byteLength(value) < 21 * 1024)).toBe(true);
+    }
+    for (const proposal of proposals) {
+      expect(proposal).toEqual(proposals[0]);
+      expect(proposal.authorization).toBe("aw");
+      expect(proposal.producers).toEqual({});
+      expect(proposal.limits.pending_nodes).toBe(settings.pending_limit);
+      expect(proposal.pools.default.logical_limit).toBe(settings.concurrency);
+      for (const worker of ESLINT_WORKERS) {
+        expect(proposal.pools.default.profiles[worker]).toMatchObject({ workflow: `.github/workflows/${worker}.lock.yml`, ref: policyOptions.ref, max_claims: 1 });
+        expect(proposal.pools.default.profiles[worker]).not.toHaveProperty("principal");
+        expect(proposal.pools.default.profiles[worker].logical_contract).toMatch(/^[a-f0-9]{64}$/);
+      }
+    }
     expect(source).toContain("github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}");
     const configMatch = compiled.match(/GH_AW_WORK_QUEUE_CONTROL_CONFIG: ("[^\n]+")/);
     expect(configMatch).not.toBeNull();
     const config = JSON.parse(JSON.parse(configMatch[1]));
     expect(config["github-token"]).toBe("${{ secrets.GH_AW_GITHUB_TOKEN }}");
     expect(config.work_queue_dispatch_credential).toEqual({ kind: "authenticated" });
-    expect(config.work_queue_workflows).toEqual([...ESLINT_WORKERS].sort());
+    expect([...config.work_queue_workflows].sort()).toEqual([...ESLINT_WORKERS].sort());
   });
 
   it("bootstraps an absent queue and launches all three workers through the real trusted control adapter without duplicate launches", async () => {
     const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-eslint-dispatch-"));
-    const fixture = queueFixture({ granted: false, workerPrincipal: policyOptions.workerPrincipal });
+    const fixture = queueFixture({ granted: false, workerPrincipal: "12" });
     const fake = fakeGitHub();
     const runs = new Map();
     const posts = [];
     const failures = [];
-    const policy = buildESLintFactoryPolicy(policyOptions);
+    const compiled = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.lock.yml", import.meta.url), "utf8");
+    const [environment] = compiledFactoryPolicyEnvironments(compiled);
+    expect(environment).toBeDefined();
+    const policy = JSON.parse(readWorkQueuePolicyConfig(environment).replaceAll("${{ github.repository }}", REPOSITORY).replaceAll("${{ github.sha }}", REF));
     fake.githubClient.rest.repos.get = async () => ({
       status: 200,
       data: { full_name: REPOSITORY, id: 7, default_branch: "main", size: 1 },
@@ -212,7 +235,7 @@ describe("ESLint factory producer and dispatcher", () => {
         config: { max: 3, work_queue_enabled: true, work_queue_workflows: ESLINT_WORKERS, aw_context_workflows: ESLINT_WORKERS, "github-token": "fixture-token", work_queue_dispatch_credential: { kind: "authenticated" } },
       };
       const result = await processControls(controls);
-      expect(result.success, JSON.stringify(result)).toBe(true);
+      expect(result.success, JSON.stringify({ result, failures })).toBe(true);
       expect(result.receipts.map(receipt => receipt.status)).toEqual(["durable", "durable"]);
       expect(posts).toHaveLength(3);
       expect(new Set(posts.map(post => post.workflow_id))).toEqual(new Set(ESLINT_WORKERS.map(profile => `${profile}.lock.yml`)));

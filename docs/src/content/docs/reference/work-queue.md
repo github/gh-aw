@@ -30,7 +30,8 @@ The native protocol distinguishes the following records and lifecycle events:
 | --- | --- |
 | Work | An immutable task definition. Tasks can form a directed acyclic graph (DAG), a dependency graph with no cycles. |
 | Claim | Authorization for one attempt at a Work item. Its original `claim_handle` identifies that attempt. |
-| Policy | Approved rules for scheduling, producer permissions, worker routing, and limits. The first trusted submission installs the proposal with Work when the branch is absent; later changes are administrator-only. |
+| Policy | Installed scheduling and delivery limits with approved worker contracts. First submission installs Policy and Work; economic changes require an explicit quiescent update. |
+| Deployment | A durable prospective execution revision/availability for a logical worker; compatible evolution does not reset Policy or revoke outstanding assignments. |
 | Pool | A group of tasks with shared worker routes and capacity limits. |
 | Reservation | Native worker capacity held for an assignment, including while launch or termination is uncertain. |
 | Native launch | The request to start a GitHub Actions worker run. A committed assignment is not proof of launch. |
@@ -62,14 +63,14 @@ that result does not require Policy seeding.
 
 | Entry point | First-use behavior |
 | --- | --- |
-| Workflow `work_queue_submit` | Installs the exact compiler-approved Policy proposal with entitled Work. |
-| Native `submit-work`, `submit-graph` | Installs native defaults bound to the submitting operator and `.github/workflows/worker.lock.yml` at the verified default-branch commit. Embedding hosts can supply an approved `Branch.PolicyProposal`. |
+| Workflow `work_queue_submit` | Atomically installs scheduling resolved from `aw.json` and AW-approved worker routes with the first Work. |
+| Native `submit-work`, `submit-graph` | Resolves scheduling and AW worker routes from the verified repository revision. Embedding hosts can supply an approved `Branch.PolicyProposal`. |
 | Activation, reads, snapshots, dispatch-only requests and controls | Do not create a queue or install Policy. |
 | `policy` | Updates only an existing, quiescent queue. Standalone Policy seeding is unsupported. |
 
 Agentic Workflows and Actions supply authenticated runtime identity. The queue
-uses that identity for Policy entitlements, operation roles and Claim ownership;
-it does not define another authentication mechanism. Agents cannot choose Policy
+uses that identity for operation roles and Claim ownership, not producer
+enrollment or allowlists. Agents cannot choose Policy
 or receive queue-write credentials. Worker routes must accept
 `work_queue_assignment` and be verifiable at their approved immutable revisions.
 
@@ -79,6 +80,65 @@ An installed Policy stays authoritative, and malformed or policyless existing
 ledgers are rejected rather than reset. Historical Policy-only genesis records
 remain readable.
 
+## Repository scheduling settings
+
+The optional `.github/workflows/aw.json` `work_queue` object contains global
+scheduling and Issue/label settings. Missing file, missing section and `{}` use defaults. Unknown
+fields, null, wrong types and out-of-range values are errors. AW supplies
+authentication, credentials and worker routes through declared workers and
+`safe-outputs.dispatch-workflow.workflows`; these do not belong in `work_queue`.
+
+| Field | Default | Accepted values |
+| --- | --- | --- |
+| `concurrency` | 16 | Integer 1–4,096; logical and native capacity per pool |
+| `pending_limit` | 4,096 | Integer 1–4,096; queue-wide pending Work |
+| `retry.max_attempts` | 3 | Integer 1–16 |
+| `retry.backoff_seconds` | 30 | Integer 1–3,600 |
+| `mode` | `weighted-priority` | `weighted-priority` or `strict-priority` |
+| `class_weights` | `[8,4,2,1,1]` | Five integer class weights, each 1–1,000 |
+| `accounting_weights` | `{"":1}` | Named integer fairness weights, each 1–1,000; the empty key retains weight 1; `{}` uses defaults |
+| `pools` | One `default` pool | Up to 64 named scheduling objects with optional `concurrency`, `retry`, `per_account_limit` (1–4,096); inherit AW routes and singleton assignments; `{}` uses defaults |
+| `issues` | Disabled | `true`, `false`, or `{"label":"work"}`; global backing Issue projection and tracking/status label prefix, at most 33 UTF-8 bytes |
+
+The first submission publishes the resolved Policy and Work in one atomic
+commit. Concurrent first submissions retry against the installed winner without
+losing or duplicating Work. The installed scheduling Policy stays authoritative:
+scheduling edits affect a future bootstrap or explicit
+`policy --from-config --epoch EPOCH`, never silently replace an active queue.
+Updates require quiescence across Work, reservations and delivery.
+Workflow-level `work-queue-policy` is deprecated and conflicts with repository
+`work_queue`; historical Policies remain readable with their original semantics.
+Workflow-level `tools.work-queue.issues` is deprecated; configure projection and
+labels in `aw.json`. Issue settings configure protected workflow hooks, not new
+projector grants or scheduling epochs. Definitions at both levels conflict
+rather than silently overriding each other.
+
+### Worker evolution
+
+Compatible worker deployments change future execution without draining the
+queue. Compiler-derived logical contracts cover declared inputs, permissions,
+tools and output/resource capabilities, including imports; prompts and engine
+selection are not deployment identity. New admissions freeze the approved
+contract. Pending unpinned Work follows only compatible execution revisions;
+`execution_ref` explicitly pins an approved revision. Historical profiles
+without contract metadata retain exact-ref behavior.
+
+Deployment transitions preserve Work identities, dependencies, Results,
+fairness debt and reservations. Existing Dispatch profiles and run/credential
+bindings remain the authority for completion, delivery and reconciliation.
+Incompatible, unavailable or AW-unapproved workers block only affected Work and
+its dependent successors, without charging fairness or consuming attempts.
+Scheduling economics and genuinely conflicting shared resources use the
+separate quiescent Policy update.
+
+Protected producer/dispatcher processing synchronizes only its AW-approved
+targets before a new submission or dispatch request; replay of an accepted
+request does not retarget it. Workers cannot publish deployment updates.
+Native operators use `deploy --from-config`, optionally selecting `--pool` or
+`--worker-profile`. Each transition compares the current ref/contract. Historical
+pinned availability updates use `activate: false` and never promote an old
+revision as the current route.
+
 > [!WARNING]
 > Direct repository writers can replace or delete the ledger. A missing queue
 > branch is fresh genesis and may lose prior request identities, reservations
@@ -87,12 +147,8 @@ remain readable.
 
 ## Backing Issues
 
-```aw
-tools:
-  work-queue:
-    worker: true
-    issues:
-      label: cookie
+```json title=".github/workflows/aw.json"
+{"work_queue": {"issues": {"label": "cookie"}}}
 ```
 
 `issues: true` enables projection with the `work` tracking label and a
@@ -111,9 +167,15 @@ is required.
 
 The existing activation and conclusion jobs project only Work admitted by
 their authenticated run/attempt and Work in their original authenticated Claims.
-Installed `Policy.projectors` rules must authorize the exact principal, workflow
-revision, pool, and backing repository. Pre-existing Issues also require
-explicit lossless identities in that rule's `backing_issues` array. A shared queue, workflow name, label,
+AW-managed queues use this authenticated scope, not projector enrollment.
+Automatic projection targets the queue repository and the Work pool's allowed
+repositories; no global scan or shared-queue scope is implied.
+Historical Policies without `authorization: "aw"` retain `Policy.projectors`
+rules authorizing exact principal, workflow revision, pool and backing
+repository. Even AW-managed queues require explicit exact `backing_issues`
+grants for pre-existing Issues and explicit projector authority for
+cross-repository projection; ordinary `aw.json` does not supply those grants.
+A shared queue, workflow name, label,
 API token, or caller-supplied Work ID does not grant scope. Agent execution
 stages intents and receives no projector or queue-writer credential.
 Conclusion refreshes checked Git state after queue settlement, including when
@@ -161,7 +223,8 @@ execution does not receive those write credentials. Issue creation uses the
 shared `withRetry` helper only for a proven pre-execution rate-limit rejection;
 timeouts and partial or ambiguous mutation responses are not blindly retried.
 
-Issues stay open by default. An administrator may set a projector rule's
+Issues stay open by default. Ordinary AW configuration exposes no closure
+policy. An authorized operator may install a projector rule's
 `"completion_policy": "close-on-result"` before Work admission; closure still
 requires a verified non-PR Result and current target authority. Later policy
 expansion cannot retroactively authorize closure. Agent payload fields,
@@ -245,7 +308,7 @@ performed by the runtime or authorized operator, rather than by the agent.
 | Role | Behavior |
 | --- | --- |
 | Observer | Can read and explain the queue and use normally authorized reports or `noop`. Cannot submit, dispatch, or finish Work. |
-| Producer/dispatcher | Stages task plans within producer permissions and requests assignments within pool and budget limits. Trusted processing refreshes the log, selects tasks by Policy, and commits the next fair group of assignments atomically. |
+| Producer/dispatcher | AW-authorized participant stages task plans within scheduling bounds and requests assignments within pool and budget limits. Trusted processing refreshes the log, selects tasks by Policy, and commits the next fair group of assignments atomically. |
 | Worker | Requires a version-3 Claim array. Trusted activation authenticates the actual run, workflow, and revision before authorizing effects for each Claim. |
 
 A declared worker with missing assignment input fails; it does not become an
@@ -257,7 +320,7 @@ only within its authority; this does not authorize arbitrary resource writes.
 | MCP tool | Purpose |
 | --- | --- |
 | `work_queue_read`, `work_queue_explain` | Inspect the immutable snapshot. Predictions may be stale; sorting changes only the display order. |
-| `work_queue_submit` | Stage immutable task or graph plans within size limits and installed producer permissions. |
+| `work_queue_submit` | Stage immutable task or graph plans within size and installed scheduling limits. |
 | `work_queue_dispatch_next` | Request the next assignments from a pool, within a specified limit. The scheduler selects the Work and target. |
 | `work_queue_claim_finish` | Stage a `completed` or `cancelled` finish intent for an original Claim. |
 
@@ -339,7 +402,9 @@ initialize Policy over an invalid log.
 | `trace --request-id ID` or `trace --claim-id ID` | Read causal events within size limits, without exposing payloads or receipt contents. `--offset` and `--limit` control pagination. |
 | `compact` | Replace the current log prefix with a version-3 checkpoint of deterministic replay state. Preserves fairness accounting, ownership, delivery barriers, bootstrap Work positions and request identities, including across repeated compaction. |
 | `policy --file policy.json --epoch EPOCH` | Update an existing queue's authorized Policy for future work only when quiescent. Does not seed an absent queue. |
-| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to producer permissions. On an absent queue, atomically install the verified native default Policy and Work without administrator seeding. |
+| `policy --from-config --epoch EPOCH` | Resolve repository scheduling and AW worker routes, then explicitly update an existing quiescent queue. Mutually exclusive with `--file`. |
+| `deploy --from-config [--pool POOL] [--worker-profile PROFILE]` | Refresh protected worker revisions and availability on an existing AW-managed queue without draining or changing scheduling economics. Uses exact compiler contracts and current-route CAS; unavailable targets pause locally. |
+| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`. On an absent queue, atomically install verified scheduling and AW routes with Work without administrator seeding. |
 | `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. Bootstraps an absent queue under the same rules as `submit-work`. |
 | `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit the next assignments selected by deterministic fair scheduling and their reservations. Does not send a workflow-dispatch POST. |
 | `control`, `cancel-work` | Apply authorized pause, cutover, or cancellation decisions without refunding accounted service or force-releasing a reservation for a possible native run. |
@@ -352,6 +417,12 @@ the same logical publication across retries. Each command's `--help`
 describes validated inputs. Reservation, native launch, verified run binding,
 Completion, Result, and Release are distinct; successful `dispatch-next` is
 not proof of launch.
+
+`submit-work --execution-ref IMMUTABLE_SHA` explicitly pins execution to a
+registered, compatible revision. Retries retain the original admission contract
+and pin; an explicit pin change is rejected. Omit the flag for compatible
+prospective deployment updates. Unmarked historical Policies retain exact-ref
+behavior until an explicit quiescent migration to AW-managed contracts.
 
 A Policy update requires a quiescent queue: no nonterminal (unfinished) Work,
 outstanding reservations, or unresolved delivery barriers for completed Work.

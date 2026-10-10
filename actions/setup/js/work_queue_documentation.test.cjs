@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { DEFAULT_LIMITS } = require("./work_queue_limits.cjs");
 const { validatePolicy } = require("./work_queue_policy.cjs");
+const { buildAWPolicy } = require("./work_queue_settings.cjs");
 const repositoryRoot = path.resolve(__dirname, "../../..");
 const deploymentPath = "docs/src/content/docs/guides/deploy-work-queue.md";
 const referencePath = "docs/src/content/docs/reference/work-queue.md";
@@ -24,16 +25,20 @@ describe("work-queue deployment documentation", () => {
     expect(queue).not.toMatch(/\bstorage:/);
   });
 
-  it("installs the documented policy after replacing identity placeholders", () => {
+  it("resolves documented scheduling without identity placeholders", () => {
     const source = readRepositoryFile(deploymentPath);
     const examples = [...source.matchAll(/```json(?: [^\n]*)?\n([\s\S]*?)\n```/g)];
     expect(examples).toHaveLength(2);
-    const policy = JSON.parse(examples[0][1].replaceAll("REPLACE_WITH_PRODUCER_ACTOR_ID", "11").replaceAll("REPLACE_WITH_WORKER_CREDENTIAL_ACTOR_ID", "12").replaceAll("REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA", "a".repeat(40)));
+    const config = JSON.parse(examples[0][1]);
+    const policy = buildAWPolicy({ repository: "github/gh-aw", ref: "a".repeat(40), workflows: ["eslint-refiner"], settings: config.work_queue });
 
     expect(validatePolicy(policy)).toBe(policy);
     expect(policy.accounting_weights).toEqual({ "": 1 });
-    expect(policy.producers["11"].fairness_keys).toEqual([""]);
-    expect(policy.limits).toEqual(DEFAULT_LIMITS);
+    expect(policy.producers).toEqual({});
+    expect(policy.authorization).toBe("aw");
+    expect(policy.limits).toEqual({ ...DEFAULT_LIMITS, pending_nodes: 30 });
+    expect(policy.pools.default).toMatchObject({ logical_limit: 3, native_limit: 3, retry: { max_attempts: 3, backoff_ms: 30000 } });
+    expect(policy.pools.default.profiles["eslint-refiner"]).not.toHaveProperty("principal");
     const projection = JSON.parse(
       examples[1][1]
         .replaceAll("REPLACE_WITH_NATIVE_PRINCIPAL_ID", "12")
@@ -42,7 +47,6 @@ describe("work-queue deployment documentation", () => {
         .replaceAll("REPLACE_WITH_NUMERIC_ISSUE_ID", "9007199254740993")
         .replaceAll("REPLACE_WITH_ISSUE_NUMBER", "42")
     );
-    expect(validatePolicy({ ...policy, ...projection }).projectors).toEqual(projection.projectors);
     expect(projection.projectors[0].completion_policy).toBe("keep-open");
     expect(projection.projectors[0].backing_issues[0]).toEqual({ kind: "issue", host: "github.com", repository: "github/gh-aw", repository_id: "9876", resource_id: "9007199254740993", number: "42" });
   });

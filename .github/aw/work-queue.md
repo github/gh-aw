@@ -4,22 +4,21 @@ description: Agent instructions for Git-backed work queue producers, dispatchers
 
 # Work Queue
 
-Choose Git-backed `tools.work-queue` for fair scheduling, immutable Work DAGs
-and Claim-scoped effects; `work-queue.jsonl` is authoritative. Protocol v3 has
-no storage selector; Issues/PRs are dependencies, not storage. Weights distribute
-Claim opportunities, not CPU or successful completions. For issue-backed WorkQueueOps
-alternatives, see [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md).
+`tools.work-queue` schedules immutable DAGs and Claim-scoped effects;
+`work-queue.jsonl` is authoritative. V3 has no storage selector; Issues/PRs are
+dependencies. Weights distribute Claim opportunities, not CPU/completions.
+For issue-backed WorkQueueOps, see [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md).
 
 ## Select the role
 
 - **Observer:** read/explain only; never submit, dispatch or finish Work.
-- **Producer/dispatcher:** submit entitled plans and request bounded pool work;
+- **Producer/dispatcher:** submit trusted plans and request bounded pool work;
   queue authority grants no arbitrary resource-writing outputs.
 - **Worker:** require compiler-supplied version-3 `claims`; never override
   reserved `work_queue_assignment` or caller context.
 
 Trust compiler/runtime role, not snapshot metadata; don't downgrade workers.
-Activation authenticates run/workflow/revision; reruns cannot inherit attempt 1.
+AW authenticates run/workflow/revision; reruns cannot inherit attempt 1.
 An absent branch is uninitialized/empty. Its first producer submit atomically
 creates it with compiled Policy and Work; reads and dispatch alone never do.
 Reject malformed or unsupported existing logs.
@@ -36,26 +35,33 @@ tools:
 ```
 
 Dispatchers need `tools.work-queue: true`, a worker allowlist and bounded
-`dispatch-workflow.max`. Compiler-approved Policy binds each profile's workflow,
-immutable SHA, principal, trust domain and effect scope; moving `target-ref` is
-ignored.
+`dispatch-workflow.max`. AW supplies approved routes and credentials and
+binds the actual immutable native run to each Claim; moving `target-ref` is ignored.
 
-Configure producer entitlements. First submit automatically installs compiled
-Policy and Work. Standalone seeding is unsupported; AW and Actions authorize
-the trusted submission.
-Policy updates require an existing, quiescent queue and administrator authority. Admin
-status grants no producer entitlement. Never expose queue-write credentials to
+Optional `.github/workflows/aw.json` `work_queue` contains global scheduling and
+Issues/label settings: concurrency, pending limit, retries, pools/fairness and
+`issues` with an optional `label`. Missing settings
+use one default pool, weighted-priority, concurrency 16, pending 4,096,
+singleton assignments and three attempts with 30-second backoff.
+First submit automatically installs compiled Policy and Work.
+Standalone seeding is unsupported; AW and Actions authorize the trusted submission.
+No producer enrollment, principal or credential settings are needed.
+Economic Policy updates require quiescence and explicit
+`policy --from-config --epoch EPOCH`; config edits never rewrite active state.
+Compatible deployments evolve future execution without draining.
+Never expose queue-write credentials to
 agents/snapshot MCP. Repository access rules are GitHub's responsibility, not
 queue configuration. See [deployment](../../docs/src/content/docs/guides/deploy-work-queue.md).
 
 ## Mirror admitted Work with Issues
 
-`tools.work-queue.issues: true` mirrors admitted Work with purple `work` and
+`aw.json` `work_queue.issues: true` mirrors admitted Work with purple `work` and
 `work: <status>` labels. An object may customize the tracking label and status
-label prefix with `label`. Require installed projector authority: only protected hooks
+label prefix with `label`. No per-workflow override or enrollment is needed.
+Only protected AW hooks
 project their own admissions/original Claims. Immutable `backing_issue` binds
 one Work per Issue. Agents never write mirrors; human edits never establish
-Result. Pre-existing Issues need exact installed `backing_issues` grants.
+Result. Pre-existing Issues require exact installed `backing_issues` grants.
 Only trusted admission-time `completion_policy` permits closure, never payload.
 Uncertain writes stay pending, never recreated or globally repaired.
 Upgrade all closed-schema readers first. See the
@@ -64,7 +70,7 @@ Upgrade all closed-schema readers first. See the
 ## Plan and dispatch
 
 - Read the immutable snapshot; predictions may be stale and cannot override
-  Policy. Submit bounded, secret-free plans within producer entitlements.
+  Policy. Submit bounded, secret-free plans within scheduling limits.
 - Request a pool prefix with `work_queue_dispatch_next` (`pool`, `max_claims`,
   `max_dispatches`). Never choose winners/targets or use scalar dispatch.
 - Trusted processing refreshes the ledger and commits a compatible fair prefix.
@@ -85,8 +91,8 @@ Upgrade all closed-schema readers first. See the
 - Treat finish as an intent: trusted processing publishes Completion before
   scoped effects and Result only after independently verified delivery.
 
-Use advertised `<mcp-clis>` subcommands with one JSON argument, not
-structured-tool `command`/`description`. `uninitialized` plus null SHA is empty;
+Use `<mcp-clis>` subcommands with one JSON argument.
+`uninitialized` plus null SHA is empty;
 first `work_queue_submit` atomically installs compiled Policy and Work. Submit
 before dispatch. Existing policyless ledgers are failures; workers require
 Policy. `status: "staged"` is no grant or launch.
@@ -100,9 +106,10 @@ wait for their own predecessor Results.
 Never infer nonlaunch/termination from lost responses, dispatcher cancellation
 or elapsed deadlines. Retain reservations until exact evidence exists. Do not
 rerun effects after Completion with uncertain delivery; bounded verification
-yields Result or DeliveryFailure. Use pause/drain for incompatible revisions;
-quiesce before Policy changes. Reject old protocols, scalar assignments and
-automatic upgrades; preserve old evidence before explicit redeployment.
+yields Result or DeliveryFailure. Compatible deployments preserve obligations,
+debt, Results and frozen assignments; explicit `execution_ref` pins stay pinned.
+Unavailable/incompatible workers pause affected Work only. Quiesce economic
+Policy changes. Reject unsupported protocols and scalar assignments.
 Retries and repeated checkpoints preserve accepted submission identity; do not
 delete a queue to retry admission.
 
@@ -111,16 +118,15 @@ delete a queue to retry admission.
 - Operator commands, TUI and diagnostic artifacts:
   [queue reference](../../docs/src/content/docs/reference/work-queue.md).
   Cancellation is terminal for Work, not a worker stop; reconcile separately.
-  Build with `go build -o ./gh-aw ./cmd/gh-aw`; use
+  Build `go build -o ./gh-aw ./cmd/gh-aw`; use
   `./gh-aw work-queue --repo OWNER/REPO stats --json`. `dispatch-next` grants
   reservations, never launches; use the authorized dispatcher.
-- Daily report rotation, dedicated Policy and Claim examples:
+- Daily report rotation and Claims:
   [portfolio walkthrough](../../docs/src/content/docs/patterns/daily-report-portfolio.md)
   and [shared worker instructions](../workflows/shared/daily-report-worker.md).
-- Normative contracts and unfinished implementation boundaries:
+- Contracts and implementation boundaries:
   [specification](../../docs/src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements).
 - Executable models, fixtures and bounded verification:
   [formal reference](../../specs/work-queue/README.md).
 
-Do not treat audit exports, agent assertions or functional tests as proof of
-verified Result or deployment-security completion.
+Tests do not prove Result or live deployment.

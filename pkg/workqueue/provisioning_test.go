@@ -7,6 +7,26 @@ import (
 	"testing"
 )
 
+func TestConfigSourceWorkerApprovalRequiresTypedDeclaration(t *testing.T) {
+	for _, source := range []string{
+		"Ordinary workflow without frontmatter",
+		"---\ntools: true\n---\n",
+		"---\ntools:\n  work-queue: true\n---\n",
+		"---\ntools:\n  work-queue:\n    worker: \"true\"\n---\n",
+		"---\ntools:\n  work-queue:\n    worker: false\n---\n",
+	} {
+		if approved, err := configSourceIsWorker([]byte(source)); err != nil || approved {
+			t.Fatalf("untyped or absent worker declaration became approved: %v", err)
+		}
+	}
+	if approved, err := configSourceIsWorker([]byte(approvedWorkerSource)); err != nil || !approved {
+		t.Fatalf("typed AW worker declaration lost approval: %v", err)
+	}
+	if _, err := configSourceIsWorker([]byte("---\ntools: [\n---\n")); err == nil {
+		t.Fatal("malformed source frontmatter was silently ignored")
+	}
+}
+
 func TestProductionInitializationRequiresVerifiedWorkerRoute(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -35,6 +55,7 @@ func TestProductionInitializationRequiresVerifiedWorkerRoute(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			work.WorkerProfile = "worker"
 			request, err := NewRequest("submit", "submit", actor, SubmitParameters{Nodes: []WorkDefinition{work}})
 			if err != nil {
 				t.Fatal(err)

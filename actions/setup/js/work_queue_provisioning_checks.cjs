@@ -6,19 +6,21 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { defaultPolicy } = require("./work_queue_policy.cjs");
+const { buildAWPolicy } = require("./work_queue_settings.cjs");
 const { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
 
 const validYAML = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
 const profile = defaultPolicy({ repository: "owner/repo", principal: "1001", ref: "a".repeat(40) }).pools.default.profiles.default;
 
-function nativeRoute(content = validYAML) {
+/** @param {string} content @param {{contentError?: Error, registrationError?: Error}} failures */
+function nativeRoute(content = validYAML, failures = {}) {
   const calls = [];
   const bytes = Buffer.from(content, "utf8");
   const state = {
     file: { type: "file", path: profile.workflow, encoding: "base64", content: bytes.toString("base64"), size: bytes.length },
     registration: { path: profile.workflow, state: "active" },
-    contentError: null,
-    registrationError: null,
+    contentError: failures.contentError ?? null,
+    registrationError: failures.registrationError ?? null,
   };
   const githubClient = {
     rest: {
@@ -143,10 +145,11 @@ function registerTests({ describe, it }) {
     });
     it("fails closed on authenticated native read errors", async () => {
       for (const endpoint of ["contentError", "registrationError"])
-        for (const status of [404, 403, 500]) {
+        for (const status of [404, 401, 403, 429, 500]) {
           const native = nativeRoute();
           native.state[endpoint] = Object.assign(new Error("native read failed"), { status });
-          await rejected(native);
+          if (status === 404) await rejected(native);
+          else await assert.rejects(verifyWorkerRoute(options(native)), error => error === native.state[endpoint]);
           assert.equal(native.calls.length, endpoint === "contentError" ? 1 : 2);
         }
     });
@@ -160,6 +163,20 @@ function registerTests({ describe, it }) {
       assert.equal(native.calls.length, 2);
       await verifyWorkerRoutes(input);
       assert.equal(native.calls.length, 4);
+    });
+    it("validates shared AW registry without reading unrelated native routes", async () => {
+      const native = nativeRoute();
+      native.state.contentError = Object.assign(new Error("unused worker unavailable"), { status: 404 });
+      const policy = buildAWPolicy({
+        repository: "owner/repo",
+        ref: profile.ref,
+        workflows: ["worker", ...Array.from({ length: 30 }, (_, index) => `report-${index}`)],
+        settings: { pools: { reports: { concurrency: 3 } } },
+      });
+      await verifyWorkerRoutes({ githubClient: native.githubClient, owner: "owner", repo: "repo", policy });
+      assert.equal(native.calls.length, 0);
+      await rejected(native, policy.pools.default.profiles.worker);
+      assert.equal(native.calls.length, 1);
     });
     it("fails explicitly before registration when the production YAML parser is missing", () => {
       const script = `

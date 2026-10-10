@@ -50,7 +50,8 @@ async function verifyWorkerRoute({ githubClient, owner, repo, profile }) {
   let file;
   try {
     file = (await githubClient.rest.repos.getContent({ owner, repo, path: profile.workflow, ref: profile.ref }))?.data;
-  } catch {
+  } catch (error) {
+    if (error?.status !== 404) throw error;
     throw queueError("policy_missing", "approved worker route cannot be verified at its immutable revision");
   }
   if (!isRecord(file) || file.type !== "file" || file.path !== profile.workflow || file.encoding !== "base64" || typeof file.content !== "string")
@@ -68,19 +69,40 @@ async function verifyWorkerRoute({ githubClient, owner, repo, profile }) {
     throw queueError("policy_missing", "approved worker route contains invalid UTF-8");
   }
   if (assignmentInputType(contents) !== "string") throw queueError("policy_missing", "approved worker route must accept the work_queue_assignment string input");
+  if (profile.logical_contract && workerContract(contents) !== profile.logical_contract) throw queueError("policy_missing", "worker route does not carry its compiler-derived logical contract");
   let registration;
   try {
     registration = (await githubClient.rest.actions.getWorkflow({ owner, repo, workflow_id: posix.basename(profile.workflow) }))?.data;
-  } catch {
+  } catch (error) {
+    if (error?.status !== 404) throw error;
     throw queueError("policy_missing", "approved worker route registration cannot be verified");
   }
+
   if (!isRecord(registration) || registration.path !== profile.workflow || registration.state !== "active") throw queueError("policy_missing", "approved worker route must be active at its exact registered path");
+}
+
+function workerContract(contents) {
+  let parseDocument;
+  ({ parseDocument } = require("./work_queue_yaml.cjs"));
+  const document = parseDocument(contents, { uniqueKeys: true, merge: true });
+  if (!document || document.errors.length || document.warnings.length) return undefined;
+  const contracts = new Set();
+  const visit = value => {
+    if (value instanceof Map) {
+      const env = value.get("env");
+      if (env instanceof Map && env.has("GH_AW_WORK_QUEUE_CONTRACT")) contracts.add(env.get("GH_AW_WORK_QUEUE_CONTRACT"));
+      for (const child of value.values()) visit(child);
+    } else if (Array.isArray(value)) for (const child of value) visit(child);
+  };
+  visit(document.toJS({ mapAsMap: true, maxAliasCount: 100 }));
+  return contracts.size === 1 ? [...contracts][0] : undefined;
 }
 
 /** @param {{githubClient: RouteClient, owner: string, repo: string, policy: ReturnType<typeof import("./work_queue_policy.cjs").defaultPolicy> | null}} options */
 async function verifyWorkerRoutes({ githubClient, owner, repo, policy }) {
   if (!policy) throw queueError("policy_missing", "Policy must precede worker routing");
   validatePolicy(policy);
+  if (policy.authorization === "aw") return;
   const seen = new Set();
   for (const pool of Object.values(policy.pools))
     for (const profile of Object.values(pool.profiles)) {
@@ -91,4 +113,4 @@ async function verifyWorkerRoutes({ githubClient, owner, repo, policy }) {
     }
 }
 
-module.exports = { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes };
+module.exports = { MAX_WORKFLOW_BYTES, verifyWorkerRoute, verifyWorkerRoutes, workerContract };

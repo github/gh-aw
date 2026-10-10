@@ -42,6 +42,9 @@ type checkpointSnapshot struct {
 }
 
 func checkpointTraceOperation(operation Operation) (Operation, error) {
+	if kind, err := operationKind(operation); err == nil && kind == "Deployment" {
+		return Canonical(operation)
+	}
 	event, err := traceEventForOperation(operation)
 	if err != nil {
 		return nil, err
@@ -54,7 +57,7 @@ func checkpointTraceOperation(operation Operation) (Operation, error) {
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return nil, err
 	}
-	for _, field := range []string{"position", "commit_id", "previous", "request_id", "request_kind", "policy_epoch", "at", "actor"} {
+	for _, field := range []string{"position", "commit_id", "previous", "request_id", "request_kind", "policy_epoch", "at", "actor", "pool", "worker_profile", "profile"} {
 		delete(fields, field)
 	}
 	data, err = json.Marshal(fields)
@@ -342,6 +345,9 @@ func restoreCheckpoint(commit QueueCommit) (Projection, error) {
 		return invalid()
 	}
 	state := snapshot.Projection
+	if err := validateDeploymentCheckpoint(state, snapshot.Requests); err != nil {
+		return invalid()
+	}
 	if state.Works == nil || state.Claims == nil || state.Dispatches == nil ||
 		state.Observations == nil || state.Clocks == nil || state.ObservationWrites == nil ||
 		snapshot.ObservationIDs == nil || snapshot.TerminalBarriers == nil ||
@@ -521,9 +527,48 @@ func restoreCheckpoint(commit QueueCommit) (Projection, error) {
 			return invalid()
 		}
 	}
+	type checkpointStart struct {
+		principal string
+		actor     Actor
+	}
+	starts := map[string]checkpointStart{}
+	for _, receipt := range snapshot.Requests {
+		for _, event := range receipt.Events {
+			var start dispatchLifecycle
+			if json.Unmarshal(event, &start) == nil && start.DispatchID != "" && start.State == "started" && start.CredentialPrincipal != "" {
+				if _, exists := starts[start.DispatchID]; exists {
+					return invalid()
+				}
+				starts[start.DispatchID] = checkpointStart{principal: start.CredentialPrincipal, actor: receipt.Actor}
+			}
+		}
+	}
 	for id, dispatch := range state.Dispatches {
 		if dispatch == nil || dispatch.DispatchID != id ||
 			state.Requests[dispatch.RequestID].ID != dispatch.CommitID {
+			return invalid()
+		}
+		if dispatch.Profile.Principal != "" && dispatch.CredentialPrincipal == "" {
+			continue
+		}
+		if dispatch.Profile.Principal != "" && !decimalIdentity(dispatch.Profile.Principal) ||
+			dispatch.CredentialPrincipal != "" && !decimalIdentity(dispatch.CredentialPrincipal) ||
+			dispatch.Profile.Principal != "" && dispatch.CredentialPrincipal != "" &&
+				dispatch.Profile.Principal != dispatch.CredentialPrincipal ||
+			dispatch.Run != nil && dispatch.Run.Principal != DispatchPrincipal(dispatch) {
+			return invalid()
+		}
+		if dispatch.State == "reserved" {
+			if dispatch.Sender != nil || dispatch.CredentialPrincipal != "" || dispatch.Run != nil {
+				return invalid()
+			}
+			continue
+		}
+		if !decimalIdentity(DispatchPrincipal(dispatch)) || dispatch.Sender == nil {
+			return invalid()
+		}
+		start, found := starts[id]
+		if !found || start.principal != dispatch.CredentialPrincipal || !sameJSON(start.actor, dispatch.Sender) {
 			return invalid()
 		}
 	}

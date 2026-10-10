@@ -66,10 +66,11 @@ func (b Branch) runForDispatch(ctx context.Context, state Projection, dispatch *
 		return RunBinding{}, Evidence{}, err
 	}
 	profile := dispatch.Profile
+	principal := DispatchPrincipal(dispatch)
 	workflow, _, _ := strings.Cut(run.Path, "@")
 	if workflow != profile.Workflow || run.HeadSHA != profile.Ref ||
-		!decimalIdentity(profile.Principal) || run.Actor.ID.String() != profile.Principal ||
-		run.TriggeringActor.ID.String() != "" && run.TriggeringActor.ID.String() != profile.Principal ||
+		!decimalIdentity(principal) || run.Actor.ID.String() != principal ||
+		run.TriggeringActor.ID.String() != "" && run.TriggeringActor.ID.String() != principal ||
 		!correlatedNativeTitle(run.DisplayTitle, dispatch.DispatchID) {
 		return RunBinding{}, Evidence{}, queueError("run_binding_conflict", "run workflow/revision/principal differs from approved assignment")
 	}
@@ -540,6 +541,9 @@ func (b Branch) CancelReserved(ctx context.Context, dispatchID, requestID string
 	evidence := Evidence{
 		Kind: "prelaunch", Source: "trusted_publisher", Repository: actor.Repository,
 		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal, CheckedAt: at,
+	}
+	if evidence.Principal == "" {
+		evidence.Principal = actor.Principal
 	}
 	operations := []Operation{}
 	for _, member := range dispatch.Claims {
