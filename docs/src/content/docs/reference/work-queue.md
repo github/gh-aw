@@ -305,7 +305,7 @@ initialize Policy over an invalid log.
 | `trace --request-id ID` or `trace --claim-id ID` | Read causal events within size limits, without exposing payloads or receipt contents. `--offset` and `--limit` control pagination. |
 | `compact` | Replace the current log prefix with a version-3 checkpoint of deterministic replay state. The checkpoint names the prior Git commit and preserves fairness accounting, ownership, delivery barriers, and request identities. |
 | `policy --file policy.json --epoch EPOCH` | Install an authorized Policy for future work only when the queue is quiescent. |
-| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to installed producer permissions. The CLI requires an existing Policy; a workflow producer's first safe-output submit can bootstrap an absent branch. |
+| `submit-work --file work.json` | Admit an immutable payload with default priority 3 and shared accounting key `""`, subject to producer permissions. On an absent queue, atomically install the verified native default Policy and Work without administrator seeding. |
 | `submit-graph` | Atomically admit a normalized graph within size limits, including issue and pull request dependency nodes. |
 | `dispatch-next --pool POOL --max-claims N --max-dispatches N` | Commit the next assignments selected by deterministic fair scheduling and their reservations. Does not send a workflow-dispatch POST. |
 | `control`, `cancel-work` | Apply authorized pause, cutover, or cancellation decisions without refunding accounted service or force-releasing a reservation for a possible native run. |
@@ -328,6 +328,13 @@ compiler-approved proposal with its first Work on an absent branch; the agent
 cannot choose or update Policy or receive queue-write credentials.
 Direct repository writers can alter or delete the queue; malformed
 existing history fails validation, but a missing branch is a fresh queue.
+For native first use, the default Policy binds the submitting operator and
+`.github/workflows/worker.lock.yml` at the verified default-branch commit.
+The worker must accept `work_queue_assignment` and be registered and active.
+An embedding host may supply an approved `Branch.PolicyProposal` instead.
+Workflow safe outputs use the compiler-approved proposal. Both paths publish
+one Policy-and-Work genesis commit; reads, dispatches and controls do not
+initialize an absent queue. Installed Policy remains authoritative.
 On a repository with no branches, a valid first producer submission initializes
 the default branch with `.gh-aw/work-queue-bootstrap`. If the approved worker
 workflow is not yet deployed and verifiable at its immutable revision, the

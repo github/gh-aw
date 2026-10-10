@@ -513,6 +513,15 @@ Automatic first-use bootstrap MUST NOT require repository-administration access
 or administrator seeding. GitHub enforces repository access rules independently;
 an actual Git write denial remains an error.
 
+Native operator submissions use the same combined genesis envelope. An embedding
+host MAY supply an approved Policy proposal. Otherwise the native publisher
+resolves its bounded default Policy using the submitting operator's identity and
+the verified default-branch revision of `.github/workflows/worker.lock.yml`.
+This default resolution MUST NOT request administrator authority. Replay MUST
+validate the submitted Work against that Policy before publication, and the
+publisher MUST verify worker routes and submission resource evidence. Existing
+Policy MUST NOT be replaced by a first-use proposal.
+
 Ref conflicts MUST NOT establish absence unless an independent native observation
 confirms the requested repository identity and `isEmpty = true`. In a branchless
 repository, the runtime MAY prepare the default branch only after validating the
@@ -2742,7 +2751,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Full JS typecheck/existing dependency-based tests | The earlier `create_project.cjs` SDK layout error is fixed in merge checkpoint `2dcce92c1c`, using validated literals and endpoint-derived request typing without unsafe casts. Genuine TypeScript 7.0.2 typecheck passes; 36 project tests include 12 layout/endpoint/invalid-input regressions. That merge's final component checks passed 2,122 setup-JavaScript tests in 52 files after correcting a stale workflow lock. The later `303b402810` merge ran 2,323 tests in 56 files: 2,322 passed and one real multi-repository fixture exceeded its 10-second deadline. A fixture-local 30-second deadline preserves all assertions and production retry behavior; all 109 repo-memory tests then passed. Impacted Go tests, build, typecheck, standard lint, schema freshness and JavaScript/shell lint passed. After committing the merge, change-scoped custom lint and full 328-workflow drift also passed; the initial custom-lint failures were confined to nine files byte-identical to main that the pre-merge base calculation included. Failed aggregate invocations remain failed records, not retrospectively green; global custom lint is not claimed clean. The approved feed does not supply pinned `@types/node` 26.6.4; existing 26.6.3 remains without changing pins. No dedicated hosted Actions run is claimed |
 | TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 45 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
 | Protected launch credentials, immutable effect targets and native delivery verification | Implemented with exact selected-client/profile proofs, immutable Work/profile/ancestor target intersection and private native readback. Both public and compiler control entry points reject missing/invalid protected launch metadata before client construction or queue publication, while previews and submit-only controls remain credential-independent. Local positive and refusal regressions pass; writer deployment automation is separate |
-| First-submit Policy bootstrap and live native-dispatch host compatibility | Safe-output first submit atomically creates the absent queue branch with its compiler-approved Policy and Work, without administrator seeding or repository-rule inventories; local authenticated tests cover genesis replay and ref creation. Hosted Git publication, immutable-SHA dispatch, and the pinned run-details response remain unverified live compatibility gates |
+| First-submit Policy bootstrap and live native-dispatch host compatibility | JavaScript safe outputs and native Go submissions atomically create the absent queue branch with approved Policy and Work, without administrator seeding or repository-rule inventories. Native defaults resolve the submitting operator and verified worker revision; embedding hosts may supply an explicit proposal. Local tests cover non-admin bootstrap, whole-genesis Go/JavaScript parity, replay, proposal mismatch and non-submission refusal. Hosted Git publication, immutable-SHA dispatch, and the pinned run-details response remain unverified live compatibility gates |
 
 Authenticated ingestion, actual run/attempt binding, Claim/resource checks and
 credentials withheld from agent execution remain required. GitHub owns repository

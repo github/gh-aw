@@ -177,8 +177,14 @@ func immutableWorkCreators(state Projection) (map[string]Actor, error) {
 	maps.Copy(creators, state.WorkCreators)
 	derived := map[string]Actor{}
 	checkpointPriorTips := map[string]string{}
+	bootstrapRoots := identitySet{}
 	commitsByID := make(map[string]QueueCommit, len(state.Requests))
 	for _, receipt := range state.CheckpointReceipts {
+		if receipt.Previous == nil && receipt.Kind == "submit" &&
+			(receipt.Actor.Role == "producer" || receipt.Actor.Role == "dispatcher") &&
+			isPolicyOperation(receipt.Events) && operationsAreWork(receipt.Events[1:]) {
+			bootstrapRoots.add(receipt.ID)
+		}
 		if receipt.Kind == "checkpoint" {
 			checkpointPriorTips[receipt.ID] = receipt.PriorTip
 		}
@@ -251,7 +257,7 @@ func immutableWorkCreators(state Projection) (map[string]Actor, error) {
 			}
 			id = priorTip
 		} else if commit.Previous == nil {
-			if commit.Request.Kind != "policy" {
+			if commit.Request.Kind != "policy" && !isBootstrapSubmit(commit, 0) && !bootstrapRoots.contains(commit.ID) {
 				return nil, queueError("claim_scope_invalid", "immutable Work origin history has an invalid root")
 			}
 			break

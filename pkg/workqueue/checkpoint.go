@@ -452,8 +452,12 @@ func restoreCheckpoint(commit QueueCommit) (Projection, error) {
 			return invalid()
 		}
 		ordered := make([]WorkDefinition, len(nodes))
+		firstOperation := 0
+		if index == 0 && receipt.Previous == nil && isPolicyOperation(receipt.Events) {
+			firstOperation = 1
+		}
 		for offset := range ordered {
-			node, ok := nodes[offset]
+			node, ok := nodes[offset+firstOperation]
 			if !ok {
 				return invalid()
 			}

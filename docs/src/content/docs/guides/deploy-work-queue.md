@@ -166,6 +166,13 @@ gh aw work-queue --repo github/gh-aw policy \
   --file queue-policy.json --epoch eslint-queue-v1
 ```
 
+Native `submit-work` and `submit-graph` also bootstrap on first submission
+without an administrator seed. Their default Policy binds the operator to
+`.github/workflows/worker.lock.yml` at the verified default-branch commit;
+publish that assignment-capable worker first. Embedding hosts can provide an
+approved `Branch.PolicyProposal`. Workflow submissions instead use the
+compiler-approved proposal.
+
 The default queue branch is `work-queue`. To use another queue branch, put
 `--branch QUEUE_BRANCH` before `policy`. If Policy is seeded explicitly, the
 subsequent producer submission must match that installed Policy proposal.

@@ -280,7 +280,7 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	trees := map[string]string{}
 	parents := map[string][]map[string]string{}
 	apiWrites := 0
-	admin := true
+	admin := false
 	actorID := 1001
 	original := http.DefaultTransport
 	t.Cleanup(func() { http.DefaultTransport = original })
@@ -410,6 +410,7 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	if !submitted["created"].(bool) || id != "f096f37384d5cea26021021248638442ed2bb42a3b0b01e10e85224c130f97c5" {
 		t.Fatalf("submission did not persist current Work: %v", submitted)
 	}
+	admin = true
 	before := log
 	if run(`{"task":"\u0072eview"}`, "submit-work", "--file", "-")["created"] != false || log != before {
 		t.Fatal("identity resubmission changed age or immutable metadata")
@@ -420,7 +421,11 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 	if originalCommit != acceptedCommit || log != before {
 		t.Fatal("restarted submission did not recover the original accepted request")
 	}
-	originalNode := submitted["publication"].(map[string]any)["commit"].(map[string]any)["operations"].([]any)[0]
+	originalOperations := submitted["publication"].(map[string]any)["commit"].(map[string]any)["operations"].([]any)
+	if len(originalOperations) != 2 || originalOperations[0].(map[string]any)["kind"] != "Policy" {
+		t.Fatal("first submit did not atomically install Policy and Work without admin access")
+	}
+	originalNode := originalOperations[1]
 	const rootGraphID = "b6bd7716590080313f39cf62b6867584109cd484ac4c78a48d8a4160ecac4785"
 	if originalNode.(map[string]any)["graph_id"] != rootGraphID ||
 		originalNode.(map[string]any)["node_key"] != "root" {

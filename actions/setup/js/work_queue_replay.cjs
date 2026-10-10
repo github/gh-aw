@@ -874,7 +874,8 @@ function restoreCheckpointState(checkpoint) {
     const prior = state.requests.get(receipt.request_id);
     if (receipt.kind === "submit") {
       const nodes = [...state.works.values()].filter(work => work.position?.commit === index).sort((a, b) => a.position.operation - b.position.operation);
-      if (!nodes.length || nodes.some((node, offset) => node.position.operation !== offset)) throw invalid();
+      const firstOperation = index === 0 && receipt.previous === null && receipt.events[0]?.kind === "Policy" ? 1 : 0;
+      if (!nodes.length || nodes.some((node, offset) => node.position.operation !== offset + firstOperation)) throw invalid();
       prior.request.parameters = { nodes: nodes.map(work => Object.fromEntries(nodeFields.filter(field => Object.hasOwn(work, field)).map(field => [field, work[field]]))) };
     }
     if (["submit", "dispatch_next"].includes(receipt.kind) && (digest(prior.request.parameters) !== receipt.parameters_digest || fingerprint(receipt.actor, receipt.kind, prior.request.parameters) !== receipt.fingerprint)) throw invalid();

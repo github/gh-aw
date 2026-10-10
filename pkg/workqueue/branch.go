@@ -31,6 +31,7 @@ type Branch struct {
 	DependencyClients   map[string]*api.RESTClient
 	DeliveryVerifier    DeliveryVerifier
 	RemediationVerifier RemediationVerifier
+	PolicyProposal      *Policy // Host-approved first-submit proposal; never replaces installed Policy.
 	deliveryFailures    map[string]string
 	client              *api.RESTClient
 }
@@ -386,9 +387,6 @@ func (b Branch) defaultPolicy(ctx context.Context, principal string) (Policy, er
 	profile.Ref = ref.Object.SHA
 	pool.Profiles["default"] = profile
 	policy.Pools["default"] = pool
-	if err := b.verifyWorkerRoutes(ctx, policy); err != nil {
-		return Policy{}, err
-	}
 	return policy, nil
 }
 
@@ -520,6 +518,11 @@ func (b Branch) readPublicationPrefix(ctx context.Context, actor Actor, request 
 	state, err := Replay(commits)
 	if err != nil {
 		return publicationPrefix{}, err
+	}
+	if b.PolicyProposal != nil && snapshot.head != "" && request.Kind == "submit" {
+		if _, recovered := state.Requests[request.ID]; !recovered && !sameJSON(*b.PolicyProposal, *state.Policy) {
+			return publicationPrefix{}, queueError("policy_proposal_mismatch", "submission proposal differs from installed Policy")
+		}
 	}
 	return publicationPrefix{commits: commits, snapshot: snapshot, initial: initial, state: state}, nil
 }

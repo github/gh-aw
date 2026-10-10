@@ -44,6 +44,7 @@ type queueAPI struct {
 	workerState   string
 	workerReads   int
 	workerRef     string
+	noAdmin       bool
 }
 
 type queueTransport struct{ url string }
@@ -56,6 +57,7 @@ func TestBranchAuthenticatesCanonicalRepositoryAndRejectsForeignLedger(t *testin
 		t.Fatalf("operator selected repository spelling became authority: %+v %v", actor, err)
 	}
 	control := mustOp(t, map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "operator"})
+	installMockLog(t, mock, testGenesis(t, nil))
 	request, _ := NewRequest("pause", "control", actor, OperationsParameters{Operations: []Operation{control}})
 	if _, err := branch.Publish(context.Background(), actor, request); err != nil {
 		t.Fatal(err)
@@ -122,7 +124,7 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		}
 		respond(map[string]any{"id": id, "login": "operator"})
 	case r.Method == http.MethodGet && r.URL.Path == "/repos/"+testRepository:
-		respond(map[string]any{"id": 1, "full_name": testRepository, "default_branch": "main", "permissions": map[string]bool{"push": true, "admin": true}})
+		respond(map[string]any{"id": 1, "full_name": testRepository, "default_branch": "main", "permissions": map[string]bool{"push": true, "admin": !mock.noAdmin}})
 	case r.Method == http.MethodGet && path == "issues/7":
 		mock.resourceReads++
 		if mock.resourceRead != nil {
@@ -321,6 +323,7 @@ func TestBranchVerifiesCheckpointChainsBeyondFormerDepthLimit(t *testing.T) {
 
 func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 	branch, mock := newQueueAPI(t)
+	mock.noAdmin = true
 	actor, err := branch.Authenticate(context.Background(), "producer")
 	if err != nil {
 		t.Fatal(err)
@@ -338,13 +341,13 @@ func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 		t.Fatalf("new queue initialization: %+v %v", published, err)
 	}
 	commits, err := branch.Read(context.Background())
-	if err != nil || len(commits) != 2 || mustOperationKind(t, commits[0].Operations[0]) != "Policy" {
+	if err != nil || len(commits) != 1 || mustOperationKind(t, commits[0].Operations[0]) != "Policy" {
 		t.Fatalf("mandatory policy genesis absent: %v", err)
 	}
-	if commits[0].Request.ID != "init_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
+	if commits[0].Request.ID != "submit" ||
 		commits[0].PolicyEpoch != "epoch_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
-		commits[0].ID != "q_50ddbfa08f7148bbb21046bd6c12fed643985baa93ecc09ae9a6d1c6366d1be7" ||
-		commits[1].ID != "q_55c9db94408bb38dd5f1731f2adc022fcca54ea724b4b1f4db2424d7194d9294" {
+		commits[0].ID != "q_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
+		commits[0].Actor.Role != "producer" || len(commits[0].Operations) != 2 {
 		t.Fatal("default publisher identities differ from the independent canonical bootstrap example")
 	}
 	writes := mock.refWrites
