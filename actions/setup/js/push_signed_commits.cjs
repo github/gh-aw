@@ -13,6 +13,7 @@ const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { backfillCommitObjects } = require("./git_helpers.cjs");
 const { overridePersistedExtraheader, restorePersistedExtraheader } = require("./git_auth_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { redactSecrets, redactBuiltInPatterns } = require("./redact_secrets.cjs");
 const ERROR_CODE_PREFIX_RE = /^(?:ERR_[A-Z_]+|E\d{3}):\s*/;
 /**
  * Strip the single leading `ERR_*: ` or `E001: ` sentinel from a message.
@@ -271,10 +272,19 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
   const pushArgs = pushRemoteUrl ? ["push", pushRemoteUrl, branch] : ["push", "origin", branch];
   const pushOnce = async () => {
     await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: pushRemoteUrl || "origin", branch, cwd, gitAuthEnv });
-    await exec.exec("git", pushArgs, {
+    const result = await exec.getExecOutput("git", pushArgs, {
       cwd,
       env: { ...process.env, ...(gitAuthEnv || {}) },
+      ignoreReturnCode: true,
     });
+    if (result.exitCode !== 0) {
+      const output = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
+      const secrets = [pushToken, process.env.GH_TOKEN, process.env.GITHUB_TOKEN, process.env.GITHUB_APP_TOKEN].filter(Boolean);
+      const detail = redactBuiltInPatterns(redactSecrets(output, secrets).content)
+        .content.replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")
+        .replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
+      throw new Error(`${ERR_SYSTEM}: git push failed (exit code ${result.exitCode}): ${detail}`);
+    }
     return resolveLocalHeadSha(cwd);
   };
   if (!pushRemoteUrl || !pushToken) {

@@ -2283,7 +2283,7 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
       }
     });
 
-    it("retries a compare-and-swap loss by rebasing onto the refreshed head and preserving both JSONL rows", async () => {
+    it("retries a non-fast-forward push by rebasing onto the refreshed head and preserving both JSONL rows", async () => {
       const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-race-"));
       const remoteDir = path.join(rootDir, "remote.git");
       const seedDir = path.join(rootDir, "seed");
@@ -2318,13 +2318,14 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
         const pushSignedCommitsFn = vi.fn(async ({ baseRef: receivedBaseRef, cwd }) => {
           pushBases.push(receivedBaseRef);
           if (pushBases.length === 1) {
-            throw new Error("ERR_API: GraphQL createCommitOnBranch expectedHeadOid did not match");
+            execFileSync("git", ["push", "origin", branchName], { cwd, stdio: "pipe" });
           }
 
           const revList = execSync(`git rev-list --parents ${remoteHead}..HEAD`, { cwd, encoding: "utf8" }).trim();
           const rows = fs.readFileSync(path.join(cwd, "history.jsonl"), "utf8").trim().split("\n");
           expect(revList.split(/\s+/)).toHaveLength(2);
           expect(rows).toEqual(['{"id":"base"}', '{"id":"remote"}', '{"id":"local"}']);
+          execFileSync("git", ["push", "origin", branchName], { cwd, stdio: "pipe" });
         });
 
         await pushRepoMemoryChangesWithRetry({
@@ -2352,6 +2353,8 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
         expect(pushBases).toEqual([baseRef, remoteHead]);
         expect(delays).toEqual([501]);
         expect(global.core.setFailed).not.toHaveBeenCalled();
+        expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("fetch first"));
+        expect(execFileSync("git", ["--git-dir", remoteDir, "show", `${branchName}:history.jsonl`], { encoding: "utf8" })).toBe('{"id":"base"}\n{"id":"remote"}\n{"id":"local"}\n');
       } finally {
         randomSpy.mockRestore();
         delete global.core;

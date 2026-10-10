@@ -9,9 +9,31 @@ const { generateFooterWithExpiration, createExpirationLine } = require("./epheme
 const { generateXMLMarker } = require("./messages.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { redactBuiltInPatterns } = require("./redact_secrets.cjs");
 
 const GITHUB_API_VERSION = "2022-11-28";
 const FAILED_JOBS_ISSUE_EXPIRES_HOURS = 24 * 7; // 1 week
+const STATE_PUSH_JOB_IDS = new Set(["push_ledger_changes", "push_repo_memory", "push_evals_state", "push_experiment_state"]);
+
+/**
+ * Read only error lines from an already-masked state-push job log.
+ * @param {number} jobId
+ * @returns {Promise<string>}
+ */
+async function getStatePushError(jobId) {
+  try {
+    const response = await github.rest.actions.downloadJobLogsForWorkflowRun({ ...context.repo, job_id: jobId });
+    const log = typeof response.data === "string" ? response.data : Buffer.from(response.data).toString("utf8");
+    const errors = log.split(/\r?\n/).filter(line => /##\[error\]|fatal:|error:|remote: error:|!\s+\[rejected\]/i.test(line));
+    const detail = redactBuiltInPatterns(errors.slice(-20).join("\n"))
+      .content.replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")
+      .replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
+    return sanitizeContent(detail, 4000).replace(/```/g, "``\u200b`");
+  } catch {
+    core.warning(`Could not retrieve error details for state-push job ${jobId}; see the job log`);
+    return "";
+  }
+}
 
 /**
  * Stable builtin job IDs whose failures are already reported
@@ -45,18 +67,24 @@ function isActionsReadPermissionError(error) {
 
 /**
  * Format the list of failed jobs as a markdown bulleted list.
- * @param {Array<{name: string, html_url: string | null}>} jobs
+ * @param {Array<{name: string, html_url: string | null, error_detail?: string}>} jobs
  * @returns {string}
  */
 function formatFailedJobsList(jobs) {
   return jobs
     .map(job => {
       const safeName = sanitizeContent(job.name);
+      const detail = job.error_detail
+        ? `\n\n  \`\`\`text\n${job.error_detail
+            .split("\n")
+            .map(line => `  ${line}`)
+            .join("\n")}\n  \`\`\`\n`
+        : "";
       if (job.html_url && job.html_url.startsWith("https://")) {
         const safeUrl = sanitizeContent(job.html_url);
-        return `- [\`${safeName}\`](${safeUrl})`;
+        return `- [\`${safeName}\`](${safeUrl})${detail}`;
       }
-      return `- \`${safeName}\``;
+      return `- \`${safeName}\`${detail}`;
     })
     .join("\n");
 }
@@ -92,7 +120,7 @@ async function getFailedNonBuiltinJobs() {
 
   core.info(`Querying jobs for workflow run ${runId}`);
 
-  /** @type {Array<{name: string, html_url: string | null}>} */
+  /** @type {Array<{name: string, html_url: string | null, id?: number, error_detail?: string}>} */
   const runJobs = [];
 
   let page = 1;
@@ -115,7 +143,7 @@ async function getFailedNonBuiltinJobs() {
       if (job.conclusion !== "failure") {
         continue;
       }
-      runJobs.push({ name: job.name, html_url: job.html_url });
+      runJobs.push({ name: job.name, html_url: job.html_url, ...(job.id ? { id: job.id } : {}) });
     }
 
     if (jobs.length < perPage) {
@@ -126,14 +154,22 @@ async function getFailedNonBuiltinJobs() {
 
   const matchesName = (name, display) => name === display || name.startsWith(`${display} (`) || name.startsWith(`${display} / `);
   const knownIds = new Set([...Object.keys(jobResults), ...Object.keys(jobDisplayNames)]);
-  return failedJobIds.flatMap(jobId => {
+  const failedJobs = [];
+  for (const jobId of failedJobIds) {
     const displayName = jobDisplayNames[jobId] || jobId;
     const matchingJobs = runJobs.filter(job => matchesName(job.name, displayName));
     const ambiguousName = [...knownIds].some(otherId => otherId !== jobId && matchingJobs.some(job => matchesName(job.name, jobDisplayNames[otherId] || otherId)));
-    if (matchingJobs.length > 0 && !ambiguousName) return matchingJobs;
+    if (matchingJobs.length > 0 && !ambiguousName) {
+      for (const job of matchingJobs) {
+        const detail = STATE_PUSH_JOB_IDS.has(jobId) && job.id ? await getStatePushError(job.id) : "";
+        failedJobs.push({ name: job.name, html_url: job.html_url, ...(detail ? { error_detail: detail } : {}) });
+      }
+      continue;
+    }
     core.warning(`Could not uniquely match failed job ID ${jobId} to its API display name; linking to the workflow run`);
-    return [{ name: jobId, html_url: process.env.GH_AW_RUN_URL || null }];
-  });
+    failedJobs.push({ name: jobId, html_url: process.env.GH_AW_RUN_URL || null });
+  }
+  return failedJobs;
 }
 
 /**
