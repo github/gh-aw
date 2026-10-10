@@ -35,6 +35,9 @@ func TestMCPCompileDiagnosticChild(t *testing.T) {
 		os.Exit(1)
 	}
 	log := logger.New("workflow:mcp_compile_test")
+	if scenario == "unlisted" {
+		log = logger.New("console:mcp_compile_test")
+	}
 	if scenario == "huge-line" {
 		fmt.Fprint(os.Stderr, "✗ "+compileDependencyCause+" ")
 		for range 12 << 10 {
@@ -45,7 +48,9 @@ func TestMCPCompileDiagnosticChild(t *testing.T) {
 		for range 12 << 10 {
 			log.Printf("%s", strings.Repeat("x", 1024))
 		}
-		fmt.Fprintf(os.Stderr, "\x1b[31m✗ %s\x1b[0m\n  %s\n", compileDependencyCause, compileDependencyRemediation)
+		fmt.Fprintf(os.Stderr, "\x1b[31m✗ %s\x1b[0m\n", compileDependencyCause)
+		log.Print("debug interleaved before remediation")
+		fmt.Fprintf(os.Stderr, "  %s\n", compileDependencyRemediation)
 	}
 	log.Print("trailing debug must not replace the dependency cause")
 	fmt.Fprintln(os.Stderr, "✓ cleanup completed")
@@ -85,14 +90,14 @@ func TestCompileToolPreservesStructuredFailureAfterDebugFlood(t *testing.T) {
 func compileDiagnosticChild(scenario string) execCmdFunc {
 	return func(ctx context.Context, _ ...string) *exec.Cmd {
 		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMCPCompileDiagnosticChild$")
-		cmd.Env = append(os.Environ(), "GH_AW_COMPILE_DIAGNOSTIC_CHILD="+scenario, "DEBUG=workflow:mcp_compile_test", "DEBUG_COLORS=0")
+		cmd.Env = append(os.Environ(), "GH_AW_COMPILE_DIAGNOSTIC_CHILD="+scenario, "DEBUG=workflow:mcp_compile_test,console:mcp_compile_test", "DEBUG_COLORS=0")
 		return cmd
 	}
 }
 
 func TestCompileToolBoundsHugeDebugStderr(t *testing.T) {
 	t.Parallel()
-	for _, scenario := range []string{"debug", "whitespace", "huge-line"} {
+	for _, scenario := range []string{"debug", "whitespace", "huge-line", "unlisted"} {
 		t.Run(scenario, func(t *testing.T) {
 			t.Parallel()
 			server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "test"}, nil)
@@ -119,6 +124,7 @@ func TestCompileToolBoundsHugeDebugStderr(t *testing.T) {
 				assert.LessOrEqual(t, len(message), maxMCPCompileDiagnosticBytes)
 				assert.True(t, utf8.ValidString(message))
 				assert.NotContains(t, message, "workflow:mcp_compile_test")
+				assert.NotContains(t, message, "console:mcp_compile_test")
 				assert.NotContains(t, message, "cleanup completed")
 				assert.Contains(t, message, "omitted")
 			}
@@ -149,6 +155,11 @@ func TestMCPCompileDiagnosticsStreaming(t *testing.T) {
 		{"empty", "", "exit status 1"},
 		{"debug-only", "cli:test noise +1ms\n", "exit status 1"},
 		{"multiple-errors", "✗ earlier error\n✗ terminal cause\n  remediation\n", "✗ terminal cause\nremediation"},
+		{"interleaved-debug", "✗ cause\nworkflow:compile noisy debug +1ms\n  remediation\n", "✗ cause\nremediation"},
+		{"unlisted-debug-only", "console:render Rendering table +1ms\ngitutil:gitutil Running git command +1ms\n", "exit status 1"},
+		{"shellcheck-only", "shellcheck findings in a.lock.yml:\nscript: line 1: SC2086 quote variable\n\n", "exit status 1"},
+		{"shellcheck-warning", "⚠ dependency unavailable\n⚠ shellcheck findings in a.lock.yml:\nscript: line 1: SC2086\n\n", "⚠ dependency unavailable"},
+		{"shellcheck-after-error", "✗ cause\nshellcheck findings in a.lock.yml:\nscript: line 1: SC2086\n\n", "✗ cause"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -163,6 +174,47 @@ func TestMCPCompileDiagnosticsStreaming(t *testing.T) {
 			assert.True(t, strings.HasPrefix(message, tt.expected), message)
 			assert.LessOrEqual(t, len(message), maxMCPCompileDiagnosticBytes)
 		})
+	}
+}
+
+func TestMCPCompileDiagnosticsExcludeScannerFindingsFromFailure(t *testing.T) {
+	t.Parallel()
+	for _, header := range []string{"shellcheck findings in a.lock.yml:", "⚠ shellcheck findings in a.lock.yml:"} {
+		diagnostics := &mcpCompileDiagnostics{}
+		_, err := io.WriteString(diagnostics, "⚠ dependency unavailable\n"+header+"\nscript: line 1: SC2086\n\n")
+		require.NoError(t, err)
+		diagnostics.finishLine()
+		assert.Empty(t, diagnostics.message)
+		assert.Equal(t, "⚠ dependency unavailable", diagnostics.warning)
+		assert.Equal(t, "⚠ dependency unavailable", diagnostics.failureMessage(errors.New("exit status 1")))
+		assert.Contains(t, diagnostics.shellcheck.String(), header)
+		assert.Contains(t, diagnostics.shellcheck.String(), "SC2086")
+	}
+}
+
+func TestMCPCompileDiagnosticsLoggerFormat(t *testing.T) {
+	t.Parallel()
+	for _, namespace := range []string{"console:render", "gitutil:gitutil", "jsonutil:parse", "typeutil:types", "future-package:new_namespace", "bootstrap"} {
+		for _, duration := range []string{"0ns", "5µs", "12ms", "1.5s", "2.0m", "3.0h"} {
+			line := namespace + " debug message +" + duration
+			assert.True(t, isCompileDebugLine(line), line)
+			diagnostics := &mcpCompileDiagnostics{}
+			_, err := io.WriteString(diagnostics, line+"\n")
+			require.NoError(t, err)
+			diagnostics.finishLine()
+			assert.Empty(t, diagnostics.message)
+			assert.Contains(t, diagnostics.failureMessage(errors.New("exit status 1")), "omitted")
+		}
+	}
+	for _, line := range []string{
+		"Error: dependency unavailable +1ms",
+		"error: dependency unavailable +1ms",
+		"workflow.md: error: bad config +1ms",
+		"console:render real diagnostic without elapsed time",
+		"gitutil:gitutil error with invalid duration +oops",
+		"✗ shellcheck not available",
+	} {
+		assert.False(t, isCompileDebugLine(line), line)
 	}
 }
 

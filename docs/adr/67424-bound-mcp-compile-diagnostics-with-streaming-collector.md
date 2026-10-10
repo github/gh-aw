@@ -1,8 +1,8 @@
 # ADR-67424: Bound MCP Compile Diagnostics With a Streaming Head/Tail Collector
 
 **Date**: 2026-10-10
-**Status**: Draft
-**Deciders**: pelikhan [TODO: verify additional deciders]
+**Status**: Proposed
+**Deciders**: pelikhan
 
 ---
 
@@ -12,7 +12,9 @@ When `gh aw` runs as an MCP server, the `compile` tool shells out to the compile
 
 ### Decision
 
-We will drain compile subprocess stderr through a compile-local streaming collector (`pkg/cli/mcp_compile_diagnostics.go`) instead of buffering the full stream. The collector keeps a bounded head and tail per line, strips ANSI, drops recognized debug/progress lines, and tracks whether content was omitted. Execution-failure messages are capped at 4 KiB and serialized fallback JSON at 48 KiB (including JSON escaping), with explicit truncation/omission markers. Structured compiler and scanner JSON is preserved even when it exceeds the fallback budget or the subprocess exits nonzero, and shellcheck findings are collected separately so bounding the failure message does not discard scanner diagnostics. The primary driver is bounded memory and response size without losing the actionable error.
+Drain compile subprocess stderr through a compile-local streaming collector (`pkg/cli/mcp_compile_diagnostics.go`) instead of buffering the full debug stream. The collector keeps a bounded head and tail per line, strips ANSI, recognizes debug lines by the logger's namespace/message/elapsed format rather than a namespace allowlist, and tracks whether content was omitted. Skipping debug lines keeps the current error block open so interleaved logs cannot hide subsequent remediation. Shellcheck header/finding lines are collected separately and never replace an execution error or dependency warning.
+
+Execution-failure messages are capped at 4 KiB and serialized fallback JSON at 48 KiB (including JSON escaping), with explicit truncation/omission markers. Structured compiler and scanner JSON is preserved even when it exceeds the fallback budget or the subprocess exits nonzero. The primary driver is bounded debug capture and fallback response size without losing the actionable error; structured stdout and accumulated scanner findings intentionally remain outside these bounds.
 
 ### Alternatives Considered
 
@@ -31,13 +33,13 @@ Run the compile subprocess with debug logging disabled so the flood never occurs
 ### Consequences
 
 #### Positive
-- Memory and MCP response size are bounded regardless of subprocess verbosity (4 KiB message, 48 KiB fallback JSON), validated against a 12 MiB stderr flood.
+- Debug-line capture and fallback response size are bounded (4 KiB message, 48 KiB fallback JSON), validated against a 12 MiB stderr flood. Structured stdout and accumulated scanner findings remain unbounded to preserve existing result contracts.
 - The cause-first error, multiline remediation, and ANSI-normalized diagnostics survive truncation, so failures stay actionable.
 - Structured compiler/scanner JSON and shellcheck findings remain available independently of the bounded failure message.
 
 #### Negative
 - Diagnostics can be lossy: middle content is replaced by a truncation marker, so reproducing a long failure may require rerunning the compile outside MCP.
-- Debug/progress-line classification is heuristic (prefix and substring matching on `✗`, `Error:`, `⚠`, `shellcheck findings in `, etc.) and can misclassify future or localized compiler output.
+- Debug/progress-line classification is heuristic (logger namespace/duration format and console prefixes such as `✗`, `Error:`, and `⚠`) and must track changes to logger formatting. New namespaces require no allowlist updates.
 - Head/tail byte slicing requires explicit UTF-8 validation (`strings.ToValidUTF8`) and byte-boundary tests; careless indexing here is a recurring defect source.
 
 #### Neutral
@@ -47,4 +49,4 @@ Run the compile subprocess with debug logging disabled so the flood never occurs
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+This decision remains proposed until maintainer review and merge.

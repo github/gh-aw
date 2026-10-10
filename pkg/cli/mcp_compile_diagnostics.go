@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -15,6 +16,9 @@ const (
 	maxMCPCompileFallbackBytes   = 48 << 10
 	compileDiagnosticTruncation  = "\n... (diagnostic truncated)"
 )
+
+// Match the logger's namespace/message/elapsed format, not a fixed namespace set.
+var compileDebugLinePattern = regexp.MustCompile(`^[[:alnum:]_]+(?:[:./-][[:alnum:]_]+)* .* \+[0-9]+(?:\.[0-9]+)?(?:ns|µs|ms|s|m|h)$`)
 
 // compileDiagnosticText retains both ends of a line without buffering debug floods.
 type compileDiagnosticText struct {
@@ -90,7 +94,6 @@ func (diagnostics *mcpCompileDiagnostics) finishLine() {
 	line = strings.TrimSpace(line)
 	if isCompileDebugLine(line) {
 		diagnostics.omitted = true
-		diagnostics.inBlock = false
 		return
 	}
 	switch {
@@ -98,9 +101,11 @@ func (diagnostics *mcpCompileDiagnostics) finishLine() {
 		diagnostics.shellcheck.WriteString("\n\n")
 		diagnostics.shellcheck.WriteString(line)
 		diagnostics.inFinding = true
+		return
 	case diagnostics.inFinding && (strings.Contains(line, "script:") || strings.HasPrefix(line, "script ")):
 		diagnostics.shellcheck.WriteString("\n")
 		diagnostics.shellcheck.WriteString(line)
+		return
 	case line == "":
 		diagnostics.inFinding = false
 	}
@@ -128,16 +133,7 @@ func (diagnostics *mcpCompileDiagnostics) finishLine() {
 }
 
 func isCompileDebugLine(line string) bool {
-	namespace, _, found := strings.Cut(line, " ")
-	if !found {
-		return false
-	}
-	for _, prefix := range []string{"cli:", "workflow:", "parser:", "mcp:", "agentdrain:", "repoutil:", "logger:", "stringutil:"} {
-		if strings.HasPrefix(namespace, prefix) {
-			return true
-		}
-	}
-	return false
+	return compileDebugLinePattern.MatchString(line)
 }
 
 func isCompileProgressLine(line string) bool {
