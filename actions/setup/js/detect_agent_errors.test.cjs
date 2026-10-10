@@ -37,12 +37,64 @@ const {
   isShellExpansionGuardRejectedError,
   extractMissingModelPricingModelName,
   buildOutputLines,
+  main,
   persistAgentExecution,
   findMostRecentLogFile,
   renderInternalEngineLogOnFailure,
 } = require("./detect_agent_errors.cjs");
 
 describe("detect_agent_errors.cjs", () => {
+  describe("model endpoint mismatch", () => {
+    it.each([
+      "400 Cannot translate Copilot request feature: tool_search",
+      "400 Unsupported Responses custom tool: web_search",
+      '{"type":"model_endpoint_incompatible","model":"gpt-5","endpoint":"/responses"}',
+      "Model 'gpt-5' is not accessible via the /responses endpoint.",
+    ])("detects and emits the dedicated category for %s", message => {
+      const results = detectErrors(message);
+      expect(results.modelEndpointMismatchError).toBe(true);
+      expect(results.modelNotSupportedError).toBe(false);
+      expect(results.inferenceAccessError).toBe(false);
+      expect(buildOutputLines(results)).toContain("model_endpoint_mismatch_error=true");
+    });
+
+    it("does not classify an unrelated HTTP 400 as endpoint mismatch", () => {
+      const results = detectErrors("Response status code does not indicate success: 400 (Bad Request)");
+      expect(results.http400ResponseError).toBe(true);
+      expect(results.modelEndpointMismatchError).toBe(false);
+      expect(buildOutputLines(results)).toContain("model_endpoint_mismatch_error=false");
+    });
+
+    it("does not classify empty logs as endpoint mismatch", () => {
+      expect(detectErrors("").modelEndpointMismatchError).toBe(false);
+    });
+
+    it("prints actionable mismatch diagnostics and writes the category", async () => {
+      const previousOutput = process.env.GITHUB_OUTPUT;
+      const previousInternalLogs = process.env.GH_AW_ENGINE_INTERNAL_LOGS_DIR;
+      const exists = vi.spyOn(fs, "existsSync").mockImplementation(file => String(file).endsWith("/agent-stdio.log"));
+      const read = vi.spyOn(fs, "readFileSync").mockReturnValue('{"type":"session.error","data":{"message":"Unsupported Responses custom tool: web_search"}}');
+      const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
+      const mkdir = vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+      const write = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+      const rename = vi.spyOn(fs, "renameSync").mockImplementation(() => {});
+      const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+      try {
+        process.env.GITHUB_OUTPUT = "mock-output";
+        delete process.env.GH_AW_ENGINE_INTERNAL_LOGS_DIR;
+        await main();
+        expect(append.mock.calls[0][1]).toContain("model_endpoint_mismatch_error=true");
+        expect(stderr.mock.calls.map(([message]) => message).join("")).toContain("select a model compatible with the configured endpoint and tool protocol");
+      } finally {
+        for (const spy of [exists, read, append, mkdir, write, rename, stderr]) spy.mockRestore();
+        if (previousOutput === undefined) delete process.env.GITHUB_OUTPUT;
+        else process.env.GITHUB_OUTPUT = previousOutput;
+        if (previousInternalLogs === undefined) delete process.env.GH_AW_ENGINE_INTERNAL_LOGS_DIR;
+        else process.env.GH_AW_ENGINE_INTERNAL_LOGS_DIR = previousInternalLogs;
+      }
+    });
+  });
+
   it("does not persist rejected Aider JSON errors through live detection", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-aider-errors-"));
     const previousEngine = process.env.GH_AW_ENGINE_ID;

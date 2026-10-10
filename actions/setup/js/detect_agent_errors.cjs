@@ -21,6 +21,8 @@
  *   - model_not_supported_error: The configured model is invalid or unsupported
  *     for the selected engine/account (for example unknown model name, model not
  *     found, or model unavailable for the plan).
+ *   - model_endpoint_mismatch_error: The configured model cannot serve the request
+ *     endpoint or tool protocol; changing the model or endpoint is required.
  *   - http_400_response_error: The engine surfaced a generic HTTP 400 Bad Request
  *     response (for example "Response status code does not indicate success: 400 (Bad Request)").
  *   - capi_quota_exceeded_error: The Copilot CAPI quota has been exhausted
@@ -113,7 +115,7 @@ function detectStepTimeoutFromEnvironment() {
 
 /**
  * Write GitHub Actions outputs to $GITHUB_OUTPUT.
- * @param {{ inferenceAccessError: boolean, mcpPolicyError: boolean, agenticEngineTimeout: boolean, modelNotSupportedError: boolean, http400ResponseError: boolean, capiQuotaExceededError: boolean, invocationCapExceeded: boolean, maxCacheMissesExceeded: boolean, missingModelPricingError: boolean, missingModelPricingModelName: string, shellExpansionGuardRejected: boolean }} results
+ * @param {ReturnType<typeof detectErrors>} results
  */
 function writeOutputs(results) {
   const outputFile = process.env.GITHUB_OUTPUT;
@@ -286,6 +288,9 @@ async function main() {
   }
   if (results.modelNotSupportedError) {
     process.stderr.write("[detect-agent-errors] Detected model configuration error: configured model is invalid or unavailable for this engine/account\n");
+  }
+  if (results.modelEndpointMismatchError) {
+    process.stderr.write("[detect-agent-errors] Detected model endpoint mismatch: select a model compatible with the configured endpoint and tool protocol; retrying the same configuration will not resolve this error\n");
   }
   if (results.http400ResponseError) {
     process.stderr.write("[detect-agent-errors] Detected HTTP 400 response error in agent log\n");

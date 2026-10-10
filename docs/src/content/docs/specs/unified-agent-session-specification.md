@@ -589,6 +589,7 @@ source for opaque fields.
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, `agentVersion`, observed `model`, `requestedModel`, compact `modelRouting`, and `triggerType` from `aw_info.json`. `requestedModel` prefers `requested_model` and falls back to `model` for earlier metadata. Unavailable values are not inferred. |
 | `model_routing.outcome` | The harness's observed routing status, wire model, effective endpoint, selected endpoint, effort, applied effort, and failure code from `agent/awf-routing-outcome.json`; free-form detail is excluded. |
+| `model_endpoint.mismatch` | A single harness JSON record from `agent/model-endpoint-mismatch.json`, with the model/API mismatch cause and corrective action. |
 | `guardrail.daily_aic` | Activation's daily AI Credits decision (`status`, `exceeded`, and available numeric `total`, `estimated`, `threshold`). Omitted when the guardrail has no decision; an existing event is not duplicated. |
 | `github_api.rate_limit` | Available GitHub API rate-limit JSONL observations retain the recorded source (`response_headers`, `rate_limit_api`, or `retry`), operation, resource, limit, remaining, used, reset, and retry state. `credentialSource` identifies a known GitHub Actions token, PAT, or app token where classified by the client; absent or unknown credential types are not inferred from quota values. Raw credentials and unrecognized fields are excluded. The collector prefers `github_rate_limits.jsonl` over its `usage/` copy to avoid duplicate observations. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
@@ -642,6 +643,30 @@ schema, stage, purpose, attempt, classifier model and effort, objective,
 provider, labels, mode, classifier attempts, degraded-classification state,
 selected ID/provider/model/effort, wire model, endpoint, router, latency, code,
 request ID, routed outcome, deviations, requested model, and requested effort.
+
+#### Model/endpoint mismatch
+
+The collector MUST map the single JSON object in
+`agent/model-endpoint-mismatch.json` to `model_endpoint.mismatch`, with provenance
+component `model_endpoint`, source path `agent/model-endpoint-mismatch.json`, and
+phase equal to the record's `startup` or `runtime` phase. Arrays, malformed JSON,
+and records that violate the following contract MUST produce a collection
+warning rather than a mismatch event.
+
+The payload has required fields `category: "model_endpoint_mismatch"`,
+`phase: "startup" | "runtime"`, and strings `configured_model`, `resolved_model`,
+`wire_api`, `wire_api_source`, `detail`, and `fix`. `supported_endpoints` is a
+required array of strings. `model` and `endpoint` are optional strings describing
+runtime observations. Unknown source fields are excluded; unavailable optional
+fields MUST NOT be inferred.
+
+Default summaries MUST render the cause (`detail`) and corrective action (`fix`),
+alongside the configured and resolved model, wire API and its source, and
+supported endpoints. Failure reports MUST derive this context only from the
+unified session, without rescanning raw agent or firewall logs or reading the
+source JSON separately. Reports MUST use the `model_endpoint_mismatch` grouping
+category and the `model_endpoint_mismatch_context` template placeholder, and
+redact and bound diagnostic text before publication.
 
 ### 4.8 `agent.execution`
 

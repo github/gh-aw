@@ -13,6 +13,21 @@ const { normalizeEngineLogEntries, normalizeEngineSessionEvents, parseEngineLog 
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
+/** @param {any} data @returns {boolean} */
+function isModelEndpointMismatchData(data) {
+  return (
+    data !== null &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    data.category === "model_endpoint_mismatch" &&
+    ["startup", "runtime"].includes(data.phase) &&
+    ["configured_model", "resolved_model", "wire_api", "wire_api_source", "detail", "fix"].every(key => typeof data[key] === "string") &&
+    Array.isArray(data.supported_endpoints) &&
+    data.supported_endpoints.every(endpoint => typeof endpoint === "string") &&
+    ["model", "endpoint"].every(key => !Object.hasOwn(data, key) || typeof data[key] === "string")
+  );
+}
+
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {{component: string, phase: string, path: string, events: SessionEvent[], timestampUnit?: "seconds" | "milliseconds"}} SessionSource */
 
@@ -454,6 +469,22 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     // The sanitized conclusion result includes job outcomes as well as structured or inline verdicts.
     [["usage/detection/detection_result.json", "threat-detection/detection_result.json"], "detection", "detection", "detection.result"],
   ];
+  const mismatchFile = path.join(rootDir, "agent/model-endpoint-mismatch.json");
+  if (exists(mismatchFile)) {
+    try {
+      const record = JSON.parse(read(mismatchFile));
+      if (!isModelEndpointMismatchData(record)) {
+        report(mismatchFile, "invalid_model_endpoint_mismatch", undefined);
+      } else {
+        const keys = ["category", "phase", "configured_model", "resolved_model", "wire_api", "wire_api_source", "supported_endpoints", "detail", "fix", "model", "endpoint"];
+        const data = Object.fromEntries(keys.filter(key => Object.hasOwn(record, key)).map(key => [key, record[key]]));
+        sources.push({ component: "model_endpoint", phase: record.phase, path: "agent/model-endpoint-mismatch.json", events: [{ type: "model_endpoint.mismatch", data }] });
+      }
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      report(mismatchFile, "malformed_json", undefined);
+    }
+  }
   for (const [candidates, component, phase, type] of observations) {
     const file = choose(candidates);
     if (type === "model_routing.outcome" && file) {
@@ -464,6 +495,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
           report(file, "non_object_record", undefined);
           return [];
         }
+
         return [/** @type {SessionEvent} */ { type, data: record, ...(record.timestamp !== undefined ? { timestamp: record.timestamp } : {}) }];
       });
       sources.push({ component, phase, path: path.relative(rootDir, file), events });
@@ -582,4 +614,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { SESSION_FILE_FORMAT_VERSION, sessionTimestamp, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, collectUnifiedSession, writeUnifiedSession, main };
+module.exports = { SESSION_FILE_FORMAT_VERSION, sessionTimestamp, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, collectUnifiedSession, isModelEndpointMismatchData, writeUnifiedSession, main };

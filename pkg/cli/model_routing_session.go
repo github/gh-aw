@@ -66,6 +66,34 @@ type sessionModelRoutingEvent struct {
 type sessionModelRoutingAttribution struct {
 	WorkflowInfo *sessionWorkflowInfo
 	Outcome      *sessionModelRoutingOutcome
+	Mismatches   []ModelEndpointMismatch
+}
+
+// ModelEndpointMismatch describes a model/API incompatibility reported by the unified session.
+type ModelEndpointMismatch struct {
+	Category           string   `json:"category"`
+	Phase              string   `json:"phase"`
+	ConfiguredModel    string   `json:"configured_model"`
+	ResolvedModel      string   `json:"resolved_model"`
+	WireAPI            string   `json:"wire_api"`
+	WireAPISource      string   `json:"wire_api_source"`
+	SupportedEndpoints []string `json:"supported_endpoints"`
+	Detail             string   `json:"detail"`
+	Fix                string   `json:"fix"`
+	Model              string   `json:"model,omitempty"`
+	Endpoint           string   `json:"endpoint,omitempty"`
+}
+
+func readSessionModelEndpointMismatches(runDir string) []ModelEndpointMismatch {
+	attribution, _, err := readSessionModelRouting(runDir)
+	if err != nil {
+		auditReportLog.Printf("Failed to read model endpoint mismatch diagnostics from unified session: %v", err)
+		return nil
+	}
+	if attribution == nil {
+		return nil
+	}
+	return attribution.Mismatches
 }
 
 func readSessionModelRouting(runDir string) (*sessionModelRoutingAttribution, bool, error) {
@@ -140,8 +168,53 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 			return fmt.Errorf("invalid model_routing.outcome on line %d: %w", lineNumber, err)
 		}
 		attribution.Outcome = &outcome
+	case event.Type == "model_endpoint.mismatch":
+		if event.Provenance.Component != "model_endpoint" ||
+			event.Provenance.Path != "agent/model-endpoint-mismatch.json" {
+			return nil
+		}
+		var mismatch ModelEndpointMismatch
+		if err := json.Unmarshal(event.Data, &mismatch); err != nil ||
+			!validModelEndpointMismatchData(event.Data) ||
+			event.Provenance.Phase != mismatch.Phase {
+			auditReportLog.Printf("Ignoring invalid model_endpoint.mismatch on line %d", lineNumber)
+			return nil
+		}
+		attribution.Mismatches = append(attribution.Mismatches, mismatch)
 	}
 	return nil
+}
+
+func validModelEndpointMismatchData(data json.RawMessage) bool {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(data, &fields) != nil || fields == nil {
+		return false
+	}
+	for _, key := range []string{"category", "phase", "configured_model", "resolved_model", "wire_api", "wire_api_source", "detail", "fix", "model", "endpoint"} {
+		value, present := fields[key]
+		if !present && (key == "model" || key == "endpoint") {
+			continue
+		}
+		var text string
+		if !present || bytes.Equal(bytes.TrimSpace(value), []byte("null")) || json.Unmarshal(value, &text) != nil {
+			return false
+		}
+		if key == "category" && text != "model_endpoint_mismatch" ||
+			key == "phase" && text != "startup" && text != "runtime" {
+			return false
+		}
+	}
+	var endpoints []json.RawMessage
+	if json.Unmarshal(fields["supported_endpoints"], &endpoints) != nil || endpoints == nil {
+		return false
+	}
+	for _, endpoint := range endpoints {
+		var text string
+		if bytes.Equal(bytes.TrimSpace(endpoint), []byte("null")) || json.Unmarshal(endpoint, &text) != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (attribution *sessionModelRoutingAttribution) modelRouting() *AwInfoModelRouting {

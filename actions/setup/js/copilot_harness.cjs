@@ -82,7 +82,6 @@ const {
   fetchAWFReflect,
   fetchModelsFromUrl,
   inferProviderTypeForModel,
-  getCatalogModelEntry,
   resolveMultiProviderFromReflect,
 } = require("./awf_reflect.cjs");
 const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasTerminalSafeOutput, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
@@ -96,6 +95,7 @@ const { resolveAWFModelRoutingSelection, isModelAvailableInReflectData, getAWFMo
 const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
+const { applyCopilotWireAPI: configureCopilotWireAPI, warnCopilotSubagentEndpoints, recordModelEndpointMismatch, getSupportedEndpoints, MODEL_ENDPOINT_FIX } = require("./copilot_wire_api.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
 
@@ -456,38 +456,17 @@ async function applyCopilotModelAliasResolution(options) {
 }
 
 /**
- * Auto-configure COPILOT_PROVIDER_WIRE_API based on the resolved COPILOT_MODEL.
- *
- * Skips configuration when COPILOT_PROVIDER_WIRE_API is already set so that
- * explicit engine.env values always take precedence. Looks up the wire_api for
- * the current COPILOT_MODEL in the github-copilot provider section of models.json,
- * defaulting GPT models to the responses API when the catalog does not specify one.
+ * Configure and validate COPILOT_PROVIDER_WIRE_API using AWF endpoint metadata.
  *
  * @param {{
  *   modelsJson: Record<string, unknown> | null,
+ *   awfReflectData?: any,
+ *   configuredModel?: string,
  *   logger?: (msg: string) => void,
  * }} options
  */
-function applyCopilotWireAPI({ modelsJson, logger = log }) {
-  if (process.env.COPILOT_PROVIDER_WIRE_API) {
-    logger(`COPILOT_PROVIDER_WIRE_API already set to ${process.env.COPILOT_PROVIDER_WIRE_API} — skipping auto-configure`);
-    return; // User override wins — do not auto-configure.
-  }
-  const modelName = typeof process.env.COPILOT_MODEL === "string" ? process.env.COPILOT_MODEL.trim() : "";
-  if (!modelName) return;
-
-  const catalogEntry = getCatalogModelEntry(modelsJson, modelName, "github-copilot");
-  const wireApi = catalogEntry && typeof catalogEntry.wire_api === "string" ? catalogEntry.wire_api : null;
-  if (wireApi) {
-    logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=${wireApi} for model ${modelName}`);
-    process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
-    return;
-  }
-
-  if (/^gpt-(?:[5-9]|\d{2,})(?:[.-]|$)/i.test(modelName.split("?")[0])) {
-    logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=responses for GPT model ${modelName}`);
-    process.env.COPILOT_PROVIDER_WIRE_API = "responses";
-  }
+function applyCopilotWireAPI(options) {
+  return configureCopilotWireAPI({ logger: log, ...options });
 }
 
 /**
@@ -721,12 +700,14 @@ function extractTokenCountFromOutput(output) {
  *   isTrustedAICreditsBudgetExhausted?: boolean,
  *   isSDKSessionIdleTimeout?: boolean,
  *   isModelRoutingFailure?: boolean,
+ *   isModelEndpointMismatch?: boolean,
  *   hasNumerousPermissionDenied?: boolean,
  *   tokenCount?: number,
  * }} detection
  * @returns {string}
  */
 function classifyCopilotFailure(detection) {
+  if (detection.isModelEndpointMismatch) return "model_endpoint_mismatch";
   if (detection.isModelRoutingFailure) return "model_routing_failed";
   if (detection.isInvocationCapExceeded) return "invocation_cap_exceeded";
   if (detection.isTrustedAICreditsBudgetExhausted) return "ai_credits_exhausted";
@@ -764,6 +745,7 @@ function shouldRetryFailedExecution(params) {
   if (hasNumerousPermissionDeniedIssues(params.output)) return false;
   if (isCAPIQuotaExceededError(params.output)) return false;
   const nonRetryableGuard = detectNonRetryableHarnessGuard(params.output);
+  if (nonRetryableGuard.modelEndpointMismatch) return false;
   if (nonRetryableGuard.maxRunsExceeded) return false;
   if (nonRetryableGuard.apiProxyGuardRejection) return false;
   return params.attempt < params.maxRetries && (params.hasOutput || isCAPIServerError(params.output));
@@ -1206,6 +1188,8 @@ async function main() {
   // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. sandbox.agent: false — no api-proxy running).
   /** @type {any} */
   let awfReflectData = null;
+  const configuredCopilotModel = process.env.COPILOT_MODEL || "";
+  const configuredWireAPI = process.env.COPILOT_PROVIDER_WIRE_API;
   const modelRoutingRequired = process.env.GH_AW_MODEL_ROUTING === "1";
   /** @type {any} */
   let modelRoutingSelection = null;
@@ -1226,6 +1210,7 @@ async function main() {
   if (modelRoutingSelection) {
     if (!copilotSDKMode) {
       resolvedArgs = applyCopilotRoutingArgs(resolvedArgs, modelRoutingSelection);
+      if (configuredWireAPI) process.env.COPILOT_PROVIDER_WIRE_API = configuredWireAPI;
     }
   } else {
     applyModelFallback(process.env, "COPILOT_MODEL", log);
@@ -1237,12 +1222,20 @@ async function main() {
           return null;
         }
         const refreshed = await fetchAWFReflect({ logger: log });
+        if (refreshed.ok && refreshed.reflectData) awfReflectData = refreshed.reflectData;
         return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
       },
     });
-    if (!copilotSDKMode) {
-      applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+  }
+  if (!copilotSDKMode) {
+    try {
+      applyCopilotWireAPI({ modelsJson: loadModelsJson(), awfReflectData, configuredModel: configuredCopilotModel, logger: log });
+    } catch (err) {
+      log(getErrorMessage(err));
+      process.exit(1);
+      return;
     }
+    warnCopilotSubagentEndpoints({ awfReflectData, logger: log });
   }
 
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
@@ -1515,6 +1508,7 @@ async function main() {
           const failureClass = classifyCopilotFailure({
             hasOutput: result.hasOutput,
             isModelRoutingFailure,
+            isModelEndpointMismatch: !!nonRetryableGuard.modelEndpointMismatch,
             isAuthErr,
             isAuthenticationFailed,
             isTransientCAPIError: isCAPIError,
@@ -1578,6 +1572,20 @@ async function main() {
             );
           }
 
+          if (nonRetryableGuard.modelEndpointMismatch) {
+            const mismatch = nonRetryableGuard.modelEndpointMismatch;
+            recordModelEndpointMismatch({
+              ...mismatch,
+              phase: "runtime",
+              configured_model: configuredCopilotModel,
+              resolved_model: childEnv?.COPILOT_MODEL || process.env.COPILOT_MODEL || "",
+              wire_api: childEnv?.COPILOT_PROVIDER_WIRE_API || process.env.COPILOT_PROVIDER_WIRE_API || "completions",
+              wire_api_source: configuredWireAPI ? "override" : "inferred",
+              supported_endpoints: getSupportedEndpoints(awfReflectData, mismatch.model || childEnv?.COPILOT_MODEL || process.env.COPILOT_MODEL) || [],
+            });
+            log(`model endpoint mismatch — not retrying: ${mismatch.detail} ${MODEL_ENDPOINT_FIX}`);
+            return { action: "stop" };
+          }
           if (shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeOutputs, log })) {
             return { action: "stop", exitCode: 0 };
           }
@@ -1894,6 +1902,7 @@ if (typeof module !== "undefined" && module.exports) {
     applyModelFallback,
     applyCopilotModelAliasResolution,
     applyCopilotWireAPI,
+    warnCopilotSubagentEndpoints,
     resolveAWFModelRoutingSelection,
     resolveCopilotModelRouting,
     applyCopilotRoutingSelection,

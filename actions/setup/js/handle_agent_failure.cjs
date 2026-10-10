@@ -32,6 +32,8 @@ const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
+const { isModelEndpointMismatchData } = require("./unified_session.cjs");
+const { validateSessionFileHeader } = require("./unified_session_render.cjs");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -308,6 +310,7 @@ function buildFailureMatchCategories(options) {
   if (options.copilotAgentNotFound) categories.push("copilot_agent_not_found");
   if (options.mcpPolicyError) categories.push("mcp_policy_error");
   if (options.modelNotSupportedError) categories.push("model_not_supported_error");
+  if (options.modelEndpointMismatch) categories.push("model_endpoint_mismatch");
   if (options.http400ResponseError) categories.push("http_400_response_error");
   if (options.aiCreditsRateLimitError) categories.push("ai_credits_rate_limit_error");
   if (options.hasEngineRateLimit429) categories.push("engine_rate_limit_429");
@@ -351,6 +354,55 @@ function getAgentStdioLogPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) 
 
 function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
   return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-session.jsonl") : "/tmp/gh-aw/agent-session.jsonl";
+}
+
+/** Read mismatch evidence only from the collector's unified session, never raw logs. */
+function readModelEndpointMismatch() {
+  const root = process.env.GH_AW_AGENT_OUTPUT ? path.dirname(process.env.GH_AW_AGENT_OUTPUT) : "/tmp/gh-aw";
+  const file = process.env.GH_AW_UNIFIED_SESSION || path.join(root, "usage/aw_session.jsonl");
+  try {
+    const events = fs
+      .readFileSync(file, "utf8")
+      .split(/\r?\n/)
+      .filter(line => line.trim())
+      .map(line => JSON.parse(line));
+    validateSessionFileHeader(events);
+    const matches = events.filter(
+      event =>
+        event.type === "model_endpoint.mismatch" &&
+        event.provenance?.component === "model_endpoint" &&
+        event.provenance?.path === "agent/model-endpoint-mismatch.json" &&
+        event.provenance?.phase === event.data?.phase &&
+        isModelEndpointMismatchData(event.data)
+    );
+    return matches.at(-1)?.data;
+  } catch {
+    core.debug("Unified session unavailable for model/endpoint mismatch classification");
+    return undefined;
+  }
+}
+
+/** @param {import("./types/unified_session").ModelEndpointMismatchData | undefined} mismatch @returns {string} */
+function buildModelEndpointMismatchContext(mismatch) {
+  if (!mismatch || !isModelEndpointMismatchData(mismatch)) return "";
+  const text = redactAndBoundDiagnostics(
+    [
+      `Phase: ${mismatch.phase}`,
+      `Configured model: ${mismatch.configured_model}`,
+      `Resolved model: ${mismatch.resolved_model}`,
+      `Wire API: ${mismatch.wire_api} (source: ${mismatch.wire_api_source})`,
+      `Supported endpoints: ${mismatch.supported_endpoints.join(", ")}`,
+      ...(mismatch.model !== undefined ? [`Model: ${mismatch.model}`] : []),
+      ...(mismatch.endpoint !== undefined ? [`Endpoint: ${mismatch.endpoint}`] : []),
+      `Cause: ${redactAndBoundDiagnostics(mismatch.detail, { maxLength: 2500 })}`,
+      `Fix: ${redactAndBoundDiagnostics(mismatch.fix, { maxLength: 2500 })}`,
+    ].join("\n")
+  );
+  const fence = safeMarkdownCodeFence([text]);
+  return `\n> [!WARNING]\n> **Model/Endpoint Mismatch**\n>\n> ${fence}text\n${text
+    .split("\n")
+    .map(line => `> ${line}`)
+    .join("\n")}\n> ${fence}\n`;
 }
 
 /**
@@ -4337,6 +4389,8 @@ async function main() {
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
     const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
     const terminalOutputFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
+    const modelEndpointMismatch = readModelEndpointMismatch();
+    const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
       transportWedge,
@@ -4391,6 +4445,7 @@ async function main() {
       copilotAgentNotFound: Boolean(copilotAgentNotFound),
       mcpPolicyError,
       modelNotSupportedError,
+      modelEndpointMismatch: Boolean(modelEndpointMismatch),
       http400ResponseError,
       aiCreditsRateLimitError,
       hasEngineRateLimit429,
@@ -4660,6 +4715,7 @@ async function main() {
           inference_access_error_context: inferenceAccessErrorContext,
           mcp_policy_error_context: mcpPolicyErrorContext,
           model_not_supported_error_context: modelNotSupportedErrorContext,
+          model_endpoint_mismatch_context: modelEndpointMismatchContext,
           http_400_response_error_context: http400ResponseErrorContext,
           ai_credits_rate_limit_error_context: aiCreditsRateLimitErrorContext,
           unknown_model_ai_credits_context: unknownModelAICreditsContext,
@@ -4906,6 +4962,7 @@ async function main() {
           inference_access_error_context: inferenceAccessErrorContext,
           mcp_policy_error_context: mcpPolicyErrorContext,
           model_not_supported_error_context: modelNotSupportedErrorContext,
+          model_endpoint_mismatch_context: modelEndpointMismatchContext,
           http_400_response_error_context: http400ResponseErrorContext,
           ai_credits_rate_limit_error_context: aiCreditsRateLimitErrorContext,
           unknown_model_ai_credits_context: unknownModelAICreditsContext,
@@ -5012,6 +5069,8 @@ async function main() {
 }
 
 module.exports = {
+  readModelEndpointMismatch,
+  buildModelEndpointMismatchContext,
   isInvalidatedPRMergeCheckout,
   main,
   buildCodePushFailureContext,

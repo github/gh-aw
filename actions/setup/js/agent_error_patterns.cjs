@@ -1,6 +1,6 @@
 // @ts-check
 
-const { MAX_RUNS_EXCEEDED_PATTERNS, isMaxRunsExceededError } = require("./harness_error_patterns.cjs");
+const { MAX_RUNS_EXCEEDED_PATTERNS, isMaxRunsExceededError, parseModelEndpointMismatch } = require("./harness_error_patterns.cjs");
 const STEP_TIMEOUT_TOLERANCE_MS = 30_000;
 
 // Pattern: Copilot CLI inference access denied
@@ -284,7 +284,7 @@ function extractMissingModelPricingModelName(logContent) {
 /**
  * Detect known error patterns in a log string and return detection results.
  * @param {string} logContent - Contents of the agent stdio log
- * @returns {{ inferenceAccessError: boolean, mcpPolicyError: boolean, agenticEngineTimeout: boolean, modelNotSupportedError: boolean, http400ResponseError: boolean, capiQuotaExceededError: boolean, invocationCapExceeded: boolean, maxCacheMissesExceeded: boolean, missingModelPricingError: boolean, missingModelPricingModelName: string, shellExpansionGuardRejected: boolean }}
+ * @returns {{ inferenceAccessError: boolean, mcpPolicyError: boolean, agenticEngineTimeout: boolean, modelNotSupportedError: boolean, modelEndpointMismatchError: boolean, http400ResponseError: boolean, capiQuotaExceededError: boolean, invocationCapExceeded: boolean, maxCacheMissesExceeded: boolean, missingModelPricingError: boolean, missingModelPricingModelName: string, shellExpansionGuardRejected: boolean }}
  */
 function detectErrors(logContent) {
   const missingModelPricingModelName = extractMissingModelPricingModelName(logContent);
@@ -297,6 +297,7 @@ function detectErrors(logContent) {
     mcpPolicyError: MCP_POLICY_BLOCKED_PATTERN.test(logContent),
     agenticEngineTimeout: isAgenticEngineTimeout(logContent),
     modelNotSupportedError: MODEL_NOT_SUPPORTED_PATTERN.test(modelDiagnostics) || isUnsupportedModelToolsError(logContent),
+    modelEndpointMismatchError: parseModelEndpointMismatch(logContent) !== null,
     http400ResponseError: HTTP_400_RESPONSE_ERROR_PATTERN.test(logContent),
     capiQuotaExceededError: isCAPIQuotaExceededError(logContent),
     invocationCapExceeded: isInvocationCapExceededError(logContent),
@@ -309,7 +310,7 @@ function detectErrors(logContent) {
 
 /**
  * Build GitHub Actions output lines from detection results.
- * @param {{ inferenceAccessError: boolean, mcpPolicyError: boolean, agenticEngineTimeout: boolean, modelNotSupportedError: boolean, http400ResponseError: boolean, capiQuotaExceededError: boolean, invocationCapExceeded: boolean, maxCacheMissesExceeded: boolean, missingModelPricingError: boolean, missingModelPricingModelName: string, shellExpansionGuardRejected: boolean }} results
+ * @param {{ inferenceAccessError: boolean, mcpPolicyError: boolean, agenticEngineTimeout: boolean, modelNotSupportedError: boolean, modelEndpointMismatchError: boolean, http400ResponseError: boolean, capiQuotaExceededError: boolean, invocationCapExceeded: boolean, maxCacheMissesExceeded: boolean, missingModelPricingError: boolean, missingModelPricingModelName: string, shellExpansionGuardRejected: boolean }} results
  * @returns {string[]}
  */
 function buildOutputLines(results) {
@@ -319,6 +320,7 @@ function buildOutputLines(results) {
     `mcp_policy_error=${results.mcpPolicyError}`,
     `agentic_engine_timeout=${results.agenticEngineTimeout}`,
     `model_not_supported_error=${results.modelNotSupportedError}`,
+    `model_endpoint_mismatch_error=${results.modelEndpointMismatchError === true}`,
     `http_400_response_error=${results.http400ResponseError}`,
     `capi_quota_exceeded_error=${effectiveCAPIQuotaExceeded}`,
     `invocation_cap_exceeded=${results.invocationCapExceeded}`,

@@ -70,6 +70,77 @@ describe("unified session publication views", () => {
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
+  it("renders model/endpoint mismatch cause and fix in both publication views", () => {
+    const events = [
+      header,
+      event(
+        "model_endpoint.mismatch",
+        {
+          category: "model_endpoint_mismatch",
+          phase: "runtime",
+          configured_model: "alias",
+          resolved_model: "resolved",
+          wire_api: "responses",
+          wire_api_source: "engine",
+          supported_endpoints: ["/chat/completions"],
+          model: "provider-model",
+          endpoint: "/responses",
+          detail: "Unsupported API",
+          fix: "Select a compatible model",
+        },
+        "model_endpoint",
+        0,
+        undefined,
+        "agent/model-endpoint-mismatch.json"
+      ),
+    ];
+    for (const summary of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(summary).toContain("model_endpoint.mismatch");
+      expect(summary).toContain("cause=Unsupported API");
+      expect(summary).toContain("fix=Select a compatible model");
+      expect(summary).toContain("wire_api_source=engine");
+      expect(summary).toContain("/chat/completions");
+      expect(summary).toContain("model=provider-model");
+      expect(summary).toContain("endpoint=/responses");
+    }
+  });
+
+  it("escapes and redacts hostile mismatch model, endpoint, and detail values", () => {
+    process.env.GH_AW_SECRET_NAMES = "MISMATCH_TEST";
+    process.env.SECRET_MISMATCH_TEST = "mismatch-secret-fixture";
+    const hostile = "````\n# heading\n<img src=x>\n::error::oops mismatch-secret-fixture";
+    const events = [
+      header,
+      event(
+        "model_endpoint.mismatch",
+        {
+          category: "model_endpoint_mismatch",
+          phase: "runtime",
+          configured_model: hostile,
+          resolved_model: hostile,
+          wire_api: hostile,
+          wire_api_source: hostile,
+          supported_endpoints: [hostile],
+          model: hostile,
+          endpoint: hostile,
+          detail: hostile,
+          fix: hostile,
+        },
+        "model_endpoint",
+        0,
+        undefined,
+        "agent/model-endpoint-mismatch.json"
+      ),
+    ];
+    const markdown = generateCopilotCliStyleSummary(events);
+    const plain = generatePlainTextSummary(events);
+    for (const summary of [markdown, plain]) expect(summary).not.toContain("mismatch-secret-fixture");
+    expect(markdown).not.toContain("<img");
+    const opening = markdown.match(/^(`{3,})$/m)?.[1];
+    expect(opening.length).toBeGreaterThan(4);
+    expect(plain).not.toContain("::error::");
+  });
+
   it.each(['{"query":"PRIVATE_TOOL_ARGUMENT_DELTA"}', { query: "PRIVATE_TOOL_ARGUMENT_DELTA" }])("renders standard diagnostics without dumping tool delta %j, inputs or error context", delta => {
     const events = [
       header,

@@ -38,6 +38,35 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it.each(["startup", "runtime"])("collects a single model/endpoint mismatch record in the %s phase", phase => {
+    const data = {
+      category: "model_endpoint_mismatch",
+      phase,
+      configured_model: "model-alias",
+      resolved_model: "model-resolved",
+      wire_api: "responses",
+      wire_api_source: "engine",
+      supported_endpoints: ["/chat/completions"],
+      detail: "The model does not support the responses API",
+      fix: "Use a chat/completions-compatible engine",
+      ...(phase === "runtime" ? { model: "provider-model", endpoint: "/responses" } : {}),
+    };
+    write("agent/model-endpoint-mismatch.json", { ...data, private: "omitted" });
+    const events = writeUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "model_endpoint.mismatch")).toEqual([{ type: "model_endpoint.mismatch", data, provenance: { component: "model_endpoint", phase, path: "agent/model-endpoint-mismatch.json", index: 0 } }]);
+    expect(writeUnifiedSession({ rootDir: root })).toEqual(events);
+    expect(events.at(-1).data.sources).toContainEqual({ component: "model_endpoint", phase, path: "agent/model-endpoint-mismatch.json", events: 1 });
+  });
+
+  it.each(["{broken", "[]", "null", '{"category":"model_endpoint_mismatch","phase":"other"}'])("warns rather than collecting an invalid mismatch record: %s", record => {
+    write("agent/model-endpoint-mismatch.json", record);
+    const warn = vi.fn();
+    const { events } = collectUnifiedSession({ rootDir: root, warn });
+    expect(events.some(event => event.type === "model_endpoint.mismatch")).toBe(false);
+    expect(warn).toHaveBeenCalled();
+    expect(events.some(event => event.type === "session.collection_warning" && event.data.path === "agent/model-endpoint-mismatch.json")).toBe(true);
+  });
+
   it.each([
     { engine: "copilot", metadata: undefined, restricted: false },
     { engine: "custom", metadata: undefined, restricted: false },

@@ -2,6 +2,9 @@
 
 "use strict";
 
+const { BUILT_IN_PATTERNS } = require("./redact_secrets.cjs");
+const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
+
 const AI_CREDITS_EXCEEDED_PATTERNS = [/\bmax[\s_-]*ai[\s_-]*credits[\s_-]*exceeded\b/i, /\bai[\s_-]*credits[\s_-]*rate[\s_-]*limit[\s_-]*error\b/i, /ai[\s_-]*credits?.*(?:rate[\s-]*limit|limit exceeded|budget exceeded|exceeded)/i];
 
 // Canonical rejection emitted by the AWF API proxy once the configured `apiProxy.maxAiCredits`
@@ -23,6 +26,40 @@ const GOAL_ALREADY_ACTIVE_PATTERNS = [/\bthis thread already has a goal\b[\s\S]*
 // ("max_runs_exceeded") and the human-readable message
 // ("Maximum LLM invocations exceeded").
 const MAX_RUNS_EXCEEDED_PATTERNS = [/\bmax_runs_exceeded\b/i, /Maximum LLM invocations exceeded/i];
+
+const MODEL_ENDPOINT_MISMATCH_PATTERN =
+  /\bCannot translate Copilot request feature\b|\bUnsupported Responses custom tool\b|\bmodel_endpoint_incompatible\b|\bnot accessible via the [^\r\n]{1,160}? endpoint\b|\bRouting model\s+["'`][a-z0-9._:/@-]{1,200}["'`]\s+to\s+\/[a-z0-9._/-]{1,160}\s+is incompatible\b/i;
+
+/**
+ * Extract a model/endpoint incompatibility, retaining only the matching message line.
+ * @param {unknown} output
+ * @returns {{ model?: string, endpoint?: string, detail: string } | null}
+ */
+function parseModelEndpointMismatch(output) {
+  if (typeof output !== "string") return null;
+  const maskedValues = collectAddMaskedValues(output);
+  for (const line of output.split(/\r\n|\r|\n/)) {
+    if (!MODEL_ENDPOINT_MISMATCH_PATTERN.test(line)) continue;
+    // Redact before bounding so truncation cannot leave a partial credential exposed.
+    let redactedLine = redactMaskedValues(line, maskedValues);
+    for (const { pattern } of BUILT_IN_PATTERNS) redactedLine = redactedLine.replace(pattern, "***REDACTED***");
+    redactedLine = redactedLine.replace(/\bBearer\s+[a-z0-9._~+/-]+=*/gi, "******");
+    const match = MODEL_ENDPOINT_MISMATCH_PATTERN.exec(redactedLine);
+    if (!match) continue;
+    // Keep the actual signature even when a long log prefix precedes it.
+    const start = Math.max(0, match.index - 200);
+    const detail = redactedLine.slice(start, start + 1000).trim();
+    const message = redactedLine.replace(/\\"/g, '"');
+    const model = /\bmodel(?:[_ -]name)?["'`]?\s*(?:[:=]\s*|\s+)["'`]?([a-z0-9][a-z0-9._:/@-]{0,199})/i.exec(message)?.[1];
+    const endpoint =
+      /\bnot accessible via the\s+["'`]?([a-z0-9/][a-z0-9._:/ -]{0,159}?)["'`]?\s+endpoint\b/i.exec(message)?.[1] ||
+      /\bendpoint["'`]?\s*[:=]\s*["'`]?([a-z0-9/][a-z0-9._:/-]{0,159})/i.exec(message)?.[1] ||
+      /\bRouting model\s+["'`][a-z0-9._:/@-]{1,200}["'`]\s+to\s+(\/[a-z0-9._/-]{1,160})\s+is incompatible\b/i.exec(message)?.[1] ||
+      (/\bUnsupported Responses custom tool\b/i.test(message) ? "responses" : undefined);
+    return { ...(model && !/^(?:is|not|endpoint|request|policy)$/i.test(model) ? { model } : {}), ...(endpoint ? { endpoint } : {}), detail };
+  }
+  return null;
+}
 
 // Guardrail rejections emitted by the AWF API proxy as HTTP 403 responses. These are
 // deliberate policy decisions by the proxy, never credential problems: the offending counter
@@ -69,6 +106,8 @@ function parseAPIProxyGuardRejection(output) {
   if (!safeOutput) return null;
   for (const { guard, pattern, counterRe, counterNames } of API_PROXY_GUARD_REJECTION_PATTERNS) {
     if (!pattern.test(safeOutput)) continue;
+    // Endpoint incompatibility has its own diagnostic, even if wrapped as a policy violation.
+    if (guard === "model_policy_violation" && parseModelEndpointMismatch(safeOutput)) continue;
     /** @type {Record<string, string|number>} */
     const counters = {};
     const match = counterRe ? counterRe.exec(safeOutput) : null;
@@ -165,7 +204,7 @@ function parseAICreditsExceededProxyRejection(output) {
 /**
  * Detect retry guard conditions that should stop harness retries immediately.
  * @param {unknown} output
- * @returns {{ aiCreditsExceeded: boolean, awfAPIProxyBlockingRequests: boolean, goalAlreadyActive: boolean, maxRunsExceeded: boolean, apiProxyGuardRejection: { guard: string, counters: Record<string, string|number> } | null }}
+ * @returns {{ aiCreditsExceeded: boolean, awfAPIProxyBlockingRequests: boolean, goalAlreadyActive: boolean, maxRunsExceeded: boolean, modelEndpointMismatch: { model?: string, endpoint?: string, detail: string } | null, apiProxyGuardRejection: { guard: string, counters: Record<string, string|number> } | null }}
  */
 function detectNonRetryableHarnessGuard(output) {
   const safeOutput = typeof output === "string" ? output : "";
@@ -174,6 +213,7 @@ function detectNonRetryableHarnessGuard(output) {
     awfAPIProxyBlockingRequests: AWF_API_PROXY_BLOCKING_REQUESTS_PATTERNS.some(pattern => pattern.test(safeOutput)),
     goalAlreadyActive: GOAL_ALREADY_ACTIVE_PATTERNS.some(pattern => pattern.test(safeOutput)),
     maxRunsExceeded: isMaxRunsExceededError(safeOutput),
+    modelEndpointMismatch: parseModelEndpointMismatch(safeOutput),
     apiProxyGuardRejection: parseAPIProxyGuardRejection(safeOutput),
   };
 }
@@ -189,6 +229,8 @@ module.exports = {
   AUTHENTICATION_FAILED_PATTERNS,
   isMaxRunsExceededError,
   isAuthenticationFailedError,
+  MODEL_ENDPOINT_MISMATCH_PATTERN,
+  parseModelEndpointMismatch,
   parseAPIProxyGuardRejection,
   parseAICreditsExceededProxyRejection,
 };

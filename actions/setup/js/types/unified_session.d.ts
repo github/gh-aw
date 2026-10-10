@@ -135,6 +135,20 @@ export interface ModelRoutingData {
   requestedEffort?: JsonValue;
 }
 
+export interface ModelEndpointMismatchData {
+  category: "model_endpoint_mismatch";
+  phase: "startup" | "runtime";
+  configured_model: string;
+  resolved_model: string;
+  wire_api: string;
+  wire_api_source: string;
+  supported_endpoints: string[];
+  detail: string;
+  fix: string;
+  model?: string;
+  endpoint?: string;
+}
+
 export interface UnifiedModelRoutingData {
   status?: JsonValue;
   source?: JsonValue;
@@ -404,6 +418,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.token_usage": UsageReportData;
   "firewall.model_routing": ModelRoutingData;
   "model_routing.outcome": ModelRoutingOutcomeData;
+  "model_endpoint.mismatch": ModelEndpointMismatchData;
   "firewall.steering": RuntimeObservationData;
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;
