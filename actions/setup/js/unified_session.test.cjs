@@ -160,7 +160,8 @@ describe("Unified conclusion session", () => {
       provenance: { component: "execution", phase: "agent", path: "agent-errors.jsonl" },
     });
     expect(executions[0]).not.toHaveProperty("timestamp");
-    expect(events.filter(event => event.type === "claude.assistant_error")).toHaveLength(1);
+    expect(events.filter(event => event.type === "claude.assistant_error")).toHaveLength(0);
+    expect(events.filter(event => event.type === "session.result" && event.data.errors?.some(error => error?.error === "server_error"))).toHaveLength(1);
     expect(writeUnifiedSession({ rootDir: root, engine: "claude" })).toEqual(events);
   });
 

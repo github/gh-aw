@@ -58,6 +58,7 @@ function normalizeClaudeSession(records) {
   const streamedMessages = new Map();
   const responseUsage = new Map();
   const terminalResults = [];
+  const denialReports = [];
   const agentTasks = new Map();
   const agentsByTool = new Map();
 
@@ -116,7 +117,32 @@ function normalizeClaudeSession(records) {
     const key = messageKey(source, id);
     responseUsage.set(key, { usage: { ...responseUsage.get(key)?.usage, ...normalized }, source });
   };
-  const reportError = (source, error) => emit(source, "session.result", { sourceEngine: "claude", errors: [error] });
+  const reportError = (source, error) => emit(source, "session.result", { ...sourceFields(source), sourceEngine: "claude", sourceType: source.type, errors: [error] });
+  const retainSnapshot = (event, source) => {
+    if (!event) return;
+    (event.data.snapshots ??= []).push(structuredClone(source));
+    if (event.data.model === undefined && source.message?.model !== undefined) event.data.model = source.message.model;
+  };
+  const emitRefusal = (source, state, refusal, partial) => {
+    const { delta, ...identity } = streamFields(state);
+    const data = { ...sourceFields(source), ...identity, ...refusal, ...(partial ? { partial: true } : {}) };
+    if (state.refusalEvent) {
+      retainSnapshot(state.refusalEvent, source);
+      Object.assign(state.refusalEvent.data, refusal);
+      if (!partial) delete state.refusalEvent.data.partial;
+    } else {
+      state.refusalEvent = emit(source, "assistant.refusal", data);
+    }
+    if (state.textEvents.length) {
+      (state.refusalEvent.data.observedTextEvents ??= []).push(...structuredClone(state.textEvents));
+      for (const textEvent of state.textEvents) {
+        const index = events.indexOf(textEvent);
+        if (index !== -1) events.splice(index, 1);
+      }
+      state.textEvents = [];
+    }
+    return state.refusalEvent;
+  };
 
   const streamFields = (state, index) => ({ delta: true, ...(state.id !== undefined ? { messageId: state.id } : {}), ...(state.model !== undefined ? { model: state.model } : {}), ...(index !== undefined ? { contentIndex: index } : {}) });
   const emitBlock = (source, block, metadata = {}) => {
@@ -128,6 +154,15 @@ function normalizeClaudeSession(records) {
     if (block.type === "thinking" && typeof block.thinking === "string") {
       return emit(source, "assistant.reasoning", { ...data, content: block.thinking });
     }
+    if (block.type === "redacted_thinking") {
+      return emit(source, "assistant.reasoning", { ...data, content: block });
+    }
+    if (["image", "document"].includes(block.type)) {
+      return emit(source, source.type === "user" ? "user.message" : "assistant.message", { ...data, content: block });
+    }
+    if (source.type === "assistant" && block.type === "refusal" && typeof block.refusal === "string") {
+      return emit(source, "assistant.refusal", { ...data, reason: "refusal", content: block.refusal });
+    }
     if (block.type === "tool_use") {
       const event = emit(source, "tool.execution_start", { ...data, ...toolFields(block), toolCallId: block.id, input: block.input });
       if (block.id !== undefined) tools.set(toolKey(source, block.id), event.data);
@@ -135,7 +170,9 @@ function normalizeClaudeSession(records) {
     }
     if (block.type === "tool_result") {
       const start = block.tool_use_id !== undefined ? tools.get(toolKey(source, block.tool_use_id)) : undefined;
-      const success = block.is_error === true || block.error != null ? false : block.is_error === false ? true : typeof block.success === "boolean" ? block.success : undefined;
+      const result = source.tool_use_result;
+      const failed = block.is_error === true || block.isError === true || block.success === false || block.error != null || result?.is_error === true || result?.isError === true || result?.error != null || result?.interrupted === true;
+      const success = failed ? false : block.is_error === false ? true : typeof block.success === "boolean" ? block.success : undefined;
       const workflow = source.tool_use_result?.taskType === "local_workflow" ? source.tool_use_result : undefined;
       const agent = typeof source.tool_use_result?.agentId === "string" ? source.tool_use_result : undefined;
       const event = emit(source, "tool.execution_complete", {
@@ -144,6 +181,8 @@ function normalizeClaudeSession(records) {
         ...toolFields(block, start),
         success,
         output: block.content,
+        ...(failed && !Object.hasOwn(block, "is_error") ? { isError: true } : {}),
+        ...(block.error === undefined && result?.error !== undefined ? { error: result.error } : {}),
         durationMs: isMetric(block.duration_ms) ? block.duration_ms : undefined,
         ...(workflow ? { taskId: workflow.taskId, taskType: workflow.taskType, workflowName: workflow.workflowName, workflowRunId: workflow.runId, status: workflow.status } : {}),
         ...(agent ? { taskId: agent.agentId, taskType: "local_agent", status: agent.status } : {}),
@@ -176,16 +215,18 @@ function normalizeClaudeSession(records) {
       const mapped = normalizeAgentSession([source], { sourceEngine: "claude" })[0];
       if (mapped) emit(source, "session.init", { ...sourceFields(source), ...mapped.data });
     } else if (source.type === "stream_event" && source.event && typeof source.event === "object") {
-      native(source, "claude.stream_event");
+      const transport = native(source, "claude.stream_event");
+      let mappedTransport = false;
       const raw = source.event;
       const channel = channelKey(source);
       if (raw.type === "message_start") {
-        const state = { id: raw.message?.id, model: raw.message?.model, blocks: new Map(), textEvents: [], refusalEvent: undefined };
+        const state = { id: raw.message?.id, model: raw.message?.model, blocks: new Map(), textEvents: [], refusalEvent: undefined, transportEvent: transport };
         streams.set(channel, state);
         if (state.id !== undefined) streamedMessages.set(messageKey(source, state.id), state);
         reportUsage(source, state.id, raw.message?.usage);
       } else if (raw.type === "error") {
         reportError(source, raw.error ?? raw);
+        mappedTransport = true;
       } else {
         let state = streams.get(channel);
         if (!state) {
@@ -197,16 +238,13 @@ function normalizeClaudeSession(records) {
           const refusal = getMessageRefusal(raw.delta);
           if (refusal) {
             const texts = [...state.blocks.values()].filter(block => block.type === "text").map(block => block.text);
-            state.refusalEvent = emit(source, "assistant.refusal", { ...sourceFields(source), ...refusal, ...(texts.length ? { content: texts.join("") } : {}) });
-            for (const textEvent of state.textEvents) {
-              const index = events.indexOf(textEvent);
-              if (index !== -1) events.splice(index, 1);
-            }
-            state.textEvents = [];
+            emitRefusal(source, state, { ...refusal, ...(texts.length ? { content: texts.join("") } : {}) }, true);
+            mappedTransport = true;
           }
         } else if (raw.type === "content_block_start" && raw.content_block) {
           const block = raw.content_block;
           const event = emitBlock(source, block, streamFields(state, raw.index));
+          mappedTransport = event !== undefined && event.type !== "claude.content_block";
           if (event?.type === "assistant.message") state.textEvents.push(event);
           state.blocks.set(raw.index, {
             type: block.type,
@@ -228,13 +266,18 @@ function normalizeClaudeSession(records) {
             if (state.refusalEvent) {
               const texts = [...state.blocks.values()].filter(value => value.type === "text").map(value => value.text);
               if (texts.length) state.refusalEvent.data.content = texts.join("");
+              retainSnapshot(state.refusalEvent, source);
             } else {
               const event = emitBlock(source, { type: "text", text: delta.text }, streamFields(state, raw.index));
               if (event?.type === "assistant.message") state.textEvents.push(event);
+              block.event ??= event;
             }
+            mappedTransport = true;
           } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
             block.text += delta.thinking;
-            emitBlock(source, { type: "thinking", thinking: delta.thinking }, streamFields(state, raw.index));
+            const event = emitBlock(source, { type: "thinking", thinking: delta.thinking }, streamFields(state, raw.index));
+            block.event ??= event;
+            mappedTransport = true;
           } else if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") {
             block.argumentText += delta.partial_json;
             if (block.event) block.event.data.argumentText = block.argumentText;
@@ -251,45 +294,62 @@ function normalizeClaudeSession(records) {
               continue;
             }
           }
+        } else if (raw.type === "message_stop" && state.refusalEvent) {
+          retainSnapshot(state.refusalEvent, source);
+          delete state.refusalEvent.data.partial;
+          mappedTransport = true;
         }
+      }
+      // The mapped event already retains this transport envelope and its metadata.
+      if (mappedTransport) {
+        events.splice(events.indexOf(transport), 1);
       }
     } else if (source.type === "assistant" || source.type === "user") {
       const message = source.message;
       const content = typeof message === "string" ? message : message?.content;
       if (source.type === "assistant" && source.error != null) {
-        native(source, "claude.assistant_error");
         reportError(source, { error: source.error, message: structuredClone(message) });
         continue;
       }
       if (source.type === "assistant") reportUsage(source, message?.id, message?.usage);
       const blocks = typeof content === "string" ? [{ type: "text", text: content }] : Array.isArray(content) ? content : [];
       const streamed = source.type === "assistant" && message?.id !== undefined ? streamedMessages.get(messageKey(source, message.id)) : undefined;
-      if (streamed) native(source, "claude.assistant_snapshot");
       const refusal = source.type === "assistant" ? getMessageRefusal(message) : undefined;
       if (refusal) {
-        if (streamed?.refusalEvent) Object.assign(streamed.refusalEvent.data, refusal);
+        if (streamed) emitRefusal(source, streamed, refusal, false);
         else {
           const fields = sourceFields(source);
           delete fields.content;
           emit(source, "assistant.refusal", { ...fields, ...refusal });
         }
       }
+      if (!refusal && content !== undefined && typeof content !== "string" && (!Array.isArray(content) || (content.length === 0 && !streamed))) {
+        emit(source, source.type === "user" ? "user.message" : "assistant.message", { ...sourceFields(source), content, messageId: message?.id, model: message?.model });
+      }
+      if (streamed && !refusal && blocks.length === 0) retainSnapshot(streamed.transportEvent, source);
       for (const [snapshotIndex, block] of blocks.entries()) {
-        if (refusal && block?.type === "text") continue;
+        if (refusal && ["text", "refusal"].includes(block?.type)) continue;
         // SDK assistant records can contain one finalized block rather than the full response.
         const candidates = blocks.length === 1 && streamed ? [...streamed.blocks.entries()].filter(([, observed]) => observed.type === block?.type && (block.type !== "tool_use" || observed.event?.data.toolCallId === block.id)) : [];
         const index = candidates.length === 1 ? candidates[0][0] : snapshotIndex;
         const observed = streamed?.blocks.get(index);
+        retainSnapshot(observed?.event, source);
         if (!observed || observed.type !== block?.type) {
-          emitBlock(source, block, { contentIndex: index });
+          const event = emitBlock(source, block, { contentIndex: index });
+          if (streamed && event) {
+            streamed.blocks.set(index, { type: block.type, text: block.type === "thinking" ? (block.thinking ?? "") : (block.text ?? ""), argumentText: "", event });
+            if (event.type === "assistant.message") streamed.textEvents.push(event);
+          }
         } else if (block.type === "text" || block.type === "thinking") {
           if (Object.hasOwn(block, "signature") && observed.event) observed.event.data.signature = block.signature;
           const text = block.type === "thinking" ? block.thinking : block.text;
           if (typeof text === "string" && text.startsWith(observed.text) && text !== observed.text) {
-            emitBlock(source, { ...block, [block.type === "thinking" ? "thinking" : "text"]: text.slice(observed.text.length) }, streamFields(streamed, index));
+            const event = emitBlock(source, { ...block, [block.type === "thinking" ? "thinking" : "text"]: text.slice(observed.text.length) }, streamFields(streamed, index));
+            if (event?.type === "assistant.message") streamed.textEvents.push(event);
             observed.text = text;
           } else if (typeof text === "string" && text !== observed.text) {
-            emitBlock(source, block, { contentIndex: index, delta: false });
+            const event = emitBlock(source, block, { contentIndex: index, delta: false });
+            if (event?.type === "assistant.message") streamed.textEvents.push(event);
             observed.text = text;
           }
         } else if (block.type === "tool_use" && observed.type === "tool_use" && observed.event?.data.toolCallId === block.id) {
@@ -315,10 +375,36 @@ function normalizeClaudeSession(records) {
         }
         data.errors = [diagnostic];
       }
+      if (Array.isArray(data.permissionDenials)) {
+        data.permissionDenials = data.permissionDenials.filter(denial => {
+          if (!denial || typeof denial !== "object" || Array.isArray(denial) || typeof denial.tool_use_id !== "string") return true;
+          const context = sessionContext(source);
+          const matches = denialReports.filter(report => {
+            const observed = sessionContext(report.event);
+            return (
+              report.denial.tool_use_id === denial.tool_use_id &&
+              observed.sessionId === context.sessionId &&
+              (context.parentToolUseId === undefined || observed.parentToolUseId === undefined || context.parentToolUseId === observed.parentToolUseId) &&
+              (context.agentId === undefined || observed.agentId === undefined || context.agentId === observed.agentId)
+            );
+          });
+          if (!matches.length || new Set(matches.map(report => JSON.stringify([sessionContext(report.event).parentToolUseId ?? null, sessionContext(report.event).agentId]))).size !== 1) return true;
+          for (const report of matches) Object.assign(report.denial, { ...denial, ...report.denial });
+          return false;
+        });
+      }
       terminalResults.push(emit(source, "session.result", data));
     } else if (source.type === "system" && typeof source.subtype === "string") {
       const task = agentTasks.get(taskKey(source, source.task_id));
-      if (task && source.subtype === "task_started") {
+      if (source.subtype === "permission_denied") {
+        const denial = sourceFields(source);
+        const event = emit(source, "session.result", { ...denial, sourceEngine: "claude", sourceType: source.type, permissionDenials: [denial] });
+        denialReports.push({ event, denial: event.data.permissionDenials[0] });
+      } else if (source.subtype === "api_retry" && source.error != null) {
+        reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
+      } else if (source.error != null && !task) {
+        reportError(source, source.error);
+      } else if (task && source.subtype === "task_started") {
         emitSubagent(source, "subagent.started", task, {
           agentName: source.subagent_type,
           agentType: source.subagent_type,
@@ -334,11 +420,7 @@ function normalizeClaudeSession(records) {
           ...(source.status === "stopped" ? { cancelled: true } : {}),
         });
       } else native(source, !task && Object.hasOwn(DYNAMIC_WORKFLOW_EVENT_TYPES, source.subtype) ? DYNAMIC_WORKFLOW_EVENT_TYPES[source.subtype] : "claude.system");
-      if (source.subtype === "api_retry" && source.error != null) {
-        reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
-      } else if (source.error != null && !task) {
-        reportError(source, source.error);
-      } else if (source.subtype !== "permission_denied") {
+      if (source.subtype !== "permission_denied" && source.error == null) {
         const content = typeof source.message === "string" ? source.message : (source.message?.content ?? source.content);
         if (typeof content === "string") emitBlock(source, { type: "text", text: content });
         else if (Array.isArray(content)) {
@@ -346,7 +428,10 @@ function normalizeClaudeSession(records) {
         }
       }
     } else if (["tool_progress", "tool_use_summary", "rate_limit_event", "auth_status"].includes(source.type)) {
-      native(source, `claude.${source.type}`);
+      if (source.type === "auth_status" && source.error != null) reportError(source, source.error);
+      else native(source, `claude.${source.type}`);
+    } else if (source.type === "error" && source.error != null) {
+      reportError(source, source.error);
     }
   }
 
