@@ -134,6 +134,7 @@ function execGitSync(args, options = {}) {
     timeout: defaultTimeoutMs,
     killSignal: "SIGKILL",
     ...spawnOptions,
+    stdio: spawnOptions.stdio === "inherit" ? "pipe" : spawnOptions.stdio,
     env: safeEnv,
   });
 

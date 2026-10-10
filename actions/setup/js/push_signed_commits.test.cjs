@@ -305,7 +305,18 @@ describe("push_signed_commits integration tests", () => {
       // Push the branch so ls-remote can resolve its OID
       execGit(["push", "-u", "origin", "feature-branch"], { cwd: workDir });
 
-      global.exec = makeRealExec(workDir);
+      const realExec = makeRealExec(workDir);
+      const execOptions = [];
+      global.exec = {
+        getExecOutput: async (...args) => {
+          execOptions.push(args[2]);
+          return realExec.getExecOutput(...args);
+        },
+        exec: async (...args) => {
+          execOptions.push(args[2]);
+          return realExec.exec(...args);
+        },
+      };
       const githubClient = makeMockGithubClient();
 
       await pushSignedCommits({
@@ -318,6 +329,7 @@ describe("push_signed_commits integration tests", () => {
       });
 
       expect(githubClient.graphql).toHaveBeenCalledTimes(1);
+      expect(execOptions.every(options => options.silent)).toBe(true);
       // Verify the mutation query targets createCommitOnBranch
       const [query, variables] = githubClient.graphql.mock.calls[0];
       expect(query).toContain("createCommitOnBranch");
@@ -978,6 +990,44 @@ describe("push_signed_commits integration tests", () => {
   // ──────────────────────────────────────────────────────
 
   describe("git push fallback when GraphQL fails", () => {
+    it("preserves git stderr when the exec wrapper only reports the exit code", async () => {
+      const realExec = global.exec;
+      global.exec = {
+        ...realExec,
+        getExecOutput: vi.fn().mockResolvedValue({
+          exitCode: 1,
+          stdout: "",
+          stderr: "remote: error: GH013: Repository rule violations\n! [rejected] memory/test -> memory/test (non-fast-forward)",
+        }),
+      };
+      try {
+        await expect(pushSignedCommits({ githubClient: {}, owner: "owner", repo: "repo", branch: "memory/test", baseRef: "", cwd: workDir, signedCommits: false })).rejects.toThrow("GH013: Repository rule violations");
+      } finally {
+        global.exec = realExec;
+      }
+    });
+
+    it("redacts credentials from captured git push errors", async () => {
+      const realExec = global.exec;
+      vi.stubEnv("GH_TOKEN", "test-push-secret");
+      global.exec = {
+        ...realExec,
+        getExecOutput: vi.fn().mockResolvedValue({
+          exitCode: 128,
+          stdout: "",
+          stderr: `fatal: https://${["user", "password"].join(":")}@example.com/repo rejected test-push-secret\nAuthorization: Basic encoded-value`,
+        }),
+      };
+      try {
+        const error = await pushSignedCommits({ githubClient: {}, owner: "owner", repo: "repo", branch: "memory/test", baseRef: "", cwd: workDir, signedCommits: false }).catch(error => error);
+        expect(error.message).toContain("fatal:");
+        expect(error.message).not.toMatch(/test-push-secret|password|encoded-value/);
+      } finally {
+        global.exec = realExec;
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("should fall back to git push when GraphQL throws", async () => {
       execGit(["checkout", "-b", "fallback-branch"], { cwd: workDir });
       fs.writeFileSync(path.join(workDir, "fallback.txt"), "Fallback content\n");

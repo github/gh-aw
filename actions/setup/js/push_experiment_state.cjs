@@ -560,21 +560,22 @@ async function main() {
         // Refresh baseRef and fetch the updated remote history so that
         // pushSignedCommits can resolve the new baseRef in git rev-list.
         try {
-          const { stdout: lsOut } = await exec.getExecOutput("git", ["ls-remote", "origin", `refs/heads/${branchName}`], { cwd: workspaceDir });
+          const gitEnv = { ...process.env, ...getGitAuthEnv(ghToken) };
+          const { stdout: lsOut } = await exec.getExecOutput("git", ["ls-remote", "origin", `refs/heads/${branchName}`], { cwd: workspaceDir, env: gitEnv, silent: true });
           const remoteHead = lsOut.trim().split(/\s+/)[0] || "";
           if (remoteHead && remoteHead !== currentBaseRef) {
-            currentBaseRef = remoteHead;
-            core.info(`Refreshed baseRef for retry: ${currentBaseRef}`);
             // Fetch the updated branch history into the local repo so pushSignedCommits
             // can resolve currentBaseRef in `git rev-list baseRef..HEAD`.
             try {
-              execGitSync(["fetch", "origin", `refs/heads/${branchName}`], { stdio: "pipe", cwd: workspaceDir, suppressLogs: true });
+              execGitSync(["fetch", "origin", `refs/heads/${branchName}`], { stdio: "pipe", cwd: workspaceDir, env: gitEnv, suppressLogs: true });
+              currentBaseRef = remoteHead;
+              core.info(`Refreshed baseRef for retry: ${currentBaseRef}`);
             } catch (fetchErr) {
               core.info(`Fetch of branch "${branchName}" on retry failed (non-fatal): ${getErrorMessage(fetchErr)}`);
             }
           }
-        } catch {
-          // ls-remote failed — ignored, keep existing baseRef.
+        } catch (remoteErr) {
+          core.warning(`Could not refresh baseRef for branch "${branchName}" on retry; keeping existing baseRef: ${getErrorMessage(remoteErr)}`);
         }
       } else {
         core.setFailed(`Failed to push ${stateLabel} after ${MAX_RETRIES + 1} attempts: ${errMsg}`);

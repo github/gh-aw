@@ -295,11 +295,13 @@ describe("push_to_pull_request_branch.cjs", () => {
       if (argList[0] === "diff-tree") {
         return { exitCode: 0, stdout: "", stderr: "" };
       }
+      if (argList[0] === "push" && argList[2] === "feature-branch") {
+        return { exitCode: 1, stdout: "", stderr: "! [rejected] feature-branch -> feature-branch (non-fast-forward)" };
+      }
       return originalGetExecOutput(cmd, args);
     });
 
     mockGithub.graphql.mockRejectedValueOnce(new Error("GraphQL error: branch protection"));
-    mockExec.exec.mockRejectedValueOnce(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
 
     const module = await loadModule();
     const handler = await module.main(config);
@@ -1426,11 +1428,13 @@ index 0000000..abc1234
         if (argList[0] === "diff-tree") {
           return { exitCode: 0, stdout: "", stderr: "" };
         }
+        if (argList[0] === "push" && argList[2] === "feature-branch") {
+          return { exitCode: 1, stdout: "", stderr: "! [rejected] feature-branch -> feature-branch (non-fast-forward)" };
+        }
         return originalGetExecOutput(cmd, args);
       });
 
       mockGithub.graphql.mockRejectedValueOnce(new Error("GraphQL error: branch protection"));
-      mockExec.exec.mockRejectedValueOnce(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
 
       const module = await loadModule();
       const handler = await module.main({ fallback_as_pull_request: false });
@@ -1487,6 +1491,9 @@ index 0000000..abc1234
         if (argList[0] === "diff-tree") {
           return { exitCode: 0, stdout: "", stderr: "" };
         }
+        if (argList[0] === "push" && argList[2] === "feature-branch") {
+          return { exitCode: 1, stdout: "", stderr: "! [rejected] feature-branch -> feature-branch (non-fast-forward)" };
+        }
         if (cmd === "git" && argList[0] === "push" && argList[1] === "origin") {
           return {
             exitCode: 1,
@@ -1499,8 +1506,6 @@ index 0000000..abc1234
 
       // GraphQL call fails, triggering fallback to git push
       mockGithub.graphql.mockRejectedValueOnce(new Error("GraphQL error: branch protection"));
-      // Git push fails with non-fast-forward, triggering fallback branch creation
-      mockExec.exec.mockRejectedValueOnce(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
 
       const module = await loadModule();
       const handler = await module.main({});
@@ -1556,13 +1561,14 @@ index 0000000..abc1234
         if (argList[0] === "diff" && argList[1] === "--name-status") {
           return { exitCode: 0, stdout: "", stderr: "" };
         }
+        if (argList[0] === "push") {
+          return { exitCode: 1, stdout: "", stderr: "remote: Internal Server Error" };
+        }
         return originalGetExecOutput(cmd, args);
       });
 
       // GraphQL call fails, triggering fallback to git push
       mockGithub.graphql.mockRejectedValueOnce(new Error("GraphQL error: branch protection"));
-      // Fallback git push fails
-      mockExec.exec.mockRejectedValueOnce(new Error("remote: Internal Server Error"));
 
       const module = await loadModule();
       const handler = await module.main({});
@@ -1985,6 +1991,9 @@ index 0000000..abc1234
         if (argList[0] === "diff-tree") {
           return { exitCode: 0, stdout: "", stderr: "" };
         }
+        if (argList[0] === "push" && argList[2] === "feature-branch") {
+          return { exitCode: 1, stdout: "", stderr: "! [rejected] feature-branch -> feature-branch (non-fast-forward)" };
+        }
         // Fallback branch push rejected for workflows scope
         if (cmd === "git" && argList[0] === "push" && argList[1] === "origin") {
           return {
@@ -1997,7 +2006,6 @@ index 0000000..abc1234
       });
 
       mockGithub.graphql.mockRejectedValueOnce(new Error("GraphQL error: branch protection"));
-      mockExec.exec.mockRejectedValueOnce(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
 
       const module = await loadModule();
       const handler = await module.main({});
@@ -2125,6 +2133,9 @@ index 0000000..abc1234
         if (argList[0] === "diff-tree") {
           return { exitCode: 0, stdout: "", stderr: "" };
         }
+        if (argList[0] === "push" && argList[2] === "feature-branch") {
+          return { exitCode: 1, stdout: "", stderr: "! [rejected] feature-branch -> feature-branch (non-fast-forward)" };
+        }
         // Fallback branch push rejected for workflows scope
         if (cmd === "git" && argList[0] === "push" && argList[1] === "origin") {
           return {
@@ -2137,7 +2148,6 @@ index 0000000..abc1234
       });
 
       mockGithub.graphql.mockRejectedValueOnce(new Error("GraphQL error: branch protection"));
-      mockExec.exec.mockRejectedValueOnce(new Error("! [rejected] feature-branch -> feature-branch (non-fast-forward)"));
 
       const module = await loadModule();
       const handler = await module.main({});
