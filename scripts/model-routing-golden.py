@@ -39,6 +39,7 @@ CONTENT_KEYS = {
     "result",
     "task",
     "text",
+    "title",
 }
 TOOL_IDENTIFIER_KEYS = {
     "agent",
@@ -122,6 +123,11 @@ def sensitive_key(key):
     return False
 
 
+def argument_string_key(key):
+    normalized = re.sub(r"[^a-z]", "", key.lower())
+    return "argument" in normalized or normalized in {"argstext", "inputtext", "toolinputtext"}
+
+
 def redact_string(value, key, identities):
     normalized = re.sub(r"[^a-z]", "", key.lower())
     if normalized in {"owner", "organization", "organizationlogin", "repositoryowner", "org"}:
@@ -148,6 +154,15 @@ def redact_string(value, key, identities):
 
 
 def redact(value, identities, key="", parent_key=""):
+    if isinstance(value, str) and argument_string_key(key):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return "[redacted]"
+        if not isinstance(parsed, dict):
+            return "[redacted]"
+        cleaned = redact(parsed, identities, "arguments")
+        return json.dumps(cleaned, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     if key.lower() in {"input", "arguments"} and isinstance(value, dict):
         return {
             child_key: redact(child, identities, child_key)
@@ -166,6 +181,56 @@ def redact(value, identities, key="", parent_key=""):
             return IDENTITY_REPLACEMENTS["repo"]
         return redact_string(value, key, identities)
     return value
+
+
+def collect_sensitive_content(value, key="", in_arguments=False):
+    normalized = re.sub(r"[^a-z]", "", key.lower())
+    if isinstance(value, str):
+        if argument_string_key(key):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                return [value] if len(value) >= 8 else []
+            return collect_sensitive_content(parsed, "arguments", True)
+        if in_arguments:
+            return [] if normalized in TOOL_IDENTIFIER_KEYS else ([value] if len(value) >= 8 else [])
+        if normalized in CONTENT_KEYS or sensitive_key(key):
+            return [value] if len(value) >= 8 else []
+        return []
+    if isinstance(value, dict):
+        arguments = in_arguments or normalized in {"input", "arguments"}
+        return [
+            content
+            for child_key, child in value.items()
+            for content in collect_sensitive_content(child, child_key, arguments)
+        ]
+    if isinstance(value, list):
+        return [
+            content
+            for child in value
+            for content in collect_sensitive_content(child, key, in_arguments)
+        ]
+    return []
+
+
+def verify_sensitive_content_redacted(source, destination):
+    fixture_content = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in destination.rglob("*")
+        if path.is_file()
+    )
+    for relative in ALLOWED_FILES:
+        source_path = safe_source_file(source, relative)
+        if source_path is None:
+            continue
+        if relative.endswith(".jsonl"):
+            records = read_jsonl(source_path)
+        else:
+            records = [json.loads(source_path.read_text(encoding="utf-8"))]
+        for record in records:
+            for sensitive_content in collect_sensitive_content(record):
+                if sensitive_content in fixture_content:
+                    raise ValueError(f"fixture contains unredacted content from {relative}")
 
 
 def event_type(record):
@@ -263,6 +328,7 @@ def prepare_fixture(source, destination):
             copied.append(rel)
     if not copied:
         raise ValueError(f"no routing or token-usage fixture files found under {source}")
+    verify_sensitive_content_redacted(source, destination)
     return copied
 
 

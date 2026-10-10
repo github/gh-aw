@@ -66,8 +66,21 @@ class ModelRoutingGoldenCaptureTest(unittest.TestCase):
                     start["data"]["arguments"],
                     {"agent": "file-summarizer", "task": "[redacted]"},
                 )
+                argument_text = json.loads(start["data"]["argumentText"])
+                self.assertEqual(argument_text["agent"], "file-summarizer")
+                for key in ("task", "title", "body"):
+                    self.assertEqual(argument_text[key], "[redacted]")
                 all_content = "\n".join(path.read_text(encoding="utf-8") for path in fixture.rglob("*") if path.is_file())
-                for secret in ("PRIVATE_", "private-org", "private-repo", "private-user", "/home/"):
+                for secret in (
+                    "PRIVATE_",
+                    "private-org",
+                    "private-repo",
+                    "private-user",
+                    "/home/",
+                    "PRIVATE_ARGUMENT_TEXT_TASK",
+                    "PRIVATE_ISSUE_TITLE",
+                    "PRIVATE_ISSUE_BODY",
+                ):
                     self.assertNotIn(secret, all_content)
                 start["data"]["input"]["agent"] = "[redacted]"
                 (fixture / session_path).write_text(
