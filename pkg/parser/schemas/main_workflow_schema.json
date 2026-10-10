@@ -59,7 +59,7 @@
               "logical-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
               "native-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
               "per-account-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
-              "allowed-repositories": { "type": "array", "maxItems": 64, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+              "allowed-repositories": { "type": "array", "maxItems": 64, "items": { "type": "string", "anyOf": [{ "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" }, { "const": "${{ github.repository }}" }] } },
               "max-observation-age-ms": { "type": "integer", "minimum": 1, "maximum": 3600000 },
               "retry": {
                 "type": "object",

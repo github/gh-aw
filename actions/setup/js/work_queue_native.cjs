@@ -1,6 +1,7 @@
 // @ts-check
 "use strict";
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("native");
+const { posix } = require("node:path");
 
 const { canonical, closed, parseStrictJSON } = require("./work_queue_codec.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
@@ -131,7 +132,7 @@ async function postQueueDispatch(githubClient, destination, inputs) {
   const response = await githubClient.rest.actions.createWorkflowDispatch({
     owner,
     repo,
-    workflow_id: destination.workflow,
+    workflow_id: posix.basename(destination.workflow),
     ref: destination.ref,
     inputs,
     headers: { "X-GitHub-Api-Version": API_VERSION },

@@ -149,6 +149,12 @@ even when a compiled Policy proposal is present. It validates the proposal
 without installing it; the checked commit publication creates the branch.
 An existing ledger with missing or mismatched Policy still fails validation.
 
+In an explicit frontmatter pool, use
+`allowed-repositories: ["${{ github.repository }}"]` for the workflow's own
+repository. Only this repository expression is accepted; inputs and event
+payloads cannot choose dependency repositories. Literal foreign repositories
+require separately bound read credentials.
+
 For an explicit operator-managed genesis or a later Policy update, an
 authenticated administrator may still run:
 

@@ -212,7 +212,7 @@ describe("authenticated native queue runs", () => {
     const post = vi.fn().mockRejectedValue(Object.assign(new Error("return_run_details unsupported"), { status: 422 }));
     await expect(postQueueDispatch({ rest: { actions: { createWorkflowDispatch: post } } }, expected, {})).rejects.toThrow();
     expect(post).toHaveBeenCalledTimes(1);
-    expect(post.mock.calls[0][0]).toMatchObject({ ref, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0 } });
+    expect(post.mock.calls[0][0]).toMatchObject({ owner: "owner", repo: "repo", workflow_id: "worker.lock.yml", ref, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0 } });
     expect(post.mock.calls[0][0]).not.toHaveProperty("return_run_details");
   });
 

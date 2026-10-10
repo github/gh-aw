@@ -1,11 +1,17 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { ESLINT_WORKERS, buildESLintFactoryPlan, buildESLintFactoryPolicy } from "./eslint_factory_portfolio.cjs";
 import { normalizeDispatchParameters, normalizeSubmitParameters } from "./work_queue_intents.cjs";
 import { newState, newRequest, generateRequestOperations, replayTransactions } from "./work_queue_replay.cjs";
 import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
 import { validateDeliveryContract } from "./work_queue_delivery.cjs";
+import { main as processControls } from "./work_queue_control_adapter.cjs";
+import { main as snapshotQueue } from "./write_work_queue_snapshot.cjs";
+import { fakeGitHub } from "./work_queue_store_checks.cjs";
+import { queueFixture, DISPATCHER, REF, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
 
 const repository = "owner/repo";
 const planOptions = { date: "2026-10-08", repository, repositoryId: "7" };
@@ -104,6 +110,121 @@ describe("ESLint factory producer and dispatcher", () => {
     expect(source.indexOf("Call `work_queue_submit` once")).toBeLessThan(source.indexOf("request the trusted scheduler"));
     expect(source).toContain("will atomically bootstrap the branch with its compiler-approved Policy and Work.");
     expect(source).toContain("Safe-output processing uses only the compiler-approved Policy proposal; never");
+  });
+
+  it("embeds the complete factory bootstrap Policy in activation and trusted control processing", () => {
+    const source = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.md", import.meta.url), "utf8");
+    const compiled = fs.readFileSync(new URL("../../../.github/workflows/eslint-factory-dispatcher.lock.yml", import.meta.url), "utf8");
+    const proposals = [...compiled.matchAll(/GH_AW_WORK_QUEUE_POLICY: ("[^\n]+")/g)].map(match => JSON.parse(JSON.parse(match[1]).replaceAll("${{ github.repository }}", "github/gh-aw")));
+    expect(proposals.length).toBeGreaterThanOrEqual(2);
+    const expected = buildESLintFactoryPolicy({
+      repository: "github/gh-aw",
+      ref: "6976a375a288e2ac4ca5102fd54bb9adafcf2f5e",
+      producerPrincipal: "4175913",
+      workerPrincipal: "4175913",
+    });
+    for (const proposal of proposals) expect(proposal).toEqual(expected);
+    expect(source).toContain("github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}");
+    const configMatch = compiled.match(/GH_AW_WORK_QUEUE_CONTROL_CONFIG: ("[^\n]+")/);
+    expect(configMatch).not.toBeNull();
+    const config = JSON.parse(JSON.parse(configMatch[1]));
+    expect(config["github-token"]).toBe("${{ secrets.GH_AW_GITHUB_TOKEN }}");
+    expect(config.work_queue_dispatch_credential).toEqual({ kind: "authenticated" });
+    expect(config.work_queue_workflows).toEqual([...ESLINT_WORKERS].sort());
+  });
+
+  it("bootstraps an absent queue and launches all three workers through the real trusted control adapter without duplicate launches", async () => {
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-eslint-dispatch-"));
+    const fixture = queueFixture({ granted: false, workerPrincipal: policyOptions.workerPrincipal });
+    const fake = fakeGitHub();
+    const runs = new Map();
+    const posts = [];
+    const failures = [];
+    const policy = buildESLintFactoryPolicy(policyOptions);
+    fake.githubClient.rest.repos.get = async () => ({
+      status: 200,
+      data: { full_name: REPOSITORY, id: 7, default_branch: "main", size: 1 },
+    });
+    fake.githubClient.rest.users = fixture.githubClient.rest.users;
+    fake.githubClient.rest.repos.getContent = async ({ path: filename, ref }) => {
+      expect(ref).toBe(REF);
+      expect(ESLINT_WORKERS.map(profile => `.github/workflows/${profile}.lock.yml`)).toContain(filename);
+      const content = fs.readFileSync(new URL(`../../../${filename}`, import.meta.url));
+      return { data: { type: "file", path: filename, encoding: "base64", content: content.toString("base64") } };
+    };
+    fake.githubClient.rest.actions.getWorkflow = async ({ workflow_id }) => ({ data: { path: `.github/workflows/${workflow_id}`, state: "active" } });
+    fake.githubClient.rest.actions.getWorkflowRun = async ({ run_id }) => ({ status: 200, data: String(run_id) === "15" ? fixture.nativeRun(fixture.dispatcherContext) : runs.get(String(run_id)) });
+    fake.githubClient.rest.actions.getWorkflowRunAttempt = async ({ run_id }) => fake.githubClient.rest.actions.getWorkflowRun({ run_id });
+    fake.githubClient.rest.actions.createWorkflowDispatch = async parameters => {
+      const assignment = JSON.parse(parameters.inputs.work_queue_assignment);
+      const state = replayTransactions(fake.log());
+      expect(state.dispatches.get(assignment.dispatch_id).state).toBe("started");
+      expect(parameters.ref).toBe(REF);
+      expect(assignment.claims).toHaveLength(1);
+      expect(parameters.workflow_id).toBe(`${assignment.worker_profile}.lock.yml`);
+      const id = String(42 + posts.length);
+      posts.push(parameters);
+      runs.set(id, {
+        ...fixture.nativeRun(fixture.workerContext),
+        id,
+        path: `.github/workflows/${parameters.workflow_id}`,
+        display_title: `gh-aw work-queue ${assignment.dispatch_id}`,
+      });
+      return { status: 200, data: { workflow_run_id: id, run_url: `https://api.github.com/repos/${REPOSITORY}/actions/runs/${id}`, html_url: `https://github.com/${REPOSITORY}/actions/runs/${id}` } };
+    };
+    const core = { setOutput: () => {}, info: () => {}, setFailed: message => failures.push(message) };
+    const options = {
+      githubClient: fake.githubClient,
+      context: fixture.dispatcherContext,
+      workflowRef: `${REPOSITORY}/${DISPATCHER}@${REF}`,
+      role: "dispatcher",
+      policyProposal: policy,
+      core,
+      env: {},
+      sleepFn: async () => {},
+    };
+    try {
+      const snapshot = await snapshotQueue({ ...options, snapshotPath: path.join(directory, "snapshot.json") });
+      expect(snapshot.sha).toBeNull();
+      expect(fake.refs.has("work-queue")).toBe(false);
+      const plan = buildESLintFactoryPlan(planOptions);
+      const intentPath = path.join(directory, "intents.jsonl");
+      fs.writeFileSync(
+        intentPath,
+        [
+          { version: 3, intent_id: "factory-submit", kind: "submit", parameters: { nodes: plan.nodes } },
+          { version: 3, intent_id: "factory-dispatch", kind: "dispatch_next", parameters: plan.dispatch },
+        ]
+          .map(intent => JSON.stringify(intent))
+          .join("\n") + "\n"
+      );
+      const controls = {
+        ...options,
+        intentOrigin: snapshot.origin,
+        intentPath,
+        getOctokit: token => {
+          expect(token).toBe("fixture-token");
+          return fake.githubClient;
+        },
+        config: { max: 3, work_queue_enabled: true, work_queue_workflows: ESLINT_WORKERS, aw_context_workflows: ESLINT_WORKERS, "github-token": "fixture-token", work_queue_dispatch_credential: { kind: "authenticated" } },
+      };
+      const result = await processControls(controls);
+      expect(result.success, JSON.stringify(result)).toBe(true);
+      expect(result.receipts.map(receipt => receipt.status)).toEqual(["durable", "durable"]);
+      expect(posts).toHaveLength(3);
+      expect(new Set(posts.map(post => post.workflow_id))).toEqual(new Set(ESLINT_WORKERS.map(profile => `${profile}.lock.yml`)));
+      const state = replayTransactions(fake.log());
+      expect(fake.log()[0].operations.map(operation => operation.kind)).toEqual(["Policy", "Work", "Work", "Work"]);
+      expect(state.works.size).toBe(3);
+      expect(state.claims.size).toBe(3);
+      expect([...state.dispatches.values()].every(dispatch => dispatch.state === "bound")).toBe(true);
+      expect((await processControls(controls)).success).toBe(true);
+      expect(posts).toHaveLength(3);
+      expect(replayTransactions(fake.log()).works.size).toBe(3);
+      expect(failures).toEqual([]);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("executes the actual preparation step with only two metadata reads and no ambient filesystem or credentials", async () => {

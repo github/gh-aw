@@ -14,9 +14,68 @@ tools:
   cli-proxy: true
   bash:
     - cat /tmp/gh-aw/agent/eslint-factory-plan.json
+work-queue-policy:
+  mode: weighted-priority
+  class-weights: [8, 4, 2, 1, 1]
+  accounting-weights: {"": 1}
+  producers:
+    "4175913":
+      pools: [default]
+      priorities: [3]
+      fairness-keys: [""]
+  pools:
+    default:
+      default-profile: eslint-miner
+      profiles:
+        eslint-miner:
+          workflow: .github/workflows/eslint-miner.lock.yml
+          ref: 6976a375a288e2ac4ca5102fd54bb9adafcf2f5e
+          principal: "4175913"
+          trust-domain: eslint-miner
+          credential-scope: repository
+          effect-scope: ${{ github.repository }}
+          max-claims-per-dispatch: 1
+          share-keys: false
+        eslint-refiner:
+          workflow: .github/workflows/eslint-refiner.lock.yml
+          ref: 6976a375a288e2ac4ca5102fd54bb9adafcf2f5e
+          principal: "4175913"
+          trust-domain: eslint-refiner
+          credential-scope: repository
+          effect-scope: ${{ github.repository }}
+          max-claims-per-dispatch: 1
+          share-keys: false
+        eslint-monster:
+          workflow: .github/workflows/eslint-monster.lock.yml
+          ref: 6976a375a288e2ac4ca5102fd54bb9adafcf2f5e
+          principal: "4175913"
+          trust-domain: eslint-monster
+          credential-scope: repository
+          effect-scope: ${{ github.repository }}
+          max-claims-per-dispatch: 1
+          share-keys: false
+      logical-limit: 3
+      native-limit: 3
+      allowed-repositories: ["${{ github.repository }}"]
+      max-observation-age-ms: 60000
+      retry: {max-attempts: 1, backoff-ms: 1000}
+      reconciliation: {max-attempts: 5, deadline-ms: 300000}
+  limits:
+    ledger-bytes: 67108864
+    recovery-bytes: 16777216
+    payload-bytes: 8192
+    graph-nodes: 3
+    predecessors: 64
+    pending-nodes: 30
+    operations: 32
+    assignment-bytes: 49152
+    result-bytes: 4096
+    evidence-bytes: 1024
+    observation-writes: 4096
 safe-outputs:
   dispatch-workflow:
     workflows: [eslint-miner, eslint-refiner, eslint-monster]
+    github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}
     target-ref: ${{ github.event.repository.default_branch }}
     max: 3
   noop:
@@ -104,3 +163,14 @@ Safe-output processing uses only the compiler-approved Policy proposal; never
 choose or modify Policy. The proposal must grant this dispatcher's principal
 producer entitlement. If bootstrap or admission fails, report the failure; do
 not bypass it with `noop` or ordinary worker dispatch.
+
+The compiled proposal grants producer entitlement only to `pelikhan`
+(`4175913`), the authenticated actor of this dispatcher's scheduled runs.
+The selected `GH_AW_GITHUB_TOKEN` launch credential must authenticate as that
+same approved worker principal; runtime authentication verifies it before any
+launch. There is no fallback to the unrelated `GITHUB_TOKEN` bot identity.
+Worker routes are pinned to the published revision above, not the current
+default branch. Protect the queue branch before enabling first submission.
+Changing identities or worker revisions after bootstrap requires a quiescent
+queue and an administrator Policy update; editing this proposal alone cannot
+replace installed Policy.
