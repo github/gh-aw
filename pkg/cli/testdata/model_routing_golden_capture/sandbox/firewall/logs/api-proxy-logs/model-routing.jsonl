@@ -1,0 +1,3 @@
+{"_schema":"model-routing/v0.28.50","stage":"classification","purpose":"routing_classification","classifier_model":"github-copilot/gpt-5.6-luna","classifier_effort":"high"}
+{"_schema":"model-routing/v0.28.50","stage":"selection","selected_model":"gpt-5.6-luna","selected_effort":"high","endpoint":"/responses"}
+{"_schema":"model-routing/v0.28.50","stage":"request","request_id":"capture-request-2","routed":"as_selected","outcome":"completed"}

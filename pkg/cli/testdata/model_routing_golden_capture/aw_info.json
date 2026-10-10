@@ -1,0 +1,12 @@
+{
+  "engine_id": "copilot",
+  "repository": "private-org/private-repo",
+  "actor": "private-user",
+  "task": "PRIVATE_TASK_TEXT",
+  "model_routing": {
+    "status": "selected",
+    "model": "github-copilot/gpt-5.6-luna",
+    "effort": "high",
+    "endpoint": "/responses"
+  }
+}

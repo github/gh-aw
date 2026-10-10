@@ -1,0 +1,53 @@
+{
+  "engine_id": "pi",
+  "engine_name": "Pi",
+  "model": "copilot/gpt-5.6-luna",
+  "version": "1.0.0",
+  "agent_version": "1.0.0",
+  "workflow_name": "Task",
+  "experimental": false,
+  "supports_tools_allowlist": true,
+  "cache_memory": false,
+  "run_id": 37971726317,
+  "run_number": 3,
+  "run_attempt": "1",
+  "repository": "example-org/routing-sandbox",
+  "ref": "refs/heads/main",
+  "sha": "85734d3266a3bbe1b018ee52ca978a0bb9fcf845",
+  "actor": "example-user",
+  "event_name": "workflow_dispatch",
+  "target_repo": "",
+  "staged": false,
+  "dry_run": false,
+  "allowed_domains": ["defaults", "python"],
+  "firewall_enabled": true,
+  "awf_version": "v0.28.50",
+  "awmg_version": "",
+  "agent_runtime": "",
+  "steps": {
+    "firewall": "squid"
+  },
+  "created_at": "2026-10-09T18:13:50.920Z",
+  "sub_agent_models": [
+    {
+      "model": "claude-haiku-4.5",
+      "name": "file-summarizer",
+      "patterns": ["github-copilot/claude-haiku-4.5"]
+    },
+    {
+      "model": "small",
+      "name": "quick-checker",
+      "patterns": [
+        "github-copilot/*haiku*",
+        "anthropic/*haiku*",
+        "github-copilot/gpt-5*mini*",
+        "openai/gpt-5*mini*",
+        "github-copilot/gpt-5*nano*",
+        "openai/gpt-5*nano*",
+        "github-copilot/gemini-*flash*lite*",
+        "google/gemini-*flash*lite*",
+        "gemini/gemini-*flash*lite*"
+      ]
+    }
+  ]
+}

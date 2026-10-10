@@ -1,0 +1,5 @@
+{"type":"session.init","data":{"sourceEngine":"pi","cwd":"/home/private-user/private-repo"}}
+{"type":"tool.execution_start","data":{"toolName":"subagent","toolCallId":"pi-call-1","input":{"agent":"file-summarizer","task":"PRIVATE_TASK_TEXT","prompt":"PRIVATE_PROMPT_TEXT","text":"PRIVATE_INPUT_TEXT","query":"PRIVATE_QUERY_TEXT"},"arguments":{"agent":"file-summarizer","task":"PRIVATE_ARGUMENT_TASK"},"argumentText":"{\"agent\":\"file-summarizer\",\"task\":\"PRIVATE_ARGUMENT_TEXT_TASK\",\"title\":\"PRIVATE_ISSUE_TITLE\",\"body\":\"PRIVATE_ISSUE_BODY\"}"}}
+{"type":"pi.subagent_dispatch","data":{"agent":"file-summarizer","requestedModel":"claude-haiku-4.5","resolvedModel":"claude-haiku-4.5"}}
+{"type":"subagent.request","data":{"invocationId":"legacy:file-summarizer:1","agentName":"file-summarizer","model":"claude-haiku-4-5-20251001","inputTokens":10,"outputTokens":2,"content":"PRIVATE_MESSAGE_TEXT"}}
+{"type":"tool.execution_complete","data":{"toolName":"subagent","toolCallId":"pi-call-1","success":true,"output":"PRIVATE_TOOL_OUTPUT"}}
