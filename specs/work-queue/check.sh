@@ -10,9 +10,9 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle|IssueProjection|HarnessIdentity) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle|IssueProjection|HarnessIdentity|QueueBootstrap) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, QueueLifecycle, IssueProjection, or HarnessIdentity when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, QueueLifecycle, IssueProjection, HarnessIdentity, or QueueBootstrap when set." >&2
         exit 1
         ;;
 esac
@@ -127,6 +127,18 @@ run_model IssuePRStaysOpen "" Invariant 0 IssueProjection
 run_model IssueBrokenUnowned AdmissionAuthority Invariant 12 IssueProjection
 run_model IssueBrokenPayloadClose ClosureAuthority Invariant 12 IssueProjection
 run_model IssueBrokenRetry SingleCreation Invariant 12 IssueProjection
+run_model BootstrapEmpty "" Invariant 0 QueueBootstrap
+run_model BootstrapInitialized "" Invariant 0 QueueBootstrap
+run_model BootstrapSameBranch "" Invariant 0 QueueBootstrap
+run_model BrokenBootstrapConflict AbsenceAuthority Invariant 12 QueueBootstrap
+run_model BrokenBootstrapPreparation PreparationAuthority Invariant 12 QueueBootstrap
+run_model BrokenBootstrapBranch SeparateQueueBranch Invariant 12 QueueBootstrap
+run_model BrokenBootstrapRoute PublicationAuthority Invariant 12 QueueBootstrap
+run_model BrokenBootstrapAtomic AtomicGenesis Invariant 12 QueueBootstrap
+run_model BootstrapDeferredWitness NoDeferredPreparation Invariant 12 QueueBootstrap
+run_model BootstrapRetryWitness NoDeploymentRetry Invariant 12 QueueBootstrap
+run_model BootstrapLostResponseWitness NoLostResponseRecovery Invariant 12 QueueBootstrap
+run_model BootstrapLostResponseFailureWitness NoLostResponseFailure Invariant 12 QueueBootstrap
 if [ "$RUN_COUNT" -eq 0 ]; then
     echo "No configuration matches the requested TLC filters." >&2
     exit 1

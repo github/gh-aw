@@ -502,12 +502,23 @@ Policy proposal, publication MUST atomically create the protected queue branch
 with one genesis commit containing that Policy followed by the submitted Work.
 The proposal MUST authorize the submitting principal and the Work's pool,
 priority, and accounting keys; the runtime MUST validate its immutable worker
-routes before writing. This replaces administrator-seeded genesis for normal
+routes before queue publication. This replaces administrator-seeded genesis for normal
 workflow bootstrap. Reads and dispatch-only requests MUST NOT initialize an
 absent queue. Existing nonempty ledgers without a valid Policy, empty or
 malformed logs, and unsupported histories MUST fail closed rather than being
 overwritten. Later Policy epochs remain administrator-only and require a drained
 queue.
+
+Ref conflicts MUST NOT establish absence unless an independent native observation
+confirms the requested repository identity and `isEmpty = true`. In a branchless
+repository, the runtime MAY prepare the default branch only after validating the
+first producer submission's Policy and Work. The default branch MUST differ from
+the queue branch. A lost preparation response MUST be resolved by reading that
+default branch; an absent branch or failed recheck MUST fail closed. Preparation
+MUST NOT publish Policy or Work: if the immutable worker route is unavailable, the
+invocation fails without queue publication. After worker deployment, a new
+invocation MAY resubmit the same request; Policy and Work still enter the separate queue
+branch atomically only after route verification.
 
 One scheduling **pool** is one durable decision domain with a fixed worker-capability class, worker-routing policy, capacity model, and authoritative policy epoch. All dispatchers in that domain MUST use the same policy. Arbitrary agent-chosen filters MUST NOT redefine the competition set.
 
@@ -2589,6 +2600,16 @@ and three guarded witnesses require exact named diagnostics.
 The [reproduction guide](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#bounded-launch-delivery-and-recovery-evidence)
 states its evidence abstractions and omissions. It proves neither real host
 authentication nor eventual lifecycle progress.
+
+[`QueueBootstrap.tla`](https://github.com/github/gh-aw/blob/main/specs/work-queue/QueueBootstrap.tla)
+separately checks bounded first-submit preparation and atomic genesis for empty
+and initialized repositories. Its negative controls cover unconfirmed absence,
+invalid preparation, coincident branches, unverified routes and split publication.
+Guarded witnesses demonstrate preparation without publication, retry after worker
+deployment and lost-response confirmation or rejection. These are reachability checks, not eventual
+deployment or GitHub API guarantees; the
+[bootstrap model guide](https://github.com/github/gh-aw/blob/main/specs/work-queue/README.md#first-submit-bootstrap-model)
+states the abstraction limits.
 
 Complete the lifecycle refinement and establish runtime conformance with
 independent cross-language fixtures and adversarial API/transport tests. None of
