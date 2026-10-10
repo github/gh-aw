@@ -169,6 +169,11 @@ Frontmatter alone does not install or update Policy; the first accepted producer
 submission installs its compiled proposal, and later changes remain
 administrator-only.
 
+The [workflow-evolution specification](../specs/work-queue-specification.md#710-policy-changes-and-breaking-deployment)
+replaces routine deployment drains with prospective configuration and immutable
+per-dispatch execution bindings. That design is not yet implemented; the
+quiescence steps above remain necessary for the current runtime.
+
 ## Enable backing Issue projection
 
 Upgrade all queue readers and workflow runtime deployments first. Older

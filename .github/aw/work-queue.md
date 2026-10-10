@@ -99,7 +99,9 @@ wait for their own predecessor Results.
 Never infer nonlaunch/termination from lost responses, dispatcher cancellation
 or elapsed deadlines. Retain reservations until exact evidence exists. Do not
 rerun effects after Completion with uncertain delivery; bounded verification
-yields Result or DeliveryFailure. Use pause/drain for incompatible revisions;
+yields Result or DeliveryFailure. The revised specification targets rolling compatible deployments without a
+queue-wide drain; implementation is pending. For the current runtime, use
+pause/drain for incompatible revisions;
 quiesce before Policy changes. Reject old protocols, scalar assignments and
 automatic upgrades; preserve old evidence before explicit redeployment.
 

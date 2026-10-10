@@ -83,3 +83,34 @@ queue-wide fairness. Compatibility readers are limited to historical reporting.
   schemas and strict independent conformance tests.
 - Automated queue-writer restriction verification/provisioning is deferred by
   user direction. This ADR does not claim that deployment boundary is enforced.
+
+### Workflow-evolution amendment (2026-10-09)
+
+There are no active deployments to migrate for the revised protocol. The
+quiescence/redeployment procedure above is historical rationale, not a
+requirement to build a compatibility layer or drain for ordinary workflow
+updates. Unsupported historical records remain rejected unchanged.
+
+The [revised normative contract](../src/content/docs/specs/work-queue-specification.md#710-policy-changes-and-breaking-deployment)
+separates stable workflow eligibility from exact execution ownership. Approve
+the workflow identity and trusted deployment source; resolve and freeze an
+immutable SHA, execution contract, authority scope, and configuration provenance
+when granting each dispatch. Pending unpinned Work follows compatible updates;
+reserved/bound executions retain their original authority through delivery and
+recovery. A changed configuration revision does not retire existing Claims.
+
+Prospective deployment, admission, and capacity updates preserve scheduling
+epochs and service debt. Missing or incompatible deployments block affected
+Work explicitly, not the entire graph or unrelated scheduling. Changed plans
+use new immutable nodes; verified Results and old edges remain unchanged.
+Scope expansion cannot exceed an existing Work's admitted authority ceiling.
+Draining is optional for conflicting shared-resource cutovers and remains a
+separate rule for unsupported live weight/mode/accounting transformations.
+
+This is a specification decision, not implemented runtime behavior. The
+TypeSpec/generated contracts, both replay engines, compiler/provisioning,
+dispatch and effect authorization, recovery/checkpoints, diagnostics and models
+must change together. Existing proofs and conformance fixtures do not establish
+rolling-update safety. The required evidence includes old/new revision overlap,
+ref/CAS races, local incompatibility, retained delivery authority, lowered
+capacity, and deterministic replay/compaction without moving-ref lookups.

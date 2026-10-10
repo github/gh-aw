@@ -13,6 +13,13 @@ Its [implementation coverage table](../../docs/src/content/docs/specs/work-queue
 tracks unfinished runtime/verification work and user-deferred writer-restriction
 enforcement. Do not infer deployment-security completion from functional tests.
 
+The [2026-10-09 workflow-evolution revision](../../docs/src/content/docs/specs/work-queue-specification.md#710-policy-changes-and-breaking-deployment)
+requires rolling compatible deployments and prospective configuration changes
+without queue-wide draining. The TypeSpec wire contract, native implementations,
+and models in this directory have not yet been updated for that revision.
+Their existing conformance/proof results do not cover deployment resolution,
+retained execution authority across configuration updates, or evolution races.
+
 The original `WorkQueue.tla` is retained as historical model evidence for
 [issue #64852](https://github.com/github/gh-aw/issues/64852). Its best-effort
 oldest-first selection, competing Claim arbitration and scalar worker behavior

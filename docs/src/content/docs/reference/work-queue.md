@@ -321,6 +321,12 @@ not proof of launch.
 
 A Policy update requires a quiescent queue: no nonterminal (unfinished) Work,
 outstanding reservations, or unresolved delivery barriers for completed Work.
+This describes the current implementation, not the revised protocol target.
+The [workflow-evolution specification](../specs/work-queue-specification.md#710-policy-changes-and-breaking-deployment)
+removes routine deployment drains through trusted deployment resolution,
+prospective configuration revisions, and frozen per-dispatch authority.
+Those changes are not yet implemented; do not remove runtime checks or assume
+that updating frontmatter changes an installed worker SHA.
 Installing Policy does not configure or verify queue-branch writer restrictions.
 Those restrictions must be established independently; automated enforcement
 remains deferred. A trusted workflow producer can publish only the exact

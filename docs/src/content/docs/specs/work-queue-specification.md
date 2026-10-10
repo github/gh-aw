@@ -257,7 +257,7 @@ The earlier specification had the right trust boundary, but too much protocol ma
 | A scheduler chain plus source-view digests/deltas duplicated history and complicated replay | Use one causal `QueueCommit` envelope for **all** mutations; its predecessor defines the complete pre-decision state |
 | Separate grant, Claim, and reservation facts created companion-validation and partial-state cases | A Claim grants/charges a logical slot; its dispatch group shares a native slot, both derived from the same operations |
 | Wall-clock enqueue keys obscured what “FIFO” meant during concurrent publication | Order Work by its first committed `(commit ordinal, operation index)`; timestamps measure age, not queue position |
-| Rational wire state, arbitrary hierarchy, and live weight rebasing expanded the first release | Use exact integer ticks, two scheduling levels, and policy changes only after the queue drains |
+| Rational wire state, arbitrary hierarchy, and live weight rebasing expanded the first release | Use exact integer ticks and two scheduling levels; reserve drained epochs for scheduling transformations, not deployment updates |
 | An agent could prepare inputs for a snapshot winner that changes before publication | Store Work-specific plans at submission; stage `dispatch_next(pool, max_claims, max_dispatches)` and bind selected Work late |
 | Multiple Claims in one worker could be confused with one fairness unit or one terminal result | Charge every Claim, reserve one native dispatch slot, and finalize/effect-gate each assigned handle independently |
 | Single-Claim users should not manage redundant attribution, while mixed outcomes must remain valid | Automatically scope one-Claim outputs; enforce explicit multi-Claim scopes and settle completed/cancelled members independently through DAG Results |
@@ -265,7 +265,7 @@ The earlier specification had the right trust boundary, but too much protocol ma
 | Tracing risked becoming a second authority or a new observability subsystem | Reuse existing OTLP/context plumbing; correlate by request/commit/Claim IDs and derive receipts from the canonical log |
 | Packing restrictions could silently change who competes | Select from scheduling eligibility first; admit only a packable fair prefix, without advancing debt for a rejected winner |
 | Completion without delivered outputs could strand a DAG indefinitely | Diagnose unresolved delivery, reconcile within bounds, then publish Result or an explicit terminal DeliveryFailure; replacements get new immutable nodes |
-| Drain-only policy changes could prevent operational recovery | Keep entitlement/routing changes drain-only; allow separately authorized pause/resume and equivalent-scope credential rotation without resetting debt |
+| Drain-only policy changes could prevent operational recovery and workflow evolution | Use prospective configuration revisions and frozen dispatch authority; deployment, admission, and capacity updates preserve debt without draining |
 | Per-Claim handles could be mistaken for tenant isolation | Batch only within an approved common trust domain; validate credential, data, and effect scopes before grouping |
 | Full-history replay and daily partial searches could look like scalable guarantees | Bound admission and replay costs; label algorithmic, protocol, runtime, and evidence-collection results separately |
 
@@ -492,6 +492,13 @@ Demers/Keshav/Shenker fair queueing and Goyal/Vin/Cheng start-time fair queueing
 
 The words **MUST**, **SHOULD**, and **MAY** below describe the proposed feature, not current behavior. Field names and configuration examples are illustrative API design, not accepted gh-aw syntax.
 
+**Workflow-evolution revision: 2026-10-09.** Routine workflow updates MUST NOT
+require queue-wide draining or invalidate admitted Work. Section 7.10 supersedes
+the earlier drain-only deployment design. The existing wire schema, runtime,
+and formal models still implement that earlier design; the coordinated changes
+and new acceptance evidence remain required under section 9.1. No legacy
+compatibility reader or migration layer is required for this revision.
+
 ### 7.1 Mandatory scheduling and policy modes
 
 Every queue MUST have an installed scheduling policy, and every new Claim MUST be created through the trusted scheduler. Scheduling cannot be disabled through configuration, an omitted setting, an API argument, or an operator command.
@@ -501,13 +508,13 @@ an authenticated producer or dispatcher, if the compiler supplies a validated
 Policy proposal, publication MUST atomically create the protected queue branch
 with one genesis commit containing that Policy followed by the submitted Work.
 The proposal MUST authorize the submitting principal and the Work's pool,
-priority, and accounting keys; the runtime MUST validate its immutable worker
-routes before queue publication. This replaces administrator-seeded genesis for normal
+priority, and accounting keys; the runtime MUST validate its approved worker
+identities and trusted deployment sources before queue publication. This replaces administrator-seeded genesis for normal
 workflow bootstrap. Reads and dispatch-only requests MUST NOT initialize an
 absent queue. Existing nonempty ledgers without a valid Policy, empty or
 malformed logs, and unsupported histories MUST fail closed rather than being
-overwritten. Later Policy epochs remain administrator-only and require a drained
-queue.
+overwritten. Later Policy revisions remain administrator-only; deployment-only
+updates MUST preserve the scheduling epoch and debt as specified in section 7.10.
 
 Ref conflicts MUST NOT establish absence unless an independent native observation
 confirms the requested repository identity and `isEmpty = true`. In a branchless
@@ -520,7 +527,7 @@ invocation fails without queue publication. After worker deployment, a new
 invocation MAY resubmit the same request; Policy and Work still enter the separate queue
 branch atomically only after route verification.
 
-One scheduling **pool** is one durable decision domain with a fixed worker-capability class, worker-routing policy, capacity model, and authoritative policy epoch. All dispatchers in that domain MUST use the same policy. Arbitrary agent-chosen filters MUST NOT redefine the competition set.
+One scheduling **pool** is one durable decision domain with an approved worker-capability class, prospective worker-routing/capacity configuration, and authoritative scheduling epoch. All dispatchers in that domain MUST use the same causal Policy state when proposing a grant. Arbitrary agent-chosen filters MUST NOT redefine the competition set.
 
 The protocol uses the **Git backend** exclusively. `tools.work-queue` MUST NOT expose a `storage` selector. There is no backend selection or legacy-selector handling in the compiler or runtime. The Git backend MUST enforce the full scheduler contract; advisory display, unscheduled FIFO operation, or weakened consistency is not a permitted fallback.
 
@@ -575,7 +582,9 @@ Define one current version-3 `QueueCommit` transaction protocol with closed, typ
 | `priority` | Required integer 1-5; a new submission omitting it resolves to 3 before persistence |
 | `fairness_key` | Required trusted accounting identity; a new submission omitting it resolves to `""` before persistence |
 | `pool` | Required configured scheduling/worker-capability domain |
-| `worker_profile` | Approved worker/recipe profile; omitted submissions use the pool's explicit default |
+| `worker_profile` | Stable approved worker/recipe identity; omitted submissions use the pool's explicit default, and future Claims resolve its current compatible deployment |
+| `execution_contract` | Trusted immutable input/result compatibility identifier and admitted authority ceiling; identifies supported data and effects, not behavioral equivalence of prompts or code |
+| `execution_revision` | Optional immutable SHA pin; omitted Work follows compatible deployments at each new Claim, while a reserved dispatch never changes revision |
 | `batch_trust_domain` | Required compiler/policy-resolved sharing boundary; never an agent-selected entitlement or permission set |
 | `payload` | Immutable JSON object within the [current wire value profile](#current-wire-encoding), containing task inputs and an optional agent-generated plan |
 | `graph_id`, `node_key` | Trusted graph namespace and stable local node identity; neither grants a separate fairness share |
@@ -586,7 +595,7 @@ Define one current version-3 `QueueCommit` transaction protocol with closed, typ
 
 When explicit fairness grouping is configured, the accounting key SHOULD correspond to a project, authenticated tenant, or administrator-approved workflow family. It MUST NOT be generated per Work or per retry. Without that configuration or explicit trusted submission metadata, use the single default key; do not infer a group from a producer's identity.
 
-The initial scheduler has exactly two levels: class and accounting key. Workflow-family/instance identifiers MAY be diagnostic payload metadata but MUST NOT add a third entitlement level in this release. `worker_profile` is immutable routing, validated against the pool's compiler-approved targets, not a per-dispatch filter. Work's first committed position is derived by replay, not supplied by an agent or a client clock.
+The initial scheduler has exactly two levels: class and accounting key. Workflow-family/instance identifiers MAY be diagnostic payload metadata but MUST NOT add a third entitlement level in this release. `worker_profile` is immutable logical routing, validated against the pool's compiler-approved workflow identities, not a per-dispatch filter or permanent deployment SHA. Work's first committed position is derived by replay, not supplied by an agent or a client clock.
 
 The trusted producer/policy resolves the metadata once. A child's default priority and accounting key MUST inherit from its parent's trusted assignment. A child MUST NOT gain a better priority or a separate entitlement solely because the agent asks for it.
 
@@ -608,6 +617,7 @@ A scheduling-eligible Work:
 
 - Exists and has state `available`.
 - Belongs to the pool and can be executed by a compiler-allowed worker target.
+- Has a verified compatible deployment for its immutable execution contract and optional revision pin.
 - Satisfies any trusted retry delay and admission restrictions.
 - Has an accounting key below its outstanding-Claim limit and an available logical Work slot.
 - Has verified successful results for every Work predecessor.
@@ -741,7 +751,8 @@ Use **one `QueueCommit` JSON object per line of the existing `work-queue.jsonl`*
 | `previous` | Predecessor commit identity; `null` only for genesis |
 | `request` | Trusted stable request ID, request kind, validated parameters, and semantic fingerprint |
 | `actor` | Trusted logical-request origin, including workflow run/originating attempt or authorized operator identity |
-| `policy_epoch` | Active policy identity; genesis/policy installation explicitly establishes it |
+| `policy_epoch` | Scheduling epoch; deployment-only Policy revisions preserve it, and explicit drained scheduling changes establish a new one |
+| `policy_revision` | Immutable configuration revision used to validate this decision; retained revisions continue to support existing execution authority |
 | `at` | Trusted decision timestamp used for retry eligibility and diagnostics |
 | `operations` | Nonempty ordered array of typed operations, accepted atomically |
 | `trace` | Optional validated correlation metadata; never authority or a scheduling input |
@@ -752,7 +763,8 @@ followed by the submitted Work nodes. Its request parameters still bind only
 those Work nodes, and `policy_epoch` binds the Policy operation. Replay permits
 this combined form only at ordinal zero; a producer cannot update Policy in an
 existing ledger. The ordinary administrator-only Policy request remains valid
-for explicit operator installation and later quiescent updates.
+for explicit operator installation and later prospective updates. Deployment
+and Policy revision identities are distinct from the scheduling epoch.
 
 The request fingerprint binds the actor and the validated logical intent, not the observed branch SHA or tentative selected Work. Reusing a request ID with different meaning MUST fail. A conflict retry may regenerate the tentative operations and predecessor, but must reuse the same logical request. Once committed, its identity and result are immutable.
 
@@ -800,10 +812,10 @@ Use a small operation union:
 
 | Operation | Durable responsibility |
 |---|---|
-| `Policy` | Install a policy epoch and bounded approved routing/producer rules |
+| `Policy` | Install a prospective configuration revision and bounded approved routing/producer rules; establish a scheduling epoch only for genesis or a supported scheduling transition |
 | `Control` | Pause/resume new Work admission or new grants, or record an equivalent-scope credential generation; never alter shares, ownership, or debt |
 | `Work` | Admit immutable task metadata/payload; its first commit/operation position is its FIFO position |
-| `Claim` | Record selected Work, Claim, `dispatch_id`, and local assignment handle; charge/reserve a logical Work slot and create the group's native reservation on its first Claim |
+| `Claim` | Record selected Work, Claim, `dispatch_id`, and local assignment handle; charge/reserve a logical Work slot and create the group's native reservation with frozen deployment/contract/authority on its first Claim |
 | `Completion` | Preserve effective-Claim-only terminal Work completion and final authorization prerequisites |
 | `Result` | Record a completed node's verified result/availability barrier after its scoped effect processing succeeds |
 | `DeliveryFailure` | Close a completed node's unresolved delivery barrier after terminal-run evidence and bounded reconciliation; never authorize effects or release successors |
@@ -1014,7 +1026,8 @@ The first release requires the GitHub REST dispatch contract pinned to API
 version `2026-03-10`: a successful POST returns HTTP 200 with
 `workflow_run_id`, `run_url`, and `html_url`. Preserve run/resource IDs as lossless
 canonical strings, not floating-point API integers. Validate the response, then
-fetch that exact run to check repository, approved workflow/ref revision,
+fetch that exact run to check repository, workflow and immutable revision frozen
+in the reservation,
 `workflow_dispatch` event, and trusted initiating principal before appending
 `Dispatch(bound)`. Hosts lacking that contract are unsupported, not an old-API
 compatibility path. Missing details, an unexpected success shape, or a lost
@@ -1125,7 +1138,8 @@ Suggested behavior:
 | Existing `sort` | Remain presentation-only; never override policy |
 | `work_queue_dispatch_next` | Stage pool, `max_claims`, and `max_dispatches`; commit a fair packable prefix and bind complete Claim arrays to approved workers |
 | Explicit Work selection | No direct-claim selector, preferred-Work assertion, arbitrary filter, or target-specific queue bypass |
-| Administrative priority/weight change | Append an authorized Policy transaction only after quiescence; no Control-based debt reset or out-of-policy grant override |
+| Administrative priority/weight change | Apply the separately defined priority override, or establish a new scheduling epoch after quiescence for weight/mode changes; deployment revisions never reset debt |
+| Workflow deployment update | Append an authorized prospective Policy revision without draining; resolve compatible deployment and freeze execution authority with each new reservation |
 | Operational recovery | Authorized Control operations pause/resume admission/grants or rotate equivalent credentials without resetting passes; reconcile launch and delivery barriers, never force-release |
 | Worker finish and safe outputs | Resolve the sole assignment handle automatically; require explicit handles for multiple Claims and reject foreign/ambiguous scopes before handlers |
 | Audit/logs | Expose policy epoch, selection reason, blocked reason, grants, launch outcomes, and reservations without leaking submitted identifiers |
@@ -1135,16 +1149,104 @@ Pools must define complete target eligibility. Letting each caller restrict the 
 
 ### 7.10 Policy changes and breaking deployment
 
-In the current protocol, **scheduling policy** is immutable while the queue contains any
-nonterminal Work, outstanding reservation, or unresolved completed-node delivery
-barrier. To change weights, mode, routing, trust domains, entitlement, or admission
-limits, pause new admission/grants, drain/cancel and reconcile existing work,
-settle delivery barriers with Result or DeliveryFailure, then append a `Policy`
-operation establishing a new epoch. Old terminal history remains unchanged.
+Workflow evolution is an ordinary queue operation. A routine workflow, prompt,
+or compatible tool update MUST NOT require queue-wide draining, reset service
+debt, rewrite admitted Work, or invalidate a graph, Claim, Result, or pending
+delivery. Match deployment eligibility by stable workflow identity and an
+explicitly authorized deployment source; match execution ownership by the exact
+immutable reservation and bound native run.
 
-Initialize the new epoch's derived clocks/passes at zero and compute its integer tick scales from its weights. Epoch transitions are explicit prospective reset boundaries, not hidden resets during competition. Reject a policy change on a non-drained queue with `policy_not_quiescent`.
+#### Trusted deployment resolution
 
-This deliberately removes live weight rebasing, mid-backlog mode changes, and hierarchy edits from the first release. If such features are later required, they need separately specified service-debt and in-flight semantics; do not grow them into the initial scheduler.
+A worker profile MUST authorize the repository/workflow identity, launch
+principal, trusted deployment source, supported execution contracts, and
+credential/data/effect scope. A trusted source may be an explicitly approved
+protected ref or immutable deployment publication. A workflow path, agent
+assertion, arbitrary SHA, or moving `target-ref` alone MUST NOT authorize code.
+The source's trust restrictions MUST be independently verified.
+
+Before granting a Claim, trusted processing MUST resolve that Work's compatible
+deployment to an immutable SHA and validate its compiled contract. Resolution
+and its provenance MUST become durable in the same CAS-validated reservation
+as the Claim, not in a later mutable lookup. A CAS loser refreshes Policy and
+deployment evidence and recomputes its tentative decision. Once committed,
+launch, binding, delivery, and recovery MUST use the frozen revision; a ref
+moving between reservation and POST never redirects that reservation. Replay
+uses recorded evidence, not today's ref contents.
+
+By default, available Work follows the current compatible deployment of its
+stable profile at each new Claim, including an authorized retry. Explicitly
+revision-pinned Work MUST retain its pin. Neither rule changes its payload,
+dependencies, FIFO position, priority, accounting identity, or prior charges.
+The producer establishes the immutable execution contract and authority ceiling
+at admission; a new deployment cannot expand a pending Work's permissions.
+Contract compatibility requires supported input/result schemas and approved
+authority, not proof that changed prompts or code produce identical behavior.
+
+A missing deployment, unavailable verification, or unsupported contract MUST
+surface a bounded per-Work blocked reason (`deployment_unavailable`,
+`deployment_unverified`, or `execution_contract_incompatible`). It MUST NOT
+corrupt the ledger, fabricate a compatible fallback, cancel Work, or stop
+unrelated eligible Work. Contract-incompatible Work is scheduling-ineligible;
+an eligible but unpackable winner still stops the fair prefix under section
+7.14. Operators may publish a compatible deployment or explicitly cancel and
+replace obsolete nodes; existing DAG edges and verified Results stay immutable.
+
+#### Prospective Policy revisions and retained execution authority
+
+Administrator-authorized Policy revisions MUST use the same causal log and
+stable request/CAS rules. Record a distinct configuration revision and retain
+prior revisions needed by Work, dispatches, delivery, and recovery. Policy
+operations MUST bind a new unique `policy_revision` and the expected preceding
+configuration revision; stale updates fail and are recomputed, not silently
+merged. Every mutation binds the current revision for validation of new
+decisions, while lifecycle operations additionally identify their reservation's
+historical execution authority. A valid historical binding is not a grant to
+admit new Work under retired configuration. Policy revision identity MUST NOT
+itself determine whether an existing Claim is
+effective. Each reservation freezes its execution revision, contract,
+principal/trust/credential/effect scope, applicable lifecycle limits, and
+configuration provenance. Trusted closure and recovery validate against that
+frozen authority, not the latest profile or epoch. Compaction MUST preserve it.
+
+| Change | Transition rule |
+|---|---|
+| Workflow/prompt/compatible tool deployment | Prospective; no drain, no clock reset, and old/new dispatches may coexist |
+| Producer admission grants or default worker profile | Prospective for new admissions; preserve admitted Work and existing authority |
+| Capacity limit | Count all outstanding reservations; lowering below occupancy blocks new grants until usage falls below the new limit, never evicts or releases active reservations |
+| Trust/credential/effect scope | New admissions/deployments must satisfy the updated rules; pending Work never gains authority beyond its admitted ceiling, and incompatible Work is blocked locally |
+| Weight, accounting identity, scheduler mode or hierarchy | Separate scheduling-epoch transition after quiescence until live service-debt transformation is specified; not a requirement for workflow evolution |
+
+Deployment-only updates MUST preserve the scheduling epoch, scales, clocks,
+passes, and accumulated charges exactly. Admission and capacity updates MUST
+also preserve them. A lower capacity limit may temporarily be below retained
+occupancy; that is diagnosed as over-limit occupancy, not an invalid ledger.
+Existing dispatches retain bounded closure/reconciliation budgets so newer
+limits cannot make their durable evidence impossible to publish.
+Historical record validation MUST use the bounds applicable at publication,
+not apply newer lower limits retrospectively. Reducing global retained-history
+limits below existing usage MUST still permit bounded recovery/compaction;
+configuration changes cannot strand pending delivery behind a new parser or
+publication limit.
+
+Explicit security revocation remains possible, but MUST identify affected
+authority through an authorized operation. It is not an incidental consequence
+of deploying a new revision. Preserve already committed Completion and
+uncertain delivery evidence; never force-release a possible native run or
+treat revocation as proof that an external effect did not occur.
+
+For incompatible writes to a shared resource, an operator MAY choose a scoped
+cutover: fence affected new grants, settle affected reservations and delivery,
+and resume after the domain-specific conflict is resolved. Queue-wide pause
+or drain is an optional cutover strategy, not a routine deployment prerequisite.
+If scope cannot be proven, surface the unresolved cutover rather than claim
+isolation. Other pools and independent Work SHOULD continue.
+
+Weight/mode changes still require an explicit drained scheduling transition.
+Initialize that new epoch's clocks/passes at zero and compute its integer tick
+scales from its weights. Reject an unsupported live scheduling transformation
+with `scheduling_transition_requires_quiescence`; do not use that condition to
+reject a deployment-only revision.
 
 #### Operational controls are not policy resets
 
@@ -1171,17 +1273,19 @@ lead to its one launch; pausing is not preemption or an atomic remote-POST fence
 Secrets remain in the credential provider, not in the log. Credential cutover
 must allow trusted recovery with the new credential before invalidating the old
 one where possible. Revocation/permission loss is a fail-closed operational
-incident; expanding the approved principal/resource/effect scope requires a
-drained Policy change, not `credential_generation`. External repository access
+incident; changing the approved principal/resource/effect scope requires an
+explicit prospective Policy revision, not `credential_generation`, and cannot
+expand an existing Work's admitted ceiling. External repository access
 must be revalidated before reusing observations after an access change.
 
-Initial deployment is a breaking replacement, not a compatibility rollout:
-
-1. Stop old writers and terminate or reconcile old in-flight workers before deployment; do not mix protocols on one authority.
-2. Deploy current-only readers, closed schemas, mandatory scheduling, reservation recovery, and backend validation together.
-3. Initialize new current-protocol queues with a policy transaction in their canonical logs; do not convert or silently adopt old ledgers.
-4. Recompile and deploy every dispatcher, operator client, and worker sharing each pool against the current protocol.
-5. Permit queue operation only when its backend, policy epoch, and transaction versions satisfy the complete contract.
+Initial deployment is a breaking replacement, not a compatibility rollout.
+There are no active deployments to migrate for this revision. Update the closed
+wire contract, both native engines, compiler, operator/runtime readers, and
+formal models together; initialize new queues with current Policy and deploy
+workers implementing the current protocol. Do not add legacy readers, fabricate
+historical deployment evidence, or require a migration drain as a release gate.
+Unsupported ledgers remain rejected unchanged. Subsequent ordinary workflow
+updates use trusted deployment resolution, not protocol redeployment.
 
 There is no runtime migration or backward-compatible reader for old queues. Encountering an old ledger MUST produce an explicit unsupported-protocol error and leave it unchanged; it must not erase, reset, reinterpret, or silently copy existing work. Do not rewrite committed current-protocol grants or retrospective fairness measurements. Missing policy, unsupported transaction/policy versions, and mismatched compiled policies MUST fail closed.
 
@@ -1392,7 +1496,9 @@ Use stable reason/status codes:
 | `dispatch_budget_blocked` / `assignment_size_blocked` | The next fair winner cannot fit this request; stop, do not filter it out |
 | `admission_paused` / `grants_paused` | Authorized operational control blocks new Work or Claims without disabling scheduling |
 | `ledger_limit` / `ledger_invalid` | Admission exceeds the retained-log envelope, or history cannot be validated; never hide this as no work |
-| `policy_not_quiescent` | Policy edit attempted before the queue drained |
+| `scheduling_transition_requires_quiescence` | Unsupported live weight/mode/accounting transformation; never a deployment-only update |
+| `deployment_unavailable` / `deployment_unverified` | Work's approved deployment cannot be resolved or independently verified; preserve Work and continue unrelated eligible scheduling |
+| `execution_contract_incompatible` | No approved deployment accepts this Work's immutable contract/authority ceiling; block only affected Work |
 
 Administrative/schema/auth errors, malformed history, exhausted publication retries, and uncertain launch are not success-shaped empty queues. Return their explicit error/status and preserved state. Backpressure is a legitimate evaluation result, but must not be labeled `no_work`.
 
@@ -1453,6 +1559,7 @@ The current `logSpan` helper returns no span context. The initial implementation
 | `request_id` | Stable logical intent across publication retries |
 | `commit_id`, `previous`, operation index | Exact accepted decision and its pre-state |
 | `policy_epoch`, pool, priority | Applied policy and domain |
+| `policy_revision`, workflow, resolved SHA, execution contract | Applied configuration and immutable deployment provenance, distinct from latest configuration |
 | `claim_ref`, `work_ref` | Opaque/redacted diagnostic references, not arbitrary submitted strings |
 | `dispatch_id`, local assignment handle | Shared worker launch versus individual Claim completion |
 | Graph/node/edge and observation/result references | The exact prerequisite evidence or blocking path used by the decision |
@@ -1500,7 +1607,7 @@ same outcome is idempotent; conflicting outcomes fail explicitly.
 Evaluate the next Work with pure `planNext`, then pack it into the earliest
 compatible group in this candidate, or open a group if the request/run/native
 dispatch limits permit. Only then apply its Claim, charge, and pass transitions.
-Compatibility includes approved profile, immutable ref revision, batch trust
+Compatibility includes approved profile, resolved immutable revision and execution contract, batch trust
 domain, credential/data/effect scope, serialized assignment byte limit, and
 maximum Claims per dispatch. Group membership and local handles become immutable
 in the Claim commit.
@@ -2051,7 +2158,8 @@ One authority does not require reparsing the whole ledger for every decision.
 The publisher MAY keep disposable in-memory projections, request indexes,
 ready-frontier queues, reverse dependency indexes, and class/key selection
 indexes. Bind each projection to the queue/repository identity, protocol version,
-validated Git blob/branch version, causal tip, and policy epoch. It is usable only
+validated Git blob/branch version, causal tip, scheduling epoch, configuration
+revision, and deployment-resolution evidence. It is usable only
 if derived from a fully validated prefix.
 
 On refresh, validate that the new chain extends that prefix and replay every
@@ -2125,7 +2233,8 @@ would exceed the remaining budget, and keep bounded reconciliation/closure
 available. A reserve is not an unlimited guarantee against external outages or
 storage exhaustion. Report inability to append recovery evidence explicitly,
 never truncate unique history, ignore old idempotency keys, or release slots to
-make space. A drained queue can install a deliberately larger capacity policy;
+make space. An authorized prospective Policy revision can increase capacity
+within implementation ceilings without draining;
 otherwise it remains read/recovery-only. Version 1 makes no indefinite
 retained-history operating promise.
 
@@ -2271,7 +2380,8 @@ fault. Otherwise diagnose the non-transient error and publish WorkCancellation
 for unrecoverable Work, including on attempt exhaustion. Admit corrected Work as
 new immutable nodes with ordinary positions/charges; do not edit the original
 payload or create a new accounting key. Changes to approved routing/trust
-scope require the drained Policy transition, not a recovery override.
+scope require an explicit prospective Policy revision, not a recovery override;
+pending Work remains bounded by its admitted authority ceiling.
 
 ```mermaid
 flowchart TD
@@ -2310,15 +2420,18 @@ Work definitions, revision-qualified node keys, and bounded diagnostic payload
 metadata. For example, graph `campaign-x` can contain `r1/prepare`,
 `r1/analyze`, and later `r2/analyze`. Keep the same authorized pool/accounting
 identity and existing service debt; a revision label is not a new entitlement.
-Pin each node's execution plan/ref at admission and obey the existing graph,
-byte, and batch-compatibility limits.
+Pin each node's plan, execution contract, and authority ceiling at admission.
+Leave its deployment revision unpinned by default, or explicitly pin it when
+required, and obey the existing graph, byte, and batch-compatibility limits.
 
 **Default: let existing Claims finish their admitted revision.** Updating the
 dispatcher or campaign source does not update their payloads, append members
 to their assignments, or redirect their outputs to new-revision nodes. New
 revision nodes get new identities and FIFO positions and compete through
-normal scheduling. A revised worker/workflow ref outside the current approved
-Policy requires a drained Policy change before admission or launch.
+normal scheduling. A workflow revision from the approved deployment source can
+serve new compatible Claims without draining. Changing that source or the
+approved workflow identity requires an administrator-authorized prospective
+Policy revision; it does not invalidate older Claims.
 
 If old pending work is obsolete, an authorized operator must make that
 disposition explicit; trusted producers admit the new nodes:
@@ -2355,20 +2468,21 @@ cannot acquire a cross-graph Work edge: admit its own roots and follow the
 existing input-resolution contract. Missing/incompatible old artifacts remain
 explicit input errors.
 
-For a **strict cutover**, pause admission and grants before admitting/granting
-new-revision execution. Quiesce old producers and delivery of their uncommitted
-intents, explicitly dispose of obsolete nonterminal Work, and reconcile every
-old possibly launched group to definitive nonlaunch or exact native termination.
-Settle old completed-node delivery barriers, apply a drained Policy change if
-required, then resume admission for checked new nodes while retaining the grant
-pause until the update is complete. Keep grants paused through bounded
-multi-commit updates when operation limits prevent one transaction. A pause
-alone is not a fence for already-started launches; unresolved groups make strict
-cutover pending, not complete. Revision does not roll back effects already
-delivered.
+For an optional **strict cutover**, fence affected admission/grants before
+admitting/granting incompatible new-revision execution. Quiesce affected old
+producers and delivery of their uncommitted intents, explicitly dispose of
+obsolete nonterminal Work, and reconcile affected possibly launched groups to
+definitive nonlaunch or exact native termination. Settle their completed-node
+delivery barriers, publish any prospective Policy revision, and resume checked
+new nodes. Keep the fence through bounded multi-commit updates. The existing
+queue-wide pause Controls are a conservative fallback, not proof of a scoped
+fence or a requirement for every workflow revision. A pause alone is not a fence
+for already-started launches; unresolved groups make strict cutover pending,
+not complete. Revision does not roll back effects already delivered.
 
-Any required Policy change needs **queue-wide** quiescence under section 7.10;
-draining only the revised campaign is insufficient.
+Only a separate scheduling transformation requiring a new epoch needs
+queue-wide quiescence under section 7.10. Routine deployment changes do not;
+unrelated Work and pools remain eligible during a proven scoped cutover.
 
 Overlapping revisions are safe only when their domain-specific resource/effect
 contracts permit it. Queue ownership does not serialize all writes to a shared
@@ -2378,9 +2492,10 @@ Different identities for a routine revision must not misuse `replacement_of`,
 which is reserved for the delivery-failure remediation contract.
 
 **Operator-visible outcome:** explain/trace distinguishes each revision's graph/
-node and immutable ref, surviving old Results, explicit cancellations, new
+node, logical workflow, input contract, optional pin, resolved dispatch SHA,
+configuration provenance, surviving old Results, explicit cancellations, new
 positions, and pending cutover reservations/barriers. These facts are recorded
-by Work/lifecycle/Control operations in the same log; there is no authoritative
+by Policy/Work/lifecycle/Control operations in the same log; there is no authoritative
 active-revision pointer in a separate campaign file.
 
 ## 8. Validation and evaluation plan
@@ -2472,7 +2587,7 @@ and runtime/host/deployment limitations remain explicit in the record.
 | Competing dispatchers | Only one same-version proposal commits; loser refreshes and changes selection as required |
 | Uncertain push result | A committed request identity is found and returned once; no second charge |
 | Writer enforcement | Old writer, explicit unscheduled Claim, and administrative grant-bypass paths fail for every queue |
-| Capacity | Logical open-Claim and native dispatch reservations independently remain within their limits; partial finish does not free a live worker slot |
+| Capacity | New Claims/native reservations respect current limits; lowering a limit preserves and diagnoses existing over-limit occupancy while blocking new grants; partial finish does not free a live worker slot |
 | Recovery | Definitive no-launch/terminal evidence releases exactly once; uncertain launch and still-running lease expiry do not |
 | Launch fencing/binding | Persist start marker before POST, do not blindly retry uncertain POSTs, bind actual worker run, and reject effects without a matching trusted binding |
 | Launch recovery | Lost HTTP-200 run details can be recovered by authenticated worker activation; duplicate/conflicting runs and unsupported response shapes retain capacity |
@@ -2482,12 +2597,17 @@ and runtime/host/deployment limitations remain explicit in the record.
 | Commit replay | Replaying each causal predecessor/operation prefix reconstructs the selection and explanation; forks/missing parents/invalid Claim choices fail |
 | Compaction | Permuting/deduplicating complete commit records preserves projection, request results, and future selections |
 | Backend gating | Any backend lacking scheduler serialization is rejected for queue operation; no advisory/unscheduled-FIFO fallback |
-| Policy epochs | Reject changes while nonterminal Work/reservations or unresolved delivery barriers exist; drained epoch transition resets derived ticks explicitly and preserves old history |
+| Policy revisions and scheduling epochs | Deployment/admission/capacity revisions preserve epoch, scales and debt; old Claims remain effective under frozen authority; unsupported live weight/mode transformations require a separate drained epoch |
 | Operational controls | Pause/resume and equivalent-scope credential rotation work on a non-drained queue without resetting debt, freeing slots, or blocking trusted closure/recovery |
 | Platform outage recovery | Lost publication/dispatch responses resolve by request identity and trusted native evidence; unavailable APIs retain reservations and block unverified effects |
 | Accidental run cancellation | Dispatcher cancellation is not worker termination; worker-terminal recovery preserves completed siblings, cancels only open Claims, and rejects rerun authority |
 | Agent fault classification | Transient failures back off within a finite budget; deterministic errors/exhaustion require repair or explicit WorkCancellation; completed members never replay effects |
-| In-flight campaign revision | Stored plans/assignments and old edges remain immutable; new nodes preserve accounting scope, and strict cutover waits for old native and delivery evidence |
+| In-flight campaign revision | Stored plans/assignments and old edges remain immutable; new nodes preserve accounting scope, and optional scoped cutover waits for affected native and delivery evidence |
+| Rolling workflow deployment | With pending Work, a bound old Claim and pending delivery, publish a new compatible deployment: new dispatches use its SHA, old execution/recovery uses the old SHA/contract, unrelated Work proceeds, and no drain or debt reset occurs |
+| Deployment resolution race | A moving ref after reservation cannot redirect launch; a CAS loser refreshes deployment evidence, and lost publication responses recover the identical frozen reservation |
+| Local evolution failure | Missing/unverified/incompatible deployments block only affected Work with explicit reasons; pinned Work never silently follows a new SHA, and unsupported inputs never invalidate the graph |
+| Revision authority and packing | Agent-chosen refs or unsupported contracts cannot grant authority; compatible deployment cannot expand admitted scope, and batches cannot mix different resolved SHAs/contracts |
+| Evolution replay and compaction | Replay/checkpoint preserves configuration history and frozen authority without consulting moving refs; older Claims finish and recover after newer configuration is installed |
 | Late binding | If snapshot predicts A but trusted processing selects B, launch B with B's stored plan/profile; never carry A's inputs forward |
 | Agentic intent status | Staging creates no Claim or launch; snapshot/staged/durable/granted/bound states are distinguishable |
 | Batch idempotency | Replaying one committed batch returns the same Claims and handles launches conservatively; different request parameters with the same ID fail |
@@ -2714,6 +2834,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 
 | Requirement | Implementation/evidence status |
 |---|---|
+| Rolling workflow evolution and prospective Policy revisions | **Specified 2026-10-09; not implemented or verified.** The current TypeSpec/JSON contracts, Go/JavaScript replay, compiler/provisioning, dispatch/evidence/Claim authorization, indexes/checkpoints, diagnostics and formal models still assume SHA-pinned profiles and drain-only Policy replacement. Update these surfaces together for trusted deployment resolution, immutable Work contracts/optional pins, retained dispatch authority and debt-preserving configuration revisions. Add the rolling/race/local-blocking/compaction acceptance cases above; earlier conformance and model results do not establish these semantics |
 | Git-authoritative backing Issue mirrors | Implemented in existing activation/conclusion hooks with installed projector rules, original run/Claim scope, immutable lossless bindings and comment handles, checked expected-head publication, per-Work/Issue coordination, repository status labels and summary status, mandatory generated-by templates, and conservative partial/ambiguous recovery. Local authenticated mocks cover concurrency, reruns, shared queues, staged behavior, drift repair and total request budgets; Go/JavaScript binding parity passes. No live intended-token Issue writes or hosted workflow runs are claimed |
 | Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented. An earlier combined-source local capture passed 286 independent cases with 136 dependency hashes unchanged during that capture. Safe-output changes invalidate its claim to match the current source; regenerate the capture before using it as current release evidence. Typed Go canonicalization rejects invalid Unicode before JSON encoding repairs it; checked operation-construction errors propagate through CLI and delivery consumers. Conformance does not prove arbitrary runtime/host refinement |
 | Exact fairness, FIFO defaults, deterministic fair-prefix packing and CAS recovery | Implemented in both engines, with exact integer passes, causal FIFO positions, literal shared expectations and mocked CAS/ambiguous-acknowledgment regressions. Charges are durable Claims, not CPU time or successful completions. Live Git/network contention remains unverified |
