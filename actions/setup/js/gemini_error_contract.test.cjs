@@ -51,7 +51,7 @@ describe("Gemini diagnostic history is not terminal failure", () => {
     const projected = projectSessionResult(parsed.logEntries);
     const diagnostics = parsed.logEntries.filter(event => event.type === "session.result" && event.data.errors?.length);
 
-    expect(parsed.logEntries.filter(event => event.type === "gemini.error")).toHaveLength(records.length - Number(terminal));
+    expect(parsed.logEntries.filter(event => event.type === "session.error")).toHaveLength(records.length - Number(terminal));
     expect(diagnostics.map(event => event.timestamp)).toEqual(diagnosticTimestamps);
     expect(selected.errors).toEqual(errors);
     expect(projected.errors).toEqual(errors);

@@ -1,6 +1,7 @@
 // @ts-check
 
-const { createSessionEvent, isSessionEvent, normalizeAgentSession, normalizeSessionUsage, isTokenCount, isMetric, sessionToolSuccess } = require("./agent_session.cjs");
+const { createSessionEvent, isSessionEvent, normalizeSessionUsage, isTokenCount, isMetric, sessionToolSuccess } = require("./agent_session.cjs");
+const { getMessageRefusal } = require("./provider_refusal.cjs");
 
 /** @typedef {{event: import("./types/agent_session").SessionEvent, observations: Array<any>}} GeminiFragment */
 /** @typedef {GeminiFragment & {signature: string}} GeminiDelta */
@@ -31,21 +32,28 @@ function toolSuccess(source) {
 function geminiUsage(source) {
   const usage = { ...normalizeSessionUsage(source.usage) };
   const stats = source.stats;
-  const aliases = { input_tokens: "inputTokens", output_tokens: "outputTokens", cache_creation_input_tokens: "cacheCreationInputTokens", cache_read_input_tokens: "cacheReadInputTokens" };
+  const aliases = {
+    input_tokens: "inputTokens",
+    output_tokens: "outputTokens",
+    reasoning_output_tokens: "reasoningOutputTokens",
+    cache_creation_input_tokens: "cacheCreationInputTokens",
+    cache_read_input_tokens: "cacheReadInputTokens",
+    total_tokens: "totalTokens",
+  };
   for (const [key, alias] of Object.entries(aliases)) {
     if (source.usage && Object.hasOwn(source.usage, key) && !isTokenCount(source.usage[key])) delete usage[alias];
   }
   const mapCount = (key, value) => {
+    if (aliases[key]) delete usage[aliases[key]];
     if (isTokenCount(value)) {
       usage[key] = value;
       if (Array.isArray(usage.overflowed_tokens)) usage.overflowed_tokens = usage.overflowed_tokens.filter(field => field !== key);
     } else {
       delete usage[key];
-      if (aliases[key]) delete usage[aliases[key]];
     }
   };
   if (stats && typeof stats === "object" && !Array.isArray(stats)) {
-    for (const key of ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "total_tokens"]) {
+    for (const key of Object.keys(aliases)) {
       if (!Object.hasOwn(stats, key)) continue;
       mapCount(key, stats[key]);
     }
@@ -74,28 +82,31 @@ function normalizeGeminiSession(records) {
   const tools = new Map();
   /** @type {Map<string, GeminiMessage>} */
   const messages = new Map();
+  const emptyMessages = new Map();
   let session = 0;
   let sessionId;
   /** @type {GeminiDelta|undefined} */
   let previousDelta;
-  let snapshotEmitted = false;
+  /** @type {Array<any>} */
+  let retiredObservations = [];
   const correlationKey = (source, id) => JSON.stringify([session, supplied(source, ["sessionId", "session_id"], supplied(source.data ?? {}, ["sessionId", "session_id"], sessionId)), source.parent_tool_use_id, id]);
+  const messageRole = source => (source.type === "message" ? source.role : source.type);
   const messageScope = source => {
     const id = supplied(source, ["messageId", "message_id"], source.message?.id);
     return id === undefined ? undefined : JSON.stringify([correlationKey(source, id), source.channel, source.type === "user" || source.role === "user"]);
   };
   const messageKey = (scope, role, position) => JSON.stringify([scope, role, position]);
   const emit = (source, type, data) => {
-    const event = createSessionEvent(source, type, { ...sourceFields(source), ...data });
+    const event = createSessionEvent(source, type, { ...sourceFields(source), ...data, ...(retiredObservations.length ? { observations: [...retiredObservations, structuredClone(source)] } : {}) });
+    retiredObservations = [];
     events.push(event);
     return event;
   };
   /** @param {GeminiMessage} message */
   const retireMessage = message => {
-    // Exact native envelopes survive even when adjacent deltas were coalesced.
     for (const fragment of message.fragments) {
-      fragment.event.type = "gemini.message_observation";
-      fragment.event.data = { ...fragment.event.data, observations: fragment.observations };
+      retiredObservations.push(...fragment.observations);
+      events.splice(events.indexOf(fragment.event), 1);
     }
     message.fragments = [];
   };
@@ -103,15 +114,11 @@ function normalizeGeminiSession(records) {
     const scope = messageScope(source);
     if (scope === undefined || source.delta === true) return;
     const observed = [...messages].filter(([, message]) => message.scope === scope);
-    if (!content.length) {
-      emit(source, "gemini.message_snapshot", sourceFields(source));
-      snapshotEmitted = true;
-    }
     if (!observed.length) return;
     /** @type {Map<string, {text: string, position: number}>} */
     const suppliedBlocks = new Map();
     for (const [position, block] of content.entries()) {
-      if (block?.type === "text" && typeof block.text === "string") suppliedBlocks.set(messageKey(scope, source.type === "user" || source.role === "user" ? "user" : "assistant", position), { text: block.text, position });
+      if (block?.type === "text" && typeof block.text === "string") suppliedBlocks.set(messageKey(scope, messageRole(source), position), { text: block.text, position });
       else if (block?.type === "thinking" && typeof block.thinking === "string") suppliedBlocks.set(messageKey(scope, "reasoning", position), { text: block.thinking, position });
     }
     const lastPosition = observed.reduce((last, [, message]) => Math.max(last, message.position), -Infinity);
@@ -121,8 +128,6 @@ function normalizeGeminiSession(records) {
         return !block || !block.text.startsWith(message.text) || (block.text !== message.text && block.position < lastPosition);
       }) || [...suppliedBlocks].some(([key, block]) => !messages.has(key) && block.position < lastPosition);
     if (!divergent) return;
-    if (!snapshotEmitted) emit(source, "gemini.message_snapshot", sourceFields(source));
-    snapshotEmitted = true;
     // A full array's rewrite, removal, or insertion before a sibling replaces
     // the whole visible message, so unchanged siblings keep their source order.
     for (const [key, message] of observed) {
@@ -140,29 +145,41 @@ function normalizeGeminiSession(records) {
       }
       errors.push(Object.keys(diagnostic).length ? diagnostic : sourceFields(source));
     }
-    return emit(source, "session.result", { errors, permissionDenials: supplied(source, ["permissionDenials", "permission_denials"]) });
+    return emit(source, "session.result", { sourceType: source.type, errors, permissionDenials: supplied(source, ["permissionDenials", "permission_denials"]) });
   };
   /**
    * @param {any} source
-   * @param {"user"|"assistant"|"reasoning"} role
+   * @param {"user"|"assistant"|"reasoning"|"refusal"} role
    * @param {string} text
    * @param {Record<string, any>} [fields]
    * @param {number} [position]
    * @param {GeminiDelta} [lastDelta]
    */
   const emitMessage = (source, role, text, fields = {}, position = 0, lastDelta = undefined) => {
-    const type = role === "user" ? "user.message" : role === "reasoning" ? "assistant.reasoning" : "assistant.message";
+    const type = role === "user" ? "user.message" : role === "reasoning" ? "assistant.reasoning" : role === "refusal" ? "assistant.refusal" : "assistant.message";
     // Flat stream-json has no message identity. Only an explicit message ID
     // establishes that a later full message covers previously observed deltas.
     const scope = messageScope(source);
+    const emptyKey = scope === undefined ? undefined : messageKey(scope, role, -1);
+    const empty = emptyKey === undefined ? undefined : emptyMessages.get(emptyKey);
+    if (empty) {
+      retiredObservations.push(...empty.data.observations);
+      events.splice(events.indexOf(empty), 1);
+      emptyMessages.delete(emptyKey);
+    }
     const key = scope === undefined ? undefined : messageKey(scope, role, position);
     const observed = key === undefined ? undefined : messages.get(key);
     if (source.delta !== true && observed !== undefined) {
-      if (!snapshotEmitted) emit(source, "gemini.message_snapshot", sourceFields(source));
-      snapshotEmitted = true;
-      if (text === observed.text) return;
+      if (text === observed.text) {
+        const fragment = observed.fragments.at(-1);
+        if (fragment) {
+          fragment.observations.push(structuredClone(source));
+          fragment.event.data.observations = structuredClone(fragment.observations);
+        }
+        return;
+      }
       if (text.startsWith(observed.text)) {
-        const event = emit(source, type, { ...fields, content: text.slice(observed.text.length) });
+        const event = emit(source, type, { ...fields, content: text.slice(observed.text.length), delta: true, observations: [structuredClone(source)] });
         observed.fragments.push({ event, observations: [structuredClone(source)] });
         observed.text = text;
         return;
@@ -179,10 +196,11 @@ function normalizeGeminiSession(records) {
     if (source.delta === true && lastDelta?.signature === signature && lastDelta.event.type === type && typeof lastDelta.event.data.content === "string") {
       lastDelta.event.data.content += text;
       lastDelta.observations.push(structuredClone(source));
+      lastDelta.event.data.observations = structuredClone(lastDelta.observations);
       previousDelta = lastDelta;
     } else {
       const event = emit(source, type, { ...fields, content: text });
-      const fragment = { event, observations: [structuredClone(source)] };
+      const fragment = { event, observations: event.data.observations ?? [structuredClone(source)] };
       if (key !== undefined) message.fragments.push(fragment);
       if (source.delta === true) previousDelta = { signature, ...fragment };
     }
@@ -190,9 +208,9 @@ function normalizeGeminiSession(records) {
   const emitBlock = (source, block, position) => {
     if (!block || typeof block !== "object" || Array.isArray(block)) return;
     if (block.type === "text" && typeof block.text === "string") {
-      emitMessage(source, source.type === "user" || source.role === "user" ? "user" : "assistant", block.text, block, position);
+      emitMessage(source, messageRole(source), block.text, { ...block, contentIndex: position }, position);
     } else if (block.type === "thinking" && typeof block.thinking === "string") {
-      emitMessage(source, "reasoning", block.thinking, block, position);
+      emitMessage(source, "reasoning", block.thinking, { ...block, contentIndex: position }, position);
     } else if (block.type === "tool_use") {
       const event = emit(source, "tool.execution_start", { ...block, toolCallId: block.id, toolName: block.name, input: block.input });
       if (block.id !== undefined) tools.set(correlationKey(source, block.id), event.data);
@@ -216,10 +234,11 @@ function normalizeGeminiSession(records) {
   for (const record of records) {
     const lastDelta = previousDelta;
     previousDelta = undefined;
-    snapshotEmitted = false;
+    retiredObservations = [];
     if (!record || typeof record !== "object" || Array.isArray(record)) continue;
     if (isSessionEvent(record)) {
-      const event = structuredClone(record);
+      const refusal = record.type === "assistant.message" ? getMessageRefusal(record.data) : undefined;
+      const event = refusal ? createSessionEvent(record, "assistant.refusal", refusal) : structuredClone(record);
       events.push(event);
       if (event.type === "session.init" || event.type === "session.start") {
         session++;
@@ -243,16 +262,51 @@ function normalizeGeminiSession(records) {
         modelInfo: supplied(record, ["modelInfo", "model_info"]),
       });
     } else if (["message", "assistant", "user", "reasoning"].includes(record.type)) {
-      const role = record.type === "message" ? record.role : record.type;
+      const role = messageRole(record);
       if (!["assistant", "user", "reasoning"].includes(role)) continue;
       if (role !== "user" && (record.error != null || record.is_error === true || record.isError === true || ["error", "failed"].includes(record.status))) {
-        emit(record, "gemini.message_error", sourceFields(record));
+        emit(record, "session.error", { sourceType: record.type });
         reportError(record);
         continue;
       }
       const content = record.message === undefined ? record.content : typeof record.message === "string" ? record.message : record.message?.content;
+      const refusal = role === "assistant" ? getMessageRefusal(record.message && typeof record.message === "object" ? record.message : record) : undefined;
+      if (refusal) {
+        const fields = { ...(content === null ? { content } : {}), ...refusal, ...(record.delta === true && !Object.hasOwn(record, "partial") ? { partial: true } : {}) };
+        const emitRefusal = position => {
+          if (typeof refusal.content === "string") emitMessage(record, "refusal", refusal.content, fields, position, lastDelta);
+          else emit(record, "assistant.refusal", fields);
+        };
+        if (Array.isArray(content)) {
+          let emitted = false;
+          for (const [position, block] of content.entries()) {
+            if (block?.type === "text" || block?.type === "refusal") {
+              if (!emitted) emitRefusal(position);
+              emitted = true;
+            } else emitBlock(record, block, position);
+          }
+          if (!emitted) emitRefusal(0);
+        } else emitRefusal(0);
+        continue;
+      }
       if (Array.isArray(content)) {
+        const scope = messageScope(record);
+        const emptyKey = scope === undefined ? undefined : messageKey(scope, role, -1);
+        const empty = emptyKey === undefined ? undefined : emptyMessages.get(emptyKey);
+        if (empty && !content.length) {
+          empty.data.observations = [...(empty.data.observations ?? []), structuredClone(record)];
+          continue;
+        }
+        if (empty) {
+          retiredObservations.push(...(empty.data.observations ?? []));
+          events.splice(events.indexOf(empty), 1);
+          emptyMessages.delete(emptyKey);
+        }
         reconcileContentBlocks(record, content);
+        if (!content.length) {
+          const event = emit(record, role === "user" ? "user.message" : role === "reasoning" ? "assistant.reasoning" : "assistant.message", { content, observations: [structuredClone(record)] });
+          if (emptyKey !== undefined) emptyMessages.set(emptyKey, event);
+        }
         for (const [position, block] of content.entries()) emitBlock(record, block, position);
         continue;
       }
@@ -285,6 +339,7 @@ function normalizeGeminiSession(records) {
       const metric = keys => (keys.some(key => Object.hasOwn(record.stats ?? {}, key)) ? supplied(record.stats, keys) : supplied(record, keys));
       const errors = Array.isArray(record.errors) ? [...record.errors] : undefined;
       const event = emit(record, "session.result", {
+        sourceType: supplied(record, ["sourceType"], record.type),
         numTurns: isTokenCount(metric(["numTurns", "turns", "num_turns"])) ? metric(["numTurns", "turns", "num_turns"]) : undefined,
         durationMs: isMetric(metric(["durationMs", "duration_ms"])) ? metric(["durationMs", "duration_ms"]) : undefined,
         totalCostUsd: isMetric(metric(["totalCostUsd", "total_cost_usd"])) ? metric(["totalCostUsd", "total_cost_usd"]) : undefined,
@@ -300,12 +355,16 @@ function normalizeGeminiSession(records) {
         event.data.errors = [diagnostic];
       }
     } else if (record.type === "error" && (Object.hasOwn(record, "error") || typeof record.message === "string")) {
-      emit(record, "gemini.error", sourceFields(record));
-      if (record.severity !== "warning") reportError(record);
+      emit(record, "session.error", { sourceType: record.type });
+      if (!["warning", "info"].includes(record.severity)) reportError(record);
     } else if (record.type === "system" && record.subtype) {
-      emit(record, "gemini.system", sourceFields(record));
-      if (record.error != null) reportError(record);
-      else for (const mapped of normalizeAgentSession([record], { sourceEngine: "gemini" })) emit(record, mapped.type, mapped.data);
+      if (record.error != null) {
+        emit(record, "session.error", { sourceType: record.type });
+        reportError(record);
+      } else {
+        const content = typeof record.message === "string" ? record.message : record.message?.content;
+        emit(record, "session.info", { sourceType: record.type, ...(content !== undefined ? { content } : {}) });
+      }
     }
   }
   return events;

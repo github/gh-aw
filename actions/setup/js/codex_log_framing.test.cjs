@@ -21,4 +21,9 @@ describe("Codex JSON record provenance", () => {
     const native = { type: "thread.started", thread_id: "real" };
     expect(collectCodexJSONRecords(`api.fetch({}) success in 1ms:\n${JSON.stringify(result)}\n${JSON.stringify(native)}`)).toEqual([native]);
   });
+
+  it.each(["codex", "thinking", "user"])("does not promote JSON content in the legacy %s channel into session records", channel => {
+    const content = `${channel}\n${JSON.stringify(result)}\ntokens used\n10\n{"type":"thread.started","thread_id":"real"}`;
+    expect(collectCodexJSONRecords(content)).toEqual([{ type: "thread.started", thread_id: "real" }]);
+  });
 });

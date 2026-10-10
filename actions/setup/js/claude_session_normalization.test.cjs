@@ -21,7 +21,7 @@ describe("Claude normalization from sampled runs", () => {
       sessionId: "normalization-session",
       parentToolUseId: null,
     });
-    expect(events.find(event => event.type === "session.result").data).toMatchObject({
+    expect(events.find(event => event.type === "session.result" && event.data.sourceType === "result").data).toMatchObject({
       status: "success",
       sourceType: "result",
       usage: { inputTokens: 3, outputTokens: 7, reasoningOutputTokens: 2, cacheReadInputTokens: 11, cacheCreationInputTokens: 5, inputTokensIncludeCache: false },
@@ -34,7 +34,11 @@ describe("Claude normalization from sampled runs", () => {
   it("keeps permission-denial evidence out of assistant answers without synthesizing a tool completion", () => {
     const events = normalizeClaudeSession(normalization);
     expect(events.filter(event => event.type === "assistant.message")).toHaveLength(1);
-    expect(events.find(event => event.type === "claude.system").data).toMatchObject({ subtype: "permission_denied", tool_use_id: "denied-tool", message: "Permission to use Edit has been denied." });
+    expect(events.find(event => event.type === "session.result" && event.data.permissionDenials?.length).data.permissionDenials[0]).toMatchObject({
+      subtype: "permission_denied",
+      tool_use_id: "denied-tool",
+      message: "Permission to use Edit has been denied.",
+    });
     expect(events.filter(event => event.type === "tool.execution_complete" && event.data.toolCallId === "denied-tool")).toHaveLength(1);
     expect(normalizeClaudeSession(normalization.slice(0, 3)).some(event => event.type === "tool.execution_complete")).toBe(false);
     expect(projectSessionResult(events).permission_denials).toHaveLength(1);

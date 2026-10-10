@@ -169,7 +169,8 @@ const EVENT_FIELDS = {
   "tool.execution_complete": {
     ...TOOL_FIELDS,
     success: ["success"],
-    output: ["output", "result"],
+    output: ["output"],
+    result: ["result"],
     error: ["error"],
     durationMs: ["durationMs", "duration_ms"],
     exitCode: ["exitCode", "exit_code"],
