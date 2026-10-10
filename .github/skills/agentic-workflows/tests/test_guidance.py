@@ -91,16 +91,22 @@ class GuidanceTests(unittest.TestCase):
                 self.assertIn("compiled default", text)
 
     def test_routing_and_evidence_links(self):
-        routing = SKILL.joinpath("SKILL.md").read_text()
-        line = next(line for line in routing.splitlines() if ANCHOR in line)
-        for symptom in (
-            "AWF model/endpoint 400s",
-            "silent cross-family sub-agent failures",
-            "model: auto",
-            "install-step 404s",
-            "version fields",
-        ):
-            self.assertIn(symptom, line)
+        # SKILL.md is regenerated from the embedded template by `gh aw init`,
+        # so both must carry the routing line.
+        for path in (SKILL / "SKILL.md", ROOT / "pkg/cli/data/agentic_workflows_skill.md"):
+            with self.subTest(path=path):
+                lines = [line for line in path.read_text().splitlines() if ANCHOR in line]
+                self.assertTrue(lines, f"{path} must route to {ANCHOR}")
+                line = lines[0]
+                self.assertIn(f"(../../aw/debug-agentic-workflow.md{ANCHOR})", line)
+                for symptom in (
+                    "AWF model/endpoint 400s",
+                    "silent cross-family sub-agent failures",
+                    "`model: auto` failures",
+                    "install-step 404s after a version pin",
+                    "version fields",
+                ):
+                    self.assertIn(symptom, line)
         self.assertTrue((SKILL / "../../aw/debug-agentic-workflow.md").resolve().is_file())
         full = GUIDES[0].read_text()
         for section in ("Collect Existing Evidence", "Identify the First Failing Boundary"):
