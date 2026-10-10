@@ -257,3 +257,12 @@ before dispatch; additional user authorization cannot replace the review."
 Keep compile-only results separate from live outcomes. State whether a run was
 dispatched, and never ask the user to perform technical review or bypass a failed
 gate.
+
+For unpublished workflow updates, include the
+[feature-branch/draft-PR testing path](debug-agentic-workflow.md#test-workflow-changes-from-a-branch)
+instead of a refusal alone. The agent owns authorized preparation and review;
+the user authorizes live effects. Explain independent blockers that a branch
+does not resolve, such as shared production queue state or required protections.
+Creating a branch or PR never grants execution permission or bypasses a denial.
+Under the [work-queue protocol](work-queue.md), queue use needs no repository-rule
+inventory. GitHub enforces repository access rules.

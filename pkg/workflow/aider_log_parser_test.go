@@ -31,6 +31,7 @@ const interpretedTestTypes = [...new Set([
   "claude.assistant_error", "claude.api_retry", "turn.failed",
   "claude.stream_event", "claude.assistant_snapshot", "gemini.message_snapshot",
   "pi.message_snapshot", "assistant.message_delta", "assistant.reasoning_delta",
+  "assistant.usage", "assistant.turn_end", "model.call_failure",
   "subagent.opaque", "session.shutdown",
 ])];
 `
@@ -469,6 +470,41 @@ func TestAiderStreamAndSnapshotAttributionAcrossPublication(t *testing.T) {
 			checkAiderSessionPublication(t, content, true, expected, "[]", controls)
 		})
 	}
+}
+
+func TestAiderRuntimeAccountingRequiresAttribution(t *testing.T) {
+	// Synthetic interoperability controls, not observed Aider usage events.
+	source := loadAiderSample(t).Behaviors.LogParser + `
+const assert = require("node:assert/strict");
+const { normalizeCopilotSession } = require("./copilot_session.cjs");
+const start = {type:"session.init", data:{sourceEngine:"aider", model:"openai/native"}};
+const records = [
+  {type:"assistant.usage", data:{apiCallId:"native-call", inputTokens:0, outputTokens:0}},
+  {type:"assistant.turn_end", data:{turnId:"native-turn"}},
+  {type:"model.call_failure", data:{error:{code:429, message:"native failure"}}},
+];
+for (const sourceEngine of [undefined, null, "copilot", "", false, 0]) {
+  const untrusted = records.map(record => ({
+    ...record, data:{...record.data, ...(sourceEngine === undefined ? {} : {sourceEngine})},
+  }));
+  const parsed = parseLog([start, ...untrusted].map(JSON.stringify).join("\n")).logEntries;
+  assert.deepEqual(parsed, [start], "unattributed accounting and error events are not Aider evidence");
+  assert.deepEqual(normalizeCopilotSession(parsed).filter(event => event.type === "session.result"), []);
+}
+const native = [start, ...records.map(record => ({...record, data:{...record.data, sourceEngine:"aider"}}))];
+const parsed = parseLog(native.map(JSON.stringify).join("\n")).logEntries;
+assert.deepEqual(parsed, native, "attributed extension payloads remain exact");
+const results = normalizeCopilotSession(parsed).filter(event => event.type === "session.result");
+assert.ok(results.some(event => event.data.usage?.input_tokens === 0 && event.data.usage?.output_tokens === 0));
+assert.ok(results.some(event => event.data.numTurns === 1));
+assert.ok(results.some(event => event.data.errors?.[0]?.message === "native failure"));
+`
+	actionsDir, err := filepath.Abs("../../actions/setup/js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", source)
+	cmd.Dir = actionsDir
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
 }
 
 func TestAiderInterpretedShellEventsCannotOverrideRunnerEvidence(t *testing.T) {

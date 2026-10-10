@@ -375,17 +375,7 @@ func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) ([]st
 	if !isWorkQueueParticipant(data) || data.WorkQueuePolicy == nil {
 		return nil, nil
 	}
-	names := make([]string, 0)
-	for _, pool := range data.WorkQueuePolicy.Policy.Pools {
-		for _, profile := range pool.Profiles {
-			name := filepath.Base(profile.Workflow)
-			name = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(name, ".lock.yml"), ".yml"), ".yaml")
-			if !slices.Contains(names, name) {
-				names = append(names, name)
-			}
-		}
-	}
-	slices.Sort(names)
+	names := workQueueControlWorkflows(data)
 	config := map[string]any{"work_queue_enabled": true, "work_queue_workflows": names, "aw_context_workflows": names}
 	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
 		config = handlerRegistry["dispatch_workflow"](data.SafeOutputs)
@@ -432,6 +422,27 @@ func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) ([]st
 		"            const config = JSON.parse(process.env.GH_AW_WORK_QUEUE_CONTROL_CONFIG);\n",
 		"            await main({ core, github, context, config, maxDispatches: Number(process.env.GH_AW_WORK_QUEUE_DISPATCH_BUDGET || 1)"+assignmentRequirement+" });\n",
 	), nil
+}
+
+func workQueueControlWorkflows(data *WorkflowData) []string {
+	if data.WorkQueuePolicy.Policy.Authorization == "aw" {
+		if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
+			return slices.Clone(data.SafeOutputs.DispatchWorkflow.Workflows)
+		}
+		return nil
+	}
+	names := make([]string, 0)
+	for _, pool := range data.WorkQueuePolicy.Policy.Pools {
+		for _, profile := range pool.Profiles {
+			name := filepath.Base(profile.Workflow)
+			name = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(name, ".lock.yml"), ".yml"), ".yaml")
+			if !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+		}
+	}
+	slices.Sort(names)
+	return names
 }
 
 // buildSafeOutputsUserProvidedSteps converts the user-provided safe-outputs.steps

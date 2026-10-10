@@ -172,12 +172,11 @@ engine:
                       continue
                   metadata = {}
                   for name in ("id", "model", "created"):
-                      value = field(completion, name)
-                      if value is not None:
-                          metadata["apiCallId" if name == "id" else name] = value
+                      if has_field(completion, name):
+                          metadata["apiCallId" if name == "id" else name] = field(completion, name)
                   metadata["message"] = native_value(message)
                   finish_reason = field(choice, "finish_reason")
-                  if finish_reason is not None:
+                  if has_field(choice, "finish_reason"):
                       metadata["finishReason"] = finish_reason
                   if isinstance(usage, dict):
                       metadata["usage"] = usage
@@ -403,6 +402,7 @@ engine:
           "session.task_complete", "user.message",
           "assistant.message", "assistant.message_delta",
           "assistant.reasoning", "assistant.reasoning_delta", "assistant.refusal",
+          "assistant.usage", "assistant.turn_end", "model.call_failure",
           "tool.execution_start", "tool.execution_update", "tool.execution_complete",
           "session.result", "session.error", "agent.execution",
           "detection.result", "session.format",

@@ -40,7 +40,7 @@ func runAiderSessionCaptureWithMessage(t *testing.T, scenario string, providerMe
     def show_send_output(self, completion):
         if completion.choices:
             self.io.assistant_output("  DISPLAY REASONING + REPLY  ")
-        if completion.choices and completion.choices[0].finish_reason == "length":
+        if completion.choices and getattr(completion.choices[0], "finish_reason", None) == "length":
             raise ValueError("length limit")
 
     def calculate_and_show_tokens_and_cost(self, messages, completion=None):
@@ -111,6 +111,12 @@ def main():
         if scenario == "overflow":
             response_usage = Payload(prompt_tokens=9007199254740991, completion_tokens=0)
         completion = Obj(choices=[Obj(message=message, finish_reason=reason)], usage=response_usage, id="native-response", model="native-model", created=0)
+        if scenario == "null-metadata":
+            completion.id = completion.model = completion.created = None
+            completion.choices[0].finish_reason = None
+        if scenario == "absent-metadata":
+            del completion.id, completion.model, completion.created
+            del completion.choices[0].finish_reason
         coder.show_send_output(completion)
         coder.calculate_and_show_tokens_and_cost([], completion)
     assert base_coder.run_cmd("ok") == (0, "")
@@ -205,6 +211,27 @@ func TestAiderSessionCaptureIOWarningsDoNotCreateProviderObservations(t *testing
 	assert.Equal(t, "completed", data["status"])
 	assert.Equal(t, "process.exit", data["sourceType"])
 	assert.Zero(t, data["exitCode"])
+}
+
+func TestAiderSessionCaptureDistinguishesNullAndAbsentMetadata(t *testing.T) {
+	for _, scenario := range []string{"null-metadata", "absent-metadata"} {
+		t.Run(scenario, func(t *testing.T) {
+			events := runAiderSessionCapture(t, scenario)
+			for _, eventType := range []string{"assistant.message", "assistant.reasoning"} {
+				messages := aiderEventsOfType(events, eventType)
+				require.Len(t, messages, 1)
+				data := messages[0]["data"].(map[string]any)
+				for _, field := range []string{"apiCallId", "model", "created", "finishReason"} {
+					if scenario == "null-metadata" {
+						assert.Contains(t, data, field)
+						assert.Nil(t, data[field])
+					} else {
+						assert.NotContains(t, data, field)
+					}
+				}
+			}
+		})
+	}
 }
 
 func TestAiderSessionCapturePreservesFalsyProviderContent(t *testing.T) {

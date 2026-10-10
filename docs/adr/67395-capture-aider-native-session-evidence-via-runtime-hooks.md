@@ -35,20 +35,20 @@ Leave the Python entrypoint unchanged and do all enrichment in `engine_log_parse
 #### Positive
 
 - Session records now carry provider-truth evidence: unformatted reply text, separate reasoning, structured refusals, length-limited partials and native response/model identifiers.
-- Token and cost accounting is exact and observed rather than estimated, and is published once in a terminal `session.result` with an explicit `process.exit`/exception-derived status.
+- Available token and cost accounting is exact and observed rather than estimated, and is published once in a terminal `session.result`. Status is included only when an integer process return or exception supplies it.
 - Actions-side and CLI-side reconstruction agree because shared dispatch prefers the engine's declared parser; unknown canonical extension events are retained rather than dropped.
 - Historical startup failures (e.g. provider rate limits) that previously produced zero evidence now yield attributable `session.error` diagnostics.
 
 #### Negative
 
 - The adapter is now coupled to private-ish Aider internals (`Coder.show_send_output`, `Coder.calculate_and_show_tokens_and_cost`, `coder.usage_report`, `coder.total_cost`). An upstream refactor in a future Aider release can silently degrade capture, so the engine version pin (`aider 0.86.2`) becomes load-bearing.
-- The inline Python entrypoint grew substantially (~200 added lines embedded in `.github/workflows/shared/aider.md` and replicated into five generated `.lock.yml` files), which is harder to read, lint and unit-test than ordinary Go/JS source.
+- The inline Python entrypoint grew substantially (~200 added lines embedded in `.github/workflows/shared/aider.md` and replicated into four generated `.lock.yml` files), which is harder to read, lint and unit-test than ordinary Go/JS source.
 - Capture is only validated for the pinned non-streaming profile (`--no-stream`); streaming responses are outside response-hook coverage.
 - The historical-log recovery path is heuristic (banner + `Repo-map:` preamble + `litellm.*Error` framing) and will not generalise to arbitrary unframed failure text.
 
 #### Neutral
 
-- Evidence for reasoning, refusal, partial replies and edge values (empty/null/false/zero) is synthetic in `pkg/workflow/aider_session_capture_test.go`; only smoke-success and downstream-failure paths are backed by sampled real runs under `pkg/workflow/testdata/aider_session/`.
+- Evidence for reasoning, refusal, partial replies and edge values (empty/null/false/zero) is synthetic in `pkg/workflow/aider_session_capture_test.go`; smoke-success, downstream-failure and historical startup diagnostics are backed by sampled real runs under `pkg/workflow/testdata/aider_session/`.
 - Turn counting moves from the display callback to the completion hook, so `numTurns` now reflects provider responses rather than rendered messages — comparable in practice but not byte-identical to prior runs.
 - All Aider-consuming workflows must be recompiled (`make recompile`) whenever the shared adapter changes, since the entrypoint is inlined into each lock file.
 - The shared-dispatcher change is deliberately kept as a separate commit from the Aider-owned changes to keep the engine-agnostic prerequisite reviewable on its own.
