@@ -174,11 +174,67 @@ describe("getFailedNonBuiltinJobs", () => {
         ],
       },
     });
+
     await main();
     expect(global.github.rest.issues.create).toHaveBeenCalledWith(
       expect.objectContaining({ title: "[aw] Failed jobs: Smoke Gemini", body: expect.stringContaining("- [`Build project`](https://github.com/owner/repo/actions/runs/123/jobs/789)") })
     );
     expect(global.github.rest.issues.create.mock.calls[0][0].body).not.toContain("https://github.com/owner/repo/actions/runs/123/jobs/456");
+  });
+
+  it.each(["push_repo_memory", "push_ledger_changes", "push_evals_state"])("includes persistent git error text in the %s failure issue", async jobId => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ [jobId]: { result: "failure" } }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
+      data: { jobs: [{ id: 789, name: jobId, conclusion: "failure", html_url: "https://github.com/owner/repo/actions/runs/123/job/789" }] },
+    });
+    global.github.rest.actions.downloadJobLogsForWorkflowRun = vi.fn().mockResolvedValue({
+      data: "2026-10-10T00:00:00Z ordinary log output\n2026-10-10T00:00:01Z remote: error: GH013: Repository rule violations\n2026-10-10T00:00:02Z ##[error]Failed to push changes after 11 attempts: non-fast-forward",
+    });
+    await main();
+    const body = global.github.rest.issues.create.mock.calls[0][0].body;
+    expect(body).toContain("GH013: Repository rule violations");
+    expect(body).toContain("non-fast-forward");
+    expect(body).not.toContain("ordinary log output");
+    expect(global.github.rest.actions.downloadJobLogsForWorkflowRun).toHaveBeenCalledWith({ owner: "owner", repo: "repo", job_id: 789 });
+  });
+
+  it("still reports a state-push failure when its job log is unavailable", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ push_repo_memory: { result: "failure" } }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
+      data: { jobs: [{ id: 789, name: "push_repo_memory", conclusion: "failure", html_url: "https://github.com/owner/repo/actions/runs/123/job/789" }] },
+    });
+    global.github.rest.actions.downloadJobLogsForWorkflowRun = vi.fn().mockRejectedValue(new Error("403"));
+    await main();
+    expect(global.github.rest.issues.create).toHaveBeenCalled();
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not retrieve error details"));
+  });
+
+  it.each(["buffer", "uint8array", "arraybuffer"])("redacts credentials and neutralizes Markdown from plain-text job logs returned as %s", async format => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ push_evals_state: { result: "failure" } }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
+      data: { jobs: [{ id: 789, name: "push_evals_state", conclusion: "failure", html_url: null }] },
+    });
+    const credential = ["user", "password"].join(":");
+    const bytes = Buffer.from(`fatal: non-fast-forward https://${credential}@example.com/repo Authorization: ${["Basic", "encoded-value"].join(" ")} \`\`\` <!-- @someone -->`);
+    const data = format === "buffer" ? bytes : format === "uint8array" ? new Uint8Array(bytes) : new Uint8Array(bytes).buffer;
+    global.github.rest.actions.downloadJobLogsForWorkflowRun = vi.fn().mockResolvedValue({ data });
+    await main();
+    const body = global.github.rest.issues.create.mock.calls[0][0].body;
+    expect(body).toContain("non-fast-forward");
+    expect(body).not.toMatch(/password|encoded-value|<!-- @someone -->/);
+    expect((body.match(/```/g) || []).length).toBe(2);
+  });
+
+  it("warns and preserves the failure issue when the log response is not text or bytes", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ push_evals_state: { result: "failure" } }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
+      data: { jobs: [{ id: 789, name: "push_evals_state", conclusion: "failure", html_url: null }] },
+    });
+    global.github.rest.actions.downloadJobLogsForWorkflowRun = vi.fn().mockResolvedValue({ data: { message: "not a job log" } });
+    await main();
+    expect(global.github.rest.issues.create).toHaveBeenCalled();
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not retrieve error details"));
+    expect(global.github.rest.issues.create.mock.calls[0][0].body).not.toContain("not a job log");
   });
 
   it.each(["", "invalid JSON", "null", "[]"])("rejects invalid job result metadata %j rather than falling back to name-based filtering", async metadata => {

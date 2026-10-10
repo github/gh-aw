@@ -13,7 +13,27 @@ const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { backfillCommitObjects } = require("./git_helpers.cjs");
 const { overridePersistedExtraheader, restorePersistedExtraheader } = require("./git_auth_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { redactSecrets, redactBuiltInPatterns } = require("./redact_secrets.cjs");
 const ERROR_CODE_PREFIX_RE = /^(?:ERR_[A-Z_]+|E\d{3}):\s*/;
+
+/**
+ * Capture Git output instead of writing it directly to process streams, where
+ * Actions secret masking is bypassed.
+ * @param {string[]} args
+ * @param {Record<string, any>} [options]
+ */
+function getGitExecOutput(args, options = {}) {
+  return exec.getExecOutput("git", args, { ...options, silent: true });
+}
+
+/**
+ * @param {string[]} args
+ * @param {Record<string, any>} [options]
+ */
+function execGitCommand(args, options = {}) {
+  return exec.exec("git", args, { ...options, silent: true });
+}
+
 /**
  * Strip the single leading `ERR_*: ` or `E001: ` sentinel from a message.
  * Each sentinel error in this file carries exactly one such prefix, so one
@@ -169,7 +189,7 @@ function unquoteCPath(s) {
 async function readBlobAsBase64(blobHash, cwd) {
   /** @type {Buffer[]} */
   const chunks = [];
-  await exec.exec("git", ["cat-file", "blob", blobHash], {
+  await execGitCommand(["cat-file", "blob", blobHash], {
     cwd,
     silent: true,
     listeners: {
@@ -233,7 +253,7 @@ function maybeReplaceTemporaryIdsInBase64Content(base64Content, temporaryIdMap, 
  */
 async function lsRemoteHeadOid(branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken) {
   const remote = pushRemoteUrl || "origin";
-  const doLsRemote = () => exec.getExecOutput("git", ["ls-remote", remote, `refs/heads/${branch}`], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) } });
+  const doLsRemote = () => getGitExecOutput(["ls-remote", remote, `refs/heads/${branch}`], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) } });
   let result;
   if (pushRemoteUrl && pushToken) {
     const githubServerUrl = (process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
@@ -271,10 +291,19 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
   const pushArgs = pushRemoteUrl ? ["push", pushRemoteUrl, branch] : ["push", "origin", branch];
   const pushOnce = async () => {
     await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: pushRemoteUrl || "origin", branch, cwd, gitAuthEnv });
-    await exec.exec("git", pushArgs, {
+    const result = await getGitExecOutput(pushArgs, {
       cwd,
       env: { ...process.env, ...(gitAuthEnv || {}) },
+      ignoreReturnCode: true,
     });
+    if (result.exitCode !== 0) {
+      const output = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
+      const secrets = [pushToken, process.env.GH_TOKEN, process.env.GITHUB_TOKEN, process.env.GITHUB_APP_TOKEN].filter(secret => typeof secret === "string");
+      const detail = redactBuiltInPatterns(redactSecrets(output, secrets).content)
+        .content.replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")
+        .replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
+      throw new Error(`${ERR_SYSTEM}: git push failed (exit code ${result.exitCode}): ${detail}`);
+    }
     return resolveLocalHeadSha(cwd);
   };
   if (!pushRemoteUrl || !pushToken) {
@@ -342,7 +371,7 @@ function validateSynthesizedFileChanges(additions, deletions, validationConfig) 
  * @returns {Promise<string>}
  */
 async function resolveLocalHeadSha(cwd) {
-  const { stdout } = await exec.getExecOutput("git", ["rev-parse", "HEAD"], { cwd });
+  const { stdout } = await getGitExecOutput(["rev-parse", "HEAD"], { cwd });
   return stdout.trim();
 }
 
@@ -437,7 +466,7 @@ async function pushSignedCommits({
   /** @type {string | undefined} */
   let baseRefOid;
   try {
-    const { stdout: baseRefOut } = await exec.getExecOutput("git", ["rev-parse", `${baseRef}^{commit}`], { cwd });
+    const { stdout: baseRefOut } = await getGitExecOutput(["rev-parse", `${baseRef}^{commit}`], { cwd });
     const trimmedBaseRefOid = baseRefOut.trim();
     if (OID_PATTERN.test(trimmedBaseRefOid)) {
       baseRefOid = trimmedBaseRefOid;
@@ -456,7 +485,7 @@ async function pushSignedCommits({
   // Using --parents emits each line as "<sha> <parent1> [<parent2> ...]", which lets us detect merge commits
   // (more than one parent) in a single subprocess call without iterating each SHA individually.
   const revListBase = baseRefOid ?? baseRef;
-  const { stdout: revListOut } = await exec.getExecOutput("git", ["rev-list", "--parents", "--topo-order", "--reverse", `${revListBase}..HEAD`], { cwd });
+  const { stdout: revListOut } = await getGitExecOutput(["rev-list", "--parents", "--topo-order", "--reverse", `${revListBase}..HEAD`], { cwd });
   const revListEntriesRaw = revListOut
     .trim()
     .split("\n")
@@ -489,7 +518,7 @@ async function pushSignedCommits({
   if (firstGraphqlParentOid) {
     try {
       // Partial clones may fetch a missing remote head during this probe.
-      const ancestryCheck = await exec.getExecOutput("git", ["merge-base", "--is-ancestor", firstGraphqlParentOid, "HEAD"], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) }, ignoreReturnCode: true });
+      const ancestryCheck = await getGitExecOutput(["merge-base", "--is-ancestor", firstGraphqlParentOid, "HEAD"], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) }, ignoreReturnCode: true });
       graphqlParentIsAncestorOfHead = ancestryCheck.exitCode === 0;
     } catch {
       // Ancestry probe failed — ignored, keep the default (true) and avoid rewrite.
@@ -505,7 +534,7 @@ async function pushSignedCommits({
     // those on-demand promisor fetches can authenticate in private repos even
     // after checkout credentials have been scrubbed from .git/config.
     const runRebase = async () => {
-      const result = await exec.getExecOutput("git", ["rebase", "--onto", firstGraphqlParentOid, firstReplayParentOid, "HEAD"], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) }, ignoreReturnCode: true });
+      const result = await getGitExecOutput(["rebase", "--onto", firstGraphqlParentOid, firstReplayParentOid, "HEAD"], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) }, ignoreReturnCode: true });
       return result;
     };
     let rebaseResult = await runRebase();
@@ -521,14 +550,14 @@ async function pushSignedCommits({
       }
 
       if (rebaseResolved) {
-        rebaseResult = await exec.getExecOutput("git", ["rebase", "--continue"], {
+        rebaseResult = await getGitExecOutput(["rebase", "--continue"], {
           cwd,
           env: { ...process.env, ...(gitAuthEnv || {}), GIT_EDITOR: "true" },
           ignoreReturnCode: true,
         });
         if (rebaseResult.exitCode !== 0) {
           try {
-            await exec.exec("git", ["rebase", "--abort"], { cwd });
+            await execGitCommand(["rebase", "--abort"], { cwd });
           } catch {
             // Ignore cleanup failures.
           }
@@ -538,7 +567,7 @@ async function pushSignedCommits({
       } else if (isPartialCloneObjectFailure(combinedOutput)) {
         // Always abort the in-progress rebase before attempting recovery.
         try {
-          await exec.exec("git", ["rebase", "--abort"], { cwd });
+          await execGitCommand(["rebase", "--abort"], { cwd });
         } catch {
           // Ignore cleanup failures.
         }
@@ -553,7 +582,7 @@ async function pushSignedCommits({
         // which would download a large monorepo's entire history.
         let headOid;
         try {
-          const { stdout: headOut } = await exec.getExecOutput("git", ["rev-parse", "HEAD"], { cwd });
+          const { stdout: headOut } = await getGitExecOutput(["rev-parse", "HEAD"], { cwd });
           headOid = headOut.trim();
         } catch {
           // HEAD cannot be resolved — ignored, fall back to the known range anchors.
@@ -571,7 +600,7 @@ async function pushSignedCommits({
           rebaseResult = await runRebase();
           if (rebaseResult.exitCode !== 0) {
             try {
-              await exec.exec("git", ["rebase", "--abort"], { cwd });
+              await execGitCommand(["rebase", "--abort"], { cwd });
             } catch {
               // Ignore cleanup failures.
             }
@@ -590,7 +619,7 @@ async function pushSignedCommits({
         }
       } else {
         try {
-          await exec.exec("git", ["rebase", "--abort"], { cwd });
+          await execGitCommand(["rebase", "--abort"], { cwd });
         } catch {
           // Ignore cleanup failures.
         }
@@ -599,7 +628,7 @@ async function pushSignedCommits({
         );
       }
     }
-    const { stdout: rebasedRevListOut } = await exec.getExecOutput("git", ["rev-list", "--parents", "--topo-order", "--reverse", `${firstGraphqlParentOid}..HEAD`], { cwd });
+    const { stdout: rebasedRevListOut } = await getGitExecOutput(["rev-list", "--parents", "--topo-order", "--reverse", `${firstGraphqlParentOid}..HEAD`], { cwd });
     revListEntries = rebasedRevListOut
       .trim()
       .split("\n")
@@ -653,7 +682,7 @@ async function pushSignedCommits({
       // Use git diff-tree --raw to obtain file mode information per changed file.
       // Format: :<srcMode> <dstMode> <srcHash> <dstHash> <status>[score]\t<path>[<\t><newPath>]
       // Fields: [0]=srcMode, [1]=dstMode, [2]=srcHash, [3]=dstHash, [4]=status
-      const { stdout: rawDiffOut } = await exec.getExecOutput("git", ["diff-tree", "-r", "--raw", sha], { cwd });
+      const { stdout: rawDiffOut } = await getGitExecOutput(["diff-tree", "-r", "--raw", sha], { cwd });
 
       for (const line of rawDiffOut.trim().split("\n").filter(Boolean)) {
         // Raw format lines start with ':'; skip the commit SHA header line and any other non-raw lines
@@ -773,7 +802,7 @@ async function pushSignedCommits({
             expectedHeadOid = baseRefOid;
             core.info(`pushSignedCommits: using baseRef OID for initial branch creation: ${expectedHeadOid}`);
           } else {
-            const { stdout: parentOut } = await exec.getExecOutput("git", ["rev-parse", `${sha}^`], { cwd });
+            const { stdout: parentOut } = await getGitExecOutput(["rev-parse", `${sha}^`], { cwd });
             expectedHeadOid = parentOut.trim();
           }
           if (!expectedHeadOid) {
@@ -815,7 +844,7 @@ async function pushSignedCommits({
       }
 
       // Full commit message (subject + body)
-      const { stdout: msgOut } = await exec.getExecOutput("git", ["log", "-1", "--format=%B", sha], { cwd });
+      const { stdout: msgOut } = await getGitExecOutput(["log", "-1", "--format=%B", sha], { cwd });
       const message = msgOut.trim();
       const headline = message.split("\n")[0];
       const body = message.split("\n").slice(1).join("\n").trim();
