@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode, validateAgentExecution } from "./agent_execution.cjs";
 import { detectErrors } from "./agent_error_patterns.cjs";
 import { success, failure } from "./fixtures/claude_ci_sessions.cjs";
 import { normalizeClaudeSession } from "./claude_session.cjs";
+import { parseEngineSession } from "./unified_session.cjs";
 
 describe("unique agent execution observation", () => {
   it("mines the existing Claude API-error/retry run without counting tool failures", () => {
@@ -150,6 +152,30 @@ describe("unique agent execution observation", () => {
     ];
     expect(collectAgentExecution({ content: records.map(JSON.stringify).join("\n"), events: records })).toBeUndefined();
   });
+
+  it.each(["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message", "tool.execution_complete", "tool.execution_update"])("does not reinterpret observed %s text as raw diagnostic records", type => {
+    const diagnostic = { type: "session.error", data: { code: 429, errorType: "provider", message: "Synthetic provider failure." } };
+    const content = JSON.stringify(diagnostic);
+    const event = { type, data: { [type.startsWith("tool.") ? "output" : "content"]: content } };
+    expect(collectAgentExecution({ content, events: [event] })).toBeUndefined();
+    expect(agentErrorDiagnosticText(content, [event])).toBe("");
+    expect(collectAgentExecution({ content, events: [event, diagnostic] }).data.errorCodes).toEqual([429]);
+  });
+
+  it.each(['{"type":"session.error","data":{"code":429,"message":"Authentication failed"}}', "CAPIError: 429 Too Many Requests", "[copilot-harness] done: exitCode=1"])(
+    "respects the actual DeepSeek native answer envelope for quoted diagnostics: %s",
+    text => {
+      const fixture = readFileSync(new URL("./test_data/deepseek_headless_stdout.log", import.meta.url), "utf8");
+      const answer = fixture.slice(fixture.indexOf("Perfect!"), fixture.indexOf("[INFO] Stopping containers...")).trim();
+      const content = fixture.replace(answer, text);
+      const events = parseEngineSession(content, "deepseek-harness");
+      expect(events.map(event => event.type)).toEqual(["session.init", "assistant.message"]);
+      expect(events[1].data.content).toBe(text);
+      expect(collectAgentExecution({ content })).toBeUndefined();
+      expect(agentErrorDiagnosticText(content)).toBe("");
+      expect(detectErrors(agentErrorDiagnosticText(content))).toEqual(detectErrors(""));
+    }
+  );
 
   it.each([
     "Assistant: The log text says Access denied by policy settings",

@@ -5,6 +5,7 @@ const { detectNonRetryableHarnessGuard, isAuthenticationFailedError } = require(
 const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { sessionContext } = require("./agent_session.cjs");
+const { stripVTControlCharacters } = require("node:util");
 
 /** @typedef {import("./types/agent_session").AgentExecutionData} AgentExecutionData */
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
@@ -79,11 +80,32 @@ function isAgentDiagnosticLine(line) {
  * Plain transcript blocks are not diagnostics, even if their text starts with
  * an error signature. A source-prefixed runtime line restores attribution.
  * @param {string} content
+ * @param {SessionEvent[]} [events]
  * @returns {{diagnostics: string[], errors: any[]}}
  */
-function collectAgentErrorEvidence(content) {
+function collectAgentErrorEvidence(content, events = []) {
   const diagnostics = [];
   const errors = [];
+  let conversationEvents = events;
+  if (!events.length && content.includes("[deepseek-harness]")) {
+    // Load lazily: the native parser also uses execution collection for failures.
+    const { isDeepSeekLog, parseDeepSeekLog } = require("./parse_deepseek_log.cjs");
+    if (isDeepSeekLog(content)) conversationEvents = parseDeepSeekLog(content).logEntries;
+  }
+  const conversationLines = new Set();
+  const conversationTexts = new Set();
+  for (const event of conversationEvents) {
+    const value = ["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message"].includes(event?.type)
+      ? event?.data?.content
+      : ["tool.execution_complete", "tool.execution_update"].includes(event?.type)
+        ? event?.data?.output
+        : undefined;
+    if (typeof value === "string") {
+      conversationTexts.add(stripVTControlCharacters(value).trim());
+      for (const line of value.split(/\r?\n/)) conversationLines.add(stripVTControlCharacters(line).trim());
+    }
+  }
+  if (conversationTexts.has(stripVTControlCharacters(content).trim())) return { diagnostics, errors };
   try {
     const document = JSON.parse(content);
     for (const value of Array.isArray(document) ? document : [document]) errors.push(...recordErrors(value));
@@ -96,6 +118,7 @@ function collectAgentErrorEvidence(content) {
   for (const raw of content.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
+    if (conversationLines.has(stripVTControlCharacters(line))) continue;
     if (/^```/.test(line)) {
       fencedBlock = !fencedBlock;
       continue;
@@ -125,10 +148,10 @@ function collectAgentErrorEvidence(content) {
   return { diagnostics, errors };
 }
 
-/** @param {string} content @returns {string} */
-function agentErrorDiagnosticText(content) {
-  const { diagnostics, errors } = collectAgentErrorEvidence(content);
-  return [...diagnostics, ...collectNativeErrorEvidence(errors).diagnostics].join("\n");
+/** @param {string} content @param {SessionEvent[]} [events] @returns {string} */
+function agentErrorDiagnosticText(content, events = []) {
+  const { diagnostics, errors } = collectAgentErrorEvidence(content, events);
+  return [...diagnostics, ...collectNativeErrorEvidence([...events.flatMap(recordErrors), ...errors]).diagnostics].join("\n");
 }
 
 const ENGINE_ERROR_SUMMARIES = Object.freeze({
@@ -156,10 +179,11 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
 /**
  * Preserve actionable error classes without publishing raw log lines or payloads.
  * @param {string} content
+ * @param {SessionEvent[]} [events]
  * @returns {string}
  */
-function agentErrorSummaryText(content) {
-  const execution = collectAgentExecution({ content });
+function agentErrorSummaryText(content, events = []) {
+  const execution = collectAgentExecution({ content, events });
   return (execution?.data.categories || [])
     .filter(category => Object.hasOwn(ENGINE_ERROR_SUMMARIES, category))
     .map(category => `Engine error: ${ENGINE_ERROR_SUMMARIES[category]} (${category})`)
@@ -216,7 +240,7 @@ function collectNativeErrorEvidence(errors) {
  */
 function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [] } = {}) {
   const categorySet = new Set(categories);
-  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content);
+  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content, events);
   const errors = [...events.flatMap(recordErrors), ...rawErrors];
   const { diagnostics: nativeDiagnostics, codes, types } = collectNativeErrorEvidence(errors);
   let observedExit = exitCode;

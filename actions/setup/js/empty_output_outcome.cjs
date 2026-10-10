@@ -154,9 +154,9 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
     })
     .join("\n");
   // Extract denied commands without copying harness configuration or transcript data.
-  const attributedDiagnostics = agentErrorDiagnosticText(safeStdio);
+  const attributedDiagnostics = agentErrorDiagnosticText(safeStdio, events);
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
-  const engineSummary = agentErrorSummaryText(safeStdio);
+  const engineSummary = agentErrorSummaryText(safeStdio, events);
   if (engineSummary) diagnostics.add(engineSummary);
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   if (driverExitCode !== undefined && ![...diagnostics].some(diagnostic => diagnostic.startsWith("Driver exit code:"))) {
