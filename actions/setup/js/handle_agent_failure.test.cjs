@@ -412,8 +412,8 @@ describe("handle_agent_failure", () => {
       expect(diagnostics.logExcerpt.split("\n")).toHaveLength(50);
     });
 
-    it("redacts masks declared outside the failing step and prevents fence injection", async () => {
-      mockFailedStepLog("2026-10-10T10:00:00.000Z ::add-mask::private-diagnostic-value\n2026-10-10T10:00:01.000Z private-diagnostic-value\n2026-10-10T10:00:02.000Z ````");
+    it.each(["private-diagnostic-value", "private-diagnostic&#45;value"])("redacts masks declared outside the failing step after normalization and prevents fence injection: %s", async secret => {
+      mockFailedStepLog(`2026-10-10T10:00:00.000Z ::add-mask::private-diagnostic-value\n2026-10-10T10:00:01.000Z ${secret}\n2026-10-10T10:00:02.000Z \`\`\`\``);
       const diagnostics = await getFailedAgentDiagnostics();
       const rendered = buildFailureDiagnosticsContext({ ...diagnostics, failureCategories: ["agent_failure"], engineFailureContext: "" });
       expect(rendered).not.toContain("private-diagnostic-value");
@@ -421,11 +421,33 @@ describe("handle_agent_failure", () => {
       expect(rendered).toContain("`````text");
     });
 
+    it("excludes a following step even when it starts in the failure completion second", async () => {
+      const cleanupLines = Array.from({ length: 55 }, () => "2026-10-10T10:00:02.500Z cleanup output");
+      mockFailedStepLog(["2026-10-10T10:00:01.999Z actionable failure", ...cleanupLines].join("\n"));
+      const jobs = await global.github.paginate();
+      jobs[0].steps.push({ name: "Cleanup", conclusion: "success", started_at: "2026-10-10T10:00:02Z", completed_at: "2026-10-10T10:00:03Z" });
+      const diagnostics = await getFailedAgentDiagnostics();
+      expect(diagnostics.logExcerpt).toContain("actionable failure");
+      expect(diagnostics.logExcerpt).not.toContain("cleanup output");
+    });
+
     it("keeps the tail of long log lines within the diagnostic size limit", async () => {
       mockFailedStepLog(`2026-10-10T10:00:01.000Z ${"x".repeat(10000)} final error`);
       const diagnostics = await getFailedAgentDiagnostics();
       expect(diagnostics.logExcerpt.length).toBeLessThanOrEqual(8000);
       expect(diagnostics.logExcerpt).toContain("final error");
+    });
+
+    it.each([Buffer.from("2026-10-10T10:00:01.000Z binary log"), new TextEncoder().encode("2026-10-10T10:00:01.000Z binary log").buffer])("accepts binary log responses", async data => {
+      mockFailedStepLog("");
+      global.github.request.mockResolvedValue({ data });
+      await expect(getFailedAgentDiagnostics()).resolves.toMatchObject({ logExcerpt: expect.stringContaining("binary log") });
+    });
+
+    it("explains unsupported log responses without rendering their contents", async () => {
+      mockFailedStepLog("");
+      global.github.request.mockResolvedValue({ data: { private: "private API response" } });
+      await expect(getFailedAgentDiagnostics()).resolves.toMatchObject({ failingStep: "Run agent", logUnavailable: "The Actions logs API returned an unsupported log format." });
     });
 
     it.each([403, 404, 410, 500])("retains the failing step when logs cannot be downloaded (HTTP %s)", async status => {

@@ -3,7 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { redactDiagnosticText, redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
+const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 const { getDetectionCautionAlert, getFooterAgentFailureIssueMessage, getFooterAgentFailureCommentMessage, generateXMLMarker } = require("./messages.cjs");
 const { renderTemplate, renderTemplateFromFile, getPromptPath, renderFilesList } = require("./messages_core.cjs");
 const { getCurrentBranch } = require("./get_current_branch.cjs");
@@ -1793,22 +1793,36 @@ async function getFailedAgentDiagnostics() {
   if (!Number.isFinite(start) || !Number.isFinite(end) || !agentJob.id) {
     return { failingStep, logUnavailable: "The failed step's timestamps or job ID were unavailable." };
   }
+  const nextStep = agentJob.steps.slice(agentJob.steps.indexOf(failedStep) + 1).find(step => step.started_at);
+  const nextStart = Date.parse(nextStep?.started_at);
+  const logEnd = Number.isFinite(nextStart) ? Math.min(end + 1000, nextStart) : end + 1000;
   try {
     const response = await github.request("GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs", {
       ...context.repo,
       job_id: agentJob.id,
     });
-    const log = typeof response.data === "string" ? response.data : Buffer.from(response.data).toString("utf8");
+    const data = response.data;
+    let log;
+    if (typeof data === "string") {
+      log = data;
+    } else if (data instanceof ArrayBuffer) {
+      log = Buffer.from(new Uint8Array(data)).toString("utf8");
+    } else if (data instanceof Uint8Array) {
+      log = Buffer.from(data).toString("utf8");
+    } else {
+      return { failingStep, logUnavailable: "The Actions logs API returned an unsupported log format." };
+    }
     const lines = log.split(/\r?\n/).filter(line => {
       const timestamp = Date.parse(line.split(" ", 1)[0]);
       // Actions step metadata has second precision, while log timestamps include fractions.
-      return Number.isFinite(timestamp) && timestamp >= start && timestamp < end + 1000 && !isAddMaskCommandLine(line);
+      return Number.isFinite(timestamp) && Number.isFinite(start) && timestamp >= start && timestamp < logEnd && !isAddMaskCommandLine(line);
     });
     if (lines.length === 0) {
       return { failingStep, logUnavailable: "The job log contained no lines for the failed step's time range." };
     }
-    const redacted = redactDiagnosticText(lines.join("\n"), { maskedValues: collectAddMaskedValues(log) });
-    const logExcerpt = redactAndBoundDiagnostics(redacted.split("\n").slice(-50).join("\n").slice(-8000));
+    const maskedValues = collectAddMaskedValues(log);
+    const normalized = redactAndBoundDiagnostics(lines.join("\n"), { maskedValues, maxLength: log.length });
+    const logExcerpt = redactAndBoundDiagnostics(normalized.split("\n").slice(-50).join("\n").slice(-8000), { maskedValues });
     return { failingStep, logExcerpt };
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
