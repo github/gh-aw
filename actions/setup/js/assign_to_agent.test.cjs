@@ -187,7 +187,7 @@ describe("assign_to_agent", () => {
         ${assignToAgentScript};
         return createAssignmentCredentialPreflight({ "github-token": token }, mockGithub);
       })()`);
-      await expect(preflight()).rejects.toThrow(/assign-to-agent.github-token.*GitHub App installation token.*GH_AW_AGENT_TOKEN/);
+      await expect(preflight()).rejects.toThrow(/configured assign-to-agent credential.*GitHub App installation token.*GH_AW_AGENT_TOKEN/);
       await expect(preflight()).rejects.not.toThrow(token);
       expect(mockGithub.request).not.toHaveBeenCalled();
       expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
@@ -272,19 +272,39 @@ describe("assign_to_agent", () => {
       expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
     });
 
-    it("does not authenticate staged or filtered assignments", async () => {
+    it("does not authenticate staged assignments", async () => {
       const stagedHandler = await eval(`(async () => {
         ${assignToAgentScript};
         return main({ target: "*", staged: true });
       })()`);
       await stagedHandler({ type: "assign_to_agent", issue_number: 42 }, {}, new Map());
+      expect(mockGithub.request).not.toHaveBeenCalled();
+    });
+
+    it("authenticates before checking required labels", async () => {
       const filteredHandler = await eval(`(async () => {
         ${assignToAgentScript};
         return main({ target: "*", required_labels: ["copilot-ready"] });
       })()`);
       mockGithub.rest.issues.get.mockResolvedValue({ data: { labels: [] } });
       await expect(filteredHandler({ type: "assign_to_agent", issue_number: 42 }, {}, new Map())).resolves.toMatchObject({ skipped: true });
+      expect(mockGithub.request).toHaveBeenCalledExactlyOnceWith("GET /user", { request: { timeout: 10000 } });
+    });
+
+    it("rejects an installation credential before required-label API lookups", async () => {
+      vi.stubEnv("GH_AW_ASSIGN_TO_AGENT_TOKEN", "ghs_test_installation_token");
+      vi.stubGlobal("getOctokit", vi.fn().mockReturnValue(mockGithub));
+      const handler = await eval(`(async () => {
+        ${assignToAgentScript};
+        return main({ target: "*", required_labels: ["copilot-ready"] });
+      })()`);
+
+      const result = await handler({ type: "assign_to_agent", issue_number: 42 }, {}, new Map());
+
+      expect(result.error).toContain("GitHub App installation token");
       expect(mockGithub.request).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
     });
   });
 

@@ -3422,7 +3422,7 @@ const SAFEOUTPUTS_CLI_EXCERPT_MAX_LENGTH = 300;
 function isDroppedPipeSafeOutputsCommand(line) {
   let quote = "";
   let writerSeen = false;
-  for (let i = 0; i < line.length; ) {
+  for (let i = 0; i < line.length;) {
     const char = line[i];
     if (quote) {
       if (char === "\\" && quote === '"' && i + 1 < line.length) i += 2;

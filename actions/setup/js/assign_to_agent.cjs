@@ -44,7 +44,11 @@ async function createAssignToAgentGitHubClient(config) {
  */
 function createAssignmentCredentialPreflight(config, githubClient) {
   const token = config["github-token"] || process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN;
-  const source = config["github-token"] ? "assign-to-agent.github-token" : process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN ? "GH_AW_ASSIGN_TO_AGENT_TOKEN (GH_AW_AGENT_TOKEN, GH_AW_GITHUB_TOKEN, or GITHUB_TOKEN)" : "the step-level GitHub token";
+  const source = config["github-token"]
+    ? "the configured assign-to-agent credential"
+    : process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN
+      ? "GH_AW_ASSIGN_TO_AGENT_TOKEN (GH_AW_AGENT_TOKEN, GH_AW_GITHUB_TOKEN, or GITHUB_TOKEN)"
+      : "the step-level GitHub token";
   const remedy =
     "Configure GH_AW_AGENT_TOKEN or assign-to-agent.github-token with a valid user token: a fine-grained PAT with metadata: read and actions, contents, issues, and pull requests: write, or a classic PAT with repo scope. " +
     "Check token expiry, repository access, and organization approval/SSO. GitHub App installation tokens, including GITHUB_TOKEN, cannot assign Copilot. " +
@@ -465,10 +469,10 @@ async function main(config = {}) {
     }
 
     try {
+      await validateCredential();
+
       const filterResult = await checkRequiredFilter(githubClient, { owner: effectiveOwner, repo: effectiveRepo }, number, requiredLabels, "", "assign_to_agent");
       if (filterResult) return filterResult;
-
-      await validateCredential();
 
       // Find agent (use cache to avoid repeated lookups)
       let agentLogin = agentCache[agentName];
@@ -523,6 +527,7 @@ async function main(config = {}) {
         return { success: true };
       }
 
+      // Re-check after lookups to catch label changes; credential validation is cached per handler.
       const finalFilterResult = await checkRequiredFilter(githubClient, { owner: effectiveOwner, repo: effectiveRepo }, number, requiredLabels, "", "assign_to_agent");
       if (finalFilterResult) return finalFilterResult;
 
@@ -556,10 +561,11 @@ async function main(config = {}) {
       return { success: true };
     } catch (error) {
       let errorMessage = getErrorMessage(error);
+      const isPullRequestError = error && typeof error === "object" && error.isPullRequest;
 
       // When the agent specified an issue_number that turns out to be a PR, skip
       // silently without posting a comment — error comments on PRs are confusing.
-      if (/** @type {any} */ error.isPullRequest) {
+      if (isPullRequestError) {
         core.warning(`Skipping assign_to_agent for #${number}: target is a pull request, not an issue.`);
         allResults.push({
           issue_number: issueNumber,
@@ -608,7 +614,7 @@ async function main(config = {}) {
       core.error(`Failed to assign agent "${agentName}" to ${type} #${number}: ${errorMessage}`);
 
       // Post failure comment on the issue/PR so the user sees the failure in context
-      if (error.name !== "AssignmentCredentialPreflightError") {
+      if (!(error && typeof error === "object" && error.name === "AssignmentCredentialPreflightError")) {
         try {
           await githubClient.rest.issues.createComment({
             owner: effectiveOwner,
