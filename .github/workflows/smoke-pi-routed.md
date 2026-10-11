@@ -22,7 +22,7 @@ engine:
   model-routing:
     goal: cost
     mode: economy
-    allowed-models: [gpt-5.4-mini, gpt-5.6-luna, claude-haiku-4.5]
+    allowed-models: [gpt-5.6-luna]
 imports:
   - shared/reporting.md
 max-tool-calls: 20
@@ -58,7 +58,7 @@ post-steps:
           core,
           engine: "pi",
           executionOutcome: process.env.SMOKE_EXECUTION,
-          allowedModels: ["gpt-5.4-mini", "gpt-5.6-luna", "claude-haiku-4.5"],
+          allowedModels: ["gpt-5.6-luna"],
           subAgents: [
             { name: "haiku-whoami", model: "claude-haiku-4.5", endpoint: "/v1/messages" },
             { name: "mini-whoami", model: "gpt-5.4-mini", endpoint: "/responses" },

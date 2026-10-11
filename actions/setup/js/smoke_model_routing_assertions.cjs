@@ -9,14 +9,29 @@
  * api-proxy token-usage log), never the agent's own reply. The agent-writable
  * `agent/awf-routing-outcome.json` (`model_routing.outcome`) is never evidence.
  *
+ * Request attribution follows what AWF records: a token-usage record with
+ * `purpose: "routing_classification"` is the classifier; every other record is
+ * agent traffic (AWF writes no `purpose` for agent requests, and `x_initiator`
+ * is only the billing class). Agent traffic is attributed to a declared
+ * sub-agent when the session correlates it (request IDs on `subagent.*` events,
+ * or sub-agent IDs on proxy records); otherwise by model: requests on a declared
+ * sub-agent's model belong to that sub-agent, and all other agent traffic
+ * belongs to the main agent. Declared sub-agent models must therefore be
+ * distinct from each other and disjoint from `allowedModels`.
+ *
  * Check IDs:
+ * - C1 configuration: declared sub-agent models are distinct and not in
+ *   allowed-models
  * - E1 agent execution outcome; E2 evidence files present and parseable
- * - R1 routing selected; R2 one classifier call; R3 agent traffic on the selected
- *   model and a supported endpoint; R4 no out-of-policy models
- * - M1 main-agent requests use the expected endpoint (when configured)
+ * - R1 routing selected; R2 one classifier call; R3 main-agent traffic on the
+ *   selected model and a supported endpoint; R4 main-agent requests exist and
+ *   use only allowed models
+ * - M1 main-agent requests exist and use the expected endpoint (when configured)
  * - S1 sub-agent ran exactly once; S2 completed without failing; S3 status 200 on
  *   the declared model and endpoint; S4 events carry the declared agent name
  *   (when configured)
+ *
+ * Every check that iterates over requests fails when there are none to check.
  */
 
 const fs = require("fs");
@@ -107,6 +122,29 @@ function isClassifierRequest(event) {
 }
 
 /**
+ * @param {any} value
+ * @returns {string}
+ */
+function idString(value) {
+  return value === undefined || value === null ? "" : String(value);
+}
+
+/** @param {any} request @returns {string} */
+function requestId(request) {
+  return idString(request?.request_id ?? request?.requestId);
+}
+
+/** @param {any} request @returns {string} */
+function requestAgentId(request) {
+  return idString(request?.agent_id ?? request?.agentId);
+}
+
+/** @param {any} event @returns {string} */
+function eventRequestId(event) {
+  return idString(event?.data?.requestId ?? event?.data?.request_id ?? event?.requestId ?? event?.request_id);
+}
+
+/**
  * Supported endpoints for a model, according to the routing selection and the
  * AWF `/reflect` routing metadata.
  * @param {string} model
@@ -145,6 +183,28 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   const allowedList = [...new Set((expectations.allowedModels ?? []).map(servedModel).filter(Boolean))];
   const allowed = new Set(allowedList);
   const subAgents = expectations.subAgents ?? [];
+
+  // C1: sub-agent models must be disjoint from the routing candidates and from
+  // each other, otherwise requests cannot be attributed by model.
+  if (subAgents.length) {
+    const c1Problems = [];
+    const overlapping = subAgents.filter(agent => allowed.has(servedModel(agent.model)));
+    if (overlapping.length)
+      c1Problems.push(
+        `declared sub-agent model(s) also in allowed-models [${allowedList.join(", ")}]: ${overlapping.map(agent => `${agent.name}=${servedModel(agent.model)}`).join(", ")}; sub-agent models must be disjoint from the routing candidates`
+      );
+    /** @type {Map<string, string[]>} */
+    const namesByModel = new Map();
+    for (const agent of subAgents) {
+      const model = servedModel(agent.model);
+      namesByModel.set(model, [...(namesByModel.get(model) ?? []), agent.name]);
+    }
+    const shared = [...namesByModel].filter(([, names]) => names.length > 1);
+    if (shared.length) c1Problems.push(`declared sub-agents share a model: ${shared.map(([model, names]) => `${model} (${names.join(", ")})`).join(", ")}; each sub-agent must declare a distinct model`);
+    if (c1Problems.length) fail("C1", c1Problems.join("; "));
+    else pass("C1", `declared sub-agent models are distinct and disjoint from allowed-models [${allowedList.join(", ")}]`);
+  }
+
   if (expectations.executionOutcome !== undefined) {
     if (expectations.executionOutcome === "success") pass("E1", "agent execution outcome is success");
     else fail("E1", `agent execution outcome is ${expectations.executionOutcome || "<empty>"}, expected success`);
@@ -174,60 +234,73 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   if (classifierRequests.length === 1) pass("R2", `one routing_classification request: ${describeRequest(classifierRequests[0])}`);
   else fail("R2", `expected exactly 1 routing_classification request, observed ${classifierRequests.length}: ${describeRequests(classifierRequests)}`);
 
-  // Main-agent checks only consider requests explicitly attributed to the agent.
-  const agentRequests = requests.filter(request => request.purpose === "agent");
-  const subagentRequests = requests.filter(request => request.purpose === "subagent");
+  // Every non-classifier request is agent traffic; AWF does not record which
+  // agent made it.
+  const agentTraffic = requests.filter(request => !isClassifierRequest(request));
+
+  const subagentEvents = events.filter(event => typeof event?.type === "string" && event.type.startsWith("subagent."));
+  const startedEvents = subagentEvents.filter(event => event.type === "subagent.started");
+  const observedNames = [...new Set(startedEvents.map(event => event.data?.agentName ?? "<none>"))];
+
+  // Attribute agent traffic to declared sub-agents: prefer session correlation
+  // (request IDs on sub-agent events, or sub-agent IDs on proxy records), and
+  // fall back to the declared model.
+  const subAgentEvidence = subAgents.map(agent => {
+    const started = startedEvents.filter(event => event.data?.agentName === agent.name);
+    const ids = new Set(started.map(event => idString(event.data?.invocationId ?? event.agentId)).filter(Boolean));
+    const activity = subagentEvents.filter(event => ids.has(idString(event.data?.invocationId)) || ids.has(idString(event.agentId)));
+    const eventRequestIds = new Set(activity.map(eventRequestId).filter(Boolean));
+    const correlated = agentTraffic.filter(request => eventRequestIds.has(requestId(request)) || ids.has(requestAgentId(request)));
+    return { agent, model: servedModel(agent.model), started, activity, correlated };
+  });
+  const correlatedRequests = new Set(subAgentEvidence.flatMap(evidence => evidence.correlated));
+  const attributed = subAgentEvidence.map(evidence => (evidence.correlated.length ? evidence.correlated : agentTraffic.filter(request => !correlatedRequests.has(request) && servedModel(request.model) === evidence.model)));
+  const subagentRequests = new Set(attributed.flat());
+  const mainRequests = agentTraffic.filter(request => !subagentRequests.has(request));
+  const observedMain = mainRequests.length ? describeRequests(mainRequests) : `none (agent requests: ${describeRequests(agentTraffic)})`;
 
   // R3: main-agent traffic on the selected model and a supported endpoint.
   if (!selectedModel) {
-    fail("R3", `no selected model to verify; observed agent requests: ${describeRequests(agentRequests)}`);
+    fail("R3", `no selected model to verify; observed main-agent requests: ${observedMain}`);
   } else {
     const endpoints = supportedEndpoints(selectedModel, selection, reflect);
-    const onModel = agentRequests.filter(request => servedModel(request.model) === selectedModel);
+    const onModel = mainRequests.filter(request => servedModel(request.model) === selectedModel);
     if (!endpoints.size) {
-      fail("R3", `no supported-endpoint metadata for ${selectedModel} in the routing selection or /reflect; observed: ${describeRequests(onModel.length ? onModel : agentRequests)}`);
+      fail("R3", `no supported-endpoint metadata for ${selectedModel} in the routing selection or /reflect; observed: ${onModel.length ? describeRequests(onModel) : observedMain}`);
     } else {
       const ok = onModel.find(request => Number(request.status) === 200 && endpoints.has(requestEndpoint(request)));
       if (ok) pass("R3", `main-agent request on selected model: ${describeRequest(ok)}`);
       else
         fail(
           "R3",
-          `no 200 request for ${selectedModel} on a supported endpoint (${[...endpoints].join(", ")}); observed: ${onModel.length ? describeRequests(onModel) : `no ${selectedModel} requests; other main-agent requests: ${describeRequests(agentRequests)}`}`
+          `no 200 request for ${selectedModel} on a supported endpoint (${[...endpoints].join(", ")}); observed: ${onModel.length ? describeRequests(onModel) : `no ${selectedModel} requests; main-agent requests: ${observedMain}`}`
         );
     }
   }
 
   // R4: main-agent requests must use allowed-models; sub-agent models are scoped
   // to their own checks and cannot widen the main agent's model policy.
-  const outOfPolicy = agentRequests.filter(request => !allowed.has(servedModel(request.model)));
-  if (outOfPolicy.length) fail("R4", `main-agent request(s) on models outside allowed-models [${allowedList.join(", ")}]: ${describeRequests(outOfPolicy)}`);
-  else pass("R4", `all ${agentRequests.length} main-agent request(s) used allowed models`);
+  const outOfPolicy = mainRequests.filter(request => !allowed.has(servedModel(request.model)));
+  if (!mainRequests.length) fail("R4", `no main-agent requests to check against allowed-models [${allowedList.join(", ")}]; observed agent requests: ${describeRequests(agentTraffic)}`);
+  else if (outOfPolicy.length) fail("R4", `main-agent request(s) on models outside allowed-models [${allowedList.join(", ")}]: ${describeRequests(outOfPolicy)}`);
+  else pass("R4", `all ${mainRequests.length} main-agent request(s) used allowed models`);
 
   // M1: main-agent requests use the expected endpoint.
   if (expectations.mainEndpoint) {
     const expected = normalizeEndpoint(expectations.mainEndpoint);
-    const mainRequests = agentRequests;
     const wrong = mainRequests.filter(request => requestEndpoint(request) !== expected);
-    if (!mainRequests.length) fail("M1", `no main-agent requests to check for ${expected}`);
+    if (!mainRequests.length) fail("M1", `no main-agent requests to check for ${expected}; observed agent requests: ${describeRequests(agentTraffic)}`);
     else if (wrong.length) fail("M1", `main-agent request(s) not on ${expected}; observed: ${describeRequests(wrong)}`);
     else pass("M1", `all ${mainRequests.length} main-agent request(s) used ${expected}`);
   }
 
-  const subagentEvents = events.filter(event => typeof event?.type === "string" && event.type.startsWith("subagent."));
-  const startedEvents = subagentEvents.filter(event => event.type === "subagent.started");
-  const observedNames = [...new Set(startedEvents.map(event => event.data?.agentName ?? "<none>"))];
-  for (const agent of subAgents) {
-    const model = servedModel(agent.model);
+  for (const [index, { agent, model, started, activity, correlated }] of subAgentEvidence.entries()) {
     const endpoints = (Array.isArray(agent.endpoint) ? agent.endpoint : [agent.endpoint]).map(normalizeEndpoint);
     const label = `sub-agent ${agent.name}`;
 
     // S1: ran exactly once.
-    const started = startedEvents.filter(event => event.data?.agentName === agent.name);
     if (started.length === 1) pass("S1", `${label} started once`);
     else fail("S1", `${label}: expected exactly 1 subagent.started, observed ${started.length}; observed agent names: [${observedNames.join(", ")}]`);
-
-    const ids = new Set(started.map(event => event.data?.invocationId ?? event.agentId).filter(Boolean));
-    const activity = subagentEvents.filter(event => ids.has(event.data?.invocationId) || ids.has(event.agentId));
 
     // S2: completed and did not fail.
     const completed = activity.filter(event => event.type === "subagent.completed");
@@ -236,23 +309,9 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
     else if (!completed.length || failed.length) fail("S2", `${label}: completed=${completed.length} failed=${failed.length}; observed events: ${describeEvents(activity)}`);
     else pass("S2", `${label} completed`);
 
-    // S3: sub-agent traffic on the declared model and endpoint; correlate request
-    // IDs when both the lifecycle events and proxy records expose them.
-    const eventRequestIds = new Set(
-      activity
-        .map(event => event?.data?.requestId ?? event?.data?.request_id ?? event?.requestId ?? event?.request_id)
-        .filter(value => value !== undefined && value !== null && value !== "")
-        .map(String)
-    );
-    const proxyRequestIds = new Set(
-      subagentRequests
-        .map(request => request?.requestId ?? request?.request_id)
-        .filter(value => value !== undefined && value !== null && value !== "")
-        .map(String)
-    );
-    const correlatedRequestIds = new Set([...eventRequestIds].filter(requestId => proxyRequestIds.has(requestId)));
-    const relatedSubagentRequests = correlatedRequestIds.size ? subagentRequests.filter(request => correlatedRequestIds.has(String(request.requestId ?? request.request_id))) : subagentRequests;
-    const onModel = relatedSubagentRequests.filter(request => servedModel(request.model) === model);
+    // S3: sub-agent traffic on the declared model and endpoint.
+    const related = attributed[index];
+    const onModel = related.filter(request => servedModel(request.model) === model);
     const ok = onModel.find(request => Number(request.status) === 200 && endpoints.includes(requestEndpoint(request)));
     const recorded = activity.flatMap(event => [event.data?.model, event.data?.selectedModel, event.data?.resolvedModel, event.data?.firstDispatchedModel]).filter(value => typeof value === "string" && value !== "");
     const mismatched = [...new Set(recorded.filter(value => servedModel(value) !== model))];
@@ -262,7 +321,7 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
     if (s3Problems.length) {
       const observed = onModel.length
         ? onModel.map(request => `${requestEndpoint(request) || "<no endpoint>"} ${request.status ?? "<no status>"}`).join(", ")
-        : `no ${model} requests; other sub-agent requests: ${describeRequests(relatedSubagentRequests)}`;
+        : `no ${model} requests; ${correlated.length ? `requests correlated to ${label}: ${describeRequests(correlated)}` : `agent requests: ${describeRequests(agentTraffic)}`}`;
       fail("S3", `${label}: ${s3Problems.join("; ")}; observed: ${observed}`);
     } else {
       pass("S3", `${label} request ${describeRequest(ok)}`);
