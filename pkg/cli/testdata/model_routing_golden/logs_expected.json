@@ -11,8 +11,8 @@
       "endpoint": "/chat/completions",
       "effective_endpoint": "/v1/messages",
       "selected_endpoint": "/chat/completions",
-      "run_count": 1,
-      "total_aic": 18.58855,
+      "run_count": 2,
+      "total_aic": 37.1771,
       "average_aic": 18.58855
     },
     {
@@ -58,7 +58,7 @@
       "average_aic": 933.48553
     }
   ],
-  "classifier_aic": 0.89486,
+  "classifier_aic": 1.67086,
   "main_agent_cost": {
     "requests": 50,
     "input_tokens": 4575305,
@@ -136,8 +136,8 @@
       "aic": 494.2065
     }
   ],
-  "total_requests": 121,
+  "total_requests": 124,
   "deviated_requests": 20,
-  "deviated_traffic_share": 0.165289,
+  "deviated_traffic_share": 0.16129,
   "endpoint_only_deviation_normalized": true
 }

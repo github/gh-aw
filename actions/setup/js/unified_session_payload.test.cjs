@@ -292,6 +292,11 @@ describe("essential unified session payloads", () => {
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
     ["firewall.http_access", { domain: "example.com", http_status: 0, squid_request_status: "DENIED", credentials: "omit" }, { host: "example.com", status: 0, decision: "DENIED" }],
     ["firewall.steering", { eventName: "token_steering", message: "budget warning", reason: null, body: "omit" }, { event: "token_steering", message: "budget warning", reason: null }],
+    [
+      "firewall.steering",
+      { event: "ai_credit_steering", request_id: "steered", provider: "copilot", threshold: 80, message: "[AWF AI CREDIT WARNING] budget" },
+      { event: "ai_credit_steering", requestId: "steered", threshold: 80, message: "[AWF AI CREDIT WARNING] budget" },
+    ],
     ["mcp.tool_call", { tool_call_id: "call", tool_name: "lookup", duration: 5, input_size: 0, output_size: 10, status: "error" }, { toolCallId: "call", toolName: "lookup", durationMs: 5, inputSize: 0, outputSize: 10, status: "error" }],
     ["execution.result", { exit_code: 0, duration_ms: 0, outcome: "success", extra: "omit" }, { exitCode: 0, durationMs: 0, outcome: "success" }],
     [
@@ -455,6 +460,21 @@ describe("essential unified session payloads", () => {
     expect(reconciled.cacheReadInputTokens).toBeUndefined();
     expect(reconciled.overflowed_tokens).toEqual(["cache_read_input_tokens"]);
     expect(normalizeUnifiedSessionEvent(runtime)).toEqual(runtime);
+  });
+
+  it("keeps only the AWF steering notice type and threshold on token usage events", () => {
+    const steered = normalizeUnifiedSessionEvent({
+      type: "firewall.token_usage",
+      data: { request_id: "steered", model: "claude-sonnet-5", steering: { type: "ai_credit", threshold: 90, message: "omit" } },
+    });
+    expect(steered.data).toEqual({ requestId: "steered", model: "claude-sonnet-5", steering: { type: "ai_credit", threshold: 90 } });
+    const report = normalizeUnifiedSessionEvent({ type: "usage.report", data: { request_id: "steered", steering: { type: "timeout", threshold: 99 } } });
+    expect(report.data).toEqual({ requestId: "steered", steering: { type: "timeout", threshold: 99 } });
+    expect(normalizeUnifiedSessionEvent(steered)).toEqual(steered);
+    for (const steering of [null, "ai_credit", [], {}, { message: "omit" }, { type: "ai_credit" }, { type: "unknown", threshold: 80 }, { type: "token", threshold: "90" }, { type: "token", threshold: 50 }]) {
+      expect(normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data: { request_id: "plain", steering } }).data).not.toHaveProperty("steering");
+    }
+    expect(normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data: { request_id: "plain" } }).data).not.toHaveProperty("steering");
   });
 
   it("retains normalized subagent invocation and per-request usage fields", () => {

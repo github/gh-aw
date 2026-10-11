@@ -1,0 +1,22 @@
+{
+  "input_tokens": 1338,
+  "output_tokens": 562,
+  "cache_read_tokens": 118180,
+  "cache_write_tokens": 59719,
+  "ambient_context": 1332,
+  "ai_credits": 18.58855,
+  "primary_model": "claude-sonnet-5",
+  "model_routing": {
+    "status": "selected",
+    "source": "awf-routing",
+    "provider": "copilot",
+    "wire_model": "claude-sonnet-5",
+    "model": "github-copilot/claude-sonnet-5",
+    "effort": "medium",
+    "endpoint": "/v1/messages",
+    "selected_endpoint": "/chat/completions",
+    "mode": "economy",
+    "selected_id": "choice-0010",
+    "router_version": "0.1.3"
+  }
+}

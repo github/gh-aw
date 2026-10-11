@@ -33,6 +33,34 @@ func applyGatewaySteeringSummary(summary *TokenUsageSummary, runDir string) {
 	}
 }
 
+// applySteeringNotices records the AWF steering notices delivered on model
+// requests. The unified session is the source of truth: notices are read from the
+// steering field of firewall.token_usage events. Runs without a unified session or
+// from AWF versions that do not record the field leave the list empty.
+func applySteeringNotices(summary *TokenUsageSummary, runDir string) {
+	if summary == nil {
+		return
+	}
+	_, notices, err := readUnifiedTokenUsage(runDir)
+	if err != nil {
+		tokenUsageLog.Printf("Failed to read steering notices from unified session in %s: %v", runDir, err)
+		return
+	}
+	if len(notices) > 0 {
+		tokenUsageLog.Printf("Found %d steering notice(s) in unified session", len(notices))
+	}
+	summary.SteeringNotices = notices
+}
+
+// tokenUsageSteeringNotices returns the steering notices recorded on a token
+// usage summary, or nil when there is no summary.
+func tokenUsageSteeringNotices(summary *TokenUsageSummary) []SteeringNotice {
+	if summary == nil {
+		return nil
+	}
+	return summary.SteeringNotices
+}
+
 func parseAPIProxySteeringLog(filePath string) (*apiProxySteeringLog, error) {
 	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
@@ -91,6 +119,8 @@ func gatewaySteeringEventsFromEntries(entries []proxyEventsEntry) []GatewaySteer
 			Type:      entry.eventName(),
 			Message:   strings.TrimSpace(entry.Message),
 			Timestamp: entry.Timestamp,
+			Threshold: int(entry.Threshold),
+			RequestID: strings.TrimSpace(entry.RequestID),
 		})
 	}
 	return events
@@ -113,6 +143,8 @@ func isSteeringEvent(eventName, message string) bool {
 		return strings.HasPrefix(message, awfTokenWarningPrefix)
 	case timeoutSteeringEventName:
 		return strings.HasPrefix(message, awfTimeWarningPrefix)
+	case aiCreditSteeringEventName:
+		return strings.HasPrefix(message, awfAICreditWarningPrefix)
 	default:
 		return false
 	}

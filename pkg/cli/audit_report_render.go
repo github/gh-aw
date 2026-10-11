@@ -499,6 +499,7 @@ func renderConsoleOperationalSections(data AuditData) {
 	renderConsoleWorkQueue(data.WorkQueue)
 	renderConsoleSkillActivations(data.SkillActivations)
 	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)
+	renderConsoleSteeringNotices(data.SteeringNotices)
 	renderConsoleMissingTools(data.MissingTools)
 	renderConsoleMCPFailures(data.MCPFailures)
 	renderCompactMCPHealth(data.MCPServerHealth)
@@ -588,6 +589,23 @@ func renderConsoleGatewaySteeringEvents(events []GatewaySteeringEvent) {
 		line := fmt.Sprintf("    %s: %s", event.Type, event.Message)
 		if event.Timestamp != "" {
 			line += " (" + event.Timestamp + ")"
+		}
+		fmt.Fprintln(os.Stderr, line)
+	}
+}
+
+func renderConsoleSteeringNotices(notices []SteeringNotice) {
+	if len(notices) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "  steering_notices:")
+	for _, notice := range notices {
+		line := fmt.Sprintf("    %s %d%%", notice.Type, notice.Threshold)
+		if notice.RequestID != "" {
+			line += " request_id=" + notice.RequestID
+		}
+		if notice.Phase != "" && notice.Phase != "agent" {
+			line += " phase=" + notice.Phase
 		}
 		fmt.Fprintln(os.Stderr, line)
 	}

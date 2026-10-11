@@ -52,6 +52,13 @@ func awfSupportsTokenSteering(firewallConfig *FirewallConfig) bool {
 	return awfVersionAtLeast(firewallConfig, constants.AWFTokenSteeringMinVersion)
 }
 
+// awfSupportsAgentTimeoutSteering returns true when the effective AWF version
+// sends runtime steering notices from container.agentTimeout, so the compiler
+// can emit agentTimeout for every container runtime.
+func awfSupportsAgentTimeoutSteering(firewallConfig *FirewallConfig) bool {
+	return awfVersionAtLeast(firewallConfig, constants.AWFAgentTimeoutSteeringMinVersion)
+}
+
 // awfSupportsChrootConfig returns true when the effective AWF version supports
 // chroot.binariesSourcePath and chroot.identity.* in the config file (AWF v0.27.1+).
 func awfSupportsChrootConfig(firewallConfig *FirewallConfig) bool {

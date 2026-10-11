@@ -144,11 +144,14 @@ type ProcessedRun struct {
 	cachedAudit             *AuditData
 }
 
-// GatewaySteeringEvent records an AI-credit or timeout warning injected by the gateway.
+// GatewaySteeringEvent records an AI-credit, effective-token or timeout warning
+// injected by the AWF API proxy, read from its steering event log.
 type GatewaySteeringEvent struct {
 	Type      string `json:"type" console:"header:Type"`
 	Message   string `json:"message" console:"header:Message"`
 	Timestamp string `json:"timestamp,omitempty" console:"header:Timestamp,omitempty"`
+	Threshold int    `json:"threshold,omitempty" console:"header:Threshold,omitempty"`
+	RequestID string `json:"request_id,omitempty" console:"header:Request ID,omitempty"`
 }
 
 // ReportProvenance holds the shared provenance fields common to all report record types.
