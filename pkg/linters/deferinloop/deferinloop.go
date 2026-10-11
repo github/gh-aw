@@ -1,12 +1,11 @@
 // Package deferinloop implements a Go analysis linter that flags defer
-// statements placed directly inside for or range loop bodies. A defer inside
-// a loop does not execute at the end of each iteration — it runs when the
-// enclosing function returns, which can cause resource leaks and unexpected
-// cleanup ordering.
+// statements inside loops where they run when the enclosing function returns,
+// rather than at the end of each iteration.
 package deferinloop
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -21,7 +20,7 @@ import (
 var pkgLog = logger.New("linters:deferinloop")
 
 // Analyzer is the defer-in-loop analysis pass.
-var Analyzer = analyzerutil.New("deferinloop", "reports defer statements enclosed anywhere within a for or range loop body; a function literal between a defer and an enclosing loop is treated as a new scope boundary, making the defer exempt; test files are not checked", run)
+var Analyzer = analyzerutil.New("deferinloop", "reports defer statements inside loops where they run when the enclosing function returns rather than at the end of each iteration; range-over-function iterators and function literals form scope boundaries; test files are not checked", run)
 
 func run(pass *analysis.Pass) (any, error) {
 	insp, err := astutil.Inspector(pass)
@@ -50,7 +49,7 @@ func run(pass *analysis.Pass) (any, error) {
 			continue
 		}
 
-		if !isInsideLoop(cur) {
+		if !isInsideLoop(pass, cur) {
 			continue
 		}
 
@@ -63,17 +62,25 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 // isInsideLoop reports whether cur (a DeferStmt) is enclosed anywhere within a
-// for or range loop body, without crossing a function literal boundary.
-// Defers inside func literals are exempt because they form a new function scope
-// and execute when the literal returns, not the outer function.
-func isInsideLoop(cur inspector.Cursor) bool {
+// for or range loop body, without crossing a function literal or range-over-func
+// boundary.
+func isInsideLoop(pass *analysis.Pass, cur inspector.Cursor) bool {
 	for encl := range cur.Enclosing(
 		(*ast.ForStmt)(nil),
 		(*ast.RangeStmt)(nil),
 		(*ast.FuncLit)(nil),
 	) {
-		switch encl.Node().(type) {
-		case *ast.ForStmt, *ast.RangeStmt:
+		switch node := encl.Node().(type) {
+		case *ast.ForStmt:
+			return true
+		case *ast.RangeStmt:
+			if pass.TypesInfo != nil {
+				if typ := pass.TypesInfo.TypeOf(node.X); typ != nil {
+					if _, ok := typ.Underlying().(*types.Signature); ok {
+						return false
+					}
+				}
+			}
 			return true
 		case *ast.FuncLit:
 			return false

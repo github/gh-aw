@@ -315,8 +315,8 @@ while IFS= read -r file; do
   
   # Pattern 1: Secret exfiltration
   if grep -nE '(process\.env\.|os\.getenv|ENV\[)[^;]*\.(post|fetch|axios|request|curl|wget)' "$file" > /tmp/gh-aw/agent/pattern.txt; then
-    echo "⚠️  Potential secret exfiltration in $file"
-    FINDINGS+=("SECRET_EXFIL:$file:$(head -1 /tmp/gh-aw/agent/pattern.txt | cut -d: -f1)")
+    echo "⚠️  Potential secret egress candidate in $file"
+    FINDINGS+=("SECRET_EXFIL_CANDIDATE:$file:$(head -1 /tmp/gh-aw/agent/pattern.txt | cut -d: -f1)")
   fi
   
   # Pattern 2: Eval/exec with user input
@@ -430,8 +430,8 @@ while IFS= read -r file; do
   
   # High entropy might indicate obfuscation
   if [ "$ENTROPY" -gt 70 ]; then
-    echo "⚠️  High entropy detected in $file (entropy: $ENTROPY)"
-    FINDINGS+=("HIGH_ENTROPY:$file:0:entropy=$ENTROPY")
+    echo "⚠️  High entropy candidate detected in $file (entropy: $ENTROPY)"
+    FINDINGS+=("HIGH_ENTROPY_CANDIDATE:$file:0:entropy=$ENTROPY")
   fi
   
   # Check for long hex/base64 strings
@@ -587,6 +587,16 @@ Before proceeding to Phase 5, perform a **second-pass validation** of every find
 <!-- single_pass: skip re-evaluation, proceed directly to Phase 5 -->
 {{/if}}
 
+#### Phase 4c: Evidence Validation (all scan variants)
+
+Before Phase 5, validate every candidate in `FINDINGS[]`, including in the `single_pass` variant. The iterative second pass is additional analysis, not a substitute for these checks:
+
+1. Verify that each cited path exists and that its line number is in range and points to the behavior being reported. Do not treat imports, comments, type declarations, or test fixtures alone as evidence of a production vulnerability.
+2. Treat regex matches, suspicious keywords, entropy scores, and long encoded strings as leads only. A heuristic match does not establish malicious behavior.
+3. For any `SECRET_EXFIL_CANDIDATE`, identify the sensitive value source and the outbound network sink, then trace the same value from source to sink. Cite the exact source and sink lines and explain the data flow. An environment-variable read, a network call, or high entropy on its own is insufficient. Promote the candidate to `SECRET_EXFIL` only when this path is verified; otherwise remove it from `FINDINGS[]` and record the reason in `$CACHE_DIR/dismissed-findings-${TIMESTAMP}.json`.
+4. Apply the same evidence standard to other finding types: retain only findings supported by the cited code and its behavior. If a candidate cannot be verified, do not report it as a confirmed issue.
+5. Ensure all remaining entries in `FINDINGS[]` are confirmed, correctly cited findings before running forensics or generating remediation tasks. If none remain, use the no-findings path in Phase 8.
+
 #### Phase 5: Compile and Report Findings
 
 ```bash
@@ -658,7 +668,7 @@ if [ ${#FINDINGS[@]} -gt 0 ]; then
 
 ### 📋 Executive Summary
 
-The daily security red team scan has detected **${#FINDINGS[@]}** potential security issues in the \`actions/setup/js\` and \`actions/setup/sh\` directories using the **$TECHNIQUE** technique.
+The daily security red team scan has detected **${#FINDINGS[@]}** validated security findings in the \`actions/setup/js\` and \`actions/setup/sh\` directories using the **$TECHNIQUE** technique.
 
 <details>
 <summary><b>🔍 View Detailed Findings</b></summary>

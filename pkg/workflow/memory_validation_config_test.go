@@ -11,6 +11,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseMemoryAllowedExtensions(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  map[string]any
+		want    []string
+		wantErr string
+	}{
+		{name: "missing", config: map[string]any{}},
+		{name: "not a list", config: map[string]any{"allowed-extensions": ".json"}},
+		{name: "valid and non-string entries", config: map[string]any{"allowed-extensions": []any{".json", 1, ".MD"}}, want: []string{".json", ".MD"}},
+		{name: "invalid extension", config: map[string]any{"allowed-extensions": []any{".json", "txt"}}, wantErr: `invalid allowed-extension "txt"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := parseMemoryAllowedExtensions(test.config)
+			if test.wantErr != "" {
+				require.ErrorContains(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
 func TestCompileDeclarativeMemorySchemasWithoutScripts(t *testing.T) {
 	dir := t.TempDir()
 	workflowPath := filepath.Join(dir, "memory.md")

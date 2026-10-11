@@ -1,6 +1,5 @@
 // Package globwalkignorederror implements a Go analysis linter that flags
-// filepath.Glob and os.ReadDir calls where the error return is discarded
-// with _.
+// filepath.Glob and os.ReadDir calls where the error return is discarded.
 package globwalkignorederror
 
 import (
@@ -16,7 +15,7 @@ import (
 )
 
 // Analyzer is the glob-walk-ignored-error analysis pass.
-var Analyzer = analyzerutil.New("globwalkignorederror", "reports filepath.Glob and os.ReadDir calls where the error return is discarded with _", run)
+var Analyzer = analyzerutil.New("globwalkignorederror", "reports filepath.Glob and os.ReadDir calls where the error return is discarded", run)
 
 // checkedFuncs maps package import path to the set of function names within
 // that package whose discarded error return should be flagged.
@@ -31,20 +30,20 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil)}
+	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
-		analyzeGlobWalkAssign(pass, n, generatedFiles, nolintIndex)
+		analyzeGlobWalkStmt(pass, n, generatedFiles, nolintIndex)
 	})
 }
 
-// analyzeGlobWalkAssign checks whether an assignment discards the error
-// return from filepath.Glob or os.ReadDir and reports a diagnostic if so.
-func analyzeGlobWalkAssign(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.GeneratedIndex, nolintIndex nolint.DirectiveIndex) {
-	assign, ok := n.(*ast.AssignStmt)
+// analyzeGlobWalkStmt checks whether a statement discards the error return from
+// filepath.Glob or os.ReadDir and reports a diagnostic if so.
+func analyzeGlobWalkStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.GeneratedIndex, nolintIndex nolint.DirectiveIndex) {
+	stmt, ok := n.(ast.Stmt)
 	if !ok {
 		return
 	}
-	call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, assign)
+	call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, stmt)
 	if !ok {
 		return
 	}

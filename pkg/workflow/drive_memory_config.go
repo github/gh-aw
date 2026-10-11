@@ -128,9 +128,11 @@ func parseDriveMemoryEntry(raw map[string]any, defaultID string) (DriveMemoryEnt
 	if restoreOnly, ok := raw["restore-only"].(bool); ok {
 		entry.RestoreOnly = restoreOnly
 	}
-	if err := parseDriveMemoryAllowedExtensions(raw, &entry); err != nil {
+	allowedExtensions, err := parseMemoryAllowedExtensions(raw)
+	if err != nil {
 		return entry, err
 	}
+	entry.AllowedExtensions = allowedExtensions
 	validation, err := parseMemoryValidationConfig(raw, "tools.drive-memory.validation")
 	if err != nil {
 		return entry, err
@@ -143,29 +145,6 @@ func parseDriveMemoryEntry(raw map[string]any, defaultID string) (DriveMemoryEnt
 		return entry, err
 	}
 	return entry, nil
-}
-
-func parseDriveMemoryAllowedExtensions(raw map[string]any, entry *DriveMemoryEntry) error {
-	value, exists := raw["allowed-extensions"]
-	if !exists {
-		return nil
-	}
-	values, ok := value.([]any)
-	if !ok {
-		return nil
-	}
-	entry.AllowedExtensions = make([]string, 0, len(values))
-	for _, value := range values {
-		extension, ok := value.(string)
-		if !ok {
-			continue
-		}
-		if !isValidFileExtension(extension) {
-			return fmt.Errorf("invalid allowed-extension %q: must start with '.' followed by alphanumeric characters only (e.g. .json)", extension)
-		}
-		entry.AllowedExtensions = append(entry.AllowedExtensions, extension)
-	}
-	return nil
 }
 
 func parseDriveMemoryEntries(values []any) ([]DriveMemoryEntry, error) {

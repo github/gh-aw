@@ -74,15 +74,14 @@ func checkDiscardedJSONAssign(pass *analysis.Pass, assign *ast.AssignStmt, noLin
 }
 
 func checkDiscardedJSONExpr(pass *analysis.Pass, stmt *ast.ExprStmt, noLintIndex nolint.DirectiveIndex) {
-	call, ok := stmt.X.(*ast.CallExpr)
-	if !ok {
+	call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, stmt)
+	if !ok || pkgPath != "encoding/json" {
 		return
 	}
-	if isJSONFunc(pass, call, "Marshal") {
+	switch funcName {
+	case "Marshal":
 		reportDiscardedJSONCall(pass, call, noLintIndex, "error return from json.Marshal is discarded; marshal failures produce nil bytes silently")
-		return
-	}
-	if isJSONFunc(pass, call, "Unmarshal") {
+	case "Unmarshal":
 		reportDiscardedJSONCall(pass, call, noLintIndex, "error return from json.Unmarshal is discarded; unmarshal failures leave the target value in a partial state")
 	}
 }
