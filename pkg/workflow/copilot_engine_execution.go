@@ -631,6 +631,7 @@ func (e *CopilotEngine) addCopilotWorkflowStepEnv(env map[string]string, workflo
 		env["GH_AW_VERSION"] = "dev"
 	}
 	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
+	applyAWFRuntimeAgentTimeoutEnvToMap(env, workflowData)
 	applySafeOutputEnvToMap(env, workflowData)
 	applyTraceContextEnvToMap(env)
 	applyOptionalEngineToolTimeouts(env, workflowData)

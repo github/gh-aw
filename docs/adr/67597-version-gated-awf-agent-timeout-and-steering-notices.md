@@ -27,9 +27,11 @@ and logs output.
 
 For (a), a new `AWFAgentTimeoutSteeringMinVersion` constant plus an `awfSupportsAgentTimeoutSteering` check
 follow the existing AWF feature-flag pattern (`pkg/workflow/awf_feature_flags.go`). `agentTimeout` is derived
-from the resolved `timeout-minutes` only when that value is a **literal**; expressions (including the
-`GH_AW_DEFAULT_TIMEOUT_MINUTES` default) are skipped with a debug log, and the value is raised to the step
-timeout so the GitHub step timeout always fires first. Threat detection gets its own detection-job timeout.
+from the resolved `timeout-minutes` when that value is a **literal**, and the value is raised to the step
+timeout so the GitHub step timeout always fires first. When the step timeout is an expression (including the
+`vars.GH_AW_DEFAULT_TIMEOUT_MINUTES` default), the config omits `agentTimeout`; instead, under the same version
+gate, the agent step exposes the expression as `GH_AW_ENGINE_STEP_TIMEOUT_MINUTES` and the `awf` invocation passes
+`--agent-timeout "$GH_AW_ENGINE_STEP_TIMEOUT_MINUTES"`, so AWF receives the step timeout resolved at run time. Threat detection gets its own detection-job timeout.
 
 For (b), `firewall.token_usage` (and its `usage.report` alias) retains `steering`, projected to
 `{type, threshold}` with unknown or malformed values dropped; `ai_credit_steering` event-log lines map to a
@@ -42,12 +44,11 @@ JSON schemas updated to match.
 
 #### Alternative 1: Always send `agentTimeout`, including for expression-valued timeouts
 
-We could evaluate or approximate non-literal `timeout-minutes` (for example, defaulting to 20 minutes as the
-issue suggested) so every workflow gets runtime steering. This was rejected because the compiler cannot know
-the value of `${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` at compile time; guessing would either under-shoot the
-real step timeout — letting AWF kill the agent before GitHub does, truncating final output — or over-shoot and
-make the warnings meaningless. Requiring a literal `timeout-minutes` keeps the deadline provably consistent and
-is documented in `sandbox.md`.
+We could approximate non-literal `timeout-minutes` at compile time (for example, defaulting to 20 minutes as
+the issue suggested). This was rejected because the compiler cannot know the value of
+`${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` at compile time; guessing would either under-shoot the real step
+timeout — letting AWF kill the agent before GitHub does, truncating final output — or over-shoot and make the
+warnings meaningless. Passing the runtime-resolved step timeout through `--agent-timeout` avoids the guess.
 
 #### Alternative 2: Read steering records directly from `token-usage.jsonl` in the CLI
 
@@ -76,8 +77,8 @@ would remain effectively unreachable for most users, and the issue explicitly as
   and spec-versioned (1.8.0, T-UAS-071), so downstream consumers have a stable contract.
 
 #### Negative
-- The feature silently does nothing for workflows whose `timeout-minutes` is an expression, which is the compiled
-  default; authors must opt in by writing a literal timeout, a subtlety that is easy to miss despite the docs.
+- Expression timeouts reach AWF through a CLI flag rather than the config file, so the deadline lives in two
+  places depending on whether `timeout-minutes` is a literal.
 - The behaviour depends on an unreleased AWF version, so the code path is untestable end-to-end until v0.28.51
   is published, and the min-version constant may need correcting if the release slips or renumbers.
 - Another AWF feature flag plus a spec version bump adds to the growing version-compatibility matrix that every

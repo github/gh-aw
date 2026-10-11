@@ -496,6 +496,39 @@ func resolveAWFAgentTimeoutMinutes(workflowData *WorkflowData, firewallConfig *F
 	return minutes
 }
 
+// awfRuntimeAgentTimeoutExpression returns the step timeout expression to pass to
+// AWF as --agent-timeout at run time, or "" when none applies. It covers the
+// runtimes gated by awfSupportsAgentTimeoutSteering when the step timeout is a
+// GitHub Actions expression (e.g. the vars.GH_AW_DEFAULT_TIMEOUT_MINUTES default),
+// which integer-only container.agentTimeout cannot carry. Passing the resolved
+// step timeout keeps agentTimeout at the step-timeout floor.
+func awfRuntimeAgentTimeoutExpression(workflowData *WorkflowData) string {
+	if workflowData == nil || !isFirewallEnabled(workflowData) || isCloudHypervisorRuntime(workflowData) || isNVXRuntime(workflowData) {
+		return ""
+	}
+	firewallConfig := getFirewallConfig(workflowData)
+	if !awfSupportsAgentTimeoutSteering(firewallConfig) || resolveAWFAgentTimeoutMinutes(workflowData, firewallConfig) > 0 {
+		return ""
+	}
+	stepTimeout := strings.TrimSpace(resolveStepTimeoutValue(workflowData))
+	if !isExpression(stepTimeout) {
+		return ""
+	}
+	return stepTimeout
+}
+
+// applyAWFRuntimeAgentTimeoutEnvToMap exposes the runtime step timeout to the
+// agent step's run: script, so AWF receives it via --agent-timeout without
+// embedding ${{ }} expressions in the script.
+func applyAWFRuntimeAgentTimeoutEnvToMap(env map[string]string, workflowData *WorkflowData) {
+	if env == nil {
+		return
+	}
+	if expr := awfRuntimeAgentTimeoutExpression(workflowData); expr != "" {
+		env[awfRuntimeAgentTimeoutVarName] = expr
+	}
+}
+
 func resolveAWFContainerAgentTimeoutMinutes(workflowData *WorkflowData) int {
 	// Reuse the workflow-level default timeout so Cloud Hypervisor inherits the same
 	// runtime ceiling when top-level timeout-minutes is omitted or non-numeric.

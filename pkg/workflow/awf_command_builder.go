@@ -132,6 +132,10 @@ func appendExpandableServiceAndHypervisorArgs(config AWFCommandConfig, isCloudHy
 	} else if config.WorkflowData != nil && config.WorkflowData.ServicePortExpressions != "" {
 		awfHelpersLog.Printf("Skipping --allow-host-service-ports: requires sandbox.agent.runtime: %s", AgentRuntimeDockerSudoIptables)
 	}
+	if awfRuntimeAgentTimeoutExpression(config.WorkflowData) != "" {
+		expandableArgs += fmt.Sprintf(` ${%s:+--agent-timeout "$%s"}`, awfRuntimeAgentTimeoutVarName, awfRuntimeAgentTimeoutVarName)
+		awfHelpersLog.Printf("Added --agent-timeout from %s for an expression step timeout", awfRuntimeAgentTimeoutVarName)
+	}
 	if isCloudHypervisor {
 		expandableArgs += ` --cloud-hypervisor-binary "${GH_AW_CLOUD_HYPERVISOR_BINARY}"` +
 			` --cloud-hypervisor-kernel "${GH_AW_CLOUD_HYPERVISOR_KERNEL}"` +

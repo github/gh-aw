@@ -486,6 +486,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	}
 	applySafeOutputEnvToMap(env, workflowData)
 	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
+	applyAWFRuntimeAgentTimeoutEnvToMap(env, workflowData)
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.LLMProvider != "" {
 		env["GH_AW_LLM_PROVIDER_EXPLICIT"] = "1"
 	}

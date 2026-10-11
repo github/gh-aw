@@ -73,6 +73,7 @@ func (e *AgyEngine) buildExecutionEnv(workflowData *WorkflowData, firewallEnable
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	applySafeOutputEnvToMap(env, workflowData)
 	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
+	applyAWFRuntimeAgentTimeoutEnvToMap(env, workflowData)
 	applyTraceContextEnvToMap(env)
 	applyOptionalEngineToolTimeouts(env, workflowData)
 	applyEngineMaxTurnsEnv(env, workflowData)

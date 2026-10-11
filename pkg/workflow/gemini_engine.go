@@ -347,6 +347,7 @@ touch %s
 	// Add safe outputs env
 	applySafeOutputEnvToMap(env, workflowData)
 	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
+	applyAWFRuntimeAgentTimeoutEnvToMap(env, workflowData)
 
 	// Propagate W3C trace context so engine spans nest under the gh-aw.agent.setup span.
 	applyTraceContextEnvToMap(env)

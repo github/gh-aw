@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -181,6 +182,67 @@ safe-outputs:
 				return
 			}
 			assert.Equal(t, tt.want, got, "agent and detection AWF configs should carry their own step timeouts")
+		})
+	}
+}
+
+func TestCompileWorkflow_AgentTimeoutExpressionStepTimeout(t *testing.T) {
+	const agentTimeoutArg = `${GH_AW_ENGINE_STEP_TIMEOUT_MINUTES:+--agent-timeout "$GH_AW_ENGINE_STEP_TIMEOUT_MINUTES"}`
+	stepTimeoutExpr := compilerenv.BuildTimeoutMinutesExpression(compilerenv.DefaultTimeoutMinutes, int(constants.DefaultAgenticWorkflowTimeout.Minutes()))
+
+	tests := []struct {
+		name    string
+		engine  string
+		version string
+		want    bool
+	}{
+		{name: "copilot on supported AWF version", engine: "copilot", version: string(constants.AWFAgentTimeoutSteeringMinVersion), want: true},
+		{name: "claude on supported AWF version", engine: "claude", version: string(constants.AWFAgentTimeoutSteeringMinVersion), want: true},
+		{name: "codex on supported AWF version", engine: "codex", version: string(constants.AWFAgentTimeoutSteeringMinVersion), want: true},
+		{name: "unsupported AWF version", engine: "copilot", version: "v0.28.50"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(compilerenv.DefaultTimeoutMinutes, "")
+			workflowsDir := t.TempDir()
+			markdown := `---
+on:
+  workflow_dispatch:
+engine: ` + tt.engine + `
+strict: false
+sandbox:
+  agent:
+    id: awf
+    version: ` + tt.version + `
+---
+
+# Test runtime agentTimeout
+`
+			testFile := filepath.Join(workflowsDir, "test-agent-timeout.md")
+			require.NoError(t, os.WriteFile(testFile, []byte(markdown), 0o644))
+			require.NoError(t, NewCompiler().CompileWorkflow(testFile))
+
+			lockBytes, err := os.ReadFile(filepath.Join(workflowsDir, "test-agent-timeout.lock.yml"))
+			require.NoError(t, err)
+			lockContent := string(lockBytes)
+			assert.NotRegexp(t, `\\"agentTimeout\\":\d+`, lockContent, "expression timeouts cannot be emitted as integer container.agentTimeout")
+
+			agentStepStart := strings.Index(lockContent, "id: agentic_execution")
+			require.NotEqual(t, -1, agentStepStart, "agent step should be present")
+			agentStep := lockContent[agentStepStart:]
+			if next := strings.Index(agentStep, "\n      - name:"); next != -1 {
+				agentStep = agentStep[:next]
+			}
+			assert.Contains(t, agentStep, "timeout-minutes: "+stepTimeoutExpr)
+
+			if !tt.want {
+				assert.NotContains(t, lockContent, "--agent-timeout")
+				assert.NotContains(t, agentStep, "GH_AW_ENGINE_STEP_TIMEOUT_MINUTES")
+				return
+			}
+			assert.Contains(t, agentStep, agentTimeoutArg, "awf should receive the runtime step timeout")
+			assert.Contains(t, agentStep, "GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: "+stepTimeoutExpr, "agent step env should carry the runtime step timeout")
 		})
 	}
 }
