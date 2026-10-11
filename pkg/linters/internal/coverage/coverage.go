@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 
@@ -81,31 +82,70 @@ func load() {
 func (idx *profileIndex) findProfile(filename string) *xcov.Profile {
 	norm := filepath.ToSlash(filename)
 	modPrefix := modulePrefix()
-	for key, p := range idx.profiles {
-		normKey := filepath.ToSlash(key)
-		if strings.HasSuffix(norm, "/"+normKey) || norm == normKey {
-			return p
+	keys := make([]string, 0, len(idx.profiles))
+	for key := range idx.profiles {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	var best *xcov.Profile
+	bestExact := false
+	bestLength := -1
+	bestKey := ""
+	consider := func(key, candidate string, p *xcov.Profile) {
+		exact := norm == candidate
+		if !exact && !strings.HasSuffix(norm, "/"+candidate) {
+			return
 		}
+		if exact && !bestExact ||
+			exact == bestExact && (len(candidate) > bestLength ||
+				len(candidate) == bestLength && (bestKey == "" || key < bestKey)) {
+			best = p
+			bestExact = exact
+			bestLength = len(candidate)
+			bestKey = key
+		}
+	}
+
+	for _, key := range keys {
+		p := idx.profiles[key]
+		normKey := filepath.ToSlash(key)
+		consider(key, normKey, p)
 		if modPrefix != "" {
 			if rel, ok := strings.CutPrefix(normKey, modPrefix+"/"); ok {
-				if strings.HasSuffix(norm, "/"+rel) || norm == rel {
-					return p
-				}
+				consider(key, rel, p)
 			}
 		}
 	}
-	return nil
+	return best
 }
 
-// hitCount returns the execution count for the given 1-based line number.
-// When multiple coverage blocks span the same line, the last one wins (standard
-// Go coverage tool behaviour). Returns 0 when no block covers the line.
-func hitCount(p *xcov.Profile, line int) int {
-	count := 0
+// hitCount returns the execution count for the given 1-based line and column.
+// When column data is unavailable, the last block spanning the line wins.
+func hitCount(p *xcov.Profile, line, column int) int {
+	count, lineCount := 0, 0
+	hasLineBlock, hasColumnInfo, hasColumnMatch := false, false, false
 	for _, b := range p.Blocks {
-		if b.StartLine <= line && line <= b.EndLine {
-			count = b.Count
+		if b.StartLine > line || line > b.EndLine {
+			continue
 		}
+		hasLineBlock = true
+		lineCount = b.Count
+		if b.StartCol <= 0 || b.EndCol <= 0 {
+			continue
+		}
+		hasColumnInfo = true
+		if column > 0 && (line != b.StartLine || column >= b.StartCol) &&
+			(line != b.EndLine || column < b.EndCol) {
+			count = b.Count
+			hasColumnMatch = true
+		}
+	}
+	if hasColumnMatch {
+		return count
+	}
+	if hasLineBlock && !hasColumnInfo {
+		return lineCount
 	}
 	return count
 }
@@ -135,7 +175,7 @@ func ShouldApply(pass *analysis.Pass, pos token.Pos, threshold int) bool {
 	if p == nil {
 		return true
 	}
-	return hitCount(p, position.Line) >= threshold
+	return hitCount(p, position.Line, position.Column) >= threshold
 }
 
 // RegisterHotThresholdFlag registers a -hot-threshold flag on the given

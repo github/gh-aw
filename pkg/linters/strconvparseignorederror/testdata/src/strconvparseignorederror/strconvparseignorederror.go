@@ -15,6 +15,10 @@ func bad() {
 	_ = u
 }
 
+func badBareCalls() {
+	strconv.Atoi("42") // want `error return from strconv\.Atoi is discarded`
+}
+
 func good() {
 	n, err := strconv.Atoi("42")
 	if err != nil {

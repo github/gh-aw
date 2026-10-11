@@ -12,6 +12,11 @@ func bad() {
 	_ = entries
 }
 
+func badBareCalls() {
+	filepath.Glob("*.go") // want `error return from filepath\.Glob is discarded`
+	os.ReadDir(".")       // want `error return from os\.ReadDir is discarded`
+}
+
 func good() {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
