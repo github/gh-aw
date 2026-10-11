@@ -33,7 +33,9 @@ func TestWorkQueueCompiledPolicyAndLaunchIdentity(t *testing.T) {
 			dir := filepath.Join(testutil.TempDir(t, "compiled-queue-identity-"), ".github", "workflows")
 			require.NoError(t, os.MkdirAll(dir, 0o700))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "worker.md"), []byte("---\non: workflow_dispatch\ntools:\n  work-queue:\n    worker: true\n---\nProcess the original immutable assignment.\n"), 0o600))
+			// Explicit principal policies remain supported only in legacy non-strict mode.
 			source := fmt.Sprintf(`---
+strict: false
 on: workflow_dispatch
 engine: claude
 tools:
@@ -65,6 +67,7 @@ Dispatch only approved workers using the protected launch credential.
 			filename := filepath.Join(dir, "dispatcher.md")
 			require.NoError(t, os.WriteFile(filename, []byte(source), 0o600))
 			compiler := NewCompiler(WithVersion("integration"))
+			compiler.gitRoot = filepath.Dir(filepath.Dir(dir))
 			compiler.SetApprove(true)
 			require.NoError(t, compiler.CompileWorkflow(filename))
 			content, err := os.ReadFile(filepath.Join(dir, "dispatcher.lock.yml"))

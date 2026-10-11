@@ -757,7 +757,7 @@ async function verifyCompiledDispatchIdentity(input) {
             assert.equal(dispatch.sender.principal, "11");
             assert.equal(dispatch.sender.run_attempt, 2);
             assert.equal(parameters.ref, REF);
-            assert.equal(parameters.workflow_id, WORKFLOW);
+            assert.equal(parameters.workflow_id, path.posix.basename(WORKFLOW));
             assert.notEqual(parameters.ref, fixture.dispatcherContext.sha);
             return { status: 200, data: { workflow_run_id: "42", run_url: "https://api.github.com/repos/owner/repo/actions/runs/42", html_url: "https://github.com/owner/repo/actions/runs/42" } };
           },
