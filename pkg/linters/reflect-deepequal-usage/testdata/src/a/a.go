@@ -31,7 +31,7 @@ func testDeepEqualNegation(a, b interface{}) bool {
 // testDeepEqualWithAlias should be flagged - using an alias for reflect package
 func testDeepEqualWithAlias(a, b interface{}) bool {
 	r := reflect.DeepEqual // reference to function
-	return r(a, b)
+	return r(a, b)         // want `reflect.DeepEqual\(\) is inefficient`
 }
 
 // testDeepEqualInComparison should be flagged - comparing result in expression

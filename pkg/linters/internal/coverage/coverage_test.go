@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	xcov "golang.org/x/tools/cover"
 	"golang.org/x/tools/go/analysis"
 )
 
@@ -40,6 +41,10 @@ func newFset(t *testing.T, filename string, size int) *fsetHandle {
 // lineStart returns the token.Pos for the start of the given 1-based line.
 func (h *fsetHandle) lineStart(line int) token.Pos {
 	return h.file.LineStart(line)
+}
+
+func (h *fsetHandle) lineColumn(line, column int) token.Pos {
+	return h.file.LineStart(line) + token.Pos(column-1)
 }
 
 // writeTempProfile writes a coverage profile to a temp file and returns the path.
@@ -176,16 +181,44 @@ func TestMultiBlockProfileLookup(t *testing.T) {
 	resetForTest()
 	profileKey := "github.com/org/repo/pkg/foo/foo.go"
 	content := "mode: count\n" +
-		profileKey + ":2.1,2.40 1 0\n" +
-		profileKey + ":2.41,2.80 1 5\n"
+		profileKey + ":2.1,2.10 1 0\n" +
+		profileKey + ":2.11,2.20 1 5\n"
 	t.Setenv(envVar, writeTempProfile(t, content))
 
 	absFile := "/some/absolute/path/" + profileKey
 	fh := newFset(t, absFile, 400)
 	pass := &analysis.Pass{Fset: fh.fset}
 
-	if !ShouldApply(pass, fh.lineStart(2), 3) {
-		t.Fatal("expected true: last block for line 2 has count=5, threshold=3")
+	if ShouldApply(pass, fh.lineColumn(2, 5), 1) {
+		t.Fatal("expected false: block containing column 5 has count=0")
+	}
+	if !ShouldApply(pass, fh.lineColumn(2, 15), 3) {
+		t.Fatal("expected true: block containing column 15 has count=5, threshold=3")
+	}
+}
+
+func TestFilenameMatchingPrefersMostSpecificSuffix(t *testing.T) {
+	profiles := map[string]*xcov.Profile{
+		"a/foo.go": {
+			FileName: "a/foo.go",
+			Blocks:   []xcov.ProfileBlock{{StartLine: 2, EndLine: 2, Count: 1}},
+		},
+		"pkg/a/foo.go": {
+			FileName: "pkg/a/foo.go",
+			Blocks:   []xcov.ProfileBlock{{StartLine: 2, EndLine: 2, Count: 5}},
+		},
+	}
+	idx := &profileIndex{profiles: profiles}
+
+	for range 100 {
+		got := idx.findProfile("/checkout/pkg/a/foo.go")
+		if got != profiles["pkg/a/foo.go"] {
+			var gotName string
+			if got != nil {
+				gotName = got.FileName
+			}
+			t.Fatalf("findProfile() = %q, want most-specific profile %q", gotName, "pkg/a/foo.go")
+		}
 	}
 }
 

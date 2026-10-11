@@ -11,6 +11,7 @@ import (
 	"go/types"
 	"slices"
 	"strconv"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -37,37 +38,53 @@ func RhsExprForIndex(rhs []ast.Expr, idx int) (ast.Expr, bool) {
 	case len(rhs) == 0:
 		return nil, false
 	case len(rhs) == 1 && idx == 0:
-		return rhs[0], true
-	case idx < len(rhs):
-		return rhs[idx], true
+		for _, expr := range rhs {
+			return expr, true
+		}
+	case idx >= 0 && idx < len(rhs):
+		for i, expr := range rhs {
+			if i == idx {
+				return expr, true
+			}
+		}
 	default:
 		return nil, false
 	}
+	return nil, false
 }
 
-// MatchDiscardedErrorCall reports whether assign has the form value, _ = pkg.Func(...)
-// and resolves the selected function to its imported package.
-func MatchDiscardedErrorCall(pass *analysis.Pass, assign *ast.AssignStmt) (call *ast.CallExpr, pkgPath, funcName string, ok bool) {
-	if pass == nil || pass.TypesInfo == nil || assign == nil || len(assign.Lhs) != 2 || len(assign.Rhs) != 1 {
+// MatchDiscardedErrorCall reports whether stmt discards the error result of a
+// package-qualified call and resolves the function to its imported package.
+func MatchDiscardedErrorCall(pass *analysis.Pass, stmt ast.Stmt) (call *ast.CallExpr, pkgPath, funcName string, ok bool) {
+	if pass == nil || pass.TypesInfo == nil || stmt == nil {
 		return nil, "", "", false
 	}
-	var secondLHS ast.Expr
-	for index, lhs := range assign.Lhs {
-		if index == 1 {
-			secondLHS = lhs
+
+	switch stmt := stmt.(type) {
+	case *ast.AssignStmt:
+		if len(stmt.Lhs) != 2 || len(stmt.Rhs) != 1 {
+			return nil, "", "", false
+		}
+		var blankExpr ast.Expr
+		for i, lhs := range stmt.Lhs {
+			if i == 1 {
+				blankExpr = lhs
+				break
+			}
+		}
+		blank, isBlank := blankExpr.(*ast.Ident)
+		if !isBlank || blank.Name != "_" {
+			return nil, "", "", false
+		}
+		for _, rhs := range stmt.Rhs {
+			call, ok = rhs.(*ast.CallExpr)
 			break
 		}
-	}
-	blank, ok := secondLHS.(*ast.Ident)
-	if !ok || blank.Name != "_" {
+	case *ast.ExprStmt:
+		call, ok = stmt.X.(*ast.CallExpr)
+	default:
 		return nil, "", "", false
 	}
-	var rhs ast.Expr
-	for _, expr := range assign.Rhs {
-		rhs = expr
-		break
-	}
-	call, ok = rhs.(*ast.CallExpr)
 	if !ok {
 		return nil, "", "", false
 	}
@@ -78,25 +95,87 @@ func MatchDiscardedErrorCall(pass *analysis.Pass, assign *ast.AssignStmt) (call 
 	return call, pkgPath, funcName, true
 }
 
-// PackageCall resolves a package-qualified call and returns its import path and
-// selected function name.
+// PackageCall resolves a package-qualified call, including calls through a
+// local function-value alias, and returns its import path and function name.
 func PackageCall(pass *analysis.Pass, call *ast.CallExpr) (pkgPath, funcName string, ok bool) {
 	if pass == nil || pass.TypesInfo == nil || call == nil {
 		return "", "", false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
+	return packageFunction(pass, call.Fun, nil)
+}
+
+func packageFunction(pass *analysis.Pass, expr ast.Expr, seen map[types.Object]bool) (pkgPath, funcName string, ok bool) {
+	switch expr := UnwrapParenExpr(expr).(type) {
+	case *ast.SelectorExpr:
+		ident, ok := expr.X.(*ast.Ident)
+		if !ok {
+			return "", "", false
+		}
+		pkgName, ok := pass.TypesInfo.Uses[ident].(*types.PkgName)
+		if !ok || pkgName.Imported() == nil {
+			return "", "", false
+		}
+		return pkgName.Imported().Path(), expr.Sel.Name, true
+	case *ast.Ident:
+		return packageFunctionAlias(pass, pass.TypesInfo.Uses[expr], seen)
+	}
+	return "", "", false
+}
+
+func packageFunctionAlias(pass *analysis.Pass, obj types.Object, seen map[types.Object]bool) (string, string, bool) {
+	if obj == nil {
 		return "", "", false
 	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
+	if seen == nil {
+		seen = make(map[types.Object]bool)
+	}
+	if seen[obj] {
 		return "", "", false
 	}
-	pkgName, ok := pass.TypesInfo.Uses[ident].(*types.PkgName)
-	if !ok || pkgName.Imported() == nil {
-		return "", "", false
+	seen[obj] = true
+	for _, file := range pass.Files {
+		if pkgPath, funcName, ok := packageFunctionAliasInFile(pass, file, obj, seen); ok {
+			return pkgPath, funcName, true
+		}
 	}
-	return pkgName.Imported().Path(), sel.Sel.Name, true
+	return "", "", false
+}
+
+func packageFunctionAliasInFile(pass *analysis.Pass, file *ast.File, obj types.Object, seen map[types.Object]bool) (string, string, bool) {
+	var pkgPath, funcName string
+	ast.Inspect(file, func(node ast.Node) bool {
+		if node == nil || pkgPath != "" {
+			return false
+		}
+		value := packageFunctionAliasInitializer(pass, node, obj)
+		if value == nil {
+			return true
+		}
+		pkgPath, funcName, _ = packageFunction(pass, value, seen)
+		return false
+	})
+	return pkgPath, funcName, pkgPath != ""
+}
+
+func packageFunctionAliasInitializer(pass *analysis.Pass, node ast.Node, obj types.Object) ast.Expr {
+	switch node := node.(type) {
+	case *ast.ValueSpec:
+		for i, name := range node.Names {
+			if pass.TypesInfo.Defs[name] == obj {
+				value, _ := RhsExprForIndex(node.Values, i)
+				return value
+			}
+		}
+	case *ast.AssignStmt:
+		for i, lhs := range node.Lhs {
+			ident, ok := lhs.(*ast.Ident)
+			if ok && pass.TypesInfo.Defs[ident] == obj {
+				value, _ := RhsExprForIndex(node.Rhs, i)
+				return value
+			}
+		}
+	}
+	return nil
 }
 
 // IsStringLiteral reports whether expr is a string literal.
@@ -357,11 +436,8 @@ func ImportedAs(file *ast.File, info *types.Info, importPath string) (string, bo
 		}
 		// Fallback: last segment of the path.
 		last := importPath
-		for j := len(importPath) - 1; j >= 0; j-- {
-			if importPath[j] == '/' {
-				last = importPath[j+1:]
-				break
-			}
+		if slash := strings.LastIndexByte(importPath, '/'); slash >= 0 {
+			last = importPath[slash+1:]
 		}
 		return last, true
 	}
@@ -530,7 +606,7 @@ func BuildParentMap(root ast.Node) map[ast.Node]ast.Node {
 			return false
 		}
 		if len(stack) > 0 {
-			parents[n] = stack[len(stack)-1]
+			parents[n] = stack[len(stack)-1] //nolint:uncheckedsliceindex // stack is non-empty
 		}
 		stack = append(stack, n)
 		return true
@@ -554,12 +630,12 @@ func TwoValueTypeAssertionOKIdent(typeAssert *ast.TypeAssertExpr, parents map[as
 	switch p := parent.(type) {
 	case *ast.AssignStmt:
 		if len(p.Lhs) == 2 && len(p.Rhs) == 1 {
-			okIdent, ok := p.Lhs[1].(*ast.Ident)
+			okIdent, ok := p.Lhs[1].(*ast.Ident) //nolint:uncheckedsliceindex // len(p.Lhs) is checked above
 			return okIdent, ok
 		}
 	case *ast.ValueSpec:
 		if len(p.Names) == 2 && len(p.Values) == 1 {
-			return p.Names[1], true
+			return p.Names[1], true //nolint:uncheckedsliceindex // len(p.Names) is checked above
 		}
 	}
 	return nil, false
@@ -642,7 +718,15 @@ func AddImportEdit(pass *analysis.Pass, file *ast.File, pkg string) (analysis.Te
 			if !ok || genDecl.Tok != token.IMPORT || genDecl.Lparen.IsValid() {
 				continue
 			}
-			specText := NodeText(pass.Fset, genDecl.Specs[0])
+			var spec ast.Spec
+			for _, candidate := range genDecl.Specs {
+				spec = candidate
+				break
+			}
+			if spec == nil {
+				continue
+			}
+			specText := NodeText(pass.Fset, spec)
 			if specText == "" {
 				continue
 			}

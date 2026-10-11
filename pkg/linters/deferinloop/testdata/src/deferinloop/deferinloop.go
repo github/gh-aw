@@ -86,6 +86,15 @@ func GoodGoFuncLitInsideLoop(paths []string) {
 	}
 }
 
+func GoodRangeOverFunc() {
+	iterator := func(yield func() bool) {
+		yield()
+	}
+	for range iterator {
+		defer println()
+	}
+}
+
 // GoodDeferOutsideLoop is fine — defer is not inside a loop.
 func GoodDeferOutsideLoop() {
 	f, _ := os.Open("file")

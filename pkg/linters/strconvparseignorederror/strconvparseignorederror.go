@@ -1,6 +1,6 @@
 // Package strconvparseignorederror implements a Go analysis linter that flags
 // strconv parsing calls (Atoi, ParseInt, ParseFloat, ParseBool, ParseUint)
-// where the error return is discarded with _.
+// where the error return is discarded.
 package strconvparseignorederror
 
 import (
@@ -15,7 +15,7 @@ import (
 )
 
 // Analyzer is the strconv-parse-ignored-error analysis pass.
-var Analyzer = analyzerutil.New("strconvparseignorederror", "reports strconv parsing calls where the error return is discarded with _", run)
+var Analyzer = analyzerutil.New("strconvparseignorederror", "reports strconv parsing calls where the error return is discarded", run)
 
 // strconvParseFuncs is the set of strconv functions to check.
 var strconvParseFuncs = map[string]bool{
@@ -32,20 +32,20 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil)}
+	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
-		analyzeStrconvAssign(pass, n, generatedFiles, nolintIndex)
+		analyzeStrconvStmt(pass, n, generatedFiles, nolintIndex)
 	})
 }
 
-// analyzeStrconvAssign checks whether an assignment discards the error return
-// from a strconv parsing function and reports a diagnostic if so.
-func analyzeStrconvAssign(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.GeneratedIndex, nolintIndex nolint.DirectiveIndex) {
-	assign, ok := n.(*ast.AssignStmt)
+// analyzeStrconvStmt checks whether a statement discards the error return from
+// a strconv parsing function and reports a diagnostic if so.
+func analyzeStrconvStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.GeneratedIndex, nolintIndex nolint.DirectiveIndex) {
+	stmt, ok := n.(ast.Stmt)
 	if !ok {
 		return
 	}
-	call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, assign)
+	call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, stmt)
 	if !ok {
 		return
 	}
