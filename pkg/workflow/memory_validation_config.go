@@ -20,6 +20,29 @@ const (
 	maxMemoryValidationTimeoutMinutes     = 5
 )
 
+func parseMemoryAllowedExtensions(configMap map[string]any) ([]string, error) {
+	raw, exists := configMap["allowed-extensions"]
+	if !exists {
+		return nil, nil
+	}
+	extensions, ok := raw.([]any)
+	if !ok {
+		return nil, nil
+	}
+	parsed := make([]string, 0, len(extensions))
+	for _, rawExtension := range extensions {
+		extension, ok := rawExtension.(string)
+		if !ok {
+			continue
+		}
+		if !isValidFileExtension(extension) {
+			return nil, fmt.Errorf("invalid allowed-extension %q: must start with '.' followed by alphanumeric characters only (e.g. .json)", extension)
+		}
+		parsed = append(parsed, extension)
+	}
+	return parsed, nil
+}
+
 type MemoryValidationConfig struct {
 	Script         string                   `yaml:"script,omitempty" json:"script,omitempty"`
 	TimeoutMinutes int                      `yaml:"timeout-minutes,omitempty" json:"timeout-minutes,omitempty"`
