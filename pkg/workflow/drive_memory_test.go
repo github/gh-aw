@@ -61,6 +61,11 @@ func TestExtractDriveMemoryConfig(t *testing.T) {
 			wantErr: "invalid drive-memory drive-name",
 		},
 		{
+			name:    "invalid allowed extension",
+			raw:     map[string]any{"allowed-extensions": []any{".json", "invalid"}},
+			wantErr: `invalid allowed-extension "invalid"`,
+		},
+		{
 			name:    "non-object array entry",
 			raw:     []any{"notes"},
 			wantErr: "array entries must be objects",

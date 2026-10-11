@@ -143,9 +143,11 @@ func parseCacheMemoryEntry(cacheMap map[string]any, defaultID string) (CacheMemo
 	if err := parseCacheMemoryScope(cacheMap, &entry); err != nil {
 		return entry, err
 	}
-	if err := parseCacheMemoryAllowedExtensions(cacheMap, &entry); err != nil {
+	allowedExtensions, err := parseMemoryAllowedExtensions(cacheMap)
+	if err != nil {
 		return entry, err
 	}
+	entry.AllowedExtensions = allowedExtensions
 	validation, err := parseMemoryValidationConfig(cacheMap, "tools.cache-memory.validation")
 	if err != nil {
 		return entry, err
@@ -267,29 +269,6 @@ func parseCacheMemoryScope(cacheMap map[string]any, entry *CacheMemoryEntry) err
 		return nil
 	}
 	return fmt.Errorf("invalid cache-memory scope %q: must be one of %v", entry.Scope, validCacheMemoryScopes)
-}
-
-func parseCacheMemoryAllowedExtensions(cacheMap map[string]any, entry *CacheMemoryEntry) error {
-	allowedExts, exists := cacheMap["allowed-extensions"]
-	if !exists {
-		return nil
-	}
-	extArray, ok := allowedExts.([]any)
-	if !ok {
-		return nil
-	}
-	entry.AllowedExtensions = make([]string, 0, len(extArray))
-	for _, ext := range extArray {
-		extStr, ok := ext.(string)
-		if !ok {
-			continue
-		}
-		if !isValidFileExtension(extStr) {
-			return fmt.Errorf("invalid allowed-extension %q: must start with '.' followed by alphanumeric characters only (e.g. .json)", extStr)
-		}
-		entry.AllowedExtensions = append(entry.AllowedExtensions, extStr)
-	}
-	return nil
 }
 
 func applyDefaultAllowedExtensions(entry *CacheMemoryEntry) {
