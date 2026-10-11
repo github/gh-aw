@@ -99,6 +99,17 @@ export interface RuntimeObservationData {
   requestId?: JsonValue;
 }
 
+/** AWF API proxy steering event-log observation. */
+export interface FirewallSteeringData extends RuntimeObservationData {
+  threshold?: JsonValue;
+}
+
+/** AWF steering notice delivered on a model request. */
+export interface SteeringNotice {
+  type: "ai_credit" | "timeout" | "token";
+  threshold: 80 | 90 | 95 | 99;
+}
+
 export interface ModelRoutingData {
   schema?: JsonValue;
   stage?: JsonValue;
@@ -199,6 +210,7 @@ export interface UsageReportData extends UnifiedSessionContextData {
   totalAic?: JsonValue;
   premiumRequests?: JsonValue;
   durationMs?: JsonValue;
+  steering?: SteeringNotice;
   usage?: UnifiedSessionUsage | null;
 }
 
@@ -416,7 +428,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.token_usage": UsageReportData;
   "firewall.model_routing": ModelRoutingData;
   "model_routing.outcome": ModelRoutingOutcomeData;
-  "firewall.steering": RuntimeObservationData;
+  "firewall.steering": FirewallSteeringData;
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;
   "safe_output.result": SafeOutputData;

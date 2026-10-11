@@ -31,6 +31,7 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 		// fallback rather than returning nil immediately.
 		if summary != nil {
 			applyGatewaySteeringSummary(summary, runDir)
+			applySteeringNotices(summary, runDir)
 			augmentSubagentModelAttribution(runDir, summary)
 			return summary, nil
 		}
@@ -50,6 +51,7 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 		return summary, err
 	}
 	applyGatewaySteeringSummary(summary, runDir)
+	applySteeringNotices(summary, runDir)
 	augmentSubagentModelAttribution(runDir, summary)
 	return summary, nil
 }

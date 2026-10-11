@@ -140,7 +140,7 @@ function eventDetail(event) {
     case "firewall.http_access":
       return fields(data, ["host", "method", "status", "decision"]);
     case "firewall.steering":
-      return fields(data, ["event", "message", "reason"]);
+      return fields(data, ["event", "threshold", "message", "reason"]);
     case "firewall.token_usage":
     case "usage.report":
       return fields(data, ["provider", "model", "aic", "totalAic", "premiumRequests", "durationMs"]) + " " + fields(data.usage, ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"]);

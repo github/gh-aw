@@ -527,8 +527,9 @@ func collectAgentTimelineEvents(logDir string, verbose bool) ([]UnifiedTimelineE
 // UnifiedTimelineEvent with Kind == TimelineKindSteering.
 // Returns (zero, false) when the entry is not a recognised steering event.
 //
-// The Status field is set to "token" for token_steering events and "time" for
-// timeout_steering events so that the renderer can apply appropriate icons.
+// The Status field is set to "token" for token_steering events, "time" for
+// timeout_steering events and "credit" for ai_credit_steering events, followed
+// by the budget threshold (for example "credit 90%") when AWF recorded one.
 // The Reason field carries the full message text.
 // The Time field is set from the Timestamp field when present; zero otherwise.
 func steeringEntryToTimelineEvent(entry proxyEventsEntry) (UnifiedTimelineEvent, bool) {
@@ -544,6 +545,11 @@ func steeringEntryToTimelineEvent(entry proxyEventsEntry) (UnifiedTimelineEvent,
 		status = "token"
 	case timeoutSteeringEventName:
 		status = "time"
+	case aiCreditSteeringEventName:
+		status = "credit"
+	}
+	if entry.Threshold > 0 {
+		status = fmt.Sprintf("%s %d%%", status, entry.Threshold)
 	}
 
 	var t time.Time

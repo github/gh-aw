@@ -45,6 +45,12 @@ var modelRoutingGoldenCases = []modelRoutingGoldenCase{
 		legacyClassifierAIC:  new(0.04802),
 	},
 	{
+		name:                 "claude-awf-steering-notices",
+		legacyDifference:     "steering notices are read only from unified firewall.token_usage events, so the legacy variant without usage/aw_session.jsonl lists none",
+		unifiedClassifierAIC: new(0.776),
+		legacyClassifierAIC:  new(0.776),
+	},
+	{
 		name:                 "legacy-no-session-routing",
 		legacyDifference:     "the old session has no routing events; classifier cost is recovered from raw token-usage.jsonl",
 		unifiedClassifierAIC: new(0.03908),
@@ -90,6 +96,7 @@ type modelRoutingGoldenTokenUsage struct {
 	DeclaredSubagentModels []SubagentModelRequest      `json:"declared_subagent_models,omitempty"`
 	SubagentModelActuals   []SubagentModelActual       `json:"subagent_model_actuals,omitempty"`
 	AgentUsage             []AgentUsageBreakdown       `json:"agent_usage,omitempty"`
+	SteeringNotices        []SteeringNotice            `json:"steering_notices,omitempty"`
 	MismatchCount          int                         `json:"mismatch_count,omitempty"`
 	Warnings               []string                    `json:"warnings,omitempty"`
 }
@@ -287,7 +294,8 @@ func projectModelRoutingGoldenAudit(routing *ModelRoutingSummary, usage *TokenUs
 			SubagentModelRequests:  slices.Clone(usage.SubagentModelRequests),
 			DeclaredSubagentModels: slices.Clone(usage.DeclaredSubagentModels),
 			SubagentModelActuals:   slices.Clone(usage.SubagentModelActuals), AgentUsage: slices.Clone(usage.AgentUsage),
-			MismatchCount: usage.MismatchCount, Warnings: slices.Clone(usage.Warnings),
+			SteeringNotices: slices.Clone(usage.SteeringNotices),
+			MismatchCount:   usage.MismatchCount, Warnings: slices.Clone(usage.Warnings),
 		}
 		for model, modelUsage := range usage.ByModel {
 			if modelUsage == nil {
@@ -498,6 +506,18 @@ func assertModelRoutingGoldenCase(t *testing.T, testCase modelRoutingGoldenCase,
 			routing.EffectiveEndpoint != "/v1/messages" || routing.SelectedEndpoint != "/chat/completions" ||
 			len(routing.Deviations) != 0 {
 			t.Fatalf("unexpected Claude AWF endpoint routing: %+v", routing)
+		}
+	case "claude-awf-steering-notices":
+		var want []SteeringNotice
+		if !legacy {
+			want = []SteeringNotice{
+				{Type: "ai_credit", Threshold: 80, RequestID: "d00ff6a1-276b-4edd-819e-1b29e4fddb6b", Phase: "agent"},
+				{Type: "timeout", Threshold: 90, RequestID: "6509695f-5e67-4f95-9380-af82072a78fb", Phase: "agent"},
+				{Type: "token", Threshold: 95, RequestID: "b82dc73a-a50a-4d64-91e7-84f9cf437442", Phase: "detection"},
+			}
+		}
+		if usage == nil || !reflect.DeepEqual(usage.SteeringNotices, want) {
+			t.Fatalf("unexpected steering notices for legacy=%t: %+v", legacy, usage)
 		}
 	case "pi-claude-two-subagents":
 		if usage == nil || len(usage.AgentUsage) == 0 {

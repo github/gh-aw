@@ -114,6 +114,15 @@ const AWFDockerHostPathPrefixMinVersion Version = "v0.25.43"
 // apiProxy.enableTokenSteering (mapped from frontmatter firewall.token-steering).
 const AWFTokenSteeringMinVersion Version = "v0.25.44"
 
+// AWFAgentTimeoutSteeringMinVersion is the minimum AWF version whose API proxy
+// sends runtime (timeout) steering notices when container.agentTimeout is set
+// (gh-aw-firewall#9790). Below this version the compiler only emits
+// container.agentTimeout for the Cloud Hypervisor and NVX runtimes.
+//
+// v0.28.51 is the first release after v0.28.50; it was not yet published when
+// this gate was added.
+const AWFAgentTimeoutSteeringMinVersion Version = "v0.28.51"
+
 // AWFChrootConfigMinVersion is the minimum AWF version that supports
 // chroot.binariesSourcePath and chroot.identity.* in the config file.
 // These fields let AWF handle binary staging and identity resolution natively

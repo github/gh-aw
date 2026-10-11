@@ -659,6 +659,33 @@ describe("Unified conclusion session", () => {
     }
   );
 
+  it("carries AWF steering notices from token usage and steering event logs", () => {
+    write("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", [
+      { timestamp: "2026-10-02T00:00:01Z", event: "token_usage", request_id: "credit", purpose: "agent", model: "claude-sonnet-5", input_tokens: 1, steering: { type: "ai_credit", threshold: 80 } },
+      { timestamp: "2026-10-02T00:00:02Z", event: "token_usage", request_id: "plain", purpose: "agent", model: "claude-sonnet-5", input_tokens: 1 },
+      { timestamp: "2026-10-02T00:00:03Z", event: "token_usage", request_id: "time", purpose: "agent", model: "claude-sonnet-5", input_tokens: 1, steering: { type: "timeout", threshold: 90 } },
+    ]);
+    write("sandbox/firewall/logs/api-proxy-logs/events.jsonl", [
+      { timestamp: "2026-10-02T00:00:01Z", level: "info", event: "ai_credit_steering", request_id: "credit", provider: "copilot", threshold: 80, message: "[AWF AI CREDIT WARNING] budget" },
+      { timestamp: "2026-10-02T00:00:03Z", level: "info", event: "timeout_steering", request_id: "time", provider: "copilot", threshold: 90, message: "[AWF TIME WARNING] time" },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const usage = events.filter(event => event.type === "firewall.token_usage");
+    expect(usage.map(event => [event.data.requestId, event.data.steering])).toEqual([
+      ["credit", { type: "ai_credit", threshold: 80 }],
+      ["plain", undefined],
+      ["time", { type: "timeout", threshold: 90 }],
+    ]);
+    expect(usage[1].data).not.toHaveProperty("steering");
+    expect(events.filter(event => event.type === "firewall.steering").map(event => event.data)).toEqual([
+      { event: "ai_credit_steering", level: "info", message: "[AWF AI CREDIT WARNING] budget", requestId: "credit", threshold: 80 },
+      { event: "timeout_steering", level: "info", message: "[AWF TIME WARNING] time", requestId: "time", threshold: 90 },
+    ]);
+    const validate = req("./scripts/validate_session.cjs").createSessionValidator("unified").event;
+    for (const event of events) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...usage[0], data: { ...usage[0].data, steering: { type: "ai_credit", threshold: 80, message: "PRIVATE" } } })).toBe(false);
+  });
+
   it("prefers persisted canonical events over raw logs and avoids replicated firewall accounting", () => {
     write("agent-session.jsonl", [{ type: "vendor.extension", data: { preserved: true } }]);
     write("sandbox/agent/logs/copilot-session-state/uuid/events.jsonl", [{ type: "user.message", data: { content: "duplicate" } }]);

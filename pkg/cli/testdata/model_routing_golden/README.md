@@ -8,6 +8,7 @@ listed workflow runs; they retain only the inputs needed by those analyses.
 | --- | ---: | --- |
 | `copilot-routed-gpt-responses` | `37886511291` | Copilot routing through `/responses`, classifier credits, and legacy raw-token fallback |
 | `claude-awf-selected-messages` | `37971713032` | Claude selected through `/v1/messages`, including the legacy endpoint normalization |
+| `claude-awf-steering-notices` | `37971713032` | Synthetic copy of `claude-awf-selected-messages` with hand-added AWF `steering` fields (agent `ai_credit` 80% and `timeout` 90%, detection `token` 95%); the legacy variant lists no notices |
 | `pi-claude-two-subagents` | `37971726317` | Pi session with two Claude subagents and tool-execution correlation |
 | `copilot-subagent-failed-and-alias` | `37971738805` | Failed and aliased Copilot subagent routing, cost merging, and dated served model IDs |
 | `legacy-no-session-routing` | `37505153056` | Legacy run without unified routing events; routing and classifier costs come from proxy logs |
@@ -34,6 +35,10 @@ it was not present in those source downloads. When reviewing that refresh,
 confirm that the `expected*.json` files are unchanged and run
 `make verify-model-routing-golden`. The capture command also checks for
 unredacted source content before writing the fixture.
+
+`claude-awf-steering-notices` is not a capture: its source run predates AWF
+steering records, so a recapture would drop the hand-added `steering` fields.
+Edit its `token-usage.jsonl` and `usage/aw_session.jsonl` together instead.
 
 ## Capture or add a case
 

@@ -2372,6 +2372,34 @@
                     "additionalProperties": false
                   }
                 },
+                "steering_notices": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "type": "integer"
+                      },
+                      "request_id": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "threshold"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
                 "mismatch_count": {
                   "type": "integer"
                 },
@@ -2397,6 +2425,34 @@
                 "by_model"
               ],
               "additionalProperties": false
+            },
+            "steering_notices": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "threshold": {
+                    "type": "integer"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "phase": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "threshold"
+                ],
+                "additionalProperties": false
+              }
             },
             "model_routing": {
               "type": [
@@ -4929,11 +4985,45 @@
                       },
                       "timestamp": {
                         "type": "string"
+                      },
+                      "threshold": {
+                        "type": "integer"
+                      },
+                      "request_id": {
+                        "type": "string"
                       }
                     },
                     "required": [
                       "type",
                       "message"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "steering_notices": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "threshold": {
+                        "type": "integer"
+                      },
+                      "request_id": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "threshold"
                     ],
                     "additionalProperties": false
                   }
@@ -5377,6 +5467,34 @@
                           "output_tokens",
                           "cache_read_tokens",
                           "cache_write_tokens"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "steering_notices": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "threshold": {
+                            "type": "integer"
+                          },
+                          "request_id": {
+                            "type": "string"
+                          },
+                          "phase": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "threshold"
                         ],
                         "additionalProperties": false
                       }

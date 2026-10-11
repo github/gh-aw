@@ -2494,6 +2494,34 @@
                       "additionalProperties": false
                     }
                   },
+                  "steering_notices": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "threshold": {
+                          "type": "integer"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        },
+                        "phase": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "threshold"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
                   "mismatch_count": {
                     "type": "integer"
                   },
@@ -2519,6 +2547,34 @@
                   "by_model"
                 ],
                 "additionalProperties": false
+              },
+              "steering_notices": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "threshold": {
+                      "type": "integer"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "phase": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "threshold"
+                  ],
+                  "additionalProperties": false
+                }
               },
               "model_routing": {
                 "type": [

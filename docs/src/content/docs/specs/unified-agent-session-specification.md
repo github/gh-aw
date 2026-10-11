@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.7.0"
+version: "1.8.0"
 status: Draft
-publication_date: "2026-10-09"
+publication_date: "2026-10-11"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.7.0<br>
+**Version**: 1.8.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-09<br>
+**Publication Date**: 2026-10-11<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -600,7 +600,12 @@ source for opaque fields.
 `firewall.token_usage` and its `usage.report` alias expose the following
 source-dependent fields: `provider`, `model`, `purpose` (for example `agent`,
 `subagent`, or `routing_classification`), `path`, `xInitiator`, `requestId`,
-`status`, `durationMs`, `aic`, `totalAic`, `premiumRequests`, and `usage`.
+`status`, `durationMs`, `aic`, `totalAic`, `premiumRequests`, `steering`, and
+`usage`. `steering` is the AWF notice delivered on that request, retaining only
+its `type` (`ai_credit`, `timeout`, or `token`) and `threshold` (80, 90, 95, or
+99); unrecognized values are dropped. `firewall.steering` retains the event-log
+`threshold` and maps `ai_credit_steering`, `token_steering`, and
+`timeout_steering` events.
 Consumers identify router and classifier traffic by `purpose`; a missing
 `purpose` means unknown, not agent.
 
@@ -608,6 +613,12 @@ Consumers identify router and classifier traffic by `purpose`; a missing
 `purpose`, `path`, and `xInitiator` values on `firewall.token_usage` and
 `usage.report` events. A consumer MUST treat a missing `purpose` as unknown and
 MUST NOT classify the event as agent traffic by default.
+
+**T-UAS-071 — Firewall steering notices.** A producer MUST preserve a supplied
+`steering` notice type and threshold on `firewall.token_usage` and
+`usage.report` events. A consumer MUST treat a missing `steering` field as "no
+notice recorded", not "no notice delivered", because earlier AWF versions never
+write it.
 
 **T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
 firewall, or accounting observations to produce another session total. Readers
@@ -1346,6 +1357,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-067 | Repeated native/canonical/detector error observations, live timeout evidence, final-zero and missing exits, malformed or duplicate aggregate records, quoted errors and tool failures | One deterministic `agent.execution` record with distinct native codes/types, stable categories, observed exit precedence, unchanged error evidence, and matching JS/Go reader validation. |
 | T-UAS-068 | Goose stream messages/deltas, tool requests/results, cumulative completion usage, source-second timestamps, malformed records, error-only and partial sessions | Exact supported content and IDs, observed outcomes only, no duplicated snapshots or invented partial results, explicit diagnostics. |
 | T-UAS-070 | Firewall token usage with supplied or absent purpose/path/initiator; `usage.report` alias | Supplied routing metadata survives projection; consumers treat absent purpose as unknown, not agent. |
+| T-UAS-071 | Firewall token usage with supplied, absent, or malformed `steering`; AI-credit, token, and time steering event-log entries | Type and threshold survive projection, malformed notices are dropped, steering events keep threshold and request ID, and absent notices remain unrecorded rather than undelivered. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -1828,6 +1840,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.8.0 — Draft (2026-10-11)
+
+- Added the AWF `steering` notice to `firewall.token_usage` and `usage.report` (T-UAS-071).
+- Mapped `ai_credit_steering` to `firewall.steering` and retained steering thresholds.
+- Retained serialization-format version 1.
 
 ### Version 1.7.0 — Draft (2026-10-09)
 

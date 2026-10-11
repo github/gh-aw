@@ -331,10 +331,7 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	if len(containerImages) > 0 {
 		awfImageTag = ""
 	}
-	agentTimeout := 0
-	if isCloudHypervisorRuntime(config.WorkflowData) || isNVXRuntime(config.WorkflowData) {
-		agentTimeout = resolveAWFContainerAgentTimeoutMinutes(config.WorkflowData)
-	}
+	agentTimeout := resolveAWFAgentTimeoutMinutes(config.WorkflowData, firewallConfig)
 	if awfImageTag != "" || isArcDindTopology(config.WorkflowData) || agentTimeout > 0 || len(containerImages) > 0 || isNVXRuntime(config.WorkflowData) {
 		container := &AWFContainerConfig{
 			ImageTag:     awfImageTag,
@@ -463,6 +460,40 @@ func buildAWFCloudHypervisorConfig() *AWFCloudHypervisorConfig {
 		VCPUCount:      constants.DefaultCloudHypervisorVCPUs,
 		MemoryMiB:      constants.DefaultCloudHypervisorMemoryMiB,
 	}
+}
+
+// resolveAWFAgentTimeoutMinutes returns the container.agentTimeout value to emit,
+// or 0 to omit it. Cloud Hypervisor and NVX always receive it. Other runtimes
+// receive it only when the AWF version sends runtime steering notices, because
+// AWF starts its runtime clock (and therefore its timeout notices) only when
+// agentTimeout is set.
+func resolveAWFAgentTimeoutMinutes(workflowData *WorkflowData, firewallConfig *FirewallConfig) int {
+	if isCloudHypervisorRuntime(workflowData) || isNVXRuntime(workflowData) {
+		return resolveAWFContainerAgentTimeoutMinutes(workflowData)
+	}
+	if !awfSupportsAgentTimeoutSteering(firewallConfig) {
+		awfConfigLog.Printf("Skipping container.agentTimeout: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFAgentTimeoutSteeringMinVersion)
+		return 0
+	}
+	minutes := resolveAWFContainerAgentTimeoutMinutes(workflowData)
+	if minutes <= 0 {
+		return 0
+	}
+	// AWF stops the agent (exit code 124) once agentTimeout elapses, counted from
+	// agent start. The agentic step timeout counts from step start, so an
+	// agentTimeout of at least the step timeout can never fire before it. Omit
+	// agentTimeout when the step timeout is not a compile-time integer, since the
+	// two values could not be compared.
+	stepMinutes, ok := literalStepTimeoutMinutes(workflowData)
+	if !ok {
+		awfConfigLog.Printf("Container section: step timeout %q is not a literal number; omitting agentTimeout so the step timeout governs", resolveStepTimeoutValue(workflowData))
+		return 0
+	}
+	if stepMinutes > minutes {
+		awfConfigLog.Printf("Container section: raising agentTimeout from %d to the %d-minute step timeout", minutes, stepMinutes)
+		return stepMinutes
+	}
+	return minutes
 }
 
 func resolveAWFContainerAgentTimeoutMinutes(workflowData *WorkflowData) int {

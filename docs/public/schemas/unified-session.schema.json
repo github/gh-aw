@@ -57,7 +57,7 @@
       { "if": { "properties": { "type": { "const": "firewall.event" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.http_access" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallAccessData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.model_routing" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelRoutingData" } } } },
-      { "if": { "properties": { "type": { "const": "firewall.steering" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "firewall.steering" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallSteeringData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.token_usage" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
       { "if": { "properties": { "type": { "const": "github_api.rate_limit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GitHubApiRateLimitData" } } } },
       { "if": { "properties": { "type": { "const": "grader.manifest" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderManifestData" } } } },
@@ -504,6 +504,20 @@
       },
       "additionalProperties": false
     },
+    "FirewallSteeringData": {
+      "type": "object",
+      "properties": {
+        "event": { "$ref": "#/definitions/JsonValue" },
+        "level": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "message": { "$ref": "#/definitions/JsonValue" },
+        "reason": { "$ref": "#/definitions/JsonValue" },
+        "requestId": { "$ref": "#/definitions/JsonValue" },
+        "threshold": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false,
+      "description": "AWF API proxy steering event-log observation."
+    },
     "GitHubApiRateLimitData": {
       "type": "object",
       "properties": {
@@ -706,6 +720,13 @@
       "additionalProperties": false,
       "description": "Collector metadata is separate from native engine event metadata."
     },
+    "SteeringNotice": {
+      "type": "object",
+      "properties": { "type": { "type": "string", "enum": ["ai_credit", "timeout", "token"] }, "threshold": { "type": "number", "enum": [80, 90, 95, 99] } },
+      "required": ["type", "threshold"],
+      "additionalProperties": false,
+      "description": "AWF steering notice delivered on a model request."
+    },
     "UnifiedMessageData": {
       "type": "object",
       "properties": {
@@ -799,6 +820,7 @@
         "totalAic": { "$ref": "#/definitions/JsonValue" },
         "premiumRequests": { "$ref": "#/definitions/JsonValue" },
         "durationMs": { "$ref": "#/definitions/JsonValue" },
+        "steering": { "$ref": "#/definitions/SteeringNotice" },
         "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
       },
       "additionalProperties": false
