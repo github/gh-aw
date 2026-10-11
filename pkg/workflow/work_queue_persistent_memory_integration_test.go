@@ -99,6 +99,9 @@ func TestWorkQueueFactoryDocumentationExcerptsCompile(t *testing.T) {
 			require.NoError(t, err)
 			directory := filepath.Join(testutil.TempDir(t, "work-queue-factory-docs-"), ".github", "workflows")
 			require.NoError(t, os.MkdirAll(directory, 0o700))
+			shared, err := filepath.Abs("../../.github/workflows/shared")
+			require.NoError(t, err)
+			require.NoError(t, os.Symlink(shared, filepath.Join(directory, "shared")))
 			for _, worker := range []string{"eslint-miner", "eslint-refiner", "eslint-monster"} {
 				for _, extension := range []string{".md", ".lock.yml"} {
 					target, err := filepath.Abs("../../.github/workflows/" + worker + extension)

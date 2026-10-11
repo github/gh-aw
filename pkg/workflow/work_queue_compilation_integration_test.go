@@ -92,7 +92,8 @@ func TestWorkQueueDispatchCredentialActualCompilation(t *testing.T) {
 			} else {
 				require.Equal(t, -1, mint)
 			}
-			require.NotContains(t, string(content), "GH_AW_WORK_QUEUE_POLICY:")
+			require.Contains(t, string(content), "GH_AW_WORK_QUEUE_POLICY:")
+			require.Contains(t, string(content), `\"authorization\":\"aw\"`)
 		})
 	}
 }
@@ -195,7 +196,9 @@ Compile each work-queue workflow phase.
 func TestWorkQueueNamedProfileCompilation(t *testing.T) {
 	dir := testutil.TempDir(t, "work-queue-named-profile-")
 	path := filepath.Join(dir, "worker.md")
+	// Keep coverage of legacy explicit profiles without repository-level scheduling.
 	require.NoError(t, os.WriteFile(path, []byte(`---
+strict: false
 on: workflow_dispatch
 engine: claude
 tools:
@@ -221,6 +224,7 @@ safe-outputs:
 Use the explicitly approved profile without an implicit fallback worker.
 `), 0o600))
 	compiler := NewCompiler(WithVersion("integration"))
+	compiler.gitRoot = dir
 	compiler.SetApprove(true)
 	require.NoError(t, compiler.CompileWorkflow(path))
 	content, err := os.ReadFile(filepath.Join(dir, "worker.lock.yml"))
@@ -569,7 +573,8 @@ Read the queue and dispatch an available Work identity.
 	require.Contains(t, string(compiled), `work_queue_workflows`)
 	require.Contains(t, string(compiled), `work_queue`)
 	require.NotContains(t, string(compiled), "WORK_QUEUE_HMAC_SECRET")
-	require.NotContains(t, string(compiled), "GH_AW_WORK_QUEUE_POLICY:")
+	require.Contains(t, string(compiled), "GH_AW_WORK_QUEUE_POLICY:")
+	require.Contains(t, string(compiled), `\"authorization\":\"aw\"`)
 	inputs, err := extractWorkflowDispatchInputs(filepath.Join(workflowsDir, "dispatcher.lock.yml"))
 	require.NoError(t, err)
 	require.NotContains(t, inputs, WorkQueueClaimInputName)
