@@ -211,7 +211,7 @@ describe("Generated session schemas", () => {
   });
 
   it("checks timestamp ordering, the untimed tail and execution singleton semantics", () => {
-    const timed = time => ({ ...unified({ type: "vendor.progress", data: {} }), provenance: { ...unified({}).provenance, timestampMs: time } });
+    const timed = time => ({ ...unified({ type: "vendor.progress", data: {} }), provenance: { ...unified({}).provenance, path: `source-${time}`, timestampMs: time } });
     const untimed = unified({ type: "vendor.progress", data: {} });
     expect(validateSession(jsonl([header, timed(0), timed(0), timed(1), untimed]))).toBe(5);
     expect(() => validateSession(jsonl([header, timed(1), timed(0)]))).toThrow("timestamp ordered");

@@ -330,7 +330,7 @@ export interface CollectionData {
     phase: string;
     path: string;
     events: SessionCount;
-    timestampUnit?: "seconds" | "milliseconds";
+    timestampUnit?: "seconds" | "milliseconds" | "nanoseconds";
   }[];
   warnings: SessionCount;
   untimedEvents: SessionCount;

@@ -42,6 +42,10 @@ const RUNTIME_TYPES = new Set([
   "execution.result",
   "detection.result",
   "workflow.info",
+  "github_api.rate_limit",
+  "otel.span",
+  "otel.span_event",
+  "otel.log",
 ]);
 
 /** @param {Array<any>} events @returns {boolean} */
@@ -152,6 +156,12 @@ function eventDetail(event) {
       return fields(data, ["event", "serverName", "level", "status"]);
     case "firewall.event":
       return fields(data, ["event", "level", "status"]);
+    case "github_api.rate_limit":
+      return fields(data, ["source", "operation", "resource", "status", "remaining", "limit", "attempt", "delayMs"]);
+    case "otel.span":
+    case "otel.span_event":
+    case "otel.log":
+      return fields(data, ["name", "traceId", "spanId", "parentSpanId", "severityText", "severityNumber"]) + (data.status ? ` ${fields(data.status, ["code", "message"])}` : "");
     case "safe_output.request":
       return `${fields(data, ["type", "repo", "number"])} [requested, not executed]`;
     case "safe_output.result":

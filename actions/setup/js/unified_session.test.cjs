@@ -575,10 +575,10 @@ describe("Unified conclusion session", () => {
     ];
     const original = structuredClone(sources);
     const events = mergeSessionSources(sources);
-    expect(events.map(event => event.data.content)).toEqual(["", "second", undefined, undefined]);
-    expect(events.at(-1).provenance).toMatchObject({ native: { vendor: 1 }, index: 0 });
-    expect(events.at(-1).timestamp).toBe("invalid");
-    expect(events.at(-1).provenance).not.toHaveProperty("timestampMs");
+    expect(events.map(event => event.data.content)).toEqual([undefined, "", "second", undefined]);
+    expect(events[0].provenance).toMatchObject({ native: { vendor: 1 }, index: 0 });
+    expect(events[0].timestamp).toBe("invalid");
+    expect(events[0].provenance).not.toHaveProperty("timestampMs");
     expect(sources).toEqual(original);
     expect(mergeSessionSources(sources)).toEqual(events);
   });
@@ -1029,9 +1029,9 @@ describe("Unified conclusion session", () => {
       { type: "assistant.message", timestamp: "2026-10-02T00:00:01Z", data: { content: "first timed event" } },
     ]);
     const events = writeUnifiedSession({ rootDir: root });
-    expect(events.map(event => event.type)).toEqual(["session.format", "assistant.message", "session.format", "session.collection"]);
+    expect(events.map(event => event.type)).toEqual(["session.format", "session.format", "assistant.message", "session.collection"]);
     expect(events[0].data.version).toBe(1);
-    expect(events[2]).toMatchObject({ data: { version: "native-engine-format" }, provenance: { component: "agent", index: 0 } });
+    expect(events[1]).toMatchObject({ data: { version: "native-engine-format" }, provenance: { component: "agent", index: 0 } });
   });
 
   it("fails explicitly on read errors and removes a stale output rather than uploading it", () => {

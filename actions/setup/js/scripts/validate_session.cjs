@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { Ajv } = require("ajv");
 const { validateSessionFileHeader } = require("../unified_session_render.cjs");
+const { sessionOrderingEntries } = require("../unified_session_order.cjs");
 
 const SCHEMA_DIRECTORY = path.resolve(__dirname, "../../../../docs/public/schemas");
 
@@ -58,16 +59,40 @@ function validateSession(content, kind = "unified", format = "jsonl") {
   if (!validators.array(events)) throw new Error(`Invalid ${kind} session: ${schemaDiagnostic(validators.array.errors)}`);
   if (kind === "unified") {
     validateSessionFileHeader(events);
-    let previousTime = -Infinity;
-    let untimed = false;
+    const sourceKey = source => JSON.stringify([source.component, source.phase, source.path]);
+    const sources = new Map();
+    const units = new Map(events.find(event => event.type === "session.collection" && event.provenance.component === "collector")?.data.sources?.map(source => [sourceKey(source), source.timestampUnit]) ?? []);
     for (const [index, event] of events.entries()) {
       const sourcePath = event.provenance.path;
       if (!sourcePath || /^(?:[/\\]|[a-z]:)/i.test(sourcePath) || sourcePath.split(/[/\\]/).includes("..")) throw new Error(`Invalid relative provenance path at record ${index + 1}`);
       if (index === 0) continue;
-      const time = event.provenance.timestampMs;
-      if (time === undefined) untimed = true;
+      const key = sourceKey(event.provenance);
+      let source = sources.get(key);
+      if (!source) {
+        source = { component: event.provenance.component, timestampUnit: units.get(key) ?? (event.provenance.component === "otel" ? "nanoseconds" : "milliseconds"), events: [] };
+        sources.set(key, source);
+      }
+      if (source.component !== "otel" && source.events.at(-1)?.provenance.index > event.provenance.index) throw new Error(`Unified session is not source ordered at record ${index + 1}`);
+      source.events.push(event);
+    }
+    const ordered = sessionOrderingEntries(
+      [...sources.values()].map(source => ({
+        ...source,
+        events: source.events.map(event => ({
+          timestamp: event.timestamp ?? event.provenance.timestampMs,
+          event,
+        })),
+      }))
+    );
+    const keys = new Map(ordered.map(({ event, time }) => [event.event, time]));
+    let previousTime;
+    let unanchored = false;
+    for (const [index, event] of events.entries()) {
+      if (index === 0) continue;
+      const time = keys.get(event);
+      if (time === undefined) unanchored = true;
       else {
-        if (untimed || time < previousTime) throw new Error(`Unified session is not timestamp ordered at record ${index + 1}`);
+        if (unanchored || (previousTime !== undefined && time < previousTime)) throw new Error(`Unified session is not timestamp ordered at record ${index + 1}`);
         previousTime = time;
       }
     }

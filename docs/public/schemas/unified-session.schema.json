@@ -367,7 +367,7 @@
               "phase": { "type": "string" },
               "path": { "type": "string" },
               "events": { "$ref": "#/definitions/SessionCount" },
-              "timestampUnit": { "type": "string", "enum": ["seconds", "milliseconds"] }
+              "timestampUnit": { "type": "string", "enum": ["seconds", "milliseconds", "nanoseconds"] }
             },
             "required": ["component", "phase", "path", "events"],
             "additionalProperties": false

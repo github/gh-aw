@@ -10,32 +10,16 @@ const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs"
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAgentExecution, parseAgentExitCode, validateAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { normalizeEngineLogEntries, normalizeEngineSessionEvents, parseEngineLog } = require("./engine_log_parser.cjs");
+const { sessionTimestamp, orderSessionSources } = require("./unified_session_order.cjs");
+const { normalizeOtelEvents } = require("./unified_session_otel.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
-/** @typedef {{component: string, phase: string, path: string, events: SessionEvent[], timestampUnit?: "seconds" | "milliseconds"}} SessionSource */
+/** @typedef {{component: string, phase: string, path: string, events: SessionEvent[], timestampUnit?: import("./unified_session_order.cjs").TimestampUnit}} SessionSource */
 
 /** @param {unknown} value @returns {boolean} */
 const isNativePath = value => typeof value === "string" && /^sandbox\/agent\/logs\/copilot-session-state\/[A-Za-z0-9_-]+\/events\.jsonl$/.test(value);
-
-/**
- * Timestamp units come from the source schema, never from the value's magnitude.
- * Native timestamps stay unchanged; this value is only an ordering key.
- * @param {any} record
- * @param {"seconds" | "milliseconds"} [unit]
- * @returns {number | undefined}
- */
-function sessionTimestamp(record, unit = "milliseconds") {
-  const value = record.timestamp ?? record.ts ?? record.time ?? record.created_at ?? record.message?.timestamp;
-  if (typeof value === "number") {
-    const ms = unit === "seconds" ? value * 1000 : value;
-    return Number.isFinite(ms) && Math.abs(ms) <= 8640000000000000 ? ms : undefined;
-  }
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return undefined;
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? ms : undefined;
-}
 
 /**
  * Source-local positions disambiguate repeated native IDs and expanded records.
@@ -44,47 +28,44 @@ function sessionTimestamp(record, unit = "milliseconds") {
  * @returns {import("./types/unified_session").UnifiedSession}
  */
 function mergeSessionSources(sources) {
-  const events = sources.flatMap(source =>
-    source.events.map((event, index) => {
-      const timestampMs = sessionTimestamp(event, source.timestampUnit);
-      const normalized = normalizeUnifiedSessionEvent(event, source.phase);
-      const native = event.provenance;
-      const sourceIndex =
-        source.component === "agent" &&
-        isNativePath(source.path) &&
-        native &&
-        typeof native === "object" &&
-        "path" in native &&
-        native.path === source.path &&
-        (!("phase" in native) || native.phase === source.phase) &&
-        "index" in native &&
-        typeof native.index === "number" &&
-        Number.isSafeInteger(native.index) &&
-        native.index >= 0
-          ? native.index
-          : index;
-      if (event.type === "detection.result" && source.path !== "usage/detection/detection_result.json") {
-        delete normalized.data.reason;
-      }
-      return {
-        ...normalized,
-        provenance: {
-          component: source.component,
-          phase: source.phase,
-          path: source.path,
-          index: sourceIndex,
-          ...(timestampMs !== undefined ? { timestampMs } : {}),
-          ...(Object.hasOwn(event, "provenance") ? { native: structuredClone(event.provenance) } : {}),
-        },
-      };
-    })
+  return orderSessionSources(
+    sources.map(source => ({
+      ...source,
+      events: source.events.map((event, index) => {
+        const timestampMs = sessionTimestamp(event, source.timestampUnit);
+        const normalized = normalizeUnifiedSessionEvent(event, source.phase);
+        const native = event.provenance;
+        const sourceIndex =
+          source.component === "agent" &&
+          isNativePath(source.path) &&
+          native &&
+          typeof native === "object" &&
+          "path" in native &&
+          native.path === source.path &&
+          (!("phase" in native) || native.phase === source.phase) &&
+          "index" in native &&
+          typeof native.index === "number" &&
+          Number.isSafeInteger(native.index) &&
+          native.index >= 0
+            ? native.index
+            : index;
+        if (event.type === "detection.result" && source.path !== "usage/detection/detection_result.json") {
+          delete normalized.data.reason;
+        }
+        return {
+          ...normalized,
+          provenance: {
+            component: source.component,
+            phase: source.phase,
+            path: source.path,
+            index: sourceIndex,
+            ...(timestampMs !== undefined ? { timestampMs } : {}),
+            ...(Object.hasOwn(event, "provenance") ? { native: structuredClone(event.provenance) } : {}),
+          },
+        };
+      }),
+    }))
   );
-  events.sort((left, right) => {
-    const leftTime = left.provenance.timestampMs ?? Infinity;
-    const rightTime = right.provenance.timestampMs ?? Infinity;
-    return leftTime === rightTime ? 0 : leftTime < rightTime ? -1 : 1;
-  });
-  return events;
 }
 
 /** @param {"mcp" | "firewall"} component @param {any} record @returns {SessionEvent} */
@@ -118,6 +99,7 @@ function normalizeRuntimeEvent(component, record) {
     ...(record.timestamp !== undefined ? { timestamp: record.timestamp } : {}),
     ...(record.ts !== undefined ? { ts: record.ts } : {}),
     ...(record.time !== undefined ? { time: record.time } : {}),
+    ...(record.created_at !== undefined ? { created_at: record.created_at } : {}),
   };
 }
 
@@ -208,7 +190,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
    * @param {string} component
    * @param {string} phase
    * @param {`${string}.${string}` | undefined} type
-   * @param {"seconds" | "milliseconds"} [timestampUnit]
+   * @param {import("./unified_session_order.cjs").TimestampUnit} [timestampUnit]
    */
   const add = (file, component, phase, type, timestampUnit = "milliseconds") => {
     if (!exists(file)) return 0;
@@ -222,14 +204,21 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
         report(file, "non_object_record", undefined);
         continue;
       }
-      if (component === "agent") {
+      if (component === "otel") {
+        events.push(
+          ...normalizeOtelEvents(record, code => {
+            incompleteSources.add(file);
+            report(file, code, undefined);
+          })
+        );
+      } else if (component === "agent") {
         if (isSessionEvent(record)) events.push(record);
         else if (!hasLegacyContent || normalizeEngineLogEntries([record], engine ?? "custom").length === 0) {
           incompleteSources.add(file);
           report(file, "non_canonical_agent_event", undefined);
         }
       } else if (type) {
-        events.push({ type, data: record, ...(record.timestamp !== undefined ? { timestamp: record.timestamp } : {}), ...(record.created_at !== undefined ? { created_at: record.created_at } : {}) });
+        events.push({ type, data: record, ...Object.fromEntries(["timestamp", "ts", "time", "created_at"].filter(key => record[key] !== undefined).map(key => [key, record[key]])) });
       } else if (component === "mcp" || component === "firewall") events.push(normalizeRuntimeEvent(component, record));
       else throw new Error(`${ERR_VALIDATION}: Missing event mapping for ${component}`);
     }
@@ -419,6 +408,8 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     ["", "agent"],
     ["threat-detection/", "detection"],
   ]) {
+    const otel = choose([`${prefix}otel.jsonl`, `usage/${prefix}otel.jsonl`]);
+    if (otel) add(otel, "otel", phase, undefined, "nanoseconds");
     for (const file of walk(path.join(rootDir, prefix, "mcp-logs"))) add(file, "mcp", phase, undefined);
     const seen = new Set();
     for (const layout of ["sandbox/firewall/logs", "sandbox/firewall/audit", "sandbox/firewall-audit-logs", "firewall-logs", "firewall-audit-logs"]) {

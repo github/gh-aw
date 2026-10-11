@@ -6,6 +6,7 @@ import "embed"
 // dependencies, not test fixtures. The CLI uses the same sources as Actions.
 //
 //go:embed js/session_cli.cjs js/unified_session.cjs js/unified_session_payload.cjs js/unified_session_render.cjs
+//go:embed js/unified_session_order.cjs js/unified_session_otel.cjs
 //go:embed js/parse_claude_log.cjs js/parse_codex_log.cjs js/parse_copilot_log.cjs js/parse_gemini_log.cjs
 //go:embed js/parse_custom_log.cjs js/parse_pi_log.cjs js/parse_opencode_log.cjs js/parse_goose_log.cjs
 //go:embed js/parse_agy_log.cjs
