@@ -118,6 +118,12 @@ describe("git_helpers.cjs", () => {
       expect(result).toContain("git version");
     });
 
+    it("captures inherited git output for Actions logging", async () => {
+      const { execGitSync } = await import("./git_helpers.cjs");
+
+      expect(execGitSync(["--version"], { stdio: "inherit" })).toContain("git version");
+    });
+
     it("should not call core.error when suppressLogs is true", async () => {
       const { execGitSync } = await import("./git_helpers.cjs");
 

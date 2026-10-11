@@ -35,6 +35,7 @@ func generateFindings(processedRun ProcessedRun, metrics MetricsData, errors []V
 	findings = append(findings, generateToolingFindings(processedRun)...)
 	findings = append(findings, generateFirewallFindings(processedRun)...)
 	findings = append(findings, generateSubagentModelFindings(processedRun.TokenUsage)...)
+	findings = append(findings, generateSubagentModelUnavailableFindings(processedRun.Run.LogsPath)...)
 	findings = append(findings, generateSuccessFindings(processedRun.Run, metrics, errors)...)
 	return findings
 }

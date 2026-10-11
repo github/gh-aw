@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -25,31 +26,21 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 		Repo:         repo,
 	}
 	if num == 0 || repo == "" || item.BeforeState == nil || item.AfterState == nil {
-		report.OutcomeStatus = OutcomeStatusUnknown
 		report.Detail = "missing execution state"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceNone,
-			Signal:           "missing_execution_state",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
 		return report
 	}
 
-	beforeLabels := mutableStringSlice(item.BeforeState["labels"])
-	afterLabels := mutableStringSlice(item.AfterState["labels"])
+	beforeLabels := outcomeLabelNames(item.BeforeState["labels"])
+	afterLabels := outcomeLabelNames(item.AfterState["labels"])
 
 	// Compute the replacement delta: labels added and labels removed.
 	added := labelSetDiff(afterLabels, beforeLabels)
 	removed := labelSetDiff(beforeLabels, afterLabels)
 
 	if len(added) == 0 && len(removed) == 0 {
-		report.OutcomeStatus = OutcomeStatusUnknown
 		report.Detail = "no label delta"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceNone,
-			Signal:           "no_state_delta",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "no_state_delta")
 		return report
 	}
 
@@ -59,7 +50,7 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 		report.EvalError = err.Error()
 		return report
 	}
-	currentLabels := mutableStringSlice(currentState["labels"])
+	currentLabels := outcomeLabelNames(currentState["labels"])
 
 	// The replacement is retained when all added labels are still present and
 	// all removed labels are still absent, regardless of any other label changes.
@@ -67,13 +58,8 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 	removedStillAbsent := !labelSetContainsAny(currentLabels, removed)
 
 	if addedRetained && removedStillAbsent {
-		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = "label replacement retained"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "state_retained",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "state_retained")
 		return report
 	}
 
@@ -81,28 +67,18 @@ func evalReplaceLabel(ctx context.Context, item CreatedItemReport, repoOverride 
 	addedReverted := !labelSetContainsAny(currentLabels, added)
 	removedBack := labelSetContainsAll(currentLabels, removed)
 	if addedReverted && removedBack {
-		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = "label replacement reverted"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusRejected,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "state_reverted",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_reverted")
 		return report
 	}
-
-	report.OutcomeStatus = OutcomeStatusRejected
 	report.Detail = "label replacement replaced"
-	report.OutcomeEvaluation = OutcomeEvaluation{
-		OutcomeStatus:    OutcomeStatusRejected,
-		EvidenceStrength: EvidenceStrong,
-		Signal:           "state_replaced",
-	}
+
+	report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_replaced")
 	return report
 }
 
 // labelSetDiff returns the elements of a that are not in b.
-// Both slices must be sorted (as produced by mutableStringSlice).
+// Both slices must be sorted (as produced by outcomeLabelNames).
 // Uses binary search for O(n log m) performance.
 func labelSetDiff(a, b []string) []string {
 	var out []string
@@ -154,7 +130,28 @@ func evalAddLabels(ctx context.Context, item CreatedItemReport, repoOverride str
 		return report
 	}
 
-	labels, err := ghAPIGetArray(ctx, fmt.Sprintf("issues/%d/labels", num), repo)
+	before := item.LabelsBefore
+	if item.BeforeState != nil {
+		before = mutableStringSlice(item.BeforeState["labels"])
+	}
+	added := item.LabelsAdded
+	if len(added) == 0 {
+		for _, label := range item.Labels {
+			added = append(added, label.Name)
+		}
+	}
+	if before == nil || len(added) == 0 {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
+		report.Detail = "missing execution state"
+		return report
+	}
+	delta := labelSetDiff(outcomeLabelNames(added), outcomeLabelNames(before))
+	if len(delta) == 0 {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "no_state_delta")
+		report.Detail = "no persisted state delta"
+		return report
+	}
+	labels, err := outcomeEvidenceGHAPIGetArray(ctx, fmt.Sprintf("issues/%d/labels", num), repo)
 	if err != nil {
 		outcomeEvalLabelLog.Printf("Failed to fetch labels for %s#%d: %v", repo, num, err)
 		report.OutcomeStatus = OutcomeStatusError
@@ -162,18 +159,27 @@ func evalAddLabels(ctx context.Context, item CreatedItemReport, repoOverride str
 		return report
 	}
 
-	// We don't know exactly which labels were added (the manifest doesn't record them),
-	// so we cannot reliably verify retention. If labels are still present we report
-	// pending rather than accepted, because the current labels could differ entirely
-	// from the ones we added. Only an empty label list is a clear rejection signal.
-	if len(labels) > 0 {
-		report.OutcomeStatus = OutcomeStatusPending
-		report.Detail = "cannot evaluate label retention (added labels not recorded; extend manifest to include label names)"
+	current := make([]string, 0, len(labels))
+	for _, label := range labels {
+		current = append(current, outcomeString(label["name"]))
+	}
+	if labelSetContainsAll(outcomeLabelNames(current), delta) {
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "state_retained")
+		report.Detail = "label addition retained"
 	} else {
-		report.OutcomeStatus = OutcomeStatusRejected
-		report.Detail = "all labels removed"
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_replaced")
+		report.Detail = "added labels removed"
 	}
 
 	outcomeEvalLabelLog.Printf("Label evaluation result: result=%s, label_count=%d", report.OutcomeStatus, len(labels))
 	return report
+}
+
+func outcomeLabelNames(raw any) []string {
+	labels := mutableStringSlice(raw)
+	for i := range labels {
+		labels[i] = strings.ToLower(labels[i])
+	}
+	slices.Sort(labels)
+	return labels
 }

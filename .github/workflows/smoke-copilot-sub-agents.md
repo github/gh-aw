@@ -54,6 +54,68 @@ evals:
 sandbox:
   agent:
     id: awf
+post-steps:
+  - name: Assert sub-agent model and wire API evidence
+    if: always()
+    uses: actions/github-script@v9.0.0
+    env:
+      SMOKE_VARIANT: ${{ needs.activation.outputs.sub_agent_strategy }}
+      SMOKE_EXECUTION: ${{ steps.agentic_execution.outcome }}
+    with:
+      script: |
+        const assert = require("node:assert/strict");
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const root = "/tmp/gh-aw";
+        const { writeUnifiedSession } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/unified_session.cjs"));
+        writeUnifiedSession({ rootDir: root, engine: "copilot" });
+        const readJsonl = file => fs.readFileSync(file, "utf8")
+          .split("\n").filter(line => line.trim()).map(line => JSON.parse(line));
+        const events = readJsonl(path.join(root, "usage/aw_session.jsonl"));
+        const started = events.filter(event => event.type === "subagent.started");
+        if (process.env.SMOKE_VARIANT === "single_agent_control") {
+          assert.equal(started.length, 0, "Control variant must not invoke sub-agents");
+          return;
+        }
+        assert.equal(process.env.SMOKE_EXECUTION, "success", "Copilot SDK execution failed");
+        const proxyPaths = [
+          "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
+          "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
+          "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
+        ];
+        const proxyFile = proxyPaths.map(file => path.join(root, file)).find(file => fs.existsSync(file));
+        assert.ok(proxyFile, "Missing api-proxy token usage evidence");
+        const requests = readJsonl(proxyFile);
+        const expected = [
+          ["haiku-whoami", "claude-haiku-4.5", "/chat/completions"],
+          ["mini-whoami", "gpt-5-mini", "/responses"],
+          ["nano-whoami", "gpt-5-nano", "/responses"],
+        ];
+        const servedModel = model => String(model || "")
+          .replace(/^copilot(?:-(?:responses|completions))?(?:-\d+)?\//, "")
+          .replace(/-[0-9]{4}(?:-[0-9]{2}-[0-9]{2}|[0-9]{4})$/, "")
+          .replace(/^(claude-.+)-([0-9]+)-([0-9]+)$/, "$1-$2.$3");
+        for (const [agentName, model, endpoint] of expected) {
+          const invocations = started.filter(event => event.data.agentName === agentName);
+          assert.equal(invocations.length, 1, `${agentName} must actually run exactly once`);
+          const invocation = invocations[0];
+          const invocationId = invocation.data.invocationId || invocation.agentId;
+          assert.ok(invocationId, `${agentName} is missing an invocation ID`);
+          const activity = events.filter(event => event.data?.invocationId === invocationId || event.agentId === invocationId);
+          assert.ok(activity.some(event => event.type === "subagent.completed"), `${agentName} did not complete`);
+          assert.ok(!activity.some(event => event.type === "subagent.failed"), `${agentName} failed`);
+          const models = activity.flatMap(event => [
+            event.data.model, event.data.selectedModel, event.data.resolvedModel, event.data.firstDispatchedModel,
+          ]).filter(Boolean);
+          assert.ok(models.length > 0, `${agentName} has no recorded model`);
+          assert.ok(models.every(value => servedModel(value) === model), `${agentName} changed or fell back from ${model}`);
+          assert.ok(requests.some(request =>
+            servedModel(request.model) === model &&
+            (request.path || request.endpoint) === endpoint &&
+            Number(request.status) === 200 &&
+            request.purpose !== "routing_classification"),
+            `${agentName} has no successful ${model} request on ${endpoint}`);
+        }
 ---
 
 # Smoke Test: Copilot SDK Inline Sub-Agents

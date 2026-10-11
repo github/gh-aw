@@ -64,9 +64,10 @@ type sessionModelRoutingEvent struct {
 }
 
 type sessionModelRoutingAttribution struct {
-	WorkflowInfo *sessionWorkflowInfo
-	Outcome      *sessionModelRoutingOutcome
-	Mismatches   []ModelEndpointMismatch
+	WorkflowInfo              *sessionWorkflowInfo
+	Outcome                   *sessionModelRoutingOutcome
+	Mismatches                []ModelEndpointMismatch
+	UnavailableSubagentModels []sessionSubagentModelUnavailable
 }
 
 // ModelEndpointMismatch describes a model/API incompatibility reported by the unified session.
@@ -94,6 +95,12 @@ func readSessionModelEndpointMismatches(runDir string) []ModelEndpointMismatch {
 		return nil
 	}
 	return attribution.Mismatches
+}
+
+type sessionSubagentModelUnavailable struct {
+	AgentName     string `json:"agentName"`
+	DeclaredModel string `json:"declaredModel"`
+	Model         string `json:"model"`
 }
 
 func readSessionModelRouting(runDir string) (*sessionModelRoutingAttribution, bool, error) {
@@ -181,6 +188,12 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 			return nil
 		}
 		attribution.Mismatches = append(attribution.Mismatches, mismatch)
+	case event.Type == "subagent.model_unavailable" && event.Provenance.Component == "agent" && event.Provenance.Phase == "agent":
+		var unavailable sessionSubagentModelUnavailable
+		if json.Unmarshal(event.Data, &unavailable) == nil &&
+			unavailable.AgentName != "" && unavailable.DeclaredModel != "" && unavailable.Model != "" {
+			attribution.UnavailableSubagentModels = append(attribution.UnavailableSubagentModels, unavailable)
+		}
 	}
 	return nil
 }

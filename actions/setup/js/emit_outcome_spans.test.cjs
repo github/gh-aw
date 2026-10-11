@@ -195,6 +195,9 @@ describe("emit_outcome_spans.cjs", () => {
       rejected: 1,
       ignored: 0,
       pending: 0,
+      unknown: 1,
+      errors: 2,
+      lifecycle: 3,
       noop: 0,
       accepted_strong: 1,
       accepted_medium: 0,
@@ -231,6 +234,9 @@ describe("emit_outcome_spans.cjs", () => {
           reactions_positive: 4,
           reactions_negative: 1,
           comments: 0,
+          human_comments: 0,
+          human_reviews: 0,
+          human_edits: 0,
           zero_touch: true,
         }),
         JSON.stringify({
@@ -302,6 +308,9 @@ describe("emit_outcome_spans.cjs", () => {
     expect(summarySpan.attributes).toContainEqual({ key: "gh-aw.outcome.date", value: "2026-05-13" });
     expect(summarySpan.attributes).toContainEqual({ key: "gh-aw.outcome.zero_touch_count", value: 1 });
     expect(summarySpan.attributes).toContainEqual({ key: "gh-aw.outcome.accepted_strong", value: 1 });
+    expect(summarySpan.attributes).toContainEqual({ key: "gh-aw.outcome.unknown", value: 1 });
+    expect(summarySpan.attributes).toContainEqual({ key: "gh-aw.outcome.errors", value: 2 });
+    expect(summarySpan.attributes).toContainEqual({ key: "gh-aw.outcome.lifecycle", value: 3 });
     expect(summarySpan.attributes).toContainEqual({ key: "gh-aw.outcome.fallback_exists_only_count", value: 1 });
     expect(spans[1].attributes).toContainEqual({ key: "gh-aw.exporter.name", value: "outcome-collector" });
     expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.url", value: "https://github.com/github/gh-aw/issues/1" });
@@ -318,6 +327,9 @@ describe("emit_outcome_spans.cjs", () => {
     expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.reactions_positive", value: 4 });
     expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.reactions_negative", value: 1 });
     expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.comments", value: 0 });
+    expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.human_comments", value: 0 });
+    expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.human_reviews", value: 0 });
+    expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.human_edits", value: 0 });
     expect(spans[1].attributes).toContainEqual({ key: "gh-aw.outcome.zero_touch", value: true });
     expect(spans[2].attributes.find(attr => attr.key === "gh-aw.outcome.review_comments")).toBeUndefined();
     expect(spans[2].attributes.find(attr => attr.key === "gh-aw.outcome.changed_files")).toBeUndefined();

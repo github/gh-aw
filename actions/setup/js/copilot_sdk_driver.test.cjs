@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { createRequire } from "module";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 
 const require = createRequire(import.meta.url);
@@ -10,18 +9,129 @@ const { runWithCopilotSDK, parsePermissionConfigFromServerArgs } = require("./co
 describe("copilot_sdk_driver.cjs", () => {
   let testSessionStateDir;
   let prevSessionStateDir;
+  let agentDirectorySpy;
   beforeAll(() => {
     prevSessionStateDir = process.env.GH_AW_SESSION_STATE_BASE_DIR;
-    testSessionStateDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-test-session-state-"));
+    testSessionStateDir = fs.mkdtempSync(path.join(process.cwd(), ".gh-aw-test-session-state-"));
     process.env.GH_AW_SESSION_STATE_BASE_DIR = testSessionStateDir;
+    const runtimeFs = require("fs");
+    const readdirSync = runtimeFs.readdirSync;
+    agentDirectorySpy = vi.spyOn(runtimeFs, "readdirSync").mockImplementation((directory, options) => {
+      // Never inspect the developer checkout's agents when exercising the SDK.
+      if (!String(directory).startsWith(testSessionStateDir) && String(directory).endsWith("/.github/agents")) return [];
+      return readdirSync(directory, options);
+    });
   });
   afterAll(() => {
     if (prevSessionStateDir === undefined) delete process.env.GH_AW_SESSION_STATE_BASE_DIR;
     else process.env.GH_AW_SESSION_STATE_BASE_DIR = prevSessionStateDir;
     if (testSessionStateDir) fs.rmSync(testSessionStateDir, { recursive: true, force: true });
+    agentDirectorySpy.mockRestore();
   });
 
   describe("runWithCopilotSDK", () => {
+    it.each([
+      ["gpt-5.4", "claude-sonnet-4.6", "copilot-responses", "copilot-completions"],
+      ["claude-sonnet-4.6", "gpt-5.4", "copilot-completions", "copilot-responses"],
+    ])("qualifies %s session and cross-provider %s custom agents at runtime", async (sessionModel, agentModel, sessionProvider, agentProvider) => {
+      const workspace = path.join(testSessionStateDir, `${sessionProvider}-workspace`);
+      const workflow = path.join(testSessionStateDir, `${sessionProvider}-workflow`);
+      fs.mkdirSync(path.join(workspace, ".github/agents"), { recursive: true });
+      fs.mkdirSync(path.join(workflow, ".github/agents"), { recursive: true });
+      fs.writeFileSync(
+        path.join(workspace, ".github/agents/researcher.agent.md"),
+        `---\nname: researcher\ndescription: >-\n  Research across\n  providers\ntools:\n  - read\n  - grep\nmodel: copilot/${agentModel}\n---\nResearch carefully.\n`
+      );
+      fs.writeFileSync(path.join(workflow, ".github/agents/workflow.agent.md"), "---\nname: workflow-agent\nmodel: medium\ntools: read, grep\n---\nWorkflow prompt.");
+      for (const alias of ["small", "large"]) fs.writeFileSync(path.join(workflow, `.github/agents/${alias}.agent.md`), `---\nmodel: ${alias}\n---\nAlias prompt.`);
+      fs.writeFileSync(path.join(workflow, ".github/agents/unknown.agent.md"), "---\nname: unknown-agent\nmodel: unavailable-model\n---\nKeep this agent.");
+      const createSession = vi.fn().mockResolvedValue({
+        sessionId: `${sessionProvider}-agent-session`,
+        on: () => {},
+        sendAndWait: vi.fn().mockResolvedValue({ data: { content: "done" } }),
+        disconnect: vi.fn().mockResolvedValue(undefined),
+      });
+      const constructor = vi.fn();
+      class FakeCopilotClient {
+        constructor(options) {
+          constructor(options);
+        }
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = createSession;
+        stop = vi.fn().mockResolvedValue(undefined);
+      }
+      const logger = vi.fn();
+      const result = await runWithCopilotSDK({
+        sdkUri: "http://127.0.0.1:3002",
+        prompt: "test prompt",
+        model: `copilot/${sessionModel}`,
+        models: [
+          { id: sessionModel, provider: sessionProvider },
+          { id: agentModel, provider: agentProvider },
+        ],
+        providers: [
+          { name: "copilot-responses", type: "openai", baseUrl: "http://api-proxy:10002", wireApi: "responses" },
+          { name: "copilot-completions", type: "openai", baseUrl: "http://api-proxy:10002", wireApi: "completions" },
+        ],
+        workingDirectory: workspace,
+        agentsBaseDir: workflow,
+        bare: true,
+        logger,
+        sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => "allow" },
+      });
+      expect(result.exitCode).toBe(0);
+      expect(constructor).toHaveBeenCalledWith(expect.objectContaining({ workingDirectory: workspace }));
+      expect(createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: `${sessionProvider}/${sessionModel}`,
+          workingDirectory: workspace,
+          skipCustomInstructions: true,
+          customAgents: expect.arrayContaining([
+            { name: "researcher", displayName: "researcher", description: "Research across providers", tools: ["read", "grep"], prompt: "Research carefully.", model: `${agentProvider}/${agentModel}` },
+            { name: "workflow-agent", displayName: "workflow-agent", tools: ["read", "grep"], prompt: "Workflow prompt.", model: `${sessionProvider}/${sessionModel}` },
+            { name: "unknown-agent", displayName: "unknown-agent", prompt: "Keep this agent.", model: `${sessionProvider}/${sessionModel}` },
+            { name: "small", displayName: "small", prompt: "Alias prompt.", model: `${sessionProvider}/${sessionModel}` },
+            { name: "large", displayName: "large", prompt: "Alias prompt.", model: `${sessionProvider}/${sessionModel}` },
+          ]),
+        })
+      );
+      expect(logger).toHaveBeenCalledWith(expect.stringMatching(/warning:.*unknown-agent.*unavailable-model.*session model/i));
+      const captured = fs
+        .readFileSync(path.join(testSessionStateDir, `${sessionProvider}-agent-session/events.jsonl`), "utf8")
+        .trim()
+        .split("\n")
+        .map(JSON.parse);
+      expect(captured.filter(event => event.type === "subagent.model_unavailable")).toEqual([
+        expect.objectContaining({ data: { agentName: "unknown-agent", declaredModel: "unavailable-model", model: `${sessionProvider}/${sessionModel}` } }),
+      ]);
+    });
+
+    it("captures ephemeral selection and final model results including BYOK and subagent context", async () => {
+      const event = { type: "model.call_final_result", ephemeral: true, timestamp: "2026-10-10T00:00:00Z", data: { isByok: true, model: "anthropic/claude-sonnet-4.6", agentId: "researcher", parentToolCallId: "delegate-1" } };
+      const selected = { type: "subagent.selected", ephemeral: true, timestamp: event.timestamp, data: { agentName: "researcher", model: "anthropic/claude-sonnet-4.6", resolvedModel: "anthropic/claude-sonnet-4.6" } };
+      let onEvent = () => {};
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        stop = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockResolvedValue({
+          sessionId: "final-model-result",
+          on: handler => {
+            onEvent = handler;
+          },
+          sendAndWait: async () => {
+            onEvent(selected);
+            onEvent(event);
+            return { data: { content: "done" } };
+          },
+          disconnect: vi.fn().mockResolvedValue(undefined),
+        });
+      }
+      await runWithCopilotSDK({ sdkUri: "http://127.0.0.1:3002", prompt: "test", logger: () => {}, sdkModule: { CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => "allow" } });
+      const events = fs.readFileSync(path.join(testSessionStateDir, "final-model-result/events.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+      expect(events).toContainEqual(event);
+      expect(events).toContainEqual(selected);
+    });
+
     it("disconnects session and stops client on success", async () => {
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);
@@ -990,7 +1100,7 @@ describe("copilot_sdk_driver.cjs", () => {
         sdkUri: "http://127.0.0.1:3002",
         prompt: "test prompt",
         logger: () => {},
-        model: "gpt-5.4",
+        model: "copilot/gpt-5.4",
         providers,
         models,
         sdkModule: {
@@ -1003,7 +1113,7 @@ describe("copilot_sdk_driver.cjs", () => {
       expect(result.exitCode).toBe(0);
       expect(createSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: "gpt-5.4",
+          model: "copilot/gpt-5.4",
           providers,
           models,
         })

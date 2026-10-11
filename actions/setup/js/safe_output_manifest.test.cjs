@@ -282,6 +282,11 @@ describe("safe_output_manifest", () => {
   });
 
   describe("ensureManifestExists", () => {
+    it("preserves executed milestone and pushed commit identities", () => {
+      expect(extractCreatedItemFromResult("assign_milestone", { success: true, issue_number: 1, milestone_number: 2 })?.metadata).toEqual({ milestone_number: 2 });
+      expect(extractCreatedItemFromResult("push_to_pull_request_branch", { success: true, number: 1, commit_sha: "abcdef123", metadata: { note: "kept" } })?.metadata).toEqual({ commit_sha: "abcdef123", note: "kept" });
+    });
+
     it("should create an empty file if the manifest does not exist", () => {
       expect(fs.existsSync(testManifestFile)).toBe(false);
       ensureManifestExists(testManifestFile);

@@ -37,23 +37,13 @@ func evalRetainedUpdate(ctx context.Context, item CreatedItemReport, repoOverrid
 	}
 	if num == 0 || repo == "" {
 		outcomeEvalUpdateLog.Printf("Missing execution state: num=%d, repo=%s", num, repo)
-		report.OutcomeStatus = OutcomeStatusUnknown
 		report.Detail = "missing execution state"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceNone,
-			Signal:           "missing_execution_state",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
 		return report
 	}
 	if item.BeforeState == nil || item.AfterState == nil {
-		report.OutcomeStatus = OutcomeStatusUnknown
 		report.Detail = "missing execution state"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceNone,
-			Signal:           "missing_execution_state",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "missing_execution_state")
 		return report
 	}
 
@@ -68,13 +58,8 @@ func evalRetainedUpdate(ctx context.Context, item CreatedItemReport, repoOverrid
 	outcomeEvalUpdateLog.Printf("State comparison for %s #%d: changed=%d, retained=%d, reverted=%d, replaced=%d, merged=%v",
 		objectKind, num, len(comparison.Changed), len(comparison.Retained), len(comparison.Reverted), len(comparison.Replaced), merged)
 	if len(comparison.Changed) == 0 {
-		report.OutcomeStatus = OutcomeStatusUnknown
 		report.Detail = "no persisted state delta"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusUnknown,
-			EvidenceStrength: EvidenceNone,
-			Signal:           "no_state_delta",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusUnknown, EvidenceNone, "no_state_delta")
 		return report
 	}
 
@@ -83,37 +68,19 @@ func evalRetainedUpdate(ctx context.Context, item CreatedItemReport, repoOverrid
 		report.OutcomeStatus = OutcomeStatusAccepted
 		if strongOnMerge && merged {
 			report.Detail = objectKind + " update retained and merged"
-			report.OutcomeEvaluation = OutcomeEvaluation{
-				OutcomeStatus:    OutcomeStatusAccepted,
-				EvidenceStrength: EvidenceStrong,
-				Signal:           "state_retained_and_merged",
-			}
+			report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceStrong, "state_retained_and_merged")
 			return report
 		}
 		report.Detail = objectKind + " update retained"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusAccepted,
-			EvidenceStrength: EvidenceMedium,
-			Signal:           "state_retained",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusAccepted, EvidenceMedium, "state_retained")
 		return report
 	case len(comparison.Reverted) == len(comparison.Changed):
-		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = objectKind + " update reverted"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusRejected,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "state_reverted",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_reverted")
 		return report
 	default:
-		report.OutcomeStatus = OutcomeStatusRejected
 		report.Detail = objectKind + " update replaced"
-		report.OutcomeEvaluation = OutcomeEvaluation{
-			OutcomeStatus:    OutcomeStatusRejected,
-			EvidenceStrength: EvidenceStrong,
-			Signal:           "state_replaced",
-		}
+		report.OutcomeEvaluation = outcomeEvidence(OutcomeStatusRejected, EvidenceStrong, "state_replaced")
 		return report
 	}
 }
@@ -165,7 +132,9 @@ func mutableTrackedFields(itemType string) []string {
 
 func mutableStateEqual(field string, left any, right any) bool {
 	switch field {
-	case "labels", "assignees":
+	case "labels":
+		return slices.Equal(outcomeLabelNames(left), outcomeLabelNames(right))
+	case "assignees":
 		return slices.Equal(mutableStringSlice(left), mutableStringSlice(right))
 	case "draft":
 		return mutableBool(left) == mutableBool(right)
@@ -240,9 +209,9 @@ func extractCurrentPullRequestUpdateState(ctx context.Context, repo string, numb
 	if err != nil {
 		return nil, false, err
 	}
-	base, _ := pullRequest["base"].(map[string]any)
-	head, _ := pullRequest["head"].(map[string]any)
-	merged, _ := pullRequest["merged"].(bool)
+	base := outcomeValue[map[string]any](pullRequest["base"])
+	head := outcomeValue[map[string]any](pullRequest["head"])
+	merged := outcomeValue[bool](pullRequest["merged"])
 	return map[string]any{
 		"title":     mutableString(pullRequest["title"]),
 		"body_hash": mutableBodyHash(pullRequest["body"]),
@@ -254,7 +223,7 @@ func extractCurrentPullRequestUpdateState(ctx context.Context, repo string, numb
 }
 
 func extractNamedItems(raw any, key string) []string {
-	items, _ := raw.([]any)
+	items := outcomeValue[[]any](raw)
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		if value := outcomeNestedString(item, key); value != "" {

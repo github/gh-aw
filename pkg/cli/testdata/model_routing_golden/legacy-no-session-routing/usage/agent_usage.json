@@ -1,0 +1,9 @@
+{
+  "input_tokens": 10841,
+  "output_tokens": 69220,
+  "cache_read_tokens": 9534114,
+  "cache_write_tokens": 446654,
+  "ambient_context": 892,
+  "ai_credits": 933.48553,
+  "primary_model": "claude-opus-5"
+}

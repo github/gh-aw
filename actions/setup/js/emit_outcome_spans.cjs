@@ -191,6 +191,9 @@ async function main() {
     if (reactionsPositive !== null) attributes.push(buildAttr("gh-aw.outcome.reactions_positive", reactionsPositive));
     if (reactionsNegative !== null) attributes.push(buildAttr("gh-aw.outcome.reactions_negative", reactionsNegative));
     if (comments !== null) attributes.push(buildAttr("gh-aw.outcome.comments", comments));
+    for (const field of ["human_comments", "human_reviews", "human_edits"]) {
+      if (typeof eval_[field] === "number") attributes.push(buildAttr(`gh-aw.outcome.${field}`, eval_[field]));
+    }
     if (zeroTouch) attributes.push(buildAttr("gh-aw.outcome.zero_touch", true));
 
     // Map normalized outcome_status to OTLP status: accepted=OK, rejected=ERROR, all others=UNSET
@@ -225,6 +228,9 @@ async function main() {
     buildAttr("gh-aw.outcome.rejected", getSummaryNumber("rejected", 0)),
     buildAttr("gh-aw.outcome.ignored", getSummaryNumber("ignored", 0)),
     buildAttr("gh-aw.outcome.pending", getSummaryNumber("pending", 0)),
+    buildAttr("gh-aw.outcome.unknown", getSummaryNumber("unknown", 0)),
+    buildAttr("gh-aw.outcome.errors", getSummaryNumber("errors", 0)),
+    buildAttr("gh-aw.outcome.lifecycle", getSummaryNumber("lifecycle", 0)),
     buildAttr("gh-aw.outcome.noop", getSummaryNumber("noop", 0)),
     buildAttr("gh-aw.outcome.accepted_strong", getSummaryNumber("accepted_strong", 0)),
     buildAttr("gh-aw.outcome.accepted_medium", getSummaryNumber("accepted_medium", 0)),

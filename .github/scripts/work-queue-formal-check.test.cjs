@@ -7,7 +7,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
-const { TLC_SHA256, classify, checkpointBundle, runVerification } = require("./work-queue-formal-check.cjs");
+const { TLC_SHA256, classify, checkpointBundle, runVerification, readFileDescriptor, writeJSONToFileDescriptor } = require("./work-queue-formal-check.cjs");
 
 const SUCCESS = "Model checking completed. No error has been found.\n42 states generated, 21 distinct states found, 0 states left on queue.\nThe depth of the complete state graph search is 7.\n";
 const INVARIANT_FALSE = "Error: The invariant of DAGValidity is equal to FALSE\n";
@@ -47,6 +47,12 @@ if (mode === "passed") {
 } else if (mode === "violation") {
   console.error("Error: Invariant Safety is violated.");
   process.exit(12);
+} else if (mode === "replace_log") {
+  const config = process.argv[process.argv.indexOf("-config") + 1];
+  const logPath = path.join(path.dirname(config), "tlc.log");
+  fs.unlinkSync(logPath);
+  fs.symlinkSync(process.env.FORMAL_TEST_REPLACEMENT_FILE, logPath);
+  process.stdout.write(${JSON.stringify(SUCCESS)});
 } else if (mode === "invariant_false") {
   process.stderr.write(${JSON.stringify(INVARIANT_FALSE)});
   process.exit(151);
@@ -105,6 +111,48 @@ test("only natural exit plus exhaustion is a pass", () => {
   assert.equal(classify(151, null, false, "The invariant of DAGValidity could not be evaluated.\n"), "tool_error");
   assert.equal(classify(150, null, false, INVARIANT_FALSE), "tool_error");
   assert.equal(classify(150, null, false, "Error: Parsing failed."), "tool_error");
+});
+
+test("log collection rejects replaced evidence without modifying the symlink target", async t => {
+  const options = fixture(t);
+  const replacement = path.join(path.dirname(options.javaBin), "replacement.log");
+  fs.writeFileSync(replacement, "replacement content");
+  options.env.FORMAL_TEST_MODE = "replace_log";
+  options.env.FORMAL_TEST_REPLACEMENT_FILE = replacement;
+
+  await assert.rejects(runVerification(options), /TLC log path no longer identifies/);
+
+  assert.equal(fs.readFileSync(replacement, "utf8"), "replacement content");
+  assert.equal(fs.existsSync(path.join(options.outputDir, "bundle", "summary.md")), false);
+  assert.equal(fs.existsSync(path.join(options.outputDir, "result-space.reserve")), false);
+});
+
+test("descriptor reads consume short reads until the snapshotted size or EOF", t => {
+  const options = fixture(t);
+  const fd = fs.openSync(options.jar, "r+");
+  t.after(() => fs.closeSync(fd));
+  const readSync = fs.readSync;
+  t.mock.method(fs, "readSync", (file, buffer, offset, length, position) => readSync(file, buffer, offset, Math.min(length, 3), position));
+  assert.equal(readFileDescriptor(fd), "fixture, not a real TLC jar");
+  let size = 100;
+  t.mock.method(fs, "fstatSync", () => ({ size }));
+  assert.equal(readFileDescriptor(fd), "fixture, not a real TLC jar");
+  size = 0;
+  assert.equal(readFileDescriptor(fd), "");
+});
+
+test("descriptor JSON writes consume short writes and overwrite from position zero", t => {
+  const options = fixture(t);
+  const fd = fs.openSync(options.jar, "r+");
+  t.after(() => fs.closeSync(fd));
+  const writeSync = fs.writeSync;
+  t.mock.method(fs, "writeSync", (file, buffer, offset, length, position) => writeSync(file, buffer, offset, Math.min(length, 3), position));
+  for (const value of [{ status: "running", message: "Unicode \u00e9" }, { status: "passed" }]) {
+    writeJSONToFileDescriptor(fd, value);
+    assert.equal(readFileDescriptor(fd), `${JSON.stringify(value, null, 2)}\n`);
+  }
+  fs.writeSync.mock.mockImplementation(() => 0);
+  assert.throws(() => writeJSONToFileDescriptor(fd, {}), /Unable to make progress/);
 });
 
 for (const { config, moduleName } of CONFIGS) {

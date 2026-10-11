@@ -1,0 +1,9 @@
+{
+  "input_tokens": 36226,
+  "output_tokens": 1149,
+  "cache_read_tokens": 36503,
+  "cache_write_tokens": 17120,
+  "ambient_context": 4701,
+  "ai_credits": 2.812022,
+  "primary_model": "claude-haiku-4-5-20251001"
+}

@@ -1,0 +1,7 @@
+{
+  "engine_id": "pi",
+  "model": "copilot/gpt-5.6-luna",
+  "repository": "private-org/private-repo",
+  "actor": "private-user",
+  "sub_agent_models": [{ "name": "file-summarizer", "model": "claude-haiku-4.5", "patterns": ["anthropic/*haiku*"] }]
+}

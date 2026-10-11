@@ -56,6 +56,33 @@ func TestMaintenanceWorkflowJobMetadata(t *testing.T) {
 	}
 }
 
+func TestMaintenanceWorkflowQuotesCompileGitHubToken(t *testing.T) {
+	token := "${{ secrets.MAINTENANCE_TOKEN }}: 'quoted' # comment \\\n  injected: true"
+	generated, err := buildMaintenanceWorkflowYAML(context.Background(), buildMaintenanceWorkflowYAMLOptions{
+		cronSchedule: "37 0 * * *", scheduleDesc: "Daily", runsOnValue: "ubuntu-slim",
+		actionMode: ActionModeDev, version: "dev", defaultBranch: "main",
+		compileGitHubToken: token,
+	})
+	require.NoError(t, err)
+
+	var doc struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yamlv3.Unmarshal([]byte(generated), &doc))
+	var got string
+	for _, step := range doc.Jobs["compile-workflows"].Steps {
+		if value, ok := step.Env["GH_AW_MAINTENANCE_GITHUB_TOKEN"]; ok {
+			got = value
+			break
+		}
+	}
+	require.Equal(t, token, got)
+}
+
 func TestMaintenanceWorkflowDisabledManualJobsAcceptedByConfig(t *testing.T) {
 	for _, job := range []string{
 		"run_operation", "cleanup-cache-memory", "update_pull_request_branches",

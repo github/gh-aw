@@ -216,7 +216,7 @@ describe("Copilot dynamic workflow sessions", () => {
       .split("\n")
       .map(JSON.parse);
     expect(events.filter(event => event.type.startsWith("workflow.run_"))).toEqual(lifecycle.filter(event => event.type.startsWith("workflow.run_")));
-    expect(events.find(event => event.type === "subagent.started")).toEqual(lifecycle[3]);
+    expect(events.find(event => event.type === "subagent.started")).toEqual({ ...lifecycle[3], data: { ...lifecycle[3].data, agentDisplayName: lifecycle[3].data.agentName } });
     expect(events.find(event => event.type === "assistant.message")).toEqual(lifecycle[5]);
     expect(events.filter(event => event.type === "assistant.message_delta")).toEqual([delta]);
     expect(setTimeoutSpy.mock.calls.filter(([, timeout]) => timeout === 1234)).toHaveLength(0);

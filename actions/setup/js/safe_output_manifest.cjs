@@ -282,6 +282,11 @@ function extractCreatedItemFromResult(type, result) {
         }
       : undefined);
   const labels = Array.isArray(result.labels) ? result.labels : Array.isArray(result.labelsAdded) ? result.labelsAdded.map(name => ({ name })) : undefined;
+  const metadata = {
+    ...(result.metadata || {}),
+    ...(type === "assign_milestone" && result.milestone_number != null ? { milestone_number: result.milestone_number } : {}),
+    ...(type === "push_to_pull_request_branch" && result.commit_sha ? { commit_sha: result.commit_sha } : {}),
+  };
 
   return {
     type,
@@ -294,7 +299,7 @@ function extractCreatedItemFromResult(type, result) {
     ...(target ? { target } : {}),
     ...(labels ? { labels } : {}),
     ...(result.temporaryId ? { temporaryId: result.temporaryId } : {}),
-    ...(result.metadata && Object.keys(result.metadata).length > 0 ? { metadata: result.metadata } : {}),
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     ...(result.before_state ? { before_state: result.before_state } : {}),
     ...(result.after_state ? { after_state: result.after_state } : {}),
     ...(Array.isArray(result.labelsAdded) ? { labelsAdded: result.labelsAdded } : {}),
