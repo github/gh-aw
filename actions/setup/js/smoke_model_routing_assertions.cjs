@@ -17,10 +17,11 @@
  * or sub-agent IDs on proxy records); otherwise by model: requests on a declared
  * sub-agent's model belong to that sub-agent, and all other agent traffic
  * belongs to the main agent. Declared sub-agent models must therefore be
- * disjoint from `allowedModels`.
+ * distinct from each other and disjoint from `allowedModels`.
  *
  * Check IDs:
- * - C1 configuration: declared sub-agent models are not in allowed-models
+ * - C1 configuration: declared sub-agent models are distinct and not in
+ *   allowed-models
  * - E1 agent execution outcome; E2 evidence files present and parseable
  * - R1 routing selected; R2 one classifier call; R3 main-agent traffic on the
  *   selected model and a supported endpoint; R4 main-agent requests exist and
@@ -183,16 +184,25 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   const allowed = new Set(allowedList);
   const subAgents = expectations.subAgents ?? [];
 
-  // C1: sub-agent models must be disjoint from the routing candidates, otherwise
-  // requests cannot be attributed by model.
+  // C1: sub-agent models must be disjoint from the routing candidates and from
+  // each other, otherwise requests cannot be attributed by model.
   if (subAgents.length) {
+    const c1Problems = [];
     const overlapping = subAgents.filter(agent => allowed.has(servedModel(agent.model)));
     if (overlapping.length)
-      fail(
-        "C1",
+      c1Problems.push(
         `declared sub-agent model(s) also in allowed-models [${allowedList.join(", ")}]: ${overlapping.map(agent => `${agent.name}=${servedModel(agent.model)}`).join(", ")}; sub-agent models must be disjoint from the routing candidates`
       );
-    else pass("C1", `declared sub-agent models are disjoint from allowed-models [${allowedList.join(", ")}]`);
+    /** @type {Map<string, string[]>} */
+    const namesByModel = new Map();
+    for (const agent of subAgents) {
+      const model = servedModel(agent.model);
+      namesByModel.set(model, [...(namesByModel.get(model) ?? []), agent.name]);
+    }
+    const shared = [...namesByModel].filter(([, names]) => names.length > 1);
+    if (shared.length) c1Problems.push(`declared sub-agents share a model: ${shared.map(([model, names]) => `${model} (${names.join(", ")})`).join(", ")}; each sub-agent must declare a distinct model`);
+    if (c1Problems.length) fail("C1", c1Problems.join("; "));
+    else pass("C1", `declared sub-agent models are distinct and disjoint from allowed-models [${allowedList.join(", ")}]`);
   }
 
   if (expectations.executionOutcome !== undefined) {

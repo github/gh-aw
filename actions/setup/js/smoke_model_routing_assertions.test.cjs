@@ -215,6 +215,16 @@ describe("smoke_model_routing_assertions", () => {
         "FAIL C1 declared sub-agent model(s) also in allowed-models [gpt-5.4-mini, gpt-5.6-luna, claude-haiku-4.5]: haiku-whoami=claude-haiku-4.5, mini-whoami=gpt-5.4-mini; sub-agent models must be disjoint from the routing candidates",
       ]);
     });
+
+    it("fails C1 when two declared sub-agents share a normalized model", () => {
+      fixture({ session: piSession(), requests: piRequests() });
+      const subAgents = [
+        { name: "haiku-whoami", model: "claude-haiku-4.5", endpoint: "/v1/messages" },
+        { name: "mini-whoami", model: "copilot/claude-haiku-4-5-20251001", endpoint: "/v1/messages" },
+      ];
+      const { failures } = check({ ...piExpectations, subAgents });
+      expect(failures.filter(line => line.startsWith("FAIL C1 "))).toEqual(["FAIL C1 declared sub-agents share a model: claude-haiku-4.5 (haiku-whoami, mini-whoami); each sub-agent must declare a distinct model"]);
+    });
   });
 
   describe("wrong model", () => {
