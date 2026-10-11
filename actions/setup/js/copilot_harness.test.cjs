@@ -66,6 +66,7 @@ const {
   writeCopilotOutputs,
   parseCopilotSDKServerArgsFromEnv,
   applyCopilotWireAPI,
+  warnCopilotSubagentEndpoints,
   applyCopilotModelAliasResolution,
   formatInferenceEndpointForLog,
   logCopilotInferenceConfiguration,
@@ -3642,6 +3643,70 @@ process.exit(1);`,
     });
   });
 
+  describe("model endpoint mismatch retries", () => {
+    it("fails before spawning the CLI for an incompatible override", () => {
+      const tempDir = makeHarnessTempDir("copilot-endpoint-startup-");
+      const callsPath = path.join(tempDir, "spawned");
+      const preloadPath = path.join(tempDir, "reflect.cjs");
+      const stubPath = path.join(tempDir, "stub.cjs");
+      fs.writeFileSync(
+        preloadPath,
+        `const reflect = require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))});
+reflect.fetchAWFReflect = async () => ({ok: true, reflectData: {endpoints: [{provider: "github", configured: true, routing_models: [{model_id: "gpt-5.6-luna", candidate_metadata_complete: true, supported_endpoints: ["/responses"]}]}]}});`
+      );
+      fs.writeFileSync(stubPath, `require("fs").writeFileSync(${JSON.stringify(callsPath)}, "spawned");`);
+      const result = spawnSync(process.execPath, ["--require", preloadPath, "copilot_harness.cjs", process.execPath, stubPath], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: { ...harnessChildEnv, GH_AW_TMP_DIR: tempDir, AWF_REFLECT_ENABLED: "1", GH_AW_MODEL_ROUTING: "0", COPILOT_MODEL: "gpt-5.6-luna", COPILOT_PROVIDER_WIRE_API: "completions" },
+        encoding: "utf8",
+        timeout: 15000,
+      });
+      expect(result.status).toBe(1);
+      expect(fs.existsSync(callsPath)).toBe(false);
+      expect(result.stderr).toMatch(/gpt-5.6-luna.*completions.*\/chat\/completions.*\/responses.*Pin a compatible model.*remove.*upgrade/);
+      expect(JSON.parse(fs.readFileSync(path.join(tempDir, "agent", "model-endpoint-mismatch.json"), "utf8"))).toMatchObject({ phase: "startup" });
+    });
+
+    const messages = [
+      "400 Cannot translate Copilot request feature 'tools[custom]' between Responses and Chat Completions. Routing model \"gpt-5.6-luna\" to /responses is incompatible",
+      "400 Unsupported Responses custom tool '(unknown)'",
+      "400 model_endpoint_incompatible",
+      "400 Model gpt-5.6-luna is not accessible via the /chat/completions endpoint",
+    ];
+    it.each(messages.flatMap(message => [false, true].map(partial => [message, partial])))("stops %s after partial=%s", (message, partial) => {
+      const tempDir = makeHarnessTempDir("copilot-endpoint-retry-");
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const callsPath = path.join(tempDir, "calls.jsonl");
+      fs.writeFileSync(
+        stubPath,
+        `const fs = require("fs");
+const callsPath = process.env.COPILOT_HARNESS_STUB_CALLS;
+const prior = fs.existsSync(callsPath);
+fs.appendFileSync(callsPath, JSON.stringify(process.argv.slice(2)) + "\\n");
+if (${partial} && !prior) process.stdout.write("partial work done\\n");
+else process.stderr.write(${JSON.stringify(message)} + "\\n");
+process.exit(1);`
+      );
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: { ...harnessChildEnv, GH_AW_TMP_DIR: tempDir, COPILOT_HARNESS_STUB_CALLS: callsPath, GH_AW_SAFE_OUTPUTS: path.join(tempDir, "safe-outputs.jsonl") },
+        encoding: "utf8",
+        timeout: 15000,
+      });
+      expect(result.status).toBe(1);
+      const calls = fs
+        .readFileSync(callsPath, "utf8")
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      expect(calls).toHaveLength(partial ? 2 : 1);
+      if (partial) expect(calls[1]).toContain("--continue");
+      expect(result.stderr).toContain("failureClass=model_endpoint_mismatch");
+      expect(result.stderr).toContain("model endpoint mismatch — not retrying");
+      expect(JSON.parse(fs.readFileSync(path.join(tempDir, "agent", "model-endpoint-mismatch.json"), "utf8"))).toMatchObject({ phase: "runtime", category: "model_endpoint_mismatch", detail: message });
+    });
+  });
+
   describe("applyCopilotWireAPI", () => {
     afterEach(() => {
       delete process.env.COPILOT_MODEL;
@@ -3666,6 +3731,155 @@ process.exit(1);`,
         },
       };
     }
+
+    function reflectModels(models) {
+      return { endpoints: [{ provider: "github", configured: true, routing_models: models.map(([model_id, supported_endpoints]) => ({ model_id, supported_endpoints, candidate_metadata_complete: true })) }] };
+    }
+
+    it("rejects an incompatible override and records the startup failure", () => {
+      const tempDir = makeHarnessTempDir("copilot-wire-mismatch-");
+      vi.stubEnv("GH_AW_TMP_DIR", tempDir);
+      process.env.COPILOT_MODEL = "gpt-5.6-luna";
+      process.env.COPILOT_PROVIDER_WIRE_API = "completions";
+      expect(() => applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["gpt-5.6-luna", ["/responses"]]]), configuredModel: "auto" })).toThrow(
+        /auto.*gpt-5.6-luna.*completions.*override.*\/chat\/completions.*\/responses.*Pin a compatible model.*remove.*upgrade/
+      );
+      const record = JSON.parse(fs.readFileSync(path.join(tempDir, "agent", "model-endpoint-mismatch.json"), "utf8"));
+      expect(record).toMatchObject({ phase: "startup", configured_model: "auto", resolved_model: "gpt-5.6-luna", supported_endpoints: ["/responses"] });
+    });
+
+    it.each(["gpt-5.6-luna-utility", "new-model-not-in-catalog"])("uses endpoint metadata for %s", model => {
+      process.env.COPILOT_MODEL = model;
+      const logs = [];
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([[model, ["/responses"]]]), logger: message => logs.push(message) });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+      expect(logs.join("\n")).toContain(model.startsWith("gpt-5") ? "source=model-name rule" : "source=AWF /reflect");
+    });
+
+    it("resolves auto to a utility model before selecting its advertised endpoint", async () => {
+      process.env.COPILOT_MODEL = "auto";
+      const reflect = reflectModels([["gpt-5.6-luna-utility", ["/responses"]]]);
+      reflect.endpoints[0].provider = "copilot";
+      reflect.endpoints[0].models = ["gpt-5.6-luna-utility"];
+      const read = vi.spyOn(fs, "readFileSync").mockReturnValueOnce(JSON.stringify({ apiProxy: { models: { auto: ["copilot/gpt-5.6-luna-utility"] } } }));
+      try {
+        await applyCopilotModelAliasResolution({ awfReflectData: reflect, logger: () => {} });
+      } finally {
+        read.mockRestore();
+      }
+      expect(process.env.COPILOT_MODEL).toBe("gpt-5.6-luna-utility");
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflect, configuredModel: "auto" });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+    });
+
+    it("retains the CLI completions default when both endpoints are supported without a preference", () => {
+      process.env.COPILOT_MODEL = "new-model";
+      const logs = [];
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["new-model", ["/responses", "/chat/completions"]]]), logger: message => logs.push(message) });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("completions");
+      expect(logs.join("\n")).toContain("source=CLI default");
+      expect(logs.join("\n")).not.toContain("source=AWF /reflect");
+    });
+
+    it("looks up endpoint metadata without model effort query parameters", () => {
+      process.env.COPILOT_MODEL = "new-model?effort=high";
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["new-model", ["/responses"]]]) });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+    });
+
+    it("uses the only supported endpoint even when the name suggests responses", () => {
+      process.env.COPILOT_MODEL = "gpt-5.6-luna";
+      applyCopilotWireAPI({ modelsJson: makeModelsJson(), awfReflectData: reflectModels([["gpt-5.6-luna", ["/chat/completions"]]]) });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("completions");
+    });
+
+    it("keeps the catalog preference when both endpoints are supported", () => {
+      process.env.COPILOT_MODEL = "gpt-5-mini";
+      const logs = [];
+      applyCopilotWireAPI({ modelsJson: makeModelsJson(), awfReflectData: reflectModels([["gpt-5-mini", ["/chat/completions", "/responses"]]]), logger: message => logs.push(message) });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+      expect(logs.join("\n")).toContain("source=catalog");
+      expect(logs.join("\n")).not.toContain("source=AWF /reflect");
+    });
+
+    it("preserves a model-name preference when both endpoints are supported", () => {
+      process.env.COPILOT_MODEL = "gpt-5-unknown";
+      const logs = [];
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["gpt-5-unknown", ["/chat/completions", "/responses"]]]), logger: message => logs.push(message) });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+      expect(logs.join("\n")).toContain("source=model-name rule");
+      expect(logs.join("\n")).not.toContain("source=AWF /reflect");
+    });
+
+    it("labels a routing-selected endpoint as routing rather than an override", () => {
+      process.env.COPILOT_MODEL = "new-model";
+      process.env.COPILOT_PROVIDER_WIRE_API = "responses";
+      const logs = [];
+      applyCopilotWireAPI({
+        modelsJson: null,
+        awfReflectData: reflectModels([["new-model", ["/responses", "/chat/completions"]]]),
+        overrideSource: "routing",
+        logger: message => logs.push(message),
+      });
+      expect(logs.join("\n")).toContain("source=routing (verified against AWF /reflect)");
+    });
+
+    it("rejects a model with no CLI-compatible endpoints", () => {
+      vi.stubEnv("GH_AW_TMP_DIR", makeHarnessTempDir("copilot-wire-unusable-"));
+      process.env.COPILOT_MODEL = "new-model";
+      expect(() => applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["new-model", ["/messages"]]]) })).toThrow(/no usable endpoint.*\/messages.*Pin a compatible model/);
+    });
+
+    it("falls back when candidate metadata is incomplete", () => {
+      process.env.COPILOT_MODEL = "gpt-5.6-luna";
+      const reflect = reflectModels([["gpt-5.6-luna", ["/chat/completions"]]]);
+      reflect.endpoints[0].routing_models[0].candidate_metadata_complete = false;
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflect });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+    });
+
+    it("does not select from ambiguous configured endpoint metadata", () => {
+      process.env.COPILOT_MODEL = "gpt-5.6-luna";
+      const reflect = reflectModels([["gpt-5.6-luna", ["/chat/completions"]]]);
+      reflect.endpoints.push({ ...reflect.endpoints[0], provider: "copilot" });
+      applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflect });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+    });
+
+    it("redacts secrets before saving mismatch evidence", () => {
+      const tempDir = makeHarnessTempDir("copilot-wire-redaction-");
+      vi.stubEnv("GH_AW_TMP_DIR", tempDir);
+      vi.stubEnv("GH_AW_SECRET_NAMES", "DIAGNOSTIC_TEST");
+      vi.stubEnv("SECRET_DIAGNOSTIC_TEST", "test-secret-value-for-redaction");
+      process.env.COPILOT_MODEL = "new-model";
+      process.env.COPILOT_PROVIDER_WIRE_API = "test-secret-value-for-redaction";
+      expect(() => applyCopilotWireAPI({ modelsJson: null, awfReflectData: reflectModels([["new-model", ["/responses"]]]) })).toThrow();
+      expect(fs.readFileSync(path.join(tempDir, "agent", "model-endpoint-mismatch.json"), "utf8")).not.toContain("test-secret-value-for-redaction");
+    });
+
+    it("warns only for custom agents incompatible with the session endpoint", () => {
+      const agentsDir = makeHarnessTempDir("copilot-subagents-");
+      fs.writeFileSync(path.join(agentsDir, "other.md"), "---\nmodel: 'claude-haiku-5.5'\n---\nAgent");
+      fs.writeFileSync(path.join(agentsDir, "same.md"), "---\nmodel: gpt-5-mini\n---\nAgent");
+      fs.writeFileSync(path.join(agentsDir, "unknown.md"), "---\nmodel: unknown\n---\nAgent");
+      process.env.COPILOT_MODEL = "gpt-5.6-luna";
+      process.env.COPILOT_PROVIDER_WIRE_API = "responses";
+      const logs = [];
+      warnCopilotSubagentEndpoints({
+        agentsDir,
+        awfReflectData: reflectModels([
+          ["gpt-5.6-luna", ["/responses"]],
+          ["gpt-5-mini", ["/responses"]],
+          ["claude-haiku-5.5", ["/chat/completions"]],
+        ]),
+        logger: message => logs.push(message),
+      });
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatch(/other.md.*claude-haiku-5.5.*\/chat\/completions.*\/responses.*67460.*5103/);
+      logs.length = 0;
+      warnCopilotSubagentEndpoints({ agentsDir, awfReflectData: null, logger: message => logs.push(message) });
+      expect(logs).toHaveLength(0);
+    });
 
     it("sets COPILOT_PROVIDER_WIRE_API=responses for a responses model", () => {
       process.env.COPILOT_MODEL = "gpt-5-mini";

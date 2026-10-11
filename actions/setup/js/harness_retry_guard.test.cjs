@@ -5,8 +5,82 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, isMaxRunsExceededError, isAuthenticationFailedError, parseAICreditsExceededProxyRejection, parseAPIProxyGuardRejection } = require("./harness_retry_guard.cjs");
+const { parseModelEndpointMismatch, MODEL_ENDPOINT_MISMATCH_PATTERN } = require("./harness_error_patterns.cjs");
 
 describe("harness_retry_guard.cjs", () => {
+  it.each([
+    "400 Cannot translate Copilot request feature: tool_search",
+    "400 Unsupported Responses custom tool: web_search",
+    '{"error":{"type":"model_endpoint_incompatible","model":"gpt-5","endpoint":"/responses"}}',
+    "Model 'gpt-5' is not accessible via the /v1/responses endpoint.",
+  ])("detects model endpoint mismatch: %s", message => {
+    const parsed = parseModelEndpointMismatch(`unrelated first line\n${message}\nunrelated last line`);
+    expect(parsed?.detail).toBe(message);
+    expect(detectNonRetryableHarnessGuard(message).modelEndpointMismatch).toEqual(parsed);
+  });
+
+  it("extracts the model and endpoint from matching text and JSON", () => {
+    expect(parseModelEndpointMismatch("Model 'gpt-5' is not accessible via the /v1/responses endpoint.")).toEqual({
+      model: "gpt-5",
+      endpoint: "/v1/responses",
+      detail: "Model 'gpt-5' is not accessible via the /v1/responses endpoint.",
+    });
+    const message = '{"type":"model_endpoint_incompatible","model":"gpt-5","endpoint":"/responses"}';
+    expect(parseModelEndpointMismatch(message)).toEqual({ model: "gpt-5", endpoint: "/responses", detail: message });
+    expect(parseModelEndpointMismatch("Unsupported Responses custom tool: web_search")?.endpoint).toBe("responses");
+    expect(parseModelEndpointMismatch("Model gpt-5 is not accessible via the Chat Completions API endpoint.")?.endpoint).toBe("Chat Completions API");
+    expect(parseModelEndpointMismatch("Cannot translate Copilot request feature: tool_search")).toEqual({ detail: "Cannot translate Copilot request feature: tool_search" });
+  });
+
+  it("extracts model and endpoint from an escaped structured provider error", () => {
+    const message = JSON.stringify({ type: "error", message: JSON.stringify({ type: "model_endpoint_incompatible", model: "gpt-5", endpoint: "/responses" }) });
+    expect(parseModelEndpointMismatch(message)).toEqual({ model: "gpt-5", endpoint: "/responses", detail: message });
+    expect(parseModelEndpointMismatch("cannot translate copilot request feature: tool_search")).not.toBeNull();
+  });
+
+  it("captures the actual routing model and endpoint", () => {
+    const detail = 'Routing model "gpt-5.6-luna" to /responses is incompatible';
+    expect(parseModelEndpointMismatch(detail)).toEqual({ model: "gpt-5.6-luna", endpoint: "/responses", detail });
+    expect(parseModelEndpointMismatch(`model_endpoint_incompatible: ${detail}`)?.endpoint).toBe("/responses");
+  });
+
+  it("redacts credentials and registered masks before bounding matching details", () => {
+    const token = "ghp_" + "A".repeat(36);
+    const output = `::add-mask::private-secret-value\nAuthorization: ${"Bearer"} ${"arbitrary-" + "credential"} ${token} private-secret-value Cannot translate Copilot request feature: tool_search`;
+    const detail = parseModelEndpointMismatch(output)?.detail;
+    expect(detail).toContain("Cannot translate Copilot request feature");
+    expect(detail).not.toContain(token);
+    expect(detail).not.toContain("arbitrary-credential");
+    expect(detail).not.toContain("private-secret-value");
+    expect(detail).toContain("***");
+  });
+
+  it("bounds details around the actual mismatch rather than the first log line", () => {
+    const message = "Cannot translate Copilot request feature";
+    const parsed = parseModelEndpointMismatch(`unrelated\n${"x".repeat(2000)} ${message}: ${"y".repeat(2000)}\ntrailing`);
+    expect(parsed?.detail.length).toBeLessThanOrEqual(1000);
+    expect(parsed?.detail).toContain(message);
+    expect(parsed?.detail).not.toContain("unrelated");
+    expect(parsed?.detail).not.toContain("trailing");
+  });
+
+  it("does not mask endpoint mismatch with a generic model policy rejection", () => {
+    const message = '{"type":"model_policy_violation","message":"model_endpoint_incompatible: model gpt-5 is not accessible via the responses endpoint"}';
+    expect(detectNonRetryableHarnessGuard(message).modelEndpointMismatch).not.toBeNull();
+    expect(parseAPIProxyGuardRejection(message)).toBeNull();
+    expect(parseAPIProxyGuardRejection('{"type":"model_policy_violation"}')?.guard).toBe("model_policy_violation");
+  });
+
+  it.each(["400 Bad Request", "400 invalid input", "normal output", "", null, undefined])("does not detect unrelated output: %s", output => {
+    expect(parseModelEndpointMismatch(output)).toBeNull();
+    expect(detectNonRetryableHarnessGuard(output).modelEndpointMismatch).toBeNull();
+  });
+
+  it("does not match empty strings or join endpoint phrases across lines", () => {
+    expect(MODEL_ENDPOINT_MISMATCH_PATTERN.test("")).toBe(false);
+    expect(parseModelEndpointMismatch("not accessible via the responses\nendpoint")).toBeNull();
+  });
+
   it.each([
     { type: "turn.failed", error: { message: "unexpected status 403 Forbidden: Maximum AI credits exceeded (301 / 300)." } },
     { type: "error", message: "unexpected status 403 Forbidden: Maximum AI credits exceeded (301 / 300)." },

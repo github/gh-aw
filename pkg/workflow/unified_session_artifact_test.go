@@ -20,6 +20,11 @@ func TestUnifiedSessionAgentArtifactPaths(t *testing.T) {
 			paths := compiler.collectArtifactPaths(data, engine, constants.AgentStdioLogPath, nil)
 			assert.Contains(t, paths, "/tmp/gh-aw/agent-session.jsonl")
 			assert.Contains(t, paths, "/tmp/gh-aw/agent-errors.jsonl")
+			if id == "copilot" {
+				assert.Contains(t, paths, "/tmp/gh-aw/agent/model-endpoint-mismatch.json")
+			} else {
+				assert.NotContains(t, paths, "/tmp/gh-aw/agent/model-endpoint-mismatch.json")
+			}
 			assert.Contains(t, paths, "/tmp/gh-aw/aw-prompts/user.txt")
 			assert.Contains(t, paths, "/tmp/gh-aw/aw-prompts/system.txt")
 			assert.Contains(t, paths, agentExecutionExitCodePath)

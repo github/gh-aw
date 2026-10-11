@@ -515,6 +515,7 @@ jobs:
       missing_model_pricing_error: ${{ steps.detect-agent-errors.outputs.missing_model_pricing_error || 'false' }}
       missing_model_pricing_model_name: ${{ steps.detect-agent-errors.outputs.missing_model_pricing_model_name || '' }}
       model: ${{ needs.activation.outputs.model }}
+      model_endpoint_mismatch_error: ${{ steps.detect-agent-errors.outputs.model_endpoint_mismatch_error || 'false' }}
       model_not_supported_error: ${{ steps.detect-agent-errors.outputs.model_not_supported_error || 'false' }}
       output: ${{ steps.collect_output.outputs.output }}
       output_types: ${{ steps.collect_output.outputs.output_types }}
@@ -1398,6 +1399,7 @@ jobs:
             /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent_usage.jsonl
             /tmp/gh-aw/agent_usage.json
+            /tmp/gh-aw/agent/model-endpoint-mismatch.json
             /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl
             /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
@@ -1656,6 +1658,7 @@ jobs:
           GH_AW_UNKNOWN_MODEL_AI_CREDITS: ${{ needs.agent.outputs.unknown_model_ai_credits || 'false' }}
           GH_AW_AIC: ${{ needs.agent.outputs.aic }}
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
+          GH_AW_DETECTION_JOB_RESULT: ${{ needs.detection.result }}
           GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
           GH_AW_MAX_AI_CREDITS: "1500"
           GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
@@ -1663,6 +1666,7 @@ jobs:
           GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
           GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}
           GH_AW_MODEL_NOT_SUPPORTED_ERROR: ${{ needs.agent.outputs.model_not_supported_error }}
+          GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR: ${{ needs.agent.outputs.model_endpoint_mismatch_error }}
           GH_AW_HTTP_400_RESPONSE_ERROR: ${{ needs.agent.outputs.http_400_response_error }}
           GH_AW_MAX_CACHE_MISSES_EXCEEDED: ${{ needs.agent.outputs.max_cache_misses_exceeded }}
           GH_AW_MISSING_MODEL_PRICING_ERROR: ${{ needs.agent.outputs.missing_model_pricing_error }}

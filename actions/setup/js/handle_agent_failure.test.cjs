@@ -82,6 +82,130 @@ describe("handle_agent_failure", () => {
     delete process.env.GH_AW_GROUP_REPORTS;
   });
 
+  describe("model/endpoint mismatch context", () => {
+    const mismatch = {
+      category: "model_endpoint_mismatch",
+      phase: "runtime",
+      configured_model: "model-alias",
+      resolved_model: "model-resolved",
+      wire_api: "responses",
+      wire_api_source: "engine",
+      supported_endpoints: ["/chat/completions"],
+      detail: "Unsupported endpoint",
+      fix: "Select a compatible model",
+      model: "provider-model",
+      endpoint: "/responses",
+    };
+    const header = { type: "session.format", data: { version: 1 }, provenance: { component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", index: 0 } };
+    const record = { type: "model_endpoint.mismatch", data: mismatch, provenance: { component: "model_endpoint", phase: "runtime", path: "agent/model-endpoint-mismatch.json", index: 0 } };
+
+    it("reads only the unified session and uses the dedicated grouping category", () => {
+      const fs = require("fs");
+      const { readModelEndpointMismatch, buildModelEndpointMismatchContext, buildFailureMatchCategories } = require("./handle_agent_failure.cjs");
+      const read = vi.spyOn(fs, "readFileSync").mockReturnValue([header, record].map(event => JSON.stringify(event)).join("\n"));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", join(promptRoot, "agent-output.json"));
+      vi.stubEnv("GH_AW_UNIFIED_SESSION", "");
+      try {
+        expect(readModelEndpointMismatch()).toEqual(mismatch);
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(read).toHaveBeenCalledWith(join(promptRoot, "usage/aw_session.jsonl"), "utf8");
+        const context = buildModelEndpointMismatchContext(mismatch);
+        expect(context).toContain("Cause: Unsupported endpoint");
+        expect(context).toContain("Fix: Select a compatible model");
+        expect(context).toContain("Configured model: model-alias");
+        expect(context).toContain("Endpoint: /responses");
+        expect(buildFailureMatchCategories({ agentConclusion: "failure", modelEndpointMismatch: true })).toEqual(["model_endpoint_mismatch"]);
+        expect(buildModelEndpointMismatchContext(mismatch, "failure")).toContain("same model/endpoint mismatch");
+        expect(buildModelEndpointMismatchContext(mismatch, "success")).not.toContain("Threat detection also failed");
+        expect(require("./handle_agent_failure.cjs").buildFailureIssueTitle({ workflowName: "Test", hasModelEndpointMismatch: true })).toContain("model/endpoint mismatch");
+      } finally {
+        read.mockRestore();
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it.each(["missing", "malformed", "headerless", "agent-forged", "wrong-phase", "wrong-path", "invalid"])("does not rescan logs when unified evidence is %s", kind => {
+      const fs = require("fs");
+      const { readModelEndpointMismatch } = require("./handle_agent_failure.cjs");
+      const records =
+        kind === "headerless"
+          ? [record]
+          : [
+              header,
+              kind === "agent-forged"
+                ? { ...record, provenance: { ...record.provenance, component: "agent" } }
+                : kind === "wrong-phase"
+                  ? { ...record, provenance: { ...record.provenance, phase: "startup" } }
+                  : kind === "wrong-path"
+                    ? { ...record, provenance: { ...record.provenance, path: "agent-session.jsonl" } }
+                    : kind === "invalid"
+                      ? { ...record, data: { ...mismatch, supported_endpoints: "bad" } }
+                      : record,
+            ];
+      const read = vi.spyOn(fs, "readFileSync").mockImplementation(() => {
+        if (kind === "missing") throw new Error("missing");
+        return kind === "malformed" ? "{" : records.map(event => JSON.stringify(event)).join("\n");
+      });
+      try {
+        expect(readModelEndpointMismatch()).toBeUndefined();
+        expect(read).toHaveBeenCalledTimes(1);
+      } finally {
+        read.mockRestore();
+      }
+    });
+
+    it("bounds and redacts mismatch details and omits absent optional observations", () => {
+      const { buildModelEndpointMismatchContext } = require("./handle_agent_failure.cjs");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "MISMATCH_TEST");
+      vi.stubEnv("SECRET_MISMATCH_TEST", "mismatch-secret-fixture");
+      try {
+        const context = buildModelEndpointMismatchContext({ ...mismatch, model: undefined, endpoint: undefined, detail: "mismatch-secret-fixture " + "x".repeat(20000) });
+        // Explicit undefined optional fields are not valid JSON contract values.
+        expect(context).toBe("");
+        const { model, endpoint, ...startup } = mismatch;
+        const redacted = buildModelEndpointMismatchContext({ ...startup, phase: "startup", detail: "mismatch-secret-fixture", fix: "x".repeat(20000) });
+        expect(redacted).not.toContain("mismatch-secret-fixture");
+        expect(redacted).not.toContain("> Model:");
+        expect(redacted).not.toContain("> Endpoint:");
+        expect(redacted.length).toBeLessThan(8500);
+        const bounded = buildModelEndpointMismatchContext({ ...mismatch, detail: "x".repeat(20000), fix: "Preserved corrective action" });
+        expect(bounded).toContain("Fix: Preserved corrective action");
+        expect(buildModelEndpointMismatchContext(undefined)).toBe("");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("renders hostile model, endpoint, and detail values as literal redacted diagnostics", () => {
+      const { buildModelEndpointMismatchContext } = require("./handle_agent_failure.cjs");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "MISMATCH_TEST");
+      vi.stubEnv("SECRET_MISMATCH_TEST", "mismatch-secret-fixture");
+      try {
+        const hostile = "````\n# Injected heading\n[click](https://evil.example)\n<img src=x>\nmismatch-secret-fixture";
+        const result = buildModelEndpointMismatchContext({
+          ...mismatch,
+          configured_model: hostile,
+          resolved_model: hostile,
+          supported_endpoints: [hostile],
+          model: hostile,
+          endpoint: hostile,
+          detail: hostile,
+          fix: hostile,
+        });
+        expect(result).not.toContain("mismatch-secret-fixture");
+        const opening = result.match(/^> (`{3,})text$/m)?.[1];
+        expect(opening).toBeTruthy();
+        expect(result.indexOf("<img")).toBeGreaterThan(result.indexOf(`${opening}text`));
+        expect(result.lastIndexOf("<img")).toBeLessThan(result.lastIndexOf(opening));
+        for (const run of result.slice(result.indexOf(`${opening}text`) + opening.length + 4, result.lastIndexOf(opening)).match(/`+/g) ?? []) {
+          expect(run.length).toBeLessThan(opening.length);
+        }
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+  });
+
   describe("invalidated PR merge-ref checkout", () => {
     const closedAt = "2026-10-03T12:00:00Z";
     const checkoutCompletedAt = "2026-10-03T12:00:01Z";
@@ -1134,6 +1258,251 @@ describe("handle_agent_failure", () => {
 
       expect(createCommentMock).toHaveBeenCalledOnce();
       expect(createIssueMock).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])("publishes unified mismatch context and grouping in a failure report (reuse=%s)", async reuse => {
+      const mismatch = {
+        category: "model_endpoint_mismatch",
+        phase: "startup",
+        configured_model: "model-alias",
+        resolved_model: "model-resolved",
+        wire_api: "responses",
+        wire_api_source: "engine",
+        supported_endpoints: ["/chat/completions"],
+        detail: "Unsupported model API",
+        fix: "Select a compatible model",
+      };
+      fs.mkdirSync(path.join(tmpDir, "usage"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, "usage/aw_session.jsonl"),
+        [
+          { type: "session.format", data: { version: 1 }, provenance: { component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", index: 0 } },
+          { type: "model_endpoint.mismatch", data: mismatch, provenance: { component: "model_endpoint", phase: "startup", path: "agent/model-endpoint-mismatch.json", index: 0 } },
+        ]
+          .map(event => JSON.stringify(event))
+          .join("\n")
+      );
+      const output = path.join(tmpDir, "output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [{ type: "create_issue", title: "Result", body: "Done" }] }));
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      process.env.GH_AW_FAILURE_REPORT_AS_ISSUE = "true";
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_UNIFIED_SESSION", "");
+      for (const template of ["agent_failure_issue.md", "agent_failure_comment.md"]) {
+        fs.writeFileSync(path.join(promptsDir, template), fs.readFileSync(new URL(`../md/${template}`, import.meta.url), "utf8"));
+      }
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      const createComment = vi.fn().mockResolvedValue({ data: { id: 1001 } });
+      global.github = {
+        rest: {
+          search: {
+            issuesAndPullRequests: vi.fn(async ({ q }) => ({
+              data: {
+                total_count: reuse && q.includes("is:issue") ? 1 : 0,
+                items:
+                  reuse && q.includes("is:issue")
+                    ? [
+                        {
+                          number: 42,
+                          html_url: "https://github.com/owner/repo/issues/42",
+                          body: buildExistingIssueBody({ branch: "feature/current", categories: ["model_endpoint_mismatch"] }),
+                        },
+                      ]
+                    : [],
+              },
+            })),
+          },
+          issues: { create, createComment },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      try {
+        await main();
+        const called = reuse ? createComment : create;
+        expect(called).toHaveBeenCalledOnce();
+        const body = called.mock.calls[0][0].body;
+        expect(body).toContain("**Model/Endpoint Mismatch**");
+        expect(body).toContain("Cause: Unsupported model API");
+        expect(body).toContain("Fix: Select a compatible model");
+        expect(body).not.toContain("{model_endpoint_mismatch_context}");
+        if (!reuse) expect(body).toContain("failure_categories: model_endpoint_mismatch");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("reports a startup mismatch instead of the collector's engine outage when no session or terminal output exists", async () => {
+      fs.mkdirSync(path.join(tmpDir, "agent"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, "agent/model-endpoint-mismatch.json"),
+        JSON.stringify({
+          category: "model_endpoint_mismatch",
+          phase: "startup",
+          configured_model: "gpt-5.6-luna",
+          resolved_model: "gpt-5.6-luna",
+          wire_api: "completions",
+          wire_api_source: "override",
+          supported_endpoints: ["/responses", "ws:/responses"],
+          detail: "Model gpt-5.6-luna does not support /chat/completions",
+          fix: "Pin a compatible model, remove the COPILOT_PROVIDER_WIRE_API override, or upgrade gh-aw.",
+        })
+      );
+      const output = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(
+        output,
+        JSON.stringify({
+          items: [
+            {
+              type: "report_incomplete",
+              reason: "engine_driver_failure",
+              failureCause: "engine_outage",
+              driverExitCode: 1,
+              retryCount: 0,
+              details:
+                "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nDriver exit code: 1. The engine driver exited before a terminal safe output was recorded.\nFailure classification: engine_outage\nLast engine error type: unknown\nRetry attempts observed: 0",
+            },
+          ],
+          errors: [],
+          collectorEmptyOutputCause: "engine_driver_failure",
+          collectorFailureCause: "engine_outage",
+          collectorDriverExitCode: 1,
+          collectorRetryCount: 0,
+        })
+      );
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      process.env.GH_AW_FAILURE_REPORT_AS_ISSUE = "true";
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_UNIFIED_SESSION", "");
+      vi.stubEnv("GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR", "true");
+      for (const template of ["agent_failure_issue.md", "agent_failure_comment.md"]) {
+        fs.writeFileSync(path.join(promptsDir, template), fs.readFileSync(new URL(`../md/${template}`, import.meta.url), "utf8"));
+      }
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      const createComment = vi.fn().mockResolvedValue({ data: { id: 1001 } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => []),
+        graphql: vi.fn(),
+      };
+      try {
+        await main();
+        expect(create).toHaveBeenCalledOnce();
+        const { title, body } = create.mock.calls[0][0];
+        expect(title).toContain("model/endpoint mismatch");
+        expect(body).toContain("**Model/Endpoint Mismatch**");
+        expect(body).toContain("Cause: Model gpt-5.6-luna does not support /chat/completions");
+        expect(body).toContain("Fix: Pin a compatible model, remove the COPILOT_PROVIDER_WIRE_API override, or upgrade gh-aw.");
+        expect(body).toContain("model_endpoint_mismatch");
+        expect(body).not.toContain("engine_outage");
+        expect(body).not.toContain("Last engine error type: unknown");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("reports a startup mismatch together with failed-step diagnostics when step data is available", async () => {
+      fs.mkdirSync(path.join(tmpDir, "agent"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, "agent/model-endpoint-mismatch.json"),
+        JSON.stringify({
+          category: "model_endpoint_mismatch",
+          phase: "startup",
+          configured_model: "gpt-5.6-luna",
+          resolved_model: "gpt-5.6-luna",
+          wire_api: "completions",
+          wire_api_source: "override",
+          supported_endpoints: ["/responses"],
+          detail: "Model gpt-5.6-luna does not support /chat/completions",
+          fix: "Remove the COPILOT_PROVIDER_WIRE_API override.",
+        })
+      );
+      const output = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(
+        output,
+        JSON.stringify({
+          items: [{ type: "report_incomplete", reason: "engine_driver_failure", failureCause: "engine_outage", driverExitCode: 1, retryCount: 0, details: "Failure classification: engine_outage" }],
+          errors: [],
+          collectorEmptyOutputCause: "engine_driver_failure",
+          collectorFailureCause: "engine_outage",
+          collectorDriverExitCode: 1,
+          collectorRetryCount: 0,
+        })
+      );
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      process.env.GH_AW_FAILURE_REPORT_AS_ISSUE = "true";
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_UNIFIED_SESSION", "");
+      vi.stubEnv("GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR", "true");
+      for (const template of ["agent_failure_issue.md", "agent_failure_comment.md"]) {
+        fs.writeFileSync(path.join(promptsDir, template), fs.readFileSync(new URL(`../md/${template}`, import.meta.url), "utf8"));
+      }
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => [{ id: 456, name: "agent", conclusion: "failure", steps: [{ name: "Run agent", conclusion: "failure" }] }]),
+        request: vi.fn().mockResolvedValue({ data: "Error: agent-generated step log" }),
+        graphql: vi.fn(),
+      };
+      try {
+        await main();
+        expect(create).toHaveBeenCalledOnce();
+        const { title, body } = create.mock.calls[0][0];
+        expect(title).toContain("model/endpoint mismatch");
+        expect(body).toContain("**Model/Endpoint Mismatch**");
+        expect(body).toContain("Cause: Model gpt-5.6-luna does not support /chat/completions");
+        expect(body).toContain("Fix: Remove the COPILOT_PROVIDER_WIRE_API override.");
+        expect(body).toContain("failure_categories: model_endpoint_mismatch");
+        expect(body).toContain("### Failure Diagnostics");
+        expect(body).toContain("**Agent job conclusion:** `failure`");
+        expect(body).toContain("**Failing step:** `Run agent`");
+        expect(body).toContain("The model/endpoint mismatch above is the classified cause.");
+        expect(body.indexOf("**Model/Endpoint Mismatch**")).toBeLessThan(body.indexOf("### Failure Diagnostics"));
+        expect(body).not.toContain("engine_outage");
+        expect(body).not.toContain("engine_driver_failure");
+        expect(body).not.toContain("agent-generated step log");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("does not file a failure issue for a recovered sub-agent mismatch in a successful run", async () => {
+      const output = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(output, JSON.stringify({ items: [{ type: "create_issue", title: "Result", body: "Done" }], errors: [] }));
+      process.env.GH_AW_AGENT_CONCLUSION = "success";
+      process.env.GH_AW_FAILURE_REPORT_AS_ISSUE = "true";
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_UNIFIED_SESSION", "");
+      vi.stubEnv("GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR", "true");
+      const create = vi.fn();
+      const createComment = vi.fn();
+      const search = vi.fn(async () => ({ data: { total_count: 0, items: [] } }));
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: search },
+          issues: { create, createComment },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      try {
+        await main();
+        expect(create).not.toHaveBeenCalled();
+        expect(createComment).not.toHaveBeenCalled();
+        expect(search).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it.each(["&amp;#38;#96;", "&\x00#96;", "&<!-- hidden -->#96;"])("omits agent-generated diagnostics from the final posted failure comment: %s", async entity => {

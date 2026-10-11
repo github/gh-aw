@@ -21,6 +21,8 @@
  *   - model_not_supported_error: The configured model is invalid or unsupported
  *     for the selected engine/account (for example unknown model name, model not
  *     found, or model unavailable for the plan).
+ *   - model_endpoint_mismatch_error: The configured model cannot serve the request
+ *     endpoint or tool protocol; changing the model or endpoint is required.
  *   - http_400_response_error: The engine surfaced a generic HTTP 400 Bad Request
  *     response (for example "Response status code does not indicate success: 400 (Bad Request)").
  *   - capi_quota_exceeded_error: The Copilot CAPI quota has been exhausted
@@ -79,8 +81,6 @@ const { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode } = 
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 
-const LOG_FILE = "/tmp/gh-aw/agent-stdio.log";
-
 // File written by the engine execution step with the epoch milliseconds at which the
 // engine CLI was started. Used to measure how long the engine ran before it was killed.
 const AGENT_CLI_START_MS_FILE = "/tmp/gh-aw/agent_cli_start_ms.txt";
@@ -113,7 +113,7 @@ function detectStepTimeoutFromEnvironment() {
 
 /**
  * Write GitHub Actions outputs to $GITHUB_OUTPUT.
- * @param {{ inferenceAccessError: boolean, mcpPolicyError: boolean, agenticEngineTimeout: boolean, modelNotSupportedError: boolean, http400ResponseError: boolean, capiQuotaExceededError: boolean, invocationCapExceeded: boolean, maxCacheMissesExceeded: boolean, missingModelPricingError: boolean, missingModelPricingModelName: string, shellExpansionGuardRejected: boolean }} results
+ * @param {ReturnType<typeof detectErrors>} results
  */
 function writeOutputs(results) {
   const outputFile = process.env.GITHUB_OUTPUT;
@@ -121,12 +121,26 @@ function writeOutputs(results) {
     process.stderr.write("[detect-agent-errors] GITHUB_OUTPUT not set — skipping output\n");
     return;
   }
-
   const lines = buildOutputLines(results);
   try {
     fs.appendFileSync(outputFile, lines.join("\n") + "\n");
   } catch (err) {
     process.stderr.write(`[detect-agent-errors] Failed to write to GITHUB_OUTPUT: ${getErrorMessage(err)}\n`);
+  }
+}
+
+function hasModelEndpointMismatchRecord(rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw") {
+  try {
+    const record = JSON.parse(fs.readFileSync(path.join(rootDir, "agent", "model-endpoint-mismatch.json"), "utf8"));
+    return (
+      record?.category === "model_endpoint_mismatch" &&
+      ["startup", "runtime"].includes(record.phase) &&
+      ["configured_model", "resolved_model", "wire_api", "wire_api_source", "detail", "fix"].every(key => typeof record[key] === "string") &&
+      Array.isArray(record.supported_endpoints) &&
+      record.supported_endpoints.every(endpoint => typeof endpoint === "string")
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -214,7 +228,7 @@ async function renderInternalEngineLogOnFailure() {
  * @param {ReturnType<typeof detectErrors>} results
  * @param {string} [rootDir]
  */
-function persistAgentExecution(logContent, results, rootDir = path.dirname(LOG_FILE)) {
+function persistAgentExecution(logContent, results, rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw") {
   const exitPath = path.join(rootDir, "agent_execution_exit_code.txt");
   const execution = collectAgentExecution({
     content: logContent,
@@ -227,17 +241,18 @@ function persistAgentExecution(logContent, results, rootDir = path.dirname(LOG_F
   writeSessionArtifact(path.join(rootDir, "agent-errors.jsonl"), execution ? [execution] : [], collectAddMaskedValues(logContent));
 }
 
-async function main() {
+async function main({ rootDir = process.env.GH_AW_TMP_DIR || "/tmp/gh-aw" } = {}) {
   let logContent = "";
+  const logFile = path.join(rootDir, "agent-stdio.log");
 
-  if (fs.existsSync(LOG_FILE)) {
+  if (fs.existsSync(logFile)) {
     try {
-      logContent = fs.readFileSync(LOG_FILE, "utf8");
+      logContent = fs.readFileSync(logFile, "utf8");
     } catch (err) {
-      throw new Error(`Failed to read file ${LOG_FILE}: ${getErrorMessage(err)}`, { cause: err });
+      throw new Error(`Failed to read file ${logFile}: ${getErrorMessage(err)}`, { cause: err });
     }
   } else {
-    process.stderr.write(`[detect-agent-errors] Log file not found: ${LOG_FILE}\n`);
+    process.stderr.write(`[detect-agent-errors] Log file not found: ${logFile}\n`);
   }
 
   const stdioResults = detectErrors(agentErrorDiagnosticText(logContent, process.env.GH_AW_ENGINE_ID === "aider" ? "aider" : undefined));
@@ -269,6 +284,7 @@ async function main() {
 
   const results = {
     ...stdioResults,
+    modelEndpointMismatchError: stdioResults.modelEndpointMismatchError || hasModelEndpointMismatchRecord(rootDir),
     agenticEngineTimeout: stdioResults.agenticEngineTimeout || stepTimeout,
     maxCacheMissesExceeded: stdioResults.maxCacheMissesExceeded || eventLogCacheMissesExceeded,
     missingModelPricingError: stdioResults.missingModelPricingError || auditMissingPricing,
@@ -286,6 +302,9 @@ async function main() {
   }
   if (results.modelNotSupportedError) {
     process.stderr.write("[detect-agent-errors] Detected model configuration error: configured model is invalid or unavailable for this engine/account\n");
+  }
+  if (results.modelEndpointMismatchError) {
+    process.stderr.write("[detect-agent-errors] Detected model endpoint mismatch: select a model compatible with the configured endpoint and tool protocol; retrying the same configuration will not resolve this error\n");
   }
   if (results.http400ResponseError) {
     process.stderr.write("[detect-agent-errors] Detected HTTP 400 response error in agent log\n");
@@ -310,7 +329,7 @@ async function main() {
 
   writeOutputs(results);
 
-  persistAgentExecution(logContent, results);
+  persistAgentExecution(logContent, results, rootDir);
 
   await renderInternalEngineLogOnFailure();
 }
@@ -323,6 +342,7 @@ if (require.main === module) {
 
 module.exports = {
   ...errorPatterns,
+  hasModelEndpointMismatchRecord,
   persistAgentExecution,
   main,
   detectStepTimeoutFromEnvironment,

@@ -46,6 +46,7 @@ func renderConsole(data AuditData, logsPath string) {
 	renderConsoleSession(data.SessionAnalysis)
 	renderConsoleTokenUsage(data.FirewallTokenUsage)
 	renderConsoleModelRouting(data.ModelRouting)
+	renderConsoleModelEndpointMismatches(data.ModelEndpointMismatches)
 	renderConsoleGitHubAPIUsage(data.GitHubRateLimitUsage)
 	renderConsoleJobs(data.Jobs)
 	renderConsolePrompt(data.PromptAnalysis)
@@ -53,6 +54,19 @@ func renderConsole(data AuditData, logsPath string) {
 	renderConsoleOperationalSections(data)
 	renderConsolePolicyAndExperiments(data)
 	renderConsoleLogsPath(logsPath)
+}
+
+func renderConsoleModelEndpointMismatches(mismatches []ModelEndpointMismatch) {
+	for _, mismatch := range mismatches {
+		fmt.Fprintf(os.Stderr, "  model_endpoint_mismatch: phase=%s configured_model=%s resolved_model=%s wire_api=%s wire_api_source=%s supported_endpoints=%s\n",
+			safeModelRoutingText(mismatch.Phase), safeModelRoutingText(mismatch.ConfiguredModel),
+			safeModelRoutingText(mismatch.ResolvedModel), safeModelRoutingText(mismatch.WireAPI),
+			safeModelRoutingText(mismatch.WireAPISource), safeModelRoutingText(strings.Join(mismatch.SupportedEndpoints, ", ")))
+		if mismatch.Model != "" || mismatch.Endpoint != "" {
+			fmt.Fprintf(os.Stderr, "    model=%s endpoint=%s\n", safeModelRoutingText(mismatch.Model), safeModelRoutingText(mismatch.Endpoint))
+		}
+		fmt.Fprintf(os.Stderr, "    detail: %s\n    fix: %s\n", safeModelRoutingText(mismatch.Detail), safeModelRoutingText(mismatch.Fix))
+	}
 }
 
 func renderConsoleOverview(data AuditData) {

@@ -32,6 +32,8 @@ const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
+const { collectUnifiedSession, isModelEndpointMismatchData } = require("./unified_session.cjs");
+const { validateSessionFileHeader } = require("./unified_session_render.cjs");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -309,6 +311,7 @@ function buildFailureMatchCategories(options) {
   if (options.copilotAgentNotFound) categories.push("copilot_agent_not_found");
   if (options.mcpPolicyError) categories.push("mcp_policy_error");
   if (options.modelNotSupportedError) categories.push("model_not_supported_error");
+  if (options.modelEndpointMismatch) categories.push("model_endpoint_mismatch");
   if (options.http400ResponseError) categories.push("http_400_response_error");
   if (options.aiCreditsRateLimitError) categories.push("ai_credits_rate_limit_error");
   if (options.hasEngineRateLimit429) categories.push("engine_rate_limit_429");
@@ -354,6 +357,66 @@ function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
   return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-session.jsonl") : "/tmp/gh-aw/agent-session.jsonl";
 }
 
+/** Read mismatch evidence only from the collector's unified session, never raw logs. */
+function readModelEndpointMismatch() {
+  const root = process.env.GH_AW_AGENT_OUTPUT ? path.dirname(process.env.GH_AW_AGENT_OUTPUT) : "/tmp/gh-aw";
+  const file = process.env.GH_AW_UNIFIED_SESSION || path.join(root, "usage/aw_session.jsonl");
+  try {
+    /** @type {any[]} */
+    let events;
+    try {
+      events = fs
+        .readFileSync(file, "utf8")
+        .split(/\r?\n/)
+        .filter(line => line.trim())
+        .map(line => JSON.parse(line));
+    } catch (error) {
+      const missing = error && typeof error === "object" && "code" in error && error.code === "ENOENT";
+      if (process.env.GH_AW_UNIFIED_SESSION || !missing) throw error;
+      // The conclusion job reports failures before the usage artifact step writes the
+      // session file, so collect the downloaded agent artifacts in memory instead.
+      events = collectUnifiedSession({ rootDir: root, warn: () => {} }).events;
+    }
+    validateSessionFileHeader(events);
+    const matches = events.filter(
+      event =>
+        event.type === "model_endpoint.mismatch" &&
+        event.provenance?.component === "model_endpoint" &&
+        event.provenance?.path === "agent/model-endpoint-mismatch.json" &&
+        event.provenance?.phase === event.data?.phase &&
+        isModelEndpointMismatchData(event.data)
+    );
+    return matches.at(-1)?.data;
+  } catch {
+    core.debug("Unified session unavailable for model/endpoint mismatch classification");
+    return undefined;
+  }
+}
+
+/** @param {import("./types/unified_session").ModelEndpointMismatchData | undefined} mismatch @returns {string} */
+function buildModelEndpointMismatchContext(mismatch, detectionJobResult = process.env.GH_AW_DETECTION_JOB_RESULT) {
+  if (!mismatch || !isModelEndpointMismatchData(mismatch)) return "";
+  const text = redactAndBoundDiagnostics(
+    [
+      `Phase: ${mismatch.phase}`,
+      `Configured model: ${mismatch.configured_model}`,
+      `Resolved model: ${mismatch.resolved_model}`,
+      `Wire API: ${mismatch.wire_api} (source: ${mismatch.wire_api_source})`,
+      `Supported endpoints: ${mismatch.supported_endpoints.join(", ")}`,
+      ...(mismatch.model !== undefined ? [`Model: ${mismatch.model}`] : []),
+      ...(mismatch.endpoint !== undefined ? [`Endpoint: ${mismatch.endpoint}`] : []),
+      `Cause: ${redactAndBoundDiagnostics(mismatch.detail, { maxLength: 2500 })}`,
+      `Fix: ${redactAndBoundDiagnostics(mismatch.fix, { maxLength: 2500 })}`,
+      ...(detectionJobResult === "failure" ? ["Threat detection also failed while using this engine configuration; its missing result may be a consequence of the same model/endpoint mismatch."] : []),
+    ].join("\n")
+  );
+  const fence = safeMarkdownCodeFence([text]);
+  return `\n> [!WARNING]\n> **Model/Endpoint Mismatch**\n>\n> ${fence}text\n${text
+    .split("\n")
+    .map(line => `> ${line}`)
+    .join("\n")}\n> ${fence}\n`;
+}
+
 /**
  * Build a precise failure issue title for known failure classes.
  * Falls back to the generic failure title when no specific class matches.
@@ -378,6 +441,7 @@ function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
  * @param {boolean} options.maxAICreditsExceeded
  * @param {boolean} options.hasAssignmentErrors
  * @param {boolean} options.http400ResponseError
+ * @param {boolean} [options.hasModelEndpointMismatch]
  * @param {boolean} options.unknownModelAICredits
  * @param {boolean} [options.copilotOrgBillingError]
  * @param {string} [options.copilotAgentNotFound] - Requested agent identifier if a "No such agent" failure was detected
@@ -401,6 +465,7 @@ function buildFailureIssueTitle(options) {
     const modelSuffix = options.missingModelPricingModelName ? ` (${options.missingModelPricingModelName})` : "";
     return `[aw] ${workflowName} has no AI credits pricing for model${modelSuffix}`;
   }
+  if (options.hasModelEndpointMismatch) return `[aw] ${workflowName} has model/endpoint mismatch`;
   // Keep HTTP 400 below AI-credits signals: quota/rate-limit indicates an account-level
   // budget state that should take precedence when both classes are detected.
   if (options.http400ResponseError) return `[aw] ${workflowName} hit HTTP 400 bad request`;
@@ -1818,7 +1883,8 @@ async function getFailedAgentDiagnostics() {
 function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", attributionUnavailable = "", engineFailureContext, items = [] }) {
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
   const isGenericFailure = failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || infrastructureMessages.length > 0;
-  if (!isGenericFailure) {
+  const hasModelEndpointMismatch = failureCategories.includes("model_endpoint_mismatch");
+  if (!isGenericFailure && !hasModelEndpointMismatch) {
     return "";
   }
 
@@ -1841,6 +1907,8 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
   }
   if (engineFailureContext.trim()) {
     context += engineFailureContext.trim() + "\n\n";
+  } else if (hasModelEndpointMismatch) {
+    context += "The model/endpoint mismatch above is the classified cause.\n\n";
   } else {
     context += "The runtime did not record a specific cause. Check the linked run for failure details.\n\n";
   }
@@ -3931,6 +3999,11 @@ async function main() {
     const { aiCredits, maxAICredits, aiCreditsRateLimitError: detectedAICreditsRateLimitError, maxAICreditsExceeded } = resolveAICreditsFailureState();
     const aiCreditsRateLimitError = agentConclusion === "failure" && detectedAICreditsRateLimitError;
     const inferenceAccessError = process.env.GH_AW_INFERENCE_ACCESS_ERROR === "true";
+    const modelEndpointMismatchSignal = process.env.GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR === "true";
+    const signaledModelEndpointMismatch = modelEndpointMismatchSignal ? readModelEndpointMismatch() : undefined;
+    // A sub-agent that hit a mismatch and recovered does not fail a successful run;
+    // only a failed agent job or startup mismatch evidence is reported.
+    const modelEndpointMismatchError = modelEndpointMismatchSignal && (agentConclusion !== "success" || signaledModelEndpointMismatch?.phase === "startup");
     const copilotOrgBillingError = !maxAICreditsExceeded && detectCopilotOrgBillingErrorFromLog();
     const copilotAgentNotFound = detectCopilotAgentNotFoundFromLog();
     const mcpPolicyError = process.env.GH_AW_MCP_POLICY_ERROR === "true";
@@ -4277,7 +4350,8 @@ async function main() {
       !maxAICreditsExceeded &&
       !hasMissingTool &&
       !hasMissingData &&
-      !hasToolDenialsExceeded
+      !hasToolDenialsExceeded &&
+      !modelEndpointMismatchError
     ) {
       core.info(
         `Agent job did not fail and no assignment/discussion/code-push/push-repo-memory/app-token/lockdown/oauth-token-check/stale-lock-file/daily-workflow-aic/daily-workflow-aic-accounting/ai-credits/max-ai-credits-exceeded/report-incomplete/cache-miss/missing-tool/missing-data/tool-denials-exceeded/secret-verification errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`
@@ -4286,7 +4360,7 @@ async function main() {
     }
 
     // If we only have noop outputs (and no report_incomplete/cache-miss/missing-tool/data/tool-denials-exceeded), skip failure handling
-    if (hasOnlyNoopOutputs && !hasReportIncomplete && !hasCacheMissMisconfiguration && !hasMissingTool && !hasMissingData && !hasToolDenialsExceeded) {
+    if (hasOnlyNoopOutputs && !hasReportIncomplete && !hasCacheMissMisconfiguration && !hasMissingTool && !hasMissingData && !hasToolDenialsExceeded && !modelEndpointMismatchError) {
       core.info("Agent completed with only noop outputs - skipping failure handling");
       return;
     }
@@ -4296,7 +4370,7 @@ async function main() {
     // This prevents false-positive failure issues when a transient AI model error occurs
     // after the agent has already finished its task (e.g., create_discussion produced but
     // the server returned a spurious error on teardown).
-    if (hasCompletedDespiteJobFailure && !hasReportIncomplete && !hasCacheMissMisconfiguration) {
+    if (hasCompletedDespiteJobFailure && !hasReportIncomplete && !hasCacheMissMisconfiguration && !modelEndpointMismatchError) {
       core.info("Agent completed with valid safe outputs despite job failure (terminal_reason: completed) — skipping failure handling");
       return;
     }
@@ -4379,16 +4453,28 @@ async function main() {
       }
     }
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
-    const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
-    const terminalOutputFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
+    const modelEndpointMismatchCandidate = modelEndpointMismatchSignal ? signaledModelEndpointMismatch : readModelEndpointMismatch();
+    const modelEndpointMismatch = agentConclusion === "success" && modelEndpointMismatchCandidate?.phase !== "startup" ? undefined : modelEndpointMismatchCandidate;
+    const hasModelEndpointMismatch = modelEndpointMismatchError || Boolean(modelEndpointMismatch);
+    const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
+    // A model/endpoint mismatch explains the missing terminal output, so the collector's
+    // generic empty-output classification (e.g. engine_outage) must not override it.
+    const collectorEmptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
+    const emptyOutputCause = hasModelEndpointMismatch ? undefined : collectorEmptyOutputCause;
+    const terminalOutputFailureCause = hasModelEndpointMismatch || !agentOutputResult.success ? undefined : agentOutputResult.collectorFailureCause;
+    const reportItems = (Array.isArray(agentOutputResult.items) ? agentOutputResult.items : []).filter(
+      item => !(hasModelEndpointMismatch && collectorEmptyOutputCause && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause && typeof item.failureCause === "string")
+    );
+    const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
+      hasModelEndpointMismatch,
       transportWedge,
       emptyOutputCause,
       terminalOutputFailureCause,
       isTimedOut,
       hasMissingSafeOutputs,
-      hasReportIncomplete,
+      hasReportIncomplete: hasReportedIncomplete,
       hasMissingTool,
       hasMissingData,
       hasCacheMissMisconfiguration,
@@ -4424,7 +4510,7 @@ async function main() {
       hasRepoMemoryValidationErrors: repoMemoryValidationErrors.length > 0,
       hasPushRepoMemoryFailure,
       hasMissingSafeOutputs,
-      hasReportIncomplete,
+      hasReportIncomplete: hasReportedIncomplete,
       hasMissingTool,
       hasToolDenialsExceeded,
       hasMissingData,
@@ -4435,6 +4521,7 @@ async function main() {
       copilotAgentNotFound: Boolean(copilotAgentNotFound),
       mcpPolicyError,
       modelNotSupportedError,
+      modelEndpointMismatch: hasModelEndpointMismatch,
       http400ResponseError,
       aiCreditsRateLimitError,
       hasEngineRateLimit429,
@@ -4506,10 +4593,10 @@ async function main() {
       }
     }
 
-    const agentOutputItems = Array.isArray(agentOutputResult.items) ? agentOutputResult.items : [];
+    const agentOutputItems = reportItems;
     const needsFailureDiagnostics =
       failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || agentOutputItems.some(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
-    const failureDiagnostics = needsFailureDiagnostics ? await getFailedAgentDiagnostics() : { failingStep: "" };
+    const failureDiagnostics = needsFailureDiagnostics || hasModelEndpointMismatch ? await getFailedAgentDiagnostics() : { failingStep: "" };
 
     // Check if parent issue creation is enabled (defaults to false)
     const groupReports = process.env.GH_AW_GROUP_REPORTS === "true";
@@ -4594,7 +4681,7 @@ async function main() {
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
         const permissionDeniedContext = hasToolDenialsExceeded ? "" : buildPermissionDeniedContext(agentOutputResult.items, workflowID);
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items, { includeAgentText: !needsFailureDiagnostics });
+        const reportIncompleteContext = buildReportIncompleteContext(reportItems, { includeAgentText: !needsFailureDiagnostics });
 
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
@@ -4620,7 +4707,14 @@ async function main() {
         // context is the more actionable signal.
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
-        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
+        const engineFailureContext = shouldBuildEngineFailureContext(
+          agentConclusion,
+          hasToolDenialsExceeded,
+          isTimedOut,
+          missingModelPricingError,
+          shellExpansionGuardRejected,
+          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext)
+        )
           ? buildEngineFailureContext({
               suppressEngineRateLimit429: maxAICreditsExceeded,
               maxCacheMissesExceeded,
@@ -4705,6 +4799,7 @@ async function main() {
           inference_access_error_context: inferenceAccessErrorContext,
           mcp_policy_error_context: mcpPolicyErrorContext,
           model_not_supported_error_context: modelNotSupportedErrorContext,
+          model_endpoint_mismatch_context: modelEndpointMismatchContext,
           http_400_response_error_context: http400ResponseErrorContext,
           ai_credits_rate_limit_error_context: aiCreditsRateLimitErrorContext,
           unknown_model_ai_credits_context: unknownModelAICreditsContext,
@@ -4835,7 +4930,7 @@ async function main() {
         const missingToolContext = missingToolReportAsFailure && !hasToolDenialsExceeded ? buildMissingToolContext(agentOutputResult.items) : "";
 
         // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(agentOutputResult.items, { includeAgentText: !needsFailureDiagnostics });
+        const reportIncompleteContext = buildReportIncompleteContext(reportItems, { includeAgentText: !needsFailureDiagnostics });
 
         // Build permission denied context (denied commands list + fix prompt).
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
@@ -4865,7 +4960,14 @@ async function main() {
         // context is the more actionable signal.
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
-        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
+        const engineFailureContext = shouldBuildEngineFailureContext(
+          agentConclusion,
+          hasToolDenialsExceeded,
+          isTimedOut,
+          missingModelPricingError,
+          shellExpansionGuardRejected,
+          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext)
+        )
           ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded, metadataOnly: needsFailureDiagnostics })
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
@@ -4951,6 +5053,7 @@ async function main() {
           inference_access_error_context: inferenceAccessErrorContext,
           mcp_policy_error_context: mcpPolicyErrorContext,
           model_not_supported_error_context: modelNotSupportedErrorContext,
+          model_endpoint_mismatch_context: modelEndpointMismatchContext,
           http_400_response_error_context: http400ResponseErrorContext,
           ai_credits_rate_limit_error_context: aiCreditsRateLimitErrorContext,
           unknown_model_ai_credits_context: unknownModelAICreditsContext,
@@ -5057,6 +5160,8 @@ async function main() {
 }
 
 module.exports = {
+  readModelEndpointMismatch,
+  buildModelEndpointMismatchContext,
   isInvalidatedPRMergeCheckout,
   main,
   buildCodePushFailureContext,

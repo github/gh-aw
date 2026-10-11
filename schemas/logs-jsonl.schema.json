@@ -5790,6 +5790,68 @@
                   ],
                   "additionalProperties": false
                 },
+                "model_endpoint_mismatches": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "category": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string"
+                      },
+                      "configured_model": {
+                        "type": "string"
+                      },
+                      "resolved_model": {
+                        "type": "string"
+                      },
+                      "wire_api": {
+                        "type": "string"
+                      },
+                      "wire_api_source": {
+                        "type": "string"
+                      },
+                      "supported_endpoints": {
+                        "type": [
+                          "null",
+                          "array"
+                        ],
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "detail": {
+                        "type": "string"
+                      },
+                      "fix": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "endpoint": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "category",
+                      "phase",
+                      "configured_model",
+                      "resolved_model",
+                      "wire_api",
+                      "wire_api_source",
+                      "supported_endpoints",
+                      "detail",
+                      "fix"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
                 "github_rate_limit_usage": {
                   "type": [
                     "null",

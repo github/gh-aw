@@ -22602,6 +22602,7 @@ safe-outputs:
   # categories must match included AND not match excluded. Common categories:
   # agent_failure, timed_out, transport_wedge, missing_safe_outputs,
   # report_incomplete, missing_tool, missing_data, inference_access_error,
+  # model_endpoint_mismatch,
   # mcp_policy_error, ai_credits_rate_limit_error, max_ai_credits_exceeded,
   # daily_ai_credits_unknown.
   report-failure-as-issue: []

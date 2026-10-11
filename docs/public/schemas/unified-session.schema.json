@@ -88,6 +88,7 @@
       { "if": { "properties": { "type": { "const": "mcp.rpc.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.tool_call" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "model_endpoint.mismatch" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelEndpointMismatchData" } } } },
       { "if": { "properties": { "type": { "const": "model_routing.outcome" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelRoutingOutcomeData" } } } },
       { "if": { "properties": { "type": { "const": "prompt.system" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "prompt.user" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
@@ -582,6 +583,24 @@
         "reason": { "$ref": "#/definitions/JsonValue" },
         "error": { "$ref": "#/definitions/JsonValue" }
       },
+      "additionalProperties": false
+    },
+    "ModelEndpointMismatchData": {
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "const": "model_endpoint_mismatch" },
+        "phase": { "type": "string", "enum": ["startup", "runtime"] },
+        "configured_model": { "type": "string" },
+        "resolved_model": { "type": "string" },
+        "wire_api": { "type": "string" },
+        "wire_api_source": { "type": "string" },
+        "supported_endpoints": { "type": "array", "items": { "type": "string" } },
+        "detail": { "type": "string" },
+        "fix": { "type": "string" },
+        "model": { "type": "string" },
+        "endpoint": { "type": "string" }
+      },
+      "required": ["category", "phase", "configured_model", "resolved_model", "wire_api", "wire_api_source", "supported_endpoints", "detail", "fix"],
       "additionalProperties": false
     },
     "ModelRoutingData": {

@@ -54,9 +54,19 @@ func TestReportFailureAsIssueWithCategoriesFilter(t *testing.T) {
 			expectCategories: []string{"agent_failure"},
 		},
 		{
+			name:             "array including model endpoint mismatch",
+			reportValue:      []any{"model_endpoint_mismatch"},
+			expectCategories: []string{"model_endpoint_mismatch"},
+		},
+		{
 			name:                     "array with excluded categories",
 			reportValue:              []any{"!inference_access_error", "!ai_credits_rate_limit_error"},
 			expectExcludedCategories: []string{"inference_access_error", "ai_credits_rate_limit_error"},
+		},
+		{
+			name:                     "array excluding model endpoint mismatch",
+			reportValue:              []any{"!model_endpoint_mismatch"},
+			expectExcludedCategories: []string{"model_endpoint_mismatch"},
 		},
 		{
 			name:                     "array with mixed include and exclude categories",
@@ -179,6 +189,31 @@ Create an issue.
 	compiler := NewCompiler()
 	err := compiler.CompileWorkflow(testFile)
 	require.NoError(t, err, "Workflow with safe-outputs.report-failed-jobs should compile without errors")
+}
+
+func TestModelEndpointMismatchReportFailureSchemaValidation(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "model-endpoint-mismatch-schema-test")
+	testContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+safe-outputs:
+  create-issue:
+    max: 1
+  report-failure-as-issue:
+    - model_endpoint_mismatch
+    - "!model_endpoint_mismatch"
+timeout-minutes: 5
+---
+
+# Test Workflow
+
+Create an issue.
+`
+	testFile := filepath.Join(tmpDir, "test-model-endpoint-mismatch.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, NewCompiler().CompileWorkflow(testFile))
 }
 
 // TestFailureIssueRepoSchemaValidation ensures that failure-issue-repo accepts both a

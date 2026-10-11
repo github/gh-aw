@@ -179,7 +179,7 @@ func buildMainJobCoreOutputs(data *WorkflowData) map[string]string {
 // configured engine provides an error-detection script ID.
 func (c *Compiler) addMainJobEngineErrorOutputs(outputs map[string]string, data *WorkflowData) {
 	// Add inference_access_error, mcp_policy_error, agentic_engine_timeout,
-	// model_not_supported_error, http_400_response_error, invocation_cap_exceeded,
+	// model_not_supported_error, model_endpoint_mismatch_error, http_400_response_error, invocation_cap_exceeded,
 	// and shell_expansion_guard_rejected outputs for engines
 	// that provide an error detection step.
 	// These outputs are written by the host-runner detect-agent-errors step (via the
@@ -201,6 +201,8 @@ func (c *Compiler) addMainJobEngineErrorOutputs(outputs map[string]string, data 
 	compilerMainJobLog.Printf("Added agentic_engine_timeout output (engine=%s, step=%s)", engine.GetID(), constants.DetectAgentErrorsStepID)
 	outputs["model_not_supported_error"] = fmt.Sprintf("${{ %s.model_not_supported_error || 'false' }}", stepRef)
 	compilerMainJobLog.Printf("Added model_not_supported_error output (engine=%s, step=%s)", engine.GetID(), constants.DetectAgentErrorsStepID)
+	outputs["model_endpoint_mismatch_error"] = fmt.Sprintf("${{ %s.model_endpoint_mismatch_error || 'false' }}", stepRef)
+	compilerMainJobLog.Printf("Added model_endpoint_mismatch_error output (engine=%s, step=%s)", engine.GetID(), constants.DetectAgentErrorsStepID)
 	outputs["http_400_response_error"] = fmt.Sprintf("${{ %s.http_400_response_error || 'false' }}", stepRef)
 	compilerMainJobLog.Printf("Added http_400_response_error output (engine=%s, step=%s)", engine.GetID(), constants.DetectAgentErrorsStepID)
 	outputs["invocation_cap_exceeded"] = fmt.Sprintf("${{ %s.invocation_cap_exceeded || 'false' }}", stepRef)
