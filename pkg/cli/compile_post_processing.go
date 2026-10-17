@@ -116,7 +116,7 @@ func generateMaintenanceWorkflowWrapper(
 
 func generateWorkQueueEventWorkflowWrapper(ctx context.Context, workflowDataList []*workflow.WorkflowData, workflowsDir string, gitRoot string, strict bool, noLogo bool) error {
 	compilePostProcessingLog.Print("Generating work queue event workflow")
-	if !workflow.WorkQueueIssueMirroringEnabled(workflowDataList) {
+	if !workflow.WorkQueueEventsEnabled(workflowDataList) {
 		return workflow.GenerateWorkQueueEventWorkflow(ctx, workflowDataList, workflowsDir, nil)
 	}
 

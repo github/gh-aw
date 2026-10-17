@@ -376,9 +376,12 @@ emitted event in the same namespace within that process. The first event uses
 diagnostics and failures use the same timing.
 
 Namespaces cover `store`, `replay`, `scheduler`, `native`, `dispatch`,
-`reconciler`, `claims`, `delivery`, `effects`, `memory`, `intents`, and `mcp`. Events describe
+`reconciler`, `run`, `claims`, `delivery`, `effects`, `memory`, `intents`, and `mcp`. Events describe
 publication attempts, conflicts, recovery, capacity and packing limits,
 native launch and binding, independent verification, and durable settlement.
+`DEBUG=work-queue:run` traces automatic terminal-run cleanup: ignored events,
+staged previews, binding counts, release outcomes, and sanitized failure categories,
+without logging event payloads, task content, native identities, or raw errors.
 Metadata contains only counts, flags, retry delays, and HTTP status codes.
 Blocked control and launch-processing failures are always visible, even without
 `DEBUG`. Diagnostics, receipts, the step summary, and the Actions failure annotation
@@ -483,6 +486,17 @@ cancellation then releases capacity and makes unfinished Work eligible under
 the installed retry policy. Active origins, unavailable evidence, and any
 durable start marker retain their reservations; cancellation never resends a
 possibly started launch.
+
+Compiled queue workers also register a `workflow_run: completed` handler in
+`agentic-workqueue.yml`, including when Issue mirroring is disabled. It selects
+only the completed run's existing reservation, then independently authenticates
+the original run attempt, revision, principal and dispatch correlation before
+releasing capacity. Unfinished Claims follow the installed retry policy;
+completed Claims and delivery barriers are preserved. The handler never
+dispatches work, replays effects, or treats Actions success as a verified Result.
+It runs trusted default-branch code, not the worker's checkout or artifacts.
+An unavailable or mismatched native read retains the reservation for subsequent
+bounded dispatcher reconciliation or `reconcile --dispatch-id`.
 
 ### Diagnostic artifacts
 
