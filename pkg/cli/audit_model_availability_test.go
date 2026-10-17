@@ -241,3 +241,21 @@ func TestAuditFindingPlaybookRoutes(t *testing.T) {
 		assert.Equal(t, "https://github.com/github/gh-aw/blob/main/.github/aw/"+tt.path, auditFindingPlaybookURL(tt.code))
 	}
 }
+
+// TestAuditModelAvailabilityRecognizesSharedResolutionMessage verifies that the pi startup
+// line written by pi_models_json.cjs (Pi phrase followed by the shared model_unavailable
+// message from resolve_model_alias.cjs) is still classified as model_unavailable.
+func TestAuditModelAvailabilityRecognizesSharedResolutionMessage(t *testing.T) {
+	runDir := t.TempDir()
+	log := `[gh-aw/pi-models-json] model resolution: engine=pi role=main configured=copilot/claude-opus-5 resolved=claude-opus-5 provider=copilot status=exact
+[gh-aw/pi-models-json] warning: awf-reflect model availability check failed (provider=copilot, model=claude-opus-5)
+[gh-aw/pi-models-json] fatal: Pi model "claude-opus-5" is not advertised by the configured copilot proxy endpoint; The requested model is not supported: 'copilot/claude-opus-5' is not available in the workflow's live model catalog. For Copilot, availability also depends on the agentic-workflows integration, not just organization policy. Select a model offered to this workflow; enabling a missing model for that integration requires Copilot API support.
+`
+	writeModelAvailabilityEvidence(t, runDir, "agent-stdio.log", log)
+	writeModelAvailabilityEvidence(t, runDir, "sandbox/firewall/awf-reflect.json",
+		`{"models_fetch_complete":true,"endpoints":[{"provider":"copilot","configured":true,"models":["claude-opus-5.5"]}]}`)
+	findings := generateModelAvailabilityFindings(WorkflowRun{Conclusion: "failure", LogsPath: runDir})
+	require.Len(t, findings, 1)
+	assert.Equal(t, AuditFindingModelUnavailable, findings[0].Code)
+	assert.Contains(t, findings[0].Description, `but not "claude-opus-5"`)
+}

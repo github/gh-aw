@@ -7,7 +7,19 @@ const fs = require("fs");
 const path = require("path");
 const { fileURLToPath } = require("url");
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const { buildCatalogFromReflect, globMatch, ModelAliasResolutionError, normalizeForCopilotCLI, resolveConfiguredCopilotModel, resolveModelAlias, selectLatestGlobMatch } = require("./resolve_model_alias.cjs");
+const {
+  buildCatalogFromReflect,
+  globMatch,
+  isBundledModelId,
+  loadBuiltinModelAliases,
+  loadModelAliasMap,
+  ModelAliasResolutionError,
+  normalizeForCopilotCLI,
+  resolveConfiguredCopilotModel,
+  resolveEngineModel,
+  resolveModelAlias,
+  selectLatestGlobMatch,
+} = require("./resolve_model_alias.cjs");
 const { detectErrors } = require("./agent_error_patterns.cjs");
 
 const ALIAS_MAP = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../pkg/workflow/data/model_aliases.json"), "utf8")).aliases;
@@ -276,5 +288,60 @@ describe("resolve_model_alias", () => {
     // (which is reachable via both path-a and path-b).
     const result = resolveModelAlias("combo", diamondAliasMap, ["copilot/claude-haiku-4.5"]);
     expect(result).toBe("copilot/claude-haiku-4.5");
+  });
+});
+
+// Without AWF no /reflect catalogue can exist. A name listed in the bundled model catalogue
+// (models.json) is a plausible model id and passes through as exact; pure aliases fail.
+describe("resolveEngineModel without a possible catalogue", () => {
+  const run = (configuredModel, env = {}) => resolveEngineModel({ engine: "test", configuredModel, aliasMap: ALIAS_MAP, reflectData: null, env, record: false });
+
+  it("defines plausible model ids by the bundled catalogue", () => {
+    for (const id of ["gpt-5-mini", "gpt-5.4", "gpt-5.5", "gpt-5"]) expect(isBundledModelId(id)).toBe(true);
+    for (const alias of ["small", "opus", "auto", "sonnet", "mini"]) expect(isBundledModelId(alias)).toBe(false);
+  });
+
+  it.each(["copilot/gpt-5.4", "copilot/gpt-5-mini", "gpt-5.5", "gpt-5", "copilot/gpt-5"])("passes %s through as exact", async model => {
+    expect(await run(model)).toMatchObject({ engineModel: model, alias: false, status: "exact" });
+  });
+
+  it.each(["small", "copilot/opus", "auto"])("fails pure alias %s with catalog_unavailable", async model => {
+    await expect(run(model)).rejects.toMatchObject({ reason: "catalog_unavailable", message: `model-catalog retrieval prevented alias resolution for '${model}'` });
+  });
+
+  it("keeps the with-AWF rule: incomplete discovery fails an alias that is also a model id", async () => {
+    await expect(run("copilot/gpt-5-mini", { AWF_REFLECT_ENABLED: "1" })).rejects.toMatchObject({ reason: "catalog_unavailable" });
+  });
+
+  it("overlays GH_AW_MODEL_ALIASES on the bundled built-ins", () => {
+    expect(loadModelAliasMap({ env: { GH_AW_MODEL_ALIASES: '{"opus":["anthropic/claude-opus-4-7"]}', GH_AW_AWF_CONFIG_PATH: "/nonexistent" } })).toEqual({ ...ALIAS_MAP, opus: ["anthropic/claude-opus-4-7"] });
+  });
+});
+
+describe("bundled built-in model aliases", () => {
+  const env = { GH_AW_AWF_CONFIG_PATH: "/nonexistent" };
+
+  it("ships a copy identical to pkg/workflow/data/model_aliases.json", () => {
+    expect(fs.readFileSync(path.join(__dirname, "model_aliases.json"), "utf8")).toBe(fs.readFileSync(path.join(__dirname, "../../../pkg/workflow/data/model_aliases.json"), "utf8"));
+  });
+
+  it("loads the built-ins from the bundled file with no alias env var", () => {
+    expect(loadBuiltinModelAliases()).toEqual(ALIAS_MAP);
+    expect(loadModelAliasMap({ env })).toEqual(ALIAS_MAP);
+    expect(loadModelAliasMap({ env, envVar: "GH_AW_PI_MODEL_ALIASES" })).toEqual(ALIAS_MAP);
+  });
+
+  it("lets workflow and imported aliases from the env var override and extend the built-ins", () => {
+    const overrides = { opus: ["anthropic/claude-opus-4-7"], team: ["copilot/gpt-5.4"] };
+    const merged = loadModelAliasMap({ env: { ...env, GH_AW_MODEL_ALIASES: JSON.stringify(overrides) } });
+    expect(merged).toEqual({ ...ALIAS_MAP, ...overrides });
+    expect(merged?.sonnet).toEqual(ALIAS_MAP.sonnet);
+    expect(loadModelAliasMap({ env: { ...env, GH_AW_PI_MODEL_ALIASES: JSON.stringify(overrides) }, envVar: "GH_AW_PI_MODEL_ALIASES" })).toEqual({ ...ALIAS_MAP, ...overrides });
+  });
+
+  it("does not let callers mutate the cached built-ins", () => {
+    const first = loadBuiltinModelAliases();
+    first?.sonnet.push("mutated");
+    expect(loadBuiltinModelAliases()?.sonnet).toEqual(ALIAS_MAP.sonnet);
   });
 });

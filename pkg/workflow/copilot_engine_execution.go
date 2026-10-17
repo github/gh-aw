@@ -622,6 +622,7 @@ func (e *CopilotEngine) addCopilotWorkflowStepEnv(env map[string]string, workflo
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.ModelRouting != nil {
 		env["GH_AW_MODEL_ROUTING"] = "1"
 	}
+	applyModelAliasesEnv(env, workflowData)
 	// Tag the step as a GitHub AW agentic execution for discoverability by agents
 	env["GITHUB_AW"] = "true"
 	env["GH_AW_PHASE"] = workflowRunPhase(workflowData)

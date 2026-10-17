@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { spawnSync } from "child_process";
 import { createRequire } from "module";
 import fs from "fs";
@@ -143,6 +143,91 @@ describe("claude_harness.cjs", () => {
     it("maps native Anthropic auto to sonnet without requiring Copilot credentials or reflection", async () => {
       const env = { GH_AW_LLM_PROVIDER: "anthropic", ANTHROPIC_MODEL: "auto", ANTHROPIC_BASE_URL: "https://custom.example/anthropic" };
       expect(await buildClaudeChildEnv(null, env, () => {})).toMatchObject({ ...env, ANTHROPIC_MODEL: "sonnet" });
+    });
+
+    describe("recorded /reflect from run 38945917145", () => {
+      const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
+      let tmpDir;
+      beforeEach(() => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-model-resolution-"));
+      });
+      afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+      const envFor = model => ({ GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: model, GH_AW_TMP_DIR: tmpDir, GH_AW_AWF_CONFIG_PATH: path.join(tmpDir, "missing-awf-config.json") });
+      const records = () => JSON.parse(fs.readFileSync(path.join(tmpDir, "agent/model-resolution.json"), "utf8"));
+      const withoutModels = (reflect, pattern) => {
+        const endpoint = reflect.endpoints.find(entry => entry.provider === "copilot");
+        endpoint.models = endpoint.models.filter(model => !pattern.test(model));
+        return reflect;
+      };
+
+      it("resolves copilot/opus to the newest live Opus", async () => {
+        const logs = [];
+        const child = await buildClaudeChildEnv(reflectFixtures.ddgReflect(), envFor("copilot/opus"), message => logs.push(message));
+        expect(child.ANTHROPIC_MODEL).toBe("claude-opus-5.5");
+        expect(child.ANTHROPIC_BASE_URL).toBe("http://api-proxy:10002");
+        expect(logs.filter(line => line.startsWith("model resolution: engine=claude"))).toEqual([expect.stringContaining("configured=copilot/opus resolved=claude-opus-5.5")]);
+        expect(records()).toEqual([{ engine: "claude", role: "main", configured_model: "copilot/opus", resolved_model: "claude-opus-5.5", provider: "copilot", status: "resolved", cause: null }]);
+      });
+
+      it("auto keeps its Sonnet, Opus, Haiku order", async () => {
+        const reflect = reflectFixtures.ddgReflect();
+        expect((await buildClaudeChildEnv(reflect, envFor("copilot/auto"), () => {})).ANTHROPIC_MODEL).toBe("claude-sonnet-5.5");
+        withoutModels(reflect, /sonnet/);
+        expect((await buildClaudeChildEnv(reflect, envFor("copilot/auto"), () => {})).ANTHROPIC_MODEL).toBe("claude-opus-5.5");
+        withoutModels(reflect, /opus/);
+        expect((await buildClaudeChildEnv(reflect, envFor("auto"), () => {})).ANTHROPIC_MODEL).toBe("claude-haiku-5.5");
+      });
+
+      // gpt-5-mini is both a built-in alias and a live id in the recorded /reflect; the
+      // "absent" case removes it from a copy of the recording.
+      it("a live exact id wins over an alias with the same name", async () => {
+        for (const model of ["copilot/gpt-5-mini", "gpt-5-mini"]) {
+          expect((await buildClaudeChildEnv(reflectFixtures.ddgReflect(), envFor(model), () => {})).ANTHROPIC_MODEL).toBe("gpt-5-mini");
+          expect(records().at(-1)).toEqual({ engine: "claude", role: "main", configured_model: model, resolved_model: "gpt-5-mini", provider: "copilot", status: "exact", cause: null });
+        }
+        expect((await buildClaudeChildEnv(reflectFixtures.withoutCopilotModels(["gpt-5-mini"]), envFor("gpt-5-mini"), () => {})).ANTHROPIC_MODEL).toBe("gpt-5.4-mini");
+      });
+
+      it("workflow-defined alias overrides built-in", async () => {
+        const reflect = reflectFixtures.withCopilotModels(["claude-opus-6"]);
+        expect((await buildClaudeChildEnv(reflect, envFor("opus"), () => {})).ANTHROPIC_MODEL).toBe("claude-opus-6");
+        reflect.model_aliases = { ...reflect.model_aliases, opus: ["copilot/claude-opus-5*"] };
+        expect((await buildClaudeChildEnv(reflect, envFor("opus"), () => {})).ANTHROPIC_MODEL).toBe("claude-opus-5.5");
+      });
+
+      // Incomplete discovery is derived from the recorded file (models_fetch_complete: false,
+      // Copilot models: null); no recorded run with this shape exists.
+      it("incomplete discovery passes exact ids through and fails aliases after one refetch", async () => {
+        const exact = await buildClaudeChildEnv(reflectFixtures.incompleteDiscovery(), envFor("copilot/claude-opus-5"), () => {});
+        expect(exact.ANTHROPIC_MODEL).toBe("claude-opus-5");
+        const refetchReflectData = vi.fn().mockResolvedValue(reflectFixtures.incompleteDiscovery());
+        await expect(buildClaudeChildEnv(reflectFixtures.incompleteDiscovery(), envFor("copilot/opus"), () => {}, { refetchReflectData })).rejects.toMatchObject({ name: "ModelAliasResolutionError", reason: "catalog_unavailable" });
+        expect(refetchReflectData).toHaveBeenCalledTimes(1);
+        expect(records().at(-1)).toMatchObject({ engine: "claude", configured_model: "copilot/opus", status: "failed", cause: "catalog_unavailable" });
+      });
+    });
+
+    // sandbox.agent: false (no AWF): the alias map arrives through GH_AW_MODEL_ALIASES only.
+    it("native Claude without AWF never launches Claude Code's own opus for a workflow-defined opus", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-no-awf-"));
+      try {
+        const env = {
+          GH_AW_LLM_PROVIDER: "anthropic",
+          ANTHROPIC_MODEL: "opus",
+          GH_AW_TMP_DIR: tmpDir,
+          GH_AW_AWF_CONFIG_PATH: path.join(tmpDir, "missing-awf-config.json"),
+          GH_AW_MODEL_ALIASES: JSON.stringify({ opus: ["anthropic/claude-opus-4-7"] }),
+        };
+        await expect(buildClaudeChildEnv(null, env, () => {})).rejects.toMatchObject({ name: "ModelAliasResolutionError", reason: "catalog_unavailable" });
+        expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "agent/model-resolution.json"), "utf8"))).toEqual([
+          { engine: "claude", role: "main", configured_model: "opus", resolved_model: null, provider: "anthropic", status: "failed", cause: "catalog_unavailable" },
+        ]);
+        // With /reflect, the same map resolves to the workflow's pin.
+        const reflect = { endpoints: [{ provider: "anthropic", configured: true, models: ["claude-opus-4-7", "claude-opus-5"] }] };
+        expect((await buildClaudeChildEnv(reflect, env, () => {})).ANTHROPIC_MODEL).toBe("claude-opus-4-7");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
 
     it.each(["auto", "copilot/auto"])("fails before inference when %s has no advertised Claude model", async model => {

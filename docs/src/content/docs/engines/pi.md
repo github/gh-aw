@@ -127,6 +127,8 @@ The integration runs Pi headlessly; terminal UI controls, interactive authentica
 
 The built-in `tools.playwright` integration uses `playwright-cli`; omit its `mode` field. Native `tools.web-search`, `max-continuations`, native `engine.agent` selection, and custom `engine.harness` scripts remain unsupported. Custom drivers must implement their own policies and cannot opt into the built-in aggregate tool budgets.
 
+Pi resolves [model aliases](/gh-aw/reference/engines/#model-aliases) for the main model and for sub-agents with the same rules as Copilot: `model: copilot/opus` runs on the newest live Opus. Exact ids are checked against AWF `/reflect` before Pi starts, and an unlisted id fails with `model_unavailable`, producing the same unavailable-model failure issue as Copilot. When AWF's model discovery is incomplete, exact ids pass through and aliases fail with `catalog_unavailable`; sub-agents no longer fall back to Pi's built-in model list.
+
 ## Sub-agents
 
 Define [inline sub-agents](/gh-aw/reference/inline-sub-agents/) with a non-empty `description` and instruct the parent to call the `subagent` tool:
@@ -145,7 +147,7 @@ Read the requested files and report the facts.
 
 The built-in CLI, SDK, and RPC modes load managed delegation, including with `engine.bare: true`. Each invocation starts an isolated, ephemeral child session with the agent's instructions and the workflow system prompt. The tool accepts one agent and task per call; it does not accept chain or parallel-task parameters, and children cannot recursively delegate.
 
-An omitted model inherits the parent's configured model. Bare model IDs use the parent's provider; aliases such as `small` resolve against that provider's advertised models. A declaration cannot switch to another provider or silently fall back to the parent model when alias resolution fails. The optional `?effort=` parameter supports `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`; Pi maps `none` to `off` and clamps thinking to the selected model's capabilities. The `max` effort requires installed Pi v1.3.0 or newer and is rejected during runtime setup on older installations. Other model parameters are rejected. An explicit `name` must match the agent marker.
+An omitted model inherits the parent's configured model. Bare model IDs use the parent's provider; aliases such as `small` resolve against that provider's models in AWF `/reflect`, using the same rules as the main model. A declaration cannot switch to another provider or silently fall back to the parent model when alias resolution fails. The optional `?effort=` parameter supports `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`; Pi maps `none` to `off` and clamps thinking to the selected model's capabilities. The `max` effort requires installed Pi v1.3.0 or newer and is rejected during runtime setup on older installations. Other model parameters are rejected. An explicit `name` must match the agent marker.
 
 Children retain the workflow's inference gateway, MCP configuration, steering, bash allowlist, and edit restrictions. Tool-call and denial budgets are shared with the parent. Children use compiler-managed execution arguments rather than inheriting `engine.args` overrides. Optional automatically discovered extensions are disabled in children; only the managed infrastructure extensions are loaded. Custom drivers do not support this delegation path.
 

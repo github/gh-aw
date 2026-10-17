@@ -52,7 +52,9 @@ const {
   removeCodexRoutingOverrides,
   applyCodexRoutingEffort,
   resolveCodexModelRouting,
+  resolveCodexConfiguredModel,
 } = require("./codex_harness.cjs");
+const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
 const { detectNonRetryableHarnessGuard } = require("./harness_retry_guard.cjs");
 
 const agentTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-harness-tests-"));
@@ -211,6 +213,68 @@ describe("codex_harness.cjs", () => {
       expect(calls).toHaveLength(1);
     });
   });
+  describe("shared model resolution (recorded /reflect from run 38945917145)", () => {
+    const tmpDirs = [];
+    afterAll(() => tmpDirs.forEach(dir => fs.rmSync(dir, { recursive: true, force: true })));
+    const envFor = () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-model-resolution-"));
+      tmpDirs.push(dir);
+      return { GH_AW_TMP_DIR: dir, GH_AW_AWF_CONFIG_PATH: path.join(dir, "missing-awf-config.json") };
+    };
+    const resolve = (model, reflectData, options = {}) => resolveCodexConfiguredModel({ model, provider: "copilot", reflectData, logger: () => {}, env: envFor(), ...options });
+    const withAliases = (reflect, aliases) => ({ ...reflect, model_aliases: { ...reflect.model_aliases, ...aliases } });
+
+    it("resolves a workflow-defined glob alias to the newest live match", async () => {
+      const env = envFor();
+      const reflect = withAliases(reflectFixtures.ddgReflect(), { luna: ["copilot/gpt-5.6*"] });
+      expect(await resolve("copilot/luna", reflect, { env })).toBe("gpt-5.6-luna");
+      expect(JSON.parse(fs.readFileSync(path.join(env.GH_AW_TMP_DIR, "agent/model-resolution.json"), "utf8"))).toEqual([
+        { engine: "codex", role: "main", configured_model: "copilot/luna", resolved_model: "gpt-5.6-luna", provider: "copilot", status: "resolved", cause: null },
+      ]);
+      const { resolveConfiguredCopilotModel } = require("./resolve_model_alias.cjs");
+      expect(resolveConfiguredCopilotModel({ configuredModel: "luna", aliasMap: reflect.model_aliases, reflectData: reflect })).toBe("gpt-5.6-luna");
+    });
+
+    it("passes an exact id through unchanged", async () => {
+      expect(await resolve("copilot/gpt-5.6-sol", reflectFixtures.ddgReflect())).toBe("gpt-5.6-sol");
+    });
+
+    // gpt-5-mini is both a built-in alias and a live id in the recorded /reflect; the
+    // "absent" case removes it from a copy of the recording.
+    it("a live exact id wins over an alias with the same name", async () => {
+      expect(await resolve("copilot/gpt-5-mini", reflectFixtures.ddgReflect())).toBe("gpt-5-mini");
+      const env = envFor();
+      expect(await resolve("gpt-5-mini", reflectFixtures.ddgReflect(), { env })).toBe("gpt-5-mini");
+      expect(JSON.parse(fs.readFileSync(path.join(env.GH_AW_TMP_DIR, "agent/model-resolution.json"), "utf8"))).toEqual([
+        { engine: "codex", role: "main", configured_model: "gpt-5-mini", resolved_model: "gpt-5-mini", provider: "copilot", status: "exact", cause: null },
+      ]);
+      expect(await resolve("gpt-5-mini", reflectFixtures.withoutCopilotModels(["gpt-5-mini"]))).toBe("gpt-5.4-mini");
+    });
+
+    it("keeps copilot/auto as the Copilot gateway sentinel", async () => {
+      expect(await resolve("copilot/auto", reflectFixtures.ddgReflect())).toBe("auto");
+    });
+
+    it("workflow-defined alias overrides built-in", async () => {
+      const reflect = reflectFixtures.withCopilotModels(["claude-opus-6"]);
+      expect(await resolve("opus", reflect)).toBe("claude-opus-6");
+      expect(await resolve("opus", withAliases(reflect, { opus: ["copilot/claude-opus-5*"] }))).toBe("claude-opus-5.5");
+    });
+
+    // Incomplete discovery is derived from the recorded file (models_fetch_complete: false,
+    // Copilot models: null); no recorded run with this shape exists.
+    it("incomplete discovery passes exact ids through and fails aliases after one refetch", async () => {
+      expect(await resolve("copilot/gpt-5.6-sol", reflectFixtures.incompleteDiscovery())).toBe("gpt-5.6-sol");
+      let refetches = 0;
+      const refetchReflectData = async () => {
+        refetches++;
+        return reflectFixtures.incompleteDiscovery();
+      };
+      await expect(resolve("copilot/gpt-5.6", reflectFixtures.incompleteDiscovery(), { refetchReflectData })).rejects.toMatchObject({ name: "ModelAliasResolutionError", reason: "catalog_unavailable" });
+      expect(refetches).toBe(1);
+    });
+  });
+
   describe("AWF model routing", () => {
     const reflectData = {
       endpoints: [{ provider: "github", configured: true, models: ["gpt-5.6-sol"] }],

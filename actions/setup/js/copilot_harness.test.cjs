@@ -4105,6 +4105,71 @@ process.exit(1);`
       vi.restoreAllMocks();
     });
 
+    describe("recorded /reflect from run 38945917145", () => {
+      const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
+      let tmpDir;
+      const originalTmpDir = process.env.GH_AW_TMP_DIR;
+      const resolve = async (model, reflects, aliases = reflectFixtures.builtinAliases()) => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-model-resolution-"));
+        process.env.GH_AW_TMP_DIR = tmpDir;
+        process.env.COPILOT_MODEL = model;
+        writeAwfConfig(aliases);
+        const refetch = vi.fn();
+        for (const reflectData of reflects.slice(1)) refetch.mockResolvedValueOnce(reflectData);
+        try {
+          const resolved = await applyCopilotModelAliasResolution({ awfReflectData: reflects[0], logger: () => {}, refetchReflectData: refetch });
+          return { resolved, refetch };
+        } finally {
+          if (originalTmpDir === undefined) delete process.env.GH_AW_TMP_DIR;
+          else process.env.GH_AW_TMP_DIR = originalTmpDir;
+        }
+      };
+      const records = () => JSON.parse(fs.readFileSync(path.join(tmpDir, "agent/model-resolution.json"), "utf8"));
+      afterEach(() => {
+        if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
+      });
+
+      it("keeps alias and exact-id behaviour with the recorded /reflect", async () => {
+        expect((await resolve("opus", [reflectFixtures.ddgReflect()])).resolved).toBe("claude-opus-5.5");
+        expect(records()).toEqual([{ engine: "copilot", role: "main", configured_model: "opus", resolved_model: "claude-opus-5.5", provider: "copilot", status: "resolved", cause: null }]);
+        expect((await resolve("opus?effort=high", [reflectFixtures.ddgReflect()])).resolved).toBe("claude-opus-5.5?effort=high");
+        expect((await resolve("claude-opus-5", [reflectFixtures.ddgReflect()])).resolved).toBe("claude-opus-5");
+        expect(process.env.COPILOT_MODEL).toBe("claude-opus-5");
+        expect((await resolve("copilot/opus", [reflectFixtures.ddgReflect()])).resolved).toBe("claude-opus-5.5");
+        expect(process.env.COPILOT_MODEL).toBe("claude-opus-5.5");
+      });
+
+      // gpt-5-mini is both a built-in alias and a live id in the recorded /reflect; the
+      // "absent" case removes it from a copy of the recording.
+      it("a live exact id wins over an alias with the same name", async () => {
+        expect((await resolve("copilot/gpt-5-mini", [reflectFixtures.ddgReflect()])).resolved).toBe("gpt-5-mini");
+        expect((await resolve("gpt-5-mini", [reflectFixtures.ddgReflect()])).resolved).toBe("gpt-5-mini");
+        expect(records()).toEqual([{ engine: "copilot", role: "main", configured_model: "gpt-5-mini", resolved_model: "gpt-5-mini", provider: null, status: "exact", cause: null }]);
+        expect((await resolve("gpt-5-mini", [reflectFixtures.withoutCopilotModels(["gpt-5-mini"])])).resolved).toBe("gpt-5.4-mini");
+      });
+
+      it("workflow-defined alias overrides built-in", async () => {
+        const reflect = reflectFixtures.withCopilotModels(["claude-opus-6"]);
+        expect((await resolve("opus", [reflect])).resolved).toBe("claude-opus-6");
+        expect((await resolve("opus", [reflect], { ...reflectFixtures.builtinAliases(), opus: ["copilot/claude-opus-5*"] })).resolved).toBe("claude-opus-5.5");
+      });
+
+      // Incomplete discovery is derived from the recorded file (models_fetch_complete: false,
+      // Copilot models: null); no recorded run with this shape exists.
+      it("incomplete discovery passes exact ids through and fails aliases after one refetch", async () => {
+        const exact = await resolve("claude-opus-5", [reflectFixtures.incompleteDiscovery()]);
+        expect(exact.resolved).toBe("claude-opus-5");
+        expect(exact.refetch).not.toHaveBeenCalled();
+        const exit = vi.spyOn(process, "exit").mockImplementation(code => {
+          throw new Error(`exit ${code}`);
+        });
+        vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        await expect(resolve("opus", [reflectFixtures.incompleteDiscovery(), reflectFixtures.incompleteDiscovery()])).rejects.toThrow("exit 1");
+        expect(exit).toHaveBeenCalledWith(1);
+        expect(records()).toEqual([{ engine: "copilot", role: "main", configured_model: "opus", resolved_model: null, provider: null, status: "failed", cause: "catalog_unavailable" }]);
+      });
+    });
+
     it("resolves a known alias against an available catalog without refetching", async () => {
       process.env.COPILOT_MODEL = "sol";
       writeAwfConfig({ sol: ["copilot/gpt-5.6-sol"] });

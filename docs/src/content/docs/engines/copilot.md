@@ -59,6 +59,8 @@ The converter atomically replaces the catalog and publishes a SHA-256 digest thr
 
 Copilot supports the broadest set of `gh-aw` engine-specific features: native custom-agent selection with `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlisting. Offline BYOK mode disables its native web tools. Compilation rejects `tools.web-search` and CLI-mode `tools.web-fetch`; configure an MCP server instead. SDK mode (`engine.copilot-sdk: true`) supports `tools.web-fetch` through a custom proxy-aware implementation. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
 
+Copilot resolves [model aliases](/gh-aw/reference/engines/#model-aliases) before the CLI starts: `model: opus` and `model: copilot/opus` both run on the newest live Opus, and an unresolvable alias stops the run with `model_unavailable`. Exact ids such as `claude-opus-5.5` reach the CLI unchanged; an unavailable exact id fails at the first request and produces the unavailable-model failure issue.
+
 ### Dynamic workflows
 
 Copilot CLI [dynamic workflows](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-dynamic-workflows) are experimental and disabled by default. Enable them explicitly with `engine.dynamic-workflows: true`. The compiler emits `Using experimental feature: copilot.dynamic-workflows` only when enabled; batch compilation includes their usage in the experimental-feature summary.

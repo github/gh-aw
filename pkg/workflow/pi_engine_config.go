@@ -136,11 +136,7 @@ func validatePiSessionConfig(raw json.RawMessage) error {
 
 func (e *PiEngine) applyPiConfigEnv(env map[string]string, data *WorkflowData) {
 	env["GH_AW_PI_CONFIG"] = "{}"
-	aliases, err := json.Marshal(data.ModelMappings)
-	if err != nil {
-		panic(fmt.Sprintf("BUG: cannot encode Pi model aliases: %v", err))
-	}
-	env["GH_AW_PI_MODEL_ALIASES"] = string(aliases)
+	applyModelAliasOverridesEnv(env, "GH_AW_PI_MODEL_ALIASES", data)
 	childData := *data
 	if data.EngineConfig != nil {
 		childConfig := *data.EngineConfig

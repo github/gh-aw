@@ -981,7 +981,7 @@ Optional workflow metadata for categorization and organization. Enables filterin
 
 ### Model Alias
 
-A short human-friendly name (such as `sonnet` or `mini`) that gh-aw resolves to the best available concrete model at compile time. Aliases are defined as ordered lists of provider-scoped glob patterns; the first pattern that matches an available model wins. Meta-aliases reference other aliases and are resolved recursively. Built-in vendor aliases and meta-aliases are listed in the [Model Aliases & Multipliers Reference](/gh-aw/reference/model-tables/). Custom aliases can be defined in workflow frontmatter using the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
+A short human-friendly name (such as `sonnet` or `mini`) that gh-aw resolves at runtime, before the engine starts, to the newest matching model in the live model list. Aliases are defined as ordered lists of provider-scoped glob patterns; the first pattern that matches an available model wins. Meta-aliases reference other aliases and are resolved recursively. A provider prefix (`copilot/opus`) limits the lookup to that provider, and exact model ids are never rewritten. Built-in vendor aliases and meta-aliases are listed in the [Model Aliases & Multipliers Reference](/gh-aw/reference/model-tables/). Custom aliases are defined under `models:` in workflow frontmatter; see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
 
 ### Model Policy (`models.allowed`, `models.blocked`)
 

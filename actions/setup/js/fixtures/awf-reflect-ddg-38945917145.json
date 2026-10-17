@@ -1,0 +1,909 @@
+{
+  "endpoints": [
+    {
+      "provider": "openai",
+      "port": 10000,
+      "base_url": "http://api-proxy:10000",
+      "configured": false,
+      "models": null,
+      "model_metadata": null,
+      "automatic_model_selection": {
+        "model": "auto",
+        "constraint_field": "model_provider",
+        "model_providers": ["anthropic", "openai", "google"],
+        "preserves_backend": true,
+        "requires_advertised_endpoints": true,
+        "candidates": { "anthropic": { "messages": [], "chat/completions": [], "responses": [] }, "openai": { "messages": [], "chat/completions": [], "responses": [] }, "google": { "messages": [], "chat/completions": [], "responses": [] } }
+      },
+      "routing_models": null,
+      "models_url": "http://api-proxy:10000/v1/models"
+    },
+    {
+      "provider": "anthropic",
+      "port": 10001,
+      "base_url": "http://api-proxy:10001",
+      "configured": false,
+      "models": null,
+      "model_metadata": null,
+      "automatic_model_selection": {
+        "model": "auto",
+        "constraint_field": "model_provider",
+        "model_providers": ["anthropic", "openai", "google"],
+        "preserves_backend": true,
+        "requires_advertised_endpoints": true,
+        "candidates": { "anthropic": { "messages": [], "chat/completions": [], "responses": [] }, "openai": { "messages": [], "chat/completions": [], "responses": [] }, "google": { "messages": [], "chat/completions": [], "responses": [] } }
+      },
+      "routing_models": null,
+      "models_url": "http://api-proxy:10001/v1/models"
+    },
+    {
+      "provider": "copilot",
+      "port": 10002,
+      "base_url": "http://api-proxy:10002",
+      "configured": true,
+      "models": [
+        "claude-haiku-4.5",
+        "claude-haiku-5.5",
+        "claude-opus-5.5",
+        "claude-sonnet-5",
+        "claude-sonnet-5.5",
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-0613",
+        "gpt-4",
+        "gpt-4-0613",
+        "gpt-4-o-preview",
+        "gpt-4.1",
+        "gpt-4.1-2025-04-14",
+        "gpt-41-copilot",
+        "gpt-4o",
+        "gpt-4o-2024-05-13",
+        "gpt-4o-2024-08-06",
+        "gpt-4o-2024-11-20",
+        "gpt-4o-mini",
+        "gpt-4o-mini-2024-07-18",
+        "gpt-5-mini",
+        "gpt-5.3-codex",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.5",
+        "gpt-5.6-luna",
+        "gpt-5.6-luna-utility",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-6-astra",
+        "gpt-6-luna",
+        "gpt-6-sol",
+        "gpt-6.1-sol",
+        "grok-4.5",
+        "grok-4.6",
+        "grok-4.7",
+        "mai-code-1.1-flash",
+        "text-embedding-3-small",
+        "text-embedding-3-small-inference",
+        "text-embedding-ada-002",
+        "trajectory-compaction"
+      ],
+      "model_metadata": [
+        { "id": "claude-haiku-4.5", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01", "pricing": { "default": { "input": 1, "output": 5, "cachedInput": 0.1, "cacheWrite": 1.25 } } },
+        {
+          "id": "claude-haiku-5.5",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 0.1, "output": 0.5, "cachedInput": 0.01, "cacheWrite": 0.12, "threshold": 100000 }, "long_context": { "input": 0.5, "output": 2.5, "cachedInput": 0.05, "cacheWrite": 0.62, "threshold": 936000 } }
+        },
+        {
+          "id": "claude-opus-5.5",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 4, "output": 20, "cachedInput": 0.2, "cacheWrite": 5, "threshold": 200000 }, "long_context": { "input": 4, "output": 20, "cachedInput": 0.2, "cacheWrite": 5, "threshold": 1000000 } }
+        },
+        {
+          "id": "claude-sonnet-5",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 2, "output": 10, "cachedInput": 0.2, "cacheWrite": 2.5, "threshold": 200000 }, "long_context": { "input": 2, "output": 10, "cachedInput": 0.2, "cacheWrite": 2.5, "threshold": 936000 } }
+        },
+        {
+          "id": "claude-sonnet-5.5",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 2, "output": 10, "cachedInput": 0.1, "cacheWrite": 2.5, "threshold": 200000 }, "long_context": { "input": 2, "output": 10, "cachedInput": 0.1, "cacheWrite": 2.5, "threshold": 936000 } }
+        },
+        { "id": "gpt-3.5-turbo", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-3.5-turbo-0613", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01", "pricing": { "default": { "input": 2.5, "output": 10, "cachedInput": 1.25, "cacheWrite": 0 } } },
+        { "id": "gpt-4-0613", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01", "pricing": { "default": { "input": 2.5, "output": 10, "cachedInput": 1.25, "cacheWrite": 0 } } },
+        { "id": "gpt-4-o-preview", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4.1", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4.1-2025-04-14", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-41-copilot", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01", "pricing": { "default": { "input": 2, "output": 8, "cachedInput": 0.5, "cacheWrite": 0 } } },
+        { "id": "gpt-4o", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4o-2024-05-13", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4o-2024-08-06", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4o-2024-11-20", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4o-mini", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-4o-mini-2024-07-18", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "gpt-5-mini", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01", "pricing": { "default": { "input": 0.25, "output": 2, "cachedInput": 0.02, "cacheWrite": 0 } } },
+        {
+          "id": "gpt-5.3-codex",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 1.75, "output": 14, "cachedInput": 0.17, "cacheWrite": 0, "threshold": 272000 } }
+        },
+        {
+          "id": "gpt-5.4",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 2.5, "output": 15, "cachedInput": 0.25, "cacheWrite": 0, "threshold": 272000 }, "long_context": { "input": 5, "output": 22.5, "cachedInput": 0.5, "cacheWrite": 0, "threshold": 922000 } }
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 0.75, "output": 4.5, "cachedInput": 0.07, "cacheWrite": 0, "threshold": 272000 } }
+        },
+        {
+          "id": "gpt-5.5",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 5, "output": 30, "cachedInput": 0.5, "cacheWrite": 0, "threshold": 272000 }, "long_context": { "input": 10, "output": 45, "cachedInput": 1, "cacheWrite": 0, "threshold": 922000 } }
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 0.2, "output": 1.2, "cachedInput": 0.02, "cacheWrite": 0.25, "threshold": 200000 }, "long_context": { "input": 0.4, "output": 1.8, "cachedInput": 0.04, "cacheWrite": 0.5, "threshold": 922000 } }
+        },
+        { "id": "gpt-5.6-luna-utility", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        {
+          "id": "gpt-5.6-sol",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 4, "output": 20, "cachedInput": 0.4, "cacheWrite": 5, "threshold": 272000 }, "long_context": { "input": 8, "output": 30, "cachedInput": 0.8, "cacheWrite": 10, "threshold": 922000 } }
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 2, "output": 12, "cachedInput": 0.2, "cacheWrite": 2.5, "threshold": 272000 }, "long_context": { "input": 4, "output": 18, "cachedInput": 0.4, "cacheWrite": 5, "threshold": 922000 } }
+        },
+        {
+          "id": "gpt-6-astra",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 10, "output": 50, "cachedInput": 1, "cacheWrite": 12.5, "threshold": 272000 }, "long_context": { "input": 20, "output": 75, "cachedInput": 2, "cacheWrite": 25, "threshold": 1050000 } }
+        },
+        {
+          "id": "gpt-6-luna",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": {
+            "default": { "input": 0.1, "output": 0.5, "cachedInput": 0.01, "cacheWrite": 0.12, "threshold": 272000 },
+            "long_context": { "input": 0.2, "output": 0.75, "cachedInput": 0.02, "cacheWrite": 0.25, "threshold": 872000 }
+          }
+        },
+        {
+          "id": "gpt-6-sol",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 2, "output": 10, "cachedInput": 0.2, "cacheWrite": 2.5, "threshold": 272000 }, "long_context": { "input": 4, "output": 15, "cachedInput": 0.4, "cacheWrite": 5, "threshold": 872000 } }
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 2, "output": 10, "cachedInput": 0.1, "cacheWrite": 2.5, "threshold": 272000 }, "long_context": { "input": 4, "output": 15, "cachedInput": 0.2, "cacheWrite": 5, "threshold": 922000 } }
+        },
+        {
+          "id": "grok-4.5",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "wire_api": "responses",
+          "pricing": { "default": { "input": 2, "output": 6, "cachedInput": 0.5, "cacheWrite": 0, "threshold": 200000 }, "long_context": { "input": 4, "output": 12, "cachedInput": 1, "cacheWrite": 0, "threshold": 500000 } }
+        },
+        {
+          "id": "grok-4.6",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "wire_api": "responses",
+          "pricing": { "default": { "input": 2, "output": 6, "cachedInput": 0.5, "cacheWrite": 0, "threshold": 200000 }, "long_context": { "input": 4, "output": 12, "cachedInput": 1, "cacheWrite": 0, "threshold": 500000 } }
+        },
+        {
+          "id": "grok-4.7",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "wire_api": "responses",
+          "pricing": { "default": { "input": 2, "output": 6, "cachedInput": 0.5, "cacheWrite": 0, "threshold": 200000 }, "long_context": { "input": 4, "output": 12, "cachedInput": 1, "cacheWrite": 0, "threshold": 500000 } }
+        },
+        {
+          "id": "mai-code-1.1-flash",
+          "source": "provider",
+          "observed_at": "2026-10-16T18:18:16.558Z",
+          "api_version": "2026-07-01",
+          "pricing": { "default": { "input": 0.2, "output": 1.2, "cachedInput": 0.02, "cacheWrite": 0.25, "threshold": 128000 } }
+        },
+        { "id": "text-embedding-3-small", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "text-embedding-3-small-inference", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "text-embedding-ada-002", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01" },
+        { "id": "trajectory-compaction", "source": "provider", "observed_at": "2026-10-16T18:18:16.558Z", "api_version": "2026-07-01", "wire_api": "completions" }
+      ],
+      "automatic_model_selection": {
+        "model": "auto",
+        "constraint_field": "model_provider",
+        "model_providers": ["anthropic", "openai", "google"],
+        "preserves_backend": true,
+        "requires_advertised_endpoints": true,
+        "candidates": {
+          "anthropic": {
+            "messages": ["claude-sonnet-5.5", "claude-sonnet-5", "claude-opus-5.5", "claude-haiku-5.5", "claude-haiku-4.5"],
+            "chat/completions": ["claude-sonnet-5.5", "claude-sonnet-5", "claude-opus-5.5", "claude-haiku-5.5", "claude-haiku-4.5"],
+            "responses": []
+          },
+          "openai": {
+            "messages": [],
+            "chat/completions": ["gpt-5.4", "gpt-5-mini"],
+            "responses": ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5-mini"]
+          },
+          "google": { "messages": [], "chat/completions": [], "responses": [] }
+        }
+      },
+      "routing_models": [
+        { "model_id": "claude-haiku-4.5", "source": "provider", "supported_endpoints": ["/chat/completions", "/v1/messages"], "supported_reasoning_efforts": [], "context_window_tokens": 200000, "candidate_metadata_complete": true },
+        {
+          "model_id": "claude-haiku-5.5",
+          "source": "provider",
+          "supported_endpoints": ["/v1/messages", "/chat/completions"],
+          "supported_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1000000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "claude-opus-5.5",
+          "source": "provider",
+          "supported_endpoints": ["/v1/messages", "/chat/completions"],
+          "supported_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1000000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "claude-sonnet-5",
+          "source": "provider",
+          "supported_endpoints": ["/v1/messages", "/chat/completions"],
+          "supported_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1000000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "claude-sonnet-5.5",
+          "source": "provider",
+          "supported_endpoints": ["/v1/messages", "/chat/completions"],
+          "supported_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1000000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-3.5-turbo",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 16384,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-3.5-turbo-0613",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 16384,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 32768,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4-0613",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 32768,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4-o-preview",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4.1",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4.1-2025-04-14",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-41-copilot",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": null,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4o",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4o-2024-05-13",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4o-2024-08-06",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4o-2024-11-20",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4o-mini",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-4o-mini-2024-07-18",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 128000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-5-mini",
+          "source": "provider",
+          "supported_endpoints": ["/chat/completions", "/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["low", "medium", "high"],
+          "context_window_tokens": 264000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.3-codex",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["low", "medium", "high", "xhigh"],
+          "context_window_tokens": 400000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.4",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "/chat/completions", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.4-mini",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh"],
+          "context_window_tokens": 400000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.5",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.6-luna",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.6-luna-utility",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "gpt-5.6-sol",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-5.6-terra",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-6-astra",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-6-luna",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1000000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-6-sol",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1000000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "gpt-6.1-sol",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["none", "low", "medium", "high", "xhigh", "max"],
+          "context_window_tokens": 1050000,
+          "candidate_metadata_complete": true
+        },
+        { "model_id": "grok-4.5", "source": "provider", "supported_endpoints": ["/responses"], "supported_reasoning_efforts": ["low", "medium", "high"], "context_window_tokens": 500000, "candidate_metadata_complete": true },
+        { "model_id": "grok-4.6", "source": "provider", "supported_endpoints": ["/responses"], "supported_reasoning_efforts": ["low", "medium", "high", "xhigh"], "context_window_tokens": 500000, "candidate_metadata_complete": true },
+        { "model_id": "grok-4.7", "source": "provider", "supported_endpoints": ["/responses"], "supported_reasoning_efforts": ["low", "medium", "high", "xhigh"], "context_window_tokens": 500000, "candidate_metadata_complete": true },
+        {
+          "model_id": "mai-code-1.1-flash",
+          "source": "provider",
+          "supported_endpoints": ["/responses", "ws:/responses"],
+          "supported_reasoning_efforts": ["low", "medium", "high"],
+          "context_window_tokens": 256000,
+          "candidate_metadata_complete": true
+        },
+        {
+          "model_id": "text-embedding-3-small",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": null,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "text-embedding-3-small-inference",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": null,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "text-embedding-ada-002",
+          "source": "provider",
+          "supported_endpoints": [],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": null,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        },
+        {
+          "model_id": "trajectory-compaction",
+          "source": "provider",
+          "supported_endpoints": ["/chat/completions"],
+          "supported_reasoning_efforts": [],
+          "context_window_tokens": 262144,
+          "candidate_metadata_complete": false,
+          "candidate_metadata_reason": "Model is not enabled in the Copilot model picker"
+        }
+      ],
+      "models_url": "http://api-proxy:10002/models",
+      "credential_kind": "github_token",
+      "selected_scheme": "Bearer",
+      "inference_credential_source": "github_token",
+      "inference_selected_scheme": "Bearer",
+      "integration_id_source": "default"
+    },
+    {
+      "provider": "gemini",
+      "port": 10003,
+      "base_url": "http://api-proxy:10003",
+      "configured": false,
+      "models": null,
+      "model_metadata": null,
+      "automatic_model_selection": {
+        "model": "auto",
+        "constraint_field": "model_provider",
+        "model_providers": ["anthropic", "openai", "google"],
+        "preserves_backend": true,
+        "requires_advertised_endpoints": true,
+        "candidates": { "anthropic": { "messages": [], "chat/completions": [], "responses": [] }, "openai": { "messages": [], "chat/completions": [], "responses": [] }, "google": { "messages": [], "chat/completions": [], "responses": [] } }
+      },
+      "routing_models": null,
+      "models_url": "http://api-proxy:10003/v1beta/models"
+    },
+    {
+      "provider": "vertex",
+      "port": 10004,
+      "base_url": "http://api-proxy:10004",
+      "configured": false,
+      "models": null,
+      "model_metadata": null,
+      "automatic_model_selection": {
+        "model": "auto",
+        "constraint_field": "model_provider",
+        "model_providers": ["anthropic", "openai", "google"],
+        "preserves_backend": true,
+        "requires_advertised_endpoints": true,
+        "candidates": { "anthropic": { "messages": [], "chat/completions": [], "responses": [] }, "openai": { "messages": [], "chat/completions": [], "responses": [] }, "google": { "messages": [], "chat/completions": [], "responses": [] } }
+      },
+      "routing_models": null,
+      "models_url": null
+    }
+  ],
+  "models_fetch_complete": true,
+  "model_aliases": {
+    "agent": ["sonnet-6x", "gpt-6", "gpt-5.4", "gpt-5.5", "gpt-5.6", "gpt-5.3", "gemini-pro", "any"],
+    "any": ["copilot/*", "anthropic/*", "openai/*", "google/*", "gemini/*"],
+    "auto": ["copilot/auto", "large"],
+    "claude": ["agent"],
+    "codex": ["agent"],
+    "coding": ["copilot/gpt-5*codex*", "openai/gpt-5*codex*", "gpt-5-codex", "kimi"],
+    "copilot": ["agent"],
+    "detection": ["small"],
+    "evals": ["small"],
+    "gemini": ["agent"],
+    "gpt-5": ["copilot/gpt-5*", "openai/gpt-5*"],
+    "gpt-5-codex": ["copilot/gpt-5*codex*", "openai/gpt-5*codex*"],
+    "gpt-5-mini": ["copilot/gpt-5*mini*", "openai/gpt-5*mini*"],
+    "gpt-5.3": ["copilot/gpt-5.3*", "openai/gpt-5.3*"],
+    "gpt-5.4": ["copilot/gpt-5.4*", "openai/gpt-5.4*"],
+    "gpt-5.5": ["copilot/gpt-5.5*", "openai/gpt-5.5*"],
+    "gpt-5.6": ["copilot/gpt-5.6*", "openai/gpt-5.6*"],
+    "gpt-6": ["copilot/gpt-6*", "openai/gpt-6*"],
+    "grok": ["copilot/*grok*", "openai/*grok*"],
+    "haiku": ["copilot/*haiku*", "anthropic/*haiku*"],
+    "large": ["sonnet", "gpt-6", "gpt-5-pro", "gpt-5", "gemini-pro"],
+    "mai-code": ["copilot/MAI-Code*", "copilot/mai-code*", "openai/MAI-Code*"],
+    "mini": ["haiku", "gpt-5-mini", "gpt-5-nano", "gemini-flash-lite"],
+    "opus": ["copilot/*opus*", "anthropic/*opus*"],
+    "opusplan": ["opus?effort=high"],
+    "small": ["mini"],
+    "small-agent": ["haiku", "gpt-5-mini", "gemini-flash"],
+    "sonnet": ["copilot/*sonnet*", "anthropic/*sonnet*"],
+    "sonnet-6x": ["copilot/*sonnet-4.5*", "copilot/*sonnet-4.6*", "copilot/*sonnet-5*", "copilot/*sonnet-4-5-*", "anthropic/*sonnet-4-5-*", "copilot/*sonnet-4-6*", "anthropic/*sonnet-4-6*", "anthropic/*sonnet-5*"],
+    "summarization": ["haiku", "gpt-5-mini", "gemini-flash-lite", "mini"]
+  },
+  "model_fallback": { "enabled": true, "strategy": "middle_power", "excludeEngines": [] },
+  "model_fallback_effective": {
+    "openai": { "enabled": true, "strategy": "middle_power", "excludeEngines": [], "suppressed": false },
+    "anthropic": { "enabled": true, "strategy": "middle_power", "excludeEngines": [], "suppressed": false },
+    "copilot": { "enabled": false, "strategy": "middle_power", "excludeEngines": [], "suppressed": true, "suppression_reason": "copilot_standard_authoritative" },
+    "gemini": { "enabled": true, "strategy": "middle_power", "excludeEngines": [], "suppressed": false },
+    "vertex": { "enabled": true, "strategy": "middle_power", "excludeEngines": [], "suppressed": false }
+  },
+  "ai_credits": { "total": 0, "max_ai_credits": 1000, "effective_max_ai_credits": 1000, "percent_used": 0, "thresholds_crossed": [], "thresholds_pending": [], "by_model": {} },
+  "time_steering": { "enabled": true, "timeout_minutes": 15, "started_at_ms": 1792174704242, "percent_elapsed": 0.47, "thresholds_crossed": [], "thresholds_pending": [] },
+  "runs": { "enabled": true, "max_runs": 30, "invocation_count": 0, "remaining_runs": 30 },
+  "cache_misses": { "enabled": true, "max_cache_misses": 5, "consecutive_cache_misses": 0, "remaining_cache_misses": 5 },
+  "permission_denied": { "enabled": false, "max_permission_denied": null, "denied_count": 0 },
+  "model_api_mapping": {
+    "available": true,
+    "last_updated": "2026-10-08T07:12:00Z",
+    "providers": ["openai", "anthropic"],
+    "models": {
+      "openai": {
+        "endpoints": {
+          "responses": {
+            "path": "/v1/responses",
+            "description": "Newer unified API for agentic, tool-using, and multimodal workflows. Required for GPT-5+ models; some older models (o1, o3, gpt-4o, gpt-4.1) support it alongside chat/completions."
+          },
+          "chat_completions": { "path": "/v1/chat/completions", "description": "Legacy conversational API. Being deprecated for newer models by end of 2026." }
+        },
+        "models": [
+          { "family": "gpt-6-astra", "patterns": ["gpt-6-astra*"], "endpoints": ["chat_completions", "responses"], "notes": "Newest flagship model (Trusted Access Program rollout). Supports Chat Completions and Responses APIs." },
+          {
+            "family": "gpt-6-sol",
+            "patterns": ["gpt-6-sol*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "GPT-6 tier balancing intelligence and cost. Supports both Chat Completions and Responses APIs per official model page."
+          },
+          {
+            "family": "gpt-6.1-sol",
+            "patterns": ["gpt-6.1-sol*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "GPT-6.1 tier balancing intelligence and cost (successor to gpt-6-sol). Supports both Chat Completions and Responses APIs, consistent with other GPT-6 tiers."
+          },
+          {
+            "family": "gpt-6-luna",
+            "patterns": ["gpt-6-luna*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "GPT-6 tier for cost-sensitive, high-volume use. Supports both Chat Completions and Responses APIs per official model page."
+          },
+          {
+            "family": "gpt-daybreak",
+            "patterns": ["gpt-daybreak-blue-latest", "gpt-daybreak-red-latest"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only (ResponsesModel-only Literal). Experimental/preview aliases not present in ChatModel."
+          },
+          {
+            "family": "gpt-rosalind-research",
+            "patterns": ["gpt-rosalind-research*"],
+            "endpoints": ["responses"],
+            "notes": "Life sciences reasoning model, Trusted Access Program (approved organizations only). Responses API only, consistent with other restricted-access specialized models (gpt-daybreak-*, gpt-5.6-cyber). Billing begins October 5, 2026."
+          },
+          { "family": "gpt-5.6-cyber", "patterns": ["gpt-5.6-cyber*"], "endpoints": ["responses"], "notes": "Responses API only (ResponsesModel-only Literal, not in ChatModel). More specific than gpt-5.6* pattern below." },
+          {
+            "family": "gpt-5.6",
+            "patterns": ["gpt-5.6*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "Supports both endpoints. Includes gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna per OpenAI SDK ChatModel. gpt-5.6-cyber is responses-only (see separate entry above)."
+          },
+          {
+            "family": "gpt-5.5-pro",
+            "patterns": ["gpt-5.5-pro", "gpt-5.5-pro-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only (ResponsesOnlyModel per OpenAI OpenAPI spec). More specific than gpt-5.5* pattern below. Includes dated variants like gpt-5.5-pro-2026-04-23."
+          },
+          {
+            "family": "gpt-5.5",
+            "patterns": ["gpt-5.5*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "Supports both endpoints. Listed on the official GPT-5.5 model page. gpt-5.5-pro is responses-only (see separate entry above)."
+          },
+          {
+            "family": "gpt-5.4",
+            "patterns": ["gpt-5.4*"],
+            "routingPatterns": ["gpt-5.4", "gpt-5.4-2026-03-05"],
+            "endpoints": ["chat_completions", "responses"],
+            "routing": { "reasoningEfforts": ["none", "low", "medium", "high", "xhigh"], "contextWindowTokens": 1050000 },
+            "notes": "Supports both endpoints on OpenAI. GPT-5.4 routing metadata is exact-model only; mini/nano variants need separately verified data. The model page lists none, low, medium, high, and xhigh reasoning effort and a 1,050,000-token context window."
+          },
+          {
+            "family": "gpt-5.3-codex",
+            "patterns": ["gpt-5.3-codex", "gpt-5.3-codex-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only per official model page (developers.openai.com/api/docs/models/gpt-5.3-codex). More specific than gpt-5.3* pattern below."
+          },
+          {
+            "family": "gpt-5.3",
+            "patterns": ["gpt-5.3*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "Supports both endpoints. Only gpt-5.3-chat-latest confirmed for both endpoints; gpt-5.3-codex is responses-only (see separate entry above). No bare gpt-5.3 base model exists."
+          },
+          {
+            "family": "gpt-5.2-codex",
+            "patterns": ["gpt-5.2-codex", "gpt-5.2-codex-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only per official model page (developers.openai.com/api/docs/models/gpt-5.2-codex). More specific than gpt-5.2* pattern below."
+          },
+          {
+            "family": "gpt-5.2-pro",
+            "patterns": ["gpt-5.2-pro", "gpt-5.2-pro-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only per official model page (developers.openai.com/api/docs/models/gpt-5.2-pro). More specific than gpt-5.2* pattern below."
+          },
+          { "family": "gpt-5.2", "patterns": ["gpt-5.2*"], "endpoints": ["chat_completions", "responses"], "notes": "Supports both endpoints. gpt-5.2-pro and gpt-5.2-codex are responses-only (see separate entries above)." },
+          { "family": "gpt-5.1-codex-max", "patterns": ["gpt-5.1-codex-max"], "endpoints": ["responses"], "notes": "Responses API only (ResponsesOnlyModel)." },
+          {
+            "family": "gpt-5.1-codex",
+            "patterns": ["gpt-5.1-codex", "gpt-5.1-codex-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only per official model pages (developers.openai.com/api/docs/models/gpt-5.1-codex, /gpt-5.1-codex-mini). More specific than gpt-5.1* pattern below. gpt-5.1-codex-max is covered by a dedicated entry above."
+          },
+          {
+            "family": "gpt-5.1",
+            "patterns": ["gpt-5.1*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "Supports both endpoints for gpt-5.1 and gpt-5.1-mini. gpt-5.1-codex, gpt-5.1-codex-mini, and gpt-5.1-codex-max are responses-only (see separate entries above)."
+          },
+          {
+            "family": "gpt-5-codex/pro",
+            "patterns": ["gpt-5-codex", "gpt-5-pro", "gpt-5-pro-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only for gpt-5-codex and gpt-5-pro (ResponsesOnlyModel). Includes dated variants like gpt-5-pro-2025-10-06."
+          },
+          { "family": "gpt-5", "patterns": ["gpt-5", "gpt-5-*"], "endpoints": ["chat_completions", "responses"], "notes": "Supports both endpoints for gpt-5, gpt-5-mini, gpt-5-nano." },
+          {
+            "family": "o4-mini-deep-research",
+            "patterns": ["o4-mini-deep-research", "o4-mini-deep-research-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only (ResponsesOnlyModel). Includes dated variants like o4-mini-deep-research-2025-06-26."
+          },
+          { "family": "o4", "patterns": ["o4*"], "endpoints": ["chat_completions", "responses"], "notes": "Reasoning model. o4-mini supports both endpoints (ModelIdsShared)." },
+          {
+            "family": "o3-pro/deep-research",
+            "patterns": ["o3-pro", "o3-pro-*", "o3-deep-research", "o3-deep-research-*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only. o3-pro and o3-deep-research are in ResponsesModel but not ChatModel."
+          },
+          { "family": "o3", "patterns": ["o3*"], "endpoints": ["chat_completions", "responses"], "notes": "Reasoning model. o3, o3-mini support both endpoints. o3-pro/deep-research use responses only (covered by separate entry above)." },
+          { "family": "o1-pro", "patterns": ["o1-pro", "o1-pro-*"], "endpoints": ["responses"], "notes": "Responses API only. o1-pro is in ResponsesModel but not ChatModel." },
+          {
+            "family": "o1-mini/preview",
+            "patterns": ["o1-mini*", "o1-preview*"],
+            "endpoints": ["chat_completions"],
+            "notes": "Chat Completions API only per official model pages (developers.openai.com/api/docs/models/o1-mini, /o1-preview). Not available via Responses API. More specific than o1* pattern below."
+          },
+          {
+            "family": "o1",
+            "patterns": ["o1*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "Reasoning model. o1 (base) supports both endpoints. o1-pro is responses-only and o1-mini/o1-preview are chat_completions-only (see separate entries above)."
+          },
+          { "family": "computer-use-preview", "patterns": ["computer-use-preview*"], "endpoints": ["responses"], "notes": "Responses API only. Specialized model for computer use tasks." },
+          {
+            "family": "codex-mini",
+            "patterns": ["codex-mini*"],
+            "endpoints": ["responses"],
+            "notes": "Responses API only per official model page (developers.openai.com/api/docs/models/codex-mini-latest). Chat Completions is marked unsupported on the model page."
+          },
+          {
+            "family": "chatgpt-4o-latest",
+            "patterns": ["chatgpt-4o-latest"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "Rolling alias for the latest ChatGPT-optimized GPT-4o model. Supports both endpoints (ModelIdsShared). Not matched by gpt-4o* pattern due to chatgpt- prefix."
+          },
+          { "family": "gpt-4o", "patterns": ["gpt-4o*"], "endpoints": ["chat_completions", "responses"], "notes": "Multimodal. Supports both endpoints. Includes audio and search preview variants." },
+          { "family": "gpt-4.1", "patterns": ["gpt-4.1*"], "endpoints": ["chat_completions", "responses"], "notes": "Supports both endpoints. Includes gpt-4.1-mini, gpt-4.1-nano." },
+          {
+            "family": "gpt-4.5",
+            "patterns": ["gpt-4.5*"],
+            "endpoints": ["chat_completions", "responses"],
+            "notes": "Preview model. Now supports both endpoints per official model page (developers.openai.com/api/docs/models/gpt-4.5-preview); Responses API support was added since the previous mapping update."
+          },
+          { "family": "gpt-4-turbo", "patterns": ["gpt-4-turbo*"], "endpoints": ["chat_completions", "responses"], "notes": "Legacy. In ModelIdsShared per OpenAI spec v2.3.0; supports both endpoints." },
+          { "family": "gpt-4", "patterns": ["gpt-4", "gpt-4-*"], "endpoints": ["chat_completions", "responses"], "notes": "Legacy. In ModelIdsShared per OpenAI spec v2.3.0; supports both endpoints." },
+          { "family": "gpt-3.5-turbo", "patterns": ["gpt-3.5-turbo*"], "endpoints": ["chat_completions", "responses"], "notes": "Legacy. In ModelIdsShared per OpenAI spec v2.3.0; supports both endpoints. Deprecated." }
+        ]
+      },
+      "anthropic": {
+        "endpoints": { "messages": { "path": "/v1/messages", "description": "Unified Messages API for all Claude models. Supports tool use, streaming, extended thinking, and vision." } },
+        "models": [
+          {
+            "family": "claude-opus-5",
+            "patterns": ["claude-opus-5*"],
+            "routingPatterns": ["claude-opus-5-5", "claude-opus-5"],
+            "endpoints": ["messages"],
+            "routing": { "reasoningEfforts": ["low", "medium", "high", "max"], "contextWindowTokens": 1000000 },
+            "notes": "Flagship Opus generation 5 models with verified 1M-token context windows and the Anthropic effort parameter."
+          },
+          {
+            "family": "claude-fable-5",
+            "patterns": ["claude-fable-5*"],
+            "routingPatterns": ["claude-fable-5-1", "claude-fable-5"],
+            "endpoints": ["messages"],
+            "routing": { "reasoningEfforts": ["low", "medium", "high", "max"], "contextWindowTokens": 1000000 },
+            "notes": "Latest flagship family with verified 1M-token context windows and the Anthropic effort parameter."
+          },
+          {
+            "family": "claude-mythos-5",
+            "patterns": ["claude-mythos-5*", "claude-mythos-preview*"],
+            "routingPatterns": ["claude-mythos-5-1", "claude-mythos-5", "claude-mythos-preview*"],
+            "endpoints": ["messages"],
+            "routing": { "reasoningEfforts": ["low", "medium", "high", "max"], "contextWindowTokens": 1000000 },
+            "notes": "Specialized models, invitation-only, with verified 1M-token context windows and the Anthropic effort parameter."
+          },
+          {
+            "family": "claude-sonnet-5",
+            "patterns": ["claude-sonnet-5*"],
+            "routingPatterns": ["claude-sonnet-5-5", "claude-sonnet-5"],
+            "endpoints": ["messages"],
+            "routing": { "reasoningEfforts": ["low", "medium", "high", "max"], "contextWindowTokens": 1000000 },
+            "notes": "Best combination of speed and intelligence with verified 1M-token context windows and the Anthropic effort parameter."
+          },
+          {
+            "family": "claude-opus-4",
+            "patterns": ["claude-opus-4*"],
+            "routingPatterns": ["claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6"],
+            "endpoints": ["messages"],
+            "routing": { "reasoningEfforts": ["low", "medium", "high", "max"], "contextWindowTokens": 1000000 },
+            "notes": "Opus 4.6 and newer models have verified 1M-token context windows and support the Anthropic effort parameter."
+          },
+          {
+            "family": "claude-sonnet-4",
+            "patterns": ["claude-sonnet-4*"],
+            "routingPatterns": ["claude-sonnet-4-6"],
+            "endpoints": ["messages"],
+            "routing": { "reasoningEfforts": ["low", "medium", "high", "max"], "contextWindowTokens": 1000000 },
+            "notes": "Sonnet 4.6 has a verified 1M-token context window and supports the Anthropic effort parameter."
+          },
+          {
+            "family": "claude-haiku-5",
+            "patterns": ["claude-haiku-5*"],
+            "endpoints": ["messages"],
+            "notes": "Fast/cheap Haiku generation 5 (claude-haiku-5-5). 1M token context window per official models overview; effort levels not verified, so no routing metadata."
+          },
+          { "family": "claude-haiku-4", "patterns": ["claude-haiku-4*"], "endpoints": ["messages"], "notes": "Includes claude-haiku-4-5. Fast/cheap. 200K token context." },
+          { "family": "claude-3.5-sonnet", "patterns": ["claude-3-5-sonnet*", "claude-3.5-sonnet*"], "endpoints": ["messages"], "notes": "Previous generation. 200K token context." },
+          { "family": "claude-3.5-haiku", "patterns": ["claude-3-5-haiku*", "claude-3.5-haiku*"], "endpoints": ["messages"], "notes": "Previous generation fast model." },
+          { "family": "claude-3.7-sonnet", "patterns": ["claude-3-7-sonnet*", "claude-3.7-sonnet*"], "endpoints": ["messages"], "notes": "Previous generation extended thinking model. 200K token context." },
+          { "family": "claude-3-opus", "patterns": ["claude-3-opus*"], "endpoints": ["messages"], "notes": "Previous generation. 200K token context." }
+        ]
+      }
+    },
+    "error": null
+  },
+  "routing": null
+}

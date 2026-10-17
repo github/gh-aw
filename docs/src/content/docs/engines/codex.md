@@ -94,6 +94,8 @@ When a workflow does not declare any `plugins`, GitHub Agentic Workflows writes 
 
 Plugins are registered after configuration generation in the same `CODEX_HOME` used for execution. Inline skills use `.codex/skills/<name>/SKILL.md`.
 
+The harness resolves [model aliases](/gh-aw/reference/engines/#model-aliases) before Codex starts, against the configured provider's live models: `copilot/gpt-5.6` runs on the newest live `gpt-5.6*` model, and workflow-defined aliases under `models:` work the same way. Exact ids such as `copilot/gpt-5.6-sol` reach Codex unchanged. `copilot/auto` stays the Copilot gateway sentinel.
+
 ## Custom Codex configuration
 
 `engine.config` accepts TOML that is parsed and structurally merged with the generated configuration. Root settings remain at the root, and table settings preserve unrelated defaults:

@@ -64,6 +64,8 @@ Analyze the repository and create a concise daily status report covering:
 
 Gemini supports top-level `max-turns`, custom API targets, and per-command bash allowlisting. Gemini does not provide native `tools.web-search`; configure an MCP search integration when needed. It also does not support bare mode, `max-continuations`, native `engine.agent` selection, or custom `engine.harness` scripts. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
 
+Gemini does not resolve [model aliases](/gh-aw/reference/engines/#model-aliases) yet: the configured model reaches the CLI unchanged, and the compiler warns when `model:` is a gh-aw alias. Use an exact model id.
+
 ## Session artifacts
 
 Gemini's native `agent-stdio.log` maps to the standard events in

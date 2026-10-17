@@ -9,7 +9,7 @@ permissions:
   copilot-requests: write
 name: Smoke Pi Sub Agents
 strict: true
-model: copilot/gpt-5.3-codex
+model: copilot/gpt-5.3
 engine:
   id: pi
   bare: true

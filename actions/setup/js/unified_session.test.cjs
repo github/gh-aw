@@ -572,6 +572,38 @@ describe("Unified conclusion session", () => {
     expect(events.some(event => event.type === "session.collection_warning" && event.data.path === "agent/model-endpoint-mismatch.json")).toBe(true);
   });
 
+  it("projects the model resolution record", () => {
+    const records = [
+      { engine: "pi", role: "main", configured_model: "copilot/opus", resolved_model: "claude-opus-5.5", provider: "copilot", status: "resolved", cause: null },
+      { engine: "pi", role: "reader", configured_model: "copilot/claude-opus-5", resolved_model: null, provider: "copilot", status: "failed", cause: "model_unavailable" },
+    ];
+    write(
+      "agent/model-resolution.json",
+      records.map(record => ({ ...record, private: "omitted" }))
+    );
+    const events = writeUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "model.resolution")).toEqual(
+      records.map((data, index) => ({ type: "model.resolution", data, provenance: { component: "model_resolution", phase: "agent", path: "agent/model-resolution.json", index } }))
+    );
+    expect(writeUnifiedSession({ rootDir: root })).toEqual(events);
+    expect(events.at(-1).data.sources).toContainEqual({ component: "model_resolution", phase: "agent", path: "agent/model-resolution.json", events: 2 });
+  });
+
+  it.each([
+    "{broken",
+    "[]",
+    "{}",
+    JSON.stringify([{ engine: "pi", role: "main", configured_model: "opus", resolved_model: null, provider: null, status: "resolved", cause: null }]),
+    JSON.stringify([{ engine: "pi", role: "main", configured_model: "opus", resolved_model: null, provider: null, status: "failed", cause: "other" }]),
+  ])("warns rather than collecting an invalid model resolution record: %s", record => {
+    write("agent/model-resolution.json", record);
+    const warn = vi.fn();
+    const { events } = collectUnifiedSession({ rootDir: root, warn });
+    expect(events.some(event => event.type === "model.resolution")).toBe(false);
+    expect(warn).toHaveBeenCalled();
+    expect(events.some(event => event.type === "session.collection_warning" && event.data.path === "agent/model-resolution.json")).toBe(true);
+  });
+
   it.each([
     { engine: "copilot", metadata: undefined, restricted: false },
     { engine: "custom", metadata: undefined, restricted: false },

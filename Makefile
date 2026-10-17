@@ -40,7 +40,7 @@ all: build
 
 # Build the binary, run make deps before this
 .PHONY: build
-build: sync-action-pins sync-action-scripts sync-compat
+build: sync-action-pins sync-action-scripts sync-compat sync-model-aliases
 	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/gh-aw
 
 # Build for all platforms
@@ -1282,6 +1282,13 @@ sync-action-pins:
 		echo "⚠ Warning: .github/aw/actions-lock.json does not exist yet"; \
 	fi
 
+# Sync built-in model aliases from pkg/workflow/data to the setup action, where the
+# shared model resolver loads them at run time (see resolve_model_alias.cjs)
+.PHONY: sync-model-aliases
+sync-model-aliases:
+	@cp pkg/workflow/data/model_aliases.json actions/setup/js/model_aliases.json
+	@echo "✓ Built-in model aliases synced to actions/setup/js/model_aliases.json"
+
 # Sync action scripts
 .PHONY: sync-action-scripts
 sync-action-scripts:
@@ -1534,6 +1541,7 @@ help:
 	@echo "  check-stale-schema-binary - Guard: detect modified schema files under pkg/parser/schemas/ without a binary rebuild"
 	@echo "  install          - Install binary locally"
 	@echo "  sync-action-pins - Sync actions-lock.json from .github/aw to pkg/actionpins/data and pkg/workflow/data (runs automatically during build)"
+	@echo "  sync-model-aliases - Sync pkg/workflow/data/model_aliases.json to actions/setup/js/model_aliases.json (runs automatically during build)"
 	@echo "  sync-action-scripts - Sync install-gh-aw.sh and install-gh-aw.ps1 to actions/setup-cli/ (runs automatically during build)"
 	@echo "  sync-compat      - Sync max-agent in .github/aw/compat.json latest interval with DefaultCopilotVersion (runs automatically during build)"
 	@echo "  check-stale-compat - Guard: detect when compat.json max-agent is out of sync with DefaultCopilotVersion"

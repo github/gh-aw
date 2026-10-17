@@ -60,6 +60,7 @@ const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSi
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
 const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
+const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode } = require("./awf_model_routing.cjs");
@@ -502,6 +503,31 @@ function applyCodexRoutingEffort(args, effort) {
 }
 
 /**
+ * Run the shared "resolve configured model" step for the Codex main model, then
+ * Codex's provider-prefix check. `auto` keeps its Copilot gateway meaning.
+ * @param {{ model: string, provider: string, reflectData?: any, refetchReflectData?: () => Promise<any>, env?: NodeJS.ProcessEnv, logger?: (message: string) => void }} options
+ * @returns {Promise<string>}
+ */
+async function resolveCodexConfiguredModel(options) {
+  const env = options.env || process.env;
+  const logger = options.logger || log;
+  if (!options.model) return "";
+  const result = await resolveEngineModel({
+    engine: "codex",
+    role: "main",
+    configuredModel: options.model,
+    provider: options.provider,
+    reflectData: options.reflectData,
+    refetchReflectData: options.refetchReflectData,
+    preserveAuto: true,
+    normalize: resolution => normalizeCodexModel(resolution.resolvedModel, options.provider, { env, logger }),
+    logger,
+    env,
+  });
+  return result.engineModel;
+}
+
+/**
  * Resolve and apply AWF's selection to a Codex invocation.
  * @param {any} reflectData
  * @param {string[]} args
@@ -912,7 +938,24 @@ async function main() {
     const endpointOverride = result.selection.selected_endpoint && result.selection.selected_endpoint !== result.selection.endpoint ? ` selected_endpoint=${result.selection.selected_endpoint}` : "";
     log(`inference routing: mode=awf-routed model=${resolvedModel} effort=${result.selection.effort || "(unset)"} endpoint=${result.selection.endpoint}${endpointOverride}`);
   } else {
-    resolvedModel = normalizeCodexModel(codexModelEnvVar ? applyModelFallback(process.env, codexModelEnvVar, log) : "", process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
+    try {
+      resolvedModel = await resolveCodexConfiguredModel({
+        model: codexModelEnvVar ? applyModelFallback(process.env, codexModelEnvVar, log) : "",
+        provider: process.env.GH_AW_LLM_PROVIDER || "openai",
+        reflectData,
+        refetchReflectData: async () => {
+          if (process.env.AWF_REFLECT_ENABLED !== "1") return null;
+          const refreshed = await fetchAWFReflect({ logger: log });
+          return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
+        },
+        env: process.env,
+        logger: log,
+      });
+    } catch (err) {
+      log(`fatal: ${getErrorMessage(err)}`);
+      process.exit(1);
+      return;
+    }
     resolvedArgs = normalizeCodexModelArgs(resolvedArgs, process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
     resolvedArgs = injectModelFlagAfterExec(resolvedArgs, resolvedModel);
   }
@@ -1283,6 +1326,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildMissingToolPermissionIssuePayload,
     emitMissingToolPermissionIssue,
     buildCodexChildEnv,
+    resolveCodexConfiguredModel,
     hasCodexAzureOIDCProxy,
     extractPortFromURL,
     extractOpenAIProxyBaseURLFromToml,

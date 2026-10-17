@@ -1973,10 +1973,13 @@ features:
   # (optional)
   dangerously-allow-roles-read-and-pull-request-target: true
 
-# Model policy and optional pricing configuration. The policy fields
-# (allowed/blocked) are experimental and merged as unions across imports. The
-# providers field is optional and supplies pricing data merged by provider/model
-# key.
+# Model policy, optional pricing configuration, and workflow-defined model
+# aliases. The policy fields (allowed/blocked) are experimental and merged as
+# unions across imports. The providers field is optional and supplies pricing data
+# merged by provider/model key. Any other key defines a model alias: an ordered
+# list of model identifiers, glob patterns (for example copilot/*opus*), or other
+# alias names. Aliases are resolved at runtime against the live model catalog; the
+# main workflow's aliases override imported and built-in aliases.
 # (optional)
 models:
   # Experimental allowlist of model names/patterns. Mapped to AWF

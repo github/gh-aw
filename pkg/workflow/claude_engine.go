@@ -526,6 +526,7 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	}
 	applyMCPScriptsSecretEnv(env, workflowData)
 	applyModelRoutingEnv(env, workflowData)
+	applyModelAliasesEnv(env, workflowData)
 	return env
 }
 

@@ -22,8 +22,10 @@ package workflow
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -140,7 +142,25 @@ func (c *Compiler) validateModelAliasMap(
 	}
 
 	// Validate user-supplied frontmatter aliases only (builtins are pre-validated).
-	for key, entries := range frontmatterModels {
+	if err := c.validateUserModelAliases(frontmatterModels, markdownPath); err != nil {
+		return err
+	}
+
+	// V-MAF-010: detect circular alias references across the merged map.
+	if err := detectCircularModelAliases(mergedAliasMap, markdownPath); err != nil {
+		return err
+	}
+
+	modelAliasValidationLog.Print("Model alias map validation passed")
+	return nil
+}
+
+// validateUserModelAliases runs the key and entry checks (V-MAF-001..006, V-MAF-011) on one
+// user-supplied alias map: the main workflow's models: aliases or one imported workflow's.
+// Keys are checked in sorted order so the first reported error is deterministic.
+func (c *Compiler) validateUserModelAliases(models map[string][]string, markdownPath string) error {
+	for _, key := range slices.Sorted(maps.Keys(models)) {
+		entries := models[key]
 		// V-MAF-005: alias keys MUST NOT contain "/", "?", or "&".
 		if err := validateAliasKey(key, markdownPath); err != nil {
 			return err
@@ -154,13 +174,6 @@ func (c *Compiler) validateModelAliasMap(
 		// V-MAF-011: warn about unrecognised parameter keys in each entry.
 		c.warnUnrecognizedModelParams(entries, markdownPath)
 	}
-
-	// V-MAF-010: detect circular alias references across the merged map.
-	if err := detectCircularModelAliases(mergedAliasMap, markdownPath); err != nil {
-		return err
-	}
-
-	modelAliasValidationLog.Print("Model alias map validation passed")
 	return nil
 }
 

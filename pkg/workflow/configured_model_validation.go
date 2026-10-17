@@ -47,11 +47,54 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 	if !usesGitHubInference || codexModelID(baseModel) == "auto" || isCodexCompatibleModel(baseModel) {
 		return
 	}
+	// An alias is resolved at runtime by the Codex harness; its result cannot be judged here.
+	if configuredModelAliasKey(data.Model, data.ModelMappings) != "" {
+		return
+	}
 
 	message := fmt.Sprintf(
 		"Codex with model %q may fail because Codex relies on capabilities that general-purpose Copilot models do not provide. Select a supported Codex model such as copilot/gpt-6.1-sol",
 		data.Model,
 	)
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+		formatCompilerMessage(markdownPath, "warning", message)))
+	c.IncrementWarningCount()
+}
+
+// configuredModelAliasKey returns the gh-aw alias key used by a configured model (after
+// removing an optional provider/ prefix and ?parameters), or "" when the model is an
+// exact id or a GitHub Actions expression.
+func configuredModelAliasKey(model string, aliases map[string][]string) string {
+	model = strings.TrimSpace(model)
+	if model == "" || strings.Contains(model, "${{") {
+		return ""
+	}
+	base, _, _ := strings.Cut(model, "?")
+	if _, after, found := strings.Cut(base, "/"); found {
+		base = after
+	}
+	if _, ok := aliases[base]; ok && base != "" {
+		return base
+	}
+	return ""
+}
+
+// warnEngineCannotResolveModelAlias warns when an engine that does not run the shared
+// "resolve configured model" step (Gemini and declarative engines) is given a gh-aw
+// alias: the alias would reach the engine's CLI unchanged.
+func (c *Compiler) warnEngineCannotResolveModelAlias(data *WorkflowData, markdownPath string) {
+	if data == nil || data.EngineConfig == nil {
+		return
+	}
+	engineID := ResolveEngineID(data)
+	if engineID == "" || engineRunsSharedModelResolution(engineID) {
+		return
+	}
+	alias := configuredModelAliasKey(data.Model, data.ModelMappings)
+	if alias == "" {
+		return
+	}
+	message := fmt.Sprintf("engine %q does not resolve gh-aw model aliases yet: model %q uses alias %q, which is passed to the engine unchanged. Use an exact model id with this engine", engineID, data.Model, alias)
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 		formatCompilerMessage(markdownPath, "warning", message)))
 	c.IncrementWarningCount()

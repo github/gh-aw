@@ -43,10 +43,14 @@ interactive authentication.
 
 ## Models and installation
 
-The default native model slug is `gemini-3.8-flash-medium`. Use native Agy slugs,
-not `google/`, `gemini/` or Copilot provider prefixes. Availability depends on
-the native release and the API key's access; an unknown or inaccessible model
-fails the run.
+The default native model slug is `gemini-3.8-flash-medium`. Exact ids must be
+native Agy slugs, not `google/`, `gemini/` or Copilot provider prefixes, and are
+passed through unchanged. Availability depends on the native release and the API
+key's access; an unknown or inaccessible model fails the run.
+
+Model aliases ([how they resolve](/gh-aw/reference/engines/#model-aliases))
+resolve against the Gemini provider's live models from AWF `/reflect`, and Agy
+receives the native slug.
 
 The harness downloads the native Linux x64 v1.3.6 release, verifies its published
 SHA-256 checksum, extracts only `antigravity`, and verifies the executable version.

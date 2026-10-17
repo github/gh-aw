@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { resolveModelAlias, splitModelIdentifier } = require("./resolve_model_alias.cjs");
+const { loadBuiltinModelAliases, ModelAliasResolutionError, recordModelResolution, resolveConfiguredModel, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 const { writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { verifyPiThinkingEffort } = require("./pi_runtime.cjs");
@@ -40,34 +40,43 @@ function readPiSubagents(agentDir, sdk) {
   }
 }
 
-/** @param {{agentDir: string, sdk: any, provider: string, catalog: string[], gateway: boolean, parentModel: string, logger?: (message: string) => void}} options */
+/**
+ * Resolve each sub-agent's model with the shared "resolve configured model" step,
+ * limited to the parent's provider. Pass `reflectData` (the live /reflect catalogue)
+ * or an explicit `catalog`; without either, aliases fail with catalog_unavailable.
+ * Set `noCatalog` when no catalogue can exist (AWF disabled) so bundled model ids pass through.
+ *
+ * @param {{agentDir: string, sdk: any, provider: string, catalog?: string[], reflectData?: any, noCatalog?: boolean, gateway: boolean, parentModel: string, logger?: (message: string) => void, env?: NodeJS.ProcessEnv}} options
+ */
 function preparePiSubagents(options) {
-  const { agentDir, sdk, provider, catalog, gateway, parentModel, logger = () => {} } = options;
+  const { agentDir, sdk, provider, catalog, reflectData, noCatalog, gateway, parentModel, logger = () => {}, env = process.env } = options;
   let aliases;
   try {
-    aliases = JSON.parse(process.env.GH_AW_PI_MODEL_ALIASES || "{}");
+    aliases = JSON.parse(env.GH_AW_PI_MODEL_ALIASES || "{}");
   } catch (error) {
     throw new Error("Cannot parse Pi sub-agent model aliases", { cause: error });
   }
   if (!aliases || typeof aliases !== "object" || Array.isArray(aliases)) throw new Error("Pi sub-agent model aliases must be an object");
+  // GH_AW_PI_MODEL_ALIASES carries only workflow-defined and imported aliases; built-ins ship with the setup action.
+  aliases = { ...loadBuiltinModelAliases(), ...aliases };
   const scopedProvider = aliasProvider(provider);
-  // Restrict alias resolution to the parent's provisioned provider, never another credential route.
-  const scopedCatalog = catalog.flatMap(model => {
-    const slash = model.indexOf("/");
-    if (slash < 0) return [model, `${scopedProvider}/${model}`];
-    const prefix = aliasProvider(model.slice(0, slash));
-    return prefix === scopedProvider ? [`${prefix}/${model.slice(slash + 1)}`, model.slice(slash + 1)] : [];
-  });
   const agents = readPiSubagents(agentDir, sdk).map(agent => {
     const requested = agent.declaredModel || parentModel;
     const { base, params } = splitModelIdentifier(requested);
     if (!base || /[\s*$[\]]/.test(base)) throw new Error(`Pi sub-agent "${agent.name}" model must be a literal model or alias`);
-    const isAlias = Object.hasOwn(aliases, base);
     const slash = base.indexOf("/");
-    if (!isAlias && slash >= 0 && aliasProvider(base.slice(0, slash)) !== scopedProvider) throw new Error(`Pi sub-agent "${agent.name}" model "${requested}" uses a different provider than ${provider}`);
-    const normalized = !isAlias && slash >= 0 ? `${scopedProvider}/${base.slice(slash + 1)}` : base;
-    const resolved = isAlias ? resolveModelAlias(requested, aliases, scopedCatalog, { logger }) : normalized;
-    if (!resolved) throw new Error(`Pi sub-agent "${agent.name}" model alias "${requested}" did not resolve on ${provider}`);
+    // Restrict resolution to the parent's provisioned provider, never another credential route.
+    if (slash >= 0 && aliasProvider(base.slice(0, slash)) !== scopedProvider) throw new Error(`Pi sub-agent "${agent.name}" model "${requested}" uses a different provider than ${provider}`);
+    let resolution;
+    try {
+      resolution = resolveConfiguredModel({ configuredModel: requested, aliasMap: aliases, reflectData, catalog, noCatalog, provider: scopedProvider, logger });
+    } catch (error) {
+      if (!(error instanceof ModelAliasResolutionError)) throw error;
+      recordModelResolution({ engine: "pi", role: agent.name, configured_model: requested, resolved_model: null, provider: error.provider || null, status: "failed", cause: error.reason }, env);
+      error.message = `Pi sub-agent "${agent.name}" model alias "${requested}" did not resolve on ${provider}: ${error.message}`;
+      throw error;
+    }
+    const resolved = resolution.modelId;
     const selected = splitModelIdentifier(resolved);
     const modelId = selected.base.includes("/") ? selected.base.slice(selected.base.indexOf("/") + 1) : selected.base;
     const effort = selected.params.get("effort") || params.get("effort");
@@ -75,6 +84,7 @@ function preparePiSubagents(options) {
     if (effort && !["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(effort)) throw new Error(`Pi sub-agent "${agent.name}" has unsupported thinking effort "${effort}"`);
     verifyPiThinkingEffort(effort);
     logger(`sub-agent ${agent.name}: requested=${requested} resolved=${provider}/${modelId}`);
+    recordModelResolution({ engine: "pi", role: agent.name, configured_model: requested, resolved_model: modelId, provider: resolution.provider || null, status: resolution.status, cause: null }, env);
     return { ...agent, modelId, model: `${gateway ? "aw-gateway" : provider}/${modelId}`, ...(effort ? { thinking: effort === "none" ? "off" : effort } : {}) };
   });
   writeSecureOutput(path.join(agentDir, "subagents.json"), JSON.stringify(agents, null, 2));

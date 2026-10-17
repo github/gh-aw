@@ -3244,7 +3244,7 @@
       ]
     },
     "models": {
-      "description": "Model policy and optional pricing configuration. The policy fields (allowed/blocked) are experimental and merged as unions across imports. The providers field is optional and supplies pricing data merged by provider/model key.",
+      "description": "Model policy, optional pricing configuration, and workflow-defined model aliases. The policy fields (allowed/blocked) are experimental and merged as unions across imports. The providers field is optional and supplies pricing data merged by provider/model key. Any other key defines a model alias: an ordered list of model identifiers, glob patterns (for example copilot/*opus*), or other alias names. Aliases are resolved at runtime against the live model catalog; the main workflow's aliases override imported and built-in aliases.",
       "type": "object",
       "properties": {
         "allowed": {
@@ -3292,7 +3292,15 @@
           "description": "Fallback per-token pricing ($/1M tokens) for models not in the built-in pricing table. Required when max-ai-credits is active and the model is self-hosted or unrecognized (e.g. BYOK Ollama). Without this, the AWF API proxy rejects unrecognized models with HTTP 400."
         }
       },
-      "additionalProperties": false
+      "additionalProperties": {
+        "type": "array",
+        "description": "Workflow-defined model alias: an ordered list of model identifiers, glob patterns, or other alias names. The first entry that matches the live model catalog wins.",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minItems": 1
+      }
     },
     "experiments": {
       "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls how experiment state is persisted: 'repo' (default) commits state to a git branch named 'experiments/{sanitizedWorkflowID}' (workflow ID lowercased with hyphens removed) for durability; 'cache' uses GitHub Actions cache. At runtime the activation job picks a variant and persists the updated counters. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. When multiple experiments are declared, assignments are statistically balanced using a least-used counter that round-robins across variants (or weighted when 'weight' is provided); ties are broken randomly so no variant is systematically favoured on the first run.",

@@ -16,8 +16,7 @@ import (
 )
 
 // TestModelAliasesFromImportedWorkflow verifies that a workflow can import a shared workflow
-// and that compilation succeeds. Model aliases via the `models` frontmatter field have been
-// removed; aliases now come only from the builtin alias map.
+// and that compilation succeeds.
 func TestModelAliasesFromImportedWorkflow(t *testing.T) {
 	tempDir := testutil.TempDir(t, "models-import-test-*")
 

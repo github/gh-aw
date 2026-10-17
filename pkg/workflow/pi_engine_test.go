@@ -645,3 +645,40 @@ func TestPiEngine_GetExecutionSteps_ModelRouting(t *testing.T) {
 	assert.Contains(t, step, "--custom-flag kept")
 	assert.Contains(t, step, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`)
 }
+
+func TestPiEngineUsesAgentErrorDetection(t *testing.T) {
+	assert.Equal(t, "detect_agent_errors", NewPiEngine().GetErrorDetectionScriptId(), "Pi must run detect_agent_errors so an unavailable model produces the model-not-supported failure issue")
+}
+
+func TestPiEngine_GetExecutionSteps_AliasModelResolvedAtRuntime(t *testing.T) {
+	for _, tt := range []struct {
+		model     string
+		wantAlias bool
+	}{
+		{model: "copilot/opus", wantAlias: true},
+		{model: "copilot/claude-opus-5.5"},
+		{model: "copilot/auto"},
+	} {
+		t.Run(tt.model, func(t *testing.T) {
+			workflowData := &WorkflowData{
+				Name:               "test-pi-alias",
+				Model:              tt.model,
+				ModelMappings:      BuiltinModelAliases(),
+				EngineConfig:       &EngineConfig{ID: "pi"},
+				ParsedTools:        NewTools(map[string]any{}),
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+			}
+			steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
+			require.Len(t, steps, 1)
+			stepText := strings.Join(steps[0], "\n")
+			modelID := strings.TrimPrefix(tt.model, "copilot/")
+			if tt.wantAlias {
+				assert.Contains(t, stepText, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-model)"`)
+				assert.NotContains(t, stepText, "--model aw-gateway/"+modelID)
+			} else {
+				assert.Contains(t, stepText, "--model aw-gateway/"+modelID)
+				assert.NotContains(t, stepText, "/tmp/gh-aw/pi-model")
+			}
+		})
+	}
+}

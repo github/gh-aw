@@ -3,7 +3,7 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.10.0"
+version: "1.11.0"
 status: Draft
 publication_date: "2026-10-16"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.10.0<br>
+**Version**: 1.11.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-16<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.10.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.11.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -643,6 +643,7 @@ source for opaque fields.
 | `model_routing.outcome` | The harness's observed routing status, wire model, effective endpoint, selected endpoint, effort, applied effort, and failure code from `agent/awf-routing-outcome.json`; free-form detail is excluded. |
 | `model.inventory` | AWF's runtime model list from `sandbox/firewall/models.json` and persisted `/reflect` inventory, selecting the first valid copy from `agent/awf-reflect.json`, then `sandbox/firewall/awf-reflect.json`. Agent and threat-detection inventories retain their source path and phase separately. Payloads contain provider names, full model ID lists, routing model IDs and supported endpoints, and the observed `modelsFetchComplete` flag when supplied. Endpoint routing metadata takes precedence over the top-level fallback. Credentials, headers, URLs, and unrecognized fields are excluded. Missing inventory does not imply unavailable models; malformed sources emit collection warnings rather than empty inventory events. JSON parse failures produce one warning per source. |
 | `model_endpoint.mismatch` | A single harness JSON record from `agent/model-endpoint-mismatch.json`, with the model/API mismatch cause and corrective action. |
+| `model.resolution` | Runner-written records from `agent/model-resolution.json`, one per resolved role, with the engine, role, configured and resolved model, provider, status, and failure cause from the shared "resolve configured model" step (T-UAS-074). |
 | `guardrail.daily_aic` | Activation's daily AI Credits decision (`status`, `exceeded`, and available numeric `total`, `estimated`, `threshold`). Omitted when the guardrail has no decision; an existing event is not duplicated. |
 | `github_api.rate_limit` | Available GitHub API rate-limit JSONL observations retain the recorded source (`response_headers`, `rate_limit_api`, or `retry`), operation, resource, limit, remaining, used, reset, and retry state. `credentialSource` identifies a known GitHub Actions token, PAT, or app token where classified by the client; absent or unknown credential types are not inferred from quota values. Raw credentials and unrecognized fields are excluded. The collector prefers `github_rate_limits.jsonl` over its `usage/` copy to avoid duplicate observations. |
 | `plugin.installation` | Successful plugin installations retain the pinned `plugin` reference, `repository`, `ref`, local checkout `path`, and `status: "installed"`, with the installation timestamp. CLI and directory-based engines record success after installation or staging; Claude records the checked-out directory made available through `--plugin-dir`, and Codex records success after marketplace registration and plugin installation. The collector prefers `plugin-installations.jsonl` over its `usage/` copy. Credentials and unrecognized fields are excluded; absent evidence does not imply an installation. |
@@ -772,6 +773,25 @@ unified session, without rescanning raw agent or firewall logs or reading the
 source JSON separately. Reports MUST use the `model_endpoint_mismatch` grouping
 category and the `model_endpoint_mismatch_context` template placeholder, and
 redact and bound diagnostic text before publication.
+
+#### Model resolution
+
+**T-UAS-074 — Configured model resolution.** The collector MUST map each record
+in the JSON array `agent/model-resolution.json` to one `model.resolution` event,
+in array order, with provenance component `model_resolution`, phase `agent`,
+source path `agent/model-resolution.json`, and the record's array index. The
+harness writes this file before it launches the engine CLI, so the events are
+runner-written evidence, not engine output. Empty arrays, non-array JSON,
+malformed JSON, and arrays with any record that violates the following contract
+MUST produce a collection warning rather than model-resolution events.
+
+Each payload has required non-empty strings `engine` and `role` (`main` or the
+sub-agent name) and `configured_model`; `resolved_model` and `provider` are
+strings or `null`; `status` is `resolved` (an alias resolved against the live
+catalogue), `exact` (an exact id passed through unchanged), or `failed`; and
+`cause` is `null` unless `status` is `failed`, when it is `model_unavailable` or
+`catalog_unavailable` and `resolved_model` is `null`. Unknown source fields are
+excluded; an absent record does not imply that a model was or was not resolved.
 
 ### 4.8 `agent.execution`
 
@@ -1552,6 +1572,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-070 | Firewall token usage with supplied or absent purpose/path/initiator; `usage.report` alias | Supplied routing metadata survives projection; consumers treat absent purpose as unknown, not agent. |
 | T-UAS-071 | Firewall token usage with supplied, absent, or malformed `steering`; AI-credit, token, and time steering event-log entries | Type and threshold survive projection, malformed notices are dropped, steering events keep threshold and request ID, and absent notices remain unrecorded rather than undelivered. |
 | T-UAS-073 | Copilot built-in and declared sub-agents with distinct display names, provider-qualified SDK model IDs, declared concrete and alias models, and sessions without `agentName` | Rows keyed by `agentName` with sorted `display_names`, one audit row per definition and one logs row per definition and effort, bare served model IDs without aliases, unchanged counts and credits, and display-name rows when `agentName` is absent. |
+| T-UAS-074 | `agent/model-resolution.json` with resolved, exact, and failed records for main and sub-agent roles; empty, non-array, malformed, and contract-violating records | One `model.resolution` event per record in array order with `model_resolution` provenance and only the contract fields; invalid sources emit collection warnings and no events. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -2073,6 +2094,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.11.0 — Draft (2026-10-16)
+
+- Added the runner-written `model.resolution` observation from `agent/model-resolution.json`, recording each engine's configured and resolved model, provider, status, and failure cause (T-UAS-074).
+- Retained serialization-format version 1.
 
 ### Version 1.10.0 — Draft (2026-10-16)
 

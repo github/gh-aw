@@ -32,6 +32,24 @@ function isModelEndpointMismatchData(data) {
   );
 }
 
+const MODEL_RESOLUTION_STATUSES = ["resolved", "exact", "failed"];
+const MODEL_RESOLUTION_CAUSES = ["model_unavailable", "catalog_unavailable"];
+
+/**
+ * Validate one entry of agent/model-resolution.json, written by the shared
+ * "resolve configured model" step (resolve_model_alias.cjs).
+ * @param {any} data
+ * @returns {boolean}
+ */
+function isModelResolutionData(data) {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) return false;
+  if (!["engine", "role", "configured_model"].every(key => typeof data[key] === "string" && data[key] !== "")) return false;
+  if (!["resolved_model", "provider"].every(key => data[key] === null || typeof data[key] === "string")) return false;
+  if (!MODEL_RESOLUTION_STATUSES.includes(data.status)) return false;
+  if (data.status === "failed") return MODEL_RESOLUTION_CAUSES.includes(data.cause) && data.resolved_model === null;
+  return data.cause === null && typeof data.resolved_model === "string";
+}
+
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {{component: string, phase: string, path: string, events: SessionEvent[], indices?: number[], timestampUnit?: import("./unified_session_order.cjs").TimestampUnit}} SessionSource */
 
@@ -551,6 +569,22 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       report(mismatchFile, "malformed_json", undefined);
     }
   }
+  const resolutionFile = path.join(rootDir, "agent/model-resolution.json");
+  if (exists(resolutionFile)) {
+    try {
+      const records = JSON.parse(read(resolutionFile));
+      if (!Array.isArray(records) || records.length === 0 || !records.every(isModelResolutionData)) {
+        report(resolutionFile, "invalid_model_resolution", undefined);
+      } else {
+        const keys = ["engine", "role", "configured_model", "resolved_model", "provider", "status", "cause"];
+        const events = records.map(record => /** @type {SessionEvent} */ ({ type: "model.resolution", data: Object.fromEntries(keys.map(key => [key, record[key]])) }));
+        sources.push({ component: "model_resolution", phase: "agent", path: "agent/model-resolution.json", events });
+      }
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      report(resolutionFile, "malformed_json", undefined);
+    }
+  }
   for (const [candidates, component, phase, type] of observations) {
     const file = choose(candidates);
     if (type === "model_routing.outcome" && file) {
@@ -708,4 +742,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { SESSION_FILE_FORMAT_VERSION, sessionTimestamp, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, collectUnifiedSession, isModelEndpointMismatchData, writeUnifiedSession, main };
+module.exports = { SESSION_FILE_FORMAT_VERSION, sessionTimestamp, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, collectUnifiedSession, isModelEndpointMismatchData, isModelResolutionData, writeUnifiedSession, main };

@@ -169,6 +169,16 @@ export interface ModelEndpointMismatchData {
   endpoint?: string;
 }
 
+export interface ModelResolutionData {
+  engine: string;
+  role: string;
+  configured_model: string;
+  resolved_model: string | null;
+  provider: string | null;
+  status: "resolved" | "exact" | "failed";
+  cause: "model_unavailable" | "catalog_unavailable" | null;
+}
+
 export interface UnifiedModelRoutingData {
   status?: JsonValue;
   source?: JsonValue;
@@ -568,6 +578,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.model_routing": ModelRoutingData;
   "model_routing.outcome": ModelRoutingOutcomeData;
   "model_endpoint.mismatch": ModelEndpointMismatchData;
+  "model.resolution": ModelResolutionData;
   "firewall.steering": FirewallSteeringData;
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;

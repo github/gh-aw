@@ -394,6 +394,31 @@ func piBareWorkflowSkillArgs(workflowData *WorkflowData) string {
 	return fmt.Sprintf(` $(cat %s 2>/dev/null)`, path.Join(constants.TmpPiAgentDir, piWorkflowSkillArgsFile))
 }
 
+// piResolvedModelFile is where pi_models_json.cjs writes the main model id chosen by the
+// shared "resolve configured model" step.
+const piResolvedModelFile = "/tmp/gh-aw/pi-model"
+
+// piModelIsAlias reports whether the configured Pi model (without provider prefix or
+// parameters) is a gh-aw alias that is resolved at runtime. Copilot's `auto` stays a
+// gateway sentinel on Pi, so it is not treated as an alias here.
+func piModelIsAlias(workflowData *WorkflowData) bool {
+	if workflowData == nil || workflowData.Model == "" {
+		return false
+	}
+	key, _, _ := strings.Cut(extractPiModelID(workflowData.Model), "?")
+	if key == "" || strings.EqualFold(key, "auto") {
+		return false
+	}
+	_, ok := workflowData.ModelMappings[key]
+	return ok
+}
+
+// GetErrorDetectionScriptId returns the host-runner script that detects agent errors,
+// including an unavailable configured model reported by the shared model resolution step.
+func (e *PiEngine) GetErrorDetectionScriptId() string {
+	return "detect_agent_errors"
+}
+
 func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile universalLLMBackendProfile, backend UniversalLLMBackend, piArgs []string, firewallEnabled, modelConfigured, driverConfigured bool) (string, []string) {
 	modelRouting := isModelRoutingEnabled(workflowData)
 	if !modelConfigured && !modelRouting {
@@ -428,7 +453,10 @@ func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile un
 			contextWindowAssignment,
 			nodeRuntimeResolutionCommand, SetupActionDestinationShell,
 		)
-		if !driverConfigured && !modelRouting {
+		// An alias is resolved at runtime by pi_models_json.cjs (the shared "resolve configured
+		// model" step), which writes the resolved id to piResolvedModelFile; exact ids are never
+		// rewritten, so they stay static in the command line.
+		if !driverConfigured && !modelRouting && !piModelIsAlias(workflowData) {
 			piArgs = append(piArgs, "--model", "aw-gateway/"+modelID)
 		}
 		piLog.Printf("Pi: using /reflect-resolved models.json gateway routing for model %q via aw-gateway (fallback port %d)", modelID, profile.gatewayPort)
@@ -453,6 +481,8 @@ func (e *PiEngine) buildPiCommand(workflowData *WorkflowData, commandName string
 		if isModelRoutingEnabled(workflowData) {
 			routingEnv = `GH_AW_PI_MODEL="aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)" GH_AW_PI_NATIVE_PROVIDER="aw-gateway" `
 			modelArg = ` --model "aw-gateway/$(cat /tmp/gh-aw/pi-routing-model)"`
+		} else if piModelsJSONSetup != "" && piModelIsAlias(workflowData) {
+			modelArg = ` --model "aw-gateway/$(cat ` + piResolvedModelFile + `)"`
 		}
 		piCommand = fmt.Sprintf(
 			`cat /tmp/gh-aw/aw-prompts/user.txt | %s%s %s%s%s --append-system-prompt /tmp/gh-aw/aw-prompts/system.txt --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_tool_policy.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_subagent_extension.cjs" --extension builtin:mcp --extension builtin:codemode --extension builtin:tool-search 2>&1 | tee %s`,

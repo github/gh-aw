@@ -18,6 +18,10 @@
  *
  * Environment variables:
  *   GH_AW_PI_MODEL_ID              — Pi model ID (without provider prefix)
+ *   GH_AW_PI_MODEL                 — configured model (exact id or gh-aw alias, optional provider/ prefix)
+ *   GH_AW_PI_MODEL_ALIASES         — workflow-defined and imported gh-aw aliases (JSON; built-ins ship in model_aliases.json)
+ *   GH_AW_PI_MODEL_FILE            — where the resolved main model id is written for the Pi CLI
+ *                                    (defaults to /tmp/gh-aw/pi-model)
  *   GH_AW_PI_CONTEXT_WINDOW        — optional model context window to write into models.json
  *   GH_AW_PI_GATEWAY_SECRET_ENV    — name of the env var holding the provider API key
  *   GH_AW_PI_GATEWAY_FALLBACK_PORT — compile-time api-proxy port, used when /reflect
@@ -37,7 +41,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { loadPiSDK, nativePiProvider, parsePiConfig, stagePiArtifacts } = require("./pi_runtime.cjs");
 const { preparePiSubagents } = require("./pi_subagent_config.cjs");
-const { buildCatalogFromReflect } = require("./resolve_model_alias.cjs");
+const { canonicalModelProvider, loadModelAliasMap, ModelAliasResolutionError, recordModelResolution, resolveEngineModel } = require("./resolve_model_alias.cjs");
 const {
   resolveAWFModelRoutingSelection,
   getAWFRoutingModel,
@@ -182,11 +186,13 @@ function resolvePiApiForProvider(provider) {
 
 /**
  * Fail before inference when a completed proxy model inventory excludes the selected model.
+ * Throws ModelAliasResolutionError with cause model_unavailable, the same cause and
+ * message Copilot uses for an unavailable configured model.
  *
- * @param {{ provider: string, modelId: string, reflectData?: any, logger?: (msg: string) => void }} options
+ * @param {{ provider: string, modelId: string, configuredModel?: string, reflectData?: any, logger?: (msg: string) => void }} options
  */
 function validatePiModelAvailability(options) {
-  const { provider, modelId, reflectData, logger = () => {} } = options;
+  const { provider, modelId, configuredModel, reflectData, logger = () => {} } = options;
   if (!reflectData) {
     logger("awf-reflect: model availability check skipped (reflection data unavailable)");
     return;
@@ -225,7 +231,11 @@ function validatePiModelAvailability(options) {
     return;
   }
   logger(`warning: awf-reflect model availability check failed (provider=${endpoint.provider}, model=${modelId})`);
-  throw new Error(`Pi model "${modelId}" is not advertised by the configured ${endpoint.provider} proxy endpoint; choose a model listed by AWF /reflect`);
+  const error = new ModelAliasResolutionError(configuredModel || modelId, "model_unavailable", { provider: canonicalModelProvider(endpoint.provider) });
+  // Keep the Pi startup phrase that `gh aw audit` classifies as model_unavailable,
+  // followed by the shared message that detect_agent_errors classifies as model not supported.
+  error.message = `Pi model "${modelId}" is not advertised by the configured ${endpoint.provider} proxy endpoint; ${error.message}`;
+  throw error;
 }
 
 /**
@@ -402,7 +412,49 @@ async function main(options = {}) {
     modelId = routingSelection.wire_model;
   }
 
-  validatePiModelAvailability({ provider, modelId, reflectData, logger });
+  const refetchReflectData = async () => {
+    if (process.env.AWF_REFLECT_ENABLED !== "1" && !routingRequired) return null;
+    try {
+      const result = await (options.fetchReflect || fetchAWFReflect)({ logger });
+      return result && result.ok && result.reflectData ? result.reflectData : null;
+    } catch (error) {
+      logger(`warning: /reflect refetch failed: ${getErrorMessage(error)}`);
+      return null;
+    }
+  };
+  const configuredModel = routingRequired ? modelId : process.env.GH_AW_PI_MODEL || modelId;
+  if (!routingRequired) {
+    // Shared "resolve configured model" step: aliases resolve to the newest live match on
+    // the configured provider, exact ids stay exact, and Copilot's `auto` stays a gateway sentinel.
+    const resolution = await resolveEngineModel({
+      engine: "pi",
+      role: "main",
+      configuredModel,
+      provider,
+      aliasMap: loadModelAliasMap({ reflectData, envVar: "GH_AW_PI_MODEL_ALIASES" }),
+      reflectData,
+      refetchReflectData,
+      preserveAuto: true,
+      normalize: result => result.modelId,
+      logger,
+    });
+    if (resolution.reflectData) reflectData = resolution.reflectData;
+    modelId = resolution.engineModel;
+  }
+
+  try {
+    validatePiModelAvailability({ provider, modelId, configuredModel, reflectData, logger });
+  } catch (error) {
+    if (error instanceof ModelAliasResolutionError && !routingRequired) {
+      recordModelResolution({ engine: "pi", role: "main", configured_model: configuredModel, resolved_model: null, provider: error.provider || null, status: "failed", cause: error.reason });
+    }
+    throw error;
+  }
+  if (!routingRequired) {
+    const modelFile = process.env.GH_AW_PI_MODEL_FILE || "/tmp/gh-aw/pi-model";
+    fs.mkdirSync(path.dirname(modelFile), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(modelFile, modelId, { encoding: "utf8", mode: 0o600 });
+  }
   const { baseUrl, source } = resolveGatewayBaseUrl({ provider, fallbackPort, reflectData, logger });
   logger(`resolved gateway baseUrl=${baseUrl} (source=${source}, provider=${provider}, fallbackPort=${fallbackPort})`);
 
@@ -465,13 +517,25 @@ async function main(options = {}) {
   if (fs.existsSync(path.join(agentDir, "agents"))) {
     const sdk = await (options.loadSDK || loadPiSDK)();
     const runtime = await sdk.ModelRuntime.create({ modelsPath: null });
-    const catalog = reflectData?.models_fetch_complete === true ? buildCatalogFromReflect(reflectData) : runtime.getModels(nativeProvider).map(model => `${model.provider}/${model.id}`);
-    const agents = preparePiSubagents({ agentDir, sdk, provider: nativeProvider, catalog, gateway: true, parentModel: `${nativeProvider}/${modelId}`, logger });
+    // Sub-agent aliases resolve against the live /reflect catalogue only (never Pi's static
+    // model list); an incomplete catalogue is refetched once before failing.
+    const prepare = (/** @type {any} */ data) => preparePiSubagents({ agentDir, sdk, provider: nativeProvider, reflectData: data, gateway: true, parentModel: `${nativeProvider}/${modelId}`, logger });
+    let agents;
+    try {
+      agents = prepare(reflectData);
+    } catch (error) {
+      if (!(error instanceof ModelAliasResolutionError) || error.reason !== "catalog_unavailable") throw error;
+      logger(`model alias resolution: retrying awf-reflect model-catalog fetch once before failing for '${error.configuredModel}'`);
+      const refreshed = await refetchReflectData();
+      if (!refreshed) throw error;
+      reflectData = refreshed;
+      agents = prepare(reflectData);
+    }
     const seen = new Set([modelId]);
     for (const agent of agents) {
       if (seen.has(agent.modelId)) continue;
       seen.add(agent.modelId);
-      validatePiModelAvailability({ provider, modelId: agent.modelId, reflectData, logger });
+      validatePiModelAvailability({ provider, modelId: agent.modelId, configuredModel: agent.declaredModel || agent.modelId, reflectData, logger });
       const catalogModel = runtime.getModel(nativeProvider, agent.modelId);
       const childApi = resolvePiApiForModel({ provider, modelId: agent.modelId, model: catalogModel, modelsJson, logger });
       const childMetadata = {};

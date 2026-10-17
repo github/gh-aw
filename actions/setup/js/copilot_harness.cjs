@@ -99,7 +99,7 @@ const { recordAWFModelRoutingOutcome } = require("./awf_model_routing.cjs");
 const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { applyCopilotWireAPI: configureCopilotWireAPI, warnCopilotSubagentEndpoints, recordModelEndpointMismatch, getSupportedEndpoints, MODEL_ENDPOINT_FIX } = require("./copilot_wire_api.cjs");
-const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
+const { loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
 const { createCopilotModelObserver, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const MODEL_NOT_SUPPORTED_PATTERN = /The requested model is not supported|No model available\b[^\n]*policy enablement/i;
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
@@ -486,37 +486,33 @@ async function applyCopilotModelAliasResolution(options) {
   const awfConfig = loadAwfConfigData();
   const aliasMap = awfConfig?.apiProxy?.models;
 
-  const tryResolve = (/** @type {object|null} */ reflectData) =>
-    resolveConfiguredCopilotModel({
-      configuredModel,
-      aliasMap,
-      reflectData,
-      logger,
-    });
-
   let resolvedModel;
   try {
-    resolvedModel = tryResolve(options.awfReflectData);
-  } catch (err) {
-    if (!(err instanceof ModelAliasResolutionError)) {
-      throw err;
+    const result = await resolveEngineModel({
+      engine: "copilot",
+      role: "main",
+      configuredModel,
+      aliasMap: aliasMap ?? loadModelAliasMap({ reflectData: options.awfReflectData }),
+      reflectData: options.awfReflectData,
+      refetchReflectData: options.refetchReflectData,
+      logPrefix: "copilot model alias resolution",
+      normalize: r => normalizeForCopilotCLI(r.resolvedModel),
+      logger,
+    });
+    resolvedModel = result.engineModel;
+    if (result.alias && resolvedModel !== configuredModel) {
+      logger(`copilot model alias resolution: '${configuredModel}' -> '${resolvedModel}'`);
     }
-    logger(`copilot model alias resolution: retrying awf-reflect model-catalog fetch once before failing for '${configuredModel}'`);
-    const refreshedReflectData = options.refetchReflectData ? await options.refetchReflectData() : null;
-    try {
-      resolvedModel = tryResolve(refreshedReflectData);
-    } catch (retryErr) {
-      if (!(retryErr instanceof ModelAliasResolutionError)) {
-        throw retryErr;
-      }
-      const failure = err.reason === "model_unavailable" ? err : retryErr;
-      logger(`copilot model alias resolution failed: ${failure.message} after a bounded refresh — refusing to start Copilot with an unresolved alias`);
-      if (failure.reason === "model_unavailable") {
-        recordCopilotModelSelection({ status: "unavailable", configured_model: configuredModel, resolved_model: "", effective_model: "" });
-      }
-      process.exit(1);
-      return configuredModel; // unreachable, keeps TypeScript control-flow analysis happy
+  } catch (failure) {
+    if (!(failure instanceof ModelAliasResolutionError)) {
+      throw failure;
     }
+    logger(`copilot model alias resolution failed: ${failure.message} after a bounded refresh — refusing to start Copilot with an unresolved alias`);
+    if (failure.reason === "model_unavailable") {
+      recordCopilotModelSelection({ status: "unavailable", configured_model: configuredModel, resolved_model: "", effective_model: "" });
+    }
+    process.exit(1);
+    return configuredModel; // unreachable, keeps TypeScript control-flow analysis happy
   }
 
   if (resolvedModel && resolvedModel !== configuredModel) {

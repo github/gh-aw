@@ -95,6 +95,8 @@ GH_AW_CLAUDE_TEST_CLI=/absolute/path/to/claude npm run test:js -- claude_cli_liv
 
 The suite uses synthetic prompts, an isolated home directory, and a loopback Anthropic-compatible server. It does not use real credentials or external inference.
 
+The harness resolves [model aliases](/gh-aw/reference/engines/#model-aliases) before Claude Code starts, so `model: copilot/opus` on GitHub Copilot inference runs on the newest live Opus. `sonnet`, `opus`, and `haiku` use gh-aw's alias map, not Claude Code's built-in meaning, on every provider. `auto` keeps Claude's rule: on Copilot inference it picks the newest Sonnet, then Opus, then Haiku. Exact ids pass through unchanged, after Claude Code's model-id overrides.
+
 ## Session trace mapping
 
 The Claude adapter maps native messages, thinking, tool calls/results, policy refusals, provider errors, and permission denials into the [unified agent session vocabulary](/gh-aw/specs/unified-agent-session-specification/). Images, documents, and opaque redacted thinking retain their structured content. Explicit tool failure or interruption signals take precedence over contradictory success fields; missing outcomes, duration, and exit codes remain unknown.

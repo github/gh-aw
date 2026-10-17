@@ -13,7 +13,7 @@ permissions:
   contents: read
   pull-requests: read
 name: Smoke Claude on Copilot
-model: claude-haiku-4.5
+model: copilot/haiku
 engine:
   id: claude
   model-provider: github

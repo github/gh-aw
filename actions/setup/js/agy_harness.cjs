@@ -8,6 +8,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { fetchAWFReflect, deriveBaseUrlFromModelsURL } = require("./awf_reflect.cjs");
+const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const [command, ...commandArgs] = process.argv.slice(2);
 const log = message => process.stderr.write(`[agy-harness] ${message}\n`);
 const maxPendingRecordLength = 16 * 1024 * 1024; // UTF-16 code units, including the record terminator.
@@ -20,15 +21,41 @@ const fail = (result, action) => {
   if (result.error || result.signal || result.status !== 0) throw new Error(`${action} failed`);
 };
 
+const NATIVE_SLUG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
+
+/**
+ * Run the shared "resolve configured model" step against the Gemini provider's /reflect
+ * catalogue, then Agy's native-slug check. An alias resolves to the bare Gemini slug;
+ * an exact id is passed through unchanged.
+ * @param {{ model: string, reflectData?: any, refetchReflectData?: () => Promise<any>, env?: NodeJS.ProcessEnv, logger?: (message: string) => void }} options
+ * @returns {Promise<string>}
+ */
+const resolveAgyModel = async options => {
+  if (!options.model) throw new Error("Agy requires a native model slug, not provider/model syntax");
+  const result = await resolveEngineModel({
+    engine: "agy",
+    role: "main",
+    configuredModel: options.model,
+    provider: "gemini",
+    reflectData: options.reflectData,
+    refetchReflectData: options.refetchReflectData,
+    normalize: resolution => (resolution.alias ? resolution.modelId : resolution.resolvedModel),
+    logger: options.logger || log,
+    env: options.env || process.env,
+  });
+  if (!NATIVE_SLUG_PATTERN.test(result.engineModel)) throw new Error("Agy requires a native model slug, not provider/model syntax");
+  return result.engineModel;
+};
+
 const main = async () => {
   const version = process.env.GH_AW_ENGINE_VERSION;
   if (!version || !Object.hasOwn(checksums, version)) throw new Error("Agy requires a verified 1.3.1, 1.3.3 or 1.3.6 release");
   if (!command) throw new Error("Agy command is required");
   const workspace = process.env.GITHUB_WORKSPACE;
   const promptPath = process.env.GH_AW_PROMPT;
-  const model = process.env.GH_AW_AGY_MODEL;
+  const configuredModel = process.env.GH_AW_AGY_MODEL || "";
   if (!workspace || !promptPath) throw new Error("GITHUB_WORKSPACE and GH_AW_PROMPT are required");
-  if (!model || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(model)) throw new Error("Agy requires a native model slug, not provider/model syntax");
+  if (!configuredModel) throw new Error("Agy requires a native model slug, not provider/model syntax");
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-agy-"));
   try {
     let binary = command;
@@ -65,9 +92,12 @@ const main = async () => {
     if (verification.stdout.trim() !== version) throw new Error("Agy executable does not match engine.version");
 
     const env = { ...process.env };
+    /** @type {any} */
+    let reflectData = null;
     if (env.AWF_REFLECT_ENABLED === "1") {
       const reflection = await fetchAWFReflect({ logger: log });
       if (!reflection.ok || !reflection.reflectData || typeof reflection.reflectData !== "object") throw new Error("Agy could not discover the AWF Gemini endpoint; direct inference fallback is disabled");
+      reflectData = reflection.reflectData;
       const endpoints = "endpoints" in reflection.reflectData && Array.isArray(reflection.reflectData.endpoints) ? reflection.reflectData.endpoints : [];
       const endpoint = endpoints.find(entry => entry?.configured === true && ["gemini", "google"].includes(entry.provider || ""));
       if (typeof endpoint?.models_url !== "string") throw new Error("Agy requires a configured Gemini models endpoint in AWF");
@@ -77,6 +107,15 @@ const main = async () => {
     } else if (!env.GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY is required when AWF is explicitly disabled");
     }
+    const model = await resolveAgyModel({
+      model: configuredModel,
+      reflectData,
+      refetchReflectData: async () => {
+        if (env.AWF_REFLECT_ENABLED !== "1") return null;
+        const refreshed = await fetchAWFReflect({ logger: log });
+        return refreshed.ok ? refreshed.reflectData || null : null;
+      },
+    });
     const home = path.join(root, "home");
     const settings = path.join(home, ".gemini", "antigravity-cli");
     fs.mkdirSync(settings, { recursive: true, mode: 0o700 });
@@ -248,9 +287,13 @@ const main = async () => {
   }
 };
 
-main().catch(error => {
-  const message = error instanceof Error ? error.message : "Agy harness failed";
-  log(message);
-  process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch(error => {
+    const message = error instanceof Error ? error.message : "Agy harness failed";
+    log(message);
+    process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { resolveAgyModel };

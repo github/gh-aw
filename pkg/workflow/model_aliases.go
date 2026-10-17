@@ -31,9 +31,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"sync"
 	"unsafe"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/syncutil"
 )
@@ -212,4 +214,114 @@ func MergeImportedModelAliases(importedModels []map[string][]string, frontmatter
 
 	modelAliasesLog.Printf("Final alias map has %d entries", len(merged))
 	return merged
+}
+
+// reservedModelsKeys are keys under the models: frontmatter field that are not alias names.
+var reservedModelsKeys = map[string]bool{
+	"providers":                  true,
+	"default-ai-credits-pricing": true,
+	"allowed":                    true,
+	"blocked":                    true,
+}
+
+// extractMainModelAliases returns the workflow-defined model aliases declared under the
+// main workflow's models: field. Reserved keys (providers, default-ai-credits-pricing,
+// allowed, blocked) keep their own meaning and are skipped.
+func extractMainModelAliases(frontmatter map[string]any) map[string][]string {
+	rawModels, ok := frontmatter["models"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	aliases := make(map[string][]string)
+	for key, value := range rawModels {
+		if reservedModelsKeys[key] {
+			continue
+		}
+		var entries []string
+		switch v := value.(type) {
+		case []string:
+			entries = append(entries, v...)
+		case []any:
+			for _, item := range v {
+				if s, ok := item.(string); ok && s != "" {
+					entries = append(entries, s)
+				}
+			}
+		}
+		if len(entries) > 0 {
+			aliases[key] = entries
+		}
+	}
+	if len(aliases) == 0 {
+		return nil
+	}
+	modelAliasesLog.Printf("Extracted %d workflow-defined model alias(es) from main frontmatter", len(aliases))
+	return aliases
+}
+
+// modelResolutionRecordPath is the runner-written record of configured and resolved
+// models, relative to /tmp/gh-aw (see MODEL_RESOLUTION_RECORD_PATH in resolve_model_alias.cjs).
+const modelResolutionRecordPath = "agent/model-resolution.json"
+
+// engineRunsSharedModelResolution reports whether the engine's harness runs the shared
+// "resolve configured model" step (resolveEngineModel in resolve_model_alias.cjs) before
+// it launches its CLI. Other engines receive the configured model unchanged.
+func engineRunsSharedModelResolution(engineID string) bool {
+	switch engineID {
+	case string(constants.CopilotEngine), string(constants.ClaudeEngine), string(constants.CodexEngine), string(constants.PiEngine), string(constants.AgyEngine):
+		return true
+	}
+	return false
+}
+
+// modelAliasesEnvVar carries the workflow-defined and imported aliases to the engine
+// harness (see MODEL_ALIASES_ENV_VAR in resolve_model_alias.cjs). The built-in aliases
+// ship with the setup action (actions/setup/js/model_aliases.json, a copy of
+// data/model_aliases.json) and the harness overlays this variable on them at run time.
+// It is set on every engine step that has such aliases, with or without AWF, so the
+// unsandboxed path resolves workflow-defined aliases too.
+const modelAliasesEnvVar = "GH_AW_MODEL_ALIASES"
+
+// workflowModelAliasOverrides returns the entries of the merged alias map that differ
+// from the built-ins: the workflow-defined and imported aliases that take effect. Merging
+// the built-ins with the result reproduces the merged map exactly. Returns nil when the
+// workflow defines and imports no effective aliases.
+func workflowModelAliasOverrides(merged map[string][]string) map[string][]string {
+	if len(merged) == 0 || isBuiltinOnlyAliasMap(merged) {
+		return nil
+	}
+	builtins := getBuiltinOnlyAliasMap()
+	var overrides map[string][]string
+	for alias, entries := range merged {
+		if builtin, ok := builtins[alias]; ok && slices.Equal(builtin, entries) {
+			continue
+		}
+		if overrides == nil {
+			overrides = make(map[string][]string)
+		}
+		overrides[alias] = entries
+	}
+	return overrides
+}
+
+// applyModelAliasOverridesEnv sets envVar to the workflow-defined and imported aliases as
+// JSON, or leaves it unset when there are none.
+func applyModelAliasOverridesEnv(env map[string]string, envVar string, data *WorkflowData) {
+	if data == nil {
+		return
+	}
+	overrides := workflowModelAliasOverrides(data.ModelMappings)
+	if len(overrides) == 0 {
+		return
+	}
+	aliases, err := json.Marshal(overrides)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: cannot encode model aliases: %v", err))
+	}
+	env[envVar] = string(aliases)
+}
+
+// applyModelAliasesEnv sets modelAliasesEnvVar to the workflow-defined and imported aliases.
+func applyModelAliasesEnv(env map[string]string, data *WorkflowData) {
+	applyModelAliasOverridesEnv(env, modelAliasesEnvVar, data)
 }

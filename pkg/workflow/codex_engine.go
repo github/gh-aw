@@ -523,6 +523,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	}
 	applyMCPScriptsSecretEnv(env, workflowData)
 	applyModelRoutingEnv(env, workflowData)
+	applyModelAliasesEnv(env, workflowData)
 	return env
 }
 

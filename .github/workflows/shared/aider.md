@@ -430,7 +430,7 @@ engine:
           "mcp.guard.blocked", "mcp.tool_call", "mcp.event", "mcp.configuration",
           "firewall.http_access", "firewall.token_usage", "firewall.model_routing",
           "firewall.steering", "firewall.event", "model_routing.outcome",
-          "model_endpoint.mismatch",
+          "model_endpoint.mismatch", "model.resolution",
           "safe_output.request", "safe_output.result", "safe_output.error",
           "experiment.state", "experiment.assignment", "grader.manifest", "grader.result",
           "eval.result", "github_api.rate_limit", "usage.report", "execution.result",

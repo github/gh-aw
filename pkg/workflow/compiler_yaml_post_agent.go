@@ -60,6 +60,11 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 			constants.TmpGhAwDirSlash+"agent/model-endpoint-mismatch.json",
 		)
 	}
+	if engineRunsSharedModelResolution(engine.GetID()) {
+		// Configured and resolved model recorded by the shared "resolve configured model"
+		// step in resolve_model_alias.cjs; unified_session.cjs projects it into aw_session.jsonl.
+		paths = append(paths, constants.TmpGhAwDirSlash+modelResolutionRecordPath)
+	}
 
 	// Collect agent stdio logs path for unified upload
 	paths = append(paths, logFileFull)

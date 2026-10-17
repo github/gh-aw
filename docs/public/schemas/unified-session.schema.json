@@ -122,6 +122,7 @@
       { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.tool_call" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "model.inventory" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelInventoryData" } } } },
+      { "if": { "properties": { "type": { "const": "model.resolution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelResolutionData" } } } },
       { "if": { "properties": { "type": { "const": "model_endpoint.mismatch" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelEndpointMismatchData" } } } },
       { "if": { "properties": { "type": { "const": "model_routing.outcome" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelRoutingOutcomeData" } } } },
       { "if": { "properties": { "type": { "const": "plugin.installation" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/PluginInstallationData" } } } },
@@ -804,6 +805,20 @@
         "modelsFetchComplete": { "type": "boolean" }
       },
       "required": ["endpoints"],
+      "additionalProperties": false
+    },
+    "ModelResolutionData": {
+      "type": "object",
+      "properties": {
+        "engine": { "type": "string" },
+        "role": { "type": "string" },
+        "configured_model": { "type": "string" },
+        "resolved_model": { "type": ["string", "null"] },
+        "provider": { "type": ["string", "null"] },
+        "status": { "type": "string", "enum": ["resolved", "exact", "failed"] },
+        "cause": { "type": ["string", "null"], "enum": ["model_unavailable", "catalog_unavailable", null] }
+      },
+      "required": ["engine", "role", "configured_model", "resolved_model", "provider", "status", "cause"],
       "additionalProperties": false
     },
     "ModelRoutingData": {
