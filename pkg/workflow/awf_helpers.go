@@ -109,6 +109,10 @@ type AWFCommandConfig struct {
 	// engine harness has started. This is used by engine harnesses so failures
 	// outside the harness still consume the bounded startup retry budget.
 	RetryStartupFailures bool
+
+	// ProtectLogCapture keeps the live stdout/stderr capture outside the agent
+	// sandbox and publishes it to LogFile only after AWF exits.
+	ProtectLogCapture bool
 }
 
 func shouldUseWorkflowCallNetworkAllowedInput(data *WorkflowData) bool {

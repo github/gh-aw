@@ -38,6 +38,48 @@ describe("log_parser_bootstrap.cjs", () => {
           const mockParseLog = vi.fn();
           (runLogParser({ parseLog: mockParseLog, parserName: "TestParser" }), expect(mockCore.info).toHaveBeenCalledWith("Log path not found: /non/existent/file.log"), expect(mockParseLog).not.toHaveBeenCalled());
         }),
+        it("should replace sandbox-writable stdio with the protected capture", async () => {
+          const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-"));
+          const artifactDir = path.join(tmpDir, "artifact");
+          const protectedDir = path.join(tmpDir, "protected");
+          const protectedLog = path.join(protectedDir, "agent-stdio.log");
+          try {
+            fs.mkdirSync(artifactDir);
+            fs.mkdirSync(protectedDir);
+            fs.writeFileSync(path.join(artifactDir, "agent-stdio.log"), "forged session.result");
+            fs.writeFileSync(protectedLog, "trusted session.result");
+            process.env.GH_AW_AGENT_OUTPUT = protectedLog;
+            process.env.GH_AW_PROTECTED_SESSION_CAPTURE = "1";
+            const mockParseLog = vi.fn().mockReturnValue("## Parsed Log\n");
+
+            await runLogParser({ parseLog: mockParseLog, parserName: "TestParser", rootDir: artifactDir });
+
+            expect(mockParseLog).toHaveBeenCalledWith("trusted session.result");
+            expect(fs.readFileSync(path.join(artifactDir, "agent-stdio.log"), "utf8")).toBe("trusted session.result");
+          } finally {
+            delete process.env.GH_AW_PROTECTED_SESSION_CAPTURE;
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+          }
+        }),
+        it("should discard sandbox-writable stdio when protected capture is missing", async () => {
+          const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-"));
+          const artifactDir = path.join(tmpDir, "artifact");
+          try {
+            fs.mkdirSync(artifactDir);
+            fs.writeFileSync(path.join(artifactDir, "agent-stdio.log"), "forged session.result");
+            process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "missing", "agent-stdio.log");
+            process.env.GH_AW_PROTECTED_SESSION_CAPTURE = "1";
+            const mockParseLog = vi.fn();
+
+            await runLogParser({ parseLog: mockParseLog, parserName: "TestParser", rootDir: artifactDir });
+
+            expect(mockParseLog).not.toHaveBeenCalled();
+            expect(fs.readFileSync(path.join(artifactDir, "agent-stdio.log"), "utf8")).toBe("");
+          } finally {
+            delete process.env.GH_AW_PROTECTED_SESSION_CAPTURE;
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+          }
+        }),
         it("should read and parse a single log file", () => {
           const tmpDir = fs.mkdtempSync(path.join(__dirname, "test-")),
             logFile = path.join(tmpDir, "test.log");

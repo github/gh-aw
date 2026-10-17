@@ -16079,6 +16079,10 @@
                     "provider-env-mode": {
                       "type": "string"
                     },
+                    "protected-session-capture": {
+                      "type": "boolean",
+                      "description": "Keep the live engine stdout/stderr capture outside the agent sandbox and publish it only after the sandbox exits."
+                    },
                     "env": {
                       "type": "object",
                       "description": "Additional static environment variables injected into the execution step. Values are rendered verbatim and must not contain secrets.",

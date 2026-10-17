@@ -34,12 +34,17 @@ type BehaviorDefinedEngine struct {
 
 var _ CodingAgentEngine = (*BehaviorDefinedEngine)(nil)
 
+const protectedSessionCaptureLogPath = "${{ runner.temp }}/gh-aw-protected-capture/agent-stdio.log"
+
 func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, error) {
 	if def == nil {
 		return nil, errors.New("engine definition is required")
 	}
 	if def.Behaviors == nil {
 		return nil, fmt.Errorf("engine definition %q is missing behaviors", def.ID)
+	}
+	if def.Behaviors.Execution != nil && def.Behaviors.Execution.ProtectedSessionCapture && def.Behaviors.LogParser == "" {
+		return nil, fmt.Errorf("engine definition %q enables protected-session-capture without a log-parser", def.ID)
 	}
 	capabilities := def.Behaviors.Capabilities.ToRuntimeCapabilities()
 	capabilities.MCP = true
@@ -73,6 +78,9 @@ func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, er
 		},
 		definition: def,
 	}
+	if engine.protectedSessionCaptureEnabled() && engine.buildWrappedLogParserScript() == "" {
+		return nil, fmt.Errorf("engine definition %q enables protected-session-capture without a usable log-parser", def.ID)
+	}
 	return engine, nil
 }
 
@@ -81,6 +89,18 @@ func (e *BehaviorDefinedEngine) behavior() *EngineBehaviorDefinition {
 		return nil
 	}
 	return e.definition.Behaviors
+}
+
+func (e *BehaviorDefinedEngine) protectedSessionCaptureEnabled() bool {
+	behavior := e.behavior()
+	return behavior != nil && behavior.Execution != nil && behavior.Execution.ProtectedSessionCapture
+}
+
+func (e *BehaviorDefinedEngine) GetLogFileForParsing() string {
+	if e.protectedSessionCaptureEnabled() {
+		return protectedSessionCaptureLogPath
+	}
+	return e.BaseEngine.GetLogFileForParsing()
 }
 
 func (e *BehaviorDefinedEngine) usesUniversalLLMConsumer() bool {
@@ -572,7 +592,7 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedEngineCommand(exec *EngineEx
 
 func (e *BehaviorDefinedEngine) behaviorDefinedFirewallEnabled(workflowData *WorkflowData) bool {
 	firewallEnabled := isFirewallEnabled(workflowData)
-	if behavior := e.behavior(); behavior != nil && behavior.HarnessScript != "" && !isFirewallDisabledBySandboxAgent(workflowData) {
+	if behavior := e.behavior(); behavior != nil && (behavior.HarnessScript != "" || e.protectedSessionCaptureEnabled()) && !isFirewallDisabledBySandboxAgent(workflowData) {
 		firewallEnabled = true
 	}
 	return firewallEnabled
@@ -621,6 +641,10 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 	applyEngineAndAgentEnv(env, workflowData, behaviorDefinedEngineLog)
 	applyMCPScriptsSecretEnv(env, workflowData)
 	e.applyBehaviorDefinedModelEnv(exec, workflowData, env)
+	if exec.ProtectedSessionCapture && firewallEnabled {
+		env["RUNNER_TEMP"] = "${{ runner.temp }}"
+		env["GH_AW_PROTECTED_SESSION_CAPTURE"] = "1"
+	}
 	return env
 }
 
@@ -720,6 +744,7 @@ func (e *BehaviorDefinedEngine) buildFirewallCommand(exec *EngineExecutionDefini
 		UsesTTY:            false,
 		AllowedDomains:     allowedDomains,
 		ExcludeEnvVarNames: ComputeAWFExcludeEnvVarNames(workflowData, excludedSecretNames),
+		ProtectLogCapture:  exec.ProtectedSessionCapture,
 	})
 }
 

@@ -720,6 +720,9 @@ func (c *Compiler) runPostEngineValidations(
 	if err := validateMaxToolCallsConfig(engineConfig, agenticEngine); err != nil {
 		return err
 	}
+	if err := validateProtectedSessionCaptureSandbox(agenticEngine, sandboxConfig); err != nil {
+		return err
+	}
 	return c.withEffectiveStrictMode(frontmatter, func() error {
 		orchestratorEngineLog.Printf("Validating strict firewall (strict=%v)", c.strictMode)
 		if err := c.validateStrictFirewall(engineSetting, networkPermissions, sandboxConfig); err != nil {
@@ -747,6 +750,17 @@ func (c *Compiler) runPostEngineValidations(
 		}
 		return nil
 	})
+}
+
+func validateProtectedSessionCaptureSandbox(engine CodingAgentEngine, sandboxConfig *SandboxConfig) error {
+	behaviorEngine, ok := engine.(*BehaviorDefinedEngine)
+	if !ok || !behaviorEngine.protectedSessionCaptureEnabled() {
+		return nil
+	}
+	if isFirewallDisabledBySandboxAgent(&WorkflowData{SandboxConfig: sandboxConfig}) {
+		return errors.New("protected-session-capture requires sandbox.agent to be enabled")
+	}
+	return nil
 }
 
 // shouldScanImportedMarkdown reports whether an import path should be processed by

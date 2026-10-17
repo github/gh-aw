@@ -3451,6 +3451,11 @@ engine:
       # (optional)
       provider-env-mode: "example-value"
 
+      # Keep the live engine stdout/stderr capture outside the agent sandbox and publish
+      # it only after the sandbox exits.
+      # (optional)
+      protected-session-capture: true
+
       # Additional static environment variables injected into the execution step. Values
       # are rendered verbatim and must not contain secrets.
       # (optional)
@@ -22052,6 +22057,11 @@ safe-outputs:
 
           # (optional)
           provider-env-mode: "example-value"
+
+          # Keep the live engine stdout/stderr capture outside the agent sandbox and publish
+          # it only after the sandbox exits.
+          # (optional)
+          protected-session-capture: true
 
           # Additional static environment variables injected into the execution step. Values
           # are rendered verbatim and must not contain secrets.

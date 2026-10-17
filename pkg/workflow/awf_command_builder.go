@@ -64,7 +64,7 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 		modelsJSONPathExport += "\n" + buildNVXAssetSetup()
 	}
 	shellWrappedCommand := WrapCommandInShell(engineCommand)
-	preCreateLog := fmt.Sprintf("(umask 177 && touch %s)", shellEscapeArg(config.LogFile))
+	preCreateLog, captureLogFileArg := buildAWFCaptureLogSettings(config)
 	writeAgentCLIStartMs := "printf '%s' \"$(date +%s%3N)\" > " + shellEscapeArg(AgentCLIStartMsPath)
 	command := buildAWFCommandScript(buildAWFCommandScriptInput{
 		writeAgentCLIStartMs:   writeAgentCLIStartMs,
@@ -82,12 +82,27 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 		awfArgs:                awfArgs,
 		shellWrappedCommand:    shellWrappedCommand,
 		logFile:                config.LogFile,
+		captureLogFileArg:      captureLogFileArg,
 		engineName:             config.EngineName,
 		retryStartupFailures:   config.RetryStartupFailures || usesBuiltInEngineHarness(config.EngineName, config.EngineCommand),
 	})
 
 	awfHelpersLog.Print("Successfully built AWF command")
 	return command
+}
+
+func buildAWFCaptureLogSettings(config AWFCommandConfig) (preCreateLog, captureLogFileArg string) {
+	preCreateLog = fmt.Sprintf("(umask 177 && touch %s)", shellEscapeArg(config.LogFile))
+	captureLogFileArg = shellEscapeArg(config.LogFile)
+	if config.ProtectLogCapture {
+		preCreateLog = `GH_AW_PROTECTED_LOG_DIR="${RUNNER_TEMP:?RUNNER_TEMP must be set}/gh-aw-protected-capture"
+rm -rf -- "$GH_AW_PROTECTED_LOG_DIR"
+mkdir -m 700 "$GH_AW_PROTECTED_LOG_DIR"
+GH_AW_PROTECTED_LOG_FILE="$GH_AW_PROTECTED_LOG_DIR/agent-stdio.log"
+(umask 177 && touch "$GH_AW_PROTECTED_LOG_FILE")`
+		captureLogFileArg = `"$GH_AW_PROTECTED_LOG_FILE"`
+	}
+	return
 }
 
 func usesBuiltInEngineHarness(engineName, engineCommand string) bool {
@@ -403,6 +418,7 @@ type buildAWFCommandScriptInput struct {
 	awfArgs                []string
 	shellWrappedCommand    string
 	logFile                string
+	captureLogFileArg      string
 	engineName             string
 	retryStartupFailures   bool
 }
@@ -447,8 +463,12 @@ func buildAWFInvocationCommand(input buildAWFCommandScriptInput) string {
 		shellJoinArgs(input.awfArgs),
 		input.shellWrappedCommand,
 	)
+	captureLogFileArg := input.captureLogFileArg
+	if captureLogFileArg == "" {
+		captureLogFileArg = shellEscapeArg(input.logFile)
+	}
 	if !input.retryStartupFailures {
-		return fmt.Sprintf("%s 2>&1 | tee -a %s", command, shellEscapeArg(input.logFile))
+		return fmt.Sprintf("%s 2>&1 | tee -a %s", command, captureLogFileArg)
 	}
 
 	return fmt.Sprintf(`GH_AW_AWF_ENGINE_NAME=%s \
@@ -459,7 +479,7 @@ bash "${RUNNER_TEMP}/gh-aw/actions/run_awf_with_startup_retries.sh" -- \
   %s`,
 		shellEscapeArg(engineName),
 		harnessMarker,
-		shellEscapeArg(input.logFile),
+		captureLogFileArg,
 		shellEscapeArg(safeEngineName),
 		command,
 	)

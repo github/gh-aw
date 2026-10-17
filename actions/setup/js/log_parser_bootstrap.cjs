@@ -249,6 +249,22 @@ async function runLogParser(options) {
       return;
     }
 
+    if (process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1") {
+      fs.mkdirSync(rootDir, { recursive: true });
+      const trustedContent = fs.existsSync(logPath) ? fs.readFileSync(logPath) : Buffer.alloc(0);
+      const publishDir = fs.mkdtempSync(path.join(rootDir, ".protected-session-capture-"));
+      const publishPath = path.join(publishDir, "agent-stdio.log");
+      try {
+        fs.writeFileSync(publishPath, trustedContent, { mode: 0o600 });
+        if (fs.existsSync(stdioLogPath) && fs.statSync(stdioLogPath).isDirectory()) {
+          fs.rmSync(stdioLogPath, { recursive: true, force: true });
+        }
+        fs.renameSync(publishPath, stdioLogPath);
+      } finally {
+        fs.rmSync(publishDir, { recursive: true, force: true });
+      }
+    }
+
     const copilotStdioFallback = parserName === "Copilot" && supportsDirectories && fs.existsSync(stdioLogPath);
     if (!fs.existsSync(logPath) && !copilotStdioFallback) {
       core.info(`Log path not found: ${logPath}`);

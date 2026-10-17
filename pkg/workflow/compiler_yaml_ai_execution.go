@@ -200,6 +200,9 @@ func (c *Compiler) generateLogParsing(yaml *strings.Builder, data *WorkflowData,
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        env:\n")
 	fmt.Fprintf(yaml, "          GH_AW_AGENT_OUTPUT: %s\n", logFileForParsing) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	if behaviorEngine, ok := engine.(*BehaviorDefinedEngine); ok && behaviorEngine.protectedSessionCaptureEnabled() {
+		yaml.WriteString("          GH_AW_PROTECTED_SESSION_CAPTURE: 1\n")
+	}
 	// GH_AW_SAFE_OUTPUTS lets the log parser detect safe-output entries written by the agent
 	// so it can downgrade a "no structured log entries" failure to a warning when the agent
 	// demonstrably completed (e.g. emitted a noop). Without this, runs where the container
