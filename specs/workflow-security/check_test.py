@@ -313,8 +313,8 @@ class RuntimeCheckoutModelTest(unittest.TestCase):
                 check.main()
             report = json.loads((results / "results.json").read_text())
             self.assertEqual(report["additional_models"],
-                             ["RuntimeRepositoryCheckout", "MCPCompile", "ActivationAdmission",
-                              "AdmissionConclusion"])
+                             ["RuntimeRepositoryCheckout", "StatusOnlyJob", "MCPCompile",
+                              "ActivationAdmission", "AdmissionConclusion"])
             cases = {case["case"] for case in report["cases"]
                      if case["model"] == "RuntimeRepositoryCheckout"}
             self.assertEqual(cases, {"secure-runtime-checkout"} |

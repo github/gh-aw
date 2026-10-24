@@ -3100,6 +3100,11 @@
             ],
             "description": "List of job IDs that must complete successfully before this job runs. Creates job dependencies for workflow orchestration."
           },
+          "detection-gate": {
+            "type": "string",
+            "enum": ["status-only"],
+            "description": "Allow a downstream custom job to run after failed or warn-mode detection only when it reads job results and detection-gated compiler-owned outputs."
+          },
           "env": {
             "type": "object",
             "description": "Environment variables for the job",
