@@ -120,9 +120,13 @@ Maintain the repository.
 			lock, err := os.ReadFile(filepath.Join(dir, "repo-assist.lock.yml"))
 			require.NoError(t, err)
 			require.NotContains(t, string(lock), "GH_AW_WIKI_NOTE: ${{ '' }}")
-			require.NotContains(t, string(lock), "persist-credentials: true")
+			require.Contains(t, string(lock), "persist-credentials: true")
 			require.Contains(t, string(lock), "Configure Git credentials")
 			require.Equal(t, admission, strings.Contains(string(lock), "needs.activation.outputs.admission-result"))
+			require.NotEmpty(t, compiler.prCheckoutLintBlock)
+			require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\ntools:\n  github: false\n---\nNo PR checkout.\n"), 0o600))
+			require.NoError(t, compiler.CompileWorkflow(path))
+			require.Empty(t, compiler.prCheckoutLintBlock, "compiler reuse must not preserve a previous workflow's exception")
 		})
 	}
 }

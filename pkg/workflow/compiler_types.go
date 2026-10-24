@@ -45,6 +45,7 @@ type Compiler struct {
 	actionTag               string                   // Override action SHA or tag for actions/setup (when set, overrides actionMode to release)
 	actionsRepo             string                   // Override the external actions repository (default: github/gh-aw-actions)
 	jobManager              *JobManager              // Manages jobs and dependencies
+	prCheckoutLintBlock     string                   // Compiler-owned checkout/authentication steps eligible for the artipacked exception
 	engineRegistry          *EngineRegistry          // Registry of available agentic engines
 	engineCatalog           *EngineCatalog           // Catalog of engine definitions backed by the registry
 	fileTracker             FileCreationTracker      // Optional file tracker for tracking created files
