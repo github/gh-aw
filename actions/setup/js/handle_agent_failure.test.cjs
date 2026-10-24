@@ -3255,6 +3255,26 @@ describe("handle_agent_failure", () => {
         expect(buildAssignmentErrorsContext("\n\n")).toBe("");
       });
 
+      it("preserves batch credential diagnostics without treating them as a PR target", () => {
+        const originalPromptsDir = process.env.GH_AW_PROMPTS_DIR;
+        try {
+          process.env.GH_AW_PROMPTS_DIR = runtimePromptsDir;
+          const diagnostic =
+            "Agent assignment credential validation failed: Bad credentials (HTTP 401). Agent assignment credential source: GH_AW_GITHUB_TOKEN. Dedicated assignment credential: present. Credential format: fine-grained PAT.";
+          const result = buildAssignmentErrorsContext(diagnostic);
+
+          expect(result).toContain(`- ${diagnostic}`);
+          expect(result).not.toContain("PR #");
+          expect(result).not.toContain("Issue #");
+        } finally {
+          if (originalPromptsDir === undefined) {
+            delete process.env.GH_AW_PROMPTS_DIR;
+          } else {
+            process.env.GH_AW_PROMPTS_DIR = originalPromptsDir;
+          }
+        }
+      });
+
       it("renders assignment failures with token guidance docs", () => {
         const originalPromptsDir = process.env.GH_AW_PROMPTS_DIR;
         try {

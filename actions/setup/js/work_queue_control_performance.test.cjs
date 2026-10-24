@@ -289,6 +289,7 @@ describe("trusted work queue control step performance", () => {
       expect(metrics.history_reads).toBeGreaterThan(5 * (scenario.depth + 1));
       expect(metrics.simulated_network_ms).toBeGreaterThan(120000);
     },
-    60000
+    // Uncached negative controls deliberately replay thousands of API reads.
+    120000
   );
 });

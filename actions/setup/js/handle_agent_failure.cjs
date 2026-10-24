@@ -2976,12 +2976,14 @@ function buildAssignmentErrorsContext(assignmentErrors) {
   let renderedErrors = "";
   for (const errorLine of errorLines) {
     const parts = errorLine.split(":");
-    if (parts.length >= 4) {
+    if (parts.length >= 4 && (parts[0] === "issue" || parts[0] === "pr")) {
       const type = parts[0]; // "issue" or "pr"
       const number = parts[1];
       const agent = parts[2];
       const error = parts.slice(3).join(":");
       renderedErrors += `- ${type === "issue" ? "Issue" : "PR"} #${number} (agent: ${agent}): ${error}\n`;
+    } else {
+      renderedErrors += `- ${errorLine}\n`;
     }
   }
 
