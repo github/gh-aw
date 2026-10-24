@@ -336,16 +336,15 @@ func (cm *CheckoutManager) GenerateDefaultCheckoutStep(
 	sb.WriteString("        with:\n")
 
 	cleanCreds := override != nil && override.cleanCreds
-	fmt.Fprintf(&sb, "          persist-credentials: %t\n", cm.keepCredentialsForPush || cleanCreds)
+	fmt.Fprintf(&sb, "          persist-credentials: %t\n", cleanCreds && !cm.keepCredentialsForPush)
 	tokenEmitted := cm.writeDefaultCheckoutInputs(&sb, override, trialMode, trialLogicalRepoSlug)
 	if cm.defaultRefOverride != "" {
 		fmt.Fprintf(&sb, "          ref: %s\n", cm.defaultRefOverride)
 	}
 
-	// safe_outputs job: when no explicit token was written above, persist the resolved
-	// push token so the credential retained in .git/config matches the token the
-	// safe-output handlers use to fetch/push (avoiding both a wrong-token push and the
-	// duplicate Authorization header that a separate per-command extraheader would add).
+	// Use the push token for checkout when no explicit token was provided.
+	// Later safe-output operations authenticate through Configure Git credentials,
+	// not a retained checkout Authorization header.
 	if !trialMode && !tokenEmitted && cm.keepCredentialsForPush && cm.pushToken != "" {
 		fmt.Fprintf(&sb, "          token: %s\n", cm.pushToken)
 	}
@@ -373,9 +372,8 @@ func (cm *CheckoutManager) GenerateDefaultCheckoutStep(
 // generateCheckoutStepLines generates YAML step lines for a single non-default checkout.
 // The index parameter identifies the checkout's position in the ordered list, used to
 // reference the correct app token minting step when app authentication is configured.
-// When keepCredentialsForPush is true (safe_outputs job), credentials are retained
-// (persist-credentials: true) and the post-checkout cleanup step is suppressed so a later
-// git fetch/push can authenticate.
+// Safe-output jobs authenticate later through Configure Git credentials rather than
+// retaining checkout Authorization headers.
 func generateCheckoutStepLines(entry *resolvedCheckout, index int, keepCredentialsForPush bool, pushToken string, getActionPin func(string) string) []string {
 	checkoutManagerLog.Printf("Generating checkout step lines: index=%d, repo=%q, path=%q, ref=%q, appAuth=%v",
 		index, entry.key.repository, entry.key.path, entry.ref, entry.githubApp != nil)
@@ -385,7 +383,7 @@ func generateCheckoutStepLines(entry *resolvedCheckout, index int, keepCredentia
 	fmt.Fprintf(&sb, "        uses: %s\n", getActionPin("actions/checkout"))
 	sb.WriteString("        with:\n")
 
-	fmt.Fprintf(&sb, "          persist-credentials: %t\n", keepCredentialsForPush || entry.cleanCreds)
+	fmt.Fprintf(&sb, "          persist-credentials: %t\n", entry.cleanCreds && !keepCredentialsForPush)
 
 	if entry.key.wiki {
 		// Wiki checkout: use "{repository}.wiki" as the effective repository.
@@ -401,9 +399,7 @@ func generateCheckoutStepLines(entry *resolvedCheckout, index int, keepCredentia
 	}
 	// Determine resolved token: github-app-minted token takes precedence
 	resolvedToken := resolveCheckoutTokenExpression(entry, index, false)
-	// safe_outputs job: when this checkout declares no token/app of its own, persist the
-	// resolved push token so the retained .git/config credential matches the token the
-	// safe-output handlers use to fetch/push.
+	// Use the push token for checkout when this entry declares no token/app of its own.
 	if resolvedToken == "" && keepCredentialsForPush && pushToken != "" {
 		resolvedToken = pushToken
 	}

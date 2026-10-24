@@ -21,7 +21,7 @@ func applyDefaultMaxAICreditsEnvToMap(env map[string]string, workflowData *Workf
 	if env == nil {
 		return
 	}
-	if workflowData != nil && !workflowData.DryRun {
+	if workflowData != nil && workflowData.AdmissionEnabled && !workflowData.DryRun {
 		output := "admission-max-ai-credits"
 		if workflowData.IsEvalsRun {
 			output += "-evals"

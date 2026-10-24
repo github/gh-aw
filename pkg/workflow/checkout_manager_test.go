@@ -239,7 +239,7 @@ func TestGenerateDefaultCheckoutStep(t *testing.T) {
 }
 
 // TestCheckoutPushTokenFallback verifies the safe_outputs push-token fallback that
-// persists the resolved PR push token into the checkout when keepCredentialsForPush is
+// supplies the resolved PR push token to the checkout when keepCredentialsForPush is
 // enabled and no explicit checkout token (or app auth) already governs the checkout.
 func TestCheckoutPushTokenFallback(t *testing.T) {
 	getPin := func(action string) string { return action + "@v4" }
@@ -251,8 +251,8 @@ func TestCheckoutPushTokenFallback(t *testing.T) {
 		cm.SetPushToken(pushToken)
 		lines := cm.GenerateDefaultCheckoutStep(false, "", getPin)
 		combined := strings.Join(lines, "")
-		assert.Contains(t, combined, "persist-credentials: true", "keepCredentialsForPush should retain credentials")
-		assert.Contains(t, combined, "token: "+pushToken, "should persist the push token")
+		assert.Contains(t, combined, "persist-credentials: false", "static checkout authenticates later through Configure Git credentials")
+		assert.Contains(t, combined, "token: "+pushToken, "should use the push token")
 		assert.Equal(t, 1, strings.Count(combined, "token: "), "token must be emitted exactly once")
 	})
 
@@ -298,7 +298,7 @@ func TestCheckoutPushTokenFallback(t *testing.T) {
 		cm.SetPushToken(pushToken)
 		lines := cm.GenerateAdditionalCheckoutSteps(getPin)
 		combined := strings.Join(lines, "")
-		assert.Contains(t, combined, "persist-credentials: true", "keepCredentialsForPush should retain credentials")
+		assert.Contains(t, combined, "persist-credentials: false", "static checkout authenticates later through Configure Git credentials")
 		assert.Contains(t, combined, "token: "+pushToken, "additional checkout should fall back to the push token")
 		assert.Equal(t, 1, strings.Count(combined, "token: "), "token must be emitted exactly once")
 	})

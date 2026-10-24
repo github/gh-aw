@@ -194,22 +194,12 @@ type CheckoutManager struct {
 	// on the default-branch checkout behaviour.
 	// An empty string means the checkout uses the repository's default branch.
 	crossRepoTargetRef string
-	// keepCredentialsForPush, when true, makes every generated checkout step retain its
-	// credentials (persist-credentials: true) and suppresses the post-checkout credential
-	// cleanup step. This is enabled for the safe_outputs job, which legitimately performs
-	// git fetch/push against the checked-out repositories (e.g. push_to_pull_request_branch,
-	// create_pull_request) and therefore needs the push-capable token left on disk.
-	//
-	// The agent job leaves this false: the untrusted agent must not be able to read
-	// credentials from disk, so its checkouts use persist-credentials: false.
+	// keepCredentialsForPush enables safe-output authentication: runtime checkouts
+	// retain their per-entry credentials, while static checkouts are re-authenticated
+	// by GenerateConfigureGitCredentialsSteps after checkout.
 	keepCredentialsForPush bool
-	// pushToken is the token expression persisted into .git/config by every generated
-	// checkout step when keepCredentialsForPush is enabled and the checkout entry does
-	// not carry its own explicit token/app auth. Setting this ensures the credential
-	// retained on disk matches the token the safe_outputs handlers use to push, so a
-	// single (correct) Authorization header is sent and no separate per-command
-	// http.extraheader injection is required. Empty means "fall back to the
-	// actions/checkout default token".
+	// pushToken is the fallback static checkout token for safe-output jobs.
+	// Entries with their own token/app auth keep that authentication.
 	pushToken string
 	// dynamicPushToken may reference same-job app-token outputs. Runtime checkouts
 	// retain it directly instead of relying on the static git-credential setup step.
@@ -280,19 +270,15 @@ func (cm *CheckoutManager) GetCrossRepoTargetRef() string {
 	return cm.crossRepoTargetRef
 }
 
-// SetKeepCredentialsForPush enables credential retention on all generated checkout steps.
-// Call this for the safe_outputs job so the push-capable token installed at checkout time
-// remains in .git/config for subsequent git fetch/push operations. The agent job must not
-// call this; its checkouts intentionally strip credentials (persist-credentials: false).
+// SetKeepCredentialsForPush enables safe-output authentication, retaining credentials
+// only for runtime checkouts that are not covered by the static git-credential step.
 func (cm *CheckoutManager) SetKeepCredentialsForPush(keep bool) {
 	checkoutManagerLog.Printf("Setting keepCredentialsForPush: %t", keep)
 	cm.keepCredentialsForPush = keep
 }
 
-// SetPushToken sets the token expression persisted into .git/config by the generated
-// checkout steps when keepCredentialsForPush is enabled. Call this for the safe_outputs
-// job with the resolved PR push token so the retained credential matches the token the
-// handlers use to fetch/push. Has no effect on entries that declare their own token/app.
+// SetPushToken sets the fallback token for static safe-output checkouts.
+// Has no effect on entries that declare their own token/app.
 func (cm *CheckoutManager) SetPushToken(token string) {
 	checkoutManagerLog.Printf("Setting pushToken: present=%t", token != "")
 	cm.pushToken = token

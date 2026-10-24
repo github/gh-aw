@@ -164,6 +164,8 @@ The generated checkout step uses `persist-credentials: false`, so the git creden
 
 Fetch everything the workflow needs at checkout time using `fetch-depth` and [`fetch:`](#fetching-additional-refs), and write changes through safe-output tools such as [`push-to-pull-request-branch`](/gh-aw/reference/safe-outputs-pull-requests/) rather than a direct `git push`. The agent is instructed not to configure credential helpers or run `git credential fill`, because authentication cannot succeed; credential errors are reported as a limitation instead of worked around.
 
+In the trusted `safe_outputs` job, static checkouts also use `persist-credentials: false`. A separate **Configure Git credentials** step authenticates subsequent fetch/push operations with the resolved safe-output token. Runtime repository-list checkouts retain their per-entry credentials because that static configuration step does not revisit them.
+
 :::note[Shallow checkout and push-to-pull-request-branch]
 `push-to-pull-request-branch` inspects the commit range `origin/<branch>..<branch>` in the agent's workspace to detect merge commits and select the appropriate transport. With the default shallow clone (`fetch-depth: 1`), `origin/<branch>` has no traversable ancestry, so `git rev-list` reports the entire local history as the range. On large monorepos (thousands of commits) this can falsely trigger bundle or rewrite paths. When the range is implausibly large in a shallow checkout, merge-commit detection returns false (with a warning) to avoid incorrect transport selection; if the range later reaches the signed-push linearization step, that step is refused with a clear error. Set `fetch-depth: 0` to ensure the correct range is visible.
 :::

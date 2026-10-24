@@ -75,6 +75,7 @@ func TestAdmissionOptIn(t *testing.T) {
 					assert.Contains(t, activation.If, admissionJobResultCondition)
 				} else {
 					assert.NotContains(t, output, "needs.admission.")
+					assert.NotContains(t, output, "needs.activation.outputs.admission-")
 					assert.NotContains(t, activation.Needs, "admission")
 					assert.NotContains(t, activation.Permissions, "id-token: write")
 					assert.NotContains(t, conclusion.Permissions, "id-token: write")
@@ -157,16 +158,25 @@ func TestAdmissionComponentBudgetOutputs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := map[string]string{}
-			applyDefaultMaxAICreditsEnvToMap(env, &WorkflowData{EngineConfig: &EngineConfig{MaxAICredits: 777}, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals})
+			applyDefaultMaxAICreditsEnvToMap(env, &WorkflowData{AdmissionEnabled: true, EngineConfig: &EngineConfig{MaxAICredits: 777}, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals})
 			assert.Equal(t, "${{ needs.activation.outputs."+tc.output+" }}", env["GH_AW_ADMISSION_MAX_AI_CREDITS"])
 			assert.Equal(t, "${{ needs.activation.outputs.admission-result }}", env["GH_AW_ADMISSION_RESULT"])
+			for _, disabled := range []*WorkflowData{
+				{EngineConfig: &EngineConfig{MaxAICredits: 777}, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals},
+				{AdmissionEnabled: true, DryRun: true, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals},
+			} {
+				env := map[string]string{}
+				applyDefaultMaxAICreditsEnvToMap(env, disabled)
+				assert.NotContains(t, env, "GH_AW_ADMISSION_RESULT")
+				assert.NotContains(t, env, "GH_AW_ADMISSION_MAX_AI_CREDITS")
+			}
 		})
 	}
 }
 
 func TestAdmissionSessionOutputs(t *testing.T) {
 	for _, daily := range []bool{false, true} {
-		step := strings.Join(buildUsageActivityGenerationStep(daily, false, func(action string) string { return action }), "")
+		step := strings.Join(buildUsageActivityGenerationStep(true, daily, false, func(action string) string { return action }), "")
 		for env, output := range map[string]string{
 			"GH_AW_ADMISSION_RESULT":                          "admission-result",
 			"GH_AW_ADMISSION_MAX_AI_CREDITS":                  "admission-max-ai-credits",
@@ -182,9 +192,10 @@ func TestAdmissionComponentExecutionWiring(t *testing.T) {
 	for _, engine := range []string{"copilot", "claude", "codex", "pi"} {
 		t.Run(engine, func(t *testing.T) {
 			data := &WorkflowData{
-				AI:           engine,
-				EngineConfig: &EngineConfig{ID: engine, MaxAICredits: 777},
-				SafeOutputs:  &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+				AdmissionEnabled: true,
+				AI:               engine,
+				EngineConfig:     &EngineConfig{ID: engine, MaxAICredits: 777},
+				SafeOutputs:      &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
 			}
 			compiler := NewCompiler()
 			evals := strings.Join(compiler.buildEvalsEngineSteps(data), "")

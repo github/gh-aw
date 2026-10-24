@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,6 +81,50 @@ func TestCompilerLintWarningsRemainAdvisory(t *testing.T) {
 	compiler := NewCompiler(WithLint(true))
 	require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{}, content, "test.md"))
 	require.Positive(t, compiler.GetWarningCount())
+}
+
+func TestCompilerLintRepoAssistGeneratedSteps(t *testing.T) {
+	t.Parallel()
+	for _, admission := range []bool{false, true} {
+		t.Run(fmt.Sprintf("admission=%t", admission), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "repo-assist.md")
+			source := fmt.Sprintf(`---
+on:
+  workflow_dispatch:
+  admission: %t
+engine: copilot
+permissions:
+  contents: read
+checkout:
+  fetch: ["*"]
+  fetch-depth: 0
+tools:
+  github: false
+  repo-memory:
+    branch-name: memory/repo-assist-memory
+safe-outputs:
+  create-pull-request:
+  push-to-pull-request-branch:
+---
+Maintain the repository.
+`, admission)
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithLint(true))
+			compiler.gitRoot = dir
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			require.Zero(t, compiler.GetWarningCount())
+			lock, err := os.ReadFile(filepath.Join(dir, "repo-assist.lock.yml"))
+			require.NoError(t, err)
+			require.NotContains(t, string(lock), "GH_AW_WIKI_NOTE: ${{ '' }}")
+			require.NotContains(t, string(lock), "persist-credentials: true")
+			require.Contains(t, string(lock), "Configure Git credentials")
+			require.Equal(t, admission, strings.Contains(string(lock), "needs.activation.outputs.admission-result"))
+		})
+	}
 }
 
 func TestCompilerLintUsesEffectiveStrictness(t *testing.T) {
