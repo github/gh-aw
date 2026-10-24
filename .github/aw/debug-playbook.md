@@ -230,15 +230,15 @@ work or bypass profiles/effect scopes.
 | --- | --- | --- |
 | `unsupported_protocol`, `codec_invalid`, `invalid_json`, `invalid_utf8`, `invalid_unicode`, `duplicate_key`, `noncanonical_number` | Version, canonical bytes, keys, Unicode/numbers. | Align producer/reader; regenerate input, not history. |
 | `ledger_invalid`, `ledger_foreign`, `ledger_nonextending` | Queue identity, DAG, ancestry. | Stop publication; recover trusted queue/tip via protocol. |
-| `queue_missing`, `policy_missing` | Queue location; trusted config. | Approved AW-managed bootstrap/deployment; no manual admin seeding. |
-| `repository_unavailable`, `repository_scope_invalid`, `branch_invalid`, `git_transport_failed` | Repo/branch, checkout credentials, Git failure. | Restore authorized transport/target; reread uncertain publication tip. |
+| `queue_missing`, `policy_missing`, `work_queue_pool_not_installed` | Queue/pool; compiled/installed policy. | Bootstrap queue/policy; absent pool: quiesce; administrator-authorized Policy update adds pool. |
+| `repository_unavailable`, `repository_scope_invalid`, `branch_invalid`, `git_transport_failed` | Repo/branch, credentials, Git failure. | Restore authorized transport; reread uncertain tip. |
 | `actor_unauthorized`, `admission_unauthorized`, `unauthorized_operation`, `ownership_unauthorized`, `work_unauthorized`, `dependency_unauthorized`, `projection_unauthorized`, `resource_unauthorized` | Principal, role/profile, operation/resource scope. | Use authorized actor/path; no impersonation/scope expansion. |
-| `policy_invalid`, `policy_epoch_invalid`, `policy_proposal_mismatch`, `profile_invalid`, `pool_invalid`, `dispatcher_invalid` | Schema, approved revision, epoch, pools/dispatcher. | Correct trusted config via supported deployment/update. |
-| `work_queue_profile_not_approved`, `work_queue_dispatch_credential_identity_unavailable` | Worker approval; verifiable dispatch identity. | Fix approved deployment/credentials; never substitute unverified identity. |
-| `deployment_invalid`, `deployment_conflict` | Schema, revision, expected tip. | Fix trusted deployment; reconcile concurrency before CAS retry. |
-| `policy_not_quiescent`, `admission_paused`, `grants_paused` | Claims/dispatches; pause controls. | Respect pause; reconcile active work before authorized policy change. |
+| `policy_invalid`, `policy_epoch_invalid`, `policy_proposal_mismatch`, `work_queue_policy_proposal_mismatch`, `profile_invalid`, `pool_invalid`, `dispatcher_invalid` | Schema/revision, epoch, pools/dispatcher. | Correct trusted config via supported deployment/update. |
+| `work_queue_profile_not_approved`, `work_queue_worker_not_compiler_approved`, `work_queue_dispatch_credential_identity_unavailable` | Installed-profile check; caller-compiled dispatch allowlist. | Quiesce; update Policy for profiles; fix allowlist/credentials; reject unverified identity. |
+| `deployment_invalid`, `deployment_conflict` | Schema, revision, expected tip. | Fix trusted deployment; reconcile before CAS retry. |
+| `policy_not_quiescent`, `admission_paused`, `grants_paused` | Claims/dispatches; pause controls. | Respect pause; reconcile before authorized Policy change. |
 | `work_expired` | Work deadline; queue time. | Refresh fair prefix; never revive expired Work. |
-| `hard_clear_snapshot_invalid`, `hard_clear_conflict` | Preview revision; current tip/receipt. | Reconcile; freshly preview/authorize resets. Never automatically reset newer snapshots. |
+| `hard_clear_snapshot_invalid`, `hard_clear_conflict` | Preview revision; current tip/receipt. | Reconcile; preview/authorize afresh; don't reset newer snapshots. |
 | `hard_clear_not_paused` | Admission/grant controls. | Pause both before authorized hard clear. |
 | `hard_clear_unresolved`, `hard_clear_uncertain` | Reservations, Claims, barriers, effects, request receipt. | Reconcile trusted evidence before retry; never discard unresolved effects. |
 | `graph_invalid`, `graph_pool_conflict`, `node_conflict`, `replacement_invalid`, `work_conflict`, `work_identity_invalid`, `work_invalid`, `identity_invalid` | Graph/node, pool, payload/fingerprint, replacement. | Fix submission contract; retain accepted identity. |
