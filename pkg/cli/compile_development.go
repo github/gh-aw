@@ -69,6 +69,7 @@ func validateDevelopmentCompileMode(config CompileConfig) error {
 		{config.Watch, "--watch"},
 		{config.Approve, "--approve"},
 		{config.AllowActionRefs, "--allow-action-refs"},
+		{config.SkipLint, "--no-lint"},
 	} {
 		if option.enabled {
 			return fmt.Errorf("--dry-run cannot be combined with %s: development testing requires emitted lock files, complete checks, and an unchanged safe-update baseline", option.name)

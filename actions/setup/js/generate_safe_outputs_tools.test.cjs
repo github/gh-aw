@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
@@ -8,8 +8,10 @@ import { normalizeClaimScope } from "./work_queue_claim_scope.cjs";
 import { loadTools, attachHandlers, registerPredefinedTools, registerDynamicTools } from "./safe_outputs_tools_loader.cjs";
 import { createServer, registerTool } from "./mcp_server_core.cjs";
 import { validateValueAgainstSchema } from "./schema-validation.cjs";
+import generateSafeOutputsTools from "./generate_safe_outputs_tools.cjs";
 
 const scriptPath = path.join(__dirname, "generate_safe_outputs_tools.cjs");
+const { main: generateTools } = generateSafeOutputsTools;
 
 describe("generate_safe_outputs_tools", () => {
   /** @type {string} */
@@ -751,6 +753,27 @@ describe("generate_safe_outputs_tools", () => {
 
     expect(result1[0].description).toEqual(result2[0].description);
     expect(result1[0].inputSchema.properties.repo).toEqual(result2[0].inputSchema.properties.repo);
+  });
+
+  it("reports tool deep-copy failures with the registered error code", async () => {
+    fs.writeFileSync(configPath, JSON.stringify({ create_issue: { max: 1 } }));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
+
+    const clone = globalThis.structuredClone;
+    vi.stubGlobal("structuredClone", value => {
+      if (value?.name === "create_issue") throw new Error("forced clone failure");
+      return clone(value);
+    });
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_TOOLS_SOURCE_PATH", toolsSourcePath);
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_CONFIG_PATH", configPath);
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_TOOLS_META_PATH", toolsMetaPath);
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_TOOLS_PATH", outputPath);
+    try {
+      await expect(generateTools()).rejects.toThrow("ERR_SAFE_OUTPUT_TOOL_COPY_FAILED: Failed to deep-copy tool create_issue: forced clone failure");
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
   });
 
   it("exits with error when source tools file is missing", () => {

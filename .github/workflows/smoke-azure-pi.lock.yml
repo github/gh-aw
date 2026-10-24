@@ -84,6 +84,7 @@ jobs:
     needs: admission
     if: (!cancelled()) && (needs.admission.result == 'success' || needs.admission.result == 'skipped')
     runs-on: ubuntu-slim
+    environment: aoai-model
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read

@@ -17,6 +17,8 @@ Every custom job must run either before `agent` or after a successful, clean `de
 - adds `detection` directly to the `needs` of every downstream custom job, including reusable workflow calls
 - wraps the job's `if` in an outer guard that cannot be overridden: `needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' && (<authored condition>)`
 
+An authored downstream custom job may set `detection-gate: status-only` to report job results after detection fails, is skipped, or reports warn-mode findings. The compiler still adds `detection` to `needs` to preserve ordering, but keeps the authored condition without the outer guard. This opt-out is accepted only when the job cannot consume agent-derived data: it cannot download artifacts, call an opaque reusable workflow, reference outputs except those of detection-gated compiler-owned jobs such as `safe_outputs`, or use `GH_AW_AGENT_OUTPUT` or agent/safe-output file paths in environment values or scripts. A job using this option must also be a leaf with respect to other custom jobs.
+
 The `custom-job-detection` lint rule provides companion diagnostics on the Actions and AW ASTs with transitive dependencies, including missing detection dependencies and conditions that bypass detection job success. It is not a substitute for the compiler's clean-output guard. Workflows with no generated detection job, including workflows that explicitly disable detection, are exempt. The contract is recorded in CTR-005 of compiler threat specification 1.0.66.
 
 ### Alternatives Considered
@@ -41,7 +43,7 @@ Validate and inject guards when custom jobs are first parsed. This option was re
 - Problem graphs, such as unordered custom jobs or jobs between `agent` and `detection`, fail at compile time with a clear `jobs.<id>.needs` error.
 
 #### Negative
-- Authors can no longer run post-agent custom jobs on detection failure, cancellation, skipping, or warn-mode findings, for example to send failure notifications or clean up. The compiler rewrites authored `if` conditions as a conjunction with a non-overridable detection guard; `always()` and other authored status overrides cannot bypass it.
+- Unmarked authors cannot run post-agent custom jobs on detection failure, cancellation, skipping, or warn-mode findings, for example to send failure notifications or clean up. The `detection-gate: status-only` exception is deliberately limited to jobs that cannot consume agent-derived data.
 - The compiled conditions are longer and partly redundant, for example `needs.detection.result == 'success'` appears both in the guard and in the authored condition. This made lock files across many workflows (smoke, release, and others) churn.
 - This can break existing workflows: custom jobs that are neither before `agent` nor after `detection`, or that `detection` depends on while also depending on `agent`, now fail to compile. Authored `if` values must be a single valid expression, so interpolated text inside them is rejected.
 

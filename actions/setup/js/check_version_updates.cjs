@@ -21,6 +21,7 @@ const { createReportIssue } = require("./issue_report.cjs");
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
+const { ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED, ERR_COMPILE_AGENTIC_VERSION_BLOCKED, ERR_COMPILE_AGENTIC_VERSION_OUTDATED } = require("./error_codes.cjs");
 
 const CONFIG_URL = "https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json";
 const FETCH_TIMEOUT_MS = 120_000;
@@ -222,7 +223,7 @@ async function reportBlockedVersionIssue(compiledVersion) {
  * @returns {Promise<void>}
  */
 async function failForMissingExecutionProvenance(compiledVersion) {
-  const message = `The setup runtime requires a workflow compiled with gh-aw ${PROVENANCE_MINIMUM_COMPILER_VERSION} or newer. Update gh-aw, run \`gh aw compile\`, and commit the regenerated workflow.`;
+  const message = `${ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED}: The setup runtime requires a workflow compiled with gh-aw ${PROVENANCE_MINIMUM_COMPILER_VERSION} or newer. Update gh-aw, run \`gh aw compile\`, and commit the regenerated workflow.`;
   core.summary
     .addRaw("### Incompatible compiled workflow\n\n")
     .addRaw(`This workflow was compiled with \`${compiledVersion}\`, but safe-output publishing now requires execution provenance added in \`${PROVENANCE_MINIMUM_COMPILER_VERSION}\`.\n\n`)
@@ -304,7 +305,7 @@ async function main() {
       .addRaw("**Action required:** Update `gh-aw` to the latest version and recompile your workflow with `gh aw compile`.\n");
     await core.summary.write();
     await reportBlockedVersionIssue(compiledVersion);
-    core.setFailed(`Blocked compile-agentic version: ${compiledVersion} is in the blocked versions list. Update gh-aw to the latest version and recompile your workflow.`);
+    core.setFailed(`${ERR_COMPILE_AGENTIC_VERSION_BLOCKED}: Blocked compile-agentic version: ${compiledVersion} is in the blocked versions list. Update gh-aw to the latest version and recompile your workflow.`);
     return;
   }
 
@@ -321,7 +322,7 @@ async function main() {
         .addRaw(`The compile-agentic version \`${compiledVersion}\` is below the minimum supported version \`${minimumVersion}\`.\n\n`)
         .addRaw("**Action required:** Update `gh-aw` to the latest version and recompile your workflow with `gh aw compile`.\n");
       await core.summary.write();
-      core.setFailed(`Outdated compile-agentic version: ${compiledVersion} is below the minimum supported version ${minimumVersion}. Update gh-aw to the latest version and recompile your workflow.`);
+      core.setFailed(`${ERR_COMPILE_AGENTIC_VERSION_OUTDATED}: Outdated compile-agentic version: ${compiledVersion} is below the minimum supported version ${minimumVersion}. Update gh-aw to the latest version and recompile your workflow.`);
       return;
     }
   }

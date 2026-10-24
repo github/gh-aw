@@ -17,14 +17,22 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
     printf '// @safe-outputs-exempt SEC-005: fixed scope validated upstream\nconst targetRepo = "owner/repo";\n' >actions/setup/js/exempt_handler.cjs
     printf 'const target_repo = "owner/repo";\nvalidateTargetRepo(target_repo);\n' >actions/setup/js/allowed_handler.cjs
 
+    for name in unified_session_payload unified_session_render; do
+        cp "$REPO_ROOT/actions/setup/js/$name.cjs" "actions/setup/js/$name.cjs"
+        sed '/@safe-outputs-exempt.*SEC-005/d' "$REPO_ROOT/actions/setup/js/$name.cjs" >"actions/setup/js/${name}_unexempted.cjs"
+    done
+    printf 'const targetRepo = "owner/repo";\noctokit.rest.issues.create({ owner: targetRepo.split("/")[0], repo: targetRepo.split("/")[1], title: "unsafe" });\n' >actions/setup/js/unsafe_handler.cjs
+
     log_high() { echo "HIGH: $1"; }
     log_pass() { echo "PASS: $1"; }
     eval "$(sed -n '/^check_cross_repo() {/,/^}/p' "$SCRIPT_DIR/check-safe-outputs-conformance.sh")"
     check_cross_repo >"$OUTPUT"
 
-    if [[ $(grep -c '^HIGH:' "$OUTPUT") -ne 2 ]] ||
+    if [[ $(grep -c '^HIGH:' "$OUTPUT") -ne 4 ]] ||
         ! grep -q 'adapter_checks_helper.cjs supports target-repo' "$OUTPUT" ||
-        ! grep -q 'unsafe_handler.cjs supports target-repo' "$OUTPUT"; then
+        ! grep -q 'unsafe_handler.cjs supports target-repo' "$OUTPUT" ||
+        ! grep -q 'unified_session_payload_unexempted.cjs supports target-repo' "$OUTPUT" ||
+        ! grep -q 'unified_session_render_unexempted.cjs supports target-repo' "$OUTPUT"; then
         echo "FAIL: SEC-005 must skip only tests, allowlisted handlers, and documented exemptions"
         cat "$OUTPUT"
         exit 1
@@ -34,7 +42,8 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
         exit 1
     fi
 
-    rm actions/setup/js/adapter_checks_helper.cjs actions/setup/js/unsafe_handler.cjs
+    rm actions/setup/js/adapter_checks_helper.cjs actions/setup/js/unsafe_handler.cjs \
+        actions/setup/js/unified_session_payload_unexempted.cjs actions/setup/js/unified_session_render_unexempted.cjs
     check_cross_repo >"$OUTPUT"
     if ! grep -q '^PASS: SEC-005: All cross-repo handlers validate allowlists' "$OUTPUT" ||
         grep -q '^HIGH:' "$OUTPUT"; then
@@ -44,7 +53,9 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
     fi
 )
 
-(cd "$REPO_ROOT" && bash "$SCRIPT_DIR/check-safe-outputs-conformance.sh" >"$OUTPUT" 2>&1) || true
+bash "$SCRIPT_DIR/check-safe-outputs-transport-integrity_test.sh"
+
+(cd "$REPO_ROOT" && bash "$SCRIPT_DIR/check-safe-outputs-conformance.sh" 2>&1 | sed -E $'s/\033\\[[0-9;]*[[:alpha:]]//g' >"$OUTPUT") || true
 
 if ! grep -q 'SEC-005: All cross-repo handlers validate allowlists' "$OUTPUT" ||
     grep -q '\[HIGH\].*SEC-005:' "$OUTPUT"; then
@@ -52,6 +63,14 @@ if ! grep -q 'SEC-005: All cross-repo handlers validate allowlists' "$OUTPUT" ||
     grep 'SEC-005:' "$OUTPUT" || true
     exit 1
 fi
+
+for finding in TYPE-016 MCE-001 USE-001 USE-003; do
+    if grep -E "\\[(HIGH|MEDIUM|LOW)\\] $finding:" "$OUTPUT" >/dev/null; then
+        echo "FAIL: Expected no $finding safe-output conformance findings"
+        grep -E "\\[(HIGH|MEDIUM|LOW)\\] $finding:" "$OUTPUT"
+        exit 1
+    fi
+done
 
 mapfile -t findings < <(grep "IMP-004: Safe output config property is missing" "$OUTPUT" || true)
 mapfile -t target_findings < <(grep "IMP-005: Safe output target authorization conformance gap" "$OUTPUT" || true)

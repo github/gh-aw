@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
@@ -9,6 +10,7 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const root = path.join(__dirname, "..");
 const promotion = fs.readFileSync(path.join(root, ".github/workflows/promote-release.yml"), "utf8");
 const ci = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+const release = fs.readFileSync(path.join(root, ".github/workflows/release.md"), "utf8");
 const alignment = ci.split("  validate-latest-releases:\n")[1].split("  validate-container-pins:\n")[0];
 
 function script(source, step) {
@@ -22,6 +24,24 @@ function script(source, step) {
 const promote = script(promotion, "Validate and promote release");
 const compare = script(alignment, "Compare latest releases");
 const stable = { tag_name: "v1.2.3", draft: false, prerelease: false };
+
+test("release safe-output example preserves apostrophes, newlines, and Unicode through Bash and JSON", () => {
+  const outputFormat = release.split("## Output Format\n")[1];
+  assert.ok(outputFormat, "Missing release output instructions");
+  const example = outputFormat.match(/```bash\n(safeoutputs update_release [^\n]+)\n```/);
+  assert.ok(example, "Missing inline JSON safeoutputs example");
+  const output = execFileSync("bash", ["--noprofile", "--norc", "-c", `safeoutputs() { printf '%s\\n' "$#"; printf '%s\\n' "$1"; printf '%s' "$2"; }\n${example[1]}`], { encoding: "utf8", timeout: 5000 });
+  const [argumentCount, tool, ...payload] = output.split("\n");
+  assert.equal(argumentCount, "2");
+  assert.equal(tool, "update_release");
+  assert.deepEqual(JSON.parse(payload.join("\n")), {
+    tag: "v0.93.1",
+    operation: "prepend",
+    body: "## 🌟 Release Highlights\n\n### ✨ What's New\n\n[Your complete markdown highlights here]",
+  });
+  assert.match(outputFormat, /native `update_release` function is explicitly exposed/);
+  assert.doesNotMatch(outputFormat, /not a bash command|Use bash to simulate tool calls|MUST call the `update_release` MCP tool/);
+});
 
 function harness({ actionsRelease = stable, release = { ...stable, id: 123, prerelease: true }, error } = {}) {
   const calls = [];

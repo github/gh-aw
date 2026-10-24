@@ -2,8 +2,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { claimControlReceipts, controlReceiptForRequest, readClaimQueueControls, isTrustedClaimQueueControlInventory, isUncommittedClaimDispatchNext, verifyClaimQueueControl } from "./work_queue_control_receipts.cjs";
 import { intentContext, acceptedSubmissionParameters } from "./work_queue_dispatch.cjs";
-import { normalizeDispatchParameters, requestForIntent } from "./work_queue_intents.cjs";
+import { normalizeDispatchParameters, normalizeSubmitParameters, requestForIntent } from "./work_queue_intents.cjs";
 import { compactTransactions, replayTransactions } from "./work_queue_replay.cjs";
+import { assignmentOnly } from "./work_queue_scheduler.cjs";
 import { queueFixture, REF, REPOSITORY, WORKFLOW } from "./work_queue_lifecycle.test_helpers.cjs";
 
 async function setup(count = 2) {
@@ -21,6 +22,104 @@ async function setup(count = 2) {
 }
 
 describe("independent Claim-scoped queue control readback", () => {
+  it("reads accepted dispatch_next in an additive pool after later installs, Policy epochs and checkpoints", async () => {
+    const fixture = queueFixture({
+      count: 1,
+      granted: false,
+      configurePolicy: policy => {
+        policy.authorization = "aw";
+        policy.producers = {};
+        delete policy.pools.default.profiles.default.principal;
+        policy.pools.default.profiles.default.logical_contract = "a".repeat(64);
+      },
+    });
+    const pool = structuredClone(fixture.state.policy.pools.default);
+    fixture.append("pool_install", { operations: [{ kind: "PoolInstall", pool: "added", config: pool }] }, fixture.dispatcher);
+    const nodes = normalizeSubmitParameters({ nodes: [{ graph_id: "added-parent", pool: "added", payload: { task: "parent" } }] }, fixture.state.policy, 1000, fixture.state);
+    fixture.append("submit", nodes, fixture.dispatcher);
+    const grant = fixture.append("dispatch_next", { pool: "added", max_claims: 1, max_dispatches: 1, max_bytes: 48000 }, fixture.dispatcher);
+    const assignment = assignmentOnly(grant.assignments[0]);
+    const dispatchId = assignment.dispatch_id;
+    fixture.append("dispatch", { operations: [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started", sender: fixture.dispatcher, credential_principal: "11" }] }, fixture.dispatcher);
+    fixture.append(
+      "dispatch",
+      {
+        operations: [
+          {
+            kind: "Dispatch",
+            dispatch_id: dispatchId,
+            state: "bound",
+            run: fixture.binding,
+            evidence: { repository: REPOSITORY, workflow: WORKFLOW, ref: REF, principal: "11", run_id: "42", run_attempt: 1, kind: "reconciliation", source: "github_api", checked_at: fixture.at },
+          },
+        ],
+      },
+      fixture.dispatcher
+    );
+    const actor = { ...fixture.workerActor, dispatch_id: dispatchId, claim_handle: "h1" };
+    fixture.append("finish", { dispatch_id: dispatchId, claim_handle: "h1", outcome: "completed" }, actor);
+    const context = { ...fixture.workerContext, payload: { repository: { id: 7 }, inputs: { work_queue_assignment: JSON.stringify(assignment) } } };
+    const nativeRun = fixture.nativeRun;
+    fixture.githubClient.rest.actions.getWorkflowRun = vi.fn(async () => ({ status: 200, data: { ...nativeRun(), display_title: `gh-aw work-queue ${dispatchId}` } }));
+    const options = { assignment, context, githubClient: fixture.githubClient, workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}`, readWorkQueueLog: fixture.readWorkQueueLog };
+    const trusted = await intentContext(options, { claim_handle: "h1" });
+    const child = normalizeSubmitParameters({ nodes: [{ graph_id: "added-child", pool: "added", payload: { task: "child" } }] }, fixture.state.policy, 1000, fixture.state);
+    fixture.append("submit", child, actor);
+    const message = { type: "work_queue_dispatch_next", intent_id: "added-dispatch", claim_handle: "h1", parameters: { pool: "added", max_claims: 1, max_dispatches: 1 } };
+    const parameters = normalizeDispatchParameters(message.parameters, fixture.state.policy, 4096);
+    const request = requestForIntent(trusted, message.intent_id, "dispatch_next", parameters);
+    fixture.append("dispatch_next", parameters, actor, request.id);
+    fixture.append("pool_install", { operations: [{ kind: "PoolInstall", pool: "later", config: pool }] }, fixture.dispatcher);
+    const verify = async transactions => {
+      const state = replayTransactions(transactions);
+      const readWorkQueueLog = async () => ({ sha: "readback-head", transactions, state });
+      const inventory = await readClaimQueueControls({ ...options, readWorkQueueLog, claim_handle: "h1" });
+      expect(await verifyClaimQueueControl({ ...options, message, inventory })).toMatchObject({ verified: true, evidence: { request_id: request.id } });
+    };
+    await verify(fixture.transactions);
+    await verify(compactTransactions(fixture.transactions, "c".repeat(40), fixture.administrator, fixture.at));
+    const member = assignment.claims[0];
+    const evidence = { repository: REPOSITORY, workflow: WORKFLOW, ref: REF, principal: "11", checked_at: fixture.at, run_id: "42", run_attempt: 1 };
+    const reconciler = { role: "reconciler", principal: "11", repository: REPOSITORY };
+    fixture.append(
+      "result",
+      {
+        operations: [
+          {
+            kind: "Result",
+            work_id: member.work_id,
+            claim_id: member.claim_id,
+            completion_id: fixture.state.works.get(member.work_id).completion_id,
+            descriptor: { kind: "none" },
+            evidence: { ...evidence, kind: "delivery", source: "verified_receipts", receipt: "verified-result" },
+          },
+        ],
+      },
+      reconciler
+    );
+    for (const work of fixture.state.works.values()) if (work.state !== "completed") fixture.append("cancel_work", { operations: [{ kind: "WorkCancellation", work_id: work.work_id, reason: "drain" }] });
+    for (const dispatch of fixture.state.dispatches.values())
+      fixture.append(
+        "release",
+        {
+          operations: [
+            {
+              kind: "Release",
+              dispatch_id: dispatch.dispatch_id,
+              evidence: dispatch.run ? { ...evidence, kind: "terminal_run", source: "github_api", status: "completed", conclusion: "success" } : { ...evidence, kind: "prelaunch", source: "trusted_publisher" },
+            },
+          ],
+        },
+        reconciler
+      );
+    const next = structuredClone(fixture.state.policy);
+    next.class_weights = [1, 1, 1, 1, 1];
+    fixture.append("policy", { operations: [{ kind: "Policy", epoch: "e2", policy: next }] });
+    await verify(fixture.transactions);
+    const checkpoint = compactTransactions(fixture.transactions, "d".repeat(40), fixture.administrator, fixture.at);
+    await verify(compactTransactions(checkpoint, "e".repeat(40), fixture.administrator, fixture.at));
+  });
+
   it("returns exact compact completed-Claim receipts from checked ledger and actual native attempt", async () => {
     const { fixture, options, message, request } = await setup();
     const inventory = await readClaimQueueControls({ ...options, claim_handle: "h1" });

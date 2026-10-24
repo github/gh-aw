@@ -1,6 +1,7 @@
 // @ts-check
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { ERR_SYSTEM, ERR_SAFE_OUTPUT_TOOL_COPY_FAILED } = require("./error_codes.cjs");
 const { validateTargetRepo, parseAllowedRepos, getDefaultTargetRepo } = require("./repo_helpers.cjs");
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 
@@ -316,7 +317,7 @@ function registerPredefinedTools(server, tools, config, registerTool, normalizeT
         try {
           toolToRegister = structuredClone(cloneableTool);
         } catch (err) {
-          throw new Error("Failed to deep-copy tool " + tool.name + ": " + getErrorMessage(err), { cause: err });
+          throw new Error(`${ERR_SAFE_OUTPUT_TOOL_COPY_FAILED}: Failed to deep-copy tool ${tool.name}: ${getErrorMessage(err)}`, { cause: err });
         }
         if (handler) {
           toolToRegister.handler = handler;
@@ -447,7 +448,7 @@ function registerDynamicTools(server, tools, config, outputFile, registerTool, n
         try {
           fs.appendFileSync(outputFile, `${JSON.stringify(entry)}\n`);
         } catch (err) {
-          throw new Error(`Failed to append to file ${outputFile}: ${getErrorMessage(err)}`, { cause: err });
+          throw new Error(`${ERR_SYSTEM}: Failed to append to file ${outputFile}: ${getErrorMessage(err)}`, { cause: err });
         }
 
         // Use output from safe-job config if available

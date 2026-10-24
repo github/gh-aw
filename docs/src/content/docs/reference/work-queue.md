@@ -9,7 +9,7 @@ For architecture, a [minimal deployment example](/gh-aw/patterns/workqueue-ops/#
 
 ## Initialization and authorization
 
-The first accepted producer submission atomically installs Policy and Work. Compilation, activation, reads, and dispatch-only requests do not initialize a queue. `policy` updates only an existing, quiescent queue.
+The first accepted producer submission atomically installs Policy and Work. Compilation, activation, reads, and dispatch-only requests do not initialize a queue. On an existing AW-managed queue, trusted submission and dispatch processing install missing configured pools on demand before deployment synchronization. Add the pool to `aw.json` and recompile the producer or dispatcher. Installation publishes a separate `PoolInstall` operation, preserves existing pools and the Policy epoch, and reuses worker authority already granted by installed pools. Workers, observers, dry-run previews, and accepted-request recovery do not install pools. New worker profiles, economic changes, and existing-pool changes still require a quiescent queue and an explicit administrator `policy` update.
 
 Native `submit-work` and `submit-graph` resolve scheduling and approved AW worker routes from the verified repository revision, not an unrelated local checkout. Assignment-capable workers must already be published.
 
@@ -327,15 +327,27 @@ Idle refresh is every 10 seconds; search and action review pause it. Failed read
 
 Events go to stderr with elapsed timing and sanitized counts, flags, statuses, and error categories, not payloads, identities, or credentials. Blocked controls and exhausted delivery verification also emit always-visible diagnostics.
 
+Routing diagnostics distinguish installed Policy gaps from compiler approval failures:
+
+| Code | Meaning and recovery |
+| --- | --- |
+| `work_queue_pool_not_installed` | The requested pool is absent from installed Policy. Configuration edits alone do not install it; recovery requires an explicit administrator Policy update after the queue is quiescent. |
+| `work_queue_profile_not_approved` | The worker profile is absent from the installed pool. Check installed Policy and caller-approved routes; adding profiles requires an administrator Policy update on a quiescent queue. |
+| `work_queue_worker_not_compiler_approved` | The caller's compiled configuration does not approve the worker route. Check `safe-outputs.dispatch-workflow.workflows` and the published worker's assignment support. |
+
 HTTP failure diagnostics include validated quota counters, `rate_limit_reset_unix` (Unix seconds), `retry_after_seconds`, fixed rate-limit/SSO flags, and the GitHub request ID when available. Explicit rate-limit evidence distinguishes throttled HTTP 403 responses from otherwise ambiguous access denials; quota headroom alone does not prove permission denial. Raw provider messages, arbitrary headers, and authorization URLs are never printed.
 
 Projection coordination failures emit `projection.locks.acquire.failed` and counts of requested versus acknowledged locks. `projection.locks.retained` indicates unacknowledged native writes whose locks remain held. These diagnostics do not authorize retries, worker reruns, receipt recreation, or lock deletion.
+
+GraphQL failures include a validated GitHub request ID even when no HTTP status is exposed. The failure summary retains the error count and allowlisted categories; individual `.graphql_error` records require runtime debug logging and are limited to five per failure. `graphql_error_details_omitted` counts errors without detailed records. Detailed records identify the error index, allowlisted type and operation, and zero-based lock (`l0`–`l49`), unlock (`u0`–`u49`), or Issue projection (`m0`–`m49`) aliases only when the request builder supplies that alias scheme. Unaliased label operations also require explicit request-builder context. Arbitrary Claim-handler aliases, including aliases named after GraphQL operations, remain unclassified. `graphql_result_present` means only that the alias returned non-null data, not that a native receipt was verified. `graphql_reference_already_exists` recognizes the exact reference-conflict message; it does not establish lock ownership or authorize deletion. Unknown paths/types remain unclassified. Collections larger than 50 are marked `graphql_errors_truncated=true` and `graphql_error_types_inspected=false`: summary category inspection is skipped, not a finding that categories are absent. Their debug details are marked `graphql_error_sample_only=true`; sampled types do not affect the summary's queue-control classification or authorize retries. Raw messages, paths, queries, variables, and response bodies are never printed.
 
 ### Diagnostic artifacts
 
 Claim audit exports contain operations, temporary-ID references, and structured errors, not raw handler output or proof of Result. Default retention is one day; failed worker `safe-outputs-items` are retained for seven days. Repository policy or `GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS` can override retention. Uploads fail if redaction fails.
 
 The `safe_outputs` job exposes `work_queue_outcome`. Unverified Claims retain delivery state, effects disposition, and reconciliation reason in scoped `claim-delivery-errors.json`.
+
+When trusted queue controls are configured, `safe_outputs.outputs.work_queue_requests` contains their version-3 JSON receipt. A successful controls job can report `no_grant` with no launches; only a launch with `state: "bound"` identifies a verified native worker run. This receipt proves launch, not worker completion or Result.
 
 Claim files live under `/tmp/gh-aw/claims/<original-identity-hash>/` with directory/file modes `0700`/`0600`:
 

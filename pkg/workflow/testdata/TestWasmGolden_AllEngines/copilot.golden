@@ -542,10 +542,9 @@ jobs:
             const { main } = require(path.join(actionsDir, 'checkout_pr_branch.cjs'));
             await main();
       - name: Install GitHub Copilot CLI
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh"
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" COPILOT_VERSION --checksums-sha256 COPILOT_CHECKSUMS_SHA256 --prefer-toolcache
         env:
           GH_HOST: github.com
-          GH_AW_COMPILED_VERSION: dev
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless

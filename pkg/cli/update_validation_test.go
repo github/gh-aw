@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/testutil"
@@ -186,4 +187,39 @@ func TestValidateUpdateSHAEntries_DeduplicatesActionSubpathChecks(t *testing.T) 
 	require.NoError(t, validateUpdateSHAEntriesWithResolvers(context.Background(), tmpDir, r))
 	assert.Equal(t, 1, commitChecks)
 	assert.Equal(t, 1, versionChecks)
+}
+
+func TestValidateUpdateSHAEntriesOverlapsIndependentChecks(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	cache := workflow.NewActionCache(tmpDir)
+	const sha = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
+	cache.Set("actions/cache", "v6.1.0", sha)
+	require.NoError(t, cache.Save())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	commitStarted := make(chan struct{})
+	versionStarted := make(chan struct{})
+	resolvers := validationResolvers{
+		verifyActionCommitExists: func(ctx context.Context, _, _ string) error {
+			close(commitStarted)
+			select {
+			case <-versionStarted:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		},
+		resolveActionVersionToSHA: func(ctx context.Context, _, _ string) (string, error) {
+			close(versionStarted)
+			select {
+			case <-commitStarted:
+				return sha, nil
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
+		},
+	}
+	require.NoError(t, validateUpdateSHAEntriesWithResolvers(ctx, tmpDir, resolvers))
 }

@@ -137,6 +137,24 @@ Yes, with a **Personal Access Token (PAT)** that has access to target repositori
 
 Yes. Private repositories can support proprietary code, a "sidecar" repository with limited access, workflow testing, and organization-internal automation. See [MultiRepoOps — Side Repository](/gh-aw/patterns/multi-repo-ops/#using-a-side-repository) for patterns using private repositories.
 
+### Can I reuse an agentic workflow outside `.github/workflows/`?
+
+Not through `workflow_call`. GitHub Actions requires reusable workflow YAML files to live directly in `.github/workflows/`, with no subdirectories. This applies to compiled `.lock.yml` files too and is a [GitHub Actions limitation](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#creating-a-reusable-workflow) that gh-aw cannot override. Compiling Markdown in another directory does not make the generated YAML callable from that location.
+
+To reuse a centrally maintained implementation without copying it into each calling repository, add `on: workflow_call` to the central workflow's Markdown, compile it, and commit its `.lock.yml` under the central repository's `.github/workflows/`. Callers reference that compiled file at the job level:
+
+```yaml title=".github/workflows/call-review.yml"
+on: workflow_dispatch
+jobs:
+  review:
+    uses: my-org/agentic-workflows/.github/workflows/review.lock.yml@v1
+    secrets: inherit
+```
+
+Use a full commit SHA instead of `v1` for an immutable reference. The caller must have access to the reusable workflow and provide the required permissions and engine credentials; `secrets: inherit` is available within the same organization or enterprise.
+
+For a repository organized by action, keep documentation and shared components separately, but retain the callable entry point in `.github/workflows/`. [Imports](/gh-aw/reference/imports/) can separate shared configuration and prompt content from entry-point Markdown; they are not independently callable workflows.
+
 ### Can I edit workflows directly on GitHub.com without recompiling?
 
 Yes, for the **markdown body** (AI instructions) — loaded at runtime, takes effect on the next run. **Frontmatter** (tools, permissions, triggers, network rules) is embedded at compile time and requires `gh aw compile my-workflow` after edits. See [Editing Workflows](/gh-aw/setup/working-with-workflows/#editing-workflows).

@@ -15,6 +15,7 @@ permissions: read-all
 env: {MESSAGE: hello}
 defaults: {run: {shell: bash}}
 concurrency: {group: native, cancel-in-progress: true}
+cache-mode: read-only
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -42,6 +43,7 @@ jobs:
 	input, err := Parse([]byte(source))
 	require.NoError(t, err)
 	require.Len(t, input.Jobs, 2)
+	assert.Equal(t, "read-only", input.CacheMode)
 	call, setup := input.Jobs[0], input.Jobs[1]
 	assert.Equal(t, JobID("call"), call.ID)
 	assert.Equal(t, []JobID{"setup"}, call.Needs)

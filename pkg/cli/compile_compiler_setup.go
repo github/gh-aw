@@ -99,6 +99,7 @@ func createAndConfigureCompiler(config CompileConfig) *workflow.Compiler {
 		workflow.WithVerbose(config.Verbose),
 		workflow.WithEngineOverride(config.EngineOverride),
 		workflow.WithFailFast(config.FailFast),
+		workflow.WithLint(!config.SkipLint),
 	)
 	compiler.SetModelPricingResolver(func(_ context.Context, provider, model string) (map[string]float64, bool) {
 		return findExactModelPricing(provider, model)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
@@ -48,7 +49,9 @@ func buildContentsAPIPath(owner, repo, path, ref string) string {
 	)
 }
 
-func fetchRemoteFileContent(ctx context.Context, client *api.RESTClient, owner, repo, path, ref string, fileContent any) error {
+func fetchRemoteFileContent(ctx context.Context, client *api.RESTClient, owner, repo, path, ref string, fileContent any) (err error) {
+	finish := ctxutil.StartOperation(ctx, fmt.Sprintf("GitHub GET %s/%s/contents/%s@%s", owner, repo, path, ref))
+	defer func() { finish(err) }()
 	remoteLog.Printf("Fetching remote file via REST API: %s/%s path=%s ref=%s", owner, repo, path, ref)
 	return client.DoWithContext(ctx, http.MethodGet, buildContentsAPIPath(owner, repo, path, ref), nil, fileContent)
 }
@@ -77,7 +80,7 @@ func canUseUnauthenticatedPublicGitHubFallback(owner, repo, host string) bool {
 // cannot access cross-organization public repositories and git clone also
 // fails. Unauthenticated requests are subject to a lower rate limit
 // (60 req/hour) but are sufficient for the handful of calls during update.
-func fetchPublicGitHubContentsAPI(ctx context.Context, owner, repo, path, ref string) ([]byte, error) {
+func fetchPublicGitHubContentsAPI(ctx context.Context, owner, repo, path, ref string) (result []byte, resultErr error) {
 	// Encode each path segment independently so that '/' separators are
 	// preserved — url.PathEscape would turn them into '%2F', breaking nested
 	// paths like '.github/workflows/shared/foo.md'.
@@ -95,6 +98,8 @@ func fetchPublicGitHubContentsAPI(ctx context.Context, owner, repo, path, ref st
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 
+	finish := ctxutil.StartOperation(ctx, fmt.Sprintf("GitHub public GET %s/%s/contents/%s@%s", owner, repo, path, ref))
+	defer func() { finish(resultErr) }()
 	resp, err := publicAPIClient.Do(req)
 	if err != nil {
 		return nil, err

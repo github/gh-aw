@@ -25,8 +25,12 @@ func TestBootstrapReleasePinsMatchCompilerDefaults(t *testing.T) {
 	} {
 		cmd := exec.Command("bash", "-c", `source "$1"; release_artifact_sha256 "$2" "$3" "$4"`,
 			"--", helper, release.repository, release.version, release.manifest)
-		if output, err := cmd.CombinedOutput(); err != nil {
+		output, err := cmd.CombinedOutput()
+		if err != nil {
 			t.Fatalf("compiler default must have a reviewed bootstrap pin: %v: %s", err, output)
+		}
+		if release.repository == "github/copilot-cli" && strings.TrimSpace(string(output)) != constants.DefaultCopilotChecksumsSHA256 {
+			t.Fatal("compiler default Copilot checksum must match the reviewed bootstrap pin; run scripts/update-copilot-version.sh")
 		}
 	}
 }

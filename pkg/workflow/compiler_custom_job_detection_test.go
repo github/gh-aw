@@ -18,13 +18,14 @@ func TestCustomJobDetectionCompilation(t *testing.T) {
 	for _, tt := range []struct {
 		name, fields, condition string
 		disabled                bool
+		statusOnly              bool
 	}{
-		{"direct", "needs: agent", "", false},
-		{"detection only", "needs: detection", "", false},
-		{"always", "needs: agent\n    if: always()", "always()", false},
-		{"or bypass", "needs: [agent, detection]\n    if: always() || needs.agent.result == 'failure'", "always() || needs.agent.result == 'failure'", false},
-		{"false condition", "needs: agent\n    if: 'false'", "false", false},
-		{"disabled detection", "needs: agent\n    if: always()", "always()", true},
+		{"direct", "needs: agent", "", false, false},
+		{"detection only", "needs: detection", "", false, false},
+		{"always", "needs: agent\n    if: always()", "always()", false, false},
+		{"or bypass", "needs: [agent, detection]\n    if: always() || needs.agent.result == 'failure'", "always() || needs.agent.result == 'failure'", false, false},
+		{"false condition", "needs: agent\n    if: 'false'", "false", false, false},
+		{"disabled detection", "needs: agent\n    if: always()", "always()", true, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			detection := ""
@@ -46,6 +47,9 @@ func TestCustomJobDetectionCompilation(t *testing.T) {
 			if tt.disabled {
 				assert.NotContains(t, job.Needs, "detection")
 				assert.NotContains(t, job.If, "needs.detection")
+			} else if tt.statusOnly {
+				assert.Contains(t, job.Needs, "detection")
+				assert.Equal(t, "always()", job.If)
 			} else {
 				assert.Contains(t, job.Needs, "detection")
 				assert.Contains(t, job.If, "needs.detection.result == 'success'")
@@ -68,7 +72,7 @@ func TestCustomJobDetectionCompilation(t *testing.T) {
 func TestCustomJobDetectionGuard(t *testing.T) {
 	for _, condition := range []string{"", "always()"} {
 		job := &Job{Name: "report", Needs: []string{"agent"}, If: condition}
-		require.NoError(t, addCustomJobDetectionGuard(job))
+		require.NoError(t, addCustomJobDetectionGuard(job, false))
 		node, err := ParseExpression(stripExpressionWrapper(job.If))
 		require.NoError(t, err)
 		for _, result := range []string{"success", "failure", "cancelled", "skipped", ""} {
@@ -84,8 +88,108 @@ func TestCustomJobDetectionGuard(t *testing.T) {
 	}
 	for _, condition := range []string{"${{ always() }} trailing", "always() &&", "${{ false }}${{ true }}"} {
 		job := &Job{Name: "report", Needs: []string{"agent"}, If: condition}
-		require.ErrorContains(t, addCustomJobDetectionGuard(job), "jobs.report.if")
+		require.ErrorContains(t, addCustomJobDetectionGuard(job, false), "jobs.report.if")
 	}
+	job := &Job{Name: "status", Needs: []string{"agent"}, If: "always()"}
+	require.NoError(t, addCustomJobDetectionGuard(job, true))
+	assert.Equal(t, []string{"agent", "detection"}, job.Needs)
+	assert.Equal(t, "always()", job.If)
+}
+
+func TestCustomJobDetectionStatusOnlyContract(t *testing.T) {
+	for _, tt := range []struct {
+		name, fields, wantErr string
+	}{
+		{
+			name:    "agent output",
+			fields:  "needs: [agent, detection]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - run: echo '${{ needs.agent.outputs.result }}'",
+			wantErr: "needs.agent.outputs",
+		},
+		{
+			name:    "detection output",
+			fields:  "needs: [agent, detection]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - run: echo '${{ needs.detection.outputs.detection_success }}'",
+			wantErr: "needs.detection.outputs",
+		},
+		{
+			name:    "custom output",
+			fields:  "needs: [agent, detection, producer]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - run: echo '${{ needs.producer.outputs.result }}'",
+			wantErr: "needs.producer.outputs",
+		},
+		{
+			name:    "non-detection-gated compiler output",
+			fields:  "needs: [agent, detection, activation]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - run: echo '${{ needs.activation.outputs.result }}'",
+			wantErr: "needs.activation.outputs",
+		},
+		{
+			name:    "artifact download",
+			fields:  "needs: [agent, detection]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - uses: actions/download-artifact@v4",
+			wantErr: "actions/download-artifact",
+		},
+		{
+			name:    "agent output environment",
+			fields:  "needs: [agent, detection]\n    detection-gate: status-only\n    if: always()\n    env:\n      GH_AW_AGENT_OUTPUT: /tmp/gh-aw/agent_output.json\n    steps:\n      - run: echo status",
+			wantErr: "GH_AW_AGENT_OUTPUT",
+		},
+		{
+			name:    "safe output file",
+			fields:  "needs: [agent, detection]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - run: cat /tmp/gh-aw/safeoutputs/outputs.jsonl",
+			wantErr: "safe-output files",
+		},
+		{
+			name:    "agent output file",
+			fields:  "needs: [agent, detection]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - run: cat '${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json'",
+			wantErr: "agent/safe-output files",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			document, err := aw.Parse("---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\nsafe-outputs:\n  create-issue:\njobs:\n  producer:\n    runs-on: ubuntu-latest\n    steps: [{run: echo producer}]\n  status:\n    runs-on: ubuntu-latest\n    " + tt.fields + "\n---\nPublic prompt.\n")
+			require.NoError(t, err)
+			compiler := NewCompiler(WithNoEmit(true))
+			data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))
+			require.NoError(t, err)
+			_, err = compiler.CompileToYAML(data, "test.md")
+			require.ErrorContains(t, err, "jobs.status")
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+
+	document, err := aw.Parse("---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\nsafe-outputs:\n  create-issue:\njobs:\n  status:\n    runs-on: ubuntu-latest\n    needs: [agent, safe_outputs]\n    detection-gate: status-only\n    if: always()\n    steps:\n      - run: echo '${{ needs.agent.result }} ${{ needs.detection.result }} ${{ needs.safe_outputs.outputs.created_issue_number }}'\n---\nPublic prompt.\n")
+	require.NoError(t, err)
+	compiler := NewCompiler(WithNoEmit(true))
+	data, err := compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))
+	require.NoError(t, err)
+	content, err := compiler.CompileToYAML(data, "test.md")
+	require.NoError(t, err)
+	require.Contains(t, content, "if: always()")
+	require.NotContains(t, content, "if: needs.detection.result == 'success'")
+	require.NotContains(t, content, "detection-gate:")
+
+	document, err = aw.Parse("---\non: workflow_dispatch\nengine: copilot\npermissions: {contents: read}\nsafe-outputs:\n  create-issue:\njobs:\n  status:\n    needs: [agent, detection]\n    detection-gate: status-only\n    if: always()\n    uses: ./.github/workflows/status.yml\n---\nPublic prompt.\n")
+	require.NoError(t, err)
+	compiler = NewCompiler(WithNoEmit(true))
+	data, err = compiler.ParseWorkflowDocument(document, filepath.Join(t.TempDir(), "test.md"))
+	require.NoError(t, err)
+	_, err = compiler.CompileToYAML(data, "test.md")
+	require.ErrorContains(t, err, "jobs.status.uses")
+	require.ErrorContains(t, err, "opaque reusable workflow")
+}
+
+func TestCustomJobDetectionStatusOnlyMustBeLeaf(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+	for _, job := range []*Job{
+		{Name: "agent"},
+		{Name: "detection", Needs: []string{"agent"}},
+		{Name: "status", Needs: []string{"agent", "detection"}, If: "always()"},
+		{Name: "notify", Needs: []string{"status", "detection"}, If: "always()"},
+	} {
+		require.NoError(t, compiler.jobManager.AddJob(job))
+	}
+	data := &WorkflowData{Jobs: map[string]any{
+		"status": map[string]any{"detection-gate": "status-only", "needs": []any{"agent", "detection"}},
+		"notify": map[string]any{"needs": []any{"status", "detection"}},
+	}}
+	require.ErrorContains(t, compiler.guardCustomJobDetection(data), "jobs.status.detection-gate")
 }
 
 func TestCustomJobDetectionTransitiveAndPreDetection(t *testing.T) {

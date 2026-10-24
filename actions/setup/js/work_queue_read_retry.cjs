@@ -25,6 +25,7 @@ async function readQueueMetadata(read, log, event, sleepFn = delay => new Promis
     } catch (error) {
       const retry = attempt < 3 && isTransientQueueReadError(error);
       log.failure(`${event}.${retry ? "retry" : "failed"}`, error, true);
+      log.diagnostic?.(`${event}.attempt`, { attempt, max_attempts: 3, retry, delay_ms: retry ? 1000 : 0 });
       if (!retry) throw error;
       await sleepFn(1000);
     }

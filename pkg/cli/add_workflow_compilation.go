@@ -36,6 +36,7 @@ func compileWorkflowWithRefreshAndActionRef(ctx context.Context, filePath string
 	compiler := workflow.NewCompiler(
 		workflow.WithVerbose(verbose),
 		workflow.WithEngineOverride(engineOverride),
+		workflow.WithLint(true),
 	)
 	applyAddActionRef(compiler, actionRef)
 
@@ -101,6 +102,7 @@ func compileWorkflowWithTrackingAndRefreshAndActionRef(ctx context.Context, file
 	compiler := workflow.NewCompiler(
 		workflow.WithVerbose(verbose),
 		workflow.WithEngineOverride(engineOverride),
+		workflow.WithLint(true),
 	)
 	applyAddActionRef(compiler, actionRef)
 	compiler.SetFileTracker(tracker)

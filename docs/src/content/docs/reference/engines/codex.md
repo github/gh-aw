@@ -7,7 +7,7 @@ For first-time setup, see [Using OpenAI Codex](/gh-aw/engines/codex/). Shared op
 
 ## Selection and authentication
 
-Use `engine: codex` with `CODEX_API_KEY` or `OPENAI_API_KEY`. ChatGPT subscription login is unsupported. The default CLI pin is `0.163.0`; override it with `engine.version`.
+Use `engine: codex` with `CODEX_API_KEY` or `OPENAI_API_KEY`. ChatGPT subscription login is unsupported. The default CLI pin is `0.164.0`; override it with `engine.version`.
 
 Codex has no default model. Set `model` explicitly or configure the repository's model-selection variables; see [model selection](/gh-aw/reference/model-tables/).
 

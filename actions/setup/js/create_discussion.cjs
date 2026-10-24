@@ -645,6 +645,7 @@ async function main(config = {}) {
     /** @type {any} */
     let createdDiscussion = null;
     const effectIds = [];
+    const cleanup = [];
 
     try {
       const createDiscussionMutation = `
@@ -704,7 +705,8 @@ async function main(config = {}) {
               workflowName,
               runUrl,
               callerWorkflowId,
-              closeOlderKey
+              closeOlderKey,
+              cleanup
             );
             if (closedDiscussions.length > 0) {
               core.info(`Closed ${closedDiscussions.length} older discussion(s)`);
@@ -743,7 +745,7 @@ async function main(config = {}) {
           body,
         },
         message,
-        { id: discussion.id, number: discussion.number, url: discussion.url, repository: qualifiedItemRepo, repositoryNodeId: repoInfo.repositoryId, category: categoryId, title, body, labels: discussionLabels, effectIds }
+        { id: discussion.id, number: discussion.number, url: discussion.url, repository: qualifiedItemRepo, repositoryNodeId: repoInfo.repositoryId, category: categoryId, title, body, labels: discussionLabels, effectIds, cleanup }
       );
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -793,6 +795,7 @@ async function main(config = {}) {
             body,
             labels: discussionLabels,
             effectIds,
+            cleanup,
           }
         );
       }

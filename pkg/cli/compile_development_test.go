@@ -236,6 +236,35 @@ Say hello.
 	assert.Zero(t, stats.Errors)
 }
 
+func TestDevelopmentCompileLintSupportedConfigurations(t *testing.T) {
+	for _, configYAML := range []string{
+		"sandbox: awf\n",
+		"sandbox: default\n",
+		"graders:\n  quality:\n    script: 'return 1;'\n",
+		"imports:\n  aw: []\ntools:\n  bash: ['echo']\n",
+		"imports: {}\ntools:\n  bash: ['echo']\n",
+		"imports:\n  aw: [shared.md]\ntools:\n  bash: ['echo']\n",
+	} {
+		t.Run(configYAML, func(t *testing.T) {
+			source := filepath.Join(t.TempDir(), "supported.md")
+			require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(source), "shared.md"), []byte("---\ntools:\n  bash: ['echo']\n---\nShared instructions.\n"), 0o600))
+			content := "---\non: workflow_dispatch\nengine: copilot\nexcluded-env:\n  - OTEL_EXPORTER_OTLP_HEADERS\n" + configYAML + "---\nSay hello.\n"
+			require.NoError(t, os.WriteFile(source, []byte(content), 0o600))
+			for _, mode := range []CompileConfig{{}, {NoEmit: true}, {DryRun: true}} {
+				mode.activeModels = &activeModelInventory{}
+				config := applyDevelopmentCompileMode(mode)
+				compiler := createAndConfigureCompiler(config)
+				require.NoError(t, compiler.CompileWorkflow(source))
+				require.Equal(t, compiler.GetExperimentalWarningCount(), compiler.GetWarningCount())
+				stats := &CompilationStats{Total: 1, Succeeded: 1}
+				results := []ValidationResult{{Workflow: source, Valid: true}}
+				require.NoError(t, enforceDevelopmentDiagnostics(config, compiler, stats, &results))
+				require.True(t, results[0].Valid)
+			}
+		})
+	}
+}
+
 func TestDevelopmentExplicitlyDisabledChecks(t *testing.T) {
 	t.Parallel()
 	for _, name := range DryRunRequiredBoolFlags() {

@@ -528,7 +528,7 @@
   },
   {
     "name": "add_comment",
-    "description": "WRITE-ONCE: do NOT probe this tool with empty or placeholder arguments. If not ready to post a real comment, call noop. Adds a comment to an existing GitHub issue, pull request, or discussion; use create_issue, create_discussion, or create_pull_request for new items. Input is limited to 524288 characters, 10 mentions, and configured max-links URL occurrences (default: 50). Oversized agent content is automatically replaced by notices to fit the complete 65536-character published comment. Markers and footers are preserved in full; publication fails if protected content alone cannot fit. Generated footer links do not count toward max-links. Discussion comments require safe-outputs.add-comment.discussions: true.",
+    "description": "WRITE-ONCE: do NOT probe this tool with empty or placeholder arguments. If not ready to post a real comment, call noop. Adds a comment to an existing GitHub issue, pull request, or discussion; use create_issue, create_discussion, or create_pull_request for new items. IMPORTANT CONSTRAINTS: Input is limited to 524288 characters, 10 mentions, and configured max-links URL occurrences (default: 50). Oversized agent content is automatically replaced by notices to fit the complete 65536-character published comment. Markers and footers are preserved in full; publication fails if protected content alone cannot fit. Generated footer links do not count toward max-links. Discussion comments require safe-outputs.add-comment.discussions: true.",
     "inputSchema": {
       "type": "object",
       "required": ["body"],

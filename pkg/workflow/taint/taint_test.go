@@ -43,7 +43,6 @@ jobs:
 	require.Len(t, result.Findings, 1)
 	assert.Equal(t, OTLPAttribute, result.Findings[0].Site.Kind)
 	assert.Equal(t, "env.GH_AW_OTLP_ATTRIBUTES", result.Findings[0].Site.Path)
-	assert.NotContains(t, result.Findings[0].String(), "API_TOKEN")
 }
 
 func TestSecretLeakSinksAndFilters(t *testing.T) {
@@ -131,7 +130,6 @@ func TestSecretLeakSinksAndFilters(t *testing.T) {
 			if tt.count > 0 {
 				assert.Equal(t, tt.kind, result.Findings[0].Site.Kind)
 				assert.Equal(t, "secrets.test_token", result.Findings[0].Sources[0].Reference)
-				assert.NotContains(t, result.Findings[0].String(), "TEST_TOKEN")
 			}
 		})
 	}
@@ -226,9 +224,6 @@ func TestActionsExpressionTaint(t *testing.T) {
 				require.Len(t, result.Findings, 1)
 			} else {
 				assert.Empty(t, result.Findings)
-			}
-			for _, finding := range result.Findings {
-				assert.NotContains(t, finding.String(), "literal-sensitive-value")
 			}
 		})
 	}

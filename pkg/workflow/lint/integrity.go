@@ -87,7 +87,11 @@ func checkActionPins(ctx context.Context, input Input) ([]Diagnostic, error) {
 }
 
 func integrityPinSeverity(input Input) (Severity, error) {
-	return sourcePolicySeverity(input, "action-pin")
+	severity, err := sourcePolicySeverity(input, "action-pin")
+	if err == nil && input.AllowActionRefs {
+		severity = Warning
+	}
+	return severity, err
 }
 
 func integrityPinDiagnostic(uses string, reusable bool, severity Severity, path string) *Diagnostic {

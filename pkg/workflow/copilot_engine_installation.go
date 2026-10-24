@@ -119,24 +119,16 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 		return getCustomCopilotCommandInstallationSteps(workflowData, inlineDriverWriteStep, sdkInstallStep)
 	}
 
-	// Version selection follows a three-level priority:
-	//   1. engine.version if explicitly set in the workflow — pass it as a positional arg.
-	//   2. compat.json toolcache lookup at runtime — enabled when no explicit version is set;
-	//      the script uses GH_AW_COMPILED_VERSION (injected by compiledVersion below) to
-	//      select the right compat window and pick the best cached binary.
-	//   3. Baked-in DEFAULT_COPILOT_VERSION in the script — final fallback.
-	//
-	// EngineConfig.Version is intentionally left unset when no explicit engine.version is given.
-	// Downstream compile-time lookups (OTel, GH_AW_INFO_VERSION, copilotSupportsNoAskUser, …)
-	// already fall back to DefaultCopilotVersion via getVersionForSetup / getInstallationVersion,
-	// so no normalization mutation is needed here.
-	copilotVersion := "" // empty means "let the script decide via compat/default" (priorities 2 & 3)
+	// Keep EngineConfig unchanged so detection/eval clones resolve the same default.
+	// The shared installer generator binds an omitted version to the compiler's
+	// reviewed default version and checksum instead of resolving it at runtime.
+	copilotVersion := ""
 	if workflowData.EngineConfig != nil {
 		if workflowData.EngineConfig.Version != "" {
 			copilotVersion = workflowData.EngineConfig.Version
 			copilotInstallLog.Printf("Using engine.version for Copilot CLI installation: %s", copilotVersion)
 		} else {
-			copilotInstallLog.Printf("No engine.version specified; script will resolve via compat.json or baked-in default")
+			copilotInstallLog.Printf("No engine.version specified; using compiler default version and checksum")
 		}
 	}
 

@@ -15,19 +15,19 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		got  Version
 		want Version
 	}{
-		{"Claude Code", DefaultClaudeCodeVersion, "2.1.300"},
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.310"},
 		{"Copilot CLI", DefaultCopilotVersion, "1.0.101"},
 		{"Copilot SDK", DefaultCopilotSDKVersion, "1.0.16"},
-		{"Codex", DefaultCodexVersion, "0.163.0"},
+		{"Codex", DefaultCodexVersion, "0.164.0"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.64.0"},
 		{"Agy CLI", DefaultAgyVersion, "1.3.6"},
 		{"Pi CLI", DefaultPiVersion, "1.3.0"},
-		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.0.2"},
+		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.0.3"},
 		{"Firewall", DefaultFirewallVersion, "v0.28.70"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"Router image release", AWFRouterReleaseImageMinVersion, "v0.28.62"},
 		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.37"},
-		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.2"},
+		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.3"},
 	}
 
 	for _, tt := range tests {
@@ -44,15 +44,15 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 func TestDefaultThreatDetectReleasePins(t *testing.T) {
 	t.Parallel()
 
-	if DefaultThreatDetectVersion != "v0.5.2" {
-		t.Fatalf("DefaultThreatDetectVersion = %q, want v0.5.2; update the version and reviewed digest table together", DefaultThreatDetectVersion)
+	if DefaultThreatDetectVersion != "v0.5.3" {
+		t.Fatalf("DefaultThreatDetectVersion = %q, want v0.5.3; update the version and reviewed digest table together", DefaultThreatDetectVersion)
 	}
 
 	expectedDigests := map[string]string{
-		"threat-detect-linux-amd64":  "b4ecda6a8f1ee09913c40b58e5e9d3337d2173618d41b1bfdef9207e4e7959b9",
-		"threat-detect-linux-arm64":  "f6260a0f9ad72bcb67c7af19c4ce262ca34e2c3d5ccbf912832a8bd277200904",
-		"threat-detect-darwin-x64":   "7ed0a68ffbdd927eb2e25f862864602af289ad9cfc85f1385d83d4d52f11251c",
-		"threat-detect-darwin-arm64": "0d4f41134a0839a496ca34f5fbbce44ba89ca0be6d681f960e7c06070b8b04c6",
+		"threat-detect-linux-amd64":  "7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009",
+		"threat-detect-linux-arm64":  "6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6",
+		"threat-detect-darwin-x64":   "e0b606fb321a8b3d67f57c4bca7aac7e02976c0cf30c675032a7599b7225ff93",
+		"threat-detect-darwin-arm64": "2600ba84538d50e91926268b2b7c59ae9443e1ae6f709673cacb05e167ddb0e9",
 	}
 	if len(DefaultThreatDetectSHA256) != len(expectedDigests) {
 		t.Fatalf("DefaultThreatDetectSHA256 has %d entries, want the complete %d-asset release matrix", len(DefaultThreatDetectSHA256), len(expectedDigests))
@@ -64,7 +64,7 @@ func TestDefaultThreatDetectReleasePins(t *testing.T) {
 			continue
 		}
 		if got != want {
-			t.Errorf("DefaultThreatDetectSHA256[%q] = %q, want the reviewed v0.5.2 digest %q; update the version and reviewed digest table together", asset, got, want)
+			t.Errorf("DefaultThreatDetectSHA256[%q] = %q, want the reviewed v0.5.3 digest %q; update the version and reviewed digest table together", asset, got, want)
 		}
 	}
 }

@@ -39,6 +39,62 @@ func TestCreateAndConfigureCompiler_ReadOnly(t *testing.T) {
 	}
 }
 
+func TestCreateAndConfigureCompiler_SkipLint(t *testing.T) {
+	t.Parallel()
+	for _, skip := range []bool{false, true} {
+		compiler := createAndConfigureCompiler(CompileConfig{SkipLint: skip})
+		require.Equal(t, !skip, reflect.ValueOf(compiler).Elem().FieldByName("lint").Bool())
+	}
+	require.ErrorContains(t, validateDevelopmentCompileMode(CompileConfig{DryRun: true, SkipLint: true}), "--no-lint")
+}
+
+func TestCreateAndConfigureCompiler_LintsByDefault(t *testing.T) {
+	t.Parallel()
+	for _, skip := range []bool{false, true} {
+		t.Run(fmt.Sprintf("skip=%t", skip), func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "test.md")
+			require.NoError(t, os.WriteFile(path, []byte(`---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+jobs:
+  disclose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "${{ secrets.TEST_SECRET }}"
+---
+Test.
+`), 0o600))
+			compiler := createAndConfigureCompiler(CompileConfig{SkipLint: skip, ReadOnly: true})
+			err := compiler.CompileWorkflow(path)
+			if skip {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "[secret-leak]")
+			}
+			require.NoFileExists(t, filepath.Join(filepath.Dir(path), "test.lock.yml"))
+		})
+	}
+}
+
+func TestCreateAndConfigureCompiler_SkipLintPreservesValidation(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "test.md")
+	require.NoError(t, os.WriteFile(path, []byte(`---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: write
+---
+Test.
+`), 0o600))
+	compiler := createAndConfigureCompiler(CompileConfig{SkipLint: true, ReadOnly: true, Strict: true})
+	require.ErrorContains(t, compiler.CompileWorkflow(path), "strict mode: write permission 'contents: write' is not allowed")
+}
+
 func TestCreateAndConfigureCompiler_GPT61SolFirewallPricing(t *testing.T) {
 	t.Parallel()
 	pricingOverlay := func(provider string) string {

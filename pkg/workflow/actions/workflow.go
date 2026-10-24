@@ -11,6 +11,7 @@ type Workflow struct {
 	Env         map[string]Expression
 	Defaults    map[string]any
 	Concurrency any
+	CacheMode   string
 	Jobs        []*Job
 
 	source *workflowSource

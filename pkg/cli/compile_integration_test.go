@@ -2303,6 +2303,7 @@ func TestCompileWithActionsRepoFlag(t *testing.T) {
 		"--action-mode", "action",
 		"--actions-repo", "myorg/custom-aw-actions",
 		"--action-tag", "v9.9.9",
+		"--allow-action-refs",
 		dstPath,
 	)
 	output, err := cmd.CombinedOutput()
@@ -2352,6 +2353,7 @@ func TestCompileWithActionsRepoDefaultFallback(t *testing.T) {
 	cmd := exec.Command(setup.binaryPath, "compile",
 		"--action-mode", "action",
 		"--action-tag", "v9.9.9",
+		"--allow-action-refs",
 		dstPath,
 	)
 	output, err := cmd.CombinedOutput()
@@ -2376,12 +2378,18 @@ func TestCompileWithActionsRepoDefaultFallback(t *testing.T) {
 
 func TestCompileWithActionRefOverrideIncludesCompilerVersionMetadata(t *testing.T) {
 	tests := []struct {
-		name string
-		args []string
+		name      string
+		args      []string
+		wantError bool
 	}{
 		{
 			name: "action-tag",
-			args: []string{"--action-tag", "v9.9.9"},
+			args: []string{"--action-tag", "v9.9.9", "--allow-action-refs"},
+		},
+		{
+			name:      "action-tag-requires-opt-in",
+			args:      []string{"--action-tag", "v9.9.9"},
+			wantError: true,
 		},
 		{
 			name: "gh-aw-ref",
@@ -2409,11 +2417,23 @@ func TestCompileWithActionRefOverrideIncludesCompilerVersionMetadata(t *testing.
 			cmdArgs = append(cmdArgs, dstPath)
 			cmd := exec.Command(setup.binaryPath, cmdArgs...)
 			output, err := cmd.CombinedOutput()
+			lockFilePath := filepath.Join(setup.workflowsDir, "test-actions-repo.lock.yml")
+			if tt.wantError {
+				if err == nil {
+					t.Fatal("Compile should reject a mutable action tag without --allow-action-refs")
+				}
+				if !strings.Contains(string(output), "[action-pin]") {
+					t.Fatalf("Compile should report an action-pin error, got:\n%s", output)
+				}
+				if _, statErr := os.Stat(lockFilePath); !os.IsNotExist(statErr) {
+					t.Fatalf("Rejected compile should not emit a lock file, got: %v", statErr)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("CLI compile command failed: %v\nOutput: %s", err, string(output))
 			}
 
-			lockFilePath := filepath.Join(setup.workflowsDir, "test-actions-repo.lock.yml")
 			lockContent, err := os.ReadFile(lockFilePath)
 			if err != nil {
 				t.Fatalf("Failed to read lock file: %v", err)

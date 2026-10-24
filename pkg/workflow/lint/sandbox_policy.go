@@ -15,7 +15,14 @@ func SandboxConfigRule() Rule {
 }
 
 func checkSandboxConfig(ctx context.Context, input Input) ([]Diagnostic, error) {
-	config, err := authoredPolicyMapping(ctx, input, "sandbox")
+	source, err := authoredPolicyMapping(ctx, input)
+	if err != nil || source == nil {
+		return nil, err
+	}
+	if shorthand, ok := source["sandbox"].(string); ok && (shorthand == "awf" || shorthand == "default") {
+		return nil, nil
+	}
+	config, err := policyMapping(source["sandbox"], "sandbox")
 	if err != nil || config == nil {
 		return nil, err
 	}

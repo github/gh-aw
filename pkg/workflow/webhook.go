@@ -13,8 +13,11 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
 )
+
+var webhookLog = logger.New("workflow:webhook")
 
 // webhookCatalogJSON is the compiler's authoritative, payload-only filter catalog.
 //
@@ -129,6 +132,7 @@ func WebhookCatalog() (map[string]WebhookEvent, error) {
 	if err := addGitHubNotificationCatalog(catalog); err != nil {
 		return nil, err
 	}
+	webhookLog.Printf("Loaded webhook catalog with %d event definition(s)", len(catalog))
 	return catalog, nil
 }
 
@@ -141,6 +145,7 @@ func WebhookDispatchEventType(workflowID string) string {
 // ParseWebhookSubscriptions validates and normalizes webhook triggers without
 // fetching or hydrating payload fields. Catalog paths are emitted for CAO.
 func ParseWebhookSubscriptions(on any, workflowID string) ([]WebhookSubscription, error) {
+	webhookLog.Printf("Parsing webhook subscriptions for workflow %s", workflowID)
 	onMap, err := webhookOnConfig(on)
 	if err != nil {
 		return nil, err
@@ -152,6 +157,7 @@ func ParseWebhookSubscriptions(on any, workflowID string) ([]WebhookSubscription
 	_, hasSlashCommand := onMap["slash-command"]
 	_, hasLabelCommand := onMap["label-command"]
 	if len(events) == 0 && !hasSlashCommand && !hasLabelCommand {
+		webhookLog.Print("No gateway-dispatch triggers configured; skipping webhook subscription parsing")
 		return nil, nil
 	}
 	repos, err := parseWebhookRepositories(onMap, "on.gateway-dispatch")
@@ -188,7 +194,9 @@ func ParseWebhookSubscriptions(on any, workflowID string) ([]WebhookSubscription
 	if err != nil {
 		return nil, err
 	}
-	return append(subscriptions, commands...), nil
+	result := append(subscriptions, commands...)
+	webhookLog.Printf("Parsed %d webhook subscription(s) for workflow %s", len(result), workflowID)
+	return result, nil
 }
 
 func parseWebhookSubscription(raw any, path, event, workflowID string, definition WebhookEvent) (WebhookSubscription, error) {

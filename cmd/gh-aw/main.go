@@ -435,6 +435,7 @@ type compileCmdOptions struct {
 	zizmor                    bool
 	poutine                   bool
 	actionlint                bool
+	skipLint                  bool
 	runnerGuard               bool
 	syft                      bool
 	grype                     bool
@@ -485,6 +486,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	zizmor, _ := cmd.Flags().GetBool("zizmor")
 	poutine, _ := cmd.Flags().GetBool("poutine")
 	actionlint, _ := cmd.Flags().GetBool("actionlint")
+	skipLint, _ := cmd.Flags().GetBool("no-lint")
 	runnerGuard, _ := cmd.Flags().GetBool("runner-guard")
 	syft, _ := cmd.Flags().GetBool("syft")
 	grype, _ := cmd.Flags().GetBool("grype")
@@ -512,7 +514,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 		environment: environment, dryRun: dryRun, allowExperimental: allowExperimental,
 		validate: validate, watch: watch, noEmit: noEmit, readOnly: readOnly, noLogo: noLogo, purge: purge, strict: strict, requireSelfHostedRunners: requireSelfHostedRunners, trial: trial, dependabot: dependabot,
 		forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
-		zizmor: zizmor, poutine: poutine, actionlint: actionlint, runnerGuard: runnerGuard, syft: syft, grype: grype, grant: grant, yamllint: yamllint, shellcheck: shellcheck,
+		zizmor: zizmor, poutine: poutine, actionlint: actionlint, skipLint: skipLint, runnerGuard: runnerGuard, syft: syft, grype: grype, grant: grant, yamllint: yamllint, shellcheck: shellcheck,
 		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, models: models, failFast: failFast, noCheckUpdate: noCheckUpdate,
 		staged: staged, approve: approve, validateImages: validateImages, ghes: ghes, verbose: verbose, useSamples: useSamples,
 	}
@@ -564,7 +566,7 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 		RequireSelfHostedRunners: o.requireSelfHostedRunners,
 		EnvironmentOverride:      o.environment, DryRun: o.dryRun, AllowExperimental: o.allowExperimental,
 		Dependabot: o.dependabot, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
-		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, RunnerGuard: o.runnerGuard,
+		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, SkipLint: o.skipLint, RunnerGuard: o.runnerGuard,
 		Syft: o.syft, Grype: o.grype, Grant: o.grant, Yamllint: o.yamllint, Shellcheck: o.shellcheck, JSONOutput: o.jsonOutput, ShowAllErrors: o.showAllErrors,
 		Stats: o.stats, Models: o.models, FailFast: o.failFast, ScheduleSeed: o.scheduleSeed, Staged: o.staged, Approve: o.approve,
 		ValidateImages: o.validateImages, PriorManifestFile: o.priorManifestFile, GHESCompat: o.ghes, UseSamples: o.useSamples,
@@ -841,6 +843,7 @@ func configureCompileToolFlags() {
 	compileCmd.Flags().Bool("zizmor", false, "Run zizmor security scanner on generated .lock.yml files")
 	compileCmd.Flags().Bool("poutine", false, "Run poutine security scanner on generated .lock.yml files")
 	compileCmd.Flags().Bool("actionlint", false, "Run actionlint linter on generated .lock.yml files")
+	compileCmd.Flags().Bool("no-lint", false, "Disable default built-in Actions/AW AST linting (compiler validation remains enabled)")
 	compileCmd.Flags().Bool("runner-guard", false, "Run runner-guard taint analysis scanner on generated .lock.yml files (uses Docker image "+cli.RunnerGuardImage+")")
 	compileCmd.Flags().Bool("syft", false, "Run syft SBOM scanner on container images referenced in compiled .lock.yml files (uses Docker image "+cli.SyftImage+")")
 	compileCmd.Flags().Bool("grype", false, "Run grype vulnerability scanner on container images referenced in compiled .lock.yml files (uses Docker image "+cli.GrypeImage+")")

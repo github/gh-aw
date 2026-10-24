@@ -16,6 +16,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCompileToolNoLint(t *testing.T) {
+	t.Parallel()
+	for _, skip := range []bool{false, true} {
+		t.Run(fmt.Sprintf("skip=%t", skip), func(t *testing.T) {
+			t.Parallel()
+			var capturedArgs []string
+			mockExec := func(ctx context.Context, args ...string) *exec.Cmd {
+				capturedArgs = slices.Clone(args)
+				return mockCommandWithOutput(`[]`, "")(ctx, args...)
+			}
+			server := mcp.NewServer(&mcp.Implementation{Name: "gh-aw", Version: "test"}, nil)
+			require.NoError(t, registerCompileTool(server, mockExec, "", true))
+			session := connectInMemory(t, server)
+			result, err := session.CallTool(t.Context(), &mcp.CallToolParams{
+				Name: "compile", Arguments: map[string]any{"skip_lint": skip},
+			})
+			require.NoError(t, err)
+			require.False(t, result.IsError)
+			assert.Equal(t, skip, slices.Contains(capturedArgs, "--no-lint"))
+
+			capturedArgs = nil
+			result, err = session.CallTool(t.Context(), &mcp.CallToolParams{
+				Name: "compile", Arguments: map[string]any{"skip_lint": skip, "dry_run": true},
+			})
+			if skip {
+				if err != nil {
+					assert.Contains(t, err.Error(), "--no-lint")
+				} else {
+					require.True(t, result.IsError)
+					assert.Contains(t, extractTextResult(t, result), "--no-lint")
+				}
+				assert.Nil(t, capturedArgs)
+			} else {
+				require.NoError(t, err)
+				require.False(t, result.IsError)
+				assert.Contains(t, capturedArgs, "--dry-run")
+			}
+		})
+	}
+}
+
 func TestCompileToolDevelopmentRejectsExplicitFalseChecks(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"strict"} {

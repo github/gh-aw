@@ -3,11 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getWorkflowIdMarkerContent } = require("./generate_footer.cjs");
-
-/**
- * Maximum number of older entities to close
- */
-const MAX_CLOSE_COUNT = 10;
+const { MAX_CLOSE_COUNT } = require("./constants.cjs");
 
 /**
  * Delay execution for a specified number of milliseconds

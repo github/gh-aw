@@ -13,10 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Print message
+        env:
+          MESSAGE: ${{ inputs.message }}
         run: |
           echo "📨 Received message:"
-          echo "${{ inputs.message }}"
+          printf '%s\n' "$MESSAGE"
           echo ""
-          echo "### 📨 Message" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ inputs.message }}" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 📨 Message"
+            echo ""
+            printf '%s\n' "$MESSAGE"
+          } >> "$GITHUB_STEP_SUMMARY"

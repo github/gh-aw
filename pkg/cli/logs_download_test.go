@@ -30,7 +30,7 @@ func TestLogsBuildBulkDownloadArgs(t *testing.T) {
 		repoFlag string
 	}{
 		{name: "default host", owner: "octo", repo: "repo", repoFlag: "octo/repo"},
-		{name: "github.com", owner: "octo", repo: "repo", hostname: "github.com", repoFlag: "octo/repo"},
+		{name: "github.com", owner: "octo", repo: "repo", hostname: "github.com", repoFlag: "github.com/octo/repo"},
 		{name: "enterprise host", owner: "octo", repo: "repo", hostname: "ghe.example.com", repoFlag: "ghe.example.com/octo/repo"},
 		{name: "implicit repository"},
 		{name: "missing owner", repo: "repo", hostname: "ghe.example.com"},
@@ -54,6 +54,28 @@ func TestLogsBuildBulkDownloadArgs(t *testing.T) {
 			assert.Equal(t, want, args)
 		})
 	}
+}
+
+func TestListRunArtifactNamesPreservesExplicitPublicHost(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "args")
+	fakeGH := filepath.Join(dir, "gh")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$GH_AW_TEST_GH_ARGS\"\nprintf '%s\\n' 'usage-artifact'\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(script), 0o755))
+	t.Setenv("GH_AW_TEST_GH_ARGS", argsFile)
+	t.Setenv("GH_HOST", "ghe.example.com")
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	names, err := listRunArtifactNames(context.Background(), 42, "octo", "repo", "github.com", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"usage-artifact"}, names)
+	args, err := os.ReadFile(argsFile)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"api", "--paginate", "repos/octo/repo/actions/runs/42/artifacts",
+		"--jq", ".artifacts[].name", "--hostname", "github.com",
+	}, strings.Fields(string(args)))
 }
 
 func TestDownloadWorkflowLogs(t *testing.T) {

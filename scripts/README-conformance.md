@@ -71,6 +71,19 @@ The checker uses color-coded output:
 | IMP-002 | Permission Computation Accuracy | HIGH | Checks permission computation function exists |
 | IMP-003 | Schema Validation Consistency | MEDIUM | Validates schema generation is implemented |
 
+### Transport Integrity Checks
+
+PTI-001 covers the PTI-001 through PTI-007 transport requirements. Its PTI-005
+structural check requires integrity rejection before the custom retry classifier.
+It accepts either adjacent `||` guards or the intervening short-circuit deadline
+guard used by the shared retry loop; it does not accept arbitrary intervening
+expressions or reordered classifiers.
+
+Run `bash scripts/check-safe-outputs-transport-integrity_test.sh` for focused
+positive and negative checker fixtures, including the current production retry
+condition. These regressions also run as part of
+`bash scripts/check-safe-outputs-conformance_test.sh`.
+
 ## Adding New Checks
 
 To add a new conformance check:

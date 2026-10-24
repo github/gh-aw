@@ -102,7 +102,22 @@ Use [`safe-outputs.create-issue`](/gh-aw/reference/safe-outputs/) to publish age
 
 Define custom jobs that run before agentic execution. The agentic execution job waits for all custom jobs to complete. Custom jobs can share data with the agent through artifacts or job outputs.
 
-To run a custom job after agentic execution, add `needs: [agent, detection]` (or `needs: detection` if agent outputs are not referenced directly). The compiler also recognizes transitive post-agent dependencies. When detection is enabled, every downstream custom job receives a direct detection dependency and a non-overridable success guard. Failed, cancelled, skipped, missing, or warn-mode flagged detection results block the custom job, including reusable workflow calls and jobs using `if: always()`. Custom jobs cannot run between agent and detection. Explicitly disabling detection removes this gate. See [Custom job detection gates](/gh-aw/reference/workflow-linters/#custom-job-detection-gates).
+To run a custom job after agentic execution, add `needs: [agent, detection]` (or `needs: detection` if agent outputs are not referenced directly). The compiler also recognizes transitive post-agent dependencies. When detection is enabled, every downstream custom job receives a direct detection dependency and a non-overridable success guard. Failed, cancelled, skipped, missing, or warn-mode flagged detection results block the custom job, including reusable workflow calls and jobs using `if: always()`. Custom jobs cannot run between agent and detection. Explicitly disabling detection removes this gate.
+
+For notifications that must run even when detection fails or flags warn-mode findings, mark a leaf custom job `detection-gate: status-only`:
+
+```yaml wrap
+jobs:
+  status:
+    needs: [agent, detection, safe_outputs]
+    detection-gate: status-only
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ needs.agent.result }} ${{ needs.detection.result }} ${{ needs.safe_outputs.outputs.created_issue_number }}"
+```
+
+The compiler adds `detection` to `needs` if needed and preserves the authored `if`, but rejects the opt-out if the job downloads artifacts, calls an opaque reusable workflow, reads outputs other than those of detection-gated compiler-owned jobs (such as `safe_outputs`), or references `GH_AW_AGENT_OUTPUT` or agent/safe-output files in `env` or `run`. Other custom jobs cannot depend on a job using this option. The `detection-gate` key is compiler-only and is not emitted in the Actions workflow. See [Custom job detection gates](/gh-aw/reference/workflow-linters/#custom-job-detection-gates).
 
 ```yaml wrap
 jobs:

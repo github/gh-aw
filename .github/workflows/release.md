@@ -1193,36 +1193,32 @@ Dependency updates and internal improvements to keep things running smoothly.
 
 ## Output Format
 
-**CRITICAL**: You MUST call the `update_release` MCP tool to update the release with the generated highlights.
+**CRITICAL**: You MUST submit `update_release` through the configured safe-output transport to update the release with the generated highlights.
 
 **HOW TO CALL THE TOOL:**
 
-The `update_release` tool is an **MCP (Model Context Protocol) tool**, not a bash command or file operation.
+Follow the runtime's safe-output transport instructions. If a native `update_release` function is explicitly exposed, pass its fields directly. Otherwise, use the `safeoutputs` CLI through Bash with one single-quoted JSON argument:
 
-**✅ CORRECT - Call the MCP tool directly:**
+```bash
+safeoutputs update_release '{"tag":"v0.93.1","operation":"prepend","body":"## 🌟 Release Highlights\n\n### ✨ What\u0027s New\n\n[Your complete markdown highlights here]"}'
+```
 
-```
-safeoutputs/update_release(
-  tag="v0.38.1",
-  operation="prepend",
-  body="## 🌟 Release Highlights\n\n[Your complete markdown highlights here]"
-)
-```
+Replace the example tag with the actual release tag and supply the complete highlights. Inside the CLI JSON argument, encode apostrophes as `\u0027`, without surrounding the escape with apostrophes: use `What\u0027s New`, never `What'\u0027's New`. Closing and reopening shell quotes around the escape strips its backslash and publishes `Whatu0027s New`. Keep newlines encoded as `\n`; Unicode can remain literal. Native tool fields use ordinary text instead of shell quoting.
 
 **❌ INCORRECT - DO NOT:**
 - Write JSON files manually (e.g., `/tmp/gh-aw/agent/safeoutputs/update_release_001.json`)
-- Use bash to simulate tool calls
 - Create scripts that write to outputs.jsonl
-- Use any file operations - the MCP tool handles everything
+- Use authenticated GitHub commands as a substitute for the safe-output transport
+- Use file operations to submit outputs - the configured transport handles persistence
 
 **Required Parameters:**
-- `tag` - Release tag from `${RELEASE_TAG}` environment variable (e.g., "v0.38.1")
+- `tag` - Release tag from `${RELEASE_TAG}` environment variable (e.g., "v0.93.1")
 - `operation` - Must be `"prepend"` to add before existing notes
 - `body` - Complete markdown content (include all formatting, emojis, links)
 
-**IMPORTANT**: The tool is accessed via the MCP gateway as `safeoutputs/update_release`. When you call this tool, the MCP server automatically writes to `/opt/gh-aw/safeoutputs/outputs.jsonl`.
+**IMPORTANT**: A successful safe-output call records the update for the publishing job; do not submit duplicate calls or write output files yourself.
 
-**WARNING**: If you don't call the MCP tool properly, the release notes will NOT be updated!
+**WARNING**: If the configured transport is unavailable or rejects the call, report the failure rather than claiming the release notes were updated.
 
 **Documentation Base URLs:**
 - User docs: `https://github.github.com/gh-aw/`

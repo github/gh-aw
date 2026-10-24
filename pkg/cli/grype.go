@@ -197,21 +197,21 @@ func runGrypeOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 		grypeLog.Printf("Using grype config %s", configFile)
 	}
 
+	// These status lines are consumed by the completeness gate in .github/workflows/static-analysis-report.md.
+	grypePlanImageScans(images)
 	for _, img := range images {
-		// Prefer the pinned reference (image@sha256:...) for immutability guarantees.
-		imageRef := img.PinnedImage
-		if imageRef == "" {
-			imageRef = img.Image
-		}
+		imageRef := grypeImageReference(img)
 
 		output, err := grypeRunOnImage(imageRef, configFile, verbose)
 		if err != nil {
 			grypeLog.Printf("Grype scan failed for %s: %v", img.Image, err)
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Grype scan failed for %s: %v", imageRef, err)))
 			scanErrors = append(scanErrors, fmt.Sprintf("%s: %v", img.Image, err))
 			continue
 		}
 
 		count := grypeDisplayFindings(img.Image, output)
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Grype scan completed for %s: %d vulnerability finding(s)", imageRef, count)))
 		totalFindings += count
 		findings = append(findings, grypeFindingsToShared(img.Image, output.Matches)...)
 	}
@@ -230,6 +230,19 @@ func runGrypeOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 	}
 
 	return nil
+}
+
+func grypePlanImageScans(images []workflow.GHAWManifestContainer) {
+	for _, img := range images {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Grype scan planned for "+grypeImageReference(img)))
+	}
+}
+
+func grypeImageReference(img workflow.GHAWManifestContainer) string {
+	if img.PinnedImage != "" {
+		return img.PinnedImage
+	}
+	return img.Image
 }
 
 // grypeConfigFile returns the path to the optional repository-root grype configuration
@@ -379,9 +392,9 @@ func grypeRunOnImage(imageRef, configFile string, verbose bool) (*grypeOutput, e
 	// Parse JSON output regardless of exit code — grype exits non-zero when vulnerabilities
 	// are found (exit 1), so a non-zero exit does not necessarily indicate a tool failure.
 	var output grypeOutput
-	var parseErr error
-	if stdout.Len() > 0 && strings.HasPrefix(strings.TrimSpace(stdout.String()), "{") {
-		parseErr = json.Unmarshal(stdout.Bytes(), &output)
+	parseErr := json.Unmarshal(stdout.Bytes(), &output)
+	if parseErr == nil && output.Matches == nil {
+		parseErr = errors.New("missing or null matches array")
 	}
 
 	if runErr != nil {
@@ -395,7 +408,7 @@ func grypeRunOnImage(imageRef, configFile string, verbose bool) (*grypeOutput, e
 		exitCode := exitErr.ExitCode()
 		// Exit code 1 means grype found vulnerabilities — that is expected and parseable.
 		// Any other non-zero code signals a real tool failure.
-		if exitCode != 1 || (parseErr != nil && stdout.Len() == 0) {
+		if exitCode != 1 {
 			stderrStr := strings.TrimSpace(stderr.String())
 			if stderrStr != "" {
 				grypeLog.Printf("grype stderr for %s: %s", imageRef, stderrStr)

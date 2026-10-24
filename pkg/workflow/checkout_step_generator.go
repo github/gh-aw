@@ -496,6 +496,21 @@ func fetchRefToRefspec(pattern string) string {
 	}
 }
 
+func writeFetchRefspecEnv(sb *strings.Builder, refs []string) string {
+	refspecs := make([]string, 0, len(refs))
+	for i, ref := range refs {
+		refspec := fetchRefToRefspec(ref)
+		if containsExpression(ref) {
+			key := fmt.Sprintf("GH_AW_FETCH_REFSPEC_%d", i)
+			writeYAMLEnv(sb, "          ", key, refspec)
+			refspecs = append(refspecs, `"$`+key+`"`)
+		} else {
+			refspecs = append(refspecs, shellEscapeArg(refspec))
+		}
+	}
+	return strings.Join(refspecs, " ")
+}
+
 // generateFetchStepLines generates a "Fetch additional refs" YAML step for the given checkout
 // entry when it has fetch refs configured. Returns an empty string when there are no fetch refs.
 // The index parameter identifies the checkout's position in the ordered list, used to
@@ -518,15 +533,6 @@ func generateFetchStepLines(entry *resolvedCheckout, index int) string {
 	name := "Fetch additional refs"
 	if entry.key.repository != "" {
 		name = "Fetch additional refs for " + entry.key.repository
-	}
-
-	// Determine authentication token
-	token := resolveCheckoutTokenExpression(entry, index, true)
-
-	// Build refspecs
-	refspecs := make([]string, 0, len(entry.fetchRefs))
-	for _, ref := range entry.fetchRefs {
-		refspecs = append(refspecs, fmt.Sprintf("'%s'", fetchRefToRefspec(ref)))
 	}
 
 	// Build the git command, navigating to the checkout directory when needed
@@ -552,11 +558,28 @@ func generateFetchStepLines(entry *resolvedCheckout, index int) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "      - name: %s\n", name)
 	sb.WriteString("        env:\n")
-	fmt.Fprintf(&sb, "          GH_AW_FETCH_TOKEN: %s\n", token)
+	fmt.Fprintf(&sb, "          GH_AW_FETCH_TOKEN: %s\n", resolveCheckoutTokenExpression(entry, index, true))
+	refspecs := writeFetchRefspecEnv(&sb, entry.fetchRefs)
 	sb.WriteString("        run: |\n")
+	sb.WriteString("          set -o pipefail\n")
 	sb.WriteString("          header=$(printf \"x-access-token:%s\" \"${GH_AW_FETCH_TOKEN}\" | base64 -w 0)\n")
-	fmt.Fprintf(&sb, `          %s -c "http.extraheader=Authorization: Basic ${header}" fetch origin%s %s`+"\n",
-		gitPrefix, depthFlag, strings.Join(refspecs, " "))
+	sb.WriteString("          for refspec in " + refspecs + "; do\n")
+	sb.WriteString("            source_ref=${refspec%%:*}\n")
+	sb.WriteString("            source_ref=${source_ref#+}\n")
+	sb.WriteString("            if matched=$(" + gitPrefix + " -c \"http.extraheader=Authorization: Basic ${header}\" ls-remote --exit-code origin \"$source_ref\" | {\n")
+	sb.WriteString("              found=0\n")
+	sb.WriteString("              while read -r oid remote_ref; do\n")
+	sb.WriteString("                case \"$remote_ref\" in $source_ref) found=1 ;; esac\n")
+	sb.WriteString("              done\n")
+	sb.WriteString("              printf '%s' \"$found\"\n")
+	sb.WriteString("            }); then\n")
+	sb.WriteString("              if [ \"$matched\" -eq 0 ]; then continue; fi\n")
+	sb.WriteString("              " + gitPrefix + " -c \"http.extraheader=Authorization: Basic ${header}\" fetch origin" + depthFlag + " \"$refspec\"\n")
+	sb.WriteString("            else\n")
+	sb.WriteString("              status=$?\n")
+	sb.WriteString("              if [ \"$status\" -ne 2 ]; then exit \"$status\"; fi\n")
+	sb.WriteString("            fi\n")
+	sb.WriteString("          done\n")
 	return sb.String()
 }
 

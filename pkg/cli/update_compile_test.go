@@ -132,6 +132,9 @@ engine: copilot
 safe-outputs:
   create-issue:
     expires: 24
+threat-detection-suppress:
+  - rule: CTR-002
+    reason: This test verifies generated workflow versions, not action pin enforcement.
 ---
 
 Say hello.

@@ -4,83 +4,12 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestHealthPayloadInventoryFindsFleetSignalsWithoutEnrichment(t *testing.T) {
-	original := healthRunGH
-	t.Cleanup(func() { healthRunGH = original })
-	collection := &HealthCollection{Host: "github.com", APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}}
-	var responses []workflowRunAPIResponse
-	for i := range 50 {
-		path := fmt.Sprintf(".github/workflows/example-%d.lock.yml", i)
-		collection.workflows = append(collection.workflows, GitHubWorkflow{Path: path, Name: path})
-		for j := range 3 {
-			responses = append(responses, workflowRunAPIResponse{ID: int64(i*3 + j + 1),
-				Path: path, Conclusion: "failure", HTMLURL: fmt.Sprintf("https://github.com/org/repo/actions/runs/%d", i*3+j+1)})
-		}
-	}
-	calls := 0
-	healthRunGH = func(_ context.Context, _ string, args ...string) ([]byte, error) {
-		calls++
-		require.Contains(t, args[3], "/actions/runs?status=failure", "inventory must not fetch jobs, files, or individual workflows")
-		first := min((calls-1)*100, len(responses))
-		last := min(calls*100, len(responses))
-		out, err := json.Marshal(map[string]any{"workflow_runs": responses[first:last]})
-		require.NoError(t, err)
-		return out, nil
-	}
-	runs, err := listHealthFailureInventory("", "org/repo", collection)
-	require.NoError(t, err)
-	assert.Equal(t, 2, calls, "150 failed runs across 50 workflows need only two listing requests")
-	assert.Len(t, runs, 150)
-	assert.Equal(t, 150, collection.FailureCandidates)
-	assert.Equal(t, 50, collection.FailureCandidateWorkflows)
-	assert.Len(t, collection.PotentialIssues, 50)
-	for _, issue := range collection.PotentialIssues {
-		assert.Equal(t, "run_list_only", issue.Evidence)
-		assert.Equal(t, "unverified", issue.RepresentativeStatus)
-		assert.Equal(t, 3, issue.FailedRuns)
-		assert.NotEmpty(t, issue.URL)
-	}
-	assert.True(t, collection.FailureListingComplete)
-	assert.False(t, collection.FailurePassComplete)
-	assert.Zero(t, collection.RevisionLookups)
-	assert.Empty(t, collection.jobPresence)
-}
-
-func TestHealthFailureInventoryStopsWhenEveryWorkflowHasEnoughCandidates(t *testing.T) {
-	original := healthRunGH
-	t.Cleanup(func() { healthRunGH = original })
-	path := ".github/workflows/example.lock.yml"
-	collection := &HealthCollection{Host: "github.com", APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000},
-		workflows: []GitHubWorkflow{{Path: path}}}
-	calls := 0
-	healthRunGH = func(_ context.Context, _ string, args ...string) ([]byte, error) {
-		calls++
-		require.Contains(t, args[3], "/actions/workflows/example.lock.yml/runs?status=failure")
-		responses := make([]workflowRunAPIResponse, 100)
-		for i := range responses {
-			responses[i] = workflowRunAPIResponse{ID: int64(i + 1), Path: path, Conclusion: "failure"}
-		}
-		out, err := json.Marshal(map[string]any{"workflow_runs": responses})
-		require.NoError(t, err)
-		return out, nil
-	}
-	runs, err := listHealthFailureInventory("", "org/repo", collection)
-	require.NoError(t, err)
-	assert.Equal(t, 1, calls)
-	assert.Len(t, runs, healthMinimumRuns, "candidate inventory is capped per registered workflow")
-	assert.Equal(t, healthMinimumRuns, collection.FailureCandidates)
-	assert.True(t, collection.FailureListingComplete)
-	assert.False(t, collection.Partial)
-}
 
 func TestHealthPayloadSignalsSurviveInventoryBudgetExhaustion(t *testing.T) {
 	stubHealthFailureCandidates(t)

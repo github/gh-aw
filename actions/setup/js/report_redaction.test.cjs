@@ -306,6 +306,23 @@ describe("coarse report redaction", () => {
     expect(renderReport(redactedMixedDetails).body).toBe("<details>\n<summary>Framework summary</summary>\n\nFramework body\n\nContent redacted.\n\n</details>\n");
   });
 
+  it("traverses formatted summaries and preserves framework-owned summary descendants", () => {
+    const input = report([
+      {
+        type: "details",
+        agentTainted: true,
+        summary: [
+          { type: "strong", agentTainted: true, children: [{ type: "text", value: "Framework label", agentTainted: false }] },
+          { type: "text", value: " private summary", agentTainted: true },
+        ],
+        children: [paragraph("private body", true)],
+      },
+    ]);
+    const redacted = redactReport(input, () => true);
+    expect(renderReport(redacted).body).toBe("<details>\n<summary><b>Framework label</b>Content redacted.</summary>\n\nContent redacted.\n\n</details>\n");
+    expect(input.children[0].summary[1].value).toBe(" private summary");
+  });
+
   it("covers preambles, footer children, and typed footer markers without altering framework title or expiration", () => {
     const input = {
       ...report([]),

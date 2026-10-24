@@ -76,17 +76,24 @@ gh aw compile --validate          # Enable workflow, image, and action SHA valid
 gh aw compile --fail-fast         # Stop at first error
 gh aw compile --purge             # Remove orphaned .lock.yml files
 gh aw compile --approve           # Approve new secrets / action changes
+gh aw compile --no-lint           # Disable default built-in AST lint (rejected with --dry-run)
 ```
 
 **MCP equivalent**: `compile` tool
 
 For debugging, follow the [compilation guide](debug-compilation.md) for required
-checks, optional Docker scanners, warning severity, diagnostic preservation and
-results. Low-severity/informational notices are not blanket failures.
+checks, optional Docker scanners, warning severity, and diagnostic preservation.
+Low-severity/informational notices are not blanket failures; validation errors,
+unclassified compiler warnings, model-inventory failures, built-in AST lint findings,
+and scanner execution/parsing failures remain fatal to the dry-run gate.
 `validate` uses `--no-emit` and skips zizmor, actionlint and poutine; a successful
-`validate` does not establish scanner coverage.
-The compile MCP input `validate_images: true` opts into `--validate-images`,
-including with `dry_run: true`; it fails when Docker is unavailable.
+`validate` does not establish scanner coverage. The compile MCP input
+`validate_images: true` opts into `--validate-images`, including with
+`dry_run: true`; it fails when Docker is unavailable.
+Compilation also runs built-in Actions/AW AST lint by default (including `--no-emit`/
+`validate`) and fails on findings; `--no-lint` (MCP `skip_lint: true`) opts out
+but is rejected with `--dry-run`. `add`/`update`/`validate` lint too without
+exposing `--no-lint`; for JS driver/grader checks use `gh aw lint --javascript-module <path>`.
 
 ---
 ### `gh aw run`

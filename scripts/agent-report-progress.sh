@@ -64,7 +64,10 @@ if [ -z "$BASE_COMMIT" ]; then
     exit 1
 fi
 
-mapfile -t CHANGED_FILES < <(
+CHANGED_FILES=()
+while IFS= read -r file; do
+    CHANGED_FILES+=("$file")
+done < <(
     {
         git diff --name-only --diff-filter=ACDMR "$BASE_COMMIT"
         git ls-files --others --exclude-standard
@@ -167,7 +170,13 @@ git diff --check "$BASE_COMMIT"
 echo "Building gh-aw..."
 make --no-print-directory build
 
-mapfile -t go_packages < <(printf '%s\n' "${go_packages[@]}" | sed '/^$/d' | LC_ALL=C sort -u)
+if [ "${#go_packages[@]}" -gt 0 ]; then
+    sorted_go_packages=()
+    while IFS= read -r package; do
+        sorted_go_packages+=("$package")
+    done < <(printf '%s\n' "${go_packages[@]}" | LC_ALL=C sort -u)
+    go_packages=("${sorted_go_packages[@]}")
+fi
 
 normalize_repo_path() {
     local file="$1"
@@ -179,6 +188,10 @@ normalize_repo_path() {
 is_changed_go_file() {
     local diagnostic_file
     local changed_file
+
+    if [ "${#go_files[@]}" -eq 0 ]; then
+        return 1
+    fi
 
     diagnostic_file=$(normalize_repo_path "$1")
     for changed_file in "${go_files[@]}"; do

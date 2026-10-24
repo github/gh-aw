@@ -40,7 +40,8 @@ describe("trusted binding Policy configuration", () => {
       );
       const expected = JSON.parse(readWorkQueuePolicyConfig(environment));
       expect(Buffer.byteLength(JSON.stringify(expected))).toBeGreaterThan(21 * 1024);
-      expect(Object.keys(expected.pools)).toHaveLength(3);
+      expect(Object.keys(expected.pools).sort()).toEqual(["daily-reports", "default", "engine-conformance", "smoke-work-queue"]);
+      expect(expected.pools["smoke-work-queue"]).toMatchObject({ logical_limit: 1, native_limit: 1 });
       expect(Object.keys(expected.pools.default.profiles).length).toBeGreaterThanOrEqual(30);
       for (const [name, value] of Object.entries(environment)) {
         expect(Buffer.byteLength(value)).toBeLessThan(21 * 1024);

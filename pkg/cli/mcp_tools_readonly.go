@@ -77,6 +77,7 @@ type compileArgs struct {
 	Zizmor         bool     `json:"zizmor,omitempty" jsonschema:"Run zizmor security scanner on generated .lock.yml files"`
 	Poutine        bool     `json:"poutine,omitempty" jsonschema:"Run poutine security scanner on generated .lock.yml files"`
 	Actionlint     bool     `json:"actionlint,omitempty" jsonschema:"Run actionlint linter on generated .lock.yml files"`
+	SkipLint       bool     `json:"skip_lint,omitempty" jsonschema:"Disable default built-in Actions/AW AST linting without disabling compiler validation; incompatible with dry_run"`
 	RunnerGuard    bool     `json:"runner-guard,omitempty" jsonschema:"Run runner-guard taint analysis scanner on generated .lock.yml files"`
 	Syft           bool     `json:"syft,omitempty" jsonschema:"Run syft SBOM scanner on container images referenced in compiled .lock.yml files"`
 	Grype          bool     `json:"grype,omitempty" jsonschema:"Run grype vulnerability scanner on container images referenced in compiled .lock.yml files"`
@@ -118,7 +119,7 @@ func registerCompileTool(server *mcp.Server, execCmd execCmdFunc, manifestCacheF
 			DestructiveHint: boolPtr(false),
 			OpenWorldHint:   boolPtr(false),
 		},
-		Description: `Compile Markdown workflows to GitHub Actions YAML with optional static analysis tools.
+		Description: `Compile Markdown workflows to GitHub Actions YAML with default built-in Actions/AW AST linting and optional external static analysis tools. Use skip_lint to disable only the built-in lint pass.
 
 ⚠️  IMPORTANT: Any change to .github/workflows/*.md files MUST be compiled using this tool.
 Without --allow-write-tools, compilation uses --no-emit and does not modify files.
@@ -156,6 +157,9 @@ Returns JSON array with validation results for each workflow:
 		}
 
 		if args.DryRun {
+			if err := validateDevelopmentCompileMode(CompileConfig{DryRun: true, SkipLint: args.SkipLint}); err != nil {
+				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, err.Error(), nil)
+			}
 			var rawArgs map[string]json.RawMessage
 			if err := json.Unmarshal(req.Params.Arguments, &rawArgs); err != nil {
 				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "invalid compile arguments", err.Error())
@@ -274,6 +278,9 @@ Returns JSON array with validation results for each workflow:
 		if args.Actionlint {
 			cmdArgs = append(cmdArgs, "--actionlint")
 		}
+		if args.SkipLint {
+			cmdArgs = append(cmdArgs, "--no-lint")
+		}
 		if args.RunnerGuard {
 			cmdArgs = append(cmdArgs, "--runner-guard")
 		}
@@ -297,8 +304,8 @@ Returns JSON array with validation results for each workflow:
 		}
 		cmdArgs = appendMCPPositionals(cmdArgs, args.Workflows...)
 
-		mcpLog.Printf("Executing compile tool: workflows=%v, strict=%v, fix=%v, zizmor=%v, poutine=%v, actionlint=%v, runner-guard=%v, syft=%v, grype=%v, grant=%v, yamllint=%v",
-			args.Workflows, args.Strict, args.Fix, args.Zizmor, args.Poutine, args.Actionlint, args.RunnerGuard, args.Syft, args.Grype, args.Grant, args.Yamllint)
+		mcpLog.Printf("Executing compile tool: workflows=%v, strict=%v, fix=%v, zizmor=%v, poutine=%v, actionlint=%v, no-lint=%v, runner-guard=%v, syft=%v, grype=%v, grant=%v, yamllint=%v",
+			args.Workflows, args.Strict, args.Fix, args.Zizmor, args.Poutine, args.Actionlint, args.SkipLint, args.RunnerGuard, args.Syft, args.Grype, args.Grant, args.Yamllint)
 
 		notifyProgress(ctx, req, 0, 100, "Compiling workflows...")
 		// Execute the CLI command

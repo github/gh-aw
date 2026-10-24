@@ -82,7 +82,11 @@ func isRepositoryPackageManifestNotFound(err error) bool {
 func downloadRepositoryPackageFileFromGitHubForHost(ctx context.Context, owner, repo, path, ref, host string) ([]byte, error) {
 	addPackageManifestLog.Printf("Downloading repository package file %s from %s/%s@%s (host=%q)", path, owner, repo, ref, host)
 	content, err := parser.DownloadFileFromGitHubForHost(ctx, owner, repo, path, ref, host)
-	return content, normalizeRepositoryPackageRemoteError(err)
+	normalizedErr := normalizeRepositoryPackageRemoteError(err)
+	if normalizedErr != nil {
+		addPackageManifestLog.Printf("Failed to download repository package file %s from %s/%s@%s: %v", path, owner, repo, ref, normalizedErr)
+	}
+	return content, normalizedErr
 }
 
 func listRepositoryPackageWorkflowFilesForHost(ctx context.Context, owner, repo, ref, workflowPath, host string) ([]string, error) {
@@ -135,6 +139,7 @@ func resolveRepositoryPackageDefaultBranch(ctx context.Context, repoSlug, host s
 		if targetHost == "" {
 			targetHost = "the configured host"
 		}
+		addPackageManifestLog.Printf("Default branch lookup for %s on %s returned empty", repoSlug, targetHost)
 		return "", fmt.Errorf("repository %s on %s returned an empty default branch. Ensure the repository exists and is accessible", repoSlug, targetHost)
 	}
 	addPackageManifestLog.Printf("Resolved default branch for %s: %s", repoSlug, branch)

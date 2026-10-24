@@ -46,7 +46,7 @@ steps:
     run: |
       set -e
       echo "Pulling Docker images for static analysis tools..."
-      
+
       # Pull zizmor Docker image
       echo "Pulling zizmor image..."
       docker pull ghcr.io/zizmorcore/zizmor:latest
@@ -156,6 +156,28 @@ steps:
       fi
 
       echo "Static analysis tool output completeness check passed."
+  - name: Assert Grype image scan completeness
+    run: |
+      python3 - /tmp/gh-aw/agent/compile-output.txt <<'PY'
+      import collections
+      import pathlib
+      import re
+      import sys
+      log = pathlib.Path(sys.argv[1]).read_text()
+      log = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", log)
+      # Keep these status-line patterns in sync with the messages in pkg/cli/grype.go.
+      # Counters ensure duplicate plans cannot be hidden by a set comparison.
+      planned = collections.Counter(re.findall(r"(?m)^i Grype scan planned for (\S+)[ \t]*$", log))
+      completed = collections.Counter(re.findall(r"(?m)^i Grype scan completed for (\S+): \d+ vulnerability finding\(s\)[ \t]*$", log))
+      failed = re.findall(r"(?m)^⚠ Grype scan failed for (\S+): .+$", log)
+      if failed or planned != completed:
+          print(f"Error: Incomplete Grype image scans: missing={dict(planned - completed)}, unexpected={dict(completed - planned)}, failed={failed}")
+          sys.exit(1)
+      if not planned and "Running grype vulnerability scanner (0 container images found in lock files)" not in log:
+          print("Error: No Grype per-image completion evidence found")
+          sys.exit(1)
+      print(f"Grype image scan completeness check passed: {sum(completed.values())} completed scan(s).")
+      PY
 
 ---
 
@@ -259,6 +281,9 @@ Review the output from all eight tools and cluster findings:
 
 **Grype Output**:
 - Extract container vulnerability findings from grype
+- Build a per-image status table from `Grype scan planned for`, `Grype scan completed for`, and `Grype scan failed for` lines, preserving pinned references/digests.
+- Report zero findings only when an image has an explicit successful completion line with zero findings. Label failed or planned-but-omitted scans as incomplete/unknown, never as zero.
+- Syft inventory is not evidence that Grype completed. Missing findings or lower counts alone do not prove CVE remediation; flag incomplete totals and do not attribute a historical dropout to a specific cause without evidence.
 - Parse finding details:
   - Package name
   - Vulnerability ID
@@ -437,6 +462,10 @@ Runner-Guard Score: [SCORE]/100 (Grade: [LETTER])
 Issues created: [list of issue links for Critical/High findings, or "none"]
 
 #### Grype Container Vulnerability Findings
+
+| Image (pinned reference) | Scan Status | Finding Count |
+|--------------------------|-------------|---------------|
+| [image@digest] | [completed / failed / incomplete] | [num / unknown] |
 
 | Package | Severity | Count | Affected Workflows |
 |---------|----------|-------|--------------------|

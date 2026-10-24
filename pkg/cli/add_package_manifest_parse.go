@@ -59,6 +59,7 @@ func parseRepositoryPackageManifest(manifestPath string, content []byte) (*repos
 func parseRepositoryPackageManifestRoot(manifestPath string, content []byte) (map[string]any, string, error) {
 	var raw any
 	if err := yaml.Unmarshal(content, &raw); err != nil {
+		addPackageManifestLog.Printf("Failed to parse manifest %s as YAML: %v", manifestPath, err)
 		return nil, "", fmt.Errorf("invalid Agentic Workflow manifest %q: %s. Ensure the manifest is valid YAML. Example:\nname: My Package", manifestPath, parser.FormatYAMLError(err, 1, string(content)))
 	}
 
@@ -75,6 +76,7 @@ func parseRepositoryPackageManifestRoot(manifestPath string, content []byte) (ma
 	}
 
 	if err := parser.ValidateRepositoryPackageManifestWithSchemaAndLocation(root, manifestPath); err != nil {
+		addPackageManifestLog.Printf("Manifest %s failed schema validation: %v", manifestPath, err)
 		return nil, "", fmt.Errorf("invalid Agentic Workflow manifest %q: %w", manifestPath, err)
 	}
 
@@ -250,6 +252,7 @@ func validateUniqueManifestInstallDestinations(installables []resolvedPackageIns
 }
 
 func validateManifestInstallableWorkflowPrivacy(manifestPath string, installationSources []resolvedPackageInstallable, readWorkflow func(string) ([]byte, error)) error {
+	addPackageManifestLog.Printf("Validating workflow privacy for %d installable(s) in %s", len(installationSources), manifestPath)
 	for _, installable := range installationSources {
 		installationSource := installable.SourcePath
 		if isActionWorkflowPath(installationSource) {

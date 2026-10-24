@@ -202,6 +202,66 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
     });
   }
   /**
+   * Summary content is HTML, not Markdown. Import only attribute-free formatting;
+   * scalar substitutions and unsupported tags remain text.
+   * @param {string} source
+   * @returns {string | ReportInline[]}
+   */
+  function summary(source) {
+    source = source.replace(/^<sub>(.*)<\/sub>$/, "$1");
+    /** @type {Record<string, "strong" | "emphasis" | "strike" | "subscript">} */
+    const formats = { b: "strong", strong: "strong", i: "emphasis", em: "emphasis", s: "strike", del: "strike", sub: "subscript" };
+    /** @type {Array<{name: string, raw: string, children: ReportInline[]}>} */
+    const stack = [{ name: "", raw: "", children: [] }];
+    const text = value => {
+      if (value) stack[stack.length - 1].children.push(fromSource({ type: "text", value: substitute(value) }));
+    };
+    while (source) {
+      const start = source.indexOf("<");
+      if (start < 0) {
+        text(source);
+        break;
+      }
+      text(source.slice(0, start));
+      source = source.slice(start);
+      const tag = htmlTag(source);
+      if (!tag) {
+        text("<");
+        source = source.slice(1);
+        continue;
+      }
+      source = source.slice(tag.raw.length);
+      const token = /^<(\/?)(b|strong|i|em|s|del|sub|code)>$/i.exec(tag.raw);
+      if (!token) {
+        text(tag.raw);
+        continue;
+      }
+      const name = token[2].toLowerCase();
+      if (name === "code" && !token[1]) {
+        const end = /<\/code>/i.exec(source);
+        if (end) {
+          stack[stack.length - 1].children.push(fromSource({ type: "code", value: substitute(source.slice(0, end.index)) }));
+          source = source.slice(end.index + end[0].length);
+        } else text(tag.raw);
+      } else if (token[1] && stack.length > 1 && stack[stack.length - 1].name === name) {
+        const frame = stack[stack.length - 1];
+        stack.pop();
+        stack[stack.length - 1].children.push(fromSource({ type: formats[name], children: frame.children }));
+      } else if (!token[1]) {
+        if (stack.length > 16) throw new TypeError("Report summary nesting exceeds the maximum depth");
+        stack.push({ name, raw: tag.raw, children: [] });
+      } else text(tag.raw);
+    }
+    while (stack.length > 1) {
+      const frame = stack[stack.length - 1];
+      stack.pop();
+      stack[stack.length - 1].children.push(fromSource({ type: "text", value: frame.raw }), ...frame.children);
+    }
+    const nodes = stack[0].children;
+    const plain = nodes.flatMap(node => (node.type === "text" ? [node.value] : []));
+    return plain.length === nodes.length ? plain.join("") : nodes;
+  }
+  /**
    * @param {string} source
    * @param {number} [inlineDepth]
    * @param {boolean} [inLink]
@@ -431,11 +491,11 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
         index++;
       } else if ((match = /^<details>\s*<summary>(.*)<\/summary>$/.exec(line.trim()))) {
         index++;
-        nodes.push(fromSource({ type: "details", summary: substitute(match[1].replace(/^<sub>(.*)<\/sub>$/, "$1")), children: blocks(true, detailsDepth + 1) }));
+        nodes.push(fromSource({ type: "details", summary: summary(match[1]), children: blocks(true, detailsDepth + 1) }));
       } else if (line.trim() === "<details>" && /^<summary>.*<\/summary>$/.test(lines[index + 1]?.trim() || "")) {
-        const summary = lines[index + 1].trim().slice("<summary>".length, -"</summary>".length);
+        const summarySource = lines[index + 1].trim().slice("<summary>".length, -"</summary>".length);
         index += 2;
-        nodes.push(fromSource({ type: "details", summary: substitute(summary.replace(/^<sub>(.*)<\/sub>$/, "$1")), children: blocks(true, detailsDepth + 1) }));
+        nodes.push(fromSource({ type: "details", summary: summary(summarySource), children: blocks(true, detailsDepth + 1) }));
       } else if (/^>/.test(line)) {
         const quoted = [];
         while (index < lines.length && /^>/.test(lines[index])) quoted.push(lines[index++].replace(/^> ?/, ""));

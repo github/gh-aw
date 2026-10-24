@@ -32,7 +32,7 @@ func (v Version) IsValid() bool {
 type ModelName string
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.300"
+const DefaultClaudeCodeVersion Version = "2.1.310"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
@@ -40,6 +40,10 @@ const DefaultClaudeCodeVersion Version = "2.1.300"
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
 const DefaultCopilotVersion Version = "1.0.101"
+
+// DefaultCopilotChecksumsSHA256 authenticates DefaultCopilotVersion's SHA256SUMS.txt.
+// Update both constants with scripts/update-copilot-version.sh after reviewing the release pin.
+const DefaultCopilotChecksumsSHA256 = "018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be"
 
 // CopilotSessionIDMinVersion is the minimum Copilot CLI version that supports
 // the exact session selector injected by the model-verification harness.
@@ -49,7 +53,7 @@ const CopilotSessionIDMinVersion Version = "1.0.35"
 const DefaultCopilotSDKVersion Version = "1.0.16"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
-const DefaultCodexVersion Version = "0.163.0"
+const DefaultCodexVersion Version = "0.164.0"
 
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.64.0"
@@ -62,7 +66,7 @@ const AgyDefaultModel = "gemini-3.8-flash-medium"
 const DefaultPiVersion Version = "1.3.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
-const DefaultGitHubMCPServerVersion Version = "v2.0.2"
+const DefaultGitHubMCPServerVersion Version = "v2.0.3"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
 //
@@ -311,15 +315,15 @@ const DefaultGitHubScriptVersion Version = "v9"
 // path and when `features: gh-aw-detection: true` enables the external detector.
 // Treat the version and complete digest table as one review unit whenever updating
 // the detector release.
-const DefaultThreatDetectVersion Version = "v0.5.2"
+const DefaultThreatDetectVersion Version = "v0.5.3"
 
 const DefaultThreatDetectArtifactBaseURL = "https://github.com/github/gh-aw-threat-detection/releases/download"
 
 var DefaultThreatDetectSHA256 = map[string]string{
-	"threat-detect-linux-amd64":  "b4ecda6a8f1ee09913c40b58e5e9d3337d2173618d41b1bfdef9207e4e7959b9",
-	"threat-detect-linux-arm64":  "f6260a0f9ad72bcb67c7af19c4ce262ca34e2c3d5ccbf912832a8bd277200904",
-	"threat-detect-darwin-x64":   "7ed0a68ffbdd927eb2e25f862864602af289ad9cfc85f1385d83d4d52f11251c",
-	"threat-detect-darwin-arm64": "0d4f41134a0839a496ca34f5fbbce44ba89ca0be6d681f960e7c06070b8b04c6",
+	"threat-detect-linux-amd64":  "7cfab3bd02717968a0584ddd3790cff22550059e36d6f656c4f35e9d27851009",
+	"threat-detect-linux-arm64":  "6f355949af98e7b5527a958ac11431bd7867db45c0191b94c3a205c662181cc6",
+	"threat-detect-darwin-x64":   "e0b606fb321a8b3d67f57c4bca7aac7e02976c0cf30c675032a7599b7225ff93",
+	"threat-detect-darwin-arm64": "2600ba84538d50e91926268b2b7c59ae9443e1ae6f709673cacb05e167ddb0e9",
 }
 
 // GhSkillsMinVersion is the minimum gh CLI version required for frontmatter skill support

@@ -7,9 +7,9 @@ sidebar:
 
 # Checkout Behavior Specification
 
-**Version**: 1.3.3<br>
+**Version**: 1.3.4<br>
 **Status**: Working Draft  
-**Publication Date**: 2026-10-14<br>
+**Publication Date**: 2026-10-24<br>
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document
@@ -281,6 +281,11 @@ When safe_outputs checkout retention is enabled, checkouts without explicit entr
 
 - Default shallow behavior MUST be `fetch-depth: 1` when unset.
 - Additional `fetch:` refs MUST emit a follow-up `git fetch` step per checkout entry.
+- Static and runtime-selected checkouts MUST check each `fetch:` pattern independently with authenticated `git ls-remote --exit-code` before fetching that pattern separately.
+- A discovery exit status of `2` (no matching remote refs), or a successful discovery containing no complete ref names matching the source refspec, MUST skip only that pattern, including literal branch names and glob patterns, and MUST NOT prevent other patterns from being fetched. Suffix-only matches MUST NOT count. An unmatched pattern MUST NOT create a local ref.
+- Other discovery failures and all fetch failures, including authentication and network errors, MUST fail the step rather than being treated as unmatched patterns.
+- Discovery MUST use the same checkout authentication as the follow-up fetch and MUST stream ref-listing stdout without buffering the complete remote ref list.
+- Expression-valued fetch patterns MUST be passed as data. Generated shell steps MUST pass them through environment variables and quoted expansions, never interpolate expression results into shell source.
 - Follow-up fetch MUST mirror effective depth (omit `--depth` only when effective depth is `0`).
 - Follow-up fetch MUST inject credentials via command-level `http.extraheader` and MUST NOT persist credentials to git config.
 
@@ -385,6 +390,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-018**: Checkout-time and final cleanup fail closed on helper failure or residual credentials, including included config files; successful verified cleanup and the no-checkout case remain usable
 - **T-CHK-019**: Runtime private/internal targets require literal per-entry opt-in and a non-public host; public hosts reject them even with opt-in, merged entries cannot broaden access, and denials reach agent failure issues
 - **T-CHK-020**: Only literal `multi: true` enables lists; omitted/false mode accepts single-repository expressions without multi restrictions, rejects empty/multiple/wildcard resolved slugs before either job's checkout, and remains distinct when imports merge
+- **T-CHK-021**: Static and runtime-selected checkouts skip unmatched literal and glob fetch patterns, including suffix-only discovery matches, without blocking matching patterns; preserve authentication and effective depth; stream discovery stdout with bounded memory; treat expression results as data; and fail on discovery errors other than status `2` or on any fetch error
 
 ### 7.2 Compliance Checklist
 
@@ -393,6 +399,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | Checkout parse + merge semantics | T-CHK-001, T-CHK-002 | C1 | Required |
 | Agent vs safe_outputs credential lifecycle | T-CHK-003, T-CHK-004 | C1/C2 | Required |
 | Sparse/shallow/fetch semantics | T-CHK-005, T-CHK-006 | C1 | Required |
+| Independent fetch patterns and unmatched-ref handling | T-CHK-021 | C1/C2 | Required |
 | Manifest path safety | T-CHK-007 | C2 | Required |
 | Trial and side-repo behavior | T-CHK-008, T-CHK-009 | C1 | Required |
 | Submodule cleanup behavior | T-CHK-010 | C1/C2 | Required |
@@ -448,6 +455,12 @@ The following MUST-level norms govern credential and token safety during checkou
 ---
 
 ## 9. Change Log
+
+### Version 1.3.4 (Working Draft)
+
+- Required independent discovery and fetching of additional refs for static and
+  runtime-selected checkouts, skipping only unmatched patterns while preserving
+  fatal errors, authentication, depth, and bounded discovery output; added T-CHK-021.
 
 ### Version 1.3.3 (Working Draft)
 

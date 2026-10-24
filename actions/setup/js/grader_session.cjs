@@ -1,6 +1,7 @@
 // @ts-check
 
 const { calculateWorkingSetFromEntries } = require("./working_set_metrics.cjs");
+const { ERR_GRADER_SESSION_INVALID } = require("./error_codes.cjs");
 
 /** @typedef {import("./types/unified_session").UnifiedSession} UnifiedSession */
 
@@ -49,7 +50,7 @@ function isToolFailure(call) {
  */
 function createSessionLookups(session) {
   if (!Array.isArray(session) || !session.every(event => isRecord(event) && typeof event.type === "string" && isRecord(event.data) && isRecord(event.provenance))) {
-    throw new Error("graders require an in-memory unified session event array");
+    throw new Error(`${ERR_GRADER_SESSION_INVALID}: graders require an in-memory unified session event array`);
   }
   /** @type {Map<string, UnifiedSession>} */
   const eventsByType = new Map();

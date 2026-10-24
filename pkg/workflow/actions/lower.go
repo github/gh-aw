@@ -23,6 +23,7 @@ func Lower(input *Workflow) (yaml.MapSlice, error) {
 		{Key: "permissions", Value: resolved.Permissions},
 		{Key: "defaults", Value: optionalMap(resolved.Defaults)},
 		{Key: "concurrency", Value: resolved.Concurrency},
+		{Key: "cache-mode", Value: optionalString(resolved.CacheMode)},
 	} {
 		if item.Value != nil {
 			root = append(root, item)

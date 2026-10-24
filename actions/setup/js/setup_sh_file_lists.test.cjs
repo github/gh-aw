@@ -99,6 +99,20 @@ const safeOutputsFiles = parseSetupShArray("SAFE_OUTPUTS_FILES");
 // Its deps must also be covered by SAFE_OUTPUTS_FILES
 const safeOutputsRoots = [...safeOutputsFiles, "safe-outputs-mcp-server.cjs"];
 
+describe("work queue pool-install packaging", () => {
+  it.each([
+    ["MCP_SCRIPTS_FILES", mcpScriptsFiles],
+    ["SAFE_OUTPUTS_FILES", safeOutputsFiles],
+  ])("deploys the pool-install module in %s", (_name, files) => {
+    expect(files).toContain("work_queue_pool_install.cjs");
+  });
+
+  it("embeds the pool-install module for standalone bundles", () => {
+    const sources = readFileSync(resolve(__dirname, "../session_parsers.go"), "utf8");
+    expect(sources).toMatch(/^\/\/go:embed .*js\/work_queue_pool_install\.cjs(?:\s|$)/m);
+  });
+});
+
 describe("setup.sh isolated redaction dependencies", () => {
   it.each([
     ["MCP_SCRIPTS_FILES", mcpScriptsFiles],
@@ -135,6 +149,7 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
             const manifest = require("./safe_output_manifest.cjs");
             const summary = require("./work_queue_summary_renderer.cjs");
             const native = require("./work_queue_native.cjs");
+            const delivery = require("./work_queue_native_creation_delivery.cjs");
             const provisioning = require("./work_queue_provisioning.cjs");
             const { normalizeWebhookContext } = require("./webhook_context.cjs");
             const payload = { url: "https://api.github.com/orgs/org/projectsV2/1/items/123", type: ["edited"] };
@@ -142,6 +157,7 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
             assert.throws(() => normalizeWebhookContext({ webhook: { event: "projects_v2_item", deliveries: [{ delivery_id: "d", payload: { ...payload, body: "private" } }] } }), /accepts only/);
             assert.equal(typeof summary.renderWorkQueue, "function");
             assert.equal(typeof native.authenticatePublisher, "function");
+            assert.equal(typeof delivery.captureDiscussionDelivery, "function");
             assert.equal(typeof provisioning.verifiedDefaultReference, "function");
             const token = "ghp_" + "a".repeat(36);
             assert.equal(
@@ -201,12 +217,14 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
             const { getFooterMessage } = require("./messages_footer.cjs");
             const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
             const native = require("./work_queue_native.cjs");
+            const delivery = require("./work_queue_native_creation_delivery.cjs");
             const provisioning = require("./work_queue_provisioning.cjs");
             const { normalizeWebhookContext } = require("./webhook_context.cjs");
             const payload = { url: "https://api.github.com/orgs/org/projectsV2/1/items/123", type: ["edited"] };
             assert.equal(normalizeWebhookContext({ webhook: { event: "projects_v2_item", deliveries: [{ delivery_id: "d", payload }] } }).items[0].item_number, "123");
             assert.throws(() => normalizeWebhookContext({ webhook: { event: "projects_v2_item", deliveries: [{ delivery_id: "d", payload: { ...payload, body: "private" } }] } }), /accepts only/);
             assert.equal(typeof native.authenticatePublisher, "function");
+            assert.equal(typeof delivery.captureDiscussionDelivery, "function");
             assert.equal(typeof provisioning.verifiedDefaultReference, "function");
             const assignment = {
               version: 3, dispatch_id: "dispatch", request_id: "request", commit_id: "commit",

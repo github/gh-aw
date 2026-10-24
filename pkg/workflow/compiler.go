@@ -326,6 +326,10 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 		c.IncrementWarningCount()
 	}
 
+	if err := c.lintCompiledWorkflow(workflowData, yamlContent, markdownPath); err != nil {
+		return "", nil, nil, err
+	}
+
 	return yamlContent, bodySecrets, bodyActions, nil
 }
 

@@ -2,6 +2,7 @@ package workqueue
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 )
 
@@ -257,6 +258,8 @@ func (state *Projection) replayOperation(operation Operation, kind string, commi
 	switch kind {
 	case "Policy":
 		return state.installReplayPolicy(operation, commit, isPolicy, epochs)
+	case "PoolInstall":
+		return state.installReplayPool(operation, commit)
 	case "Deployment":
 		return state.applyDeployment(operation)
 	case "Control":
@@ -347,6 +350,69 @@ func (state *Projection) replayTerminalResult(operation Operation, kind string, 
 	if claim := state.Claims[value.ClaimID]; claim != nil && claim.KeepOpen {
 		state.TerminalBarriers[value.ClaimID] = operation
 	}
+	return nil
+}
+
+func (state *Projection) installReplayPool(operation Operation, commit QueueCommit) error {
+	var install PoolInstallOperation
+	if err := json.Unmarshal(operation, &install); err != nil {
+		return err
+	}
+	if !validIdentity(install.Pool, false, 256) {
+		return queueError("policy_invalid", "invalid pool identity")
+	}
+	if install.Pool == "__proto__" || install.Pool == "constructor" || install.Pool == "prototype" {
+		return queueError("policy_invalid", "reserved pool identity")
+	}
+	if install.Kind != "PoolInstall" || state.Policy == nil || state.Policy.Authorization != "aw" {
+		return queueError("policy_invalid", "only new pools can be installed into an AW-managed Policy")
+	}
+	if _, exists := state.Policy.Pools[install.Pool]; exists {
+		return queueError("policy_invalid", "only new pools can be installed into an AW-managed Policy")
+	}
+	for _, repository := range install.Config.AllowedRepositories {
+		authorized := false
+		for _, pool := range state.Policy.Pools {
+			if slices.Contains(pool.AllowedRepositories, repository) {
+				authorized = true
+				break
+			}
+		}
+		if !authorized {
+			return queueError("policy_invalid", "PoolInstall cannot expand the installed repository allowlist")
+		}
+	}
+	for name, profile := range install.Config.Profiles {
+		if profile.EffectScope != commit.Actor.Repository || profile.Principal != "" {
+			return queueError("policy_invalid", "AW-managed pool routes must preserve repository-scoped authority")
+		}
+		approved := false
+		for poolName, pool := range state.Policy.Pools {
+			installed, exists := pool.Profiles[name]
+			if !exists {
+				continue
+			}
+			if deployment := state.Deployments[poolName][name]; deployment != nil {
+				if revision, exists := deployment.Revisions[profile.Ref]; exists && revision.Available && revision.Profile == profile {
+					approved = true
+				}
+			} else if installed == profile {
+				approved = true
+			}
+		}
+		if !approved {
+			return queueError("policy_invalid", "pool profiles must match installed or registered worker revision authority")
+		}
+	}
+	policy := *state.Policy
+	policy.Pools = make(map[string]PoolPolicy, len(state.Policy.Pools)+1)
+	maps.Copy(policy.Pools, state.Policy.Pools)
+	policy.Pools[install.Pool] = install.Config
+	if err := validatePolicyWithHost(policy, state.resourceHost); err != nil {
+		return err
+	}
+	state.Policy = &policy
+	state.initializeDeployments(install.Pool)
 	return nil
 }
 

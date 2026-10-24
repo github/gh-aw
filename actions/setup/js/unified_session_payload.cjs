@@ -452,6 +452,8 @@ const EVENT_FIELDS = {
     ref: ["ref"],
     sha: ["sha"],
     actor: ["actor"],
+    // @safe-outputs-exempt SEC-005: display/telemetry-only metadata, not a cross-repo API write target.
+    // Remove this exemption and validate the allowlist if this module gains cross-repo writes.
     targetRepo: ["targetRepo", "target_repo"],
     episode: ["episode"],
   },

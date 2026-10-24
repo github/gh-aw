@@ -76,6 +76,7 @@ describe("immutable Claim scope", () => {
   });
 
   it("rejects scalar, legacy, oversized and duplicate assignments", () => {
+    expect(() => normalizeAssignment(assignment(0))).toThrow("ERR_WORK_QUEUE_CLAIM_SCOPE: work_queue_claim_scope: work_queue_assignment requires an immutable array of 1 to 16 Claims; scalar assignments are unsupported");
     for (const value of [{ work_id: "w", claim_id: "c" }, { ...assignment(1), version: 2 }, assignment(17), assignment(0), { ...assignment(1), run_id: "1" }]) {
       expect(() => normalizeAssignment(value)).toThrow();
     }
@@ -94,6 +95,43 @@ describe("immutable Claim scope", () => {
     await withClaimExecution({ assignment: assignment(2), claim_handle: "h2", authorize }, async () => {
       await expect(assertClaimAuthorized({ type: "report_incomplete", claim_handle: "h2" })).rejects.toThrow(/same-Claim/);
     });
+  });
+
+  it.each(["environment", "execution"])("logs a staged preview before rejecting resource effects via %s", async source => {
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", source === "environment" ? "true" : "false");
+    vi.stubGlobal("core", undefined);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const authorize = vi.fn();
+    try {
+      await withClaimExecution({ assignment: assignment(1), claim_handle: "h1", staged: source === "execution", authorize }, async () => {
+        await expect(assertClaimAuthorized({ type: "create_issue" }, { effect: true })).rejects.toMatchObject({
+          message: "ERR_WORK_QUEUE_CLAIM_SCOPE: work_queue_claim_scope: read-only Claim preview cannot perform resource effects",
+          code: "claim_scope_invalid",
+        });
+      });
+      expect(log).toHaveBeenCalledExactlyOnceWith("🎭 Staged Mode Preview — blocking resource effects for read-only Claim preview");
+      expect(authorize).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("keeps non-staged resource authorization available without a preview notice", async () => {
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "false");
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const authorize = vi.fn().mockResolvedValue({ authorized: true, claim_handle: "h1" });
+    try {
+      await withClaimExecution({ assignment: assignment(1), claim_handle: "h1", authorize }, async () => {
+        expect(await assertClaimAuthorized({ type: "create_issue" }, { effect: true, resource: {} })).toEqual({ type: "create_issue", claim_handle: "h1" });
+      });
+      expect(authorize).toHaveBeenCalledOnce();
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("partitions prepared artifacts without path traversal or cross-Claim collisions", async () => {

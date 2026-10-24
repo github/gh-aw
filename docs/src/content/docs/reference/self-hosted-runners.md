@@ -25,6 +25,14 @@ Self-hosted runners may require `sudo` depending on the selected engine and conf
 
 - **Copilot CLI install**: The `install_copilot_cli.sh` script runs as the runner user. By default it escalates via `sudo` for file operations (fixing `.copilot` directory ownership, cleaning stale chroot directories, and installing the Copilot binary to `/usr/local/bin`). Pass `--rootless` to the script to install to `~/.local/bin` without `sudo`, which is required on ARC pods with `allowPrivilegeEscalation: false`.
 
+## Runner HTTP proxy settings
+
+On runners that require an HTTP proxy for outbound access, configure `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` in the runner environment before the CLI proxy and MCP gateway start. Both containers inherit defined values, including the lowercase forms `http_proxy`, `https_proxy`, and `no_proxy`. Explicit MCP gateway environment settings take precedence over inherited values.
+
+The MCP gateway extends inherited proxy exclusions for its internal backend hosts so local MCP traffic remains reachable. If you explicitly override the gateway's `NO_PROXY` or `no_proxy`, include the internal hosts `host.docker.internal` and `awf-enclave-mcp` along with your organization's exclusions.
+
+CLI proxy startup checks upstream GitHub API connectivity before reporting readiness. A passing local health check alone does not establish upstream connectivity. Proxy values are redacted from CLI proxy and MCP gateway diagnostics.
+
 ## ARC with Docker-in-Docker (DinD)
 
 For a complete ARC DinD setup walkthrough for GitHub Copilot coding agent, see [How to run GitHub Copilot coding agent on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/).

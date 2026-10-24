@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 // Mock the global objects that GitHub Actions provides
 const mockCore = {
@@ -400,6 +403,61 @@ describe("close_older_discussions.cjs", () => {
 
       expect(result).toHaveLength(0);
       expect(mockGithub.graphql).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cleanup delivery receipts", () => {
+    it.each(["comment", "close"])("should capture the exact %s receipt under an active Claim", async type => {
+      const { addDiscussionComment, closeDiscussionAsOutdated } = await import("./close_older_discussions.cjs");
+      const { withClaimExecution, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
+      const { graphEffectIdentity } = require("./work_queue_effect_client.cjs");
+      const discussionId = "D_old";
+      const entity = { id: type === "comment" ? "DC_comment" : discussionId, url: "https://github.com/testowner/testrepo/discussions/5" };
+      const response = type === "comment" ? { addDiscussionComment: { comment: entity } } : { closeDiscussion: { discussion: entity } };
+      const receipts = [];
+      const assignment = {
+        version: 3,
+        dispatch_id: "dispatch-1",
+        request_id: "request-1",
+        commit_id: "commit-1",
+        policy_epoch: "epoch-1",
+        pool: "pool-1",
+        worker_profile: "worker-1",
+        claims: [{ handle: "handle-1", claim_id: "claim-1", work_id: "work-1", work: {}, result_refs: [] }],
+      };
+      mockGithub.graphql.mockResolvedValueOnce(response);
+
+      const result = await withClaimExecution({ assignment, claim_handle: "handle-1" }, () => {
+        expect(currentClaimHandle()).toBe("handle-1");
+        return type === "comment" ? addDiscussionComment(mockGithub, "testowner", "testrepo", discussionId, "Superseded", receipts) : closeDiscussionAsOutdated(mockGithub, "testowner", "testrepo", discussionId, receipts);
+      });
+
+      const [query, variables] = mockGithub.graphql.mock.calls[0];
+      expect(result).toEqual(entity);
+      expect(receipts).toEqual([
+        {
+          type,
+          discussionId,
+          id: entity.id,
+          ...(type === "comment" ? { body: variables.body } : {}),
+          effectId: graphEffectIdentity(query, variables, response),
+        },
+      ]);
+      expect(receipts[0].effectId).toEqual(expect.any(String));
+      expect(receipts[0].effectId.length).toBeGreaterThan(0);
+      expect(currentClaimHandle()).toBeUndefined();
+    });
+
+    it.each(["comment", "close"])("should not capture a %s receipt outside a Claim", async type => {
+      const { addDiscussionComment, closeDiscussionAsOutdated } = await import("./close_older_discussions.cjs");
+      const entity = { id: type === "comment" ? "DC_comment" : "D_old", url: "https://github.com/testowner/testrepo/discussions/5" };
+      mockGithub.graphql.mockResolvedValueOnce(type === "comment" ? { addDiscussionComment: { comment: entity } } : { closeDiscussion: { discussion: entity } });
+      const receipts = [];
+
+      const result = type === "comment" ? await addDiscussionComment(mockGithub, "testowner", "testrepo", "D_old", "Superseded", receipts) : await closeDiscussionAsOutdated(mockGithub, "testowner", "testrepo", "D_old", receipts);
+
+      expect(result).toEqual(entity);
+      expect(receipts).toEqual([]);
     });
   });
 

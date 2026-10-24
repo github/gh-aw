@@ -44,6 +44,7 @@
     },
     "pools": {
       "default": {},
+      "smoke-work-queue": { "concurrency": 1 },
       "daily-reports": { "concurrency": 3, "per_account_limit": 1 },
       "engine-conformance": { "concurrency": 3, "per_account_limit": 1 }
     }

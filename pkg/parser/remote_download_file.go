@@ -17,6 +17,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/errorutil"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/gitutil"
@@ -296,7 +297,9 @@ func resolveAndValidateRemoteSymlinkBase(parentDir, target, dirPath string) (str
 
 // downloadFileViaGit downloads a file from a Git repository using git commands
 // This is a fallback for when GitHub API authentication fails
-func downloadFileViaGit(ctx context.Context, owner, repo, path, ref, host string) ([]byte, error) {
+func downloadFileViaGit(ctx context.Context, owner, repo, path, ref, host string) (result []byte, resultErr error) {
+	finish := ctxutil.StartOperation(ctx, fmt.Sprintf("git download %s/%s/%s@%s", owner, repo, path, ref))
+	defer func() { finish(resultErr) }()
 	remoteLog.Printf("Attempting git fallback for %s/%s/%s@%s", owner, repo, path, ref)
 
 	if err := gitutil.ValidateGitRef(ref); err != nil {

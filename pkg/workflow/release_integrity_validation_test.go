@@ -9,12 +9,66 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const testEngineChecksumsPin = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const testAWFChecksumsPin = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+func TestDefaultCopilotReleaseChecksumPin(t *testing.T) {
+	t.Parallel()
+	for _, digest := range []string{"", "invalid", strings.Repeat("A", 64)} {
+		err := validateReleaseManifestPin("compiler.default-copilot", string(constants.DefaultCopilotVersion), digest)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "compiler.default-copilot.checksums-sha256")
+	}
+	require.NoError(t, NewCompiler().validateReleaseIntegrityPins(&WorkflowData{}))
+}
+
+func TestDefaultCopilotReleaseChecksumPinsPropagateAcrossJobs(t *testing.T) {
+	t.Parallel()
+	for _, config := range []*EngineConfig{
+		nil,
+		{ID: "copilot"},
+		{ID: "copilot", Version: string(constants.DefaultCopilotVersion)},
+		{ID: "copilot", Version: "v" + string(constants.DefaultCopilotVersion)},
+	} {
+		data := &WorkflowData{
+			Name: "default-release-pins", AI: "copilot", EngineConfig: config,
+			SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+		}
+		compiler := NewCompiler()
+		var main strings.Builder
+		for _, step := range NewCopilotEngine().GetInstallationSteps(data) {
+			main.WriteString(strings.Join(step, "\n"))
+		}
+		for name, content := range map[string]string{
+			"main":      main.String(),
+			"detection": strings.Join(compiler.buildInstallDetectionEngineForExternalDetectorStep(data), ""),
+			"evals":     strings.Join(compiler.buildEvalsEngineSteps(data), ""),
+		} {
+			assert.Contains(t, content, "--checksums-sha256 "+constants.DefaultCopilotChecksumsSHA256, name)
+			assert.Contains(t, content, "--prefer-toolcache", name)
+			assert.Contains(t, content, string(constants.DefaultCopilotVersion), name)
+			assert.NotContains(t, content, "GH_AW_COMPILED_VERSION:", name)
+		}
+		assert.Same(t, config, data.EngineConfig)
+	}
+}
+
+func TestCompileDefaultCopilotReleaseChecksumPin(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "default-release-pin.md")
+	require.NoError(t, os.WriteFile(path, []byte(
+		"---\non: workflow_dispatch\nstrict: false\nengine: copilot\n---\nInspect the repository.\n"), 0o644))
+	require.NoError(t, NewCompiler(WithSkipValidation(true)).CompileWorkflow(path))
+	result, err := os.ReadFile(strings.TrimSuffix(path, ".md") + ".lock.yml")
+	require.NoError(t, err)
+	assert.Contains(t, string(result), `install_copilot_cli.sh" `+string(constants.DefaultCopilotVersion)+` --checksums-sha256 `+constants.DefaultCopilotChecksumsSHA256)
+	assert.NotContains(t, string(result), "GH_AW_COMPILED_VERSION:")
+}
 
 func releasePinnedWorkflowData() *WorkflowData {
 	return &WorkflowData{
@@ -97,6 +151,7 @@ func TestReleaseChecksumPinsPropagateAcrossJobs(t *testing.T) {
 	awfDetection := strings.Join(compiler.buildInstallAWFForExternalDetectorStep(data), "")
 	for name, content := range map[string]string{"main": main.String(), "detection": detection, "evals": evals} {
 		assert.Contains(t, content, "--checksums-sha256 "+testEngineChecksumsPin, name)
+		assert.NotContains(t, content, "--prefer-toolcache", name)
 	}
 	for name, content := range map[string]string{"main": main.String(), "detection": awfDetection, "evals": evals} {
 		assert.Contains(t, content, "--checksums-sha256 "+testAWFChecksumsPin, name)

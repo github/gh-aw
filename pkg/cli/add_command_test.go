@@ -159,6 +159,7 @@ func TestAddCommandAutoMergePropagation(t *testing.T) {
 				return nil, enableErr
 			}
 			cmd := NewAddCommand(validateEngineStub)
+			cmd.SetContext(context.Background())
 			for _, flag := range []string{prFlag, "auto-merge", "no-gitattributes"} {
 				require.NoError(t, cmd.Flags().Set(flag, "true"))
 			}
@@ -199,6 +200,45 @@ permissions:
 	lockContent, err := os.ReadFile(filepath.Join(tmpDir, ".github", "workflows", "pinned.lock.yml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(lockContent), "github/gh-aw/actions/setup@"+sha)
+}
+
+func TestAddCompilationRejectsLintErrors(t *testing.T) {
+	for _, tracked := range []bool{false, true} {
+		name := "direct"
+		if tracked {
+			name = "tracked"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, initTestGitRepo(dir))
+			workflowFile := filepath.Join(dir, ".github", "workflows", "unsafe.md")
+			require.NoError(t, os.MkdirAll(filepath.Dir(workflowFile), 0o755))
+			require.NoError(t, os.WriteFile(workflowFile, []byte(`---
+on: workflow_dispatch
+strict: false
+engine: copilot
+permissions:
+  contents: read
+jobs:
+  print-message:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "${{ secrets.TEST_SECRET }}"
+---
+Test.
+`), 0o600))
+
+			var err error
+			if tracked {
+				err = compileWorkflowWithTrackingAndActionRef(context.Background(), workflowFile, false, true, "", "", NewFileTracker())
+			} else {
+				err = compileWorkflowWithActionRef(context.Background(), workflowFile, false, true, "", "")
+			}
+			require.ErrorContains(t, err, "[secret-leak]")
+			require.NoFileExists(t, filepath.Join(dir, ".github", "workflows", "unsafe.lock.yml"))
+		})
+	}
 }
 
 func TestNewAddCommand_MentionsEnterpriseSourceResolution(t *testing.T) {

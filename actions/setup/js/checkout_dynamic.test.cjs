@@ -350,28 +350,118 @@ describe("runtime repository checkout", () => {
     vi.stubEnv("GH_AW_DYNAMIC_FETCH_1", "*");
     vi.stubEnv("GH_AW_DYNAMIC_FETCH_2", "refs/pulls/open/*");
     vi.stubEnv("GH_AW_DYNAMIC_FETCH_DEPTH", "0");
-    const runGit = vi.fn().mockReturnValue("");
+    const runGit = vi.fn().mockReturnValue("abc\trefs/heads/main\nabc\trefs/pull/1/head\n");
     await finish({ runGit });
-    expect(runGit).toHaveBeenCalledTimes(2);
-    const [args, options] = runGit.mock.calls[0];
-    expect(args).toEqual([
-      "-C",
-      path.join(fs.realpathSync(workspace), "targets/org/a"),
-      "fetch",
-      "--no-recurse-submodules",
-      "origin",
-      "+refs/heads/main:refs/remotes/origin/main",
-      "+refs/heads/*:refs/remotes/origin/*",
-      "+refs/pull/*/head:refs/remotes/origin/pull/*/head",
-    ]);
+    expect(runGit).toHaveBeenCalledTimes(12);
+    expect(runGit.mock.calls[0][0]).toEqual(["-C", path.join(fs.realpathSync(workspace), "targets/org/a"), "ls-remote", "--exit-code", "origin", "refs/heads/main"]);
+    const [args, options] = runGit.mock.calls[1];
+    expect(args).toEqual(["-C", path.join(fs.realpathSync(workspace), "targets/org/a"), "fetch", "--no-recurse-submodules", "origin", "+refs/heads/main:refs/remotes/origin/main"]);
+    expect(runGit.mock.calls[3][0].at(-1)).toBe("+refs/heads/*:refs/remotes/origin/*");
+    expect(runGit.mock.calls[5][0].at(-1)).toBe("+refs/pull/*/head:refs/remotes/origin/pull/*/head");
     expect(JSON.stringify(args)).not.toContain("secret-token");
     expect(options.env.GIT_CONFIG_VALUE_0).toBe("");
     expect(options.env.GIT_CONFIG_VALUE_1).toContain(Buffer.from("x-access-token:secret-token").toString("base64"));
+    expect(runGit.mock.calls[0][1].env).toEqual(options.env);
+    expect(runGit.mock.calls[0][1].stdio).toEqual(["ignore", "pipe", "pipe"]);
+    expect(options.stdio).toEqual(["ignore", "pipe", "pipe"]);
     expect(fs.existsSync(path.join(workspace, ".gh-aw/checkouts/0"))).toBe(false);
     runGit.mockImplementation(() => {
       throw new Error("secret-token");
     });
     await expect(finish({ runGit })).rejects.toThrow("Unable to finalize runtime checkout of org/a");
+  });
+
+  it.each(["missing", "missing/*", "refs/pulls/open/*"])("skips zero-match pattern %s while fetching other refs", async missing => {
+    await prepare(runtime);
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_COUNT", "3");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_0", missing);
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_1", "main");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_2", "also-missing");
+    const runGit = vi.fn().mockImplementation(args => {
+      if (args.includes("ls-remote") && args.at(-1) !== "refs/heads/main") {
+        throw Object.assign(new Error("no matching refs"), { status: 2 });
+      }
+      return "abc\trefs/heads/main\n";
+    });
+    await finish({ runGit });
+    const fetches = runGit.mock.calls.filter(([args]) => args.includes("fetch"));
+    expect(fetches).toHaveLength(2);
+    for (const [args] of fetches) {
+      expect(args.slice(2)).toEqual(["fetch", "--no-recurse-submodules", "origin", "--depth=1", "+refs/heads/main:refs/remotes/origin/main"]);
+    }
+  });
+
+  it.each([
+    ["missing", "refs/heads/prefix/refs/heads/missing"],
+    ["missing/*", "refs/heads/prefix/refs/heads/missing/present"],
+    ["refs/pulls/open/*", "refs/other/refs/pull/1/head"],
+  ])("skips suffix-only discovery matches for %s", async (ref, collision) => {
+    await prepare(runtime);
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_COUNT", "2");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_0", ref);
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_1", "main");
+    const runGit = vi.fn().mockImplementation(args => (args.includes("ls-remote") ? `abc\t${args.at(-1) === "refs/heads/main" ? "refs/heads/main" : collision}\n` : ""));
+    await finish({ runGit });
+    const fetches = runGit.mock.calls.filter(([args]) => args.includes("fetch"));
+    expect(fetches).toHaveLength(2);
+    for (const [args] of fetches) {
+      expect(args.at(-1)).toBe("+refs/heads/main:refs/remotes/origin/main");
+    }
+  });
+
+  it.each([
+    ["ls-remote", 128],
+    ["fetch", 128],
+    ["fetch", 2],
+  ])("does not ignore %s failure with exit status %s", async (command, status) => {
+    await prepare(runtime);
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_COUNT", "1");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_0", "main");
+    const runGit = vi.fn().mockImplementation(args => {
+      if (args.includes(command)) throw Object.assign(new Error("secret-token"), { status });
+      return "abc\trefs/heads/main\n";
+    });
+    await expect(finish({ runGit })).rejects.toThrow("Unable to finalize runtime checkout of org/a");
+  });
+
+  it("streams large discovery output and skips suffix collisions before fetching main", async () => {
+    vi.stubEnv("GH_AW_DYNAMIC_REPOSITORIES", "org/a");
+    const [entry] = await prepare(runtime);
+    const source = path.join(temp, "source");
+    const target = path.join(workspace, entry.path);
+    fs.mkdirSync(source);
+    fs.mkdirSync(target, { recursive: true });
+    const git = (cwd, args, input) => execFileSync("git", ["-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "-C", cwd, ...args], { encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"] }).trim();
+    git(source, ["init", "--initial-branch=main"]);
+    git(source, ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-m", "Fixture"]);
+    const head = git(source, ["rev-parse", "HEAD"]);
+    const refs = [
+      `update refs/heads/prefix/refs/heads/absent ${head}`,
+      `update refs/other/refs/pull/1/head ${head}`,
+      ...Array.from({ length: 10000 }, (_, index) => `update refs/heads/prefix/refs/heads/missing/${String(index).padStart(100, "0")} ${head}`),
+    ];
+    git(source, ["update-ref", "--stdin"], refs.join("\n") + "\n");
+    git(target, ["init"]);
+    git(target, ["remote", "add", "origin", `file://${source}`]);
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_COUNT", "5");
+    for (const [index, ref] of ["absent", "missing/*", "refs/pulls/open/*", "truly-missing", "main"].entries()) {
+      vi.stubEnv(`GH_AW_DYNAMIC_FETCH_${index}`, ref);
+    }
+    await finish();
+    expect(git(target, ["for-each-ref", "--format=%(refname)", "refs/remotes/origin/"])).toBe("refs/remotes/origin/main");
+    expect(git(target, ["rev-parse", "origin/main"])).toBe(head);
+  }, 30000);
+
+  it("fails closed when streaming discovery cannot access the remote", async () => {
+    vi.stubEnv("GH_AW_DYNAMIC_REPOSITORIES", "org/a");
+    const [entry] = await prepare(runtime);
+    const target = path.join(workspace, entry.path);
+    fs.mkdirSync(target, { recursive: true });
+    execFileSync("git", ["init", target], { stdio: "ignore" });
+    execFileSync("git", ["-C", target, "remote", "add", "origin", `file://${temp}/nonexistent`]);
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_COUNT", "1");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_0", "main");
+    await expect(finish()).rejects.toThrow("Unable to finalize runtime checkout of org/a");
   });
 
   it("does not accept root paths or path traversal", () => {
@@ -503,8 +593,11 @@ describe("runtime repository checkout", () => {
     git(target, ["config", "remote.origin.promisor", "true"]);
     git(target, ["config", "remote.origin.partialclonefilter", "blob:none"]);
     vi.stubEnv("GH_AW_DYNAMIC_SPARSE", "src");
-    vi.stubEnv("GH_AW_DYNAMIC_FETCH_COUNT", "1");
-    vi.stubEnv("GH_AW_DYNAMIC_FETCH_0", "feature");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_COUNT", "4");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_0", "missing");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_1", "feature");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_2", "missing/*");
+    vi.stubEnv("GH_AW_DYNAMIC_FETCH_3", "refs/pulls/open/*");
     await finish();
     expect(git(target, ["rev-parse", "origin/feature"])).toBe(git(source, ["rev-parse", "feature"]));
     expect(git(target, ["config", "--local", "--list"])).not.toMatch(/promisor|partialclonefilter|extraheader|secret-token/);
@@ -545,7 +638,10 @@ describe("runtime repository checkout", () => {
     vi.stubEnv("GH_AW_DYNAMIC_FETCH_0", "feature");
     const runGit = vi.fn((args, options) => execFileSync("git", args, options));
     await finish({ runGit });
-    expect(runGit).toHaveBeenCalledExactlyOnceWith(["-C", fs.realpathSync(target), "fetch", "--no-recurse-submodules", "origin", "--depth=1", "+refs/heads/feature:refs/remotes/origin/feature"], expect.any(Object));
+    expect(runGit.mock.calls.map(([args]) => args)).toEqual([
+      ["-C", fs.realpathSync(target), "ls-remote", "--exit-code", "origin", "refs/heads/feature"],
+      ["-C", fs.realpathSync(target), "fetch", "--no-recurse-submodules", "origin", "--depth=1", "+refs/heads/feature:refs/remotes/origin/feature"],
+    ]);
     expect(git(target, ["rev-parse", "origin/feature"])).toBe(git(source, ["rev-parse", "feature"]));
     expect(fs.readFileSync(path.join(target, ".gitmodules"), "utf8")).toBe(modules);
     expect(fs.existsSync(path.join(target, ".git/modules"))).toBe(false);

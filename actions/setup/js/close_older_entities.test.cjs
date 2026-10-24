@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { closeOlderEntities, MAX_CLOSE_COUNT, delay } from "./close_older_entities.cjs";
+import { MAX_CLOSE_COUNT as SHARED_MAX_CLOSE_COUNT } from "./constants.cjs";
 
 // Mock globals
 global.core = {
@@ -43,6 +44,10 @@ describe("close_older_entities", () => {
   describe("MAX_CLOSE_COUNT", () => {
     it("should be set to 10", () => {
       expect(MAX_CLOSE_COUNT).toBe(10);
+    });
+
+    it("re-exports the shared cleanup limit", () => {
+      expect(MAX_CLOSE_COUNT).toBe(SHARED_MAX_CLOSE_COUNT);
     });
   });
 

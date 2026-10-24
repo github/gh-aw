@@ -19,6 +19,7 @@ type workflowYAML struct {
 	Env         map[string]any      `yaml:"env"`
 	Defaults    map[string]any      `yaml:"defaults"`
 	Concurrency any                 `yaml:"concurrency"`
+	CacheMode   string              `yaml:"cache-mode"`
 	Jobs        map[string]*jobYAML `yaml:"jobs"`
 }
 
@@ -71,7 +72,7 @@ func Parse(content []byte) (*Workflow, error) {
 	result := &Workflow{
 		Name: source.Name, RunName: source.RunName, On: source.On,
 		Permissions: source.Permissions, Env: env,
-		Defaults: source.Defaults, Concurrency: source.Concurrency,
+		Defaults: source.Defaults, Concurrency: source.Concurrency, CacheMode: source.CacheMode,
 	}
 	for _, id := range sortedKeys(source.Jobs) {
 		job, err := parseJob(JobID(id), source.Jobs[id])

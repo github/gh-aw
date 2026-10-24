@@ -1,6 +1,11 @@
 package workflow
 
-import "regexp"
+import (
+	"fmt"
+	"regexp"
+
+	"github.com/github/gh-aw/pkg/constants"
+)
 
 var releaseChecksumsSHA256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var pinnedReleaseVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -8,6 +13,9 @@ var pinnedReleaseVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+$
 func (c *Compiler) validateReleaseIntegrityPins(data *WorkflowData) error {
 	if data == nil {
 		return nil
+	}
+	if err := validateReleaseManifestPin("compiler.default-copilot", string(constants.DefaultCopilotVersion), constants.DefaultCopilotChecksumsSHA256); err != nil {
+		return fmt.Errorf("invalid compiler default Copilot release pin; add an independently authenticated release pin, then run 'bash scripts/update-copilot-version.sh %s' to update the version and SHA256 together in pkg/constants/version_constants.go: %w", constants.DefaultCopilotVersion, err)
 	}
 	if err := validateEngineReleaseIntegrityPin(data.EngineConfig, ResolveEngineID(data), "engine"); err != nil {
 		return err

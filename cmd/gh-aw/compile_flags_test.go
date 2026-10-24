@@ -47,6 +47,23 @@ func TestCompileCommandShortFlags(t *testing.T) {
 	}
 }
 
+func TestCompileNoLintFlag(t *testing.T) {
+	t.Parallel()
+	flag := compileCmd.Flags().Lookup("no-lint")
+	if flag == nil || flag.DefValue != "false" {
+		t.Fatal("expected --no-lint to default to false")
+	}
+	for _, skip := range []bool{false, true} {
+		cmd := &cobra.Command{}
+		cmd.Flags().Bool("no-lint", skip, "")
+		options := getCompileCmdOptions(cmd)
+		config := options.toCompileConfig(nil)
+		if config.SkipLint != skip {
+			t.Fatalf("expected SkipLint=%t, got %t", skip, config.SkipLint)
+		}
+	}
+}
+
 func TestCompileDevelopmentRejectsExplicitFalseFlags(t *testing.T) {
 	t.Parallel()
 	for _, name := range cli.DryRunRequiredBoolFlags() {

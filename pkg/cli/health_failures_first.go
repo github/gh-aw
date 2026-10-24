@@ -90,10 +90,6 @@ func healthFailureSampleScope(run WorkflowRun) string {
 	return failureClusterKey(run.Repository, run.WorkflowPath, run.HeadBranch, run.Event)
 }
 
-func listHealthFailureInventory(startDate, repoOverride string, collection *HealthCollection) ([]WorkflowRun, error) {
-	return newHealthFailureInventory(startDate, collection).fill(repoOverride, collection)
-}
-
 type healthFailureInventory struct {
 	targets   map[string]GitHubWorkflow
 	seen      map[int64]struct{}

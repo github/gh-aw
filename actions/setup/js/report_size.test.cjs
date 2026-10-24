@@ -24,6 +24,27 @@ describe("automatic report size redaction", () => {
     expect(fitted.body.length).toBeLessThanOrEqual(100);
   });
 
+  it("fits formatted summaries without removing protected summary descendants", () => {
+    const input = report([
+      {
+        type: "details",
+        agentTainted: true,
+        summary: [
+          { type: "strong", agentTainted: true, children: [{ type: "text", value: "Protected summary", agentTainted: true, sizeProtected: true }] },
+          { type: "text", value: "private summary".repeat(1000), agentTainted: true },
+        ],
+        children: [paragraph("private body".repeat(1000))],
+      },
+    ]);
+    const copy = structuredClone(input);
+    const { body } = renderSizedReport(input, 250);
+    expect(body).toContain("<summary><b>Protected summary</b>");
+    expect(body).toContain(SIZE_NOTICE);
+    expect(body).not.toContain("private");
+    expect(body.length).toBeLessThanOrEqual(250);
+    expect(input).toEqual(copy);
+  });
+
   describe("adversarial report size redaction", () => {
     const protectedNodes = [
       { type: "xml_marker", name: "custom", value: "MARKER-INTACT" },

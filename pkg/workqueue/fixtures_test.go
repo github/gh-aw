@@ -88,8 +88,8 @@ func TestIndependentCanonicalEveryPrefixFixture(t *testing.T) {
 			operationKinds[mustOperationKind(t, operation)] = true
 		}
 	}
-	if len(operationKinds) != 12 {
-		t.Fatalf("shared fixture does not cover all twelve operations: %v", operationKinds)
+	if len(operationKinds) != 13 {
+		t.Fatalf("shared fixture does not cover all thirteen operations: %v", operationKinds)
 	}
 	admitted, err := Replay(fixture.Commits[:4])
 	if err != nil || ValidateAssignment(admitted, fixture.Assignment) != nil {

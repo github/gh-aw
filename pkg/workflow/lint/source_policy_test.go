@@ -18,6 +18,48 @@ func policyTestInput(t *testing.T, frontmatter string) Input {
 	return Input{Workflow: &actions.Workflow{}, Document: document}
 }
 
+func TestAuthoredImportsPending(t *testing.T) {
+	for _, tt := range []struct {
+		name, text string
+		pending    bool
+		invalid    bool
+	}{
+		{"absent", "", false, false},
+		{"empty list", "imports: []", false, false},
+		{"list", "imports: [shared.md]", true, false},
+		{"empty object", "imports: {}", false, false},
+		{"empty aw", "imports: {aw: []}", false, false},
+		{"aw paths", "imports: {aw: [shared.md]}", true, false},
+		{"aw mappings", "imports: {aw: [{path: shared.md, inputs: {key: value}}]}", true, false},
+		{"invalid imports", "imports: PRIVATE_VALUE", false, true},
+		{"invalid aw string", "imports: {aw: PRIVATE_VALUE}", false, true},
+		{"invalid aw mapping", "imports: {aw: {path: PRIVATE_VALUE}}", false, true},
+		{"invalid aw boolean", "imports: {aw: true}", false, true},
+		{"invalid aw null", "imports: {aw: null}", false, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			pending, err := authoredImportsPending(policyTestInput(t, tt.text))
+			if tt.invalid {
+				require.Error(t, err)
+				assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.pending, pending)
+		})
+	}
+	input := policyTestInput(t, "")
+	for _, imports := range []any{[]string{"shared.md"}, map[string]any{"aw": []string{"shared.md"}}} {
+		input.Document.Frontmatter["imports"] = imports
+		pending, err := authoredImportsPending(input)
+		require.NoError(t, err)
+		assert.True(t, pending)
+	}
+	pending, err := authoredImportsPending(Input{})
+	require.NoError(t, err)
+	assert.False(t, pending)
+}
+
 func TestSourcePolicySeverityAndBoundaries(t *testing.T) {
 	for _, tt := range []struct {
 		rule Rule
@@ -81,6 +123,14 @@ func TestConditionalImportRule(t *testing.T) {
 		want int
 	}{
 		{"strings", "imports: [shared/a.md, shared/b.md]", 0},
+		{"object strings", "imports: {aw: [shared/a.md, shared/b.md]}", 0},
+		{"empty object", "imports: {}", 0},
+		{"empty aw", "imports: {aw: []}", 0},
+		{"object inputs and uses aliases", "imports: {aw: [{uses: shared/a.md, with: {if: ordinary-input}}, {path: shared/b.md, inputs: {}}]}", 0},
+		{"object true condition", "imports: {aw: [{path: shared/a.md, if: true}]}", 1},
+		{"object false condition", "imports: {aw: [{uses: shared/a.md, if: false}]}", 1},
+		{"object null condition", "imports: {aw: [{path: shared/a.md, if: null}]}", 1},
+		{"object all entries inspected", "imports: {aw: [{path: shared/a.md, if: first-private-value}, {uses: shared/b.md, if: second-private-value}]}", 2},
 		{"inputs and uses aliases", "imports:\n  - uses: shared/a.md\n    with:\n      if: ordinary-input\n  - path: shared/b.md\n    inputs: {}", 0},
 		{"true condition", "imports:\n  - path: shared/a.md\n    if: true", 1},
 		{"false condition still forbidden", "imports:\n  - uses: shared/a.md\n    if: false", 1},
@@ -97,7 +147,11 @@ func TestConditionalImportRule(t *testing.T) {
 			require.Len(t, diagnostics, tt.want)
 			for _, diagnostic := range diagnostics {
 				assert.Equal(t, Error, diagnostic.Severity)
-				assert.Contains(t, diagnostic.Path, "imports[")
+				if _, object := input.Document.Frontmatter["imports"].(map[string]any); object {
+					assert.Contains(t, diagnostic.Path, "imports.aw[")
+				} else {
+					assert.Contains(t, diagnostic.Path, "imports[")
+				}
 				assert.NotContains(t, diagnostic.Message, "private-value")
 			}
 		})
@@ -130,6 +184,12 @@ func TestSourcePolicyMalformedInputAndCancellation(t *testing.T) {
 		{PrivateToPublicRule(), "tools:\n  github:\n    private-to-public-flows: private-value"},
 		{PrivateToPublicRule(), "tools:\n  github:\n    private-to-public-flows: [42]"},
 		{ConditionalImportRule(), "imports: private-value"},
+		{ConditionalImportRule(), "imports: {aw: private-value}"},
+		{ConditionalImportRule(), "imports: {aw: true}"},
+		{ConditionalImportRule(), "imports: {aw: null}"},
+		{ConditionalImportRule(), "imports: {aw: {path: private-value}}"},
+		{ConditionalImportRule(), "imports: {aw: [42]}"},
+		{ConditionalImportRule(), "imports: {aw: [{}]}"},
 		{ConditionalImportRule(), "imports: [42]"},
 		{ConditionalImportRule(), "imports: [{}]"},
 		{ConditionalImportRule(), "imports:\n  - path: 42"},
@@ -146,6 +206,12 @@ func TestSourcePolicyPartialDiagnosticsAndMidTraversalCancellation(t *testing.T)
 	diagnostics, err := ConditionalImportRule().Check(context.Background(), input)
 	require.Error(t, err)
 	require.Len(t, diagnostics, 2)
+	input.Document.Frontmatter["imports"] = map[string]any{"aw": input.Document.Frontmatter["imports"]}
+	diagnostics, err = ConditionalImportRule().Check(context.Background(), input)
+	require.Error(t, err)
+	require.Len(t, diagnostics, 2)
+	assert.Equal(t, "imports.aw[0].if", diagnostics[0].Path)
+	assert.Equal(t, "imports.aw[2].if", diagnostics[1].Path)
 	input.Document.Frontmatter["imports"] = []any{"first", "second", "third", "fourth"}
 	ctx := &integrityCancelContext{Context: context.Background(), remaining: 4}
 	_, err = ConditionalImportRule().Check(ctx, input)

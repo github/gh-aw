@@ -223,7 +223,7 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		}
 		awfConfigLog.Printf("API proxy: custom %s authHeader=%s", provider, authHeader)
 	}
-	copilotTarget := GetCopilotAPITarget(config.WorkflowData)
+	copilotTarget := resolveCopilotAPITarget(config.WorkflowData, awfSupportsHTTPAPITargets(firewallConfig))
 	if codexOpenAITarget && config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && config.WorkflowData.EngineConfig.APITarget != "" {
 		copilotTarget = ""
 	}

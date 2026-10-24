@@ -336,22 +336,6 @@ func parseNumberFromURL(url string) int {
 	return 0
 }
 
-// parseRepoFromURL extracts owner/repo from a GitHub URL.
-func parseRepoFromURL(url string) string {
-	// https://github.com/owner/repo/...
-	const prefix = "github.com/"
-	_, rest, found := strings.Cut(url, prefix)
-	if !found {
-		return ""
-	}
-	owner, tail, found := strings.Cut(rest, "/")
-	if found {
-		repo, _, _ := strings.Cut(tail, "/")
-		return strings.Join([]string{owner, repo}, "/")
-	}
-	return ""
-}
-
 // isBotUser returns true if the login looks like a bot account.
 func isBotUser(login string) bool {
 	login = strings.ToLower(login)

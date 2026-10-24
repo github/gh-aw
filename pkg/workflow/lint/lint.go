@@ -52,6 +52,9 @@ type Input struct {
 	// of AW frontmatter; when both are supplied it is the compiled graph.
 	Document   *aw.Document
 	JavaScript *taint.JavaScriptOptions
+	// AllowActionRefs permits well-formed mutable references as warnings.
+	// Malformed references remain errors regardless of this compiler allowance.
+	AllowActionRefs bool
 }
 
 type Diagnostic struct {

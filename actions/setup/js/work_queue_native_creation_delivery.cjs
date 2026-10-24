@@ -4,8 +4,10 @@
 
 const { canonical, digest } = require("./work_queue_codec.cjs");
 const { currentClaimHandle, claimIdentity, receiptMatchesClaim, createClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
-const { resolveRepositoryTarget, resolveParentResourceTarget, nativeDecimalIdentity } = require("./work_queue_effect_resource.cjs");
+const { canonicalResourceTarget, resolveRepositoryTarget, resolveParentResourceTarget, nativeDecimalIdentity } = require("./work_queue_effect_resource.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("native_delivery");
+const { readQueueMetadata } = require("./work_queue_read_retry.cjs");
+const { MAX_CLOSE_COUNT } = require("./constants.cjs");
 
 const receipts = new WeakMap();
 const REVISION = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
@@ -93,8 +95,28 @@ async function capturePullRequestDelivery(result, message, expected, github) {
 
 async function verifyDiscussion(options, receipt) {
   const { github, claim } = options;
-  const response = await github.graphql(
-    `query ClaimDiscussionDelivery($id: ID!) {
+  // Each older discussion can produce both a comment receipt and a close receipt.
+  if (receipt.cleanup !== undefined && (!Array.isArray(receipt.cleanup) || receipt.cleanup.length > 2 * MAX_CLOSE_COUNT)) return { verified: false };
+  if (
+    (receipt.cleanup || []).some(
+      cleanup =>
+        !cleanup ||
+        typeof cleanup !== "object" ||
+        Array.isArray(cleanup) ||
+        !["comment", "close"].includes(cleanup.type) ||
+        [cleanup.id, cleanup.discussionId].some(id => typeof id !== "string" || !id || Buffer.byteLength(id) > 256 || /[\x00-\x1f\x7f]/.test(id)) ||
+        typeof cleanup.effectId !== "string" ||
+        !/^[a-f0-9]{64}$/.test(cleanup.effectId) ||
+        (cleanup.type === "comment" && typeof cleanup.body !== "string")
+    )
+  ) {
+    log.diagnostic("discussion.cleanup.readback.mismatch", { receipt_valid: false });
+    return { verified: false };
+  }
+  const response = await readQueueMetadata(
+    () =>
+      github.graphql(
+        `query ClaimDiscussionDelivery($id: ID!) {
       node(id: $id) {
         __typename id
         ... on Discussion {
@@ -105,7 +127,10 @@ async function verifyDiscussion(options, receipt) {
         }
       }
     }`,
-    { id: receipt.id }
+        { id: receipt.id }
+      ),
+    log,
+    "discussion.read"
   );
   const node = response?.node;
   if (
@@ -141,12 +166,56 @@ async function verifyDiscussion(options, receipt) {
     return { verified: false };
   }
   const authority = await resolveRepositoryTarget(github, { repository: receipt.repository, repository_id: nativeDecimalIdentity(node.repository.databaseId), number: node.number });
+  const authorities = [authority];
+  const authorityKeys = new Set([canonical(authority)]);
+  const effects = receipt.effectIds.map(id => ({ kind: "graphql", repository: receipt.repository, id }));
+  for (const cleanup of receipt.cleanup || []) {
+    const comment = cleanup.type === "comment";
+    const { node: resource } = await readQueueMetadata(
+      () =>
+        github.graphql(
+          `query ClaimDiscussionCleanup($id: ID!) {
+          node(id: $id) {
+            __typename id
+            ... on Discussion { number closed stateReason repository { id databaseId nameWithOwner } }
+            ... on DiscussionComment { body discussion { id number repository { id databaseId nameWithOwner } } }
+          }
+        }`,
+          { id: cleanup.id }
+        ),
+      log,
+      "discussion.cleanup.read"
+    );
+    const discussion = comment ? resource?.discussion : resource;
+    if (
+      resource?.__typename !== (comment ? "DiscussionComment" : "Discussion") ||
+      resource.id !== cleanup.id ||
+      discussion?.id !== cleanup.discussionId ||
+      discussion.id === receipt.id ||
+      discussion.repository?.id !== receipt.repositoryNodeId ||
+      discussion.repository.nameWithOwner !== receipt.repository ||
+      nativeDecimalIdentity(discussion.repository.databaseId) !== authority.repository_id ||
+      (comment ? resource.body !== cleanup.body : discussion.closed !== true || discussion.stateReason !== "OUTDATED")
+    ) {
+      // Cleanup failures must remain visible without DEBUG when creation itself succeeded.
+      log.diagnostic("discussion.cleanup.readback.mismatch", { comment, resource_present: !!resource });
+      return { verified: false };
+    }
+    const target = canonicalResourceTarget({ ...authority, number: discussion.number });
+    const key = canonical(target);
+    if (!authorityKeys.has(key)) {
+      authorityKeys.add(key);
+      authorities.push(target);
+    }
+    effects.push({ kind: "graphql", repository: receipt.repository, id: cleanup.effectId });
+  }
   return createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
     resource: { kind: "discussion", repository: receipt.repository, id: node.id, number: node.number, url: node.url },
     authority_resource: authority,
-    effect_resources: receipt.effectIds.map(id => ({ kind: "graphql", repository: receipt.repository, id })),
+    authority_resources: authorities,
+    effect_resources: effects,
     evidence: { source: "independent_native_discussion_readback", id: node.id, category: node.category.id, digest: digest(node) },
   });
 }

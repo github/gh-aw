@@ -20,7 +20,7 @@ const { createExpirationLine } = require("./ephemerals.cjs");
  *   {type: "list", ordered: boolean, items: ReportBlock[][]} |
  *   {type: "quote", children: ReportBlock[]} |
  *   {type: "alert", kind: string, children: ReportBlock[]} |
- *   {type: "details", summary: string, children: ReportBlock[]} |
+ *   {type: "details", summary: string | ReportInline[], children: ReportBlock[]} |
  *   {type: "table", headers: ReportInline[][], rows: ReportInline[][][]} |
  *   {type: "task", checked: boolean, children: ReportInline[]} |
  *   {type: "separator"} |
@@ -396,8 +396,8 @@ function normalizeBlocks(nodes, depth) {
         if (node.type === "alert" && !ALERT_KINDS.has(node.kind)) throw new TypeError("Unsupported report alert kind");
         if (!children.length) break;
         if (node.type === "details") {
-          const summary = normalizeReportText(node.summary).replace(/\s+/g, " ").trim();
-          if (!summary) throw new TypeError("Report details must have a summary");
+          const summary = typeof node.summary === "string" ? normalizeReportText(node.summary).replace(/\s+/g, " ").trim() : normalizeInlines(node.summary, depth + 1);
+          if (!summary.length) throw new TypeError("Report details must have a summary");
           result.push({ type: "details", summary, children });
         } else if (node.type === "alert") result.push({ type: "alert", kind: node.kind, children });
         else result.push({ type: "quote", children });
@@ -535,8 +535,14 @@ function redactInlines(nodes) {
   });
 }
 
-/** @param {ReportInline[]} nodes */
-function renderInlines(nodes) {
+/** @param {string} value @param {boolean} [neutralizeMentions] */
+function escapeSummaryText(value, neutralizeMentions = true) {
+  const escaped = value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return neutralizeMentions ? escaped.replace(/(?<![A-Za-z0-9])@[a-zA-Z0-9][a-zA-Z0-9_/-]*/g, mention => `<code>${mention}</code>`) : escaped;
+}
+
+/** @param {ReportInline[]} nodes @param {boolean} [html] */
+function renderInlines(nodes, html = false) {
   /** @type {ReportInline[]} */
   const runs = [];
   for (const node of nodes) {
@@ -546,19 +552,20 @@ function renderInlines(nodes) {
     } else runs.push({ ...node });
   }
   const fragments = runs.map(node => {
-    if (node.type === "text") return escapeReportText(node.value);
+    if (node.type === "text") return html ? escapeSummaryText(node.value) : escapeReportText(node.value);
     if (node.type === "code") {
+      if (html) return `<code>${escapeSummaryText(node.value, false)}</code>`;
       const fence = "`".repeat(Array.from(node.value.matchAll(/`+/g)).reduce((length, match) => Math.max(length, match[0].length + 1), 1));
       const padding = /^[` ]|[` ]$/.test(node.value) && !/^ +$/.test(node.value) ? " " : "";
       return `${fence}${padding}${node.value}${padding}${fence}`;
     }
     switch (node.type) {
       case "soft_break":
-        return "\n";
+        return html ? " " : "\n";
       case "hard_break":
-        return "  \n";
+        return html ? " " : "  \n";
       case "image": {
-        if (node.width !== undefined || node.height !== undefined || node.align !== undefined) {
+        if (html || node.width !== undefined || node.height !== undefined || node.align !== undefined) {
           const attributes = [
             `src="${escapeHTMLAttribute(node.url)}"`,
             `alt="${escapeHTMLAttribute(node.alt)}"`,
@@ -577,15 +584,15 @@ function renderInlines(nodes) {
       case "closing_reference":
         return `${node.action[0].toUpperCase()}${node.action.slice(1)} ${node.target.repository || ""}${node.enabled ? "#" : "\\#"}${node.target.number}`;
       case "strong":
-        return `**${renderInlines(node.children)}**`;
+        return html ? `<b>${renderInlines(node.children, true)}</b>` : `**${renderInlines(node.children)}**`;
       case "emphasis":
-        return `*${renderInlines(node.children)}*`;
+        return html ? `<em>${renderInlines(node.children, true)}</em>` : `*${renderInlines(node.children)}*`;
       case "strike":
-        return `~~${renderInlines(node.children)}~~`;
+        return html ? `<del>${renderInlines(node.children, true)}</del>` : `~~${renderInlines(node.children)}~~`;
       case "subscript":
-        return `<sub>${renderInlines(node.children)}</sub>`;
+        return `<sub>${renderInlines(node.children, html)}</sub>`;
       case "link":
-        return `[${renderInlines(node.children)}](${escapeURLDestination(node.url)})`;
+        return html ? `<a href="${escapeHTMLAttribute(node.url)}">${renderInlines(node.children, true)}</a>` : `[${renderInlines(node.children)}](${escapeURLDestination(node.url)})`;
     }
   });
   let rendered = "";
@@ -648,11 +655,7 @@ function renderBlocks(nodes) {
         case "alert":
           return (node.type === "alert" ? `[!${node.kind}]\n` : "") + renderBlocks(node.children);
         case "details":
-          return `<details>\n<summary>${node.summary
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/(?<![A-Za-z0-9])@[a-zA-Z0-9][a-zA-Z0-9_/-]*/g, mention => `<code>${mention}</code>`)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
+          return `<details>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
         case "table": {
           const row = cells => `| ${cells.map(cell => renderInlines(cell).replace(/(?<!\\)\|/g, "\\|")).join(" | ")} |`;
           return [row(node.headers), `| ${node.headers.map(() => "---").join(" | ")} |`, ...node.rows.map(row)].join("\n");
@@ -736,6 +739,9 @@ function assertRedactedReport(report) {
           inlines(node.children);
           break;
         case "details":
+          if (Array.isArray(node.summary)) inlines(node.summary);
+          blocks(node.children);
+          break;
         case "alert":
         case "quote":
           blocks(node.children);
@@ -770,6 +776,7 @@ function redactReportForRendering(report) {
         case "task":
           return { ...node, children: redactInlines(node.children) };
         case "details":
+          return { ...node, summary: Array.isArray(node.summary) ? redactInlines(node.summary) : node.summary, children: blocks(node.children) };
         case "alert":
         case "quote":
           return { ...node, children: blocks(node.children) };

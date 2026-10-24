@@ -8,7 +8,11 @@ import (
 	"errors"
 	"reflect"
 	"sync"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var javascriptSummariesLog = logger.New("workflow:taint:javascript_summaries")
 
 //go:embed javascript/summaries.json
 var javaScriptSummaryData []byte
@@ -35,10 +39,12 @@ var javaScriptSummaries = sync.OnceValues(func() (javaScriptSummaryCatalog, erro
 func (j *javascript) summaryModule(n *JavaScriptNode, target string, source []byte) jsValue {
 	catalog, err := javaScriptSummaries()
 	if err != nil {
+		javascriptSummariesLog.Printf("JavaScript API summary catalog unavailable: %v", err)
 		j.gap(n, "JavaScript API summary catalog is unavailable")
 		return jsValue{}
 	}
 	if !j.verifySummary(catalog, target, source, make(map[string]bool)) {
+		javascriptSummariesLog.Printf("Summary verification failed for module %q", target)
 		j.gap(n, "JavaScript runtime API summary is unavailable or its source/dependency hash changed; use deep mode to traverse runtime sources")
 		return jsValue{}
 	}
@@ -127,6 +133,7 @@ func (j *javascript) callSummary(n *JavaScriptNode, model string, args []jsValue
 			"GIT_CONFIG_VALUE_0": encoded,
 		}}
 	default:
+		javascriptSummariesLog.Printf("Unknown JavaScript API summary model %q", model)
 		j.gap(n, "JavaScript API summary transfer function is unavailable")
 		return jsValue{}
 	}

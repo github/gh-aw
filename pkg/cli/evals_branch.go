@@ -93,9 +93,6 @@ func resolveRepoOverrideForRun(run WorkflowRun, owner, repo, hostname string) (s
 	if runOwner == "" || runRepo == "" {
 		return "", runHost
 	}
-	if runHost == "" {
-		runHost = "github.com"
-	}
 	return fmt.Sprintf("%s/%s", runOwner, runRepo), runHost
 }
 
@@ -133,12 +130,11 @@ func resolveRunStateBranchRef(ctx context.Context, repoOverride, branchName stri
 	const perPage = 100
 	const maxPages = 10
 	for page := 1; page <= maxPages; page++ {
-		endpoint := fmt.Sprintf("repos/%s/commits?sha=%s&per_page=%d&page=%d", repoOverride, url.QueryEscape(branchName), perPage, page)
-		args := []string{"api", "--method", "GET"}
-		if hostname != "" && hostname != "github.com" {
-			args = append(args, "--hostname", hostname)
+		endpoint := fmt.Sprintf("commits?sha=%s&per_page=%d&page=%d", url.QueryEscape(branchName), perPage, page)
+		args, err := repositoryAPIArgs(repoOverride, hostname, endpoint, "--method", "GET")
+		if err != nil {
+			return "", fmt.Errorf("invalid state branch endpoint: %w", err)
 		}
-		args = append(args, endpoint)
 		cmd := workflow.ExecGHContext(ctx, args...)
 		out, err := cmd.CombinedOutput()
 		if err != nil {

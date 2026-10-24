@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/errorutil"
 	"github.com/github/gh-aw/pkg/gitutil"
 )
@@ -26,7 +27,9 @@ var resolveRefToSHAViaGitFunc = resolveRefToSHAViaGit
 
 // resolveRefToSHAViaGit resolves a git ref to SHA using git ls-remote
 // This is a fallback for when GitHub API authentication fails
-func resolveRefToSHAViaGit(ctx context.Context, owner, repo, ref, host string) (string, error) {
+func resolveRefToSHAViaGit(ctx context.Context, owner, repo, ref, host string) (result string, resultErr error) {
+	finish := ctxutil.StartOperation(ctx, fmt.Sprintf("git ls-remote %s/%s@%s", owner, repo, ref))
+	defer func() { finish(resultErr) }()
 	remoteLog.Printf("Attempting git ls-remote fallback for ref resolution: %s/%s@%s", owner, repo, ref)
 
 	if err := gitutil.ValidateGitRef(ref); err != nil {
@@ -127,7 +130,9 @@ func resolveRefToSHAWithFallbacks(
 	publicFallback func(context.Context, string, string, string) (string, error),
 ) (string, error) {
 	var result commitLookupResponse
+	finish := ctxutil.StartOperation(ctx, "GitHub GET "+buildCommitLookupAPIPath(owner, repo, ref))
 	err := client.DoWithContext(ctx, http.MethodGet, buildCommitLookupAPIPath(owner, repo, ref), nil, &result)
+	finish(err)
 
 	if err != nil {
 		if isGitHubAPIAuthError(err) {
@@ -175,7 +180,9 @@ func buildCommitLookupAPIPath(owner, repo, ref string) string {
 // resolveRefToSHAViaPublicAPI resolves a git ref to its commit SHA using an
 // unauthenticated call to the public GitHub API. Used as a last-resort fallback
 // when both authenticated API and git ls-remote fail.
-func resolveRefToSHAViaPublicAPI(ctx context.Context, owner, repo, ref string) (string, error) {
+func resolveRefToSHAViaPublicAPI(ctx context.Context, owner, repo, ref string) (resolvedSHA string, resultErr error) {
+	finish := ctxutil.StartOperation(ctx, fmt.Sprintf("GitHub public GET %s/%s/commits/%s", owner, repo, ref))
+	defer func() { finish(resultErr) }()
 	remoteLog.Printf("Attempting unauthenticated public API ref resolution for %s/%s@%s", owner, repo, ref)
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s",
 		owner, repo, url.PathEscape(ref))
@@ -236,7 +243,10 @@ func VerifyCommitExists(ctx context.Context, owner, repo, sha, host string) erro
 		return fmt.Errorf("%w: failed to create REST client: %w", ErrVerificationSkipped, err)
 	}
 	var result commitLookupResponse
-	if apiErr := client.DoWithContext(ctx, http.MethodGet, buildCommitLookupAPIPath(owner, repo, sha), nil, &result); apiErr != nil {
+	finish := ctxutil.StartOperation(ctx, "GitHub GET "+buildCommitLookupAPIPath(owner, repo, sha))
+	apiErr := client.DoWithContext(ctx, http.MethodGet, buildCommitLookupAPIPath(owner, repo, sha), nil, &result)
+	finish(apiErr)
+	if apiErr != nil {
 		if isGitHubAPIAuthError(apiErr) {
 			return fmt.Errorf("%w: %w", ErrVerificationSkipped, apiErr)
 		}

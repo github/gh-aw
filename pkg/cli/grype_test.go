@@ -4,8 +4,10 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -380,11 +382,112 @@ func prependFakeDockerToPath(t *testing.T, stdout string) {
 
 	binDir := t.TempDir()
 	dockerPath := filepath.Join(binDir, "docker")
-	script := "#!/bin/sh\nprintf '%s' '" + stdout + "'\n"
+	script := "#!/bin/sh\nprintf '%s' '" + stdout + "'\nexit \"${TEST_DOCKER_EXIT_CODE:-0}\"\n"
 	if err := os.WriteFile(dockerPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("Failed to write fake docker executable: %v", err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestGrypeRunOnImageOutputValidation(t *testing.T) {
+	tests := []struct {
+		name            string
+		stdout          string
+		wantErr         bool
+		wantErrContains string
+	}{
+		{"empty", "", true, ""},
+		{"whitespace", " \n\t", true, ""},
+		{"non-JSON", "scanner unavailable", true, ""},
+		{"malformed JSON", `{"matches":[`, true, "failed to parse grype JSON output"},
+		{"missing matches", `{}`, true, ""},
+		{"null output", `null`, true, ""},
+		{"null matches", `{"matches":null}`, true, ""},
+		{"wrong matches type", `{"matches":{}}`, true, ""},
+		{"zero matches", `{"matches":[]}`, false, ""},
+		{"matches", `{"matches":[{"vulnerability":{"id":"CVE-2026-1234"}}]}`, false, ""},
+	}
+	for i, tc := range tests {
+		for _, exitCode := range []int{0, 1, 2} {
+			t.Run(fmt.Sprintf("%s/exit-%d", tc.name, exitCode), func(t *testing.T) {
+				prependFakeDockerToPath(t, tc.stdout)
+				t.Setenv("TEST_DOCKER_EXIT_CODE", strconv.Itoa(exitCode))
+				imageRef := fmt.Sprintf("test-output-%d-%d:latest", i, exitCode)
+				output, err := grypeRunOnImage(imageRef, "", false)
+				wantErr := tc.wantErr || exitCode == 2
+				if (err != nil) != wantErr {
+					t.Fatalf("scan error = %v, want error = %v", err, wantErr)
+				}
+				key, keyErr := grypeCacheKey(imageRef, "")
+				if keyErr != nil {
+					t.Fatal(keyErr)
+				}
+				cached, cachedErr, ok := grypeScanResultCache.get(key)
+				if !ok || (cachedErr != nil) != wantErr {
+					t.Fatalf("cache entry = (%v, %v, %v), want error = %v", cached, cachedErr, ok, wantErr)
+				}
+				if wantErr {
+					if output != nil || cached != nil {
+						t.Fatal("failed scan must not return or cache a successful result")
+					}
+					if !strings.Contains(err.Error(), imageRef) {
+						t.Fatalf("scan error must identify image: %v", err)
+					}
+					if exitCode == 1 && tc.wantErrContains != "" && !strings.Contains(err.Error(), tc.wantErrContains) {
+						t.Fatalf("scan error = %q, want it to contain %q", err, tc.wantErrContains)
+					}
+				} else if output == nil || cached != output {
+					t.Fatal("successful scan must return and cache its result")
+				}
+			})
+		}
+	}
+}
+
+func TestRunGrypeOnLockFilesImageStatus(t *testing.T) {
+	prependFakeDockerToPath(t, `{"matches":[]}`)
+	for _, failed := range []bool{false, true} {
+		for _, strict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("failed-%t/strict-%t", failed, strict), func(t *testing.T) {
+				imageRef := fmt.Sprintf("test-status-%t-%t:latest@sha256:%s", failed, strict, strings.Repeat("a", 64))
+				otherRef := fmt.Sprintf("test-status-other-%t-%t:latest", failed, strict)
+				lockFile := filepath.Join(t.TempDir(), "test.lock.yml")
+				manifest := fmt.Sprintf("# gh-aw-manifest: {\"version\":1,\"containers\":[{\"image\":\"test-status:latest\",\"pinned_image\":%q},{\"image\":%q}]}\n", imageRef, otherRef)
+				if err := os.WriteFile(lockFile, []byte(manifest), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if failed {
+					key, err := grypeCacheKey(imageRef, grypeConfigFile())
+					if err != nil {
+						t.Fatal(err)
+					}
+					grypeScanResultCache.setError(key, errors.New("invalid scanner output"))
+				}
+				var scanErr error
+				log := captureStderrForGuardPolicyReportTest(func() {
+					scanErr = runGrypeOnLockFiles([]string{lockFile}, false, strict)
+				})
+				if (scanErr != nil) != (failed && strict) {
+					t.Fatalf("scan error = %v, failed = %t, strict = %t", scanErr, failed, strict)
+				}
+				for _, ref := range []string{imageRef, otherRef} {
+					if !strings.Contains(log, "Grype scan planned for "+ref) {
+						t.Fatalf("missing planned image %s: %s", ref, log)
+					}
+				}
+				if !strings.Contains(log, "Grype scan completed for "+otherRef+": 0 vulnerability finding(s)") {
+					t.Fatalf("missing successful zero-finding image: %s", log)
+				}
+				if failed {
+					if !strings.Contains(log, "Grype scan failed for "+imageRef+":") || strings.Contains(log, "Grype scan completed for "+imageRef) {
+						t.Fatalf("failed image must not be reported as completed: %s", log)
+					}
+				} else if !strings.Contains(log, "Grype scan completed for "+imageRef+": 0 vulnerability finding(s)") {
+					t.Fatalf("missing pinned zero-finding image: %s", log)
+				}
+			})
+		}
+	}
 }
 
 func TestGrypeDockerArgs_WithoutConfig(t *testing.T) {

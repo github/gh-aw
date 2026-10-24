@@ -2,7 +2,7 @@
 set +o histexpand
 
 # Install GitHub Copilot CLI with SHA256 checksum verification
-# Usage: install_copilot_cli.sh [VERSION] [--checksums-sha256 DIGEST] [--rootless]
+# Usage: install_copilot_cli.sh [VERSION] [--checksums-sha256 DIGEST] [--prefer-toolcache] [--rootless]
 #
 # This script downloads and installs the GitHub Copilot CLI directly from GitHub
 # releases with SHA256 checksum verification, following the secure pattern from
@@ -16,7 +16,10 @@ set +o histexpand
 #                $GITHUB_PATH so subsequent steps find the binary.  Use this on
 #                ARC/DinD runners that enforce allowPrivilegeEscalation: false.
 #   --checksums-sha256 - Independently trusted SHA256SUMS.txt digest for VERSION.
-#                       Requires a literal release version and bypasses toolcache.
+#                       Requires a literal release version; bypasses toolcache unless
+#                       --prefer-toolcache is also supplied.
+#   --prefer-toolcache - Prefer a trusted cached VERSION even with a manifest pin.
+#                        The pin authenticates downloads, not the cached host binary.
 #
 # Environment overrides (testing):
 #   COPILOT_INSTALL_DIR - Override the install directory (default: /usr/local/bin).
@@ -34,8 +37,8 @@ COPILOT_REPO="github/copilot-cli"
 INSTALL_DIR="${COPILOT_INSTALL_DIR:-/usr/local/bin}"
 COPILOT_DIR="${HOME}/.copilot"
 COPILOT_TOOLCACHE_MAX_DEPTH=4
-# DEFAULT_COPILOT_VERSION is the baked-in fallback used when neither an explicit version
-# argument nor a GH_AW_COMPILED_VERSION-backed compat.json lookup is available.
+# DEFAULT_COPILOT_VERSION is the baked-in fallback used when compat.json is unavailable
+# or selects an unpinned release (only if the default is within the compat window).
 # It is the last resort (priority 3) after engine.version (priority 1) and
 # compat.json toolcache lookup (priority 2).
 DEFAULT_COPILOT_VERSION="1.0.101"
@@ -56,9 +59,11 @@ VERSION=""
 ROOTLESS=false
 COPILOT_CHECKSUMS_SHA256=""
 SEEN_CHECKSUMS_SHA256=false
+PREFER_TOOLCACHE=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --rootless) ROOTLESS=true; shift ;;
+    --prefer-toolcache) PREFER_TOOLCACHE=true; shift ;;
     --checksums-sha256)
       if [ "$SEEN_CHECKSUMS_SHA256" = true ] || [ "$#" -lt 2 ]; then
         echo "ERROR: --checksums-sha256 requires exactly one digest" >&2
@@ -493,6 +498,7 @@ find_cached_copilot_bin() {
   local candidate_version_normalized=""
   local best_candidate=""
   local best_version=""
+  local candidate_manifest_pin=""
 
   echo "Searching toolcache for GitHub Copilot CLI (requested: ${requested_version}, arch: ${ARCH_NAME}, range: ${min_version:-none}..${max_version:-none})..." >&2
   if [ -n "$cache_ttl_days" ]; then
@@ -542,8 +548,12 @@ find_cached_copilot_bin() {
       fi
 
       # A musl guest still needs a verified download even when the host uses cache.
+      candidate_manifest_pin=""
+      if [ "$candidate_version_normalized" = "$(normalize_version "$VERSION")" ]; then
+        candidate_manifest_pin="$COPILOT_CHECKSUMS_SHA256"
+      fi
       if [ "$COPILOT_GUEST_LIBC" = "musl" ] &&
-        ! release_artifact_sha256 "$COPILOT_REPO" "$candidate_version_normalized" SHA256SUMS.txt >/dev/null 2>&1; then
+        ! release_artifact_sha256 "$COPILOT_REPO" "$candidate_version_normalized" SHA256SUMS.txt "$candidate_manifest_pin" >/dev/null 2>&1; then
         echo "  Skipping candidate (no reviewed manifest pin for musl guest: ${candidate_version_normalized})" >&2
         continue
       fi
@@ -736,10 +746,10 @@ else
 fi
 
 # A supplied manifest pin authenticates downloads, not a runner's existing cache.
-if [ -n "$COPILOT_CHECKSUMS_SHA256" ]; then
+if [ -n "$COPILOT_CHECKSUMS_SHA256" ] && [ "$PREFER_TOOLCACHE" = false ]; then
   echo "Explicit checksum-manifest pin supplied; downloading verified archives instead of using toolcache."
 fi
-if [ -z "$COPILOT_CHECKSUMS_SHA256" ] &&
+if { [ -z "$COPILOT_CHECKSUMS_SHA256" ] || [ "$PREFER_TOOLCACHE" = true ]; } &&
   CACHED_COPILOT_BIN="$(find_cached_copilot_bin "$REQUESTED_VERSION" "${COMPAT_MATCHED_MIN_AGENT}" "${COMPAT_MATCHED_MAX_AGENT}" "${COMPAT_CACHE_TTL_DAYS}")"; then
   echo "Using cached GitHub Copilot CLI from ${CACHED_COPILOT_BIN}"
   activate_cached_copilot_bin "$CACHED_COPILOT_BIN"
@@ -765,6 +775,19 @@ if [ -z "$COPILOT_CHECKSUMS_SHA256" ] &&
 
   echo "ERROR: Cached Copilot CLI activation failed - command not found"
   exit 1
+fi
+
+# A live compatibility matrix can advance beyond the pins bundled in this action.
+# Keep cache selection unchanged, but never download an unreviewed release.
+if [ "$REQUESTED_VERSION" = "latest" ] && [ -n "$COMPAT_MATCHED_MAX_AGENT" ] &&
+  ! release_artifact_sha256 "$COPILOT_REPO" "$VERSION" SHA256SUMS.txt >/dev/null 2>&1; then
+  if version_is_greater "$COMPAT_MATCHED_MIN_AGENT" "$DEFAULT_COPILOT_VERSION" ||
+    version_is_greater "$DEFAULT_COPILOT_VERSION" "$COMPAT_MATCHED_MAX_AGENT"; then
+    echo "ERROR: Compat target ${VERSION} has no reviewed manifest pin and default ${DEFAULT_COPILOT_VERSION} is outside ${COMPAT_MATCHED_MIN_AGENT}..${COMPAT_MATCHED_MAX_AGENT}; update the setup action or supply an explicit version with checksums-sha256." >&2
+    exit 1
+  fi
+  echo "Compat target ${VERSION} has no reviewed manifest pin; falling back to reviewed default ${DEFAULT_COPILOT_VERSION} within ${COMPAT_MATCHED_MIN_AGENT}..${COMPAT_MATCHED_MAX_AGENT}." >&2
+  VERSION="$DEFAULT_COPILOT_VERSION"
 fi
 
 # Build download URLs

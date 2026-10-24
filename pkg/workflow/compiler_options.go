@@ -22,6 +22,11 @@ func WithSkipValidation(skip bool) CompilerOption {
 	return func(c *Compiler) { c.skipValidation = skip }
 }
 
+// WithLint enables built-in AST linting without changing compiler validation.
+func WithLint(enabled bool) CompilerOption {
+	return func(c *Compiler) { c.lint = enabled }
+}
+
 // WithNoEmit configures whether to validate without generating lock files
 func WithNoEmit(noEmit bool) CompilerOption {
 	return func(c *Compiler) { c.noEmit = noEmit }

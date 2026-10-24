@@ -9,6 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { finalId, normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { execGitSync } from "./git_helpers.cjs";
+import { Ledger } from "./ledger_store.cjs";
 import { main, persistLedgerAppends, readLedgerConfig, readTransactions, validateTransactions } from "./push_ledger_changes.cjs";
 
 const ledgerConfigs = [
@@ -86,6 +87,64 @@ test("main reports records only after the trusted persister succeeds", async () 
     assert.match(fs.readFileSync(outputFile, "utf8"), /"persisted":1/);
   } finally {
     fs.rmSync(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("persistence revalidates a table insert against the latest branch", async () => {
+  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-revalidation-"));
+  const config = { name: "findings", type: "table", key: "id", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
+  const normalized = normalizeLedgerAppends([{ operation: "insert", value: { id: "a", field: "x" } }], { transactionId: "agent:1", ledgerNames: new Set(["findings"]), ledgers: { findings: config } });
+  let pushCalled = false;
+  const previousCore = global.core;
+  global.core = { debug: () => {}, info: () => {}, warning: () => {}, setFailed: () => {} };
+  try {
+    execSync("git init && git config user.name test && git config user.email test@example.com && git commit --allow-empty -m base", { cwd: workspaceDir, stdio: "pipe" });
+    const baseRef = execSync("git rev-parse HEAD", { cwd: workspaceDir, encoding: "utf8" }).trim();
+    const artifact = { version: 1, transaction_id: "agent:1", ledgers: { findings: { appends: normalized.appends } } };
+    assert.doesNotThrow(() => validateTransactions(artifact, [config]));
+
+    await assert.rejects(
+      persistLedgerAppends({
+        appends: normalized.appends,
+        config,
+        githubClient: {},
+        owner: "octo",
+        repo: "repo",
+        token: "test-token",
+        serverHost: "github.com",
+        workspaceDir,
+        checkoutLedgerBranchFn: async ({ branchName }) => {
+          execGitSync(["checkout", "-b", branchName], { cwd: workspaceDir, stdio: "pipe" });
+          const concurrent = new Ledger({ memoryDir: workspaceDir });
+          try {
+            concurrent.append("ledger_append", { operation: "insert", value: { id: "a", field: "y" } });
+          } finally {
+            concurrent.close();
+          }
+          execGitSync(["add", "--", "ledger/shards"], { cwd: workspaceDir, stdio: "pipe" });
+          execGitSync(["-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-m", "concurrent insert"], { cwd: workspaceDir, stdio: "pipe" });
+          return baseRef;
+        },
+        pushChangesFn: async () => {
+          pushCalled = true;
+          return true;
+        },
+      }),
+      /Table key already exists/
+    );
+
+    assert.equal(pushCalled, false);
+    const shard = execFileSync("git", ["ls-tree", "-r", "--name-only", "ledgers/findings"], { cwd: workspaceDir, encoding: "utf8" }).trim();
+    const records = execFileSync("git", ["show", `ledgers/findings:${shard}`], { cwd: workspaceDir, encoding: "utf8" })
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    assert.equal(records.length, 1);
+    assert.deepEqual(records[0].payload, { operation: "insert", value: { id: "a", field: "y" } });
+  } finally {
+    if (previousCore === undefined) delete global.core;
+    else global.core = previousCore;
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
   }
 });
 

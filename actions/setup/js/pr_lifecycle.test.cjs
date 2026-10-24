@@ -2,7 +2,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 
 describe("PR lifecycle guard", () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
 
   const runtime = state => ({
     eventName: "pull_request",
@@ -12,9 +15,11 @@ describe("PR lifecycle guard", () => {
   const client = state => ({ rest: { pulls: { get: vi.fn().mockResolvedValue({ data: { state } }) } } });
 
   it("skips work triggered open when the live PR is closed", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const github = client("closed");
     expect(await getStalePullRequestReason(github, runtime("open"))).toContain("#42 closed after");
     expect(github.rest.pulls.get).toHaveBeenCalledWith({ owner: "owner", repo: "repo", pull_number: 42 });
+    expect(log).not.toHaveBeenCalled();
   });
 
   it("rechecks the state rather than caching an earlier open response", async () => {
@@ -55,10 +60,23 @@ describe("PR lifecycle guard", () => {
     await expect(getStalePullRequestReason(client(undefined), runtime("open"))).rejects.toThrow("Cannot determine current state");
   });
 
-  it("keeps staged previews available without API reads", async () => {
+  it("keeps staged previews available without API reads and logs a preview notice", async () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const github = client("closed");
     expect(await getStalePullRequestReason(github, runtime("open"))).toBeNull();
     expect(github.rest.pulls.get).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledExactlyOnceWith("🎭 Staged Mode Preview — skipping live pull request lifecycle check");
+  });
+
+  it("does not log staged previews when no open PR applies", async () => {
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const github = client("closed");
+    for (const context of [undefined, {}, { payload: {} }, runtime("closed"), runtime(undefined)]) {
+      expect(await getStalePullRequestReason(github, context)).toBeNull();
+    }
+    expect(github.rest.pulls.get).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
   });
 });

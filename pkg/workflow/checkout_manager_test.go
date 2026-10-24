@@ -3,9 +3,13 @@
 package workflow
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1019,13 +1023,28 @@ func TestGenerateFetchStep(t *testing.T) {
 		assert.NotContains(t, got, "-C ", "root checkout should not use -C flag")
 	})
 
-	t.Run("multiple refspecs in single command", func(t *testing.T) {
+	t.Run("multiple refspecs are checked and fetched independently", func(t *testing.T) {
 		entry := &resolvedCheckout{
 			fetchRefs: []string{"*", "refs/pulls/open/*"},
 		}
 		got := generateFetchStepLines(entry, 0)
 		assert.Contains(t, got, "+refs/heads/*:refs/remotes/origin/*", "should include branches refspec")
 		assert.Contains(t, got, "+refs/pull/*/head:refs/remotes/origin/pull/*/head", "should include PR refspec")
+		assert.Contains(t, got, "for refspec in ")
+		assert.Contains(t, got, `ls-remote --exit-code origin "$source_ref"`)
+		assert.Contains(t, got, `fetch origin --depth=1 "$refspec"`)
+		assert.Contains(t, got, `if [ "$status" -ne 2 ]; then exit "$status"; fi`)
+	})
+
+	t.Run("expression refspecs are passed as environment data", func(t *testing.T) {
+		got := generateFetchStepLines(&resolvedCheckout{
+			fetchRefs: []string{"main", "${{ github.head_ref }}"},
+		}, 0)
+		assert.Contains(t, got, `GH_AW_FETCH_REFSPEC_1: "+refs/heads/${{ github.head_ref }}:refs/remotes/origin/${{ github.head_ref }}"`)
+		assert.Contains(t, got, `"$GH_AW_FETCH_REFSPEC_1"`)
+		_, run, ok := strings.Cut(got, "        run: |\n")
+		require.True(t, ok)
+		assert.NotContains(t, run, "${{ github.head_ref }}")
 	})
 
 	t.Run("default depth adds --depth=1 to prevent full-history fetch", func(t *testing.T) {
@@ -1066,6 +1085,84 @@ func TestGenerateFetchStep(t *testing.T) {
 		got := generateFetchStepLines(entry, 0)
 		assert.Contains(t, got, "--depth=10", "fetch-depth: 10 should pass --depth=10 to git fetch")
 	})
+}
+
+func TestGenerateFetchStepExecution(t *testing.T) {
+	git := func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, output)
+		return strings.TrimSpace(string(output))
+	}
+	origin := t.TempDir()
+	git(origin, "init", "--initial-branch=main")
+	git(origin, "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "initial")
+	git(origin, "branch", "feature/present")
+	git(origin, "branch", "prefix/refs/heads/missing")
+	git(origin, "branch", "prefix/refs/heads/missing-glob/present")
+	git(origin, "update-ref", "refs/other/refs/pull/2/head", "HEAD")
+	git(origin, "update-ref", "refs/pull/1/head", "HEAD")
+	commit := git(origin, "rev-parse", "HEAD")
+
+	for _, tc := range []struct {
+		name       string
+		refs       []string
+		want       []string
+		expression string
+		failure    bool
+	}{
+		{name: "absent branch", refs: []string{"missing"}},
+		{name: "absent glob", refs: []string{"missing/*"}},
+		{name: "mixed explicit branches", refs: []string{"missing", "main", "feature/present", "also-missing"}, want: []string{"main", "feature/present"}},
+		{name: "mixed globs", refs: []string{"missing/*", "feature/*"}, want: []string{"feature/present"}},
+		{name: "suffix collision glob", refs: []string{"missing-glob/*", "main"}, want: []string{"main"}},
+		{name: "all branches", refs: []string{"*"}, want: []string{"main", "feature/present", "prefix/refs/heads/missing", "prefix/refs/heads/missing-glob/present"}},
+		{name: "pull refs", refs: []string{"missing/*", "refs/pulls/open/*"}, want: []string{"pull/1/head"}},
+		{name: "unavailable remote", refs: []string{"missing", "main"}, failure: true},
+		{name: "expression command substitution", refs: []string{"${{ github.head_ref }}", "main"}, expression: "feature/$(touch${IFS}PWNED)", want: []string{"feature/$(touch${IFS}PWNED)", "main"}},
+		{name: "expression backticks and quotes", refs: []string{"${{ github.head_ref }}"}, expression: "feature/`touch${IFS}PWNED`\"'", want: []string{"feature/`touch${IFS}PWNED`\"'"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.expression != "" {
+				git(origin, "branch", tc.expression)
+			}
+			dir := t.TempDir()
+			git(dir, "init")
+			remote := origin
+			if tc.failure {
+				remote = filepath.Join(dir, "nonexistent")
+			}
+			git(dir, "remote", "add", "origin", "file://"+remote)
+			var steps []struct {
+				Run string            `yaml:"run"`
+				Env map[string]string `yaml:"env"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(generateFetchStepLines(&resolvedCheckout{fetchRefs: tc.refs}, 0)), &steps))
+			require.Len(t, steps, 1)
+			cmd := exec.Command("bash", "-e", "-o", "pipefail", "-c", steps[0].Run)
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "GH_AW_FETCH_TOKEN=")
+			for key, value := range steps[0].Env {
+				if key != "GH_AW_FETCH_TOKEN" {
+					cmd.Env = append(cmd.Env, key+"="+strings.ReplaceAll(value, "${{ github.head_ref }}", tc.expression))
+				}
+			}
+			output, err := cmd.CombinedOutput()
+			if tc.failure {
+				require.Error(t, err, "%s", output)
+				return
+			}
+			require.NoError(t, err, "%s", output)
+			assert.NoFileExists(t, filepath.Join(dir, "PWNED"))
+			for _, ref := range tc.want {
+				assert.Equal(t, commit, git(dir, "rev-parse", "refs/remotes/origin/"+ref))
+			}
+			fetched := git(dir, "for-each-ref", "--format=%(refname)", "refs/remotes/origin/")
+			assert.Len(t, strings.Fields(fetched), len(tc.want))
+		})
+	}
 }
 
 // TestCheckoutManagerFetchMerging verifies that fetch refs are merged correctly.

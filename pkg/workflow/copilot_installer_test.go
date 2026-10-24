@@ -62,12 +62,6 @@ func TestCopilotEngineWithVersion(t *testing.T) {
 }
 
 func TestCopilotEngineWithoutVersion(t *testing.T) {
-	// When engine.version is not set:
-	// - EngineConfig.Version must remain unset (no normalization mutation) so that
-	//   threat-detection/evals config clones do not receive an explicit version arg.
-	// - The install step must NOT embed a hardcoded version arg — the script resolves the
-	//   version at runtime via compat.json (priority 2) or its baked-in default (priority 3).
-	// - GH_AW_COMPILED_VERSION must be injected when CompiledVersion is set on WorkflowData.
 	engine := NewCopilotEngine()
 
 	workflowData := &WorkflowData{
@@ -97,14 +91,12 @@ func TestCopilotEngineWithoutVersion(t *testing.T) {
 		t.Fatal("Could not find install step with install_copilot_cli.sh")
 	}
 
-	// Must NOT hardcode a version arg — that would bypass compat.json resolution.
-	if strings.Contains(installStep, `install_copilot_cli.sh" `+string(constants.DefaultCopilotVersion)) {
-		t.Errorf("Install step must not embed an explicit version arg when engine.version is unset; got:\n%s", installStep)
+	if !strings.Contains(installStep, `install_copilot_cli.sh" `+string(constants.DefaultCopilotVersion)+` --checksums-sha256 `+constants.DefaultCopilotChecksumsSHA256) {
+		t.Errorf("Install step must bind the compiler default version and checksum; got:\n%s", installStep)
 	}
 
-	// Must inject GH_AW_COMPILED_VERSION so the script can do compat.json resolution.
-	if !strings.Contains(installStep, "GH_AW_COMPILED_VERSION: v0.99.0") {
-		t.Errorf("Install step must inject GH_AW_COMPILED_VERSION when CompiledVersion is set; got:\n%s", installStep)
+	if strings.Contains(installStep, "GH_AW_COMPILED_VERSION:") {
+		t.Errorf("Pinned default must not use runtime compatibility resolution; got:\n%s", installStep)
 	}
 
 	// Must still pin GH_HOST to github.com.
@@ -141,8 +133,8 @@ func TestCopilotEngineWithWebSearchWithoutPinnedVersionIncludesMinVersion(t *tes
 	if !strings.Contains(installStep, "GH_AW_COPILOT_MIN_VERSION: "+string(constants.CopilotSessionIDMinVersion)) {
 		t.Errorf("Copilot model verification requires the session selector minimum, got:\n%s", installStep)
 	}
-	if strings.Contains(installStep, "install_copilot_cli.sh\" "+string(constants.DefaultCopilotVersion)) {
-		t.Errorf("Install step must not embed an explicit version arg when engine.version is unset; got:\n%s", installStep)
+	if !strings.Contains(installStep, `install_copilot_cli.sh" `+string(constants.DefaultCopilotVersion)+` --checksums-sha256 `+constants.DefaultCopilotChecksumsSHA256) {
+		t.Errorf("Install step must bind the compiler default version and checksum; got:\n%s", installStep)
 	}
 }
 

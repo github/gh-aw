@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
@@ -132,7 +132,26 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 	var failedImages []imageFailure
 	var skippedImages []string
 
-	for _, image := range images {
+	type digestResult struct {
+		digest string
+		err    error
+	}
+	results := make([]digestResult, len(images))
+	jobs := make([]func(), 0, len(images))
+	for i, image := range images {
+		pin, found := actionCache.GetContainerPin(image)
+		if found && pin.Digest != "" && !opts.refreshExisting {
+			continue
+		}
+		jobs = append(jobs, func() {
+			results[i].digest, results[i].err = deps.fetchDigest(ctx, image, verbose)
+		})
+	}
+	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
+		return false, err
+	}
+
+	for i, image := range images {
 		existingPin, hasExistingPin := actionCache.GetContainerPin(image)
 		if hasExistingPin && existingPin.Digest != "" && !opts.refreshExisting {
 			if verbose {
@@ -142,7 +161,7 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 			continue
 		}
 
-		digest, resolveErr := deps.fetchDigest(ctx, image, verbose)
+		digest, resolveErr := results[i].digest, results[i].err
 		if resolveErr != nil {
 			containerPinsLog.Printf("Failed to resolve digest for %s: %v", image, resolveErr)
 			failedImages = append(failedImages, imageFailure{image: image, reason: resolveErr.Error()})
@@ -261,18 +280,17 @@ func collectImagesFromLockFiles(workflowDir string) ([]string, error) {
 }
 
 // dockerCmdTimeout is the maximum time allowed for a single Docker CLI operation.
-// 60 seconds is sufficient for most registry metadata lookups and short pulls
+// 60 seconds is sufficient for most registry metadata lookups
 // while still bounding any hung Docker daemon or slow network connections.
 const dockerCmdTimeout = 60 * time.Second
 
 // fetchContainerDigest returns the SHA-256 content digest for the given image tag.
-// It tries three strategies in order:
-//  1. "docker buildx imagetools inspect" (no pull, preferred — works when docker daemon is running)
+// It tries two metadata-only strategies in order:
+//  1. "docker buildx imagetools inspect" (no image layers downloaded)
 //  2. "crane digest" (no pull, no daemon — works in CI without Docker)
-//  3. "docker pull" + "docker inspect" (fallback that pulls the full image)
 //
-// Returns an error when all three strategies fail.
-func fetchContainerDigest(ctx context.Context, image string, verbose bool) (string, error) {
+// Returns an error when both strategies fail; it never pulls image layers.
+func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, error) {
 	containerPinsLog.Printf("Resolving digest for container image: %s", image)
 
 	type strategy struct {
@@ -288,15 +306,16 @@ func fetchContainerDigest(ctx context.Context, image string, verbose bool) (stri
 			name: "crane digest",
 			fn:   func() (string, error) { return resolveDigestViaCrane(ctx, image) },
 		},
-		{
-			name: "docker pull + inspect",
-			fn:   func() (string, error) { return resolveDigestViaPull(ctx, image, verbose) },
-		},
 	}
 
 	var errs []string
 	for _, s := range strategies {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		finish := ctxutil.StartOperation(ctx, s.name+" "+image)
 		digest, err := s.fn()
+		finish(err)
 		if err == nil && digest != "" {
 			containerPinsLog.Printf("Resolved %s via %s: %s", image, s.name, digest)
 			return digest, nil
@@ -306,7 +325,7 @@ func fetchContainerDigest(ctx context.Context, image string, verbose bool) (stri
 		errs = append(errs, msg)
 	}
 
-	return "", errors.New(strings.Join(errs, "; "))
+	return "", fmt.Errorf("could not resolve container digest without downloading image layers; check registry access and install Docker Buildx or crane: %s", strings.Join(errs, "; "))
 }
 
 // resolveDigestViaBuildx uses "docker buildx imagetools inspect" to get the content
@@ -348,33 +367,4 @@ func resolveDigestViaCrane(ctx context.Context, image string) (string, error) {
 		return "", fmt.Errorf("unexpected digest format from crane: %q", digest)
 	}
 	return digest, nil
-}
-
-// resolveDigestViaPull pulls the image and then reads its RepoDigests field.
-func resolveDigestViaPull(ctx context.Context, image string, verbose bool) (string, error) {
-	if verbose {
-		fmt.Fprintf(os.Stderr, "  Pulling %s to resolve digest...\n", image)
-	}
-
-	pullCtx, pullCancel := context.WithTimeout(ctx, dockerCmdTimeout)
-	defer pullCancel()
-	if out, err := exec.CommandContext(pullCtx, "docker", "pull", "--quiet", image).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("docker pull failed: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-
-	inspectCtx, inspectCancel := context.WithTimeout(ctx, dockerCmdTimeout)
-	defer inspectCancel()
-	out, err := exec.CommandContext(inspectCtx, "docker", "inspect",
-		"--format", "{{index .RepoDigests 0}}", image).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("docker inspect failed: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-
-	// RepoDigest format: "registry/image@sha256:..."  or "image@sha256:..."
-	repoDigest := strings.TrimSpace(string(out))
-	idx := strings.Index(repoDigest, "@sha256:")
-	if idx < 0 {
-		return "", fmt.Errorf("no sha256 digest in repo digest %q", repoDigest)
-	}
-	return repoDigest[idx+1:], nil // return "sha256:..."
 }

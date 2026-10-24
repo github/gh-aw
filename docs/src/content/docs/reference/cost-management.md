@@ -334,6 +334,86 @@ EOF
 > `repository_dispatch`, and `workflow_dispatch` runs, including dispatches carrying internal
 > `aw_context` metadata.
 
+### Configure Advanced Cost Controls with Admission
+
+Use an admission authority when static per-run and daily limits are not enough—for example, to assign custom AIC allowances by server size or evaluate shared organization budgets before starting an agent. gh-aw implements the client, not a hosted policy server. Deploy or obtain access to an authority that implements the [admission service contract](/gh-aw/specs/admission-service-specification/); policy configuration and trusted usage accounting belong to that service.
+
+#### Enable the Admission Gate
+
+1. Opt in for an individual workflow by adding `admission: true` alongside its existing triggers:
+
+   ```aw wrap
+   on:
+     workflow_dispatch:
+     admission: true
+   ```
+
+   Alternatively, set `"admission": true` in the existing `.github/workflows/aw.json` object to opt in repository-wide. Preserve other settings.
+
+   > [!IMPORTANT]
+   > A workflow-level `false` cannot override repository-level `true`.
+
+2. Recompile affected workflows with `gh aw compile` and commit the updated Markdown or repository configuration and generated `.lock.yml` files. Admission jobs are omitted by default; setting an endpoint alone does not add them.
+
+3. Export existing managed defaults before editing them:
+
+   ```bash
+   gh aw env get defaults.yml --scope org --org MY_ORG
+   ```
+
+   Preserve the exported fields and add these settings, replacing the example URL with the deployed authority:
+
+   ```yaml
+   default_admission_url: https://admission.example.org/api/admission
+   default_admission_audience: https://admission.example.org/api/admission
+   default_admission_on_outage: block
+   ```
+
+   Apply the file:
+
+   ```bash
+   gh aw env update defaults.yml --scope org --org MY_ORG
+   ```
+
+   For one repository, use `--scope repo --repo OWNER/REPO` on both commands instead. Omitted or null fields delete existing managed variables, so do not apply a partial defaults file.
+
+The settings map to Actions variables `GH_AW_DEFAULT_ADMISSION_URL`, `GH_AW_DEFAULT_ADMISSION_AUDIENCE`, and `GH_AW_DEFAULT_ADMISSION_ON_OUTAGE`. Repository variables override organization variables. For enterprise rollout, provision each enrolled organization. The URL must be an absolute HTTPS `/api/admission` URL without credentials, query parameters, or fragments. The audience defaults to that URL when unset.
+
+For opted-in workflows, changes to these runtime variables do not require recompilation. An empty URL skips admission and retains existing local guardrails. `block` stops activation after an exhausted transient outage; the default, `ignore`, continues with existing local controls. Explicit denial and invalid approval block under either policy.
+
+The compiler grants `id-token: write` only to the admission-related jobs for this feature. Hand-authored reusable-workflow callers must also allow that permission. Authentication uses GitHub Actions OIDC; do not send PATs, provider tokens, or GitHub App private keys to the authority. The completion callback uses `/api/conclusion` on the same origin.
+
+#### Assign AIC Allowances by Server Size
+
+Configure the size-to-allowance mapping in the authority's protected policy, not in workflow frontmatter. For example, an operator might choose these illustrative primary-agent limits:
+
+| Server size policy tier | Primary allowance (AIC) |
+|---|---|
+| Small | 250 |
+| Medium | 1000 |
+| Large | 2500 |
+
+These are example policy values, not built-in tiers or recommended budgets. The admission request does not include server or runner size. Maintain a trusted mapping from verified repository/workflow identity to a size tier, or resolve the tier from independently verified deployment metadata. Do not add a `server-size` request field or trust caller-supplied size hints. A larger runner does not automatically grant more AI Credits; Actions compute charges remain separate.
+
+For the medium tier, the authority could return `200 OK` with `content-type: application/json`, `cache-control: no-store`, and:
+
+```json
+{
+  "max_ai_credits": 1000,
+  "max_ai_credits_threat_detection": 100,
+  "max_ai_credits_evals": 50
+}
+```
+
+`max_ai_credits` is required. The threat-detection and evals fields are independently optional; omitted fields retain the existing component limits. Each supplied allowance must be a plain positive JSON integer from `1` through `2147483647` (the maximum signed 32-bit integer), not a string, decimal, exponent, or unlimited sentinel. The allowances replace their respective runtime limits—even if higher than the workflow's configured limit—and are not a pooled budget.
+
+Valid approval supersedes the local daily-credit check for that activation, so implement any required shared-budget checks in the authority. Keep size-tier allowances independent of hidden remaining balances; exhausted budgets produce a uniform empty `403`, not a reduced remaining-balance response. Monitor subsequent usage with `gh aw logs` and `gh aw audit` and reconcile provider billing separately.
+
+> [!WARNING]
+> Admission is cooperative, not a hard spending cap. Workflow editors and repository-variable administrators can bypass participation, and concurrent executions can overshoot shared budgets. Hard quotas, reservations, billing settlement, and mid-run cancellation require independently enforced backend controls; enabling admission does not supply them.
+
+For advanced controls without native gh-aw settings, use this admission integration as the extension point and implement the supported start-time policy in the external authority. Do not invent frontmatter options or describe unsupported billing or enforcement features as available. See the [admission specification](/gh-aw/specs/admission-service-specification/) for identity verification, retry safety, accounting, and response requirements.
+
 ### Roll Out Shared Defaults
 
 For large installations, set baseline model and token guardrails once and let individual workflows override them only when needed:

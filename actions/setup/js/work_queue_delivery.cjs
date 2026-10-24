@@ -2,6 +2,7 @@
 "use strict";
 // @safe-outputs-exempt SEC-005 — delivery performs readback only; assertClaimAuthorized checks its selected repository against authorizeWorkerClaim's authenticated profile.effect_scope allowlist before native reads.
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("delivery");
+const { ERR_VALIDATION, ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED } = require("./error_codes.cjs");
 
 const { canonicalResourceTarget, resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 
@@ -73,7 +74,7 @@ function recordClaimDelivery(delivery, assignment, member, binding, inventory, o
 
 function createClaimDeliveryVerifier(options) {
   const assignment = normalizeAssignment(options.assignment);
-  if (typeof options.recheck !== "function") throw new Error("Claim delivery verifier requires trusted independent readback");
+  if (typeof options.recheck !== "function") throw new Error(`${ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED}: Claim delivery verifier requires trusted independent readback`);
   return (member, verification) => deliveryVerifier.run({ ...options, assignment }, () => verifyClaimDelivery(member, verification));
 }
 
@@ -172,24 +173,25 @@ async function readDeliveryControlInventory(options) {
   options.signal?.throwIfAborted();
   const assignment = normalizeAssignment(options.assignment);
   const member = assignment.claims.find(claim => claim.handle === options.claim_handle);
-  if (!member) throw new Error("Delivery queue-control inventory requires an original Claim");
+  if (!member) throw new Error(`${ERR_VALIDATION}: Delivery queue-control inventory requires an original Claim`);
   const controls = require("./work_queue_control_receipts.cjs");
   const inventory = await controls.readClaimQueueControls({ ...options, assignment });
   options.signal?.throwIfAborted();
-  if (typeof inventory?.controls_digest !== "string" || !/^[0-9a-f]{64}$/.test(inventory.controls_digest)) throw new Error("Independent queue-control inventory requires its exact readback digest, including zero controls");
+  if (typeof inventory?.controls_digest !== "string" || !/^[0-9a-f]{64}$/.test(inventory.controls_digest))
+    throw new Error(`${ERR_VALIDATION}: Independent queue-control inventory requires its exact readback digest, including zero controls`);
   controlInventories.set(inventory, { assignment: canonical(assignment), claim_handle: member.handle, run: controls.claimQueueControlRun(inventory) });
   log.debug("controls.readback.complete", { controls: inventory.controls.length });
   return inventory;
 }
 
 function validateDeliveryContract(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Missing or unsupported immutable Work effect_contract");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${ERR_VALIDATION}: Missing or unsupported immutable Work effect_contract`);
   canonical(value);
   if (value?.kind === "none" && Object.keys(value).length === 1) {
     return { version: 1, outputs: [], no_writes: true };
   }
   if (!value || typeof value !== "object" || Array.isArray(value) || value.version !== 1 || !Array.isArray(value.outputs) || value.outputs.length > 128 || Object.keys(value).some(key => !["version", "outputs", "no_writes"].includes(key))) {
-    throw new Error("Missing or unsupported immutable Work effect_contract");
+    throw new Error(`${ERR_VALIDATION}: Missing or unsupported immutable Work effect_contract`);
   }
   const types = new Set();
   for (const output of value.outputs) {
@@ -205,7 +207,7 @@ function validateDeliveryContract(value) {
       output.max > 128 ||
       Object.keys(output).some(key => !["type", "min", "max", "verification"].includes(key))
     ) {
-      throw new Error("Invalid bounded effect_contract");
+      throw new Error(`${ERR_VALIDATION}: Invalid bounded effect_contract`);
     }
     if (Object.hasOwn(output, "verification")) {
       const intent = output.verification;
@@ -222,13 +224,13 @@ function validateDeliveryContract(value) {
         typeof intent.expected !== "object" ||
         Array.isArray(intent.expected)
       )
-        throw new Error("Invalid declarative effect_contract verification intent");
+        throw new Error(`${ERR_VALIDATION}: Invalid declarative effect_contract verification intent`);
     }
     types.add(normalizeSafeOutputName(output.type));
   }
-  if (value.no_writes !== undefined && typeof value.no_writes !== "boolean") throw new Error("effect_contract.no_writes must be boolean");
-  if (value.outputs.length === 0 && value.no_writes !== true) throw new Error("Empty output contracts must explicitly declare no_writes");
-  if (value.no_writes === true && value.outputs.length !== 0) throw new Error("A no-write contract cannot declare resource outputs");
+  if (value.no_writes !== undefined && typeof value.no_writes !== "boolean") throw new Error(`${ERR_VALIDATION}: effect_contract.no_writes must be boolean`);
+  if (value.outputs.length === 0 && value.no_writes !== true) throw new Error(`${ERR_VALIDATION}: Empty output contracts must explicitly declare no_writes`);
+  if (value.no_writes === true && value.outputs.length !== 0) throw new Error(`${ERR_VALIDATION}: A no-write contract cannot declare resource outputs`);
   return value;
 }
 
@@ -246,7 +248,7 @@ async function inspectClaimDelivery(options) {
     const proof = await (options.authorize || require("./finish_work_queue_claim.cjs").authorizeWorkerClaim)(request);
     if (proof?.authorized === true && proof.run_id !== undefined) {
       const current = { run_id: proof.run_id, run_attempt: proof.run_attempt };
-      if (binding && canonical(binding) !== canonical(current)) throw new Error("Delivery authority changed its original native run binding");
+      if (binding && canonical(binding) !== canonical(current)) throw new Error(`${ERR_VALIDATION}: Delivery authority changed its original native run binding`);
       binding = current;
     }
     return proof;
@@ -255,13 +257,13 @@ async function inspectClaimDelivery(options) {
   if (!currentClaimHandle()) {
     return withClaimExecution({ assignment, claim_handle, authorize }, () => inspectClaimDelivery(options));
   }
-  if (canonical(currentClaimAssignment()) !== canonical(assignment)) throw new Error("Delivery cannot replace its original immutable assignment");
-  if (currentClaimHandle() !== claim_handle) throw new Error("Delivery cannot escape its trusted Claim execution context");
+  if (canonical(currentClaimAssignment()) !== canonical(assignment)) throw new Error(`${ERR_VALIDATION}: Delivery cannot replace its original immutable assignment`);
+  if (currentClaimHandle() !== claim_handle) throw new Error(`${ERR_VALIDATION}: Delivery cannot escape its trusted Claim execution context`);
   const claim = assignment.claims.find(member => member.handle === claim_handle);
-  if (!claim) throw new Error("Delivery handle is foreign to the immutable assignment");
+  if (!claim) throw new Error(`${ERR_VALIDATION}: Delivery handle is foreign to the immutable assignment`);
   const receipt = { version: 3, claim_handle, dispatch_id: assignment.dispatch_id, work_id: claim.work_id, claim_id: claim.claim_id, verification: "unknown", disposition: "unknown", descriptor: null };
   const normalized = messages.map(message => normalizeClaimScope({ ...message, type: normalizeSafeOutputName(message.type) }, assignment));
-  if (normalized.some(message => message.claim_handle !== claim_handle)) throw new Error("Delivery cannot consume another Claim's messages");
+  if (normalized.some(message => message.claim_handle !== claim_handle)) throw new Error(`${ERR_VALIDATION}: Delivery cannot consume another Claim's messages`);
   try {
     await assertClaimAuthorized({ type: "work_queue_result", claim_handle }, { authorize, context: options.context, github: options.github, requireCompletion: !options.staged });
   } catch (error) {
@@ -342,7 +344,7 @@ async function inspectClaimDelivery(options) {
       });
       return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Missing exact nondelegated delivery receipt" };
     }
-    if (outcome.claim_handle && outcome.claim_handle !== claim_handle) throw new Error("Foreign Claim delivery receipt");
+    if (outcome.claim_handle && outcome.claim_handle !== claim_handle) throw new Error(`${ERR_VALIDATION}: Foreign Claim delivery receipt`);
     const verification = declaredOutputs.find(expected => expected.type === message.type)?.verification;
     const verify = verification === undefined ? verifyOutput : options.verifyDeclaredOutput;
     if (verification !== undefined && (NO_WRITE_TYPES.has(message.type) || !require("./work_queue_claim_adapters.cjs").isDeclaredAdapterVerifier(verify, message.type, verification))) {
@@ -417,7 +419,7 @@ async function inspectClaimDelivery(options) {
         };
         await withClaimResourceVerification(proof, checkAuthorities, { authorize, context: options.context, github: options.github });
       } catch (error) {
-        if (!(error instanceof Error) || error.message !== "work_queue_claim_scope: adapter verification requires its private in-process authority receipt") throw error;
+        if (!(error instanceof Error) || error.message !== `ERR_WORK_QUEUE_CLAIM_SCOPE: work_queue_claim_scope: adapter verification requires its private in-process authority receipt`) throw error;
         log.debug("delivery.output.authority_receipt_missing", { index });
         return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Independent scoped resource authorization requires its private in-process authority receipt" };
       }
@@ -431,7 +433,7 @@ async function inspectClaimDelivery(options) {
     log.debug("delivery.controls.uncovered", { controls: controlInventory.controls.length, verified_controls: verifiedControls.size });
     return { ...receipt, reason: "An undeclared durable queue-control effect is outside the complete output contract" };
   }
-  for (const effect of options.effects || []) {
+  for (const [index, effect] of (options.effects || []).entries()) {
     const covered =
       effect.claim_handle === claim_handle &&
       effect.claim_id === claim.claim_id &&
@@ -442,7 +444,11 @@ async function inspectClaimDelivery(options) {
         return resource && effect.kind === resource.kind && effect.repository === resource.repository && (effect.id ? effect.id === resource.id : Number.isSafeInteger(effect.number) && effect.number === resource.number);
       });
     if (!covered) {
-      log.debug("delivery.effect.uncovered", {
+      log.diagnostic("delivery.effect.uncovered", {
+        index,
+        effects: options.effects.length,
+        graphql: effect.kind === "graphql",
+        git: ["git_blob", "git_tree", "git_commit", "git_ref"].includes(effect.kind),
         succeeded: effect.outcome === "succeeded",
         claim_matches: effect.claim_handle === claim_handle && effect.claim_id === claim.claim_id,
         work_matches: effect.work_id === claim.work_id,

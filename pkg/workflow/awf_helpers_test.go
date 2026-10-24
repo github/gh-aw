@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -807,26 +808,161 @@ func TestIsCopilotCustomConfig(t *testing.T) {
 }
 
 func TestBuildAWFConfigJSONIncludesCopilotLiteralBYOKTarget(t *testing.T) {
-	config := AWFCommandConfig{
-		EngineName:     "copilot",
-		AllowedDomains: "github.com",
-		WorkflowData: &WorkflowData{
-			EngineConfig: &EngineConfig{
-				ID: "copilot",
-				Env: map[string]string{
-					constants.CopilotProviderBaseURL: "http://host.docker.internal:11434/v1",
-				},
-			},
-			NetworkPermissions: &NetworkPermissions{
-				Firewall: &FirewallConfig{Enabled: true},
-			},
+	tests := []struct {
+		name      string
+		baseURL   string
+		githubURL string
+		apiTarget string
+		version   string
+		wantHost  string
+		wantHosts []string
+	}{
+		{
+			name:      "HTTP scheme and port with default AWF",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			wantHost:  "http://host.docker.internal:11434",
+			wantHosts: []string{"host.docker.internal:11434"},
+		},
+		{
+			name:      "HTTP at minimum supported AWF",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			version:   string(constants.AWFHTTPAPITargetMinVersion),
+			wantHost:  "http://host.docker.internal:11434",
+			wantHosts: []string{"host.docker.internal:11434"},
+		},
+		{
+			name:      "HTTP with observed AWF version",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			version:   "v0.28.70",
+			wantHost:  "http://host.docker.internal:11434",
+			wantHosts: []string{"host.docker.internal:11434"},
+		},
+		{
+			name:      "older AWF retains bare host and port",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			version:   "v0.28.12",
+			wantHost:  "host.docker.internal:11434",
+			wantHosts: []string{"host.docker.internal:11434"},
+		},
+		{
+			name:      "unknown AWF version retains bare host and port",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			version:   "custom-build",
+			wantHost:  "host.docker.internal:11434",
+			wantHosts: []string{"host.docker.internal:11434"},
+		},
+		{
+			name:      "latest AWF preserves HTTP",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			version:   "latest",
+			wantHost:  "http://host.docker.internal:11434",
+			wantHosts: []string{"host.docker.internal:11434"},
+		},
+		{
+			name:      "HTTPS retains bare host and port",
+			baseURL:   "https://provider.example.com:8443/v1",
+			wantHost:  "provider.example.com:8443",
+			wantHosts: []string{"provider.example.com:8443"},
+		},
+		{
+			name:      "bare host remains unchanged",
+			baseURL:   "provider.example.com:8080/v1",
+			wantHost:  "provider.example.com:8080",
+			wantHosts: []string{"provider.example.com:8080"},
+		},
+		{
+			name:      "explicit api-target takes precedence over both URLs",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			githubURL: "http://copilot.example.com:8080/v1",
+			apiTarget: "api.acme.ghe.com",
+			wantHost:  "api.acme.ghe.com",
+			wantHosts: []string{"host.docker.internal:11434", "api.acme.ghe.com"},
+		},
+		{
+			name:      "GitHub base URL takes precedence and remains host-only",
+			baseURL:   "https://provider.example.com/v1",
+			githubURL: "http://copilot.example.com:8080/v1",
+			wantHost:  "copilot.example.com:8080",
+			wantHosts: []string{"provider.example.com", "copilot.example.com:8080"},
+		},
+		{
+			name:      "non-BYOK HTTP GitHub base URL remains host-only",
+			githubURL: "http://copilot.example.com:8080/v1",
+			wantHost:  "copilot.example.com:8080",
+			wantHosts: []string{"copilot.example.com:8080"},
+		},
+		{
+			name:      "GitHub HTTPS URL is not changed by HTTP provider URL",
+			baseURL:   "http://host.docker.internal:11434/v1",
+			githubURL: "https://copilot.example.com",
+			wantHost:  "copilot.example.com",
+			wantHosts: []string{"host.docker.internal:11434", "copilot.example.com"},
+		},
+		{
+			name:    "provider expression is not a literal target",
+			baseURL: "${{ secrets.PROVIDER_BASE_URL }}",
+		},
+		{
+			name:    "HTTP URL containing expression is not a literal target",
+			baseURL: "http://${{ vars.PROVIDER_HOST }}:11434/v1",
+		},
+		{
+			name: "default Copilot has no target override",
 		},
 	}
 
-	jsonStr, err := BuildAWFConfigJSON(config)
-	require.NoError(t, err)
-	assert.Contains(t, jsonStr, `"copilot"`, "should include copilot target entry")
-	assert.Contains(t, jsonStr, `"host":"host.docker.internal:11434"`, "should preserve literal BYOK host and port in apiProxy target config")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{
+				EngineConfig: &EngineConfig{
+					ID:        "copilot",
+					APITarget: tt.apiTarget,
+					Env: map[string]string{
+						constants.CopilotProviderBaseURL: tt.baseURL,
+						"GITHUB_COPILOT_BASE_URL":        tt.githubURL,
+					},
+				},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true, Version: tt.version},
+				},
+			}
+			config := AWFCommandConfig{
+				EngineName:     "copilot",
+				AllowedDomains: NewCopilotEngine().buildCopilotAllowedDomains(data),
+				WorkflowData:   data,
+			}
+			jsonStr, err := BuildAWFConfigJSON(config)
+			require.NoError(t, err)
+
+			var parsed AWFConfigFile
+			require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+			require.NotNil(t, parsed.APIProxy)
+			if tt.wantHost == "" {
+				assert.NotContains(t, parsed.APIProxy.Targets, "copilot")
+			} else {
+				require.Contains(t, parsed.APIProxy.Targets, "copilot")
+				assert.Equal(t, tt.wantHost, parsed.APIProxy.Targets["copilot"].Host)
+			}
+			assert.Equal(t, tt.wantHosts, GetCopilotAllowlistTargets(data))
+			stepContent := strings.Join(NewCopilotEngine().GetExecutionSteps(data, "test.log")[0], "\n")
+			if tt.baseURL == "" {
+				assert.False(t, isCopilotBYOKMode(data, true))
+				assert.Contains(t, stepContent, "COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
+				assert.Contains(t, stepContent, "--exclude-env COPILOT_GITHUB_TOKEN")
+			} else {
+				assert.NotContains(t, stepContent, "COPILOT_GITHUB_TOKEN:")
+			}
+			for _, host := range tt.wantHosts {
+				require.NotNil(t, parsed.Network)
+				assert.Contains(t, parsed.Network.AllowDomains, host)
+			}
+			if parsed.Network != nil {
+				for _, host := range parsed.Network.AllowDomains {
+					assert.NotContains(t, host, "://", "firewall allowlist must remain host-only")
+				}
+			}
+		})
+	}
 }
 
 func TestGetCopilotAllowlistTargets(t *testing.T) {

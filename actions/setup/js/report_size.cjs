@@ -15,6 +15,7 @@ const PROTECTED_TYPES = new Set(["xml_marker", "json_marker", "marker", "expirat
 /** @param {ReportBlock | ReportInline} node */
 function isSizeRedactable(node) {
   if (node.agentTainted === false || node.sizeProtected || PROTECTED_TYPES.has(node.type)) return false;
+  if (node.type === "details" && Array.isArray(node.summary) && !node.summary.every(isSizeRedactable)) return false;
   if ("children" in node) return node.children.every(isSizeRedactable);
   if (node.type === "list") return node.items.every(item => item.every(isSizeRedactable));
   if (node.type === "table") return [...node.headers, ...node.rows.flat()].every(cell => cell.every(isSizeRedactable));
@@ -66,6 +67,7 @@ function replaceSelected(report, selected) {
           case "task":
             return { ...node, children: inlines(node.children) };
           case "details":
+            return { ...node, summary: Array.isArray(node.summary) ? inlines(node.summary) : node.summary, children: blocks(node.children) };
           case "quote":
           case "alert":
             return { ...node, children: blocks(node.children) };
@@ -106,6 +108,7 @@ function renderSizedReport(report, maxLength = MAX_BODY_LENGTH) {
         continue;
       }
       if ("children" in node) collect(node.children);
+      if (node.type === "details" && Array.isArray(node.summary)) collect(node.summary);
       if (node.type === "list") node.items.forEach(collect);
       if (node.type === "table") [...node.headers, ...node.rows.flat()].forEach(collect);
     }

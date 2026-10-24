@@ -1839,6 +1839,7 @@ jobs:
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
       work_queue_outcome: ${{ steps.process_safe_outputs.outputs.work_queue_outcome }}
+      work_queue_requests: ${{ steps.work_queue_controls.outputs.work_queue_requests }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

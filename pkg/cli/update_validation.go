@@ -54,15 +54,6 @@ func defaultValidationResolvers() validationResolvers {
 	}
 }
 
-// validateUpdateSHAEntries validates the structural and liveness integrity of
-// .github/aw/actions-lock.json after a workflow update. Container pins are
-// validated structurally only (format, key/image/pinned_image consistency);
-// live digest re-resolution is not performed because refreshing a mutable tag
-// is an explicit update operation.
-func validateUpdateSHAEntries(ctx context.Context, repoRoot string) error {
-	return validateUpdateSHAEntriesWithResolvers(ctx, repoRoot, defaultValidationResolvers())
-}
-
 // validateUpdateSHAEntriesStructural validates only the structural integrity of
 // .github/aw/actions-lock.json (format, non-empty fields, key consistency) without
 // performing any live network calls to resolve or verify SHAs. This is suitable for
@@ -87,6 +78,10 @@ func structuralOnlyResolvers() validationResolvers {
 	}
 }
 
+// validateUpdateSHAEntriesWithResolvers validates the structural and liveness
+// integrity of .github/aw/actions-lock.json after a workflow update. Container
+// pins are validated structurally only; refreshing a mutable tag is an explicit
+// update operation.
 func validateUpdateSHAEntriesWithResolvers(ctx context.Context, repoRoot string, r validationResolvers) error {
 	actionsLockPath := filepath.Join(repoRoot, ".github", "aw", "actions-lock.json")
 	if _, err := os.Stat(actionsLockPath); err != nil {
@@ -102,17 +97,48 @@ func validateUpdateSHAEntriesWithResolvers(ctx context.Context, repoRoot string,
 	}
 
 	var issues []string
-	commitChecks := make(map[string]error)
-	versionResolutions := make(map[string]struct {
+	type validationResult struct {
 		sha string
 		err error
-	})
+	}
+	commitChecks := make(map[string]*validationResult)
+	versionResolutions := make(map[string]*validationResult)
 
 	entryKeys := make([]string, 0, len(cache.Entries))
 	for key := range cache.Entries {
 		entryKeys = append(entryKeys, key)
 	}
 	sort.Strings(entryKeys)
+	var jobs []func()
+	for _, key := range entryKeys {
+		entry := cache.Entries[key]
+		if entry.Repo == "" || !IsCommitSHA(entry.SHA) {
+			continue
+		}
+		baseRepo := gitutil.ExtractBaseRepo(entry.Repo)
+		commitKey := baseRepo + "|" + strings.ToLower(entry.SHA)
+		if _, found := commitChecks[commitKey]; !found {
+			result := &validationResult{}
+			commitChecks[commitKey] = result
+			jobs = append(jobs, func() {
+				result.err = r.verifyActionCommitExists(ctx, entry.Repo, entry.SHA)
+			})
+		}
+		if entry.Version != "" {
+			versionKey := baseRepo + "|" + entry.Version
+			if _, found := versionResolutions[versionKey]; !found {
+				result := &validationResult{}
+				versionResolutions[versionKey] = result
+				jobs = append(jobs, func() {
+					result.sha, result.err = r.resolveActionVersionToSHA(ctx, entry.Repo, entry.Version)
+				})
+			}
+		}
+	}
+	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
+		return err
+	}
+
 	for _, key := range entryKeys {
 		entry := cache.Entries[key]
 		if entry.Repo == "" {
@@ -133,11 +159,7 @@ func validateUpdateSHAEntriesWithResolvers(ctx context.Context, repoRoot string,
 			// only a definitive not-found (e.g. HTTP 422/404) is an error.
 			if entry.Repo != "" {
 				cacheKey := gitutil.ExtractBaseRepo(entry.Repo) + "|" + strings.ToLower(entry.SHA)
-				checkErr, ok := commitChecks[cacheKey]
-				if !ok {
-					checkErr = r.verifyActionCommitExists(ctx, entry.Repo, entry.SHA)
-					commitChecks[cacheKey] = checkErr
-				}
+				checkErr := commitChecks[cacheKey].err
 				if checkErr != nil {
 					if errors.Is(checkErr, parser.ErrVerificationSkipped) {
 						updateValidationLog.Printf("action entry %q: skipping commit existence check (auth/network error): %v", key, checkErr)
@@ -156,11 +178,7 @@ func validateUpdateSHAEntriesWithResolvers(ctx context.Context, repoRoot string,
 				// Verify the stored version tag resolves to the stored SHA.
 				// Auth/network failures are non-fatal; only a confirmed mismatch is an error.
 				cacheKey := gitutil.ExtractBaseRepo(entry.Repo) + "|" + entry.Version
-				resolution, ok := versionResolutions[cacheKey]
-				if !ok {
-					resolution.sha, resolution.err = r.resolveActionVersionToSHA(ctx, entry.Repo, entry.Version)
-					versionResolutions[cacheKey] = resolution
-				}
+				resolution := versionResolutions[cacheKey]
 				if resolution.err != nil {
 					updateValidationLog.Printf("action entry %q: skipping version/SHA check (resolution failed): %v", key, resolution.err)
 				} else if !strings.EqualFold(resolution.sha, entry.SHA) {

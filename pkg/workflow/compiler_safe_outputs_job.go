@@ -689,10 +689,12 @@ func addHandlerManagerOutputs(data *WorkflowData, outputs map[string]string) {
 	addConditionalHandlerManagerOutputs(data, outputs)
 }
 
-// addConditionalHandlerManagerOutputs adds outputs from the handler manager step that are only
-// exposed when the corresponding safe-output type (assign_to_agent, create_agent_session, or
-// upload_artifact) is configured.
+// addConditionalHandlerManagerOutputs exposes trusted queue-control and handler-manager
+// outputs only when the corresponding queue role or safe-output type is configured.
 func addConditionalHandlerManagerOutputs(data *WorkflowData, outputs map[string]string) {
+	if isWorkQueueParticipant(data) && data.WorkQueuePolicy != nil {
+		outputs["work_queue_requests"] = "${{ steps.work_queue_controls.outputs.work_queue_requests }}"
+	}
 	if isWorkQueueWorker(data) {
 		outputs["work_queue_outcome"] = "${{ steps.process_safe_outputs.outputs.work_queue_outcome }}"
 	}

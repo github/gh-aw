@@ -33,7 +33,6 @@ also load the [queue protocol](work-queue.md).
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
 - [Downloading Workflow Logs](#downloading-workflow-logs)
 - [Auditing Specific Runs](#auditing-specific-runs)
 - [How Agentic Workflows Work](#how-agentic-workflows-work)
@@ -41,29 +40,12 @@ also load the [queue protocol](work-queue.md).
 - [Advanced Debugging Techniques](#advanced-debugging-techniques)
 - [Reference Commands](#reference-commands)
 
-## Quick Start
-
-Keep supplied run/job/step URLs intact. For every bare run ID in the examples
-below, add `--repo HOST/OWNER/REPO`; never infer the target from an unrelated checkout.
-Workflow-name and fleet reads also use that explicit repository.
-
-### Download Logs from Recent Runs
-
-```bash
-gh aw logs WORKFLOW --repo HOST/OWNER/REPO --start-date -1d --json
-```
-
-Omit `WORKFLOW` for fleet analysis; reuse cached reports before collection.
-
-### Audit a Specific Run
-
-```bash
-gh aw audit https://github.com/owner/repo/actions/runs/1234567890 --no-baseline --timeout 2m
-```
-
 ## Downloading Workflow Logs
 
 `gh aw logs` collects existing GitHub Actions artifacts and logs, not new runs.
+Keep supplied run/job/step URLs intact. For every bare run ID in the examples
+below, add `--repo HOST/OWNER/REPO`; never infer the target from an unrelated checkout.
+Workflow-name and fleet reads also use that explicit repository.
 
 ### Basic Usage
 
@@ -141,12 +123,12 @@ or `-o EVIDENCE_DIR` for a private, reusable evidence directory.
 gh aw audit 1234567890 1234567891 1234567892 --repo HOST/OWNER/REPO --group --json
 ```
 
-Group per-run finding codes/counts; inspect cached reports for exact signatures.
-Plain diffs compare metrics/firewall/tools, not complete findings.
-Match first failing boundaries and normalized error/tool/status signatures across
-comparable workflow/revision/trigger/input/configuration contexts. Count each run
-once; report matching/inspectable IDs. Missing/skipped evidence remains unknown;
-repeated HTTP 403 alone does not prove a common cause.
+Group per-run finding codes/counts; inspect cached reports for exact signatures
+rather than plain metrics/firewall/tool diffs. Match first failing boundaries
+and normalized error/tool/status signatures across comparable
+workflow/revision/trigger/input/configuration contexts, counting each run once.
+Missing/skipped evidence remains unknown; repeated HTTP 403 alone does not
+prove a common cause.
 
 ### Search and Cluster Session Evidence
 
@@ -156,13 +138,10 @@ gh aw audit 1234567890 --repo HOST/OWNER/REPO --search "api.example.com ERR_AUTH
 
 Read `evidence_search` references, neighboring context and occurrence counts in
 the actual redacted unified session. Single-run CLI search does not replace
-audit findings, `--group` recurrence checks or fleet failure clustering.
-Automatic Drain3 grouping saves repetitive excerpts without changing BM25 ranking;
-success/failure outcomes stay separate and cluster IDs stay run-local.
-BM25 relevance and Drain3 anomaly scores are not severity or confidence.
-Missing sessions are unavailable; zero hits do not clear findings or prove safety.
-Use [retrieval guidance](analyzing-runs.md#retrieve-and-cluster-session-evidence)
-for grouping criteria, omitted fields, bounds and provenance.
+audit findings, `--group` recurrence checks or fleet failure clustering; zero
+hits do not clear findings or prove safety. Use
+[retrieval guidance](analyzing-runs.md#retrieve-and-cluster-session-evidence)
+for grouping/ranking semantics, omitted fields, bounds and provenance.
 
 ### Audit Report Contents
 
@@ -173,13 +152,7 @@ attempted safe-output operations. Missing fields do not prove success.
 
 ```bash
 gh aw audit 1234567890 --repo HOST/OWNER/REPO --json > audit.json
-jq '{
-  status: .overview.status,
-  conclusion: .overview.conclusion,
-  errors: .errors,
-  missing_tools: .missing_tools,
-  tool_usage: .tool_usage
-}' audit.json
+jq '{status: .overview.status, conclusion: .overview.conclusion, errors, missing_tools, tool_usage}' audit.json
 ```
 
 ## How Agentic Workflows Work
@@ -378,36 +351,13 @@ gh aw mcp inspect <workflow-name>
 gh aw mcp list
 ```
 
-### Checking Workflow Status
+### Other Useful Commands
 
 ```bash
-# Show status of all agentic workflows
-gh aw status --repo HOST/OWNER/REPO
-```
-
-### Downloading Specific Artifacts
-
-```bash
-# Download only the agent log artifact
-gh run download <run-id> --repo HOST/OWNER/REPO -n agent-stdio.log
-```
-
-### Inspecting Job Logs
-
-```bash
-# View specific job logs
-gh run view <run-id> --repo HOST/OWNER/REPO
-gh run view --repo HOST/OWNER/REPO --job <job-id> --log
-```
-
-### Analyzing Firewall Logs
-
-```bash
-# Parse firewall logs for network issues
-gh aw logs --repo HOST/OWNER/REPO --parse
-
-# Check firewall-enabled runs
-gh aw logs --repo HOST/OWNER/REPO --firewall
+gh aw status --repo HOST/OWNER/REPO                                 # Fleet status
+gh run download <run-id> --repo HOST/OWNER/REPO -n agent-stdio.log   # One artifact
+gh run view --repo HOST/OWNER/REPO --job <job-id> --log              # One job's logs
+gh aw logs --repo HOST/OWNER/REPO --parse --firewall                 # Parsed firewall logs
 ```
 
 ### Diagnostic and Development Compilation
@@ -418,26 +368,13 @@ This heading preserves existing links; it defines no separate compilation gate.
 
 ## Reference Commands
 
-### Log Analysis Commands
-
-See the [logs command reference](cli-commands.md#gh-aw-logs), scoped to the
-identified target repository.
-
-### Audit Commands
-
-See the [audit command reference](cli-commands.md#gh-aw-audit). Preserve supplied
-URLs and qualify bare IDs with `--repo HOST/OWNER/REPO`.
-
-### MCP Commands
-
-See [MCP inspection](cli-commands.md#gh-aw-mcp-inspect), after the shared
-startup preflight; a command listing is not startup authorization.
-
-### Status Commands
-
-See the [status command reference](cli-commands.md#gh-aw-status).
-Compilation belongs to the [compilation guide](debug-compilation.md), not a
-status check.
+Full flag/option tables: [logs](cli-commands.md#gh-aw-logs) (scoped to the
+identified target repository), [audit](cli-commands.md#gh-aw-audit) (preserve
+supplied URLs; qualify bare IDs with `--repo HOST/OWNER/REPO`),
+[mcp inspect](cli-commands.md#gh-aw-mcp-inspect) (after the shared startup
+preflight — a listing is not startup authorization), and
+[status](cli-commands.md#gh-aw-status) (compilation belongs to the
+[compilation guide](debug-compilation.md), not a status check).
 
 ### Active Debugging Commands (Permitted Contexts Only)
 

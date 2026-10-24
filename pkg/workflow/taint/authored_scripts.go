@@ -254,9 +254,21 @@ func (a *analyzer) authoredScriptEnvironment(ctx context.Context, document *aw.D
 	if err != nil {
 		return nil, err
 	}
+	if shorthand, ok := document.Frontmatter["sandbox"].(string); ok && (shorthand == "awf" || shorthand == "default") {
+		return bindings, nil
+	}
 	sandbox, err := optionalField[map[string]any](document.Frontmatter, "sandbox", "workflow")
 	if err != nil {
 		return nil, err
+	}
+	switch agent := sandbox["agent"].(type) {
+	case nil:
+		return bindings, nil
+	case string, bool:
+		if agent != "awf" && agent != false {
+			return nil, errors.New("AW sandbox.agent must be awf, false, null, or a mapping")
+		}
+		return bindings, nil
 	}
 	agent, err := optionalField[map[string]any](sandbox, "agent", "sandbox")
 	if err != nil {

@@ -6,6 +6,8 @@ description: Guide for reducing token consumption in agentic workflows — DataO
 
 If a task can be solved using deterministic tools, use deterministic tools. Only use agents when necessary, as they incur higher cost. Agentic workflows allow you to run deterministic tools first and gate agent execution using conditions, enabling workflows that avoid triggering agents most of the time and only use them when needed.
 
+For advanced cost controls without native settings, such as custom AIC allowances by server size or shared organization budget policies, follow [Configure Advanced Cost Controls with Admission](https://github.github.com/gh-aw/reference/cost-management/#configure-advanced-cost-controls-with-admission) (source: `docs/src/content/docs/reference/cost-management.md`). Route these requests to that setup and server-side policy guidance rather than inventing frontmatter options. Admission requires an external authority and is cooperative; hard caps, reservations, billing settlement, and mid-run cancellation require independent backend controls.
+
 ## Quick-Reference Checklist
 
 Apply these in order, measuring cost and quality after each change:

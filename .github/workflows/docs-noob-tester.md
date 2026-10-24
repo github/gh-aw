@@ -45,6 +45,14 @@ imports:
   - shared/keep-it-short.md
   - shared/otlp.md
 pre-agent-steps:
+  - name: Checkout agentics workflows
+    uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    with:
+      repository: githubnext/agentics
+      ref: main
+      path: .agentics
+      persist-credentials: false
+      sparse-checkout: workflows
   - name: Install docs dependencies
     env:
       EXPR_GITHUB_WORKSPACE: ${{ github.workspace }}
@@ -53,6 +61,7 @@ pre-agent-steps:
       npm ci
   - name: Start docs server
     env:
+      AGENTICS_WORKFLOWS_DIR: ${{ github.workspace }}/.agentics/workflows
       EXPR_GITHUB_WORKSPACE: ${{ github.workspace }}
     run: |
       mkdir -p /tmp/gh-aw/agent

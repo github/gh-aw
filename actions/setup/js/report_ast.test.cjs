@@ -200,6 +200,68 @@ describe("report AST", () => {
     expect(body).toContain('<summary>Evidence [1] &lt;/summary&gt;&lt;img src="x"&gt; &amp; data</summary>');
   });
 
+  it.each(["<details><summary>", "<details>\n<summary>"])("preserves bold summaries imported from %s", opening => {
+    const source = `${opening}<b>View Detailed Findings</b></summary>\n\nFindings\n\n</details>`;
+    const { body } = renderReport(report(parseReportMarkdown(source)));
+    expect(body).toBe("<details>\n<summary><b>View Detailed Findings</b></summary>\n\nFindings\n\n</details>\n");
+    expect(renderReport(report(parseReportMarkdown(body))).body).toBe(body);
+  });
+
+  it("preserves nested summary formatting without interpreting Markdown or scalar markup", () => {
+    const source = "<details><summary><strong>View <b>nested</b> <em>findings</em> {label} & data [1] **literal**</strong></summary>\n\nFindings\n\n</details>";
+    const { body } = renderReport(report(parseReportMarkdown(source, { context: { label: "</b><img src=x onerror=attack()>@user" } })));
+    expect(body).toContain("<summary><b>View <b>nested</b> <em>findings</em> &lt;/b&gt;&lt;img src=x onerror=attack()&gt;<code>@user</code> &amp; data [1] **literal**</b></summary>");
+    expect(body).not.toContain("<img");
+  });
+
+  it("does not promote encoded tags or scalar substitutions into summary formatting on round trips", () => {
+    const source = "<details><summary><b>{label} &lt;b&gt;literal&lt;/b&gt;</b></summary>\n\nFindings\n\n</details>";
+    const { body } = renderReport(report(parseReportMarkdown(source, { context: { label: "<b>scalar</b>" } })));
+    expect(body).toContain("<summary><b>&lt;b&gt;scalar&lt;/b&gt; &lt;b&gt;literal&lt;/b&gt;</b></summary>");
+    expect(renderReport(report(parseReportMarkdown(body))).body).toBe(body);
+  });
+
+  it.each(["<b onclick=attack()>Label</b>", "<script>attack()</script>", "<b>Unclosed", "</summary><img src=x>"])("keeps unsupported or unmatched summary markup literal: %s", value => {
+    const source = `<details><summary>${value}</summary>\n\nFindings\n\n</details>`;
+    const { body } = renderReport(report(parseReportMarkdown(source)));
+    expect(body).toContain(`<summary>${value.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</summary>`);
+  });
+
+  it("keeps mentions and code neutralized inside formatted summaries across round trips", () => {
+    const source = "<details><summary><b>@admin <code>&lt;img&gt; @user</code> admin@example.com</b></summary>\n\nFindings\n\n</details>";
+    const { body } = renderReport(report(parseReportMarkdown(source)));
+    expect(body).toContain("<summary><b><code>@admin</code> <code>&lt;img&gt; @user</code> admin@example.com</b></summary>");
+    expect(renderReport(report(parseReportMarkdown(body))).body).toBe(body);
+  });
+
+  it("redacts secrets split across summary formatting and rejects stale redaction proofs", () => {
+    const secret = "summary-secret-fixture";
+    vi.stubEnv("GH_AW_SECRET_NAMES", "SUMMARY_SECRET");
+    vi.stubEnv("SECRET_SUMMARY_SECRET", secret);
+    const input = report([
+      {
+        type: "details",
+        summary: [
+          { type: "text", value: "summary-" },
+          { type: "strong", children: [{ type: "text", value: "secret-fixture" }] },
+        ],
+        children: [paragraph("Findings")],
+      },
+    ]);
+    expect(renderReport(input).body).not.toContain(secret);
+    expect(renderReport(input).body).not.toContain("secret-fixture");
+    const redacted = redactReportForRendering(input);
+    redacted.children[0].summary = [
+      { type: "text", value: "summary-" },
+      { type: "strong", children: [{ type: "text", value: "secret-fixture" }] },
+    ];
+    expect(() => assertRedactedReport(redacted)).toThrow("unredacted inline run");
+  });
+
+  it("rejects excessively nested summary formatting", () => {
+    expect(() => parseReportMarkdown(`<details><summary>${"<b>".repeat(18)}Label${"</b>".repeat(18)}</summary>\n\nFindings\n\n</details>`)).toThrow("maximum depth");
+  });
+
   it("escapes actual mentions without corrupting email addresses or action versions", () => {
     const value = "@admin admin@example.com actions/checkout@v5 (@team/dev) @last";
     const { body } = renderReport(report([paragraph(value), { type: "details", summary: value, children: [paragraph("Evidence")] }]));

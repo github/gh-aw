@@ -99,25 +99,6 @@ func TestParseNumberFromURL(t *testing.T) {
 	}
 }
 
-func TestParseRepoFromURL(t *testing.T) {
-	tests := []struct {
-		name     string
-		url      string
-		expected string
-	}{
-		{"full URL", "https://github.com/owner/repo/pull/42", "owner/repo"},
-		{"issues URL", "https://github.com/github/gh-aw/issues/123", "github/gh-aw"},
-		{"no github", "https://example.com/foo", ""},
-		{"empty", "", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, parseRepoFromURL(tt.url), "parsed repo from URL")
-		})
-	}
-}
-
 func TestNormalizeRepoForAPI(t *testing.T) {
 	tests := []struct {
 		name          string

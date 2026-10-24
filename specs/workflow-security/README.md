@@ -34,6 +34,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Configuration | `context`, `Activate`, `TrustedConfiguration` | Trusted activation instructions; PR-base provenance is an implementation obligation. |
 | Untrusted data | `AgentRequest`, `requestValid`, `target`, `request.private` | Declarative operation, schema validity, repository selection, and private-source classification remain separate from artifact origin. |
 | Jobs and steps | `status`, `step`, `started`, `safeOutputResult`, `appTokenPost`, `Dependencies` | Ordered host setup, agent execution, detection, validation, credential minting, effects, and the app-token action post step. |
+| Status-only custom job | [`StatusOnlyJob.tla`](StatusOnlyJob.tla) | A separate bounded model checks that an opted-in leaf status job waits for detection to finish, can proceed after failure or warn-mode findings, and satisfies the no-agent-data contract. The abstract capability flags do not verify the Actions expression parser or validator implementation. |
 | Artifacts | `artifacts`, `Consume`, `GoodOrigin` | Existence, producing job, run and invocation identity, naming prefix, instruction trust, secret/private labels. Current-run agent artifacts are still untrusted payloads. |
 | Outputs and logs | `transfers` | Artifact, output, and log channels carry independently tracked secret labels. This abstracts covered redaction, not arbitrary encoded-secret detection. |
 | Permissions | `grants`, `TokenPermissions`, `ValidatedEffects` | Repository read, issue write, content write, and inference capabilities are distinct. Workspace edits are not repository-resource writes. |
@@ -648,15 +649,27 @@ implementation and unit-test mapping in compiler threat §7.3.
 Use Java 21, Python 3 (standard library only), the repository's Go toolchain,
 and official [TLA+ Tools v1.8.0](https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0).
 The runner verifies this jar SHA-256 before executing it (the v1.8.0 release
-asset SHA-256 published by GitHub for asset `644223998`, updated on
-2026-10-15; the release notes publish SHA-1):
+asset SHA-256 published by GitHub for asset `670958559`, updated on
+2026-10-24; the release notes publish SHA-1):
 
 ```text
-5bd7b64db99ae4c6c35f290de5e809c0ee41af43f8699cf696099ffb6452b1e2
+d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f
 ```
 
-When updating the release pin, verify the downloaded bytes against the release
-asset metadata and update the workflow, runner, and this digest together.
+Upstream rebuilds this release asset and moves the `v1.8.0` tag; its versioned
+URL is not immutable. This pin identifies the 4,502,259-byte asset uploaded by
+[upstream build 40049599214](https://github.com/tlaplus/tlaplus/actions/runs/40049599214)
+at source commit `2ef2af8c767b76e5db5cba2878f027ac07aad36c`.
+The downloaded SHA-256 matches both GitHub's asset metadata and that build's
+upload log. This correlation is not an independent build attestation.
+
+When upstream replaces the asset again, verification must fail closed. Do not
+derive the expected checksum dynamically or bypass either runtime check.
+When intentionally updating the release pin, verify the downloaded bytes
+against the release asset metadata and the upstream build's upload log, then
+update the workflow and generated lock, runner, regression test, and this digest
+together. An immutable, vetted distribution would be needed to prevent future
+release-URL drift.
 Existing example reports retain the jar digest used to generate their evidence.
 
 ```bash

@@ -46,6 +46,7 @@ const {
 
 const OP_FIELDS = {
   Policy: [["kind", "epoch", "policy"], []],
+  PoolInstall: [["kind", "pool", "config"], []],
   Deployment: [["kind", "pool", "worker_profile", "expected_ref", "expected_contract", "profile", "available", "reason"], ["activate"]],
   Control: [["kind", "control", "value", "reason"], []],
   Work: [
@@ -76,8 +77,29 @@ const OP_FIELDS = {
   ],
 };
 
+function poolIdentity(name) {
+  identity(name, "pool");
+  if (["__proto__", "constructor", "prototype"].includes(name)) throw queueError("policy_invalid", "reserved pool identity");
+  return name;
+}
+
+function approvedPoolProfile(state, name, profile) {
+  for (const [poolName, pool] of Object.entries(state.policy.pools)) {
+    if (!Object.hasOwn(pool.profiles, name)) continue;
+    const deployment = state.deployments?.get(poolName)?.get(name);
+    if (!deployment) {
+      if (canonical(pool.profiles[name]) === canonical(profile)) return true;
+      continue;
+    }
+    const revisions = deployment.revisions;
+    if (Object.hasOwn(revisions, profile.ref) && revisions[profile.ref].available && canonical(revisions[profile.ref].profile) === canonical(profile)) return true;
+  }
+  return false;
+}
+
 const REQUEST_KINDS = {
   policy: ["Policy"],
+  pool_install: ["PoolInstall"],
   deployment: ["Deployment"],
   control: ["Control", "WorkPriority"],
   submit: ["Policy", "Work"],
@@ -96,6 +118,7 @@ const REQUEST_KINDS = {
 
 const OP_ROLES = {
   Policy: ["administrator", "producer", "dispatcher"],
+  PoolInstall: ["administrator", "producer", "dispatcher"],
   Deployment: ["administrator", "producer", "dispatcher"],
   Control: ["administrator"],
   Work: ["producer", "dispatcher", "worker", "administrator"],
@@ -158,6 +181,10 @@ function validateOperation(operation) {
     if (operation.authority_claim_id !== undefined) identity(operation.authority_claim_id, "authority Claim");
   }
   if (operation.kind === "Policy") validatePolicy(operation.policy);
+  if (operation.kind === "PoolInstall") {
+    poolIdentity(operation.pool);
+    if (!operation.config || typeof operation.config !== "object" || Array.isArray(operation.config)) throw queueError("policy_invalid", "pool installation requires a pool definition");
+  }
   if (operation.kind === "Deployment") validateDeployment(operation);
   if (operation.logical_contract !== undefined && !/^[a-f0-9]{64}$/.test(operation.logical_contract)) throw queueError("work_invalid", "invalid Work logical contract");
   if (operation.execution_ref !== undefined && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(operation.execution_ref)) throw queueError("work_invalid", "Work execution pin must be immutable");
@@ -743,7 +770,7 @@ function replayTransactions(transactions, asOf) {
   return state;
 }
 
-function checkpointSnapshot(state, lastAt) {
+function checkpointSnapshot(state, lastAt, retainPolicyHistory = true) {
   const projection = serializeProjection(state);
   projection.clocks = Object.fromEntries(
     Object.entries(projection.clocks).filter(([, clocks]) => clocks.classes.v !== "0" || Object.keys(clocks.classes.pass).length > 0 || Object.values(clocks.keys).some(clock => clock.v !== "0" || Object.keys(clock.pass).length > 0))
@@ -755,7 +782,7 @@ function checkpointSnapshot(state, lastAt) {
     const events =
       commit.checkpoint_events ??
       commit.operations.map(operation => {
-        if (operation.kind === "Deployment") return structuredClone(operation);
+        if (operation.kind === "Deployment" || (retainPolicyHistory && ["Policy", "PoolInstall"].includes(operation.kind))) return structuredClone(operation);
         const fields = [
           "kind",
           "work_id",
@@ -1224,10 +1251,28 @@ function replayOrdered(ordered) {
           throw queueError("checkpoint_invalid", "checkpoint must be the sole root transaction");
         case "Policy":
           break;
+        case "PoolInstall": {
+          poolIdentity(operation.pool);
+          const installedPolicy = state.policy;
+          if (!installedPolicy || installedPolicy.authorization !== "aw" || Object.hasOwn(installedPolicy.pools, operation.pool)) throw queueError("policy_invalid", "only new pools can be installed into an AW-managed Policy");
+          const policy = structuredClone(installedPolicy);
+          Object.defineProperty(policy.pools, operation.pool, { value: structuredClone(operation.config), enumerable: true, configurable: true, writable: true });
+          validatePolicy(policy);
+          const authorizedRepositories = new Set(Object.values(installedPolicy.pools).flatMap(pool => pool.allowed_repositories));
+          if (operation.config.allowed_repositories.some(repository => !authorizedRepositories.has(repository))) throw queueError("policy_invalid", "PoolInstall cannot expand the installed repository allowlist");
+          if (Object.values(operation.config.profiles).some(profile => profile.effect_scope !== state.repository || Object.hasOwn(profile, "principal")))
+            throw queueError("policy_invalid", "automatically installed AW pools must preserve repository-scoped authority");
+          for (const [name, profile] of Object.entries(operation.config.profiles))
+            if (!approvedPoolProfile(state, name, profile)) throw queueError("policy_invalid", "pool profiles must match installed or registered worker revision authority");
+          state.policy = policy;
+          initializeDeployments(state, [operation.pool]);
+          break;
+        }
         case "Deployment":
           applyDeployment(state, operation);
           break;
         case "Control":
+          if (!state.policy) throw queueError("policy_missing", "existing queue has no policy genesis");
           if (operation.control === "admission_paused") state.admission_paused = operation.value;
           if (operation.control === "grants_paused") state.grants_paused = operation.value;
           if (operation.control === "credential_generation") {
@@ -1451,7 +1496,7 @@ function compactTransactions(transactions, priorGitSHA, actor, at) {
   return checkpointTransactions(transactions, priorGitSHA, actor, at, false);
 }
 
-function checkpointTransactions(transactions, priorGitSHA, actor, at, legacy) {
+function checkpointTransactions(transactions, priorGitSHA, actor, at, legacy, retainPolicyHistory = true) {
   const validated = replayTransactions(transactions);
   if (priorGitSHA === undefined) return validated.transactions;
   if (at === undefined) at = Math.max(Date.now(), validated.time_watermark);
@@ -1464,7 +1509,7 @@ function checkpointTransactions(transactions, priorGitSHA, actor, at, legacy) {
     throw queueError("checkpoint_invalid", "checkpoint requires an administrator, valid time and prior Git commit SHA");
   const history = serializeTransactionLog(validated.transactions);
   const history_sha256 = createHash("sha256").update(history, "utf8").digest("hex");
-  const state = checkpointSnapshot(validated, lastAt);
+  const state = checkpointSnapshot(validated, lastAt, retainPolicyHistory);
   const state_sha256 = digest(state);
   const requests_compressed = deflateRawSync(Buffer.from(canonical(state.requests), "utf8")).toString("base64");
   const { requests: _, ...projection } = state;
@@ -1501,12 +1546,14 @@ function prepareCheckpoint(source, priorGitSHA, actor, at) {
 function reconstructCheckpoint(transactions, priorGitSHA, actor, at, expectedStateSHA) {
   const root = causalChain(transactions)[0];
   const administrator = actor ?? { role: "administrator", principal: root.actor.principal, repository: root.actor.repository };
-  for (const legacy of [false, true]) {
-    try {
-      const checkpoint = checkpointTransactions(transactions, priorGitSHA, administrator, at, legacy);
-      if (checkpoint[0].operations[0].state_sha256 === expectedStateSHA) return checkpoint;
-    } catch (error) {
-      if (error?.code !== "checkpoint_invalid") throw error;
+  for (const retainPolicyHistory of [true, false]) {
+    for (const legacy of [false, true]) {
+      try {
+        const checkpoint = checkpointTransactions(transactions, priorGitSHA, administrator, at, legacy, retainPolicyHistory);
+        if (checkpoint[0].operations[0].state_sha256 === expectedStateSHA) return checkpoint;
+      } catch (error) {
+        if (error?.code !== "checkpoint_invalid") throw error;
+      }
     }
   }
   throw queueError("checkpoint_invalid", "checkpoint does not match its Git parent history");
@@ -1614,6 +1661,7 @@ module.exports = {
   reconstructCheckpoint,
   proposedCommitId,
   planNext,
+  poolIdentity,
   quiescent,
   replayTransactions,
   replayTransactionLog,

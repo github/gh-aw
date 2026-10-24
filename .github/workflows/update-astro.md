@@ -110,7 +110,7 @@ You are an automated dependency updater for the `docs/` Astro site. Your job is 
 Navigate to the docs folder and run npm-check-updates to update all packages to their latest versions:
 
 ```bash
-cd docs && npx --yes npm-check-updates --update
+cd docs && npx --yes npm-check-updates --upgrade
 ```
 
 This updates `package.json` with the latest versions. Then install the updated dependencies:

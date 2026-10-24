@@ -93,6 +93,7 @@ func resolvePackageSkillDirFiles(ctx context.Context, owner, repo, ref, host, sk
 		markerPath := joinRepositoryPackagePath(skillDir, packageSkillMarkerFile)
 		if _, err := downloadPackageFileFromGitHubForHost(ctx, owner, repo, markerPath, ref, host); err != nil {
 			if isRepositoryFileNotFound(err) {
+				addPackageManifestLog.Printf("Manifest skill directory %q missing required marker %s", skillDir, packageSkillMarkerFile)
 				return nil, []string{fmt.Sprintf("Skill directory %q is missing required %s marker file", skillDir, packageSkillMarkerFile)}, nil
 			}
 			return nil, nil, fmt.Errorf("failed to validate skill marker %q (check the repository, ref, and network connectivity): %w", markerPath, err)
@@ -109,6 +110,7 @@ func resolvePackageSkillDirFiles(ctx context.Context, owner, repo, ref, host, sk
 		}
 		return nil, nil, fmt.Errorf("failed to list files in skill directory %q (check the repository, ref, and network connectivity): %w", skillDir, err)
 	}
+	addPackageManifestLog.Printf("Collected %d file(s) from skill directory %q", len(files), skillDir)
 
 	skillFiles := make([]resolvedPackageSkillFile, 0, len(files))
 	skillName := filepath.Base(skillDir)
@@ -225,6 +227,7 @@ func resolveRepositoryPackageDocsPath(ctx context.Context, owner, repo, packageP
 	repoSlug := path.Join(owner, repo)
 	packageID := repositoryPackageIdentifier(repoSlug, packagePath)
 	if _, err := downloadPackageFileFromGitHubForHost(ctx, owner, repo, readmePath, ref, host); err == nil {
+		addPackageManifestLog.Printf("Found package docs for %s at %q", packageID, readmePath)
 		return readmePath, nil
 	} else if isRepositoryFileNotFound(err) {
 		addPackageManifestLog.Printf("Package %s missing required README.md at %q", packageID, readmePath)

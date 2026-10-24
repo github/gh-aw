@@ -71,7 +71,20 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		snapshot = append(snapshot, entrySnapshot{key: key, entry: entry})
 	}
 
-	for _, s := range snapshot {
+	resolutions := make([]cachedLatestRelease, len(snapshot))
+	jobs := make([]func(), 0, len(snapshot))
+	for i, s := range snapshot {
+		jobs = append(jobs, func() {
+			allow := !disableReleaseBump || allowMajor || isCoreAction(s.entry.Repo)
+			resolutions[i].version, resolutions[i].sha, resolutions[i].err =
+				deps.getLatestRelease(ctx, s.entry.Repo, s.entry.Version, allow, verbose)
+		})
+	}
+	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
+		return err
+	}
+
+	for i, s := range snapshot {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -84,7 +97,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		effectiveAllowMajor := !disableReleaseBump || allowMajor || isCoreAction(entry.Repo)
 
 		// Check for latest release using the injectable function (also used by updateActionRefsInContent)
-		latestVersion, latestSHA, err := deps.getLatestRelease(ctx, entry.Repo, entry.Version, effectiveAllowMajor, verbose)
+		latestVersion, latestSHA, err := resolutions[i].version, resolutions[i].sha, resolutions[i].err
 		if err != nil {
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check %s: %v", entry.Repo, err)))

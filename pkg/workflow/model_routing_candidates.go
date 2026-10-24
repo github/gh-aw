@@ -14,7 +14,10 @@ import (
 	"sync"
 
 	clidata "github.com/github/gh-aw/pkg/cli/data"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var modelRoutingCandidatesLog = logger.New("workflow:model_routing_candidates")
 
 // modelRoutingCandidateGroup is one authored allowed-models entry and the
 // github-copilot/ candidates it resolves to.
@@ -93,6 +96,7 @@ func resolveModelRoutingCandidateGroups(data *WorkflowData, engineName string) (
 	if len(routing.AllowedModels) == 0 {
 		return nil, errors.New("engine.model-routing.allowed-models must contain at least one Copilot model")
 	}
+	modelRoutingCandidatesLog.Printf("Resolving %d allowed-models entries for engine=%s", len(routing.AllowedModels), engineName)
 	aliases := modelRoutingAliasMap(data)
 	groups := make([]modelRoutingCandidateGroup, 0, len(routing.AllowedModels))
 	seen := make(map[string]struct{}, len(routing.AllowedModels))
@@ -254,6 +258,9 @@ func intersectModelRoutingPolicy(groups []modelRoutingCandidateGroup, allowed, b
 			excluded = append(excluded, group.Name)
 		}
 	}
+	if len(excluded) > 0 {
+		modelRoutingCandidatesLog.Printf("Excluded %d allowed-models entries not covered by model policy: %v", len(excluded), excluded)
+	}
 	if len(result) == 0 {
 		return nil, nil, fmt.Errorf("all engine.model-routing.allowed-models are excluded by models.allowed or models.blocked policy (excluded: %s)", strings.Join(excluded, ", "))
 	}
@@ -388,6 +395,7 @@ func modelPatternsMayOverlap(a, b string) bool {
 // policy-narrowed routing.candidateModels (or the Claude/Codex family default), or, for
 // AWF without routing.candidateModels, the list that replaces models.allowed.
 func modelRoutingAWFCandidates(data *WorkflowData, engineName string, allowed, blocked []string) ([]string, error) {
+	modelRoutingCandidatesLog.Printf("Resolving model-routing AWF candidates for engine=%s", engineName)
 	groups, err := resolveModelRoutingCandidateGroups(data, engineName)
 	if err != nil {
 		return nil, NewValidationError("engine.model-routing.allowed-models", "", "invalid model-routing candidates", err.Error())
@@ -406,5 +414,6 @@ func modelRoutingAWFCandidates(data *WorkflowData, engineName string, allowed, b
 		}
 		candidates = modelRoutingDefaultCandidates(engineName)
 	}
+	modelRoutingCandidatesLog.Printf("Resolved %d model-routing candidate(s) for engine=%s", len(candidates), engineName)
 	return candidates, nil
 }

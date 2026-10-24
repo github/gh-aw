@@ -53,6 +53,10 @@ function loadDefaultRuntimeVersions() {
   };
 
   const awfVersion = getVersion("DefaultFirewallVersion");
+  const copilotChecksumsSHA256 = source.match(/^const DefaultCopilotChecksumsSHA256 = "([0-9a-f]{64})"$/m)?.[1];
+  if (!copilotChecksumsSHA256) {
+    throw new Error(`Could not find DefaultCopilotChecksumsSHA256 in ${VERSION_CONSTANTS_FILE}`);
+  }
   return {
     awfVersion,
     awfImageTag: awfVersion.replace(/^v/, ""),
@@ -61,6 +65,7 @@ function loadDefaultRuntimeVersions() {
     codexVersion: getVersion("DefaultCodexVersion"),
     piVersion: getVersion("DefaultPiVersion"),
     copilotVersion: getVersion("DefaultCopilotVersion"),
+    copilotChecksumsSHA256,
   };
 }
 
@@ -216,7 +221,7 @@ function normalizeCheckoutPin(content) {
 // Keep tracked wasm snapshots stable across default AWF/MCPG version bumps
 // without masking explicitly pinned non-default versions in fixtures.
 function normalizeDefaultRuntimeVersions(content) {
-  const { awfVersion, awfImageTag, mcpgVersion, ghMcpVersion, codexVersion, piVersion, copilotVersion } = DEFAULT_RUNTIME_VERSIONS;
+  const { awfVersion, awfImageTag, mcpgVersion, ghMcpVersion, codexVersion, piVersion, copilotVersion, copilotChecksumsSHA256 } = DEFAULT_RUNTIME_VERSIONS;
   return content
     .replace(new RegExp(`GH_AW_INFO_AWF_VERSION: "${escapeRegex(awfVersion)}"`, "g"), 'GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"')
     .replace(new RegExp(`GH_AW_INFO_AWMG_VERSION: "${escapeRegex(mcpgVersion)}"`, "g"), 'GH_AW_INFO_AWMG_VERSION: "vMCPG_VERSION"')
@@ -233,7 +238,8 @@ function normalizeDefaultRuntimeVersions(content) {
     .replace(new RegExp(`GH_AW_INFO_AGENT_VERSION: "${escapeRegex(piVersion)}"`, "g"), 'GH_AW_INFO_AGENT_VERSION: "PI_VERSION"')
     .replace(new RegExp(`(@earendil-works/pi-coding-agent@)${escapeRegex(piVersion)}\\b`, "g"), "$1PI_VERSION")
     .replace(new RegExp(`GH_AW_INFO_VERSION: "${escapeRegex(copilotVersion)}"`, "g"), 'GH_AW_INFO_VERSION: "COPILOT_VERSION"')
-    .replace(new RegExp(`GH_AW_INFO_AGENT_VERSION: "${escapeRegex(copilotVersion)}"`, "g"), 'GH_AW_INFO_AGENT_VERSION: "COPILOT_VERSION"');
+    .replace(new RegExp(`GH_AW_INFO_AGENT_VERSION: "${escapeRegex(copilotVersion)}"`, "g"), 'GH_AW_INFO_AGENT_VERSION: "COPILOT_VERSION"')
+    .replace(new RegExp(`(install_copilot_cli\\.sh"\\s+)v?${escapeRegex(copilotVersion)}(\\s+(?:--rootless\\s+)?--checksums-sha256\\s+)${escapeRegex(copilotChecksumsSHA256)}\\b`, "g"), "$1COPILOT_VERSION$2COPILOT_CHECKSUMS_SHA256");
 }
 
 // ── Normalize output ──────────────────────────────────────────────────

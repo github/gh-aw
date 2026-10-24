@@ -22,12 +22,25 @@ func (parameters DispatchParameters) MarshalJSON() ([]byte, error) {
 	return json.Marshal(value)
 }
 
-func (state *Projection) initializeDeployments() {
-	state.Deployments = map[string]map[string]*WorkerDeployment{}
+func (state *Projection) initializeDeployments(poolNames ...string) {
+	if len(poolNames) == 0 {
+		state.Deployments = map[string]map[string]*WorkerDeployment{}
+	} else if state.Deployments == nil {
+		state.Deployments = map[string]map[string]*WorkerDeployment{}
+	}
 	if state.Policy.Authorization != "aw" {
 		return
 	}
-	for pool, policy := range state.Policy.Pools {
+	if len(poolNames) == 0 {
+		for pool := range state.Policy.Pools {
+			poolNames = append(poolNames, pool)
+		}
+	}
+	for _, pool := range poolNames {
+		policy, exists := state.Policy.Pools[pool]
+		if !exists {
+			continue
+		}
 		for name, profile := range policy.Profiles {
 			if profile.LogicalContract == "" {
 				continue

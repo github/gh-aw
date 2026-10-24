@@ -3,7 +3,6 @@
 package taint
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -45,15 +44,6 @@ type Finding struct {
 	RuleID  string
 	Site    Site
 	Sources []Source
-}
-
-func (f Finding) String() string {
-	where := f.Site.Path
-	if f.Site.Line > 0 {
-		where += fmt.Sprintf(":%d", f.Site.Line)
-	}
-	// Do not quote script text, action input values, or expression literals.
-	return fmt.Sprintf("%s: secret-tainted value reaches %s at %s", f.RuleID, f.Site.Kind, where)
 }
 
 // CoverageGap identifies incomplete analysis without including script contents.

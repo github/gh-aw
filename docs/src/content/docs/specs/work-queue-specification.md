@@ -510,8 +510,30 @@ and Actions already authorizes the trusted submission. Reads, controls and
 dispatch-only requests MUST NOT initialize an
 absent queue. Existing nonempty ledgers without a valid Policy, empty or
 malformed logs, and unsupported histories MUST fail closed rather than being
-overwritten. Later scheduling Policy epochs require an authorized, quiescent
-update; compatible worker deployments use the separate prospective transition.
+overwritten. On an existing AW-managed queue, trusted producer/dispatcher
+processing MUST install a missing configured pool on first submission or
+dispatch by appending a separate `PoolInstall` before deployment synchronization,
+when the proposal preserves every
+installed pool and all non-pool Policy fields, comparing profile boundaries
+independently of the caller's newer source revision. Replay MUST require each
+new profile to match the same named profile already authorized in an installed
+pool or its available registered Deployment revisions, including its immutable ref,
+logical contract, identity, scopes, and scheduling authority. Installation MUST
+NOT introduce new worker authority or depend on the caller's local dispatch
+targets; actual submission and dispatch retain those caller-local checks.
+The operation MUST NOT revive a revision marked unavailable. Reserved pool
+identities `__proto__`, `constructor`, and `prototype` MUST be rejected.
+The adapter MUST verify the selected immutable routes before publication.
+Workers, observers, staged previews, and accepted-request recovery MUST NOT
+trigger installation. Dispatch-only requests MUST NOT bootstrap an absent queue.
+The operation MUST preserve existing Work and the Policy epoch. It MUST NOT
+edit an installed pool or scheduling economics. Compatible newer source refs
+use the separate verified Deployment transition after installation.
+Later scheduling Policy epochs require an administrator-authorized,
+quiescent update.
+Accepted-request recovery MUST reconstruct Policy through the `PoolInstall`
+operations preceding that request, not merely its epoch's initial `Policy`.
+Checkpoints MUST retain that history for recovery after later epochs.
 
 Automatic first-use bootstrap MUST NOT require repository-administration access
 or administrator seeding. GitHub enforces repository access rules independently;

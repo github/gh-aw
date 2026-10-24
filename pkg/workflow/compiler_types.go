@@ -24,6 +24,7 @@ type Compiler struct {
 	customOutput            string                   // If set, output will be written to this path instead of default location
 	version                 string                   // Version of the extension
 	skipValidation          bool                     // If true, skip schema validation
+	lint                    bool                     // Enable in-memory Actions/AW AST linting for CLI compilation
 	noEmit                  bool                     // If true, validate without generating lock files
 	readOnly                bool                     // If true, prevent compilation from populating caches or pulling images
 	strictMode              bool                     // If true, enforce strict validation requirements

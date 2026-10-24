@@ -273,6 +273,8 @@ function eventDetail(event) {
           "ref",
           "sha",
           "actor",
+          // @safe-outputs-exempt SEC-005: display-only session metadata; this module makes no cross-repo API writes.
+          // Remove this exemption and validate the allowlist if this module gains cross-repo writes.
           "targetRepo",
         ]) +
         " " +

@@ -30,7 +30,18 @@ func authoredImportsPending(input Input) (bool, error) {
 	if input.Document == nil {
 		return false, nil
 	}
-	switch imports := input.Document.Frontmatter["imports"].(type) {
+	value := input.Document.Frontmatter["imports"]
+	if imports, ok := value.(map[string]any); ok {
+		var exists bool
+		value, exists = imports["aw"]
+		if !exists {
+			return false, nil
+		}
+		if value == nil {
+			return false, errors.New("authored policy requires an imports.aw list to determine whether configuration may be inherited")
+		}
+	}
+	switch imports := value.(type) {
 	case nil:
 		return false, nil
 	case []any:
@@ -38,7 +49,7 @@ func authoredImportsPending(input Input) (bool, error) {
 	case []string:
 		return len(imports) > 0, nil
 	default:
-		return false, errors.New("authored policy requires an imports list to determine whether configuration may be inherited")
+		return false, errors.New("authored policy requires an imports list or an imports mapping with an aw list to determine whether configuration may be inherited")
 	}
 }
 
@@ -175,6 +186,14 @@ func checkConditionalImports(ctx context.Context, input Input) ([]Diagnostic, er
 	if !exists {
 		return nil, nil
 	}
+	importsPath := "imports"
+	if imports, ok := value.(map[string]any); ok {
+		value, exists = imports["aw"]
+		if !exists {
+			return nil, nil
+		}
+		importsPath += ".aw"
+	}
 	var entries []any
 	switch value := value.(type) {
 	case []any:
@@ -184,7 +203,7 @@ func checkConditionalImports(ctx context.Context, input Input) ([]Diagnostic, er
 			entries = append(entries, entry)
 		}
 	default:
-		return nil, errors.New("conditional-import requires imports to be a list; correct the AW frontmatter")
+		return nil, fmt.Errorf("conditional-import requires %s to be a list; correct the AW frontmatter", importsPath)
 	}
 	var diagnostics []Diagnostic
 	var failures []error
@@ -192,7 +211,7 @@ func checkConditionalImports(ctx context.Context, input Input) ([]Diagnostic, er
 		if err := ctx.Err(); err != nil {
 			return diagnostics, errors.Join(append(failures, err)...)
 		}
-		path := fmt.Sprintf("imports[%d]", index)
+		path := fmt.Sprintf("%s[%d]", importsPath, index)
 		if text, ok := entry.(string); ok && strings.TrimSpace(text) != "" {
 			continue
 		}

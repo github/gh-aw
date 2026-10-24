@@ -428,6 +428,24 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     }
   });
 
+  it("daily_arxiv_agents_inherit_main_without_resolving_unverified_models", async () => {
+    const run = codexLayout();
+    const source = fs.readFileSync(path.join(repoRoot, ".github/workflows/daily-arxiv-researcher.md"), "utf8");
+    const agents = extractInlineSubAgents(extractFrontmatterAndBody(source).markdown).agents;
+    expect(agents).toHaveLength(4);
+    expect(agents.every(agent => frontmatterOf(agent.content).model === undefined)).toBe(true);
+    stageInline(run, "codex", Object.fromEntries(agents.map(agent => [agent.name, agent.content])));
+
+    const outcome = await apply(run);
+
+    expect(outcome).toMatchObject({ ok: true, failures: [], resolutions: [] });
+    expect(run.records()).toEqual([]);
+    expect(roleFiles(run)).toEqual(["opportunity-extractor.toml", "paper-screener.toml", "preliminary-investigator.toml", "relevance-ranker.toml"]);
+    for (const name of roleFiles(run).map(file => file.slice(0, -".toml".length))) {
+      expect(readRole(run, name)).not.toHaveProperty("model");
+    }
+  });
+
   it.each([
     ["triple quotes", "Write \"\"\"docstrings\"\"\" and '''literals''' verbatim."],
     ["control characters", "Tab\there, bell \u0007, escape \u001b[0m, backspace \b, form feed \f, DEL \u007f and NUL-adjacent \u0001 stay."],

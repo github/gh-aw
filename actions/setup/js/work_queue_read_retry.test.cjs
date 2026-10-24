@@ -50,6 +50,7 @@ describe("bounded queue metadata reads", () => {
       status: 503,
       response: { headers: { authorization: "private-token", "x-github-request-id": "1B41:A4F74:930C3C:1DF33D1:6AD4920C" } },
     });
+
     const read = vi.fn().mockRejectedValue(failure);
     const sleepFn = vi.fn(async () => {});
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
@@ -65,6 +66,18 @@ describe("bounded queue metadata reads", () => {
     } finally {
       stderr.mockRestore();
     }
+  });
+
+  it("reports bounded attempt numbers and retry timing even without DEBUG", async () => {
+    const failure = { status: 500 };
+    const read = vi.fn().mockRejectedValue(failure);
+    const log = { failure: vi.fn(), diagnostic: vi.fn() };
+    await expect(readQueueMetadata(read, log, "repository.read", async () => {})).rejects.toBe(failure);
+    expect(log.diagnostic.mock.calls).toEqual([
+      ["repository.read.attempt", { attempt: 1, max_attempts: 3, retry: true, delay_ms: 1000 }],
+      ["repository.read.attempt", { attempt: 2, max_attempts: 3, retry: true, delay_ms: 1000 }],
+      ["repository.read.attempt", { attempt: 3, max_attempts: 3, retry: false, delay_ms: 0 }],
+    ]);
   });
 
   it("does not retry returned responses or validation and bounds cyclic cause chains", async () => {

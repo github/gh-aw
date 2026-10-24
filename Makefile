@@ -524,6 +524,7 @@ test-scripts: build
 	node --test scripts/release-workflows.test.cjs
 	bash scripts/extract-workflow-frontmatter-keys_test.sh
 	bash scripts/check-stale-lock-files_test.sh
+	bash scripts/agent-report-progress_test.sh
 	bash scripts/check-skill-file-paths_test.sh
 	bash scripts/check-safe-outputs-conformance_test.sh
 	bash scripts/resolve-base-commit_test.sh
@@ -533,6 +534,7 @@ test-scripts: build
 	bash scripts/check-cgo-cjs-workflow-purity_test.sh
 	bash scripts/update-threat-detect-pins_test.sh
 	bash scripts/update-release-pins_test.sh
+	bash scripts/update-copilot-version_test.sh
 	bash scripts/check-go-toolchain_test.sh
 	python3 scripts/test_super_linter_scope.py
 	python3 scripts/test_publish_safe_outputs_node.py

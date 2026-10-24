@@ -6,6 +6,8 @@ const { sanitizeContent } = require("./sanitize_content.cjs");
 const { MAX_CLOSE_COUNT: SHARED_MAX_CLOSE_COUNT } = require("./close_older_entities.cjs");
 const { searchOlderEntitiesByMarker } = require("./close_older_search_helpers.cjs");
 const { createCloseOlderSearchAdapter, closeOlderWithDescriptor } = require("./close_older_handler_factory.cjs");
+const { currentClaimHandle } = require("./work_queue_claim_scope.cjs");
+const { graphEffectIdentity } = require("./work_queue_effect_client.cjs");
 
 /**
  * Maximum number of older discussions to close
@@ -93,11 +95,11 @@ async function searchOlderDiscussions(github, owner, repo, workflowId, categoryI
  * @param {string} repo - Repository name (unused for GraphQL, but kept for consistency)
  * @param {string} discussionId - Discussion node ID
  * @param {string} message - Comment body
+ * @param {Array<object>} [deliveryReceipts] - Trusted native cleanup receipts for Claim readback
  * @returns {Promise<{id: string, url: string}>} Comment details
  */
-async function addDiscussionComment(github, owner, repo, discussionId, message) {
-  const result = await github.graphql(
-    `
+async function addDiscussionComment(github, owner, repo, discussionId, message, deliveryReceipts = []) {
+  const query = `
     mutation($dId: ID!, $body: String!) {
       addDiscussionComment(input: { discussionId: $dId, body: $body }) {
         comment { 
@@ -105,9 +107,10 @@ async function addDiscussionComment(github, owner, repo, discussionId, message) 
           url
         }
       }
-    }`,
-    { dId: discussionId, body: sanitizeContent(message) }
-  );
+    }`;
+  const variables = { dId: discussionId, body: sanitizeContent(message) };
+  const result = await github.graphql(query, variables);
+  if (currentClaimHandle()) deliveryReceipts.push({ type: "comment", discussionId, id: result.addDiscussionComment.comment.id, body: variables.body, effectId: graphEffectIdentity(query, variables, result) });
 
   return result.addDiscussionComment.comment;
 }
@@ -118,11 +121,11 @@ async function addDiscussionComment(github, owner, repo, discussionId, message) 
  * @param {string} owner - Repository owner (unused for GraphQL, but kept for consistency)
  * @param {string} repo - Repository name (unused for GraphQL, but kept for consistency)
  * @param {string} discussionId - Discussion node ID
+ * @param {Array<object>} [deliveryReceipts] - Trusted native cleanup receipts for Claim readback
  * @returns {Promise<{id: string, url: string}>} Discussion details
  */
-async function closeDiscussionAsOutdated(github, owner, repo, discussionId) {
-  const result = await github.graphql(
-    `
+async function closeDiscussionAsOutdated(github, owner, repo, discussionId, deliveryReceipts = []) {
+  const query = `
     mutation($dId: ID!) {
       closeDiscussion(input: { discussionId: $dId, reason: OUTDATED }) {
         discussion { 
@@ -130,9 +133,10 @@ async function closeDiscussionAsOutdated(github, owner, repo, discussionId) {
           url
         }
       }
-    }`,
-    { dId: discussionId }
-  );
+    }`;
+  const variables = { dId: discussionId };
+  const result = await github.graphql(query, variables);
+  if (currentClaimHandle()) deliveryReceipts.push({ type: "close", discussionId, id: result.closeDiscussion.discussion.id, effectId: graphEffectIdentity(query, variables, result) });
 
   return result.closeDiscussion.discussion;
 }
@@ -149,9 +153,10 @@ async function closeDiscussionAsOutdated(github, owner, repo, discussionId) {
  * @param {string} runUrl - URL of the workflow run
  * @param {string} [callerWorkflowId] - Optional calling workflow identity for precise filtering
  * @param {string} [closeOlderKey] - Optional explicit deduplication key for close-older matching
+ * @param {Array<object>} [deliveryReceipts] - Trusted native cleanup receipts for Claim readback
  * @returns {Promise<Array<{number: number, url: string}>>} List of closed discussions
  */
-async function closeOlderDiscussions(github, owner, repo, workflowId, categoryId, newDiscussion, workflowName, runUrl, callerWorkflowId, closeOlderKey) {
+async function closeOlderDiscussions(github, owner, repo, workflowId, categoryId, newDiscussion, workflowName, runUrl, callerWorkflowId, closeOlderKey, deliveryReceipts = []) {
   return closeOlderWithDescriptor({
     github,
     owner,
@@ -170,8 +175,8 @@ async function closeOlderDiscussions(github, owner, repo, workflowId, categoryId
         workflowName: params.workflowName,
         runUrl: params.runUrl,
       }),
-    addComment: addDiscussionComment,
-    closeEntity: closeDiscussionAsOutdated,
+    addComment: (client, owner, repo, id, message) => addDiscussionComment(client, owner, repo, id, message, deliveryReceipts),
+    closeEntity: (client, owner, repo, id) => closeDiscussionAsOutdated(client, owner, repo, id, deliveryReceipts),
     delayMs: GRAPHQL_DELAY_MS,
     getEntityId: entity => entity.id,
     getEntityUrl: entity => entity.url,

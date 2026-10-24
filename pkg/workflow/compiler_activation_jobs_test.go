@@ -301,6 +301,48 @@ func TestBuildActivationJob_SkipsSecretValidationWithEnvironment(t *testing.T) {
 	assert.NotContains(t, job.Outputs, "secret_verification_result", "Activation job should not expose secret_verification_result output when validate-secret is skipped")
 }
 
+// TestBuildActivationJob_Environment verifies that manual-approval takes precedence over the workflow environment.
+func TestBuildActivationJob_Environment(t *testing.T) {
+	tests := []struct {
+		name        string
+		environment string
+		approval    string
+		want        string
+	}{
+		{
+			name: "no environment",
+		},
+		{
+			name:        "inherits workflow environment",
+			environment: "environment: production",
+			want:        "environment: production",
+		},
+		{
+			name:        "indents workflow environment object",
+			environment: "environment:\n  name: production\n  url: https://example.com",
+			want:        "environment:\n      name: production\n      url: https://example.com",
+		},
+		{
+			name:        "manual approval environment takes precedence",
+			environment: "environment: production",
+			approval:    "approval",
+			want:        "environment: approval",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{
+				Environment:    tt.environment,
+				ManualApproval: tt.approval,
+			}
+			job, err := NewCompiler().buildActivationJob(data, false, "", "test.lock.yml")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, job.Environment)
+		})
+	}
+}
+
 // TestBuildActivationJob_OAuthTokenCheckStep verifies that the activation job
 // includes a step to check for OAuth tokens in COPILOT_GITHUB_TOKEN, GH_AW_GITHUB_TOKEN,
 // and GH_AW_GITHUB_MCP_SERVER_TOKEN.

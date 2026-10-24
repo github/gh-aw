@@ -743,6 +743,22 @@
       "required": ["kind", "epoch", "policy"],
       "type": "object"
     },
+    "PoolInstallOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/PoolPolicy"
+        },
+        "kind": {
+          "const": "PoolInstall"
+        },
+        "pool": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": ["kind", "pool", "config"],
+      "type": "object"
+    },
     "PoolPolicy": {
       "additionalProperties": false,
       "properties": {
@@ -934,6 +950,9 @@
           "$ref": "#/$defs/PolicyOperation"
         },
         {
+          "$ref": "#/$defs/PoolInstallOperation"
+        },
+        {
           "$ref": "#/$defs/DeploymentOperation"
         },
         {
@@ -1059,6 +1078,9 @@
           "anyOf": [
             {
               "const": "policy"
+            },
+            {
+              "const": "pool_install"
             },
             {
               "const": "deployment"

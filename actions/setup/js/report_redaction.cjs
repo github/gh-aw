@@ -15,6 +15,7 @@ const { normalizeReport } = require("./report_ast.cjs");
  */
 function isAgentSubtree(node) {
   if (node.agentTainted === false) return false;
+  if (node.type === "details" && Array.isArray(node.summary) && !node.summary.every(isAgentSubtree)) return false;
   if ("children" in node) return node.children.every(isAgentSubtree);
   if (node.type === "list") return node.items.every(item => item.every(isAgentSubtree));
   if (node.type === "table") return [...node.headers, ...node.rows.flat()].every(cell => cell.every(isAgentSubtree));
@@ -110,9 +111,11 @@ function redactReport(report, shouldRedact) {
         }
         case "details": {
           const children = blocks(node.children);
-          redacted ||= children.redacted;
-          if (agentSubtree && children.redacted) return redactionNotice();
-          return { ...node, children: children.nodes };
+          const summary = Array.isArray(node.summary) ? inlines(node.summary) : undefined;
+          const detailsRedacted = children.redacted || Boolean(summary?.redacted);
+          redacted ||= detailsRedacted;
+          if (agentSubtree && detailsRedacted) return redactionNotice();
+          return { ...node, summary: summary ? summary.nodes : node.summary, children: children.nodes };
         }
         case "alert":
         case "quote": {

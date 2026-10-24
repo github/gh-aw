@@ -9,7 +9,7 @@ For first-time setup, see [Using GitHub Copilot](/gh-aw/engines/copilot/). Share
 
 Copilot is the default engine. Grant [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) for organization-billed inference, or supply [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token). External providers use [BYOK configuration](#copilot-bring-your-own-key-byok-mode).
 
-The default CLI pin is `1.0.101`. `engine.version` overrides it; otherwise installation prefers a compatible trusted cached release before the pinned fallback. CLI-only execution is the default. `engine.copilot-sdk: true` or `engine.driver` selects SDK mode.
+The default CLI pin is `1.0.101`. The compiler embeds this version and its reviewed checksum-manifest digest in the generated workflow. Installation prefers that exact version from the trusted runner toolcache; a cache miss downloads and verifies the pinned release instead of selecting a version from the live compatibility matrix. `engine.version` overrides the default. CLI-only execution is the default. `engine.copilot-sdk: true` or `engine.driver` selects SDK mode.
 
 ## Capabilities and limitations
 
@@ -53,7 +53,11 @@ An explicit pin overrides the built-in manifest pin and bypasses the runner tool
 
 The engine's version and pin are inherited by detection and eval jobs that reuse that engine. A separate `safe-outputs.threat-detection.engine` override accepts its own `version` and `checksums-sha256`. For AWF, use [`sandbox.agent.checksums-sha256`](/gh-aw/reference/sandbox/#release-integrity-sandboxagentchecksums-sha256).
 
-Without an explicit pin, the existing trusted toolcache policy and built-in release pins apply. An unreviewed download still fails closed. A supplied pin requires a literal semantic release version such as `"1.0.101"` or `"v1.0.101"`; it cannot be combined with `latest`, an omitted version, or a version expression.
+The compiler supplies the reviewed digest automatically when `engine.version` is omitted or matches the compiler's default version. These generated installs pass `--prefer-toolcache`: the pin authenticates downloaded archives, not the cached host binary. A musl guest archive is still downloaded and verified when the host uses cache. User-supplied frontmatter pins continue to bypass the toolcache.
+
+Compilation fails if the compiler's default version or digest is missing or malformed. Other versions without an explicit pin retain the trusted toolcache policy and setup action's built-in release pins; an unreviewed download still fails closed. A frontmatter pin requires a literal semantic release version such as `"1.0.101"` or `"v1.0.101"`; it cannot be combined with `latest`, an omitted version, or a version expression.
+
+For maintainers, `pkg/constants/version_constants.go` stores `DefaultCopilotVersion` and `DefaultCopilotChecksumsSHA256` together. `bash scripts/update-copilot-version.sh VERSION` resolves both from the reviewed pin table, without downloading or trusting new release data. New releases must first be authenticated and added with `scripts/update-release-pins.sh`; the resolver refuses releases without a reviewed pin.
 
 ## Copilot Custom Configuration
 

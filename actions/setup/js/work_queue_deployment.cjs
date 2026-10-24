@@ -3,10 +3,13 @@
 
 const { canonical, closed, queueError } = require("./work_queue_codec.cjs");
 
-function initializeDeployments(state) {
-  state.deployments = new Map();
+/** @param {any} state @param {string[]} [selectedPools] */
+function initializeDeployments(state, selectedPools = undefined) {
+  if (selectedPools === undefined) state.deployments = new Map();
+  else state.deployments ??= new Map();
   if (state.policy.authorization !== "aw") return;
   for (const [pool, policy] of Object.entries(state.policy.pools)) {
+    if (selectedPools !== undefined && !selectedPools.includes(pool)) continue;
     const workers = new Map();
     for (const [name, profile] of Object.entries(policy.profiles)) {
       if (!profile.logical_contract) continue;

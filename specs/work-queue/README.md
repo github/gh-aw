@@ -38,7 +38,8 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 
 The current operator commands and keyboard browser are documented in the
 [queue reference](../../docs/src/content/docs/reference/work-queue.md#operator-commands).
-First-submit Policy bootstrap and later quiescent Policy updates are documented in the
+First-submit Policy bootstrap, explicit additive AW pool installation and later
+quiescent Policy updates are documented in the
 [deployment guide](../../docs/src/content/docs/patterns/workqueue-ops.md#deploy-a-native-queue).
 This directory retains executable specifications and formal evidence, not a
 second current user guide. The historical material below is model provenance,
@@ -362,15 +363,28 @@ unsupported. Historical Policy-only genesis records remain readable. This
 compatibility does not authorize new standalone seeding.
 
 AW-managed queues resolve global scheduling and backing Issue/label settings
-from `.github/workflows/aw.json`, with default-only automatic bootstrap.
-AW authorizes participants and approved worker targets; queue configuration
-contains no enrollment, producer allowlists, worker principals or credential
-scopes. Installed Policy remains authoritative until an explicit quiescent
-update. `AWPolicy` records the default concurrency 16, pending limit 4096,
-singleton assignment, three delivery attempts and 30-second retry interval.
-These are bootstrap constants, not a proof of optional-setting normalization.
-The older scheduling models retain their historical policy/authentication
-assumptions; no model proves AW host authorization or credential acquisition.
+from `.github/workflows/aw.json`. `QueueBootstrap` models only first-submit
+genesis; `QueuePoolInstall` separately models an explicit additive pool on an
+existing AW-managed queue. The latter preserves installed pools, accepted Work
+and the Policy epoch, and demonstrates an authorized producer can install
+without administrator authority. `RoutesApproved` represents the independent
+replay check that each profile is already authorized in installed Policy or an
+available registered Deployment revision; it is not the caller-local dispatch
+allowlist and cannot revive a revision marked unavailable.
+`RepositoryAllowlistPreserved` models replay's requirement that the added pool's
+repository allowlist be a subset of the repositories authorized by installed
+pools. Ordinary submit and dispatch intents do not implicitly publish
+`PoolInstall`; a missing pool is rejected before deployment synchronization.
+Host authorization, proposal validity, exact profile equality and native
+worker-route verification are abstract inputs, not proved by either model.
+Queue configuration contains no enrollment, producer allowlists, worker
+principals or credential scopes. Economic Policy changes still require an
+explicit quiescent update. `AWPolicy` records the default concurrency 16,
+pending limit 4096, singleton assignment, three delivery attempts and 30-second
+retry interval. These are bootstrap constants, not a proof of optional-setting
+normalization. The older scheduling models retain their historical
+policy/authentication assumptions; no model proves AW host authorization or
+credential acquisition.
 
 Run the focused checks using the official jar documented below:
 
@@ -378,6 +392,24 @@ Run the focused checks using the official jar documented below:
 TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=QueueBootstrap \
   bash specs/work-queue/check.sh
 ```
+
+The additive pool model has the same focused entry point:
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=QueuePoolInstall \
+  bash specs/work-queue/check.sh
+```
+
+| Configuration | Scope / expected result |
+|---|---|
+| `PoolInstall.cfg` | Check additive installation by an authorized producer. |
+| `PoolInstallExpandedRepositoryAllowlist.cfg` | Reject installation that widens the existing repository allowlist. |
+| `PoolInstallInvalidProposal.cfg` | Reject proposals that change existing Policy. |
+| `PoolInstallInvalidPool.cfg` | Reject an invalid new pool definition. |
+| `PoolInstallInvalidRoute.cfg` | Reject unverified/invalid worker routes. |
+| `PoolInstallUnapprovedRoute.cfg` | Reject otherwise valid routes absent from installed worker authority. |
+| `PoolInstallUnauthorized.cfg` | Reject publication without trusted host authorization. |
+| `PoolInstallProducerWitness.cfg` | Reach producer installation while preserving `Safety`; the deliberately false `NoProducerInstall` invariant must fail. |
 
 | Configuration | Scope / expected result |
 |---|---|
