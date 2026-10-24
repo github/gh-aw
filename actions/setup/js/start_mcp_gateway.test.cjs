@@ -208,7 +208,7 @@ describe("MCP gateway CA launcher arguments", () => {
       ]);
       expect(options.env.NO_PROXY).toBe(inheritedProxy ? "host.docker.internal,awf-enclave-mcp" : undefined);
       expect(launchedConfig.mcpServers.public).not.toHaveProperty("caCertFile");
-      expect(core.setFailed).toHaveBeenCalledExactlyOnceWith("ERROR: Failed to start gateway container");
+      expect(core.setFailed).toHaveBeenCalledExactlyOnceWith("ERR_SYSTEM: Failed to start gateway container");
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
@@ -794,9 +794,9 @@ describe("start_mcp_gateway startup diagnostics", () => {
       const error = await waitForSafeOutputsReadiness(config, port, "readiness-test-key", retryConfig, startupStart).catch(err => err);
 
       expect(error.message).toBe(
-        "MCP gateway safeoutputs readiness failed after 0 attempt(s): no tools registered or backend unavailable. The agent will not start. Check MCP gateway startup logs for connection resets (ECONNRESET) or delayed backend registration. Last probe: insufficient startup budget for a readiness probe (requires at least 750ms)."
+        "ERR_SYSTEM: MCP gateway safeoutputs readiness failed after 0 attempt(s): no tools registered or backend unavailable. The agent will not start. Check MCP gateway startup logs for connection resets (ECONNRESET) or delayed backend registration. Last probe: insufficient startup budget for a readiness probe (requires at least 750ms)."
       );
-      expect(error.cause.message).toBe("insufficient startup budget for a readiness probe (requires at least 750ms)");
+      expect(error.cause.message).toBe("ERR_SYSTEM: insufficient startup budget for a readiness probe (requires at least 750ms)");
       expect(requests).toEqual([]);
       expect(global.core.warning).not.toHaveBeenCalled();
       expect(Date.now()).toBe(now);
@@ -898,7 +898,10 @@ describe("start_mcp_gateway startup diagnostics", () => {
       expect(gate).toBeLessThan(source.indexOf("writeGatewayStartupMarker(gatewayStartupMarker)"));
       expect(gate).toBeLessThan(source.indexOf("fs.appendFileSync(githubOutput, outputs"));
       expect(source).toContain("stopGatewayProcess(activeGatewayPid)");
-      expect(source).toContain("core.setFailed(`FATAL: ${message}`)");
+      expect(source).toContain("function setFailed(message)");
+      expect(source).toContain("core.setFailed(/^ERR_[A-Z]+:/.test(text) ? text : `${ERR_SYSTEM}: ${text}`)");
+      expect(source).toContain("setFailed(getErrorMessage(err));");
+      expect(source).toContain("setFailed(message);");
       expect(source).toContain("const startupDeadline = gatewayStartTime + healthRetryConfig.backendStartupTimeoutMs + MCP_GATEWAY_HEALTH_REGISTRATION_MARGIN_MS");
       expect(source).toContain("httpGet(healthUrl, Math.min(2000, remainingMs))");
     });

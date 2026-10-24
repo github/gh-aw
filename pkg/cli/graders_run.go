@@ -250,7 +250,7 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 }
 
 func stageGraderRuntime(directory string) (string, error) {
-	for _, name := range []string{"trace_graders.cjs", "grader_session.cjs", "trajectory_graders.cjs", "builtin_graders.json", "working_set_metrics.cjs", "custom_graders.cjs", "custom_grader_worker.cjs", "operational_value_grader.cjs", "operational_value_worker.cjs"} {
+	for _, name := range []string{"error_codes.cjs", "trace_graders.cjs", "grader_session.cjs", "trajectory_graders.cjs", "builtin_graders.json", "working_set_metrics.cjs", "custom_graders.cjs", "custom_grader_worker.cjs", "operational_value_grader.cjs", "operational_value_worker.cjs"} {
 		content, err := setup.SessionParserSources.ReadFile("js/" + name)
 		if err != nil {
 			return "", fmt.Errorf("cannot load grader runtime %s: %w", name, err)

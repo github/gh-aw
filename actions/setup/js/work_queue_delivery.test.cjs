@@ -8,6 +8,11 @@ import { createClaimDeliveryVerifier, validateDeliveryContract, verifyClaimDeliv
 checks.registerTests({ describe, it });
 
 describe("historical diagnostic delivery contracts", () => {
+  it("uses standardized codes for invalid verifier configuration", () => {
+    const original = assignment([{ type: "create_issue", min: 1, max: 1 }]);
+    expect(() => createClaimDeliveryVerifier({ assignment: original })).toThrow(/^ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED:/);
+  });
+
   const assignment = outputs =>
     normalizeAssignment({
       version: 3,

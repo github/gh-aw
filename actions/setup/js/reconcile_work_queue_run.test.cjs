@@ -40,7 +40,7 @@ describe("inline trusted worker termination", () => {
     options.jobNames = {};
 
     await expect(main(options)).rejects.toMatchObject({
-      message: "work_queue_worker_job_context_invalid",
+      message: "ERR_VALIDATION: work_queue_worker_job_context_invalid",
       code: "work_queue_worker_job_context_invalid",
       category: "ERR_WORK_QUEUE_RECONCILIATION",
     });
@@ -189,7 +189,7 @@ describe("inline trusted worker termination", () => {
     const { options } = setup();
     if (kind === "rerun") options.context.runAttempt = 2;
     else options.context.job = "safe_outputs";
-    await expect(main(options)).rejects.toThrow("work_queue_worker_finalizer_context_invalid");
+    await expect(main(options)).rejects.toThrow("ERR_VALIDATION: work_queue_worker_finalizer_context_invalid");
     expect(options.readWorkQueueLog).not.toHaveBeenCalled();
   });
 
@@ -307,7 +307,7 @@ describe("scheduled work queue recovery", () => {
     try {
       if (pending && !deferIssueFailure) {
         await expect(maintenance({ ...options, projectIssues: true, deferIssueFailure })).rejects.toMatchObject({
-          message: expect.stringMatching(/^work_queue_issue_synchronization_pending; queue transitions are committed/),
+          message: expect.stringMatching(/^ERR_VALIDATION: work_queue_issue_synchronization_pending; queue transitions are committed/),
           code: "work_queue_issue_synchronization_pending",
           category: "ERR_WORK_QUEUE_RECONCILIATION",
         });

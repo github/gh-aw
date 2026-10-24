@@ -56,6 +56,10 @@ function pin(report, field) {
 }
 
 describe("model_pin_check acceptance cases", () => {
+  it("uses a standardized code for missing CLI configuration", () => {
+    expect(() => main([])).toThrow(/^ERR_MODEL_PIN_REFLECT_REQUIRED:/);
+  });
+
   it("1. a retired copilot/claude-opus-5 pin is unresolvable and listed under Action required", () => {
     const report = check({ ".github/workflows/gate.md": "---\nengine: pi\nmodel: copilot/claude-opus-5\n---\n# Gate\n" });
     const result = pin(report, "model");
@@ -434,7 +438,7 @@ describe("repository-pins-reflection-regression", () => {
   ];
 
   // Known unresolvable pins on main, by exact identity; any other unresolvable pin fails.
-  const KNOWN_MAIN_FAILURES = [{ workflow: ".github/workflows/video-analyzer.md", field: "model", configured: "copilot/gemini-3.7-flash", cause: "model_unavailable" }];
+  const KNOWN_MAIN_FAILURES = [];
 
   function repositoryReport() {
     const bytes = fs.readFileSync(REFLECT_FILE);

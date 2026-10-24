@@ -33,7 +33,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { ERR_MODEL_PIN_REFLECT_REQUIRED } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_MODEL_PIN_REFLECT_REQUIRED } = require("./error_codes.cjs");
 const { parseDocument } = require("./work_queue_yaml.cjs");
 const { extractInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { buildProviderCatalog, canonicalModelProvider, isLiveModelId, loadBuiltinModelAliases, ModelAliasResolutionError, resolveConfiguredModel, resolveModelAlias, splitModelIdentifier } = require("./resolve_model_alias.cjs");
@@ -863,7 +863,7 @@ function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
     const match = argv[index].match(/^--([a-z-]+)(?:=(.*))?$/);
-    if (!match) throw new Error(`unexpected argument: ${argv[index]}`);
+    if (!match) throw new Error(`${ERR_CONFIG}: unexpected argument: ${argv[index]}`);
     args[match[1]] = match[2] !== undefined ? match[2] : argv[++index] || "";
   }
   return args;
