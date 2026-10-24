@@ -955,10 +955,10 @@
       "digest": "sha256:41835613992df88f51e923bad486f96dfb2e6cda29f13e217df41833284ae382",
       "pinned_image": "ghcr.io/github/gh-aw-node@sha256:41835613992df88f51e923bad486f96dfb2e6cda29f13e217df41833284ae382"
     },
-    "ghcr.io/github/github-mcp-server:v2.0.2": {
-      "image": "ghcr.io/github/github-mcp-server:v2.0.2",
-      "digest": "sha256:ffced0d76e77428532a2ced185516992d77fd146d69eec2f244e6237d1a97796",
-      "pinned_image": "ghcr.io/github/github-mcp-server:v2.0.2@sha256:ffced0d76e77428532a2ced185516992d77fd146d69eec2f244e6237d1a97796"
+    "ghcr.io/github/github-mcp-server:v2.0.3": {
+      "image": "ghcr.io/github/github-mcp-server:v2.0.3",
+      "digest": "sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132",
+      "pinned_image": "ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"
     },
     "ghcr.io/githubnext/gh-aw-router:0.1.3": {
       "image": "ghcr.io/githubnext/gh-aw-router:0.1.3",
