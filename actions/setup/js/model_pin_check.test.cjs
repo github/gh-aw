@@ -434,7 +434,7 @@ describe("repository-pins-reflection-regression", () => {
   ];
 
   // Known unresolvable pins on main, by exact identity; any other unresolvable pin fails.
-  const KNOWN_MAIN_FAILURES = [{ workflow: ".github/workflows/video-analyzer.md", field: "model", configured: "copilot/gemini-3.7-flash", cause: "model_unavailable" }];
+  const KNOWN_MAIN_FAILURES = [];
 
   function repositoryReport() {
     const bytes = fs.readFileSync(REFLECT_FILE);

@@ -56,6 +56,8 @@ checkout:
   - `"*"` - fetch all remote branches
   - `"refs/pulls/open/*"` - all open pull-request refs
   - Branch names, glob patterns (e.g., `"feature/*"`)
+  - Each pattern is checked and fetched independently for static and runtime-selected repositories. Unmatched patterns are skipped; authentication, network, and other discovery or fetch errors remain fatal. For example, `fetch: ["main", "my-prefix/*"]` still fetches `main` when no branches match `my-prefix/*`.
+  - Discovery and fetch use the checkout's token without persisting credentials; fetches preserve the effective `fetch-depth` (`1` by default, `0` for full history).
 - `sparse-checkout:` - Newline-separated glob patterns for sparse checkout; merged when multiple configs target the same path
 - `submodules:` - Submodule handling: `"recursive"`, `"true"`, or `"false"`. `multi: true` checkouts require `false` or omission — submodule URLs can otherwise bypass the allowlist.
 - `lfs:` - Download Git LFS objects (boolean, default: `false`). `multi: true` checkouts reject `lfs: true` for the same allowlist-bypass reason.
