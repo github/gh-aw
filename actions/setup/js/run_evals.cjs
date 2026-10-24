@@ -10,7 +10,7 @@
  *   - Reads configured eval questions from GH_AW_EVALS_QUESTIONS (JSON array)
  *   - Reads the agent output from /tmp/gh-aw/evals/agent_output.json
  *   - Builds a multi-question binary evaluation prompt
- *   - Writes the prompt to /tmp/gh-aw/aw-prompts/prompt.txt for the engine
+ *   - Writes combined and split prompt files under /tmp/gh-aw/aw-prompts
  *
  * Phase "parse" (runs AFTER the agentic engine):
  *   - Reads the engine output log from /tmp/gh-aw/evals/evals.log
@@ -43,6 +43,16 @@ const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const EVALS_DIR = "/tmp/gh-aw/evals";
 const EVALS_LOG_PATH = "/tmp/gh-aw/evals/evals.log";
 const AGENT_OUTPUT_FILENAME = "agent_output.json";
+
+/**
+ * Encapsulates agent output as JSON data and escapes tag delimiters.
+ * @param {string} agentOutput
+ * @returns {string}
+ */
+function sanitizeAgentOutputForPrompt(agentOutput) {
+  if (!agentOutput) return "";
+  return JSON.stringify(agentOutput).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+}
 
 // ---------------------------------------------------------------------------
 // Phase 1 – setup: write multi-question evaluation prompt
@@ -100,11 +110,14 @@ async function setupMain() {
     core.warning(`Agent output not found at ${agentOutputPath}. ` + "Ensure the agent artifact includes agent_output.json. " + "Evaluation will proceed without agent context.");
   }
 
-  const prompt = buildEvalPrompt(questions, agentOutputContent);
+  const prompt = buildEvalPrompt(questions, sanitizeAgentOutputForPrompt(agentOutputContent));
 
   try {
     fs.mkdirSync("/tmp/gh-aw/aw-prompts", { recursive: true });
     fs.writeFileSync("/tmp/gh-aw/aw-prompts/prompt.txt", prompt);
+    // Replace split prompts restored from the agent artifact for engines such as Pi.
+    fs.writeFileSync("/tmp/gh-aw/aw-prompts/user.txt", prompt);
+    fs.writeFileSync("/tmp/gh-aw/aw-prompts/system.txt", "");
   } catch (err) {
     throw new Error(`${ERR_SYSTEM}: Failed to prepare eval prompt file: ${getErrorMessage(err)}`, { cause: err });
   }
@@ -159,13 +172,10 @@ async function parseMain() {
   }
   core.info(`Parsing evals log: ${EVALS_LOG_PATH} (${logContent.length} bytes)`);
 
-  // Build a search corpus that includes both raw log lines AND any assistant text
-  // extracted from JSONL log entries (e.g. Pi engine turn_end events).  The engine
-  // may emit answers inside JSON-encoded strings where newlines are represented as
-  // the escape sequence "\n", so the line-based regex patterns below would miss them
-  // unless the JSON content is decoded first.
+  // Prefer assistant text extracted from JSONL so echoed user prompts cannot
+  // override the judge response. Fall back to the raw log for plain-text engines.
   const extractedText = extractAssistantTextFromJsonlLog(logContent);
-  const searchContent = extractedText ? logContent + "\n" + extractedText : logContent;
+  const searchContent = extractedText || logContent;
 
   // Collect all positional Q1/Q2/... answers from the log for fallback lookup
   const positionalAnswers = extractAllPositionalAnswers(searchContent);

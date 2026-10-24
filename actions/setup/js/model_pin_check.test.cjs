@@ -433,9 +433,6 @@ describe("repository-pins-reflection-regression", () => {
     [".github/workflows/smoke-work-queue.md", "engine.fallback-models[1]"],
   ];
 
-  // Known unresolvable pins on main, by exact identity; any other unresolvable pin fails.
-  const KNOWN_MAIN_FAILURES = [{ workflow: ".github/workflows/video-analyzer.md", field: "model", configured: "copilot/gemini-3.7-flash", cause: "model_unavailable" }];
-
   function repositoryReport() {
     const bytes = fs.readFileSync(REFLECT_FILE);
     expect(crypto.createHash("sha256").update(bytes).digest("hex")).toBe(REFLECT_SHA256);
@@ -463,8 +460,8 @@ describe("repository-pins-reflection-regression", () => {
     }
 
     const unresolvable = report.action_required.map(({ workflow, field, configured, cause }) => ({ workflow, field, configured, cause }));
-    expect(unresolvable).toEqual(KNOWN_MAIN_FAILURES);
-    expect(report.counts.unresolvable).toBe(KNOWN_MAIN_FAILURES.length);
+    expect(unresolvable).toEqual([]);
+    expect(report.counts.unresolvable).toBe(0);
   });
 
   it("resolves the sub-agent aliases and keeps the GPT sub-agents on GPT models", () => {
