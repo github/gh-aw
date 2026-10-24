@@ -580,16 +580,17 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     expect(run.logs.join("\n")).not.toMatch(/not applied/);
   });
 
-  it("fails closed for an alias effort Codex does not accept", async () => {
+  it("applies an alias effort Codex accepts", async () => {
     const run = codexLayout();
     run.env.GH_AW_MODEL_ALIASES = JSON.stringify({ fast: ["openai/gpt-5.4-mini?effort=none"] });
     stageInline(run, "codex", { "paper-screener": arxivAgents()["paper-screener"].replace("model: openai/gpt-5.4-mini", "model: fast") });
 
     const outcome = await apply(run);
 
-    expect(outcome.ok).toBe(false);
-    expect(run.logs).toContainEqual(expect.stringMatching(/codex sub-agent 'paper-screener': model 'fast' resolves with effort 'none': .*not supported by the codex engine.*Refusing to start Codex/));
-    expect(roleFiles(run)).toEqual([]);
+    expect(outcome.ok).toBe(true);
+    expect(outcome.resolutions).toEqual([{ name: "paper-screener", configuredModel: "fast", model: "gpt-5.4-mini", status: "resolved", params: { effort: "none" } }]);
+    expect(readRole(run, "paper-screener")).toMatchObject({ model: "gpt-5.4-mini", model_reasoning_effort: "none" });
+    expect(run.logs.join("\n")).not.toMatch(/not applied/);
   });
 
   it.each([

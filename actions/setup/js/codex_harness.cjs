@@ -529,6 +529,18 @@ async function resolveCodexConfiguredModel(options) {
 }
 
 /**
+ * Classify a Codex routing selection error. An effort outside the routing contract
+ * (for example Codex-native "ultra") is rejected by the shared selection validator
+ * before the Codex effort mapper runs; report it as unsupported_effort, like a mapper
+ * rejection. Every other error keeps the shared classification.
+ * @param {string|null|undefined} error
+ * @returns {string}
+ */
+function getCodexRoutingFailureCode(error) {
+  return /^AWF \/reflect returned unsupported reasoning effort /.test(error || "") ? "unsupported_effort" : getAWFModelRoutingFailureCode(error);
+}
+
+/**
  * Resolve and apply AWF's selection to a Codex invocation.
  * @param {any} reflectData
  * @param {string[]} args
@@ -539,7 +551,7 @@ function resolveCodexModelRouting(reflectData, args) {
   if (result.error || !result.selection) {
     recordAWFModelRoutingOutcome({
       status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",
-      failure_code: reflectData?.routing?.failure_code || getAWFModelRoutingFailureCode(result.error),
+      failure_code: reflectData?.routing?.failure_code || getCodexRoutingFailureCode(result.error),
       detail: result.error,
     });
     return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
@@ -1375,6 +1387,7 @@ if (typeof module !== "undefined" && module.exports) {
     removeCodexRoutingOverrides,
     applyCodexRoutingEffort,
     resolveCodexModelRouting,
+    getCodexRoutingFailureCode,
     getCodexModelEnvVar,
     resolvePostResultWatchdogIdleTimeoutMs,
     createMCPCallWatchdog,

@@ -5,7 +5,8 @@ import os from "os";
 import path from "path";
 
 const require = createRequire(import.meta.url);
-const { ROUTING_REASONING_EFFORTS, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, resolveAWFModelRoutingSelection } = require("./awf_model_routing.cjs");
+const { ROUTING_REASONING_EFFORTS, getAWFModelRoutingFailureCode, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, resolveAWFModelRoutingSelection } = require("./awf_model_routing.cjs");
+const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
 
 const reflectData = {
   endpoints: [{ provider: "github", configured: true, models: ["claude-opus-5", "gpt-5.6-sol"] }],
@@ -167,10 +168,47 @@ describe("awf_model_routing.cjs", () => {
   it.each([
     ["claude", "none"],
     ["claude", "minimal"],
-    ["codex", "none"],
-    ["codex", "max"],
   ])("rejects unsupported %s effort %s", (engine, effort) => {
     expect(mapAWFRoutingEffort(engine, effort).error).toContain(`"${effort}"`);
+  });
+
+  it.each(["none", "max"])("maps a selected Codex %s effort unchanged", effort => {
+    // Derived fixture: recorded /reflect with an added selected routing block.
+    const selected = resolveAWFModelRoutingSelection(reflectFixtures.withRoutingSelection("gpt-5.6-luna", effort), true, ["/responses"], true);
+    expect(selected.error).toBeNull();
+    expect(selected.selection).toMatchObject({ wire_model: "gpt-5.6-luna", effort, endpoint: "/responses" });
+    expect(mapAWFRoutingEffort("codex", selected.selection.effort)).toEqual({ effort, error: null });
+  });
+
+  it("codex_routing_effort_contract_requires_pin_review", () => {
+    // Reviewed pair: Codex 0.163.0 accepts all seven routing-contract efforts unchanged
+    // (openai/codex rust-v0.163.0 codex-rs/protocol/src/openai_models.rs). Both values are
+    // hard-coded on purpose; a pin bump must re-review the Codex entry in mapAWFRoutingEffort.
+    const reviewedCodexVersion = "0.163.0";
+    const reviewedCodexEfforts = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+    const versionConstants = fs.readFileSync(new URL("../../../pkg/constants/version_constants.go", import.meta.url), "utf8");
+    const pinned = versionConstants.match(/^const DefaultCodexVersion Version = "([^"]+)"/m)?.[1];
+    expect(
+      pinned,
+      `Review required: DefaultCodexVersion is ${pinned}, but the Codex routing effort list in mapAWFRoutingEffort was reviewed for ${reviewedCodexVersion}. Check the new Codex ReasoningEffort parser, then update the list and this test together.`
+    ).toBe(reviewedCodexVersion);
+    expect(reviewedCodexEfforts.filter(effort => mapAWFRoutingEffort("codex", effort).error === null)).toEqual(reviewedCodexEfforts);
+    for (const effort of reviewedCodexEfforts) expect(mapAWFRoutingEffort("codex", effort)).toEqual({ effort, error: null });
+    for (const effort of ["ultra", "persistent", "off", "custom"]) expect(mapAWFRoutingEffort("codex", effort).error).toContain(`"${effort}"`);
+  });
+
+  it("non_codex_routing_effort_mappings_are_unchanged", () => {
+    const contract = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+    const claude = ["low", "medium", "high", "xhigh", "max"];
+    for (const effort of contract) {
+      expect(mapAWFRoutingEffort("claude", effort)).toEqual(claude.includes(effort) ? { effort, error: null } : { effort: null, error: `AWF model routing effort "${effort}" is not supported by the claude engine` });
+      expect(mapAWFRoutingEffort("pi", effort)).toEqual({ effort: effort === "none" ? "off" : effort, error: null });
+      expect(mapAWFRoutingEffort("copilot", effort)).toEqual({ effort, error: null });
+    }
+    for (const engine of ["claude", "codex", "pi", "copilot"]) expect(mapAWFRoutingEffort(engine, null)).toEqual({ effort: null, error: null });
+    expect(resolveAWFModelRoutingSelection(reflectFixtures.withRoutingSelection("gpt-5.6-luna", null), true, ["/responses"], true).selection?.effort).toBeNull();
+    expect(resolveAWFModelRoutingSelection(reflectFixtures.withRoutingSelection("gpt-5.6-luna", "ultra"), true, ["/responses"], true).error).toBe("AWF /reflect returned unsupported reasoning effort ultra");
+    expect(getAWFModelRoutingFailureCode("AWF /reflect returned unsupported reasoning effort ultra")).toBe("invalid_selection");
   });
 
   it.each([

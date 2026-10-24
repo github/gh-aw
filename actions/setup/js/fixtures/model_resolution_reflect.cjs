@@ -77,4 +77,19 @@ function withGeminiModels(models) {
   return reflect;
 }
 
-module.exports = { ddgReflect, builtinAliases, withCopilotModels, withoutCopilotModels, incompleteDiscovery, withGeminiModels };
+/**
+ * Derived: the recorded file (which has `routing: null`) with a selected AWF routing
+ * block added, in the /reflect `routing.selection` shape (`wire_model`, `effort`,
+ * `endpoint`). Not a downloaded artifact of any run; the recorded Copilot endpoint's
+ * `routing_models` (for example gpt-5.6-luna advertising none..max) are unchanged.
+ * @param {string} wireModel
+ * @param {string|null} effort
+ * @param {string} [endpoint]
+ */
+function withRoutingSelection(wireModel, effort, endpoint = "/responses") {
+  const reflect = ddgReflect();
+  reflect.routing = { status: "selected", selection: { provider: "copilot", model: `github-copilot/${wireModel}`, wire_model: wireModel, effort, endpoint } };
+  return reflect;
+}
+
+module.exports = { ddgReflect, builtinAliases, withCopilotModels, withoutCopilotModels, incompleteDiscovery, withGeminiModels, withRoutingSelection };
