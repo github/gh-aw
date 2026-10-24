@@ -27,7 +27,7 @@ func (c *Compiler) generateUploadAccessLogs(yaml *strings.Builder, tools map[str
 // and reliability. The step always runs (even on cancellation) and ignores missing files.
 // Uploads require successful built-in and custom secret redaction.
 // prefix is prepended to the artifact name to avoid clashes in workflow_call context.
-func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string, data *WorkflowData) {
+func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string, data *WorkflowData, protectedSessionCapture bool) {
 	if len(paths) == 0 {
 		compilerYamlArtifactsLog.Print("No paths to upload, skipping unified artifact upload")
 		return
@@ -42,7 +42,11 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 	c.stepOrderTracker.RecordArtifactUpload("Upload agent artifacts", paths)
 
 	yaml.WriteString("      - name: Upload agent artifacts\n")
-	yaml.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
+	condition := "always() && " + secretRedactionSuccessCondition(data)
+	if protectedSessionCapture {
+		condition += " && steps.parse_agent_logs.outcome == 'success'"
+	}
+	yaml.WriteString("        if: " + condition + "\n")
 	yaml.WriteString("        continue-on-error: true\n")
 	yaml.WriteString("        uses: " + c.getActionPin("actions/upload-artifact") + "\n")
 	yaml.WriteString("        with:\n")
@@ -60,12 +64,45 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 }
 
 func (c *Compiler) generateTrackedSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData) {
+	secretReferences := CollectSecretReferences(yamlContent)
+	body := injectProtectedCaptureSecretEnvironment(yaml.String(), secretReferences)
 	var step strings.Builder
 	c.generateSecretRedactionStep(&step, yamlContent, data)
-	yaml.WriteString(strings.Replace(step.String(),
+	redactionStep := strings.Replace(step.String(),
 		"      - name: Redact secrets in logs\n",
 		"      - name: Redact secrets in logs\n        id: redact_secrets\n",
-		1))
+		1)
+	yaml.Reset()
+	yaml.WriteString(body)
+	yaml.WriteString(redactionStep)
+}
+
+func injectProtectedCaptureSecretEnvironment(yamlContent string, secretReferences []string) string {
+	if len(secretReferences) == 0 {
+		return yamlContent
+	}
+	const parserStep = "      - name: Parse agent logs for step summary\n"
+	const protectedCapture = "          GH_AW_PROTECTED_SESSION_CAPTURE: 1\n"
+	start := strings.Index(yamlContent, parserStep)
+	if start < 0 {
+		return yamlContent
+	}
+	end := len(yamlContent)
+	if nextStep := strings.Index(yamlContent[start+len(parserStep):], "\n      - name:"); nextStep >= 0 {
+		end = start + len(parserStep) + nextStep
+	}
+	step := yamlContent[start:end]
+	if !strings.Contains(step, protectedCapture) {
+		return yamlContent
+	}
+	var secretEnvironment strings.Builder
+	secretEnvironment.WriteString("          GH_AW_SECRET_NAMES: '" + strings.Join(secretReferences, ",") + "'\n")
+	for _, secretName := range secretReferences {
+		escapedName := escapeSingleQuoteBackslash(secretName)
+		secretEnvironment.WriteString("          SECRET_" + escapedName + ": ${{ secrets." + secretName + " }}\n")
+	}
+	step = strings.Replace(step, protectedCapture, protectedCapture+secretEnvironment.String(), 1)
+	return yamlContent[:start] + step + yamlContent[end:]
 }
 
 // generateAgentOutputFallbackUpload generates a small, dedicated artifact upload containing

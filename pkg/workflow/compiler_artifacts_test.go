@@ -38,6 +38,17 @@ func extractWorkflowStepByName(t *testing.T, workflowYAML, stepName string) stri
 	return stepSection
 }
 
+func TestUnifiedArtifactUploadRequiresProtectedParserSuccess(t *testing.T) {
+	compiler := NewCompiler()
+	var protected strings.Builder
+	compiler.generateUnifiedArtifactUpload(&protected, []string{"/tmp/gh-aw/agent-session.jsonl"}, "", &WorkflowData{}, true)
+	assert.Contains(t, protected.String(), "steps.parse_agent_logs.outcome == 'success'")
+
+	var unprotected strings.Builder
+	compiler.generateUnifiedArtifactUpload(&unprotected, []string{"/tmp/gh-aw/agent-session.jsonl"}, "", &WorkflowData{}, false)
+	assert.NotContains(t, unprotected.String(), "parse_agent_logs")
+}
+
 func TestArtifactDownloadSingleArtifactUsesExactName(t *testing.T) {
 	steps := strings.Join(buildArtifactDownloadSteps(ArtifactDownloadConfig{
 		ArtifactName: "detection",

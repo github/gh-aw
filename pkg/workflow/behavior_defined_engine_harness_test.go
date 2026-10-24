@@ -110,6 +110,61 @@ func TestBehaviorDefinedEngineHarnessScript(t *testing.T) {
 		assert.Contains(t, execStepContent, "RUNNER_TEMP:", "RUNNER_TEMP must be set")
 	})
 
+	t.Run("protected_session_capture_uses_runner_only_log", func(t *testing.T) {
+		def := newHarnessEngineDefinition()
+		def.Behaviors.Execution.ProtectedSessionCapture = true
+		def.Behaviors.Execution.Env = map[string]string{"RUNNER_TEMP": "/tmp/overridden"}
+		def.Behaviors.LogParser = `function parseLog() { return { markdown: "", logEntries: [] }; }`
+		protectedEngine, err := NewBehaviorDefinedEngine(def)
+		require.NoError(t, err)
+
+		steps := protectedEngine.GetExecutionSteps(&WorkflowData{
+			Name: "test",
+			EngineConfig: &EngineConfig{Env: map[string]string{
+				"RUNNER_TEMP": "/tmp/engine-overridden",
+			}},
+			SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Env: map[string]string{
+				"RUNNER_TEMP":                     "/tmp/agent-overridden",
+				"GH_AW_PROTECTED_SESSION_CAPTURE": "0",
+			}}},
+		}, "/tmp/gh-aw/agent-stdio.log")
+		require.Len(t, steps, 3)
+		execStepContent := strings.Join(steps[len(steps)-1], "\n")
+
+		assert.Contains(t, execStepContent, "GH_AW_PROTECTED_SESSION_CAPTURE: 1")
+		assert.Contains(t, execStepContent, "RUNNER_TEMP: ${{ runner.temp }}")
+		assert.NotContains(t, execStepContent, "/tmp/overridden")
+		assert.NotContains(t, execStepContent, "/tmp/engine-overridden")
+		assert.NotContains(t, execStepContent, "/tmp/agent-overridden")
+		assert.Contains(t, execStepContent, `--capture-command-output "${RUNNER_TEMP}/gh-aw-protected-capture-${GH_AW_PROTECTED_CAPTURE_ID}"`)
+		assert.Contains(t, execStepContent, "GH_AW_PROTECTED_CAPTURE_ID: "+protectedSessionCaptureID)
+		assert.Contains(t, execStepContent, `exec "$GH_AW_NODE_EXEC"`)
+		assert.NotContains(t, execStepContent, "tee ")
+		assert.Contains(t, execStepContent, `printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt`)
+		assert.NotContains(t, execStepContent, "tee -a /tmp/gh-aw/agent-stdio.log")
+		assert.Equal(t, protectedSessionCaptureLogPath, protectedEngine.GetLogFileForParsing())
+
+		var parserStep strings.Builder
+		parserStep.WriteString("      - name: Configure secret\n        env:\n          VALUE: ${{ secrets.CAPTURE_TEST_SECRET }}\n")
+		NewCompiler().generateLogParsing(&parserStep, &WorkflowData{}, protectedEngine)
+		assert.Contains(t, parserStep.String(), "GH_AW_AGENT_OUTPUT: "+protectedSessionCaptureLogPath)
+		assert.Contains(t, parserStep.String(), "GH_AW_PROTECTED_SESSION_CAPTURE: 1")
+		assert.Contains(t, parserStep.String(), "id: parse_agent_logs")
+		NewCompiler().generateTrackedSecretRedactionStep(&parserStep, parserStep.String(), &WorkflowData{})
+		assert.Contains(t, parserStep.String(), "GH_AW_SECRET_NAMES: 'CAPTURE_TEST_SECRET'")
+		assert.Contains(t, parserStep.String(), "SECRET_CAPTURE_TEST_SECRET: ${{ secrets.CAPTURE_TEST_SECRET }}")
+	})
+
+	t.Run("default_session_capture_remains_shared", func(t *testing.T) {
+		steps := engine.GetExecutionSteps(&WorkflowData{Name: "test"}, "/tmp/gh-aw/agent-stdio.log")
+		require.Len(t, steps, 2)
+		execStepContent := strings.Join(steps[1], "\n")
+
+		assert.NotContains(t, execStepContent, "GH_AW_PROTECTED_SESSION_CAPTURE")
+		assert.NotContains(t, execStepContent, "gh-aw-protected-capture")
+		assert.Contains(t, execStepContent, "tee -a /tmp/gh-aw/agent-stdio.log")
+	})
+
 	t.Run("harness_filename", func(t *testing.T) {
 		assert.Equal(t, "testharness_harness.cjs", engine.harnessScriptFilename())
 	})
@@ -225,6 +280,75 @@ func TestBehaviorDefinedEngineNoHarnessScript(t *testing.T) {
 	assert.Contains(t, execStepContent, `"$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"`, "direct execution must include inline prompt substitution")
 	assert.NotContains(t, execStepContent, "GH_AW_NODE_EXEC", "should not use node harness when harness-script is absent")
 	assert.NotContains(t, execStepContent, "GHAW_HARNESS_SCRIPT_EOF", "no harness write step should be present")
+
+	def.Behaviors.Execution.ProtectedSessionCapture = true
+	def.Behaviors.LogParser = `function parseLog() { return { markdown: "", logEntries: [] }; }`
+	protectedEngine, err := NewBehaviorDefinedEngine(def)
+	require.NoError(t, err)
+	protectedSteps := protectedEngine.GetExecutionSteps(workflowData, "/tmp/test.log")
+	require.Len(t, protectedSteps, 2)
+	protectedStepContent := strings.Join(protectedSteps[len(protectedSteps)-1], "\n")
+	assert.Contains(t, protectedStepContent, "GH_AW_PROTECTED_SESSION_CAPTURE: 1")
+	assert.Contains(t, protectedStepContent, "awf --config")
+	assert.Contains(t, protectedStepContent, "gh-aw-protected-capture")
+	assert.Contains(t, protectedStepContent, "exec noharness-cli run")
+}
+
+func TestBehaviorDefinedEngineProtectedSessionCaptureValidation(t *testing.T) {
+	def := newHarnessEngineDefinition()
+	def.Behaviors.Execution.ProtectedSessionCapture = true
+
+	_, err := NewBehaviorDefinedEngine(def)
+	require.ErrorContains(t, err, "protected-session-capture without a log-parser")
+
+	def.Behaviors.LogParser = `function parseLog() { return { markdown: "", logEntries: [] }; }`
+	engine, err := NewBehaviorDefinedEngine(def)
+	require.NoError(t, err)
+	require.NoError(t, validateProtectedSessionCaptureSandbox(engine, nil))
+	require.ErrorContains(
+		t,
+		validateProtectedSessionCaptureSandbox(engine, &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Disabled: true}}}),
+		"protected-session-capture requires sandbox.agent to be enabled",
+	)
+
+	def.Behaviors.LogParser = "function parseLog() {}\n" + logParserHeredocDelimiter + "\n"
+	_, err = NewBehaviorDefinedEngine(def)
+	require.ErrorContains(t, err, "protected-session-capture without a usable log-parser")
+}
+
+func TestProtectedSessionCaptureRequiresNativeAWF(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		version string
+		runtime AgentRuntime
+		args    []string
+		wantErr string
+	}{
+		{name: "default"},
+		{name: "first_supported", version: "v0.28.67"},
+		{name: "old", version: "v0.28.66", wantErr: "requires AWF v0.28.67"},
+		{name: "cloud_hypervisor", runtime: AgentRuntimeCloudHypervisor, wantErr: "does not support microVM"},
+		{name: "nvx", runtime: AgentRuntimeNVX, wantErr: "does not support microVM"},
+		{name: "legacy_docker", runtime: AgentRuntimeDockerSudoIptables},
+		{name: "tty_argument", args: []string{"--tty"}, wantErr: "does not support sandbox.agent.args flag --tty"},
+		{name: "tty_equals_argument", args: []string{"--tty=true"}, wantErr: "does not support sandbox.agent.args flag --tty"},
+		{name: "dind_argument", args: []string{"--enable-dind"}, wantErr: "does not support sandbox.agent.args flag --enable-dind"},
+		{name: "runtime_argument", args: []string{"--container-runtime", "nvx"}, wantErr: "does not support sandbox.agent.args flag --container-runtime"},
+		{name: "runtime_equals_argument", args: []string{"--container-runtime=nvx"}, wantErr: "does not support sandbox.agent.args flag --container-runtime"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Version: test.version, Runtime: test.runtime, Args: test.args}}}
+			err := validateNativeSessionCapture(data)
+			if test.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, test.wantErr)
+				command := BuildAWFCommand(AWFCommandConfig{ProtectLogCapture: true, WorkflowData: data})
+				assert.NotContains(t, command, "tee ")
+				assert.Contains(t, command, "exit 1")
+			}
+		})
+	}
 }
 
 func TestBehaviorDefinedEngineConfigFileDisablesSC2016(t *testing.T) {

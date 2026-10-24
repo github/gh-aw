@@ -16478,6 +16478,10 @@
                     "provider-env-mode": {
                       "type": "string"
                     },
+                    "protected-session-capture": {
+                      "type": "boolean",
+                      "description": "Parse only the final stderr attempt from native AWF protected command output (v0.28.67+, non-TTY Docker only). Requires an isolated recorder and verifying log parser; raw streams remain private and incomplete capture or structural redaction collisions fail publication."
+                    },
                     "env": {
                       "type": "object",
                       "description": "Additional static environment variables injected into the execution step. Values are rendered verbatim and must not contain secrets.",

@@ -303,7 +303,9 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	agentArtifactPrefix := artifactPrefixExprForDownstreamJob(data)
 	compilerYamlLog.Printf("Emitting unified agent artifact upload with %d path(s)", len(artifactPaths))
 	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix)
-	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, data)
+	behaviorEngine, protectedSessionCapture := engine.(*BehaviorDefinedEngine)
+	protectedSessionCapture = protectedSessionCapture && behaviorEngine.protectedSessionCaptureEnabled()
+	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, data, protectedSessionCapture)
 
 	// In dev mode the setup action is referenced via a local path (./actions/setup), so its files
 	// live in the workspace. When a checkout: entry targets an external repository without a path

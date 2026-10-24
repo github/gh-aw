@@ -720,6 +720,9 @@ func (c *Compiler) runPostEngineValidations(
 	if err := validateMaxToolCallsConfig(engineConfig, agenticEngine); err != nil {
 		return err
 	}
+	if err := validateProtectedSessionCaptureSandbox(agenticEngine, &WorkflowData{SandboxConfig: sandboxConfig, NetworkPermissions: networkPermissions}); err != nil {
+		return err
+	}
 	return c.withEffectiveStrictMode(frontmatter, func() error {
 		orchestratorEngineLog.Printf("Validating strict firewall (strict=%v)", c.strictMode)
 		if err := c.validateStrictFirewall(engineSetting, networkPermissions, sandboxConfig); err != nil {
@@ -747,6 +750,36 @@ func (c *Compiler) runPostEngineValidations(
 		}
 		return nil
 	})
+}
+
+func validateProtectedSessionCaptureSandbox(engine CodingAgentEngine, data *WorkflowData) error {
+	behaviorEngine, ok := engine.(*BehaviorDefinedEngine)
+	if !ok || !behaviorEngine.protectedSessionCaptureEnabled() {
+		return nil
+	}
+	return validateNativeSessionCapture(data)
+}
+
+func validateNativeSessionCapture(data *WorkflowData) error {
+	if isFirewallDisabledBySandboxAgent(data) {
+		return errors.New("protected-session-capture requires sandbox.agent to be enabled")
+	}
+	if !awfVersionAtLeast(getFirewallConfig(data), constants.AWFProtectedCommandOutputMinVersion) {
+		return fmt.Errorf("protected-session-capture requires AWF %s or newer; update sandbox.agent.version", constants.AWFProtectedCommandOutputMinVersion)
+	}
+	if isCloudHypervisorRuntime(data) || isNVXRuntime(data) {
+		return errors.New("protected-session-capture requires a Docker runtime; AWF native command output capture does not support microVM runtimes")
+	}
+	if agent := getAgentConfig(data); agent != nil {
+		for _, arg := range agent.Args {
+			flag, _, _ := strings.Cut(arg, "=")
+			switch flag {
+			case "--tty", "--enable-dind", "--container-runtime":
+				return fmt.Errorf("protected-session-capture does not support sandbox.agent.args flag %s; use a non-TTY Docker runtime without agent Docker-socket access", flag)
+			}
+		}
+	}
+	return nil
 }
 
 // shouldScanImportedMarkdown reports whether an import path should be processed by

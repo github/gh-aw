@@ -78,6 +78,9 @@ const DefaultGitHubMCPServerVersion Version = "v2.0.2"
 // refreshes the container SHA pins that were resolved during the first pass.
 const DefaultFirewallVersion Version = "v0.28.70"
 
+// AWFProtectedCommandOutputMinVersion supports native, isolated command output capture.
+const AWFProtectedCommandOutputMinVersion Version = "v0.28.67"
+
 // AWFFallbackModelsMinVersion is the first AWF release with ordered request-level fallback.
 const AWFFallbackModelsMinVersion Version = "v0.28.31"
 

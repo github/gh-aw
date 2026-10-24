@@ -3,7 +3,7 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.4.0"
+version: "2.5.0"
 status: Draft
 publication_date: "2026-10-22"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.4.0<br>
+**Version**: 2.5.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-22<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.4.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.5.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -60,7 +60,7 @@ version; native trace records do not receive per-event specification versions.
 
 The parsers in `actions/setup/js/` translate different engine logs into a shared conversation model. `log_parser_shared.cjs` exposes `convertLegacyLogEntriesToCopilotEvents` and `convertCopilotEventsToLegacyLogEntries`; the first establishes the canonical event representation, while the second supports existing legacy renderers.
 
-This specification covers parsing supported input records, canonical conversion, usage aggregation, tool correlation, compatibility projections, bootstrap telemetry, and conclusion-job artifact merging. It does not specify engine execution, workflow frontmatter, model behavior, transport protocols, or a cross-language storage API. JSON and JSON Lines are serialization forms, not different session models. Section 3.8 additionally defines a bounded, lossy compact unified-session profile for metadata delivery; it never replaces the full session artifact.
+This specification covers parsing supported input records, canonical conversion, usage aggregation, tool correlation, compatibility projections, bootstrap telemetry, and conclusion-job artifact merging. It does not generally specify engine execution, workflow frontmatter, model behavior, transport protocols, or a cross-language storage API; Section 7.6 additionally constrains ingestion and publication for opt-in protected declarative sessions. JSON and JSON Lines are serialization forms, not different session models. Section 3.8 additionally defines a bounded, lossy compact unified-session profile for metadata delivery; it never replaces the full session artifact.
 
 ### 1.2 Data flow
 
@@ -138,6 +138,8 @@ A parser supporting fewer engines can conform for its declared engines. Omitting
 ### 2.3 Source-dependent availability
 
 “Required core event” means required vocabulary support and required emission when corresponding supported source evidence exists. It does not mean every trace contains every event or every field. Availability rules in Sections 3 and 4 are part of the contract, particularly for partial logs and older native streams.
+
+T-UAS-084 through T-UAS-086 apply only when a declarative definition enables `engine.behaviors.execution.protected-session-capture`. Other engines are not required to implement that optional profile.
 
 ## 3. Trace Model (Normative)
 
@@ -1568,7 +1570,7 @@ The adapter can discover a reported model from a finalized turn without inventin
 
 ### 7.6 Custom engines
 
-**T-UAS-041 — Custom format detection.** The custom adapter MUST select a delegate from actual supported input signatures. Parseable JSON alone, any dot-containing type alone, a nonempty markdown result, or a delegate's fabricated initialization MUST NOT establish detection. Existing Claude-compatible and Codex fallback support MUST remain available, and native canonical events MUST remain supported.
+**T-UAS-041 — Custom format detection.** The custom adapter MUST select a delegate from actual supported input signatures. Parseable JSON alone, any dot-containing type alone, a nonempty markdown result, or a delegate's fabricated initialization MUST NOT establish detection. Existing Claude-compatible and Codex fallback support MUST remain available for unprotected ingestion, and native canonical events MUST remain supported.
 
 Recognized candidates include the native event envelope, Claude legacy message/init/result shapes, Codex known JSONL lifecycle/item shapes, Codex legacy tool/exec/thinking layouts with their actual framing, and the OpenCode and Goose signatures below. Mere namespace matches with no supported payload are insufficient. Signature detection uses valid supported records even when unknown or malformed records are adjacent.
 
@@ -1589,6 +1591,57 @@ tool executions, terminal success, or accounting merely because text exists.
 Attributable startup errors remain `session.error`, not assistant answers.
 
 When no supported signature is present, the existing custom “unrecognized format” result and empty trace are returned. A raw preview is not a normalized event and is subject to the privacy boundary in Section 8.
+
+#### Protected declarative session ingestion
+
+The optional boolean `engine.behaviors.execution.protected-session-capture`
+defaults to `false`. Its configuration and runtime prerequisites are documented
+in the [custom engine reference](/gh-aw/reference/third-party-agent/#protected-session-capture).
+It requires a definition-owned `behaviors.log-parser`; the generic format
+detection and tolerant recovery rules do not authorize fallback after protected
+recorder verification fails.
+
+**T-UAS-084 — Native source and collection completeness.** Protected ingestion
+MUST use AWF-native host-only command output and validate its metadata, private
+regular stream files, completion/drain state, aggregate byte counts, and command
+outcome before parsing. Only the final started attempt's stderr MUST be passed to
+the engine's `parseLog(logContent)`; stdout, presentation logs, sandbox-written
+files, and earlier attempts MUST NOT supply substitute or concatenated session
+evidence. Missing, inconsistent, incomplete, undrained, or truncated collection
+MUST fail publication. The native aggregate capture bound is 64 MiB across both
+streams and all attempts. A complete capture with a nonzero command exit remains
+valid collection; its native exit status MUST remain authoritative over
+sandbox-writable exit metadata.
+
+**T-UAS-085 — Recorder authentication.** A protected engine MUST isolate recorder
+keys and capture-bearing descriptors from same-UID tools, including descriptors
+retained by dumpable ancestor processes. The engine-owned parser MUST verify its
+authenticated framing, sequence continuity, and terminal completeness before
+returning nonempty canonical `logEntries`. Native storage protection, parseable
+JSON, a key prefix, or an unanchored first public-key header MUST NOT alone
+establish producer authenticity. Invalid verification MUST NOT fall back to a
+legacy parser or publish a partial verified-looking trace. The compiler's
+explicit final `exec` does not replace the harness's responsibility to remove
+remaining launchers and protect its recorder channel.
+
+**T-UAS-086 — Structure-preserving protected publication.** Raw native capture
+streams MUST remain outside published session artifacts. Publication copies MUST
+apply configured workflow secrets and mask requests from either native stream,
+including to summary copies; mask requests MUST be used solely for privacy rather
+than session observations. Redaction MAY change schema-defined text and tool
+payload keys and values, but MUST NOT silently rewrite event types, identities,
+tool names, status, accounting structure, or other structural fields. The
+sandbox-writable `agent-errors.jsonl` source and its temporary sibling MUST NOT
+be published as session evidence. The verified native exit status MUST replace
+any shared exit-code sidecar used by downstream collection. A structural
+redaction collision or verification/publication failure MUST reject
+publication, gate session-artifact uploads, and discard stale publishable
+artifacts without following artifact symlinks. Cleanup failure MUST be reported
+explicitly and MUST NOT make artifacts eligible for upload.
+
+Protected session capture MUST NOT be enabled when workflow `evals` are
+configured, because the secondary engine invocation consumes `evals.log` rather
+than the native capture.
 
 ### 7.7 OpenCode sample
 
@@ -1859,6 +1912,11 @@ privacy boundaries, version failures, and end-to-end publication.
 
 Recommended execution is fixture parsing, canonical structural assertions, accounting assertions, renderer checks, and bootstrap checks. Record the class, engine formats, requirement IDs, and outcomes in the test report.
 
+For the protected profile, parser/publication fixtures do not establish live
+process isolation. Report Linux/AWF same-UID descriptor-attack coverage and the
+engine's authenticated-protocol coverage separately, including unavailable
+evidence; compilation alone is not a conformance claim.
+
 ### 9.2 Requirement compliance matrix
 
 “Expected outcome” is the assertion, not a statement that the implementation currently passes.
@@ -1901,6 +1959,9 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-081 | Routed run with main, sub-agent, classifier, and detection requests; replicated proxy copies; unknown pricing, malformed tokens, missing request records, unrouted runs | Only main requests repriced once with `computeInferenceAIC`; unpriced and unattributed coverage explicit; never a complete zero; unrouted runs omit the estimate. |
 | T-UAS-083 | AWF v0.28.70 token records for `main`, `subagent/<name>`, absent, invalid, duplicate, empty-name, illegal-character, over-length, and exact-boundary headers, and AWF-owned classifier purposes; labelled and unlabelled main/sub-agent records sharing model, tokens, and time | Valid caller fields survive projection, rejected or absent fields stay absent, AWF purposes keep `callerSource: awf`; explicit callers determine attribution, unlabelled records keep the correlation fallback, and totals are unchanged. |
 | T-UAS-082 | AWF upstream-error and failed request records from gh-aw-firewall#10211 writers with and without code/type/param/source | Supplied identifiers, status, provider, model, and request ID retained; bodies, headers, and messages excluded; invalid identifiers dropped. |
+| T-UAS-084 | Forged stdout/shared logs, multiple native attempts, inconsistent metadata/files, undrained or truncated collection, and complete nonzero exit | Only final-attempt stderr reaches the parser; invalid collection fails closed; native exit status is retained. |
+| T-UAS-085 | Valid, forged, replayed, interrupted, or missing-terminal recorder streams; same-UID tools probing recorder and ancestor `/proc/<pid>/fd` descriptors under Linux/AWF | Authenticated contiguous complete events only; keys and recorder channels inaccessible to tools; no legacy fallback or unsupported conformance claim. |
+| T-UAS-086 | Configured secrets and masks from either stream, summary copies, nested tool-payload keys/values, masks colliding with `failure`, `session.result`, IDs, or accounting keys, forged `agent-errors.jsonl`, conflicting shared/native exit codes, stale files/symlinks, and failed publication/cleanup | Payload and summary secrets redacted; structure unchanged or publication rejected; native exit code survives downstream collection; forged sources excluded; raw capture not uploaded; session uploads gated on successful publication and cleanup; stale artifacts discarded without following links. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -2422,6 +2483,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.5.0 - Draft (2026-10-22)
+
+- Defined opt-in protected declarative session ingestion: final native stderr and collection completeness, engine-owned recorder authentication, and structure-preserving publication (T-UAS-084 through T-UAS-086).
+- Distinguished protected verification failure from unprotected tolerant parsing and required separate Linux/AWF isolation and authenticated-protocol acceptance evidence.
+- Retained serialization-format version 1 and unchanged default ingestion behavior.
 
 ### Version 2.4.0 - Draft (2026-10-22)
 

@@ -200,9 +200,13 @@ func (c *Compiler) generateLogParsing(yaml *strings.Builder, data *WorkflowData,
 
 	yaml.WriteString("      - name: Parse agent logs for step summary\n")
 	yaml.WriteString("        if: always()\n")
+	yaml.WriteString(protectedSessionCaptureParserID(engine))
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        env:\n")
 	fmt.Fprintf(yaml, "          GH_AW_AGENT_OUTPUT: %s\n", logFileForParsing) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	if behaviorEngine, ok := engine.(*BehaviorDefinedEngine); ok && behaviorEngine.protectedSessionCaptureEnabled() {
+		yaml.WriteString("          GH_AW_PROTECTED_SESSION_CAPTURE: 1\n")
+	}
 	// GH_AW_SAFE_OUTPUTS lets the log parser detect safe-output entries written by the agent
 	// so it can downgrade a "no structured log entries" failure to a warning when the agent
 	// demonstrably completed (e.g. emitted a noop). Without this, runs where the container
@@ -220,6 +224,14 @@ func (c *Compiler) generateLogParsing(yaml *strings.Builder, data *WorkflowData,
 	// Load log parser script from external file using require()
 	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/" + parserScriptName + ".cjs');\n")
 	yaml.WriteString("            await main();\n")
+}
+
+func protectedSessionCaptureParserID(engine CodingAgentEngine) string {
+	behaviorEngine, ok := engine.(*BehaviorDefinedEngine)
+	if !ok || !behaviorEngine.protectedSessionCaptureEnabled() {
+		return ""
+	}
+	return "        id: parse_agent_logs\n"
 }
 
 // generateMCPScriptsLogParsing generates a step that parses mcp-scripts logs and adds them to the step summary
