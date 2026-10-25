@@ -810,7 +810,7 @@ func setAuditTimeoutEnvelope(errorEnvelope map[string]any, err error, pipeDrain 
 		return
 	}
 	stage := mcpErrorStage(err, "audit")
-	if partialStage, ok := partial["stage"].(string); ok && partialStage != "" {
+	if partialStage, ok := partial["stage"].(string); ok && isKnownAuditStage(partialStage) {
 		stage = partialStage
 	}
 	errorEnvelope["partial"] = true
@@ -820,6 +820,15 @@ func setAuditTimeoutEnvelope(errorEnvelope map[string]any, err error, pipeDrain 
 	errorEnvelope["suggestions"] = []string{
 		"Retry the same audit to reuse downloaded artifacts",
 		"Request fewer artifact sets with artifacts",
+	}
+}
+
+func isKnownAuditStage(stage string) bool {
+	switch stage {
+	case "metadata", "artifacts", "analysis", "report", "job_logs":
+		return true
+	default:
+		return false
 	}
 }
 

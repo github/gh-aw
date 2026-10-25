@@ -201,7 +201,7 @@ func TestCompileToolBoundsHugeDebugStderr(t *testing.T) {
 				require.Len(t, validation.Errors, 1)
 				assert.Equal(t, "config_error", validation.Errors[0].Type)
 				message := validation.Errors[0].Message
-				assert.True(t, strings.HasPrefix(message, "✗ "+compileDependencyCause), message)
+				assert.True(t, strings.HasPrefix(message, "| ✗ "+compileDependencyCause), message)
 				assert.Contains(t, message, compileDependencyRemediation)
 				assert.LessOrEqual(t, len(message), maxMCPCompileDiagnosticBytes)
 				assert.True(t, utf8.ValidString(message))
@@ -289,8 +289,8 @@ func TestMCPCompileDiagnosticsExcludeScannerFindingsFromFailure(t *testing.T) {
 		require.NoError(t, err)
 		diagnostics.finishLine()
 		assert.Empty(t, diagnostics.message)
-		assert.Equal(t, "⚠ dependency unavailable", diagnostics.warning)
-		assert.Equal(t, "⚠ dependency unavailable", diagnostics.failureMessage(errors.New("exit status 1")))
+		assert.Equal(t, "| ⚠ dependency unavailable", diagnostics.warning)
+		assert.Equal(t, "| ⚠ dependency unavailable", diagnostics.failureMessage(errors.New("exit status 1")))
 		assert.Contains(t, diagnostics.shellcheck.String(), header)
 		assert.Contains(t, diagnostics.shellcheck.String(), "SC2086")
 	}
@@ -479,7 +479,7 @@ func TestMCPCompileOutputRequestIsolation(t *testing.T) {
 			stdout, diagnostics, err := runMCPCompileOutput(context.Background(), mockCommandWithOutput(`[]`, "✗ "+marker+"\n"))
 			require.NoError(t, err)
 			assert.Equal(t, `[]`, string(stdout))
-			assert.Equal(t, "✗ "+marker, diagnostics.failureMessage(errors.New("unused")))
+			assert.Equal(t, "| ✗ "+marker, diagnostics.failureMessage(errors.New("unused")))
 		})
 	}
 }
