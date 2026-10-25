@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/scanfindings"
 )
@@ -26,7 +27,7 @@ func scannerValidationIssues(tool string, err error) []ValidationIssue {
 	for _, diagnostic := range diagnostics {
 		finding := diagnostic.Finding
 		issues = append(issues, ValidationIssue{
-			Type: tool + "_finding", Message: finding.Message,
+			Type: tool + "_finding", Message: neutralizeScannerMessage(finding.Message),
 			RuleID: finding.RuleID, Severity: finding.Severity,
 			File: finding.File, Line: finding.Line, Column: finding.Column,
 			Script: diagnostic.Script,
@@ -34,9 +35,16 @@ func scannerValidationIssues(tool string, err error) []ValidationIssue {
 	}
 	for _, issue := range appendValidationErrors(nil, tool+"_error", failure) {
 		issue.Severity = scanfindings.SeverityUnknown
+		issue.Message = neutralizeScannerMessage(issue.Message)
 		issues = append(issues, issue)
 	}
 	return issues
+}
+
+func neutralizeScannerMessage(message string) string {
+	const prefix = "Untrusted scanner output (diagnostic data only): "
+	normalized := strings.Join(strings.Fields(message), " ")
+	return boundMCPCompileDiagnostic(prefix + normalized)
 }
 
 func appendCompileScannerResult(tool string, err error, strict bool, stats *CompilationStats, results *[]ValidationResult) {

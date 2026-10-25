@@ -609,7 +609,7 @@ func injectDevelopmentShellcheckDiagnostics(outputStr, stderrOutput string) stri
 	}
 	if index >= 0 && index < len(results) {
 		for _, diagnostic := range diagnostics {
-			results[index].Errors = append(results[index].Errors, ValidationIssue{Type: "shellcheck", Message: diagnostic})
+			results[index].Errors = append(results[index].Errors, ValidationIssue{Type: "shellcheck", Message: neutralizeScannerMessage(diagnostic)})
 		}
 	}
 	output, err := formatValidationOutput(results)
@@ -629,7 +629,7 @@ func injectShellcheckDiagnostics(outputStr, stderrOutput string) string {
 	for _, diagnostic := range diagnostics {
 		warnings = append(warnings, ValidationIssue{
 			Type:    "shellcheck",
-			Message: diagnostic,
+			Message: neutralizeScannerMessage(diagnostic),
 		})
 	}
 	return injectValidationWarnings(outputStr, warnings)

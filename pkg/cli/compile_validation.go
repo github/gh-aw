@@ -255,7 +255,10 @@ func sanitizeValidationResults(results []ValidationResult) []ValidationResult {
 		e.Message = stringutil.SanitizeErrorMessage(e.Message)
 		if e.Script != nil {
 			script := *e.Script
+			script.JobID = stringutil.SanitizeErrorMessage(script.JobID)
+			script.StepID = stringutil.SanitizeErrorMessage(script.StepID)
 			script.StepName = stringutil.SanitizeErrorMessage(script.StepName)
+			script.Source = stringutil.SanitizeErrorMessage(script.Source)
 			script.Resource = stringutil.SanitizeErrorMessage(script.Resource)
 			e.Script = &script
 		}
