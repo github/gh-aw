@@ -52,6 +52,96 @@ func TestCompilerLintRejectsInvalidGeneratedAST(t *testing.T) {
 	require.ErrorContains(t, NewCompiler(WithLint(true)).lintCompiledWorkflow(&WorkflowData{}, "jobs: [", "test.md"), "cannot parse generated Actions AST")
 }
 
+func TestCompilerLintAuthenticatedWebhookPipeline(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, payload string
+		safeOutput    bool
+		wantError     bool
+	}{
+		{"ordinary job", `"$GH_AW_AGENT_OUTPUT"`, false, true},
+		{"safe-output endpoint", `"$GH_AW_AGENT_OUTPUT"`, true, false},
+		{"secret payload consumed by integration", `<(printf '%s' "$WEBHOOK")`, true, false},
+		{"integration still rejects logging", `"$GH_AW_AGENT_OUTPUT"; echo "$WEBHOOK"; jq -c . "$GH_AW_AGENT_OUTPUT"`, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			content := `on: workflow_dispatch
+jobs:
+  report_security_finding:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          WEBHOOK: ${{ secrets.PYDANTIC_AI_TRIAGE_SLACK_WEBHOOK_URL }}
+        run: |
+          jq -c '.items[] | select(.type == "report_security_finding") | {text: "\(.summary)\n\n\(.details)"}' \
+            ` + tc.payload + ` | curl --fail -sS -H 'Content-Type: application/json' --data @- "$WEBHOOK"
+`
+			data := &WorkflowData{}
+			if tc.safeOutput {
+				data.SafeOutputs = &SafeOutputsConfig{Jobs: map[string]*SafeJobConfig{"report-security-finding": {}}}
+			}
+			err := NewCompiler(WithLint(true)).lintCompiledWorkflow(data, content, "webhook.md")
+			if tc.wantError {
+				require.ErrorContains(t, err, "[secret-leak]")
+				require.ErrorContains(t, err, "CTR-017")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCompilerLintImportedAuthenticatedWebhook(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "notification.md")
+	source := filepath.Join(dir, "webhook.md")
+	require.NoError(t, os.WriteFile(source, []byte(`---
+on: workflow_dispatch
+imports: [notification.md]
+tools:
+  github: false
+---
+Report findings privately.
+`), 0o600))
+	for _, disclose := range []bool{false, true} {
+		payload := `"$GH_AW_AGENT_OUTPUT"`
+		if disclose {
+			payload = `"$GH_AW_AGENT_OUTPUT"; echo "$WEBHOOK"; jq -c . "$GH_AW_AGENT_OUTPUT"`
+		}
+		require.NoError(t, os.WriteFile(shared, []byte(`---
+safe-outputs:
+  jobs:
+    report-security-finding:
+      description: Privately report a security finding
+      runs-on: ubuntu-latest
+      max: 1
+      permissions: {}
+      steps:
+        - env:
+            WEBHOOK: ${{ secrets.PRIVATE_ENDPOINT }}
+          run: |
+            jq -c '.items[] | select(.type == "report_security_finding") | {text: "\(.summary)\n\n\(.details)"}' \
+              `+payload+` | curl --fail -sS -H 'Content-Type: application/json' --data @- "$WEBHOOK"
+---
+Report findings privately.
+`), 0o600))
+		compiler := NewCompiler(WithLint(true))
+		compiler.gitRoot = dir
+		compiler.SetReadOnly(true)
+		compiler.SetSkipValidation(true)
+		err := compiler.CompileWorkflow(source)
+		if !disclose {
+			require.NoError(t, err)
+			lock, err := os.ReadFile(filepath.Join(dir, "webhook.lock.yml"))
+			require.NoError(t, err)
+			require.NotContains(t, string(lock), "authenticated-endpoint")
+		} else {
+			require.ErrorContains(t, err, "[secret-leak]")
+		}
+	}
+}
+
 func TestCompilerLintPreservesThreatSuppressions(t *testing.T) {
 	t.Parallel()
 	content := "jobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo '${{ inputs.message }}'\n"
@@ -80,6 +170,97 @@ func TestCompilerLintWarningsRemainAdvisory(t *testing.T) {
 	compiler := NewCompiler(WithLint(true))
 	require.NoError(t, compiler.lintCompiledWorkflow(&WorkflowData{}, content, "test.md"))
 	require.Positive(t, compiler.GetWarningCount())
+}
+
+func TestCompilerLintGeneratedPRCheckoutSteps(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pr-checkout.md")
+	source := `---
+on:
+  workflow_dispatch:
+  admission: true
+engine: copilot
+permissions:
+  contents: read
+checkout:
+  fetch: ["*"]
+  fetch-depth: 0
+tools:
+  github: false
+safe-outputs:
+  create-pull-request:
+  push-to-pull-request-branch:
+---
+Maintain the repository.
+`
+	require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+	compiler := NewCompiler(WithLint(true))
+	compiler.gitRoot = dir
+	compiler.SetReadOnly(true)
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(path))
+	require.Zero(t, compiler.GetWarningCount())
+	lock, err := os.ReadFile(filepath.Join(dir, "pr-checkout.lock.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(lock), "persist-credentials: true")
+	require.Contains(t, string(lock), "Configure Git credentials")
+	require.NotEmpty(t, compiler.prCheckoutLintBlock)
+	require.NoError(t, os.WriteFile(path, []byte("---\non: workflow_dispatch\ntools:\n  github: false\n---\nNo PR checkout.\n"), 0o600))
+	require.NoError(t, compiler.CompileWorkflow(path))
+	require.Empty(t, compiler.prCheckoutLintBlock, "compiler reuse must not preserve a previous workflow's exception")
+}
+
+func TestCompilerLintGeneratedPRCheckoutTransformations(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, checkout, safeOutputsRunsOn, wantLockContent string
+	}{
+		{
+			name: "cross-repository checkout",
+			checkout: `checkout:
+  - repository: octo-org/target-repository
+    path: target
+`,
+			wantLockContent: "repository: octo-org/target-repository",
+		},
+		{
+			name:              "Windows runner",
+			safeOutputsRunsOn: "  runs-on: windows-latest\n",
+			wantLockContent:   "shell: bash",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "pr-checkout.md")
+			source := `---
+on:
+  workflow_dispatch:
+  admission: true
+engine: copilot
+permissions:
+  contents: read
+` + tc.checkout + `tools:
+  github: false
+safe-outputs:
+` + tc.safeOutputsRunsOn + `  create-pull-request:
+  push-to-pull-request-branch:
+---
+Maintain the repository.
+`
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithLint(true))
+			compiler.gitRoot = dir
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			require.Zero(t, compiler.GetWarningCount())
+			lock, err := os.ReadFile(filepath.Join(dir, "pr-checkout.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(lock), tc.wantLockContent)
+		})
+	}
 }
 
 func TestCompilerLintUsesEffectiveStrictness(t *testing.T) {

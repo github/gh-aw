@@ -366,7 +366,7 @@ func providerScopedSubagentPatterns(model string, patterns []string, provider st
 	return scoped
 }
 
-func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *WorkflowData) error { //nolint:largefunc // Existing artifact collection keeps related output paths and ordering together.
+func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *WorkflowData, protectedSessionCapture bool) error { //nolint:largefunc // Existing artifact collection keeps related output paths and ordering together.
 	// Copy the raw safe-output NDJSON to a /tmp/gh-aw/ path so it can be included in the
 	// unified agent artifact together with all other /tmp/gh-aw/ outputs.
 	yaml.WriteString("      - name: Copy Safe Outputs\n")
@@ -392,12 +392,19 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 
 	yaml.WriteString("      - name: Ingest agent output\n")
 	yaml.WriteString("        id: collect_output\n")
-	yaml.WriteString("        if: always()\n")
+	condition := "always()"
+	if protectedSessionCapture {
+		condition += " && steps.parse_agent_logs.outcome == 'success'"
+	}
+	yaml.WriteString("        if: " + condition + "\n")
 	writeFormattedYAML(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 
 	// Add environment variables for JSONL validation
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}\n")
+	if protectedSessionCapture {
+		yaml.WriteString("          GH_AW_PROTECTED_SESSION_CAPTURE: 1\n")
+	}
 
 	// Config is written to file, not passed as env var
 

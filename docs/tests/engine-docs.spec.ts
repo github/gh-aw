@@ -48,5 +48,13 @@ test("custom engine reference owns imported definitions and unsupported samples"
   await expect(content.locator("#shared-imported-engines")).toBeVisible();
   await expect(content.locator("#unsupported-engine-samples")).toBeVisible();
   await expect(content.locator("pre").first()).toContainText("id: example-engine");
+  const protectedCapture = content.locator("#protected-session-capture");
+  await expect(protectedCapture).toBeVisible();
+  await expect(content.locator("pre").filter({ hasText: "protected-session-capture: true" })).toContainText("execution:");
+  await expect(content.locator('a[href$="unified-agent-session-specification/#protected-declarative-session-ingestion"]')).toBeVisible();
+  await expect(content).toContainText("Native capture protects storage, not the origin of guest-side bytes.");
+  await expect(content).toContainText("native exit code remains authoritative over any shared exit-code sidecar");
+  await expect(content).toContainText("unified session-artifact uploads are eligible only after verification, publication, and cleanup all succeed");
+  await expect(content).toContainText("compilation rejects this combination");
   await expect(content).not.toContainText("engine: opencode");
 });

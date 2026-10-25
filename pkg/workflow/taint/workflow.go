@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/aw"
 )
@@ -45,6 +46,7 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 				return err
 			}
 		}
+		a.safeOutputJob = slices.Contains(rule.SafeOutputJobs, string(job.ID))
 		if err := a.job(job, resolved, bindings); err != nil {
 			return err
 		}
@@ -82,6 +84,25 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 	return a.result, nil
 }
 
+func safeOutputIntegrationJobs(rule Rule, document *aw.Document) ([]string, error) {
+	jobs := slices.Clone(rule.SafeOutputJobs)
+	if document == nil {
+		return jobs, nil
+	}
+	blocks, err := aw.ExecutionBlocks(context.Background(), document)
+	if err != nil {
+		return nil, err
+	}
+	for _, block := range blocks {
+		for _, prefix := range []string{"safe-outputs.jobs.", "safe-jobs."} {
+			if name, ok := strings.CutPrefix(block.Path, prefix); ok {
+				jobs = append(jobs, stringutil.NormalizeSafeOutputIdentifier(name))
+			}
+		}
+	}
+	return jobs, nil
+}
+
 // AnalyzeDocument checks the AW prompt and script entry points alongside its
 // compiled Actions graph. Fast mode avoids generated JavaScript traversal.
 // Callers compile through workflow.Compiler.CompileDocument so imports and
@@ -90,6 +111,11 @@ func AnalyzeDocument(document *aw.Document, compiled *actions.Workflow, rule Rul
 	if document == nil {
 		return Result{}, errors.New("AW document cannot be nil")
 	}
+	jobs, err := safeOutputIntegrationJobs(rule, document)
+	if err != nil {
+		return Result{}, err
+	}
+	rule.SafeOutputJobs = jobs
 	ctx := context.Background()
 	if rule.JavaScript != nil && rule.JavaScript.Context != nil {
 		ctx = rule.JavaScript.Context

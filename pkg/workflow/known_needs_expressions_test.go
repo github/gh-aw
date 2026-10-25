@@ -687,7 +687,7 @@ Release tag: ${{ needs.config.outputs.release_tag }}
 	}
 	assert.Contains(t, substSection, "GH_AW_NEEDS_PRECOMPUTE_OUTPUTS_ACTION",
 		"Substitution step should reference precompute's output (it runs before activation)")
-	assert.Contains(t, substSection, "GH_AW_NEEDS_CONFIG_OUTPUTS_RELEASE_TAG: '__GH_AW_DEFERRED_",
+	assert.Contains(t, substSection, "GH_AW_NEEDS_CONFIG_OUTPUTS_RELEASE_TAG: \"__GH_AW_DEFERRED_",
 		"Activation should stage a late binding for config's output")
 	assert.NotContains(t, substSection, "${{ needs.config.outputs.release_tag }}",
 		"Activation cannot evaluate config's output")

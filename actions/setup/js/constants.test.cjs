@@ -8,6 +8,7 @@ const {
   FAQ_CREATE_PR_PERMISSIONS_URL,
   MAX_LABELS,
   MAX_ASSIGNEES,
+  MAX_CAPTURE_BYTES,
   GATEWAY_JSONL_PATH,
   RPC_MESSAGES_PATH,
   MANIFEST_FILE_PATH,
@@ -96,6 +97,12 @@ describe("constants", () => {
     });
   });
 
+  describe("protected command output limits", () => {
+    it("should cap aggregate capture at 64 MiB", () => {
+      expect(MAX_CAPTURE_BYTES).toBe(67_108_864);
+    });
+  });
+
   describe("daily AIC scan cache restore limits", () => {
     it("should export the bounded run and page counts and scan window", () => {
       expect(MAX_RESTORE_RUNS).toBe(10);
@@ -121,6 +128,7 @@ describe("constants", () => {
         "FAQ_CREATE_PR_PERMISSIONS_URL",
         "MAX_LABELS",
         "MAX_ASSIGNEES",
+        "MAX_CAPTURE_BYTES",
         "GATEWAY_JSONL_PATH",
         "RPC_MESSAGES_PATH",
         "MANIFEST_FILE_PATH",

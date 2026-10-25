@@ -27,7 +27,7 @@ func (c *Compiler) generateUploadAccessLogs(yaml *strings.Builder, tools map[str
 // and reliability. The step always runs (even on cancellation) and ignores missing files.
 // Uploads require successful built-in and custom secret redaction.
 // prefix is prepended to the artifact name to avoid clashes in workflow_call context.
-func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string, data *WorkflowData) {
+func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string, data *WorkflowData, protectedSessionCapture bool) {
 	if len(paths) == 0 {
 		compilerYamlArtifactsLog.Print("No paths to upload, skipping unified artifact upload")
 		return
@@ -42,7 +42,11 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 	c.stepOrderTracker.RecordArtifactUpload("Upload agent artifacts", paths)
 
 	yaml.WriteString("      - name: Upload agent artifacts\n")
-	yaml.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
+	condition := "always() && " + secretRedactionSuccessCondition(data)
+	if protectedSessionCapture {
+		condition += " && steps.parse_agent_logs.outcome == 'success'"
+	}
+	yaml.WriteString("        if: " + condition + "\n")
 	yaml.WriteString("        continue-on-error: true\n")
 	yaml.WriteString("        uses: " + c.getActionPin("actions/upload-artifact") + "\n")
 	yaml.WriteString("        with:\n")
@@ -75,7 +79,7 @@ func (c *Compiler) generateTrackedSecretRedactionStep(yaml *strings.Builder, yam
 // artifact and every safe output is silently dropped. Uploading the few-KB payload separately
 // gives those jobs a reliable fallback source.
 // prefix is prepended to the artifact name to avoid clashes in workflow_call context.
-func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data *WorkflowData, prefix string) {
+func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data *WorkflowData, prefix string, protectedSessionCapture bool) {
 	if data.SafeOutputs == nil || data.SafeOutputs.AutoInjectedCreateIssue {
 		return
 	}
@@ -108,7 +112,11 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 	yaml.WriteString("      # Small dedicated copy of the agent output so safe-output processing\n")
 	yaml.WriteString("      # survives a failed or timed-out upload of the larger agent artifact\n")
 	yaml.WriteString("      - name: Upload agent output fallback artifact\n")
-	yaml.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
+	condition := "always() && " + secretRedactionSuccessCondition(data)
+	if protectedSessionCapture {
+		condition += " && steps.parse_agent_logs.outcome == 'success'"
+	}
+	yaml.WriteString("        if: " + condition + "\n")
 	yaml.WriteString("        continue-on-error: true\n")
 	yaml.WriteString("        uses: " + c.getActionPin("actions/upload-artifact") + "\n")
 	yaml.WriteString("        with:\n")

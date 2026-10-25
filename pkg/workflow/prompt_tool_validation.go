@@ -12,7 +12,8 @@ import (
 )
 
 var promptToolImperative = regexp.MustCompile(`(?i)^(?:please\s+|you must\s+|must\s+)?(use|call|run)\s+(?:the\s+)?(?:tool\s+)?(.+)$`)
-var promptQualifiedTool = regexp.MustCompile(`(?:^|[^A-Za-z0-9_])(?:mcp__([A-Za-z0-9_-]+)__([A-Za-z0-9_-]+)|([A-Za-z0-9_-]+)\(([A-Za-z0-9_-]+)\))(?:$|[^A-Za-z0-9_])`)
+var promptQualifiedTool = regexp.MustCompile(`^(mcp__([A-Za-z0-9_-]+)__([A-Za-z0-9_-]+)|([A-Za-z0-9_-]+)\(([A-Za-z0-9_-]+)\))(?:$|[^A-Za-z0-9_])`)
+var promptToolListSeparator = regexp.MustCompile("(?i)^`?\\s*(?:,\\s*(?:(?:and|or)\\s+)?|(?:and|or)\\s+)`?")
 var promptMCPToolPhrase = regexp.MustCompile(`(?i)^(?:the\s+)?\x60?([a-z][a-z0-9_-]*)\x60?\s+(?:tool\s+)?(?:of|from)\s+(?:the\s+)?\x60?([a-z][a-z0-9_-]*)\x60?\s+MCP\s+server\b`)
 var promptBareTool = regexp.MustCompile(`^([a-z][a-z0-9_]+)(?:$|[\s\x60.,(])`)
 var promptListPrefix = regexp.MustCompile(`^(?:[-*+]\s+|\d+[.)]\s+)`)
@@ -115,10 +116,11 @@ func promptKnownTools() map[string]promptToolRequirement {
 }
 
 type promptToolScanState struct {
-	fence      string
-	shellFence strings.Builder
-	runFence   bool
-	pendingRun bool
+	fence       string
+	nestedFence string
+	shellFence  strings.Builder
+	runFence    bool
+	pendingRun  bool
 }
 
 func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[string]promptToolRequirement) []promptToolRequirement {
@@ -126,33 +128,42 @@ func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[str
 	marker := ""
 	for _, candidate := range []string{"```", "~~~"} {
 		if strings.HasPrefix(line, candidate) {
-			marker = candidate
+			marker = line[:len(line)-len(strings.TrimLeft(line, candidate[:1]))]
 			break
 		}
 	}
-	if marker != "" {
-		var requirements []promptToolRequirement
-		if state.fence != "" {
-			if strings.HasPrefix(line, state.fence) {
-				if state.runFence {
-					requirements = promptShellRequirements(state.shellFence.String())
-				}
-				state.fence, state.runFence = "", false
-				state.shellFence.Reset()
-			}
-		} else {
-			state.fence = marker
-			language := strings.TrimSpace(strings.TrimPrefix(line, marker))
-			state.runFence = state.pendingRun && slices.Contains([]string{"bash", "sh", "shell"}, language)
-		}
-		state.pendingRun = false
-		return requirements
-	}
 	if state.fence != "" {
+		// Output templates may use same-length fences for embedded examples, regardless of language.
+		if state.nestedFence != "" {
+			if isClosingCodeFence(line, state.nestedFence) {
+				state.nestedFence = ""
+			}
+			return nil
+		}
+		if !state.runFence && marker == state.fence && strings.TrimSpace(strings.TrimPrefix(line, marker)) != "" {
+			state.nestedFence = marker
+			return nil
+		}
+		if marker != "" && isClosingCodeFence(line, state.fence) {
+			var requirements []promptToolRequirement
+			if state.runFence {
+				requirements = promptShellRequirements(state.shellFence.String())
+			}
+			state.fence, state.runFence = "", false
+			state.shellFence.Reset()
+			return requirements
+		}
 		if state.runFence {
 			state.shellFence.WriteString(rawLine)
 			state.shellFence.WriteByte('\n')
 		}
+		return nil
+	}
+	if marker != "" {
+		state.fence = marker
+		language := strings.TrimSpace(strings.TrimPrefix(line, marker))
+		state.runFence = state.pendingRun && slices.Contains([]string{"bash", "sh", "shell"}, language)
+		state.pendingRun = false
 		return nil
 	}
 	if line == "" {
@@ -242,31 +253,44 @@ func promptInvocationRequirements(verb, target string, knownTools map[string]pro
 }
 
 func promptQualifiedRequirements(target string) ([]promptToolRequirement, bool) {
-	matches := promptQualifiedTool.FindAllStringSubmatch(target, -1)
-	if len(matches) == 0 {
-		return nil, false
-	}
 	var requirements []promptToolRequirement
-	for _, groups := range matches {
-		var server, tool string
+	qualified := false
+	for {
+		groups := promptQualifiedTool.FindStringSubmatch(target)
+		if len(groups) < 2 {
+			break
+		}
+		var invocation, server, tool string
 		for index, group := range groups {
 			if group == "" {
 				continue
 			}
 			switch index {
-			case 1, 3:
-				server = group
+			case 1:
+				invocation = group
 			case 2, 4:
+				server = group
+			case 3, 5:
 				tool = group
 			}
 		}
-		// Native read tools are available by default; Read(path) is not an MCP reference.
-		if slices.Contains([]string{"Read", "read", "Glob", "glob", "Grep", "grep", "LS", "NotebookRead", "read_file", "read_many_files", "list_directory", "grep_search", "view"}, server) {
-			continue
+		// Parenthesized "(s)" is ambiguous pluralization; explicit MCP names are not.
+		if tool == "s" && !strings.HasPrefix(invocation, "mcp__") {
+			break
 		}
-		requirements = append(requirements, promptToolRequirement{server: server, tool: tool, nativeMCP: true})
+		qualified = true
+		// Native read tools are available by default; Read(path) is not an MCP reference.
+		if !slices.Contains([]string{"Read", "read", "Glob", "glob", "Grep", "grep", "LS", "NotebookRead", "read_file", "read_many_files", "list_directory", "grep_search", "view"}, server) {
+			requirements = append(requirements, promptToolRequirement{server: server, tool: tool, nativeMCP: true})
+		}
+		target = target[len(invocation):]
+		separator := promptToolListSeparator.FindString(target)
+		if separator == "" {
+			break
+		}
+		target = target[len(separator):]
 	}
-	return requirements, true
+	return requirements, qualified
 }
 
 func promptLiteralShellCommand(target string) bool {

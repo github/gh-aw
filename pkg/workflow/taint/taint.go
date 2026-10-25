@@ -70,6 +70,9 @@ type Rule struct {
 	ActionSources      func(uses string) []string
 	JavaScript         *JavaScriptOptions
 	IsJavaScriptFilter func(*JavaScriptNode) bool
+	// SafeOutputJobs identifies compiled third-party integration jobs from
+	// compiler provenance, not job-name heuristics.
+	SafeOutputJobs []string
 }
 
 type value []Source
@@ -128,9 +131,15 @@ type analyzer struct {
 	promptScope   scope
 	failure       error
 	literalScript bool
+	safeOutputJob bool
 }
 
 func (a *analyzer) emit(site Site, sources value) {
+	// Declared integrations consume credentials over the network, not through
+	// logs, outputs, prompts, or publication. JS and shell share this boundary.
+	if a.rule.ID == "secret-leak" && a.safeOutputJob && site.Kind == Network {
+		return
+	}
 	if len(sources) == 0 || !a.rule.IsSink(site) {
 		return
 	}

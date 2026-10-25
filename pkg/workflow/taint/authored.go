@@ -41,6 +41,7 @@ func analyzeAuthoredDocument(ctx context.Context, document *aw.Document, rule Ru
 		return a.result, err
 	}
 	for _, block := range blocks {
+		a.safeOutputJob = strings.HasPrefix(block.Path, "safe-outputs.jobs.") || strings.HasPrefix(block.Path, "safe-jobs.")
 		if ctx.Err() != nil {
 			return a.result, errors.Join(append(failures, ctx.Err())...)
 		}

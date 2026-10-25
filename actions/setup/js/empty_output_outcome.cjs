@@ -150,7 +150,12 @@ function buildCompletionEvidence(rootDir = "/tmp/gh-aw") {
  * @returns {ReturnType<typeof collectUnifiedSession>}
  */
 function collectOutcomeSession(rootDir = "/tmp/gh-aw") {
-  return collectUnifiedSession({ rootDir, ...(process.env.GH_AW_ENGINE_ID === "aider" ? { engine: "aider" } : {}), warn: () => {} });
+  return collectUnifiedSession({
+    rootDir,
+    ...(process.env.GH_AW_ENGINE_ID === "aider" ? { engine: "aider" } : {}),
+    protectedSessionCapture: process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1",
+    warn: () => {},
+  });
 }
 
 /** @param {import("./types/unified_session").UnifiedSession} events @returns {boolean} */
@@ -180,6 +185,7 @@ function hasFailedFinalResult(events) {
  * }}
  */
 function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
+  const protectedCapture = process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1";
   const diagnostics = new Set();
   if (errors.length) diagnostics.add("Safe-output validation status: failed");
   let reason = errors.length ? "invalid_safe_outputs" : "missing_terminal_safe_output";
@@ -187,7 +193,8 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   let maskedValues = [];
   try {
     ({ events, maskedValues } = session ?? collectOutcomeSession(rootDir));
-  } catch {
+  } catch (error) {
+    if (protectedCapture) throw error;
     diagnostics.add("Runtime diagnostics could not be collected.");
   }
   const failedFinalResult = hasFailedFinalResult(events);
@@ -195,7 +202,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   let stdio = "";
   try {
     const stdioPath = path.join(rootDir, "agent-stdio.log");
-    if (fs.lstatSync(stdioPath).isFile()) stdio = fs.readFileSync(stdioPath, "utf8");
+    if (!protectedCapture && fs.lstatSync(stdioPath).isFile()) stdio = fs.readFileSync(stdioPath, "utf8");
   } catch {
     stdio = "";
   }

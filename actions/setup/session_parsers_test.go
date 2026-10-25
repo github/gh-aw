@@ -56,3 +56,24 @@ func TestSessionParserSourcesLoadNativeCreationVerifier(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 }
+
+func TestSessionParserSourcesLoadLogParserBootstrap(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is required to load embedded JavaScript sources")
+	}
+
+	bundleDir := t.TempDir()
+	require.NoError(t, os.CopyFS(bundleDir, SessionParserSources))
+
+	cmd := exec.Command(node, "-e", `
+		const assert = require("node:assert/strict");
+		const bootstrap = require("./js/log_parser_bootstrap.cjs");
+		assert.equal(typeof bootstrap.runLogParser, "function");
+		assert.equal(typeof bootstrap.readCopilotSessions, "function");
+	`)
+	cmd.Dir = bundleDir
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}

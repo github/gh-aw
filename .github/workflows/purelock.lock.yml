@@ -324,7 +324,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER: ${{ (steps.create-steering-issue.outputs.issue_number) }}
-          GH_AW_NEEDS_PURELOCK_PRECOMPUTE_OUTPUTS_COVERAGE_SOURCE: ${{ '__GH_AW_DEFERRED_690FE2B788A8BCD1__' }}
+          GH_AW_NEEDS_PURELOCK_PRECOMPUTE_OUTPUTS_COVERAGE_SOURCE: "__GH_AW_DEFERRED_690FE2B788A8BCD1__"
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
           GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_pull_request, upload_code_coverage, report_missing_tool, report_missing_data, noop(max:2)\n"
           GH_AW_PROMPT_CONTENT_0002: "<issue-steering>\nThe steering issue for this run is #__GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER__.\n\n"
@@ -352,7 +352,7 @@ jobs:
           GH_AW_SKILL_DIR: ".codex/skills"
           GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_NEEDS_PURELOCK_PRECOMPUTE_OUTPUTS_COVERAGE_SOURCE: ${{ '__GH_AW_DEFERRED_690FE2B788A8BCD1__' }}
+          GH_AW_NEEDS_PURELOCK_PRECOMPUTE_OUTPUTS_COVERAGE_SOURCE: "__GH_AW_DEFERRED_690FE2B788A8BCD1__"
         with:
           script: |
             const path = require('path');
@@ -379,7 +379,7 @@ jobs:
           GH_AW_MCP_CLI_SERVERS_LIST: '- `safeoutputs` — run `safeoutputs --help` to see available tools'
           GH_AW_NEEDS_ACTIVATION_OUTPUTS_STEERING_ISSUE_NUMBER: ${{ (steps.create-steering-issue.outputs.issue_number) }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
-          GH_AW_NEEDS_PURELOCK_PRECOMPUTE_OUTPUTS_COVERAGE_SOURCE: '__GH_AW_DEFERRED_690FE2B788A8BCD1__'
+          GH_AW_NEEDS_PURELOCK_PRECOMPUTE_OUTPUTS_COVERAGE_SOURCE: "__GH_AW_DEFERRED_690FE2B788A8BCD1__"
         with:
           script: |
             const path = require('path');

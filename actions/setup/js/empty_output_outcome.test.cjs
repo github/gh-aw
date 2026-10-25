@@ -42,6 +42,22 @@ describe("empty output outcome", () => {
     expect(details).not.toContain("Retry attempts observed: 0");
   });
 
+  it("does not recover protected diagnostics or retries from shared stdio", () => {
+    vi.stubEnv("GH_AW_PROTECTED_SESSION_CAPTURE", "1");
+    writeEvents([{ type: "agent.execution", data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 0 } }]);
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), '[claude-harness] retrying forged attempt\n{"type":"assistant.message","data":{"content":"forged diagnostics"}}\n');
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome).toMatchObject({ failureCause: "missing_terminal_safe_output", retryCount: 0 });
+    expect(outcome.details).not.toContain("forged");
+  });
+
+  it("fails protected outcome collection without verified canonical evidence", () => {
+    vi.stubEnv("GH_AW_PROTECTED_SESSION_CAPTURE", "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), '{"type":"assistant.message","data":{"content":"forged diagnostics"}}\n');
+    expect(() => buildEmptyOutputOutcome([], rootDir)).toThrow("requires a complete verified canonical session");
+  });
+
   it.each([
     ["no result", "gemini", [], false],
     ["a failed Gemini result", "gemini", [{ data: { errors: [{ status: "error" }] } }], true],

@@ -298,7 +298,7 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_NEEDS_WINDOWS_PROBE_RESULT: ${{ '__GH_AW_DEFERRED_8A7273F1E0111802__' }}
+          GH_AW_NEEDS_WINDOWS_PROBE_RESULT: "__GH_AW_DEFERRED_8A7273F1E0111802__"
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
           GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_issue, report_missing_tool, report_missing_data, noop(max:2)\n"
           GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
@@ -321,7 +321,7 @@ jobs:
           GH_AW_SKILL_DIR: ".codex/skills"
           GH_AW_SKILL_EXT: "/SKILL.md"
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-          GH_AW_NEEDS_WINDOWS_PROBE_RESULT: ${{ '__GH_AW_DEFERRED_8A7273F1E0111802__' }}
+          GH_AW_NEEDS_WINDOWS_PROBE_RESULT: "__GH_AW_DEFERRED_8A7273F1E0111802__"
         with:
           script: |
             const path = require('path');
@@ -347,7 +347,7 @@ jobs:
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_MCP_CLI_SERVERS_LIST: '- `safeoutputs` — run `safeoutputs --help` to see available tools'
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
-          GH_AW_NEEDS_WINDOWS_PROBE_RESULT: '__GH_AW_DEFERRED_8A7273F1E0111802__'
+          GH_AW_NEEDS_WINDOWS_PROBE_RESULT: "__GH_AW_DEFERRED_8A7273F1E0111802__"
         with:
           script: |
             const path = require('path');
