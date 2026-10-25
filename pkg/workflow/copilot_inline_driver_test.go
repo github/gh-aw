@@ -97,7 +97,7 @@ func TestCopilotEngineInstallationWithInlineDriver(t *testing.T) {
 			runtime:    "node",
 			source:     "console.log('hello')",
 			expectPath: inlineCopilotSDKDriverNodePath,
-			expectRun:  "npm install --ignore-scripts --no-save @github/copilot-sdk@",
+			expectRun:  copilotSDKNpmCICommand,
 		},
 		{
 			name:       "python",

@@ -36,7 +36,6 @@ type copilotSDKInstallSpec struct {
 
 const workspaceCommandPrefix = `cd "${GITHUB_WORKSPACE}" && `
 const copilotSDKPythonTargetDir = `${GITHUB_WORKSPACE}/.gh-aw/copilot-sdk/python`
-const copilotSDKWebFetchDependency = "undici@6.28.0"
 
 // inlineMavenVersion is the pinned Maven version used to bootstrap Maven for inline Java drivers
 // on runners that don't have it pre-installed (e.g. self-hosted). GitHub-hosted runners already
@@ -256,7 +255,6 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {
@@ -269,7 +267,6 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 		)
 	case "typescript":
 		spec.stepName = "Install GitHub Copilot SDK (TypeScript)"
-		spec.command = workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency + " ts-node@10.9.2 typescript@5.8.3"
 	case "go":
 		spec.stepName = "Install GitHub Copilot SDK (Go)"
 		spec.command = workspaceCommandPrefix + "go get github.com/github/copilot-sdk/go@v" + version
@@ -284,7 +281,7 @@ func getCopilotSDKInstallSpec(command string) copilotSDKInstallSpec {
 		spec.command = workspaceCommandPrefix + "mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=com.github:copilot-sdk-java:" + version
 	}
 
-	return spec
+	return useLockedCopilotSDKNpmInstall(spec)
 }
 
 func getInlineCopilotSDKInstallSpec(runtimeID string) copilotSDKInstallSpec {
@@ -293,7 +290,6 @@ func getInlineCopilotSDKInstallSpec(runtimeID string) copilotSDKInstallSpec {
 	spec := copilotSDKInstallSpec{
 		runtimeID: runtimeID,
 		stepName:  "Install GitHub Copilot SDK (Node.js)",
-		command:   workspaceCommandPrefix + "npm install --ignore-scripts --no-save @github/copilot-sdk@" + version + " " + copilotSDKWebFetchDependency,
 	}
 
 	switch runtimeID {
@@ -339,7 +335,7 @@ func getInlineCopilotSDKInstallSpec(runtimeID string) copilotSDKInstallSpec {
 		}
 	}
 
-	return spec
+	return useLockedCopilotSDKNpmInstall(spec)
 }
 
 func detectRuntimeFromCopilotCommand(command string) string {
