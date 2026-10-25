@@ -25,32 +25,33 @@ func TestAuthoredImportEntries(t *testing.T) {
 		frontmatter map[string]any
 		entries     []any
 		path        string
+		nested      bool
 		present     bool
 		invalid     bool
 	}{
-		{"absent", nil, nil, "imports", false, false},
-		{"null", map[string]any{"imports": nil}, nil, "imports", true, true},
-		{"empty mapping", map[string]any{"imports": map[string]any{}}, nil, "imports.aw", false, false},
-		{"other import kind", map[string]any{"imports": map[string]any{"mcp": []any{"server"}}}, nil, "imports.aw", false, false},
-		{"null aw", map[string]any{"imports": map[string]any{"aw": nil}}, nil, "imports.aw", true, true},
-		{"any list", map[string]any{"imports": []any{"shared.md"}}, []any{"shared.md"}, "imports", true, false},
-		{"string list", map[string]any{"imports": []string{"shared.md"}}, []any{"shared.md"}, "imports", true, false},
-		{"aw any list", map[string]any{"imports": map[string]any{"aw": []any{"shared.md"}}}, []any{"shared.md"}, "imports.aw", true, false},
-		{"aw string list", map[string]any{"imports": map[string]any{"aw": []string{"shared.md"}}}, []any{"shared.md"}, "imports.aw", true, false},
-		{"empty list", map[string]any{"imports": []any{}}, []any{}, "imports", true, false},
-		{"empty string list", map[string]any{"imports": []string{}}, nil, "imports", true, false},
-		{"nil list", map[string]any{"imports": []any(nil)}, nil, "imports", true, false},
-		{"nil string list", map[string]any{"imports": []string(nil)}, nil, "imports", true, false},
-		{"malformed imports", map[string]any{"imports": "PRIVATE_VALUE"}, nil, "imports", true, true},
-		{"malformed aw", map[string]any{"imports": map[string]any{"aw": true}}, nil, "imports.aw", true, true},
-		{"malformed entry is not inspected", map[string]any{"imports": []any{42}}, []any{42}, "imports", true, false},
-		{"conditional entry", map[string]any{"imports": []any{conditional}}, []any{conditional}, "imports", true, false},
-		{"aw conditional entry", map[string]any{"imports": map[string]any{"aw": []any{conditional}}}, []any{conditional}, "imports.aw", true, false},
+		{"absent", nil, nil, "imports", false, false, false},
+		{"null", map[string]any{"imports": nil}, nil, "imports", false, true, true},
+		{"empty mapping", map[string]any{"imports": map[string]any{}}, nil, "imports.aw", true, false, false},
+		{"other import kind", map[string]any{"imports": map[string]any{"mcp": []any{"server"}}}, nil, "imports.aw", true, false, false},
+		{"null aw", map[string]any{"imports": map[string]any{"aw": nil}}, nil, "imports.aw", true, true, true},
+		{"any list", map[string]any{"imports": []any{"shared.md"}}, []any{"shared.md"}, "imports", false, true, false},
+		{"string list", map[string]any{"imports": []string{"shared.md"}}, []any{"shared.md"}, "imports", false, true, false},
+		{"aw any list", map[string]any{"imports": map[string]any{"aw": []any{"shared.md"}}}, []any{"shared.md"}, "imports.aw", true, true, false},
+		{"aw string list", map[string]any{"imports": map[string]any{"aw": []string{"shared.md"}}}, []any{"shared.md"}, "imports.aw", true, true, false},
+		{"empty list", map[string]any{"imports": []any{}}, []any{}, "imports", false, true, false},
+		{"empty string list", map[string]any{"imports": []string{}}, nil, "imports", false, true, false},
+		{"nil list", map[string]any{"imports": []any(nil)}, nil, "imports", false, true, false},
+		{"nil string list", map[string]any{"imports": []string(nil)}, nil, "imports", false, true, false},
+		{"malformed imports", map[string]any{"imports": "PRIVATE_VALUE"}, nil, "imports", false, true, true},
+		{"malformed aw", map[string]any{"imports": map[string]any{"aw": true}}, nil, "imports.aw", true, true, true},
+		{"malformed entry is not inspected", map[string]any{"imports": []any{42}}, []any{42}, "imports", false, true, false},
+		{"conditional entry", map[string]any{"imports": []any{conditional}}, []any{conditional}, "imports", false, true, false},
+		{"aw conditional entry", map[string]any{"imports": map[string]any{"aw": []any{conditional}}}, []any{conditional}, "imports.aw", true, true, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			before, err := json.Marshal(tt.frontmatter)
 			require.NoError(t, err)
-			entries, path, present, err := authoredImportEntries(tt.frontmatter)
+			entries, path, nested, present, err := authoredImportEntries(tt.frontmatter)
 			if tt.invalid {
 				require.Error(t, err)
 				assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
@@ -59,6 +60,7 @@ func TestAuthoredImportEntries(t *testing.T) {
 			}
 			assert.Equal(t, tt.entries, entries)
 			assert.Equal(t, tt.path, path)
+			assert.Equal(t, tt.nested, nested)
 			assert.Equal(t, tt.present, present)
 			after, err := json.Marshal(tt.frontmatter)
 			require.NoError(t, err)
