@@ -37,6 +37,9 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 	if err := validateCompileConfig(config); err != nil {
 		return nil, err
 	}
+	if err := validateMCPCompileProgressPath(config.MCPProgressFile); err != nil {
+		return nil, err
+	}
 	if config.DryRun {
 		config.dryRunReport = newDryRunCompileReport(config)
 		if !config.JSONOutput {
