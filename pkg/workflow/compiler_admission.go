@@ -12,6 +12,12 @@ import (
 
 const admissionJobResultCondition = "(needs.admission.result == 'success' || needs.admission.result == 'skipped')"
 
+// Dry-run execution keeps its own credit limits, but conclusion still records
+// metadata from the admission job, which remains in the dry-run graph.
+func admissionBudgetOutputsEnabled(data *WorkflowData) bool {
+	return data != nil && data.AdmissionEnabled && !data.DryRun
+}
+
 func (c *Compiler) isAdmissionEnabled(frontmatter map[string]any) bool {
 	if on, ok := frontmatter["on"].(map[string]any); ok {
 		if enabled, ok := on["admission"].(bool); ok && enabled {

@@ -129,7 +129,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 		CachedPermissions:    data.CachedPermissions,
 		ModelCosts:           data.ModelCosts,
 		IsDetectionRun:       true,
-		AdmissionEnabled:     data.AdmissionEnabled && !data.DryRun,
+		AdmissionEnabled:     admissionBudgetOutputsEnabled(data),
 		RunnerConfig:         data.RunnerConfig,
 		TimeoutMinutes:       "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
 		CompiledVersion:      data.CompiledVersion,
