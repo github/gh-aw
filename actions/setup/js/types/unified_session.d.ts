@@ -341,6 +341,17 @@ export interface McpConfigurationData {
   }[];
 }
 
+export interface McpCliAuditData {
+  /** @asType integer @minimum 0 */
+  callStarts: SessionCount;
+  /** @asType integer @minimum 0 */
+  callCompletions: SessionCount;
+  /** @asType integer @minimum 0 */
+  toolErrors: SessionCount;
+  /** @asType integer @minimum 0 */
+  malformedRecords: SessionCount;
+}
+
 export interface FirewallAccessData {
   host?: JsonValue;
   method?: JsonValue;
@@ -717,6 +728,7 @@ export interface UnifiedSessionEventDataMap {
   "mcp.tool_call": McpObservationData;
   "mcp.event": RuntimeObservationData & { serverName?: JsonValue };
   "mcp.configuration": McpConfigurationData;
+  "mcp.cli_audit": McpCliAuditData;
   "firewall.http_access": FirewallAccessData;
   "firewall.token_usage": UsageReportData;
   "firewall.model_routing": ModelRoutingData;

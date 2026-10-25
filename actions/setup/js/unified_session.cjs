@@ -17,6 +17,36 @@ const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
+const MCP_CLI_AUDIT_PATH = "mcp-cli-audit/safeoutputs.audit.jsonl";
+const MCP_CLI_AUDIT_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Keep CLI audit details private while retaining aggregate call evidence.
+ * @param {string} content
+ * @param {(code: string, line?: number) => void} report
+ * @returns {{callStarts: number, callCompletions: number, toolErrors: number, malformedRecords: number}}
+ */
+function summarizeMcpCliAudit(content, report) {
+  const summary = { callStarts: 0, callCompletions: 0, toolErrors: 0, malformedRecords: 0 };
+  for (const entry of iterateJsonlEvents(content)) {
+    if (entry.type === "invalid") {
+      if (entry.reason !== "blank") {
+        summary.malformedRecords++;
+        report("malformed_jsonl", entry.lineNumber);
+      }
+      continue;
+    }
+    if (!entry.value || typeof entry.value !== "object" || Array.isArray(entry.value) || typeof entry.value.event !== "string") {
+      summary.malformedRecords++;
+      report("invalid_audit_record", entry.lineNumber);
+      continue;
+    }
+    if (entry.value.event === "call_start") summary.callStarts++;
+    else if (entry.value.event === "call_complete") summary.callCompletions++;
+    else if (entry.value.event === "tool_error") summary.toolErrors++;
+  }
+  return summary;
+}
 
 /** @param {any} data @returns {boolean} */
 function isModelEndpointMismatchData(data) {
@@ -616,6 +646,20 @@ function collectUnifiedSession({
       continue;
     }
     if (file) add(file, component, phase, type);
+  }
+  const mcpCliAudit = path.join(rootDir, MCP_CLI_AUDIT_PATH);
+  if (exists(mcpCliAudit)) {
+    if (fs.lstatSync(mcpCliAudit).size > MCP_CLI_AUDIT_MAX_BYTES) {
+      report(mcpCliAudit, "source_size_limit", undefined);
+    } else {
+      const data = summarizeMcpCliAudit(read(mcpCliAudit), (code, line) => report(mcpCliAudit, code, line));
+      sources.push({
+        component: "mcp",
+        phase: "agent",
+        path: path.relative(rootDir, mcpCliAudit),
+        events: [{ type: "mcp.cli_audit", data }],
+      });
+    }
   }
   const executionFile = path.join(rootDir, "agent-errors.jsonl");
   if (!protectedSessionCapture) add(executionFile, "agent", "agent", undefined);

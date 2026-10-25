@@ -966,6 +966,37 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.type === "mcp.rpc.request")).toHaveLength(1);
   });
 
+  it("persists aggregate safe-output CLI audit evidence without payload details", () => {
+    const audit = write("mcp-cli-audit/safeoutputs.audit.jsonl", [
+      { event: "call_start", tool: "PRIVATE_TOOL", argumentBytes: 42 },
+      { event: "call_complete", tool: "PRIVATE_TOOL", totalElapsedMs: 12 },
+      { event: "tool_error", tool: "PRIVATE_TOOL", error: "PRIVATE_ERROR" },
+      { event: "keepalive_ping_done", pingId: 1000 },
+    ]);
+    fs.appendFileSync(audit, "not-json\n");
+
+    const events = writeUnifiedSession({ rootDir: root, warn: vi.fn() });
+    const telemetry = events.find(event => event.type === "mcp.cli_audit");
+    expect(telemetry).toMatchObject({
+      data: { callStarts: 1, callCompletions: 1, toolErrors: 1, malformedRecords: 1 },
+      provenance: { component: "mcp", phase: "agent", path: "mcp-cli-audit/safeoutputs.audit.jsonl" },
+    });
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(persisted).not.toContain("PRIVATE_TOOL");
+    expect(persisted).not.toContain("PRIVATE_ERROR");
+    expect(validateSession(persisted)).toBe(events.length);
+  });
+
+  it("distinguishes an empty recorded CLI audit from unavailable audit data", () => {
+    write("mcp-cli-audit/safeoutputs.audit.jsonl", "");
+    const recorded = collectUnifiedSession({ rootDir: root }).events.find(event => event.type === "mcp.cli_audit");
+    expect(recorded?.data).toEqual({ callStarts: 0, callCompletions: 0, toolErrors: 0, malformedRecords: 0 });
+
+    fs.rmSync(path.join(root, "mcp-cli-audit/safeoutputs.audit.jsonl"));
+    const missing = collectUnifiedSession({ rootDir: root }).events;
+    expect(missing.some(event => event.type === "mcp.cli_audit")).toBe(false);
+  });
+
   it("rejects malformed recorded exit codes and does not follow an exit-code symlink", () => {
     write("agent_execution_exit_code.txt", "1 trailing");
     expect(() => collectUnifiedSession({ rootDir: root })).toThrow("Invalid agent execution exit code");

@@ -97,6 +97,7 @@
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.admission" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AdmissionDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.daily_aic" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DailyAICDecisionData" } } } },
+      { "if": { "properties": { "type": { "const": "mcp.cli_audit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpCliAuditData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.configuration" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpConfigurationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       {
@@ -762,6 +763,12 @@
         { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         { "type": "object", "additionalProperties": { "$ref": "#/definitions/JsonValue" } }
       ]
+    },
+    "McpCliAuditData": {
+      "type": "object",
+      "properties": { "callStarts": { "type": "integer", "minimum": 0 }, "callCompletions": { "type": "integer", "minimum": 0 }, "toolErrors": { "type": "integer", "minimum": 0 }, "malformedRecords": { "type": "integer", "minimum": 0 } },
+      "required": ["callStarts", "callCompletions", "toolErrors", "malformedRecords"],
+      "additionalProperties": false
     },
     "McpConfigurationData": {
       "type": "object",

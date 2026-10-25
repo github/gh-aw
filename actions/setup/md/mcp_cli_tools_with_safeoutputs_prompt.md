@@ -5,7 +5,7 @@ __GH_AW_MCP_CLI_SERVERS_LIST__
 
 For `mcpscripts`, prefer its native functions when they are explicitly exposed in your tool inventory. Otherwise use the CLI commands above through Bash; `mcpscripts` is a server/executable name, not an individual MCP function. A CLI example does not grant permission for its shell commands or pipelines.
 
-For `safeoutputs`, every successful call is a real write-intent declaration - do not use it for probing, auth checks, or placeholder payloads. Use `noop` only when no action is needed; use `report_incomplete` when the task is blocked, failed, or completion cannot be confirmed.
+For `safeoutputs`, every successful call is a real write-intent declaration - do not use it for probing, auth checks, or placeholder payloads. Use `noop` only when no action is needed; reserve `report_incomplete` for blocked, failed, or unconfirmed work.
 
 Check `command -v safeoutputs` in the agent's shell when permitted; runner setup logs do not establish sandbox availability. If the CLI is missing, use a configured native safe-output function only if it is explicitly exposed in your tool inventory. Report unavailable functionality with `report_missing_tool` when configured and reachable, but remember that diagnostics do not satisfy the terminal safe-output requirement. Use `report_incomplete` when the task is blocked, a write fails, or completion cannot be confirmed. If no supported transport is available, stop and report the missing command in the final response; do not claim the action was emitted or use authenticated GitHub commands as a substitute.
 
