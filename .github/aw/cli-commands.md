@@ -40,6 +40,12 @@ Full per-command flags, examples, and MCP equivalents live in
 ---
 ## MCP Tool ↔ CLI Quick Reference
 
+`gh aw audit <run-id>` inspects a run's execution evidence, including missing tools,
+safe outputs, and metrics. With multiple run IDs, it compares runs for differences.
+The corresponding MCP tools are `audit` (one run) and `audit-diff` (comparison).
+The tool names below are available through an authorized, configured
+`agentic-workflows` MCP server; “local only” means there is no MCP equivalent.
+
 | CLI command | MCP tool |
 |---|---|
 | `gh aw status` | `status` |
