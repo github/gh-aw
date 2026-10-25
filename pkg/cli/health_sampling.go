@@ -114,11 +114,11 @@ func listHealthWorkflowRuns(opts ListWorkflowRunsOptions, page int, collection *
 		if run.Status == "waiting" || isClusterFailureConclusion(run.Conclusion) {
 			hasJobs, err := healthRunHasJobs(run, collection)
 			if err != nil {
-				return nil, 0, err
+				return runs, len(data.Runs), err
 			}
 			if !hasJobs {
 				if err := observeHealthApprovalExpiry(run, collection); err != nil {
-					return nil, 0, err
+					return runs, len(data.Runs), err
 				}
 				healthLog.Printf("Ignoring run %d with no jobs", run.DatabaseID)
 				continue
@@ -221,10 +221,7 @@ func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string,
 	seen := make(map[int64]struct{})
 	sourceBoundaries := make(map[string]struct{})
 	for page := 1; ; page++ {
-		batch, total, err := healthListWorkflowRuns(opts, page, collection)
-		if err != nil {
-			return sample, err
-		}
+		batch, total, listErr := healthListWorkflowRuns(opts, page, collection)
 		if collection.visited == nil {
 			collection.visited = make(map[string]struct{})
 		}
@@ -255,6 +252,9 @@ func sampleHealthWorkflow(target GitHubWorkflow, startDate, repoOverride string,
 				healthLog.Printf("Stopping health history for %s: workflow source changed on %s after run %d", run.WorkflowPath, run.HeadBranch, run.DatabaseID)
 				sourceBoundaries[scope] = struct{}{}
 			}
+		}
+		if listErr != nil {
+			return sample, listErr
 		}
 		if collection.stopped {
 			return sample, errHealthAPIBudget
