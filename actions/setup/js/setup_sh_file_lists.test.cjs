@@ -39,6 +39,25 @@ describe("setup.sh Copilot runtime files", () => {
     expect(getDirectLocalRequires("copilot_sdk_driver.cjs")).toContain("copilot_routing_effort.cjs");
   });
 
+  it("copies the maintained SDK resolver as a runtime asset", () => {
+    const runnerRoot = resolve(__dirname, `.setup-copilot-sdk-resolver-${process.pid}`);
+    mkdirSync(runnerRoot);
+    try {
+      const start = setupShContent.indexOf("# Copy all .cjs files from js/ to destination");
+      const end = setupShContent.indexOf("# Copy any .json files as well", start);
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(end).toBeGreaterThan(start);
+      const copyBlock = setupShContent.slice(start, end);
+      execFileSync("bash", ["-ec", `FILE_COUNT=0\ndebug_log() { :; }\n${copyBlock}`], {
+        env: { ...process.env, JS_SOURCE_DIR: __dirname, DESTINATION: runnerRoot },
+      });
+
+      expect(readFileSync(resolve(runnerRoot, "copilot_sdk_resolver.cjs"), "utf8")).toBe(readFileSync(resolve(__dirname, "copilot_sdk_resolver.cjs"), "utf8"));
+    } finally {
+      rmSync(runnerRoot, { recursive: true, force: true });
+    }
+  });
+
   it("copies the maintained SDK manifests and lockfiles into the runtime action directory", () => {
     const runnerRoot = resolve(__dirname, `.setup-copilot-sdk-${process.pid}`);
     mkdirSync(runnerRoot);

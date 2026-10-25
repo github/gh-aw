@@ -77,6 +77,11 @@ func TestCopilotSDKGeneratedLockedInstall(t *testing.T) {
 			runnerTemp := t.TempDir()
 			assetDir := filepath.Join(runnerTemp, "gh-aw", "actions", "copilot-sdk", spec.runtimeID)
 			require.NoError(t, os.MkdirAll(assetDir, 0700))
+			resolverAssetDir := filepath.Join(runnerTemp, "gh-aw", "actions")
+			require.NoError(t, os.MkdirAll(resolverAssetDir, 0700))
+			resolver, err := os.ReadFile("../../actions/setup/js/" + copilotSDKNpmResolverFile)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(resolverAssetDir, copilotSDKNpmResolverFile), resolver, 0600))
 			for _, filename := range []string{"package.json", "package-lock.json"} {
 				content, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", spec.runtimeID, filename))
 				require.NoError(t, err)
@@ -86,10 +91,12 @@ func TestCopilotSDKGeneratedLockedInstall(t *testing.T) {
 			require.NoError(t, os.Mkdir(filepath.Join(workspace, "node_modules"), 0700))
 			bin := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(bin, "npm"), []byte("#!/bin/sh\n"+
-				`test "$*" = "ci --ignore-scripts --no-audit --no-fund" && test -f package.json && test -f package-lock.json`+"\n"), 0700))
+				`test "$*" = "ci --ignore-scripts --no-audit --no-fund" && test -f package.json && test -f package-lock.json && test -f resolve.cjs`+"\n"), 0700))
 			script := strings.Join(spec.runLines, "\n")
 			require.Contains(t, script, copilotSDKNpmCICommand)
 			require.NotContains(t, script, "npm install")
+			require.NotContains(t, script, "printf")
+			require.Contains(t, script, copilotSDKNpmResolverFile)
 			cmd := exec.Command("bash", "-e", "-c", script)
 			cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace, "RUNNER_TEMP="+runnerTemp, "PATH="+bin+":"+os.Getenv("PATH"))
 			output, err := cmd.CombinedOutput()
@@ -109,6 +116,9 @@ func TestCopilotSDKGeneratedLockedInstall(t *testing.T) {
 			expectedManifest, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", spec.runtimeID, "package.json"))
 			require.NoError(t, err)
 			assert.JSONEq(t, string(expectedManifest), string(manifest))
+			gotResolver, err := os.ReadFile(filepath.Join(workspace, ".gh-aw", "copilot-sdk", "resolve.cjs"))
+			require.NoError(t, err)
+			assert.Equal(t, string(resolver), string(gotResolver))
 		})
 	}
 }
@@ -186,7 +196,9 @@ func TestCopilotSDKIsolatedModuleResolution(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(path, "index.js"), []byte("module.exports = '"+value+"'"), 0600))
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(workspace, "project/node_modules/undici/local-only.js"), []byte(`module.exports = "local-only"`), 0600))
-	require.NoError(t, os.WriteFile(filepath.Join(workspace, ".gh-aw/copilot-sdk/resolve.cjs"), []byte(copilotSDKNpmResolver), 0600))
+	resolver, err := os.ReadFile("../../actions/setup/js/" + copilotSDKNpmResolverFile)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(workspace, ".gh-aw/copilot-sdk/resolve.cjs"), resolver, 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(workspace, "legacy.cjs"), []byte(`require("node:module").registerHooks = undefined;`), 0600))
 	for _, profile := range []string{"node", "typescript"} {
 		manifest, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", profile, "package.json"))
