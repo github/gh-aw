@@ -42,7 +42,7 @@ func (state *Projection) initializeDeployments(poolNames ...string) {
 			continue
 		}
 		for name, profile := range policy.Profiles {
-			if profile.LogicalContract == "" {
+			if profile.LogicalContract == "" || state.Deployments[pool][name] != nil {
 				continue
 			}
 			if state.Deployments[pool] == nil {

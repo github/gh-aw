@@ -662,6 +662,9 @@
         "config": {
           "$ref": "#/$defs/PoolPolicy"
         },
+        "config_ref": {
+          "$ref": "#/$defs/Revision"
+        },
         "kind": {
           "const": "PoolInstall"
         },

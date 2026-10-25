@@ -38,12 +38,14 @@ native runs; ignore moved `target-ref`.
 `aw.json` `work_queue`: concurrency, pending limits, retries, pools, fairness,
 Issues. Defaults: weighted-priority, concurrency 16,
 pending 4,096, singleton assignments, three attempts, 30-second backoff.
-Submission initializes Policy/Work. Only trusted submit/dispatch install missing
-configured pools before deployment synchronization, reusing installed worker
-authority and preserving pools/epoch; never workers, observers, dry-run previews or
-accepted-request recovery. New worker profiles require administrator Policy updates.
+Submission initializes Policy/Work. Trusted submit/dispatch install pools/profiles;
+workers, observers, previews and accepted-request recovery never install.
+New workers require default-revision
+AW source/contract verification and active registration.
+`PoolInstall.config_ref` records provenance, not authority.
+Preserve installed profiles/limits/epoch.
 Standalone seeding is unsupported; AW/Actions authorize submissions.
-Economic/existing-pool changes require quiescence and
+Economic/installed-authority changes require quiescence and
 `policy --from-config --epoch EPOCH`; config edits never rewrite active state.
 Compatible deployments need no drain. Never expose queue-write credentials to
 agents/snapshot MCP. Repository access rules are GitHub's responsibility.

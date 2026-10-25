@@ -219,6 +219,9 @@ run_model PoolInstallInvalidRoute "" Invariant 0 QueuePoolInstall
 run_model PoolInstallUnapprovedRoute "" Invariant 0 QueuePoolInstall
 run_model PoolInstallUnauthorized "" Invariant 0 QueuePoolInstall
 run_model PoolInstallProducerWitness NoProducerInstall Invariant 12 QueuePoolInstall
+run_model PoolInstallNewWorker "" Invariant 0 QueuePoolInstall
+run_model PoolInstallExistingPool "" Invariant 0 QueuePoolInstall
+run_model PoolInstallNewWorkerWitness NoNewWorkerInstall Invariant 12 QueuePoolInstall
 run_model WorkerEvolution "" Invariant 0 WorkerEvolution
 run_model WorkerEvolutionPrincipal "" Invariant 0 WorkerEvolution
 run_model BrokenEvolutionCAS DeploymentCAS Invariant 12 WorkerEvolution
