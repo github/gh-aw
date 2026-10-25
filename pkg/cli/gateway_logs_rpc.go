@@ -26,7 +26,11 @@ func parseRPCMessages(logPath string, verbose bool) (*GatewayMetrics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open rpc-messages.jsonl: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			gatewayLogsLog.Printf("Failed to close rpc-messages.jsonl: %v", err)
+		}
+	}()
 
 	metrics := &GatewayMetrics{
 		Servers: make(map[string]*GatewayServerMetrics),
@@ -246,7 +250,11 @@ func buildToolCallsFromRPCMessages(logPath string) ([]MCPToolCall, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open rpc-messages.jsonl: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			gatewayLogsLog.Printf("Failed to close rpc-messages.jsonl: %v", err)
+		}
+	}()
 
 	type pendingCall struct {
 		serverID  string

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 var addReviewerLog = logger.New("workflow:add_reviewer")
@@ -25,7 +26,7 @@ func (c *Compiler) parseAddReviewerConfig(outputMap map[string]any) *AddReviewer
 	}
 
 	// Get config data for pre-processing before YAML unmarshaling
-	configData, _ := outputMap["add-reviewer"].(map[string]any)
+	configData, _ := typeutil.LookupMap(outputMap, "add-reviewer")
 
 	// Pre-process reviewers fields to convert single string to array BEFORE unmarshaling
 	if configData != nil {

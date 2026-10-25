@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
 	"maps"
 	"os"
@@ -185,11 +184,10 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 	queue := []string{}
 
 	// Process the main content first
-	scanner := bufio.NewScanner(strings.NewReader(content))
 	var result strings.Builder
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	for line := range strings.Lines(content) {
+		line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
 
 		// Parse import directive using the helper function that handles both syntaxes
 		directive := parser.ParseImportDirective(line)
@@ -256,10 +254,6 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-
 	// Process queue of files to check for nested includes
 	for len(queue) > 0 {
 		// Dequeue the first file
@@ -289,9 +283,8 @@ func processIncludesWithWorkflowSpec(content string, workflow *WorkflowSpec, com
 		}
 
 		// Scan for nested includes
-		nestedScanner := bufio.NewScanner(strings.NewReader(markdownContent))
-		for nestedScanner.Scan() {
-			line := nestedScanner.Text()
+		for line := range strings.Lines(markdownContent) {
+			line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
 
 			directive := parser.ParseImportDirective(line)
 			if directive != nil {
@@ -335,11 +328,10 @@ func processIncludesInContent(content string, workflow *WorkflowSpec, commitSHA 
 	}
 
 	// Then process @include directives in markdown
-	scanner := bufio.NewScanner(strings.NewReader(processedImportsContent))
 	var result strings.Builder
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	for line := range strings.Lines(processedImportsContent) {
+		line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
 
 		// Parse import directive
 		directive := parser.ParseImportDirective(line)
@@ -393,7 +385,7 @@ func processIncludesInContent(content string, workflow *WorkflowSpec, commitSHA 
 		}
 	}
 
-	return result.String(), scanner.Err()
+	return result.String(), nil
 }
 
 // isLocalFileForUpdate returns true when importPath resolves to an existing file

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 var assignToUserLog = logger.New("workflow:assign_to_user")
@@ -23,7 +24,7 @@ func (c *Compiler) parseAssignToUserConfig(outputMap map[string]any) *AssignToUs
 	}
 
 	// Get config data for pre-processing before YAML unmarshaling
-	configData, _ := outputMap["assign-to-user"].(map[string]any)
+	configData, _ := typeutil.LookupMap(outputMap, "assign-to-user")
 
 	// Pre-process templatable bool fields
 	if err := preprocessBoolFieldAsString(configData, "unassign-first", assignToUserLog); err != nil {

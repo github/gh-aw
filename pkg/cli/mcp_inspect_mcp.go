@@ -182,7 +182,11 @@ func connectStdioMCPServer(ctx context.Context, config parser.RegistryMCPServerC
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MCP server: %w", err)
 	}
-	defer session.Close()
+	defer func() {
+		if err := session.Close(); err != nil {
+			mcpInspectServerLog.Printf("Failed to close MCP session: %v", err)
+		}
+	}()
 
 	if verbose {
 		console.PrintSuccessMessage("Successfully connected to MCP server")
@@ -237,7 +241,11 @@ func connectHTTPMCPServer(ctx context.Context, config parser.RegistryMCPServerCo
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to HTTP MCP server: %w", err)
 	}
-	defer session.Close()
+	defer func() {
+		if err := session.Close(); err != nil {
+			mcpInspectServerLog.Printf("Failed to close HTTP MCP session: %v", err)
+		}
+	}()
 
 	if verbose {
 		console.PrintSuccessMessage("Successfully connected to HTTP MCP server")

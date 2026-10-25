@@ -205,7 +205,7 @@ func getOTLPGitHubApp(config *FrontmatterConfig, frontmatter map[string]any) *OT
 	if !ok {
 		return nil
 	}
-	audience, _ := authMap["audience"].(string)
+	audience, _ := typeutil.LookupString(authMap, "audience")
 	return &OTLPGitHubAppConfig{
 		Audience: audience,
 	}
@@ -218,15 +218,15 @@ func getOTLPWorkloadIdentity(config *FrontmatterConfig, frontmatter map[string]a
 	if frontmatter == nil {
 		return nil
 	}
-	obs, _ := frontmatter["observability"].(map[string]any)
-	otlp, _ := obs["otlp"].(map[string]any)
-	workloadIdentity, _ := otlp["workload-identity"].(map[string]any)
+	obs, _ := typeutil.LookupMap(frontmatter, "observability")
+	otlp, _ := typeutil.LookupMap(obs, "otlp")
+	workloadIdentity, _ := typeutil.LookupMap(otlp, "workload-identity")
 	if workloadIdentity == nil {
 		return nil
 	}
-	provider, _ := workloadIdentity["provider"].(string)
-	audience, _ := workloadIdentity["audience"].(string)
-	serviceAccount, _ := workloadIdentity["service-account"].(string)
+	provider, _ := typeutil.LookupString(workloadIdentity, "provider")
+	audience, _ := typeutil.LookupString(workloadIdentity, "audience")
+	serviceAccount, _ := typeutil.LookupString(workloadIdentity, "service-account")
 	return &OTLPWorkloadIdentityConfig{
 		Provider:       provider,
 		Audience:       audience,
@@ -620,7 +620,7 @@ func collectAllOTLPEndpoints(frontmatter map[string]any) []otlpEndpointEntry {
 		}
 	case map[string]any:
 		// Object form: endpoint: {url: "...", headers: {...}}
-		if url, _ := ep["url"].(string); url != "" {
+		if url, ok := ep["url"].(string); ok && url != "" {
 			headers := ""
 			if h, hasH := ep["headers"]; hasH {
 				headers = normalizeOTLPHeadersForEndpoint(h, url)
@@ -634,8 +634,8 @@ func collectAllOTLPEndpoints(frontmatter map[string]any) []otlpEndpointEntry {
 			if !ok {
 				continue
 			}
-			url, _ := itemMap["url"].(string)
-			if url == "" {
+			url, ok := itemMap["url"].(string)
+			if !ok || url == "" {
 				continue
 			}
 			headers := ""
@@ -697,7 +697,7 @@ func extractRawOTLPEndpointMaps(obs map[string]any) []map[string]any {
 			result = append(result, entry)
 		}
 	case map[string]any:
-		if url, _ := ep["url"].(string); url != "" {
+		if url, ok := ep["url"].(string); ok && url != "" {
 			// Shallow copy: top-level keys (url, headers) are copied. The headers
 			// value (a map[string]any) is shared by reference, but it is never mutated
 			// downstream — it is only read by normalizeOTLPHeaders and collectAllOTLPEndpoints.
@@ -711,7 +711,7 @@ func extractRawOTLPEndpointMaps(obs map[string]any) []map[string]any {
 			if !ok {
 				continue
 			}
-			if url, _ := itemMap["url"].(string); url != "" {
+			if url, ok := itemMap["url"].(string); ok && url != "" {
 				// Shallow copy: see note above — headers value is never mutated.
 				entry := make(map[string]any, len(itemMap))
 				maps.Copy(entry, itemMap)

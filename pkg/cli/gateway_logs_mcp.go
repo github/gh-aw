@@ -101,7 +101,11 @@ func extractToolCallsFromGatewayLog(gatewayLogPath string, mcpData *MCPToolUsage
 	if err != nil {
 		return fmt.Errorf("could not open gateway.jsonl; ensure required prerequisites are configured, then retry: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			gatewayLogsLog.Printf("Failed to close gateway.jsonl: %v", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, maxScannerBufferSize)

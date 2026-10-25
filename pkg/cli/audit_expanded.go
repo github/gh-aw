@@ -299,7 +299,11 @@ func readHarnessRoutingOutcomeArtifact(logsPath string) *sessionModelRoutingOutc
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditExpandedLog.Printf("Failed to close audit data file: %v", err)
+		}
+	}()
 	content, err := io.ReadAll(io.LimitReader(file, (64<<10)+1))
 	if err != nil || len(content) > 64<<10 {
 		return nil

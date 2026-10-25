@@ -7,6 +7,26 @@ import (
 	"testing"
 )
 
+func TestParseBool(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		m    map[string]any
+		want bool
+	}{
+		{name: "nil"},
+		{name: "absent", m: map[string]any{}},
+		{name: "true", m: map[string]any{"enabled": true}, want: true},
+		{name: "false", m: map[string]any{"enabled": false}},
+		{name: "wrong type", m: map[string]any{"enabled": "true"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ParseBool(tc.m, "enabled"); got != tc.want {
+				t.Errorf("ParseBool() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestLookupMap(t *testing.T) {
 	tests := []struct {
 		name     string

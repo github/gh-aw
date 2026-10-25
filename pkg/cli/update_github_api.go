@@ -55,7 +55,10 @@ func withUpdateGitHubClient(ctx context.Context, verbose bool) context.Context {
 }
 
 func updateGitHubClientFromContext(ctx context.Context) *updateGitHubClient {
-	client, _ := ctx.Value(updateGitHubClientKey{}).(*updateGitHubClient)
+	client, ok := ctx.Value(updateGitHubClientKey{}).(*updateGitHubClient)
+	if !ok {
+		return nil
+	}
 	return client
 }
 
@@ -72,7 +75,11 @@ func (c *updateGitHubClient) request(ctx context.Context, client *api.RESTClient
 	if err != nil {
 		return nil, nil, err
 	}
-	defer response.Body.Close()
+	defer func() {
+		if closeErr := response.Body.Close(); closeErr != nil {
+			updateLog.Printf("Failed to close GitHub API response body: %v", closeErr)
+		}
+	}()
 	body, err = io.ReadAll(response.Body)
 	if err != nil {
 		return nil, nil, err

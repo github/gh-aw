@@ -195,7 +195,11 @@ func parseEventsJSONLMetrics(path string, verbose bool) (workflow.LogMetrics, er
 	if err != nil {
 		return metrics, fmt.Errorf("failed to open events.jsonl: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			copilotEventsJSONLLog.Printf("Failed to close events.jsonl: %v", err)
+		}
+	}()
 
 	toolCallMap := make(map[string]*workflow.ToolCallInfo)
 	var currentSequence []string

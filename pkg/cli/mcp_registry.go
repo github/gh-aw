@@ -88,7 +88,11 @@ func (c *MCPRegistryClient) SearchServers(ctx context.Context, query string) ([]
 		spinner.Stop()
 		return nil, fmt.Errorf("failed to search MCP registry: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			mcpRegistryLog.Printf("Failed to close MCP registry response: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		spinner.Stop()

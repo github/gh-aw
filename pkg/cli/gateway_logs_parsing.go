@@ -47,7 +47,11 @@ func parseGatewayLogs(logDir string, verbose bool) (*GatewayMetrics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open gateway.jsonl: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			gatewayLogsLog.Printf("Failed to close gateway.jsonl: %v", err)
+		}
+	}()
 
 	metrics := &GatewayMetrics{
 		Servers: make(map[string]*GatewayServerMetrics),

@@ -2,10 +2,28 @@ package scanfindings
 
 import (
 	"bytes"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+type failingFindingsWriter struct {
+	writes int
+}
+
+func (w *failingFindingsWriter) Write([]byte) (int, error) {
+	w.writes++
+	return 0, errors.New("output unavailable")
+}
+
+func TestRenderStopsOnWriteError(t *testing.T) {
+	w := &failingFindingsWriter{}
+	Render(w, []Finding{{Message: "first"}, {Message: "second"}})
+	if w.writes != 1 {
+		t.Errorf("Render attempted %d writes after output failed, want 1", w.writes)
+	}
+}
 
 func TestNewFinding(t *testing.T) {
 	fileLines := []string{"one", "two", "three", "four", "five"}

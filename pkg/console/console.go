@@ -562,14 +562,26 @@ func RenderComposedSections(sections []string) {
 	out := stderrWriter()
 	if tty.IsStderrTerminal() {
 		plan := lipgloss.JoinVertical(lipgloss.Left, sections...)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, plan)
-		fmt.Fprintln(out, "")
-	} else {
-		fmt.Fprintln(out, "")
-		for _, section := range sections {
-			fmt.Fprintln(out, section)
+		if _, err := fmt.Fprintln(out, ""); err != nil {
+			consoleLog.Printf("Failed to write section spacing: %v", err)
 		}
-		fmt.Fprintln(out, "")
+		if _, err := fmt.Fprintln(out, plan); err != nil {
+			consoleLog.Printf("Failed to write composed sections: %v", err)
+		}
+		if _, err := fmt.Fprintln(out, ""); err != nil {
+			consoleLog.Printf("Failed to write section spacing: %v", err)
+		}
+	} else {
+		if _, err := fmt.Fprintln(out, ""); err != nil {
+			consoleLog.Printf("Failed to write section spacing: %v", err)
+		}
+		for _, section := range sections {
+			if _, err := fmt.Fprintln(out, section); err != nil {
+				consoleLog.Printf("Failed to write section: %v", err)
+			}
+		}
+		if _, err := fmt.Fprintln(out, ""); err != nil {
+			consoleLog.Printf("Failed to write section spacing: %v", err)
+		}
 	}
 }

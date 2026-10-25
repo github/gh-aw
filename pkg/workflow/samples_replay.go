@@ -152,7 +152,10 @@ func buildDynamicWorkflowSampleEntry(toolName string, sample map[string]any) (Sa
 		return SampleEntry{}, false
 	}
 
-	workflowName, _ := sample["workflow_name"].(string)
+	workflowName, ok := sample["workflow_name"].(string)
+	if !ok {
+		return SampleEntry{}, false
+	}
 	workflowName = strings.TrimSpace(workflowName)
 	if workflowName == "" {
 		return SampleEntry{}, false

@@ -16,6 +16,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestWriteTempScriptFile(t *testing.T) {
+	script := "echo ${{ github.repository }}\n"
+	path, err := writeTempScriptFile(script)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, os.Remove(path)) })
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, sanitizeGHAExpressions(script), string(content))
+}
+
+func TestWriteTempScriptFileCreationFailure(t *testing.T) {
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+	path, err := writeTempScriptFile("echo test")
+	require.ErrorContains(t, err, "failed to create temp file")
+	require.Empty(t, path)
+}
+
+func TestExtractRunStepsWithNonStringMetadata(t *testing.T) {
+	steps := extractRunStepsFromJob(map[string]any{
+		"steps": []any{map[string]any{
+			"run": "echo test", "shell": 42, "name": false, "id": []any{},
+		}},
+	}, "bash", "workflow.lock.yml")
+	require.Len(t, steps, 1)
+	require.Equal(t, "bash", steps[0].Shell)
+	require.Empty(t, steps[0].Name)
+	require.Empty(t, steps[0].ID)
+	require.Empty(t, resolveDefaultShell(map[string]any{"run": map[string]any{"shell": 42}}))
+}
+
 // TestIsShellcheckableShell tests the shell filter.
 func TestIsShellcheckableShell(t *testing.T) {
 	t.Parallel()

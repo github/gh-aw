@@ -143,7 +143,10 @@ func resolveDefaultShell(defaults map[string]any) string {
 	if !ok {
 		return ""
 	}
-	shell, _ := run["shell"].(string)
+	shell, ok := run["shell"].(string)
+	if !ok {
+		return ""
+	}
 	return shell
 }
 
@@ -167,17 +170,22 @@ func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string
 			continue
 		}
 
-		shell, _ := step["shell"].(string)
+		shell, ok := step["shell"].(string)
 		effectiveShell := shell
-		if effectiveShell == "" {
+		if !ok || effectiveShell == "" {
 			effectiveShell = jobDefaultShell
 		}
 
 		if !isShellcheckableShell(effectiveShell) {
 			continue
 		}
-		name, _ := step["name"].(string)
-		id, _ := step["id"].(string)
+		var name, id string
+		if value, ok := step["name"].(string); ok {
+			name = value
+		}
+		if value, ok := step["id"].(string); ok {
+			id = value
+		}
 		steps = append(steps, runStepInfo{
 			ID:       id,
 			Name:     name,
@@ -219,7 +227,10 @@ func extractRunStepsFromLockFile(lockFile string) ([]runStepInfo, error) {
 
 	// Resolve workflow-level default shell (lowest priority).
 	workflowDefaultShell := resolveDefaultShell(func() map[string]any {
-		d, _ := workflowYAML["defaults"].(map[string]any)
+		d, ok := workflowYAML["defaults"].(map[string]any)
+		if !ok {
+			return nil
+		}
 		return d
 	}())
 
@@ -257,11 +268,20 @@ func writeTempScriptFile(script string) (string, error) {
 		return "", fmt.Errorf("failed to create temp file for shellcheck: %w", err)
 	}
 	if _, err := tmpFile.WriteString(sanitizedScript); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			shellcheckLog.Printf("Failed to close shellcheck temp file after write failure: %v", closeErr)
+		}
+		if removeErr := os.Remove(tmpFile.Name()); removeErr != nil {
+			shellcheckLog.Printf("Failed to remove shellcheck temp file after write failure: %v", removeErr)
+		}
 		return "", fmt.Errorf("failed to write shellcheck temp file: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		if removeErr := os.Remove(tmpFile.Name()); removeErr != nil {
+			shellcheckLog.Printf("Failed to remove shellcheck temp file after close failure: %v", removeErr)
+		}
+		return "", fmt.Errorf("failed to close shellcheck temp file: %w", err)
+	}
 	return tmpFile.Name(), nil
 }
 

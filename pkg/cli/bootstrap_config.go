@@ -20,13 +20,22 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 	}
 
 	bootstrapLog.Printf("Printing bootstrap config TODO: package=%s, actions=%d", profile.PackageID, len(profile.Profile.Config))
-	fmt.Fprintln(w, "")
-	fmt.Fprintln(w, console.FormatInfoMessage("Post-installation steps from "+profile.PackageID+":"))
+	if _, err := fmt.Fprintln(w, ""); err != nil {
+		bootstrapLog.Printf("Failed to write bootstrap checklist separator: %v", err)
+		return
+	}
+	if _, err := fmt.Fprintln(w, console.FormatInfoMessage("Post-installation steps from "+profile.PackageID+":")); err != nil {
+		bootstrapLog.Printf("Failed to write bootstrap checklist heading: %v", err)
+		return
+	}
 
 	for _, action := range profile.Profile.Config {
 		switch action.Type {
 		case "require-owner-type":
-			fmt.Fprintf(w, "  ☐ Verify repository owner type: %s\n", action.Value)
+			if _, err := fmt.Fprintf(w, "  ☐ Verify repository owner type: %s\n", action.Value); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap owner type step: %v", err)
+				return
+			}
 		case "repo-variable":
 			line := "  ☐ Set repository variable: " + action.Name
 			if action.Prompt != "" {
@@ -35,7 +44,10 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 			if action.Optional {
 				line += " (optional)"
 			}
-			fmt.Fprintln(w, line)
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap repository variable step: %v", err)
+				return
+			}
 		case "repo-secret":
 			line := "  ☐ Set repository secret: " + action.Name
 			if action.Prompt != "" {
@@ -44,30 +56,50 @@ func printBootstrapConfigTODO(w io.Writer, profile *resolvedBootstrapProfile) {
 			if action.Optional {
 				line += " (optional)"
 			}
-			fmt.Fprintln(w, line)
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap repository secret step: %v", err)
+				return
+			}
 		case "repo-label":
-			fmt.Fprintf(w, "  ☐ Create or update repository label: %s (%s)\n", action.Name, action.Color)
+			if _, err := fmt.Fprintf(w, "  ☐ Create or update repository label: %s (%s)\n", action.Name, action.Color); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap label step: %v", err)
+				return
+			}
 		case "github-app":
 			appLabel := action.AppName
 			if appLabel == "" {
 				appLabel = "GitHub App"
 			}
-			fmt.Fprintf(w, "  ☐ Configure %s (variable: %s, secret: %s)\n",
-				appLabel, action.AppIDVariable, action.PrivateKeySecret)
+			if _, err := fmt.Fprintf(w, "  ☐ Configure %s (variable: %s, secret: %s)\n",
+				appLabel, action.AppIDVariable, action.PrivateKeySecret); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap GitHub App step: %v", err)
+				return
+			}
 		case "copilot-auth":
 			secret := action.Secret
 			if secret == "" {
 				secret = "COPILOT_GITHUB_TOKEN"
 			}
-			fmt.Fprintf(w, "  ☐ Set Copilot PAT secret: %s\n", secret)
+			if _, err := fmt.Fprintf(w, "  ☐ Set Copilot PAT secret: %s\n", secret); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap Copilot authentication step: %v", err)
+				return
+			}
 		case "commit-and-push":
-			fmt.Fprintf(w, "  ☐ Commit and push local changes — %s\n", action.Message)
+			if _, err := fmt.Fprintf(w, "  ☐ Commit and push local changes — %s\n", action.Message); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap commit step: %v", err)
+				return
+			}
 		case "handoff":
-			fmt.Fprintln(w, console.FormatInfoMessage(action.Message))
+			if _, err := fmt.Fprintln(w, console.FormatInfoMessage(action.Message)); err != nil {
+				bootstrapLog.Printf("Failed to write bootstrap handoff step: %v", err)
+				return
+			}
 		}
 	}
 
-	fmt.Fprintln(w, "")
+	if _, err := fmt.Fprintln(w, ""); err != nil {
+		bootstrapLog.Printf("Failed to write bootstrap checklist separator: %v", err)
+	}
 }
 
 // executeBootstrapConfigForAdd runs the bootstrap config actions interactively.

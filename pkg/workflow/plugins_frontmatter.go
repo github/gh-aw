@@ -279,8 +279,8 @@ func parseRawPluginReferences(rawPlugins []any) []PluginReference {
 			}
 			refs = append(refs, PluginReference{Plugin: pluginSpec})
 		case map[string]any:
-			pluginSpec, _ := typed["plugin"].(string)
-			if strings.TrimSpace(pluginSpec) == "" {
+			pluginSpec, ok := typed["plugin"].(string)
+			if !ok || strings.TrimSpace(pluginSpec) == "" {
 				continue
 			}
 			ref := PluginReference{Plugin: strings.TrimSpace(pluginSpec)}

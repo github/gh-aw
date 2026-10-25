@@ -84,7 +84,9 @@ func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // render manually prints the spinner frame (required when using WithoutRenderer)
 func (m spinnerModel) render() {
 	if m.output != nil {
-		fmt.Fprintf(m.output, "%s%s%s %s", ansiCarriageReturn, ansiClearLine, m.spinner.View(), m.message)
+		if _, err := fmt.Fprintf(m.output, "%s%s%s %s", ansiCarriageReturn, ansiClearLine, m.spinner.View(), m.message); err != nil {
+			spinnerLog.Printf("Failed to render spinner frame: %v", err)
+		}
 	}
 }
 
@@ -205,7 +207,9 @@ func (s *SpinnerWrapper) Start() {
 					spinnerLog.Printf("Panic in spinner program (recovered): %v", r)
 				}
 			}()
-			_, _ = s.program.Run()
+			if _, err := s.program.Run(); err != nil {
+				spinnerLog.Printf("Error running spinner program: %v", err)
+			}
 		}()
 	}
 }
@@ -231,7 +235,9 @@ func (s *SpinnerWrapper) Stop() {
 			spinnerLog.Print("Stopping spinner")
 			s.program.Quit()
 			s.wg.Wait() // Wait for the goroutine to complete (goroutine releases the slot)
-			fmt.Fprintf(s.out, "%s%s", ansiCarriageReturn, ansiClearLine)
+			if _, err := fmt.Fprintf(s.out, "%s%s", ansiCarriageReturn, ansiClearLine); err != nil {
+				spinnerLog.Printf("Failed to clear spinner line: %v", err)
+			}
 		} else {
 			// Suppressed spinner has no goroutine; release the slot directly (no-op).
 			releaseActiveSpinner(s)
@@ -257,21 +263,29 @@ func (s *SpinnerWrapper) StopWithMessage(msg string) {
 			if wasRendering {
 				s.program.Quit()
 				s.wg.Wait() // Wait for the goroutine to complete (goroutine releases the slot)
-				fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg)
+				if _, err := fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg); err != nil {
+					spinnerLog.Printf("Failed to write spinner completion message: %v", err)
+				}
 			} else {
 				// Suppressed spinner never rendered; release the slot and print the message.
 				// Still emit CR+ClearLine so the message is not appended to any active
 				// spinner frame that may currently occupy the terminal line.
 				releaseActiveSpinner(s)
-				fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg)
+				if _, err := fmt.Fprintf(s.out, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg); err != nil {
+					spinnerLog.Printf("Failed to write spinner completion message: %v", err)
+				}
 			}
 		} else {
 			// Still print the message even if spinner wasn't running
-			fmt.Fprintf(s.out, "%s\n", msg)
+			if _, err := fmt.Fprintf(s.out, "%s\n", msg); err != nil {
+				spinnerLog.Printf("Failed to write spinner completion message: %v", err)
+			}
 		}
 	} else if msg != "" {
 		// If spinner is disabled, still print the message for user feedback
-		fmt.Fprintf(s.out, "%s\n", msg)
+		if _, err := fmt.Fprintf(s.out, "%s\n", msg); err != nil {
+			spinnerLog.Printf("Failed to write spinner completion message: %v", err)
+		}
 	}
 }
 

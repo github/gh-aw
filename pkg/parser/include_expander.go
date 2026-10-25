@@ -170,9 +170,8 @@ func ExtractBodyLevelImportPaths(content, baseDir string) []BodyLevelImport {
 	repoRoot := findGitHubRepoRoot(baseDir)
 
 	var results []BodyLevelImport
-	scanner := bufio.NewScanner(strings.NewReader(content))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+	for rawLine := range strings.SplitSeq(content, "\n") {
+		line := strings.TrimSpace(rawLine)
 
 		// Match {{#runtime-import}} directives only.
 		m := bodyLevelRuntimeImportRe.FindStringSubmatch(line)
@@ -302,6 +301,9 @@ func processIncludesForField(content, baseDir string, extractFunc func(string) (
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, "", fmt.Errorf("failed to scan includes for field: %w", err)
+	}
 	return results, result.String(), nil
 }
 

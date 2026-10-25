@@ -104,7 +104,11 @@ func fetchPublicGitHubContentsAPI(ctx context.Context, owner, repo, path, ref st
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			remoteLog.Printf("Failed to close public API response body: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

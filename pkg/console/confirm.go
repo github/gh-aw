@@ -57,10 +57,18 @@ func showTextConfirm(title, affirmative, negative string, reader io.Reader) (boo
 	confirmLog.Printf("Showing text confirm: title=%s", title)
 	out := stderrWriter()
 
-	fmt.Fprintf(out, "\n%s\n\n", title)
-	fmt.Fprintf(out, "  1) %s\n", affirmative)
-	fmt.Fprintf(out, "  2) %s\n", negative)
-	fmt.Fprintf(out, "\nEnter y/yes/1 to confirm, n/no/2 to cancel: ")
+	if _, err := fmt.Fprintf(out, "\n%s\n\n", title); err != nil {
+		return false, fmt.Errorf("failed to write confirmation title: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "  1) %s\n", affirmative); err != nil {
+		return false, fmt.Errorf("failed to write affirmative option: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "  2) %s\n", negative); err != nil {
+		return false, fmt.Errorf("failed to write negative option: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "\nEnter y/yes/1 to confirm, n/no/2 to cancel: "); err != nil {
+		return false, fmt.Errorf("failed to write confirmation prompt: %w", err)
+	}
 
 	var input string
 	_, err := fmt.Fscan(reader, &input)

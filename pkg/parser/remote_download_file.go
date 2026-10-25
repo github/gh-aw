@@ -372,7 +372,11 @@ func downloadFileViaRawURL(ctx context.Context, owner, repo, filePath, ref strin
 	if err != nil {
 		return nil, fmt.Errorf("raw URL request failed for %s: %w", rawURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			remoteLog.Printf("Failed to close raw URL response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("raw URL returned HTTP %d for %s", resp.StatusCode, rawURL)

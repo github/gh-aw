@@ -146,7 +146,7 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 	//   - If the generated key already exists with the same value → reuse as-is.
 	//   - If it exists with a different value → pick an alternate name by appending
 	//     a numeric suffix (_2, _3, …) so the original user-defined value is preserved.
-	existingEnv, _ := step["env"].(map[string]any)
+	existingEnv, _ := typeutil.LookupMap(step, "env")
 	newEnv := make(map[string]any, typeutil.SafeAllocationCapacity(len(existingEnv), len(ordered)))
 	maps.Copy(newEnv, existingEnv)
 
@@ -204,11 +204,11 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 	sanitized["env"] = newEnv
 
 	// Build human-readable descriptions for caller warnings.
-	stepName, _ := step["name"].(string)
+	stepName, hasStepName := step["name"].(string)
 	var descriptions []string
 	for _, s := range ordered {
 		var msg string
-		if stepName != "" {
+		if hasStepName && stepName != "" {
 			msg = fmt.Sprintf(
 				"extracted ${{ %s }} from run: script in step %q into env var %s to prevent shell injection",
 				s.Content, stepName, s.EnvVar,

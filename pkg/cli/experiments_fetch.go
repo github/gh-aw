@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -86,10 +85,9 @@ func parseEvalResultRecords(data []byte) []evalResultRecord {
 	if len(data) == 0 {
 		return nil
 	}
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
 	var records []evalResultRecord
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}

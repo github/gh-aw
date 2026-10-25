@@ -281,6 +281,9 @@ func ExtractMarkdownSection(content, sectionName string) (string, error) {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("failed to scan markdown section %q: %w", sectionName, err)
+	}
 	if !inSection {
 		parserLog.Printf("Section not found: %s", sectionName)
 		return "", fmt.Errorf("section '%s' not found", sectionName)

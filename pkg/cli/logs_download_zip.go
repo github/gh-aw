@@ -29,7 +29,11 @@ func unzipFile(zipPath, destDir string, verbose bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to open zip file: %w", err)
 	}
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil {
+			logsDownloadZipLog.Printf("Failed to close zip archive: %v", err)
+		}
+	}()
 
 	logsDownloadZipLog.Printf("Extracting %d entries from %s to %s", len(r.File), zipPath, destDir)
 
@@ -93,7 +97,11 @@ func extractZipFileContents(f *zip.File, filePath string) (extractErr error) {
 	if err != nil {
 		return fmt.Errorf("failed to open file in zip: %w", err)
 	}
-	defer srcFile.Close()
+	defer func() {
+		if err := srcFile.Close(); err != nil {
+			logsDownloadZipLog.Printf("Failed to close zip entry: %v", err)
+		}
+	}()
 
 	// Create the destination file
 	destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, constants.FilePermSensitive)

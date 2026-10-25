@@ -165,10 +165,12 @@ func finishGitHubAPIRateLimitReportToWriter(ctx context.Context, report *GitHubA
 	report.End = &state
 	if !jsonOutput && isGitHubAPIRateLimitLow(state) {
 		percentRemaining := float64(state.Remaining) * 100 / float64(state.Limit)
-		fmt.Fprintln(warningWriter, console.FormatWarningMessage(fmt.Sprintf(
+		if _, err := fmt.Fprintln(warningWriter, console.FormatWarningMessage(fmt.Sprintf(
 			"GitHub API rate limit for %s is running low: %d of %d core requests remain (%.2f%%); resets at %s",
 			report.Host, state.Remaining, state.Limit, percentRemaining, time.Unix(state.Reset, 0).UTC().Format(time.RFC3339),
-		)))
+		))); err != nil {
+			logsRateLimitLog.Printf("Failed to write API rate limit warning: %v", err)
+		}
 	}
 }
 

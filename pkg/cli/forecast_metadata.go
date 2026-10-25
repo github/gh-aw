@@ -9,6 +9,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
@@ -140,10 +141,8 @@ func extractConcurrencyLimit(cfg *workflow.FrontmatterConfig) int {
 		return 0
 	}
 	// When concurrency is configured with cancel-in-progress: true, effective concurrency = 1.
-	if v, ok := cfg.Concurrency["cancel-in-progress"]; ok {
-		if b, _ := v.(bool); b {
-			return 1
-		}
+	if typeutil.ParseBool(cfg.Concurrency, "cancel-in-progress") {
+		return 1
 	}
 	// When there's a concurrency group without cancel-in-progress, runs queue up; treat as 1
 	// active at a time by convention (GitHub Actions queues at most one pending run).

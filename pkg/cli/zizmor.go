@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -336,9 +335,7 @@ func parseAndDisplayZizmorOutputWithOptions(stdout, stderr string, verbose bool,
 
 	// Parse stderr for "completed" messages to get list of files
 	completedFiles := []string{}
-	scanner := bufio.NewScanner(strings.NewReader(stderr))
-	for scanner.Scan() {
-		line := scanner.Text()
+	for line := range strings.SplitSeq(stderr, "\n") {
 		// Look for lines like: " INFO audit: zizmor: 🌈 completed ./.github/workflows/pdf-summary.lock.yml"
 		if strings.Contains(line, "INFO audit: zizmor: 🌈 completed") {
 			parts := strings.Split(line, "completed ")

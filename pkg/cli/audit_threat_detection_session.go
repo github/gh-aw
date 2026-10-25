@@ -59,7 +59,11 @@ func readUnifiedDetectionResult(runDir string) (*unifiedDetectionResult, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to open unified session: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditThreatDetectionLog.Printf("Failed to close unified session: %v", err)
+		}
+	}()
 	return parseUnifiedDetectionResult(file)
 }
 

@@ -61,7 +61,10 @@ func (c *Compiler) parseCommentMemoryConfigValue(rawConfig any) *CommentMemoryCo
 
 	commentMemoryLog.Print("Parsing comment-memory configuration")
 
-	configData, _ := rawConfig.(map[string]any)
+	var configData map[string]any
+	if fields, ok := rawConfig.(map[string]any); ok {
+		configData = fields
+	}
 	if err := preprocessIntFieldAsString(configData, "max", commentMemoryLog); err != nil {
 		commentMemoryLog.Printf("Invalid max value: %v", err)
 		return nil

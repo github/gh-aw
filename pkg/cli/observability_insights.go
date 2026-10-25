@@ -349,11 +349,23 @@ func renderObservabilityInsightsTo(w io.Writer, insights []ObservabilityInsight)
 			icon = "[low]"
 		}
 
-		fmt.Fprintln(w, console.FormatSectionHeaderStderr(fmt.Sprintf("%s %s [%s]", icon, insight.Title, insight.Category)))
-		fmt.Fprintln(w, console.FormatListItemStderr(insight.Summary))
-		if strings.TrimSpace(insight.Evidence) != "" {
-			fmt.Fprintln(w, console.FormatListItemStderr("Evidence: "+insight.Evidence))
+		if _, err := fmt.Fprintln(w, console.FormatSectionHeaderStderr(fmt.Sprintf("%s %s [%s]", icon, insight.Title, insight.Category))); err != nil {
+			observabilityInsightsLog.Printf("Failed to write observability insight heading: %v", err)
+			return
 		}
-		fmt.Fprintln(w)
+		if _, err := fmt.Fprintln(w, console.FormatListItemStderr(insight.Summary)); err != nil {
+			observabilityInsightsLog.Printf("Failed to write observability insight summary: %v", err)
+			return
+		}
+		if strings.TrimSpace(insight.Evidence) != "" {
+			if _, err := fmt.Fprintln(w, console.FormatListItemStderr("Evidence: "+insight.Evidence)); err != nil {
+				observabilityInsightsLog.Printf("Failed to write observability insight evidence: %v", err)
+				return
+			}
+		}
+		if _, err := fmt.Fprintln(w); err != nil {
+			observabilityInsightsLog.Printf("Failed to write observability insight separator: %v", err)
+			return
+		}
 	}
 }

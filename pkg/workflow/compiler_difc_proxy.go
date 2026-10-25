@@ -62,6 +62,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/goccy/go-yaml"
 )
 
@@ -83,8 +84,8 @@ func hasDIFCGuardsConfigured(data *WorkflowData) bool {
 	if !hasGitHub || githubTool == false {
 		return false
 	}
-	toolConfig, _ := githubTool.(map[string]any)
-	return len(getGitHubGuardPolicies(toolConfig)) > 0
+	toolConfig, ok := githubTool.(map[string]any)
+	return ok && len(getGitHubGuardPolicies(toolConfig)) > 0
 }
 
 // isIntegrityProxyEnabled returns true unless the user has explicitly disabled the DIFC proxy
@@ -239,7 +240,7 @@ func writeProxyUpstreamEnv(sb *strings.Builder) {
 func (c *Compiler) buildStartDIFCProxyStepYAML(data *WorkflowData) string {
 	difcProxyLog.Print("Building Start DIFC proxy step YAML")
 
-	githubToolConfig, _ := data.Tools["github"].(map[string]any)
+	githubToolConfig, _ := typeutil.LookupMap(data.Tools, "github")
 
 	// Get MCP server token (same token the gateway uses for the GitHub MCP server)
 	customGitHubToken := getGitHubToken(githubToolConfig)
@@ -559,7 +560,7 @@ func buildCLIProxyPolicyJSON(githubToolConfig map[string]any, data *WorkflowData
 func (c *Compiler) buildStartCliProxyStepYAML(data *WorkflowData) string {
 	difcProxyLog.Print("Building Start CLI proxy step YAML")
 
-	githubToolConfig, _ := data.Tools["github"].(map[string]any)
+	githubToolConfig, _ := typeutil.LookupMap(data.Tools, "github")
 
 	// Get token for the proxy
 	var resolvedToken string

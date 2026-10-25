@@ -86,7 +86,7 @@ func resolveSafeOutputsDataSchema(config *SafeOutputsConfig) (bool, map[string]a
 		if err != nil {
 			return false, nil, "", err
 		}
-		if normalizedType, _ := normalized["type"].(string); normalizedType != "object" {
+		if normalizedType, ok := normalized["type"].(string); !ok || normalizedType != "object" {
 			return false, nil, "", fmt.Errorf("safe-outputs.data must resolve to an object schema, got %q. Expected a schema whose top-level type is object. Example:\nsafe-outputs:\n  data:\n    verdict: string", normalizedType)
 		}
 		return true, normalized, "", nil
@@ -106,7 +106,7 @@ func resolveSafeOutputsDataSchema(config *SafeOutputsConfig) (bool, map[string]a
 			if normalizeErr != nil {
 				return false, nil, "", normalizeErr
 			}
-			if normalizedType, _ := normalized["type"].(string); normalizedType != "object" {
+			if normalizedType, ok := normalized["type"].(string); !ok || normalizedType != "object" {
 				return false, nil, "", fmt.Errorf("safe-outputs.data must resolve to an object schema, got %q. Expected a schema whose top-level type is object. Example:\nsafe-outputs:\n  data:\n    verdict: string", normalizedType)
 			}
 			return true, normalized, "", nil
@@ -158,8 +158,8 @@ func simplifyDataSchemaNode(raw any, path string, allowShorthand bool) (map[stri
 	}
 
 	result := make(map[string]any)
-	typeName, _ := node["type"].(string)
-	if typeName == "" {
+	typeName, ok := node["type"].(string)
+	if !ok || typeName == "" {
 		switch {
 		case node["properties"] != nil || node["required"] != nil || node["additionalProperties"] != nil:
 			typeName = "object"

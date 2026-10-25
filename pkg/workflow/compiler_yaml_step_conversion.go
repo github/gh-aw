@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/goccy/go-yaml"
 )
 
@@ -168,7 +169,7 @@ func (c *Compiler) renderStepFromMap(out *strings.Builder, step map[string]any, 
 		step = sanitized
 	}
 
-	stepName, _ := step["name"].(string)
+	stepName, _ := typeutil.LookupString(step, "name")
 	stepConversionLog.Printf("Rendering step from map: name=%q, fields=%d", stepName, len(step))
 	// Start the step with a dash
 	out.WriteString(indent + "- ")

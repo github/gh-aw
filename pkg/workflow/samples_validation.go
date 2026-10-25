@@ -11,6 +11,7 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/syncutil"
+	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -132,8 +133,8 @@ func normalizeInputSchemaRefs(schema map[string]any, sharedDefs map[string]any) 
 		return
 	}
 
-	localDefs, _ := schema["$defs"].(map[string]any)
-	if localDefs == nil {
+	localDefs, ok := schema["$defs"].(map[string]any)
+	if !ok || localDefs == nil {
 		localDefs = map[string]any{}
 		schema["$defs"] = localDefs
 	}
@@ -272,13 +273,13 @@ func substituteRuntimeExpressionsForValidation(v any, schema map[string]any) any
 	case map[string]any:
 		var props map[string]any
 		if schema != nil {
-			props, _ = schema["properties"].(map[string]any)
+			props, _ = typeutil.LookupMap(schema, "properties")
 		}
 		out := make(map[string]any, len(val))
 		for k, vv := range val {
 			var propSchema map[string]any
 			if props != nil {
-				propSchema, _ = props[k].(map[string]any)
+				propSchema, _ = typeutil.LookupMap(props, k)
 			}
 			out[k] = substituteRuntimeExpressionsForValidation(vv, propSchema)
 		}
@@ -286,7 +287,7 @@ func substituteRuntimeExpressionsForValidation(v any, schema map[string]any) any
 	case []any:
 		var itemSchema map[string]any
 		if schema != nil {
-			itemSchema, _ = schema["items"].(map[string]any)
+			itemSchema, _ = typeutil.LookupMap(schema, "items")
 		}
 		out := make([]any, len(val))
 		for i, vv := range val {
@@ -365,8 +366,11 @@ func placeholderForType(t string, schema map[string]any) any {
 	case "array":
 		return []any{}
 	case "object":
-		props, _ := schema["properties"].(map[string]any)
-		required, _ := schema["required"].([]any)
+		props, _ := typeutil.LookupMap(schema, "properties")
+		required, hasRequired := schema["required"].([]any)
+		if !hasRequired {
+			return map[string]any{}
+		}
 		out := make(map[string]any, len(required))
 		for _, rv := range required {
 			k, ok := rv.(string)
@@ -375,7 +379,7 @@ func placeholderForType(t string, schema map[string]any) any {
 			}
 			var propSchema map[string]any
 			if props != nil {
-				propSchema, _ = props[k].(map[string]any)
+				propSchema, _ = typeutil.LookupMap(props, k)
 			}
 			out[k] = placeholderForSchema(propSchema)
 		}

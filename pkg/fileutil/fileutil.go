@@ -218,7 +218,11 @@ func CopyFile(src, dst string) error {
 		fileutilLog.Printf("Failed to open source file: %s", err)
 		return err
 	}
-	defer in.Close()
+	defer func() {
+		if err := in.Close(); err != nil {
+			fileutilLog.Printf("Failed to close source file: %v", err)
+		}
+	}()
 
 	out, err := os.Create(dst)
 	if err != nil {

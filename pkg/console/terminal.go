@@ -3,9 +3,12 @@ package console
 import (
 	"fmt"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/styles"
 	"github.com/github/gh-aw/pkg/tty"
 )
+
+var terminalLog = logger.New("console:terminal")
 
 // ANSI escape sequences for terminal control
 //
@@ -27,7 +30,9 @@ const (
 // Uses ANSI escape codes for cross-platform compatibility
 func ClearScreen() {
 	if tty.IsStderrTerminal() {
-		fmt.Fprint(stderrWriter(), ansiClearScreen)
+		if _, err := fmt.Fprint(stderrWriter(), ansiClearScreen); err != nil {
+			terminalLog.Printf("Failed to clear screen: %v", err)
+		}
 	}
 }
 
@@ -35,7 +40,9 @@ func ClearScreen() {
 // Uses ANSI escape codes: \r moves cursor to start, \033[K clears to end of line
 func ClearLine() {
 	if tty.IsStderrTerminal() {
-		fmt.Fprintf(stderrWriter(), "%s%s", ansiCarriageReturn, ansiClearLine)
+		if _, err := fmt.Fprintf(stderrWriter(), "%s%s", ansiCarriageReturn, ansiClearLine); err != nil {
+			terminalLog.Printf("Failed to clear line: %v", err)
+		}
 	}
 }
 
@@ -48,9 +55,19 @@ func ShowWelcomeBanner(description string) {
 		header = styles.Header.Render(header)
 	}
 	out := stderrWriter()
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, header)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, description)
-	fmt.Fprintln(out, "")
+	if _, err := fmt.Fprintln(out, ""); err != nil {
+		terminalLog.Printf("Failed to write welcome banner spacing: %v", err)
+	}
+	if _, err := fmt.Fprintln(out, header); err != nil {
+		terminalLog.Printf("Failed to write welcome banner header: %v", err)
+	}
+	if _, err := fmt.Fprintln(out, ""); err != nil {
+		terminalLog.Printf("Failed to write welcome banner spacing: %v", err)
+	}
+	if _, err := fmt.Fprintln(out, description); err != nil {
+		terminalLog.Printf("Failed to write welcome banner description: %v", err)
+	}
+	if _, err := fmt.Fprintln(out, ""); err != nil {
+		terminalLog.Printf("Failed to write welcome banner spacing: %v", err)
+	}
 }

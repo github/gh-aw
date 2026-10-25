@@ -128,7 +128,11 @@ func parseGitHubRateLimitsFile(filePath string) (*GitHubRateLimitUsage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open rate limits file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			gitHubRateLimitUsageLog.Printf("Failed to close rate limits file: %v", err)
+		}
+	}()
 
 	type resourceState struct {
 		requestsMade      int

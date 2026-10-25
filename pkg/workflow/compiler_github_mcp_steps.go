@@ -70,7 +70,7 @@ func githubLockdownStepConfiguredGuardValues(githubTool any) (minIntegrity strin
 	// When set to "allow", the user has explicitly opted in to cross-visibility data
 	// flows, so the repos default should be "all" rather than "public" even for
 	// public repositories.
-	if ptpFlows, _ := toolConfig["private-to-public-flows"].(string); ptpFlows == "allow" {
+	if ptpFlows, ok := toolConfig["private-to-public-flows"].(string); ok && ptpFlows == "allow" {
 		privateToPublicFlowsAllow = true
 	}
 	return minIntegrity, repos, privateToPublicFlowsAllow
@@ -295,10 +295,10 @@ func (c *Compiler) generateParseGuardVarsStep(yaml *strings.Builder, data *Workf
 		githubConfigLog.Print("Skipping parse-guard-vars step: GitHub tool not enabled")
 		return
 	}
-	githubToolMap, _ := githubTool.(map[string]any)
+	githubToolMap, ok := githubTool.(map[string]any)
 
 	// Only generate the step when guard policies are configured.
-	if len(getGitHubGuardPolicies(githubToolMap)) == 0 {
+	if !ok || len(getGitHubGuardPolicies(githubToolMap)) == 0 {
 		githubConfigLog.Print("Skipping parse-guard-vars step: no explicit guard policies configured")
 		return
 	}

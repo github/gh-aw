@@ -3,11 +3,20 @@
 package parser
 
 import (
+	"bufio"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestExtractMarkdownSectionReportsScannerError(t *testing.T) {
+	content := "# Tools\nPartial section\n" + strings.Repeat("x", 2*bufio.MaxScanTokenSize)
+	result, err := ExtractMarkdownSection(content, "Tools")
+	require.ErrorContains(t, err, "failed to scan markdown section")
+	require.Empty(t, result)
+}
 
 func TestExtractFrontmatterFromContent(t *testing.T) {
 	tests := []struct {

@@ -245,7 +245,11 @@ func parseFirewallLog(logPath string, verbose bool) (*FirewallAnalysis, error) {
 		firewallLogLog.Printf("Failed to open firewall log: %v", err)
 		return nil, fmt.Errorf("failed to open firewall log: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			firewallLogLog.Printf("Failed to close firewall log: %v", err)
+		}
+	}()
 
 	analysis := &FirewallAnalysis{
 		RequestsByDomain: make(map[string]DomainRequestStats),

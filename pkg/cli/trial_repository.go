@@ -180,7 +180,10 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 	// Wait for user confirmation
 	fmt.Fprint(os.Stderr, console.FormatPromptMessage("Press Enter after you have enabled these permissions..."))
 	var userInput string
-	_, _ = fmt.Scanln(&userInput) // Ignore error (user pressed Enter without typing anything)
+	if _, err := fmt.Scanln(&userInput); err != nil {
+		// An empty line is expected; input failures must not block trial setup.
+		trialRepoLog.Printf("Permission confirmation input ended: %v", err)
+	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Continuing with trial setup"))
 
 	// Enable discussions in the repository as most workflows use them

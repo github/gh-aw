@@ -196,7 +196,11 @@ func resolveRefToSHAViaPublicAPI(ctx context.Context, owner, repo, ref string) (
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			remoteLog.Printf("Failed to close public API ref response body: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

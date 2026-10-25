@@ -150,7 +150,11 @@ func readSessionModelRouting(runDir string) (*sessionModelRoutingAttribution, bo
 }
 
 func readSessionModelRoutingEvents(file *os.File) (*sessionModelRoutingAttribution, error) {
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditReportLog.Printf("Failed to close unified model routing session: %v", err)
+		}
+	}()
 	attribution := &sessionModelRoutingAttribution{}
 	reader := bufio.NewReader(file)
 	for lineNumber := 1; ; lineNumber++ {

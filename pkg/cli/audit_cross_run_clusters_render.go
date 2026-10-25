@@ -17,33 +17,68 @@ func renderMarkdownClusterAnalysisToWriter(w io.Writer, ca *ClusterAnalysis) {
 	}
 
 	if len(ca.Patterns) > 0 {
-		fmt.Fprintln(w, "## Cluster Patterns")
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "| Severity | Kind | Title | Description |\n")
-		fmt.Fprintf(w, "|----------|------|-------|-------------|\n")
-		for _, p := range ca.Patterns {
-			fmt.Fprintf(w, "| %s %s | %s | %s | %s |\n",
-				renderSeverityIcon(p.Severity), p.Severity, p.Kind, p.Title, p.Description)
+		if _, err := fmt.Fprintln(w, "## Cluster Patterns"); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write cluster patterns heading: %v", err)
+			return
 		}
-		fmt.Fprintln(w)
+		if _, err := fmt.Fprintln(w); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write cluster patterns separator: %v", err)
+			return
+		}
+		if _, err := fmt.Fprintf(w, "| Severity | Kind | Title | Description |\n"); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write cluster patterns table header: %v", err)
+			return
+		}
+		if _, err := fmt.Fprintf(w, "|----------|------|-------|-------------|\n"); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write cluster patterns table separator: %v", err)
+			return
+		}
+		for _, p := range ca.Patterns {
+			if _, err := fmt.Fprintf(w, "| %s %s | %s | %s | %s |\n",
+				renderSeverityIcon(p.Severity), p.Severity, p.Kind, p.Title, p.Description); err != nil {
+				auditCrossRunClustersLog.Printf("Failed to write cluster pattern: %v", err)
+				return
+			}
+		}
+		if _, err := fmt.Fprintln(w); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write cluster patterns separator: %v", err)
+			return
+		}
 	}
 
 	if len(ca.Clusters) > 0 {
-		fmt.Fprintln(w, "## Run Clusters")
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "| Dimension | Value | Runs | Avg Tokens | Avg Turns | Avg Duration | Success Rate |\n")
-		fmt.Fprintf(w, "|-----------|-------|------|------------|-----------|--------------|-------------|\n")
+		if _, err := fmt.Fprintln(w, "## Run Clusters"); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write run clusters heading: %v", err)
+			return
+		}
+		if _, err := fmt.Fprintln(w); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write run clusters separator: %v", err)
+			return
+		}
+		if _, err := fmt.Fprintf(w, "| Dimension | Value | Runs | Avg Tokens | Avg Turns | Avg Duration | Success Rate |\n"); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write run clusters table header: %v", err)
+			return
+		}
+		if _, err := fmt.Fprintf(w, "|-----------|-------|------|------------|-----------|--------------|-------------|\n"); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write run clusters table separator: %v", err)
+			return
+		}
 		for _, c := range ca.Clusters {
 			durStr := "—"
 			if c.Metrics.AvgDurationNs > 0 {
 				durStr = timeutil.FormatDurationNs(c.Metrics.AvgDurationNs)
 			}
-			fmt.Fprintf(w, "| %s | %s | %d | %d | %.1f | %s | %.0f%% |\n",
+			if _, err := fmt.Fprintf(w, "| %s | %s | %d | %d | %.1f | %s | %.0f%% |\n",
 				c.Dimension, c.Value, c.Count,
 				c.Metrics.AvgTokens, c.Metrics.AvgTurns, durStr,
-				c.Metrics.SuccessRate*100)
+				c.Metrics.SuccessRate*100); err != nil {
+				auditCrossRunClustersLog.Printf("Failed to write run cluster: %v", err)
+				return
+			}
 		}
-		fmt.Fprintln(w)
+		if _, err := fmt.Fprintln(w); err != nil {
+			auditCrossRunClustersLog.Printf("Failed to write run clusters separator: %v", err)
+		}
 	}
 }
 

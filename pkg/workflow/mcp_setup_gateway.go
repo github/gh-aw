@@ -12,6 +12,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
@@ -80,8 +81,8 @@ func generateMCPGatewaySetup(yaml *strings.Builder, tools map[string]any, mcpToo
 		yaml.WriteString("          chmod 777 /tmp/gh-aw/mcp-logs/playwright\n")
 	}
 	port, domain, payloadDir, payloadPathPrefix, payloadSizeThreshold := resolveMCPGatewayValues(workflowData, gatewayConfig)
-	githubToolRaw, hasGitHub := tools["github"]
-	githubTool, _ := githubToolRaw.(map[string]any)
+	_, hasGitHub := tools["github"]
+	githubTool, _ := typeutil.LookupMap(tools, "github")
 	if err := writeMCPGatewayExports(yaml, writeMCPGatewayExportsOptions{
 		engine:               engine,
 		workflowData:         workflowData,

@@ -252,7 +252,11 @@ func fetchAgenticWorkflowsMarkdownFiles(ctx context.Context) ([]string, error) {
 		}
 		return nil, fmt.Errorf("github API request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			copilotAgentsLog.Printf("Failed to close GitHub API response: %v", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusForbidden {
 		copilotAgentsLog.Print("GitHub API returned HTTP 403; fetching public raw markdown file list without authentication")

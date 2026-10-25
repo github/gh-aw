@@ -16,7 +16,10 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var renderLog = logger.New("scanfindings:render")
 
 // SeverityLevel is the shared severity vocabulary used by every scanner
 // integration. Native severity labels are normalized with ParseSeverity.
@@ -204,7 +207,10 @@ func FormatMessage(severityLabel, ruleID, description string) string {
 // Render writes the findings to w using the shared console error format.
 func Render(w io.Writer, findings []Finding) {
 	for _, finding := range findings {
-		fmt.Fprint(w, console.FormatError(finding.CompilerError()))
+		if _, err := fmt.Fprint(w, console.FormatError(finding.CompilerError())); err != nil {
+			renderLog.Printf("Failed to write scanner finding: %v", err)
+			return
+		}
 	}
 }
 

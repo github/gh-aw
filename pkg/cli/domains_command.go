@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
@@ -237,10 +238,7 @@ func extractWorkflowDomainConfig(filePath string) (engineID string, network *wor
 	}
 
 	// Extract tools map from raw frontmatter (tools is kept as map[string]any)
-	var toolsMap map[string]any
-	if toolsRaw, ok := result.Frontmatter["tools"]; ok {
-		toolsMap, _ = toolsRaw.(map[string]any)
-	}
+	toolsMap, _ := typeutil.LookupMap(result.Frontmatter, "tools")
 
 	return engineID, config.Network, toolsMap, config.Runtimes
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -220,6 +221,45 @@ func TestEditCommandLeavesWorkflowUnchangedForNoOpEdits(t *testing.T) {
 	content, err := os.ReadFile(workflowPath)
 	require.NoError(t, err)
 	assert.Equal(t, original, string(content))
+}
+
+type editOutputErrorWriter struct{}
+
+func (editOutputErrorWriter) Write([]byte) (int, error) {
+	return 0, io.ErrClosedPipe
+}
+
+func TestEditCommandReturnsOutputWriteErrors(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		args []string
+	}{
+		{name: "no-op", args: []string{"--schedule", "off"}},
+		{name: "dry-run", args: []string{"max-turns: 20", "--dry-run"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			workflowPath := dir + "/workflow.md"
+			original := "---\non: workflow_dispatch\n---\n# Workflow\n"
+			require.NoError(t, os.WriteFile(workflowPath, []byte(original), 0o600))
+
+			cmd := NewEditCommand()
+			cmd.SetArgs(append([]string{workflowPath}, tt.args...))
+			cmd.SetOut(editOutputErrorWriter{})
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+			require.ErrorIs(t, cmd.Execute(), io.ErrClosedPipe)
+
+			content, err := os.ReadFile(workflowPath)
+			require.NoError(t, err)
+			assert.Equal(t, original, string(content))
+			entries, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			assert.Len(t, entries, 1, "output failures must not compile or write workflows")
+		})
+	}
 }
 
 func TestWriteFileAtomicallyReplacesContent(t *testing.T) {

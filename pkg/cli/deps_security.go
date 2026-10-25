@@ -158,10 +158,16 @@ func querySecurityAdvisories(ctx context.Context, depVersions map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			depsSecurityLog.Printf("Failed to close GitHub API response: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, resp.Body)
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			depsSecurityLog.Printf("Failed to drain GitHub API error response: %v", err)
+		}
 		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 

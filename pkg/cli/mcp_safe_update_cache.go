@@ -59,7 +59,7 @@ func CollectLockFileManifests(workflowsDir string) map[string]*workflow.GHAWMani
 
 // WritePriorManifestFile serialises the manifest cache to a temporary JSON file and
 // returns its path.  The caller is responsible for removing the file when done.
-func WritePriorManifestFile(cache map[string]*workflow.GHAWManifest) (string, error) {
+func WritePriorManifestFile(cache map[string]*workflow.GHAWManifest) (cachePath string, writeErr error) {
 	mcpLog.Printf("Writing prior manifest cache to temp file: %d entries", len(cache))
 	data, err := json.Marshal(cache)
 	if err != nil {
@@ -70,10 +70,23 @@ func WritePriorManifestFile(cache map[string]*workflow.GHAWManifest) (string, er
 	if err != nil {
 		return "", fmt.Errorf("create manifest cache file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			if writeErr == nil {
+				writeErr = fmt.Errorf("close manifest cache file: %w", err)
+			} else {
+				mcpLog.Printf("Failed to close manifest cache file: %v", err)
+			}
+		}
+		if writeErr != nil {
+			cachePath = ""
+			if err := os.Remove(f.Name()); err != nil {
+				mcpLog.Printf("Failed to remove incomplete manifest cache file: %v", err)
+			}
+		}
+	}()
 
 	if _, err := f.Write(data); err != nil {
-		_ = os.Remove(f.Name())
 		return "", fmt.Errorf("write manifest cache file: %w", err)
 	}
 

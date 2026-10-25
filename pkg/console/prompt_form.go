@@ -10,9 +10,12 @@ import (
 	"strings"
 
 	"charm.land/huh/v2"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/styles"
 	"github.com/github/gh-aw/pkg/tty"
 )
+
+var promptFormLog = logger.New("console:prompt_form")
 
 const (
 	ansiSaveCursor       = "\0337"
@@ -77,15 +80,25 @@ func (f *PromptForm) RunWithContext(ctx context.Context) error {
 
 func (f *PromptForm) run(runForm func() error) error {
 	if !f.clearOnRun {
-		fmt.Fprintln(f.out)
+		if _, err := fmt.Fprintln(f.out); err != nil {
+			return fmt.Errorf("failed to write prompt spacing: %w", err)
+		}
 		return runForm()
 	}
 	// Reserve enough inline space before saving the cursor. Without this, a form
 	// rendered near the bottom of the terminal can scroll its saved origin upward,
 	// leaving completed question lines behind when the cursor is restored.
-	fmt.Fprint(f.out, strings.Repeat("\n", promptReservedRows), cursorUp(promptReservedRows), ansiSaveCursor)
-	fmt.Fprintln(f.out)
-	defer fmt.Fprint(f.out, ansiRestoreCursor, ansiClearScreenBelow)
+	if _, err := fmt.Fprint(f.out, strings.Repeat("\n", promptReservedRows), cursorUp(promptReservedRows), ansiSaveCursor); err != nil {
+		return fmt.Errorf("failed to reserve prompt space: %w", err)
+	}
+	defer func() {
+		if _, err := fmt.Fprint(f.out, ansiRestoreCursor, ansiClearScreenBelow); err != nil {
+			promptFormLog.Printf("Failed to clear completed prompt: %v", err)
+		}
+	}()
+	if _, err := fmt.Fprintln(f.out); err != nil {
+		return fmt.Errorf("failed to write prompt spacing: %w", err)
+	}
 	return runForm()
 }
 

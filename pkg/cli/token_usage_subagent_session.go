@@ -169,7 +169,11 @@ func readUnifiedTokenUsage(runDir string) ([]TokenUsageEntry, []SteeringNotice, 
 	if err != nil {
 		return nil, nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			tokenUsageSubagentLog.Printf("Failed to close unified token usage session: %v", err)
+		}
+	}()
 
 	collected := unifiedTokenUsageCollection{entries: make([]TokenUsageEntry, 0)}
 	var routingEvents []unifiedRoutingEvent

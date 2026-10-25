@@ -82,7 +82,11 @@ func FetchImportURL(ctx context.Context, rawURL string, opts FetchOptions) (*Fet
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL: %w", sanitizeHTTPError(err))
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			importURLFetcherLog.Printf("Failed to close GET response: %v", err)
+		}
+	}()
 
 	importURLFetcherLog.Printf("GET response: status=%d content-type=%q", resp.StatusCode, resp.Header.Get("Content-Type"))
 
@@ -143,7 +147,11 @@ func tryHead(ctx context.Context, client *http.Client, rawURL string) (string, b
 		importURLFetcherLog.Printf("HEAD request failed (will fallback to GET): %v", sanitizeHTTPError(err))
 		return "", false
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			importURLFetcherLog.Printf("Failed to close HEAD response: %v", err)
+		}
+	}()
 
 	importURLFetcherLog.Printf("HEAD response: status=%d content-type=%q", resp.StatusCode, resp.Header.Get("Content-Type"))
 

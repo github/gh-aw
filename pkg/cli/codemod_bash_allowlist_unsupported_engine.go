@@ -9,6 +9,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/typeutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
@@ -46,7 +47,7 @@ func applyBashAllowlistUnsupportedEngineCheck(content string, frontmatter map[st
 	if err != nil {
 		bashAllowlistUnsupportedEngineCodemodLog.Printf("Failed to resolve effective tools: %v", err)
 		// Fall back to top-level tools only so we never swallow a real error silently.
-		effectiveTools, _ = frontmatter["tools"].(map[string]any)
+		effectiveTools, _ = typeutil.LookupMap(frontmatter, "tools")
 	}
 
 	// Extract the bash value once so we avoid a double-read: HasBashExplicitRestriction
@@ -92,7 +93,7 @@ func applyBashAllowlistUnsupportedEngineCheck(content string, frontmatter map[st
 // The returned map is a best-effort result: if import resolution fails the error is returned so
 // the caller can fall back gracefully.
 func resolveEffectiveBashTools(content string, frontmatter map[string]any, filePath string) (map[string]any, error) {
-	topTools, _ := frontmatter["tools"].(map[string]any)
+	topTools, _ := typeutil.LookupMap(frontmatter, "tools")
 
 	// Fast path: if the top-level tools already declares a bash key, the top-level value is
 	// authoritative (it wins in the MergeTools merge), so we never need to resolve imports.
@@ -111,7 +112,7 @@ func resolveEffectiveBashTools(content string, frontmatter map[string]any, fileP
 // resolveEffectiveTools returns the effective tools map for the workflow, merging in tools from
 // imports and markdown includes when a file path is available.
 func resolveEffectiveTools(content string, frontmatter map[string]any, filePath string) (map[string]any, error) {
-	topTools, _ := frontmatter["tools"].(map[string]any)
+	topTools, _ := typeutil.LookupMap(frontmatter, "tools")
 
 	if filePath == "" {
 		return topTools, nil

@@ -375,11 +375,16 @@ func (c *Compiler) buildLabelCommandEventsMap(data *WorkflowData) (map[string]an
 func mergeLabelCommandOtherEvents(labelEventsMap map[string]any, otherEvents map[string]any) {
 	for eventKey, eventVal := range otherEvents {
 		if existing, exists := labelEventsMap[eventKey]; exists {
-			existingMap, _ := existing.(map[string]any)
-			userMap, _ := eventVal.(map[string]any)
-			if existingMap != nil && userMap != nil {
-				existingTypes, _ := existingMap["types"].([]any)
-				userTypes, _ := userMap["types"].([]any)
+			existingMap, existingOK := existing.(map[string]any)
+			userMap, userOK := eventVal.(map[string]any)
+			if existingOK && userOK && existingMap != nil && userMap != nil {
+				var existingTypes, userTypes []any
+				if types, ok := existingMap["types"].([]any); ok {
+					existingTypes = types
+				}
+				if types, ok := userMap["types"].([]any); ok {
+					userTypes = types
+				}
 				merged := make([]any, 0, typeutil.SafeAllocationCapacity(len(existingTypes), len(userTypes)))
 				merged = append(merged, existingTypes...)
 				merged = append(merged, userTypes...)

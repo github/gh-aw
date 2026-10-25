@@ -62,7 +62,9 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 	if startMsg == "" {
 		startMsg = fmt.Sprintf("Repeating %d more times. Press Ctrl+C to stop.", options.RepeatCount)
 	}
-	fmt.Fprintln(output, console.FormatInfoMessageStdout(startMsg))
+	if _, err := fmt.Fprintln(output, console.FormatInfoMessageStdout(startMsg)); err != nil {
+		retryLog.Printf("Failed to write repeat start message: %v", err)
+	}
 
 	// Use provided context or fall back to background context
 	ctx := ctxutil.OrBackground(options.Ctx)
@@ -86,13 +88,17 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 		select {
 		case <-ctx.Done():
 			retryLog.Printf("Context cancelled at iteration %d/%d", i, options.RepeatCount)
-			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
+			if _, err := fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat...")); err != nil {
+				retryLog.Printf("Failed to write repeat cancellation message: %v", err)
+			}
 			runCleanup()
 			return ctx.Err()
 
 		case <-sigChan:
 			retryLog.Printf("Interrupt signal received at iteration %d/%d", i, options.RepeatCount)
-			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
+			if _, err := fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat...")); err != nil {
+				retryLog.Printf("Failed to write repeat interruption message: %v", err)
+			}
 			runCleanup()
 			return context.Canceled
 
@@ -108,7 +114,9 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 					repeatMsg = fmt.Sprintf(repeatMsg, time.Now().Format("2006-01-02 15:04:05"))
 				}
 			}
-			fmt.Fprintln(output, console.FormatInfoMessageStdout(repeatMsg))
+			if _, err := fmt.Fprintln(output, console.FormatInfoMessageStdout(repeatMsg)); err != nil {
+				retryLog.Printf("Failed to write repeat iteration message: %v", err)
+			}
 
 			if err := options.ExecuteFunc(); err != nil {
 				retryLog.Printf("Error during iteration %d: %v", i, err)

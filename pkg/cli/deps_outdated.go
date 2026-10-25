@@ -175,10 +175,16 @@ func getLatestVersion(ctx context.Context, modulePath, currentVersion string, ve
 	if err != nil {
 		return "", 0, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			depsOutdatedLog.Printf("Failed to close proxy response: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, resp.Body)
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			depsOutdatedLog.Printf("Failed to drain proxy error response: %v", err)
+		}
 		return "", 0, fmt.Errorf("proxy returned status %d", resp.StatusCode)
 	}
 

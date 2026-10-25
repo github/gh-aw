@@ -316,7 +316,11 @@ func collectGatewayTimelineEvents(logDir string, verbose bool) ([]UnifiedTimelin
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			gatewayLogsLog.Printf("Failed to close gateway timeline file: %v", err)
+		}
+	}()
 
 	isRPCMessages := strings.HasSuffix(filepath.Base(path), "rpc-messages.jsonl")
 	gatewayLogsLog.Printf("Collecting gateway timeline events from: %s (rpc_messages=%v)", path, isRPCMessages)
@@ -399,7 +403,11 @@ func parseEventsJSONL(path string) ([]copilotEventsJSONLEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open events.jsonl: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			gatewayLogsLog.Printf("Failed to close events.jsonl: %v", err)
+		}
+	}()
 
 	var entries []copilotEventsJSONLEntry
 	scanner := bufio.NewScanner(f)

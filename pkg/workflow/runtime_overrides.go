@@ -5,6 +5,8 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 func cloneRuntimeWithActionOverrides(base *Runtime, actionRepo, actionVersion string) *Runtime {
@@ -65,11 +67,11 @@ func applyRuntimeOverrides(runtimes map[string]any, requirements map[string]*Run
 		}
 
 		// Extract action-repo and action-version from config
-		actionRepo, _ := configMap["action-repo"].(string)
-		actionVersion, _ := configMap["action-version"].(string)
+		actionRepo, _ := typeutil.LookupString(configMap, "action-repo")
+		actionVersion, _ := typeutil.LookupString(configMap, "action-version")
 
 		// Extract if condition from config
-		ifCondition, _ := configMap["if"].(string)
+		ifCondition, _ := typeutil.LookupString(configMap, "if")
 
 		// Extract cooldown flag from config (optional)
 		cooldown, hasCooldown := configMap["cooldown"].(bool)

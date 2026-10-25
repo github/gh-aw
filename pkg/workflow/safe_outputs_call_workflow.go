@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 var safeOutputsCallWorkflowLog = logger.New("workflow:safe_outputs_call_workflow")
@@ -72,8 +73,8 @@ func generateCallWorkflowTool(workflowName string, workflowInputs map[string]any
 		metadataKey:       "_call_workflow_name",
 	})
 
-	inputSchema, _ := tool["inputSchema"].(map[string]any)
-	properties, _ := inputSchema["properties"].(map[string]any)
+	inputSchema, _ := typeutil.LookupMap(tool, "inputSchema")
+	properties, _ := typeutil.LookupMap(inputSchema, "properties")
 	requiredCount := 0
 	if required, ok := inputSchema["required"].([]string); ok {
 		requiredCount = len(required)

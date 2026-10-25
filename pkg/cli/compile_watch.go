@@ -62,7 +62,11 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 	if err != nil {
 		return fmt.Errorf("failed to create file watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() {
+		if err := watcher.Close(); err != nil {
+			compileWatchLog.Printf("Failed to close file watcher: %v", err)
+		}
+	}()
 
 	// addWatchPath adds a path to the watcher with platform-specific configuration.
 	// On Windows, uses a larger buffer (64KB) to prevent event overflow in busy directories.

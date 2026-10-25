@@ -693,6 +693,27 @@ func TestGenerateMainJobSteps(t *testing.T) {
 	}
 }
 
+func TestGenerateMainJobStepsRejectsMalformedModelBeforeExecution(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.stepOrderTracker = NewStepOrderTracker()
+	data := &WorkflowData{
+		Name:            "Malformed model",
+		AI:              "pi",
+		Model:           "/gpt-5",
+		MarkdownContent: "Test prompt",
+		EngineConfig:    &EngineConfig{ID: "pi"},
+		ParsedTools:     &ToolsConfig{},
+	}
+	var yaml strings.Builder
+
+	require.NotPanics(t, func() {
+		err := compiler.generateMainJobSteps(&yaml, data)
+		require.ErrorContains(t, err, "provider prefix is empty")
+	})
+	assert.False(t, data.CachedAllowedDomainsComputed)
+	assert.NotContains(t, yaml.String(), "id: agentic_execution")
+}
+
 // TestGenerateMainJobStepsWithDevMode tests dev mode CLI build steps integration
 func TestGenerateMainJobStepsWithDevMode(t *testing.T) {
 	compiler := NewCompiler()

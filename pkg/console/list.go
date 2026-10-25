@@ -69,14 +69,22 @@ func showTextList(title string, items []ListItem) (string, error) {
 	listLog.Printf("Showing text list: title=%s, items=%d", title, len(items))
 	out := stderrWriter()
 
-	fmt.Fprintf(out, "\n%s\n\n", title)
+	if _, err := fmt.Fprintf(out, "\n%s\n\n", title); err != nil {
+		return "", fmt.Errorf("failed to write list title: %w", err)
+	}
 	for i, item := range items {
-		fmt.Fprintf(out, "  %d) %s\n", i+1, item.title)
+		if _, err := fmt.Fprintf(out, "  %d) %s\n", i+1, item.title); err != nil {
+			return "", fmt.Errorf("failed to write list item: %w", err)
+		}
 		if item.description != "" {
-			fmt.Fprintf(out, "     %s\n", item.description)
+			if _, err := fmt.Fprintf(out, "     %s\n", item.description); err != nil {
+				return "", fmt.Errorf("failed to write list item description: %w", err)
+			}
 		}
 	}
-	fmt.Fprintf(out, "\nSelect (1-%d): ", len(items))
+	if _, err := fmt.Fprintf(out, "\nSelect (1-%d): ", len(items)); err != nil {
+		return "", fmt.Errorf("failed to write selection prompt: %w", err)
+	}
 
 	var choice int
 	_, err := fmt.Scanf("%d", &choice)

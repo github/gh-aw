@@ -91,8 +91,8 @@ func runEditCommand(cmd *cobra.Command, args []string) error {
 		edited = edited || applied
 	}
 	if !edited {
-		fmt.Fprintln(cmd.OutOrStdout(), "workflow already matches the requested changes")
-		return nil
+		_, err := fmt.Fprintln(cmd.OutOrStdout(), "workflow already matches the requested changes")
+		return err
 	}
 	if err := parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(parsed.Frontmatter, workflowPath); err != nil {
 		return fmt.Errorf("invalid edited workflow: %w", err)
@@ -102,8 +102,8 @@ func runEditCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if editFlagBool(cmd, "dry-run") {
-		fmt.Fprint(cmd.OutOrStdout(), updated)
-		return nil
+		_, err := fmt.Fprint(cmd.OutOrStdout(), updated)
+		return err
 	}
 
 	return writeAndCompileEditedWorkflow(cmd.Context(), workflowPath, content, updated)
@@ -151,8 +151,7 @@ func writeFileAtomically(path string, content []byte) error {
 	tempPath := file.Name()
 	defer func() { _ = os.Remove(tempPath) }()
 	if _, err := file.Write(content); err != nil {
-		_ = file.Close()
-		return err
+		return errors.Join(err, file.Close())
 	}
 	if err := file.Close(); err != nil {
 		return err

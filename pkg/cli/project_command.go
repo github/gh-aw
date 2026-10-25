@@ -725,7 +725,7 @@ func getStatusField(ctx context.Context, info projectURLInfo, verbose bool) (sta
 
 	for _, field := range fields {
 		if fieldName, ok := field["name"].(string); ok && fieldName == "Status" {
-			fieldID, _ := field["id"].(string)
+			fieldID := getString(field, "id")
 			if fieldID == "" {
 				continue
 			}

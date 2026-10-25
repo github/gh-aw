@@ -125,7 +125,11 @@ func parseAuditJSONL(jsonlPath string) ([]AuditLogEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open audit JSONL: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			firewallPolicyLog.Printf("Failed to close audit JSONL: %v", err)
+		}
+	}()
 
 	var entries []AuditLogEntry
 	scanner := bufio.NewScanner(file)

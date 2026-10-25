@@ -30,8 +30,9 @@ var verboseFlag bool
 var bannerFlag bool
 
 // printVersion writes the CLI name and version string to the given writer.
-func printVersion(w io.Writer) {
-	fmt.Fprintf(w, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+func printVersion(w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
+	return err
 }
 
 // formatListWithOr formats a list of strings with commas and "or" before the last item
@@ -114,8 +115,7 @@ For detailed help on any command, use:
 			// executions (e.g. tests reusing rootCmd) don't keep printing
 			// the version after a run that didn't pass --version.
 			_ = cmd.Flags().Set("version", "false")
-			printVersion(os.Stdout)
-			return nil
+			return printVersion(os.Stdout)
 		}
 		return cmd.Help()
 	},
@@ -397,8 +397,7 @@ var versionCmd = &cobra.Command{
 	Long:    `Print the current version and build information for the gh aw CLI extension.`,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` version   # Print the current version`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		printVersion(os.Stdout)
-		return nil
+		return printVersion(os.Stdout)
 	},
 }
 
@@ -624,7 +623,7 @@ func fixPathForCommand(s string) string {
 	return s
 }
 
-func writeUsageCommands(cmd *cobra.Command) {
+func writeUsageCommands(cmd *cobra.Command) error {
 	out := cmd.OutOrStderr()
 	cmds := cmd.Commands()
 	colWidth := 0
@@ -635,60 +634,93 @@ func writeUsageCommands(cmd *cobra.Command) {
 	}
 	colFmt := fmt.Sprintf("\n  %%-%ds %%s", colWidth)
 	if len(cmd.Groups()) == 0 {
-		fmt.Fprint(out, "\n\nAvailable Commands:")
+		if _, err := fmt.Fprint(out, "\n\nAvailable Commands:"); err != nil {
+			return err
+		}
 		for _, sub := range cmds {
 			if sub.IsAvailableCommand() || sub.Name() == "help" {
-				fmt.Fprintf(out, colFmt, sub.Name(), sub.Short)
+				if _, err := fmt.Fprintf(out, colFmt, sub.Name(), sub.Short); err != nil {
+					return err
+				}
 			}
 		}
-		return
+		return nil
 	}
 	for _, group := range cmd.Groups() {
-		fmt.Fprintf(out, "\n\n%s", group.Title)
+		if _, err := fmt.Fprintf(out, "\n\n%s", group.Title); err != nil {
+			return err
+		}
 		for _, sub := range cmds {
 			if sub.GroupID == group.ID && (sub.IsAvailableCommand() || sub.Name() == "help") {
-				fmt.Fprintf(out, colFmt, sub.Name(), sub.Short)
+				if _, err := fmt.Fprintf(out, colFmt, sub.Name(), sub.Short); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	if !cmd.AllChildCommandsHaveGroup() {
-		fmt.Fprint(out, "\n\nAdditional Commands:")
+		if _, err := fmt.Fprint(out, "\n\nAdditional Commands:"); err != nil {
+			return err
+		}
 		for _, sub := range cmds {
 			if sub.GroupID == "" && (sub.IsAvailableCommand() || sub.Name() == "help") {
-				fmt.Fprintf(out, colFmt, sub.Name(), sub.Short)
+				if _, err := fmt.Fprintf(out, colFmt, sub.Name(), sub.Short); err != nil {
+					return err
+				}
 			}
 		}
 	}
+	return nil
 }
 
 func rootUsageFunc(cmd *cobra.Command) error {
 	out := cmd.OutOrStderr()
-	fmt.Fprint(out, "Usage:")
+	if _, err := fmt.Fprint(out, "Usage:"); err != nil {
+		return err
+	}
 	if cmd.Runnable() {
-		fmt.Fprintf(out, "\n  %s", fixPathForCommand(cmd.UseLine()))
+		if _, err := fmt.Fprintf(out, "\n  %s", fixPathForCommand(cmd.UseLine())); err != nil {
+			return err
+		}
 	}
 	if cmd.HasAvailableSubCommands() {
-		fmt.Fprintf(out, "\n  %s [command]", fixPathForCommand(cmd.CommandPath()))
+		if _, err := fmt.Fprintf(out, "\n  %s [command]", fixPathForCommand(cmd.CommandPath())); err != nil {
+			return err
+		}
 	}
 	if len(cmd.Aliases) > 0 {
-		fmt.Fprintf(out, "\n\nAliases:\n  %s", cmd.NameAndAliases())
+		if _, err := fmt.Fprintf(out, "\n\nAliases:\n  %s", cmd.NameAndAliases()); err != nil {
+			return err
+		}
 	}
 	if cmd.HasExample() {
-		fmt.Fprintf(out, "\n\nExamples:\n%s", cmd.Example)
+		if _, err := fmt.Fprintf(out, "\n\nExamples:\n%s", cmd.Example); err != nil {
+			return err
+		}
 	}
 	if cmd.HasAvailableSubCommands() {
-		writeUsageCommands(cmd)
+		if err := writeUsageCommands(cmd); err != nil {
+			return err
+		}
 	}
 	if cmd.HasAvailableLocalFlags() {
-		fmt.Fprintf(out, "\n\nFlags:\n%s", strings.TrimRight(cmd.LocalFlags().FlagUsages(), " \t\n"))
+		if _, err := fmt.Fprintf(out, "\n\nFlags:\n%s", strings.TrimRight(cmd.LocalFlags().FlagUsages(), " \t\n")); err != nil {
+			return err
+		}
 	}
 	if cmd.HasAvailableInheritedFlags() {
-		fmt.Fprintf(out, "\n\nGlobal Flags:\n%s", strings.TrimRight(cmd.InheritedFlags().FlagUsages(), " \t\n"))
+		if _, err := fmt.Fprintf(out, "\n\nGlobal Flags:\n%s", strings.TrimRight(cmd.InheritedFlags().FlagUsages(), " \t\n")); err != nil {
+			return err
+		}
 	}
 	if cmd.HasAvailableSubCommands() {
-		fmt.Fprintf(out, "\n\nUse \"%s [command] --help\" for more information about a command.\n", fixPathForCommand(cmd.CommandPath()))
+		if _, err := fmt.Fprintf(out, "\n\nUse \"%s [command] --help\" for more information about a command.\n", fixPathForCommand(cmd.CommandPath())); err != nil {
+			return err
+		}
 	} else {
-		fmt.Fprintln(out)
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
 	}
 	return nil
 }

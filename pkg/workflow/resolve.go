@@ -281,7 +281,11 @@ func extractLockFileWorkflowName(lockFile string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			resolveLog.Printf("Failed to close lock file %s: %v", lockFile, err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(f)
 	// Lock file `name:` lines are short, but allow generous headroom for long names.

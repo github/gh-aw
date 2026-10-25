@@ -259,8 +259,12 @@ func findModelRoutingFile(runDir string) string {
 		return legacy
 	}
 	var found string
-	_ = filepath.WalkDir(runDir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
+	walkErr := filepath.WalkDir(runDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			tokenUsageSubagentLog.Printf("Failed to search model routing path %s: %v", path, err)
+			return nil
+		}
+		if entry.IsDir() {
 			return nil
 		}
 		if entry.Name() == "model-routing.jsonl" {
@@ -269,6 +273,9 @@ func findModelRoutingFile(runDir string) string {
 		}
 		return nil
 	})
+	if walkErr != nil {
+		tokenUsageSubagentLog.Printf("Failed to search model routing files in %s: %v", runDir, walkErr)
+	}
 	return found
 }
 
@@ -427,7 +434,11 @@ func parseModelRoutingFile(path string, usageEntries []TokenUsageEntry) *ModelRo
 	if err != nil {
 		return &ModelRoutingSummary{Status: "unavailable"}
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			tokenUsageSubagentLog.Printf("Failed to close model routing file: %v", err)
+		}
+	}()
 
 	summary := &ModelRoutingSummary{
 		Status:        "not_routed",

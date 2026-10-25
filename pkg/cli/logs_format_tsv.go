@@ -34,8 +34,11 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 
 	s := data.Summary
 	// Summary line with key aggregates
-	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors\n",
-		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors)
+	if _, err := fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors\n",
+		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors); err != nil {
+		logsTSVLog.Printf("Failed to write TSV summary: %v", err)
+		return
+	}
 
 	if len(data.Runs) == 0 {
 		return
@@ -47,7 +50,10 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 		"tokens", "aic", "turns", "errors",
 		"event", "branch", "created_at", "classification", "url",
 	}
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	if _, err := fmt.Fprintln(w, strings.Join(headers, "\t")); err != nil {
+		logsTSVLog.Printf("Failed to write TSV headers: %v", err)
+		return
+	}
 
 	// Rows
 	for _, r := range data.Runs {
@@ -85,21 +91,33 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 			classification,
 			url,
 		}
-		fmt.Fprintln(w, strings.Join(fields, "\t"))
+		if _, err := fmt.Fprintln(w, strings.Join(fields, "\t")); err != nil {
+			logsTSVLog.Printf("Failed to write TSV run: %v", err)
+			return
+		}
 	}
 
 	// Append observability insights as comments (high signal density)
 	if len(data.Observability) > 0 {
-		fmt.Fprintln(w, "# insights:")
+		if _, err := fmt.Fprintln(w, "# insights:"); err != nil {
+			logsTSVLog.Printf("Failed to write TSV insights header: %v", err)
+			return
+		}
 		for _, obs := range data.Observability {
-			fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary)
+			if _, err := fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary); err != nil {
+				logsTSVLog.Printf("Failed to write TSV insight: %v", err)
+				return
+			}
 		}
 	}
 
 	// Append firewall summary if present
 	if data.FirewallLog != nil && data.FirewallLog.TotalRequests > 0 {
-		fmt.Fprintf(w, "# firewall: %d requests (%d allowed, %d blocked)\n",
-			data.FirewallLog.TotalRequests, data.FirewallLog.AllowedRequests, data.FirewallLog.BlockedRequests)
+		if _, err := fmt.Fprintf(w, "# firewall: %d requests (%d allowed, %d blocked)\n",
+			data.FirewallLog.TotalRequests, data.FirewallLog.AllowedRequests, data.FirewallLog.BlockedRequests); err != nil {
+			logsTSVLog.Printf("Failed to write TSV firewall summary: %v", err)
+			return
+		}
 	}
 
 	// Append engine distribution if multiple engines
@@ -108,7 +126,9 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 		for engine, count := range data.Summary.EngineCounts {
 			parts = append(parts, fmt.Sprintf("%s:%d", engine, count))
 		}
-		fmt.Fprintf(w, "# engines: %s\n", strings.Join(parts, " "))
+		if _, err := fmt.Fprintf(w, "# engines: %s\n", strings.Join(parts, " ")); err != nil {
+			logsTSVLog.Printf("Failed to write TSV engine distribution: %v", err)
+		}
 	}
 }
 
@@ -122,8 +142,11 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 	logsTSVLog.Printf("Rendering %d runs as verbose TSV", data.Summary.TotalRuns)
 
 	s := data.Summary
-	fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors | %d missing_tools | %d github_api_calls\n",
-		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors, s.TotalMissingTools, s.TotalGitHubAPICalls)
+	if _, err := fmt.Fprintf(w, "# %d runs | %s duration | %s tokens | %d turns | %d errors | %d missing_tools | %d github_api_calls\n",
+		s.TotalRuns, s.TotalDuration, formatTSVSummaryTokens(s.TotalTokens), s.TotalTurns, s.TotalErrors, s.TotalMissingTools, s.TotalGitHubAPICalls); err != nil {
+		logsTSVLog.Printf("Failed to write verbose TSV summary: %v", err)
+		return
+	}
 
 	if len(data.Runs) == 0 {
 		return
@@ -136,7 +159,10 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 		"event", "branch", "actor", "created_at", "tbt",
 		"classification", "action_min", "display_title", "url",
 	}
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	if _, err := fmt.Fprintln(w, strings.Join(headers, "\t")); err != nil {
+		logsTSVLog.Printf("Failed to write verbose TSV headers: %v", err)
+		return
+	}
 
 	for _, r := range data.Runs {
 		conclusion := r.Conclusion
@@ -181,13 +207,22 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 			displayTitle,
 			r.URL,
 		}
-		fmt.Fprintln(w, strings.Join(fields, "\t"))
+		if _, err := fmt.Fprintln(w, strings.Join(fields, "\t")); err != nil {
+			logsTSVLog.Printf("Failed to write verbose TSV run: %v", err)
+			return
+		}
 	}
 
 	if len(data.Observability) > 0 {
-		fmt.Fprintln(w, "# insights:")
+		if _, err := fmt.Fprintln(w, "# insights:"); err != nil {
+			logsTSVLog.Printf("Failed to write verbose TSV insights header: %v", err)
+			return
+		}
 		for _, obs := range data.Observability {
-			fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary)
+			if _, err := fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary); err != nil {
+				logsTSVLog.Printf("Failed to write verbose TSV insight: %v", err)
+				return
+			}
 		}
 	}
 }

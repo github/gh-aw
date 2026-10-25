@@ -65,6 +65,7 @@ package workflow
 
 import (
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 // CloseEntityType represents the type of entity being closed
@@ -109,7 +110,7 @@ func (c *Compiler) parseCloseEntityConfig(outputMap map[string]any, params Close
 	}
 
 	// Get config data for pre-processing before YAML unmarshaling
-	configData, _ := outputMap[params.ConfigKey].(map[string]any)
+	configData, _ := typeutil.LookupMap(outputMap, params.ConfigKey)
 
 	// Pre-process templatable int fields
 	if err := preprocessIntFieldAsString(configData, "max", logger); err != nil {

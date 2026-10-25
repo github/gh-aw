@@ -145,7 +145,11 @@ func readLegacyDetectionUsageResult(runDir string) (detectionUsageResult, bool) 
 	if err != nil {
 		return detectionUsageResult{}, false
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditThreatDetectionLog.Printf("Failed to close detection usage result: %v", err)
+		}
+	}()
 	var result detectionUsageResult
 	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&result); err != nil {
 		return detectionUsageResult{}, false
@@ -177,8 +181,12 @@ func findLegacyThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bo
 		return threatDetectionVerdict{}, false
 	}
 	var resultFiles, logFiles []string
-	_ = filepath.WalkDir(runDir, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.Type()&os.ModeSymlink != 0 {
+	walkErr := filepath.WalkDir(runDir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			auditThreatDetectionLog.Printf("Failed to search threat-detection verdict path %s: %v", path, err)
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
 			return nil
 		}
 		if entry.IsDir() {
@@ -195,6 +203,9 @@ func findLegacyThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bo
 		}
 		return nil
 	})
+	if walkErr != nil {
+		auditThreatDetectionLog.Printf("Failed to search threat-detection verdicts in %s: %v", runDir, walkErr)
+	}
 	var foundVerdict threatDetectionVerdict
 	found := false
 	for _, path := range append(resultFiles, logFiles...) {
@@ -227,7 +238,11 @@ func threatDetectionExecutionNotStarted(run WorkflowRun) bool {
 	if err != nil {
 		return false
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditThreatDetectionLog.Printf("Failed to close detection execution evidence: %v", err)
+		}
+	}()
 
 	var evidence detectionExecutionEvidence
 	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&evidence); err != nil {
@@ -262,8 +277,12 @@ func hasThreatDetectionArtifact(runDir string) bool {
 			continue
 		}
 		found := false
-		_ = filepath.WalkDir(filepath.Join(runDir, artifactDir.Name()), func(_ string, entry fs.DirEntry, err error) error {
-			if err != nil || entry.Type()&os.ModeSymlink != 0 {
+		walkErr := filepath.WalkDir(filepath.Join(runDir, artifactDir.Name()), func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				auditThreatDetectionLog.Printf("Failed to search threat-detection artifact path %s: %v", path, err)
+				return nil
+			}
+			if entry.Type()&os.ModeSymlink != 0 {
 				return nil
 			}
 			if entry.IsDir() {
@@ -278,6 +297,10 @@ func hasThreatDetectionArtifact(runDir string) bool {
 			}
 			return nil
 		})
+		if walkErr != nil {
+			auditThreatDetectionLog.Printf("Failed to search threat-detection artifact %s: %v", artifactDir.Name(), walkErr)
+			continue
+		}
 		if found {
 			return true
 		}
@@ -290,7 +313,11 @@ func readThreatDetectionResult(path string) (threatDetectionVerdict, bool) {
 	if err != nil {
 		return threatDetectionVerdict{}, false
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditThreatDetectionLog.Printf("Failed to close detection result: %v", err)
+		}
+	}()
 
 	var raw rawThreatDetectionVerdict
 	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&raw); err != nil {
@@ -315,7 +342,11 @@ func scanThreatDetectionLog(path string) (threatDetectionVerdict, bool) {
 	if err != nil {
 		return threatDetectionVerdict{}, false
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			auditThreatDetectionLog.Printf("Failed to close detection log: %v", err)
+		}
+	}()
 
 	var foundVerdict threatDetectionVerdict
 	found := false

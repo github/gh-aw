@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -613,12 +612,11 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 	}
 
 	// Parse the workflow content to find @include directives
-	scanner := bufio.NewScanner(strings.NewReader(content))
 	seen := make(map[string]struct {
 	})
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	for line := range strings.Lines(content) {
+		line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
 		matches := includeDirectivePattern.FindStringSubmatch(line)
 		if matches == nil {
 			continue

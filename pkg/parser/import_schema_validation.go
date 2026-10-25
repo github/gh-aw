@@ -6,6 +6,8 @@ package parser
 import (
 	"fmt"
 	"maps"
+
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 // validateWithImportSchema validates the provided 'with'/'inputs' values against
@@ -42,10 +44,13 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 
 	// Check each declared schema field
 	for paramName, paramDefRaw := range schemaMap {
-		paramDef, _ := paramDefRaw.(map[string]any)
+		paramDef, ok := paramDefRaw.(map[string]any)
+		if !ok {
+			continue
+		}
 
 		// Check required parameters
-		if req, _ := paramDef["required"].(bool); req {
+		if typeutil.ParseBool(paramDef, "required") {
 			if _, provided := inputs[paramName]; !provided {
 				return fmt.Errorf("import '%s': required 'with' input %q is missing (declared in import-schema)", importPath, paramName)
 			}
@@ -57,8 +62,8 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 		}
 
 		// Skip type validation when type is not specified
-		declaredType, _ := paramDef["type"].(string)
-		if declaredType == "" {
+		declaredType, ok := paramDef["type"].(string)
+		if !ok || declaredType == "" {
 			continue
 		}
 
@@ -93,9 +98,12 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 	}
 	// Validate each declared property
 	for propName, propDefRaw := range propsMap {
-		propDef, _ := propDefRaw.(map[string]any)
+		propDef, ok := propDefRaw.(map[string]any)
+		if !ok {
+			continue
+		}
 		// Check required sub-fields
-		if req, _ := propDef["required"].(bool); req {
+		if typeutil.ParseBool(propDef, "required") {
 			if _, provided := objMap[propName]; !provided {
 				return fmt.Errorf("import '%s': required property %q of 'with' input %q is missing", importPath, propName, name)
 			}
@@ -104,8 +112,8 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 		if !provided {
 			continue
 		}
-		propType, _ := propDef["type"].(string)
-		if propType == "" {
+		propType, ok := propDef["type"].(string)
+		if !ok || propType == "" {
 			continue
 		}
 		qualifiedName := name + "." + propName
@@ -158,13 +166,12 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 			return fmt.Errorf("import '%s': 'with' input %q must be an array (got %T)", importPath, name, value)
 		}
 		// Validate item types if an 'items' schema is declared
-		itemsDefRaw, hasItems := paramDef["items"]
-		if !hasItems {
+		itemsDef, ok := typeutil.LookupMap(paramDef, "items")
+		if !ok {
 			return nil
 		}
-		itemsDef, _ := itemsDefRaw.(map[string]any)
-		itemType, _ := itemsDef["type"].(string)
-		if itemType == "" {
+		itemType, ok := itemsDef["type"].(string)
+		if !ok || itemType == "" {
 			return nil
 		}
 		for i, item := range arr {

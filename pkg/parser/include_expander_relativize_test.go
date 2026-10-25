@@ -3,11 +3,37 @@
 package parser
 
 import (
+	"bufio"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestExtractBodyLevelImportPathsAfterLongLine(t *testing.T) {
+	content := strings.Repeat("x", 2*bufio.MaxScanTokenSize) + "\n{{#runtime-import .github/workflows/shared/tools.md}}\n"
+	imports := ExtractBodyLevelImportPaths(content, t.TempDir())
+	require.Equal(t, []BodyLevelImport{{Path: ".github/workflows/shared/tools.md"}}, imports)
+}
+
+func TestIncludeScannersReportErrors(t *testing.T) {
+	content := strings.Repeat("x", 2*bufio.MaxScanTokenSize) + "\n@include shared/tools.md\n"
+	t.Run("content expansion", func(t *testing.T) {
+		result, err := processIncludesWithVisited(content, t.TempDir(), false, make(map[string]struct{}), nil)
+		require.ErrorContains(t, err, "failed to scan includes")
+		require.Empty(t, result)
+	})
+	t.Run("field expansion", func(t *testing.T) {
+		results, result, err := processIncludesForField(content, t.TempDir(), func(string) (string, error) {
+			t.Fatal("must not extract fields after a scanner error")
+			return "", nil
+		}, "", nil)
+		require.ErrorContains(t, err, "failed to scan includes for field")
+		require.Empty(t, results)
+		require.Empty(t, result)
+	})
+}
 
 func TestRelativizeIncludedFilePath(t *testing.T) {
 	tests := []struct {

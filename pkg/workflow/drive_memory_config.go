@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 const (
@@ -219,7 +220,7 @@ func validateDriveMemoryRuntime(data *WorkflowData) error {
 		if !ok {
 			continue
 		}
-		restoreMemory, _ := job["restore-memory"].(bool)
+		restoreMemory := typeutil.ParseBool(job, "restore-memory")
 		if !restoreMemory {
 			continue
 		}

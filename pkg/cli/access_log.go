@@ -92,7 +92,11 @@ func parseSquidAccessLog(logPath string, verbose bool) (*DomainAnalysis, error) 
 		accessLogLog.Printf("Failed to open access log %s: %v", logPath, err)
 		return nil, fmt.Errorf("failed to open access log: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			accessLogLog.Printf("Failed to close access log: %v", err)
+		}
+	}()
 
 	analysis := &DomainAnalysis{}
 

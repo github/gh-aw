@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -192,7 +193,11 @@ func createBootstrapGitHubApp(ctx context.Context, repo, owner, repoName, ownerT
 	if err != nil {
 		return nil, err
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			githubAppBootstrapLog.Printf("Failed to close registration listener: %v", err)
+		}
+	}()
 
 	appOwner, appOwnerType, appName, homepageURL, description, err := setupBootstrapGitHubAppDetails(ctx, repo, owner, ownerType, action, overrides)
 	if err != nil {
@@ -281,7 +286,9 @@ func buildBootstrapGitHubAppMux(ctx context.Context, csrfState, owner, ownerType
 	mux := http.NewServeMux()
 	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.WriteString(w, registrationPage)
+		if _, err := io.WriteString(w, registrationPage); err != nil {
+			githubAppBootstrapLog.Printf("Failed to write registration page: %v", err)
+		}
 	})
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		returnedState := r.URL.Query().Get("state")

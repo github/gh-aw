@@ -42,7 +42,11 @@ func parseRedactedDomainsLog(logPath string, verbose bool) (*RedactedDomainsAnal
 		redactedDomainsLog.Printf("Failed to open redacted domains log: %v", err)
 		return nil, fmt.Errorf("failed to open redacted domains log: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			redactedDomainsLog.Printf("Failed to close redacted domains log: %v", err)
+		}
+	}()
 
 	domainsSet := make(map[string]struct {
 	})

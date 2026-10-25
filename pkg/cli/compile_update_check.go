@@ -231,7 +231,11 @@ func fetchLatestReleaseTag(ctx context.Context, client *http.Client) (string, er
 	if err != nil {
 		return "", fmt.Errorf("failed to query latest release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			compileUpdateCheckLog.Printf("Failed to close latest release response: %v", err)
+		}
+	}()
 
 	finalURL := resp.Request.URL
 	switch resp.StatusCode {
@@ -270,7 +274,11 @@ func downloadReleaseProbeFile(ctx context.Context, client *http.Client, tag stri
 	if err != nil {
 		return false, fmt.Errorf("failed to download probe file for %s: %w", tag, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			compileUpdateCheckLog.Printf("Failed to close probe response: %v", err)
+		}
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

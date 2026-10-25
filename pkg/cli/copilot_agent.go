@@ -176,7 +176,11 @@ func readLogHeader(path string, maxBytes int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			copilotCodingAgentLog.Printf("Failed to close agent file: %v", err)
+		}
+	}()
 
 	buffer := make([]byte, maxBytes)
 	n, err := file.Read(buffer)
