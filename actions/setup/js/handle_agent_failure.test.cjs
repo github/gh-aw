@@ -5992,9 +5992,11 @@ describe("handle_agent_failure", () => {
 
   describe("buildReportIncompleteContext", () => {
     it.each([
-      ["TypeError: private-driver-payload\n", 1, "Driver execution failed (unhandled JavaScript exception)", "General failure"],
-      ["", 127, "no output captured", "Command not found"],
-    ])("renders classified stderr from the shared driver wrapper in failure reports", async (stderr, exitCode, summary, meaning) => {
+      ["TypeError: private-driver-payload\n", 1, "Driver execution failed (unhandled JavaScript exception)", "General failure", false],
+      ["TypeError: private-driver-payload\n", 1, "Driver execution failed (unhandled JavaScript exception) (from stdout; stderr may have been redirected)", "General failure", true],
+      ['{"type":"assistant.message","data":{"content":"TypeError: private-driver-payload"}}\n', 1, "Output captured during driver execution, but no classified stderr diagnostic", "General failure", true],
+      ["", 127, "no output captured", "Command not found", false],
+    ])("renders classified stderr from the shared driver wrapper in failure reports", async (stderr, exitCode, summary, meaning, merged) => {
       const { runProcess } = require("./process_runner.cjs");
       const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
       const rootDir = mkdtempSync(join(require("os").tmpdir(), "failure-driver-stderr-"));
@@ -6002,7 +6004,7 @@ describe("handle_agent_failure", () => {
       try {
         const result = await runProcess({
           command: process.execPath,
-          args: ["-e", `process.stderr.write(${JSON.stringify(stderr)}); process.exit(${exitCode})`],
+          args: ["-e", `process.${merged ? "stdout" : "stderr"}.write(${JSON.stringify(stderr)}); process.exit(${exitCode})`],
           logArgs: ["<test-driver>"],
           attempt: 0,
           log: message => logs.push(`[gemini-harness] ${message}`),

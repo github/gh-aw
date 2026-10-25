@@ -308,20 +308,21 @@ describe("empty output outcome", () => {
   });
 
   it.each([
-    ["copilot", "dependency_loading", "Driver dependency loading failed"],
-    ["codex", "syntax_error", "Driver initialization failed"],
-    ["pi", "runtime_exception", "Driver execution failed"],
-    ["gemini", "no_output", "no output captured"],
-  ])("reads shared stderr capture from the %s wrapper", (engine, category, summary) => {
+    ["copilot", "", "dependency_loading", "Driver dependency loading failed"],
+    ["claude", "2026-10-25T12:00:00.000Z ", "runtime_exception", "Driver execution failed"],
+    ["codex", "2026-10-25T12:00:00.000Z ", "syntax_error", "Driver initialization failed"],
+    ["pi", "", "runtime_exception", "Driver execution failed"],
+    ["gemini", "", "no_output", "no output captured"],
+  ])("reads shared stderr capture from the %s wrapper", (engine, timestamp, category, summary) => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
-    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), `[${engine}-harness] attempt 1: driver stderr summary: exitCode=1 category=${category}\n`);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), `[${engine}-harness] ${timestamp}attempt 1: driver stderr summary: exitCode=1 category=${category} source=stderr\n`);
     expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Last driver stderr summary: ${summary}`);
   });
 
   it.each([
-    "[gemini-harness] attempt 1: driver stderr summary: exitCode=139 category=runtime_exception\n",
-    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=private_payload\n",
-    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception\n[gemini-harness] attempt 2: driver stderr summary: exitCode=139 category=runtime_exception\n",
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=139 category=runtime_exception source=stderr\n",
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=private_payload source=stderr\n",
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception source=stderr\n[gemini-harness] attempt 2: driver stderr summary: exitCode=139 category=runtime_exception source=stderr\n",
   ])("does not use unknown categories or captures inconsistent with the final exit", capture => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), capture);
@@ -331,7 +332,7 @@ describe("empty output outcome", () => {
   });
 
   it("does not trust stderr metadata quoted by the agent", () => {
-    const content = "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception";
+    const content = "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception source=stderr";
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
     writeEvents([{ type: "assistant.message", data: { content } }]);
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), content);

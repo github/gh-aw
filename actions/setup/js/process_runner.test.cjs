@@ -337,7 +337,7 @@ describe("process_runner.cjs", () => {
       });
       expect(result.hasOutput).toBe(true);
       expect(result.output).toContain("hello stderr");
-      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=unclassified");
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=unclassified source=stderr");
     });
 
     it("sets hasOutput false when no output is produced", async () => {
@@ -350,7 +350,19 @@ describe("process_runner.cjs", () => {
       });
       expect(result.hasOutput).toBe(false);
       expect(result.output).toBe("");
-      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=no_output");
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=no_output source=stderr");
+    });
+
+    it("preserves the process result when diagnostic classification throws", async () => {
+      const logs = [];
+      const result = await runProcess({
+        command: process.execPath,
+        args: ["-e", 'process.stderr.write("[copilot-harness] done: exitCode=999\\n"); process.exit(1)'],
+        attempt: 0,
+        log: message => logs.push(message),
+      });
+      expect(result.exitCode).toBe(1);
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=unclassified source=stderr");
     });
 
     it("logs spawning with logArgs instead of args when provided", async () => {

@@ -15,7 +15,7 @@
 
 "use strict";
 
-const { classifyDriverStderr } = require("./agent_execution.cjs");
+const { classifyDriverStderr, agentErrorDiagnosticText } = require("./agent_execution.cjs");
 const { spawn } = require("child_process");
 const os = require("os");
 const { StringDecoder } = require("string_decoder");
@@ -270,7 +270,19 @@ function runProcess({
       observeStdout(stdoutTail, true);
       observeStderr(stderrTail, true);
       const exitCode = cancelled ? (exitCodeForSignal(cancellationSignal) ?? 1) : (code ?? exitCodeForSignal(signal) ?? 1);
-      if (exitCode !== 0) log(`attempt ${attempt + 1}: driver stderr summary: exitCode=${exitCode} category=${classifyDriverStderr(stderr)}`);
+      if (exitCode !== 0) {
+        // Shell commands may redirect stderr into stdout before the runner sees it.
+        const source = stderr.trim() || !stdout.trim() ? "stderr" : "stdout";
+        let category;
+        try {
+          const diagnostic = source === "stderr" ? stderr : agentErrorDiagnosticText(stdout).slice(-8000);
+          category = classifyDriverStderr(diagnostic || (source === "stdout" ? "unclassified output" : ""));
+        } catch {
+          // Malformed diagnostics must not prevent the process result from settling.
+          category = "unclassified";
+        }
+        log(`attempt ${attempt + 1}: driver stderr summary: exitCode=${exitCode} category=${category} source=${source}`);
+      }
       settle({
         exitCode,
         output: stdout && stderr ? `${stdout}${stdout.endsWith("\n") ? "" : "\n"}${stderr}` : stdout || stderr,

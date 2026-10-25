@@ -328,7 +328,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
       .filter(Boolean)
       .at(-1);
     if (lastCapture && Number(lastCapture[1]) === driverExitCode && Object.hasOwn(DRIVER_STDERR_SUMMARIES, lastCapture[2])) {
-      capturedStderrSummary = DRIVER_STDERR_SUMMARIES[lastCapture[2]];
+      capturedStderrSummary = `${DRIVER_STDERR_SUMMARIES[lastCapture[2]]}${lastCapture[3] === "stdout" ? " (from stdout; stderr may have been redirected)" : ""}`;
     }
     for (const line of evidence.diagnostics.slice().reverse()) {
       driverStderrSummary = agentErrorSummaryText(line, [], rawSourceEngine);

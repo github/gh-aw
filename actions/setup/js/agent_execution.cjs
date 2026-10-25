@@ -70,6 +70,8 @@ function recordErrors(record) {
 /** @param {string} line @returns {boolean} */
 function isAgentDiagnosticLine(line) {
   if (DRIVER_STDERR_RECORD_PATTERN.test(line)) return true;
+  if (/^(?:(?:Syntax|Type|Reference|Range|URI|Eval)Error:|Error \[(?:ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|ERR_INVALID_TYPESCRIPT_SYNTAX)\]:|Error: Cannot find (?:module|package)\b|FATAL ERROR:.*(?:heap|Allocation failed))/.test(line))
+    return true;
   if (/^\[(?:copilot|claude|codex)-harness\]/.test(line)) return !/\b(?:outputTail=|spawning:|resolved --prompt-file:)/.test(line);
   if (/^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) return true;
   if (/^\[gh-aw\/pi-provider\]\s+\S+\s+provider_error\b/.test(line)) return true;
@@ -221,7 +223,7 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
   sandbox_runtime_crash: "Sandbox runtime crashed",
 });
 
-const DRIVER_STDERR_RECORD_PATTERN = /^\[[a-z][a-z0-9-]*-harness\] attempt \d+: driver stderr summary: exitCode=(\d{1,3}) category=([a-z_]+)$/;
+const DRIVER_STDERR_RECORD_PATTERN = /^\[[a-z][a-z0-9-]*-harness\] (?:\d{4}-\d{2}-\d{2}T\S+Z )?attempt \d+: driver stderr summary: exitCode=(\d{1,3}) category=([a-z_]+) source=(stderr|stdout)$/;
 const DRIVER_STDERR_SUMMARIES = Object.freeze({
   ...Object.fromEntries(Object.entries(ENGINE_ERROR_SUMMARIES).map(([category, summary]) => [category, `Engine request/execution: ${summary} (${category})`])),
   no_output: "no output captured",
