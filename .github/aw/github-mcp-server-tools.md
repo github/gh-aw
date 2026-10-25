@@ -34,7 +34,12 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 | `assign_copilot_to_issue` | Assign GitHub Copilot to an issue | `owner`, `repo`, `issue_number` |
 | `create_pull_request_with_copilot` | Ask Copilot to create a pull request | `owner`, `repo`, `issue_number` |
 | `get_automation` | Get a Copilot Automation | `owner`, `repo`, `automation_id` |
+| `get_automation_group` | Get one exact repository Automation group and its current visible members | `owner`, `repo`, `group_id` |
 | `get_automation_revision` | Get a Copilot Automation revision | `owner`, `repo`, `automation_id`, `revision_id` |
+| `get_automations_configuration_for_repository` | Get Copilot Automations configuration for a repository | `owner`, `repo` |
+| `get_copilot_session_events` | Read one chronological page of a Copilot session's SDK events | `session_id`, `page_size`, `page_number`/`after` |
+| `get_copilot_task_status` | Read a current Copilot task-status snapshot by task ID | `task_id` |
+| `list_automation_groups` | List repository Automation groups and the authenticated account identity | `owner`, `repo` |
 | `list_automation_revisions` | List Copilot Automation revisions | `owner`, `repo`, `automation_id` |
 | `list_automations` | List Copilot Automations | `owner`, `repo` |
 | `list_available_automation_tools` | List available Copilot Automation tools | None |
@@ -149,10 +154,11 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 | `list_issue_fields` | List available issue fields for a repository | `owner`, `repo` |
 | `list_issue_types` | List available issue types for a repository | `owner`, `repo` |
 | `list_issues` | List issues in a repository | `owner`, `repo`, `state`, `labels`, `page` |
-| `search_issues` | Search issues across GitHub | `query`, `page`, `per_page` |
+| `search_issues` | Search issues across GitHub using natural-language semantic matching (already scoped to `is:issue`) | `query`, `owner`, `repo` |
 | `semantic_issue_similarity_search` | Find GitHub issues semantically similar to a given issue | `owner`, `repo`, `issue_number` |
-| `semantic_issues_search` | Search issues using natural language queries | `query`, `owner`, `repo` |
 | `sub_issue_write` | Create or manage sub-issues | `owner`, `repo`, `issue_number` |
+
+> **Removed in v2.7**: `semantic_issues_search` was a stale duplicate entry with the same description/behavior as `search_issues` and was not found as a distinct tool during self-inspection; removed from the mapping.
 
 ---
 

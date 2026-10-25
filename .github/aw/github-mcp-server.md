@@ -6,7 +6,7 @@ description: Overview and practical guidance for configuring and using GitHub MC
 
 **Source**: [github/github-mcp-server](https://github.com/github/github-mcp-server/tree/main/pkg/github)
 **Mapping File**: [pkg/workflow/data/github_toolsets_permissions.json](https://github.com/github/gh-aw/blob/main/pkg/workflow/data/github_toolsets_permissions.json)
-**Last Updated**: 2026-08-16
+**Last Updated**: 2026-10-25
 
 ## Overview
 
@@ -74,7 +74,7 @@ When the GitHub tool is configured, gh-aw injects a separate `<github-context>` 
 | `actions` | Workflow introspection, triggering runs |
 | `code_quality` | Code quality finding lookups |
 | `code_security` | Code scanning alert management |
-| `copilot` | Copilot assignment, PR creation, review requests, and Automation tools |
+| `copilot` | Copilot assignment, PR creation, review requests, and Automation (including Automation groups and session/task status) tools |
 | `copilot_issue_intents` | Intent-aware Copilot issue assignment |
 | `copilot_spaces` | GitHub Copilot Spaces (remote mode only) |
 | `dependabot` | Dependency vulnerability management |
