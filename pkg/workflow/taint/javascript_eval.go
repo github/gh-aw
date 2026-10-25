@@ -24,6 +24,7 @@ type javascript struct {
 	loading        map[string]struct{}
 	active         map[*jsFunction]bool
 	returns        jsValue
+	fastVerified   bool
 	budget         int
 	failure        error
 	catchDepth     int
@@ -84,6 +85,12 @@ func (j *javascript) initialGlobals() map[string]jsValue {
 func jsIndex(i int) string { return strconv.Itoa(i) }
 
 func (j *javascript) run() error {
+	if j.options != nil && j.options.fastEntries != nil && !j.options.fastEntries[j.input.Source] {
+		return nil
+	}
+	if j.options != nil && j.options.fastMatched != nil {
+		j.recordFastEntry()
+	}
 	if j.a.rule.ID == "" || j.a.rule.IsSource == nil || j.a.rule.IsSink == nil {
 		return errors.New("JavaScript taint rule requires an id, sources, and sinks")
 	}
@@ -107,7 +114,23 @@ func (j *javascript) run() error {
 		return nil
 	}
 	j.eval(tree)
+	var transferred value
+	transferred = union(transferred, j.stdout)
+	for _, sources := range j.files {
+		transferred = union(transferred, sources)
+	}
+	j.markUnverifiedOutput(transferred, nil)
 	return j.failure
+}
+
+func (j *javascript) markUnverifiedOutput(sources value, node *JavaScriptNode) {
+	if len(sources) == 0 || j.a.stepOutput == nil || j.options == nil ||
+		j.options.fastMatched == nil || j.options.fastEntries != nil || j.fastVerified ||
+		!j.a.stepOutput.modeled {
+		return
+	}
+	j.a.stepOutput.modeled = false
+	j.gap(node, "authored JavaScript output has no verified compiled entry; downstream output transport is not fully modeled")
 }
 
 func (j *javascript) parse(source string) (*JavaScriptNode, error) {
