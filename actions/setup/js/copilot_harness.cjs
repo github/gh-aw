@@ -108,6 +108,7 @@ const { loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAlia
 const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
+const { buildCopilotSDKDriverEnv } = require("./copilot_sdk_driver_env.cjs");
 const MODEL_NOT_SUPPORTED_PATTERN = /The requested model is not supported|No model available\b[^\n]*policy enablement/i;
 const { parseAICreditsErrorInfoFromAuditLog, parseMaxAICreditsFromAuditLog, parseMaxAICreditsExceededFromAuditLog, parseAPIProxyGuardRejectionFromEventLog, formatAPIProxyGuardRejection } = require("./ai_credits_context.cjs");
 
@@ -1486,27 +1487,6 @@ function buildCopilotSDKChildEnv({ sdkEnv, copilotSDKMode, copilotConnectionToke
  */
 function buildCopilotEngineChildEnv(baseEnv, sdkEnv) {
   return stripExecutionEvidenceEnv({ ...baseEnv, ...sdkEnv });
-}
-
-/**
- * @param {NodeJS.ProcessEnv} baseEnv
- * @returns {NodeJS.ProcessEnv}
- */
-function buildCopilotSDKDriverEnv(baseEnv) {
-  const sdkDir = path.join(baseEnv.GITHUB_WORKSPACE || process.cwd(), ".gh-aw", "copilot-sdk");
-  const resolver = path.join(sdkDir, "resolve.cjs");
-  if (!fs.existsSync(resolver)) return baseEnv;
-  if (baseEnv.GH_AW_TRUSTED_SDK_RESOLVER !== "1") {
-    log("Skipping workspace Copilot SDK resolver preload because GH_AW_TRUSTED_SDK_RESOLVER is not enabled");
-    return baseEnv;
-  }
-  const nodeModules = path.join(sdkDir, "node_modules");
-  return {
-    ...baseEnv,
-    NODE_OPTIONS: `${baseEnv.NODE_OPTIONS ? `${baseEnv.NODE_OPTIONS} ` : ""}--import=${JSON.stringify(resolver)}`,
-    NODE_PATH: `${nodeModules}${baseEnv.NODE_PATH ? `${path.delimiter}${baseEnv.NODE_PATH}` : ""}`,
-    PATH: `${path.join(nodeModules, ".bin")}${path.delimiter}${baseEnv.PATH || ""}`,
-  };
 }
 
 /**
