@@ -2,12 +2,30 @@ package workflow
 
 import "strings"
 
+const windowsWSLShell = `node "${{ runner.temp }}/gh-aw/actions/windows_wsl.cjs" {0}`
+const windowsWSLEnv = "GH_AW_WINDOWS_WSL"
+
+func usesWindowsWSL(job *Job) bool {
+	if job == nil || strings.TrimSpace(strings.TrimPrefix(job.RunsOn, "runs-on:")) != "windows-latest" {
+		return false
+	}
+	for _, step := range job.Steps {
+		if strings.Contains(step, "      - name: Setup Scripts\n") {
+			return true
+		}
+	}
+	return false
+}
+
 func renderStepForRunner(step, runsOn string) string {
 	if strings.TrimSpace(strings.TrimPrefix(runsOn, "runs-on:")) != "windows-latest" || !containsRunField(step) {
 		return step
 	}
 
-	return setBashShell(prefixShellScriptWithBash(step))
+	if setup := strings.Index(step, "      - name: Setup Scripts\n"); setup >= 0 {
+		return step[:setup] + setRunnerShell(prefixShellScriptWithBash(step[setup:]), windowsWSLShell)
+	}
+	return setRunnerShell(prefixShellScriptWithBash(step), windowsWSLShell)
 }
 
 func containsRunField(step string) bool {
@@ -102,7 +120,7 @@ func shellHereDocDelimiter(commandLine string) string {
 	return strings.Trim(delimiter, "'\"")
 }
 
-func setBashShell(step string) string {
+func setRunnerShell(step, shell string) string {
 	lines := strings.SplitAfter(step, "\n")
 	var result strings.Builder
 	result.Grow(len(step))
@@ -110,21 +128,21 @@ func setBashShell(step string) string {
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "      - ") {
-			result.WriteString(setBashShellForStep(currentStep.String()))
+			result.WriteString(setRunnerShellForStep(currentStep.String(), shell))
 			currentStep.Reset()
 		}
 		currentStep.WriteString(line)
 	}
-	result.WriteString(setBashShellForStep(currentStep.String()))
+	result.WriteString(setRunnerShellForStep(currentStep.String(), shell))
 	return result.String()
 }
 
-func setBashShellForStep(step string) string {
+func setRunnerShellForStep(step, shell string) string {
 	if !strings.Contains(step, "\n        run:") {
 		return step
 	}
 	if strings.Contains(step, "\n        shell:") {
 		return step
 	}
-	return strings.Replace(step, "\n        run:", "\n        shell: bash\n        run:", 1)
+	return strings.Replace(step, "\n        run:", "\n        shell: "+shell+"\n        run:", 1)
 }

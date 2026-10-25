@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
@@ -41,7 +42,11 @@ func GenerateRuntimeSetupSteps(requirements []RuntimeRequirement, data *Workflow
 			// Capture ERLANG_HOME (the OTP root) so GetNpmBinPathSetup() can add ERLANG_HOME/bin
 			// to PATH inside the AWF container, making erl accessible to mix and elixir.
 			runtimeStepGeneratorLog.Print("Adding ERLANG_HOME capture step for AWF chroot mode compatibility")
-			steps = append(steps, generateEnvCaptureStep("ERLANG_HOME", `erl -noshell -eval 'io:format("~s", [code:root_dir()]), halt().'`))
+			capture := generateEnvCaptureStep("ERLANG_HOME", `erl -noshell -eval 'io:format("~s", [code:root_dir()]), halt().'`)
+			if data != nil && strings.TrimSpace(strings.TrimPrefix(data.RunsOn, "runs-on:")) == "windows-latest" {
+				capture = strings.Split(setRunnerShell(strings.Join(capture, "\n"), "bash"), "\n")
+			}
+			steps = append(steps, capture)
 		}
 		// Note: Java and .NET don't need capture steps because:
 		// - AWF_HOST_PATH captures the complete host PATH including $JAVA_HOME/bin and $DOTNET_ROOT

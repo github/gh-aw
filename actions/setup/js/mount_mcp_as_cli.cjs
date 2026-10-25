@@ -555,9 +555,9 @@ function generateCLIWrapperScript(serverName, serverUrl, toolsFile, agentId, bri
   // values for defense-in-depth.
   const safeName = shellEscapeDoubleQuoted(serverName);
   const safeUrl = shellEscapeDoubleQuoted(serverUrl);
-  const safeToolsFile = shellEscapeDoubleQuoted(path.relative(CLI_BIN_DIR, toolsFile));
+  const safeToolsFile = shellEscapeDoubleQuoted(path.relative(CLI_BIN_DIR, toolsFile).replaceAll("\\", "/"));
   const safeAgentId = shellEscapeDoubleQuoted(agentId);
-  const safeBridge = shellEscapeDoubleQuoted(path.relative(CLI_BIN_DIR, bridgeScript));
+  const safeBridge = shellEscapeDoubleQuoted(path.relative(CLI_BIN_DIR, bridgeScript).replaceAll("\\", "/"));
 
   return `#!/usr/bin/env bash
 set +o histexpand

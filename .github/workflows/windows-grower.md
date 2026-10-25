@@ -52,7 +52,7 @@ safe-outputs:
     labels: [automation, ai-generated, windows]
     max: 1
     expires: 7d
-  missing-tool:
+  report-missing-tool:
 timeout-minutes: 20
 strict: true
 ---

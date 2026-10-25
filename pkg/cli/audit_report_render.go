@@ -702,6 +702,12 @@ func renderConsoleCreatedItems(items []CreatedItemReport) {
 			line += " " + item.URL
 		} else if item.Repo != "" && item.Number > 0 {
 			line += fmt.Sprintf(" %s#%d", item.Repo, item.Number)
+		} else if item.Identifier != "" {
+			line += " " + item.Identifier
+		} else if item.ID != nil {
+			line += fmt.Sprintf(" %v", item.ID)
+		} else if item.IdentityUnavailableReason != "" {
+			line += " (identity unavailable: " + item.IdentityUnavailableReason + ")"
 		}
 		fmt.Fprintln(os.Stderr, line)
 	}

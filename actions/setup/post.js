@@ -105,7 +105,18 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
   console.log(`Cleaning up ${tmpDir}...`);
 
   // Try sudo rm -rf first (handles root-owned files on GitHub-hosted runners)
-  const result = spawnSync("sudo", ["rm", "-rf", tmpDir], { stdio: "inherit" });
+  let result;
+  if (process.platform === "win32" && process.env.GH_AW_WINDOWS_WSL === "true") {
+    try {
+      require("./js/windows_wsl.cjs").cleanupWindowsRuntime();
+      result = { status: 0 };
+    } catch (error) {
+      console.error(`Warning: failed to clean up WSL runtime: ${error.message}`);
+      result = { status: 1 };
+    }
+  } else {
+    result = spawnSync("sudo", ["rm", "-rf", tmpDir], { stdio: "inherit" });
+  }
 
   if (result.status === 0) {
     console.log(`Cleaned up ${tmpDir}`);
@@ -141,11 +152,7 @@ function listTmpGhAwFiles(tmpDir, maxDepth, maxFiles) {
       continue;
     }
 
-    const awfChrootCleanupResult = spawnSync(
-      "sudo",
-      ["find", "/tmp", "-maxdepth", "1", "-name", pattern, "-type", "d", "-exec", "rm", "-rf", "--", "{}", "+"],
-      { stdio: "inherit" }
-    );
+    const awfChrootCleanupResult = spawnSync("sudo", ["find", "/tmp", "-maxdepth", "1", "-name", pattern, "-type", "d", "-exec", "rm", "-rf", "--", "{}", "+"], { stdio: "inherit" });
     if (awfChrootCleanupResult.status === 0) {
       const awfChrootNoun = awfChrootDirs.length === 1 ? "directory" : "directories";
       console.log(`Cleaned up ${awfChrootDirs.length} /tmp/${pattern} ${awfChrootNoun}`);

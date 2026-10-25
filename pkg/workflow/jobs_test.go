@@ -279,8 +279,8 @@ func TestRenderStepForRunner(t *testing.T) {
 	if !strings.Contains(got, "        run: bash \"${RUNNER_TEMP}/gh-aw/actions/setup.sh\" --verbose\n") {
 		t.Fatalf("Windows step did not invoke the shell script with Bash:\n%s", got)
 	}
-	if !strings.Contains(got, "        shell: bash\n") {
-		t.Fatalf("Windows step did not explicitly select Bash:\n%s", got)
+	if !strings.Contains(got, "        shell: "+windowsWSLShell+"\n") {
+		t.Fatalf("Windows step did not select WSL:\n%s", got)
 	}
 
 	quotedPath := "      - name: Run script\n        run: './my script.sh' --verbose\n"
@@ -303,10 +303,46 @@ func TestRenderStepForRunner(t *testing.T) {
 	if !strings.Contains(got, "        shell: pwsh\n") {
 		t.Fatalf("Windows step changed its explicit shell:\n%s", got)
 	}
+	explicitBash := "      - name: Run script\n        shell: bash\n        run: ./script.sh\n"
+	if got = renderStepForRunner(explicitBash, "windows-latest"); !strings.Contains(got, "shell: bash\n") {
+		t.Fatalf("Windows step changed its explicit native Bash shell:\n%s", got)
+	}
+
+	actionStep := "      - uses: actions/github-script@sha\n        with:\n          script: console.log('hello')\n"
+	if got = renderStepForRunner(actionStep, "windows-latest"); got != actionStep {
+		t.Fatalf("Windows native action changed:\n%s", got)
+	}
+	beforeSetup := "      - name: Native bootstrap\n        shell: bash\n        run: echo native\n"
+	setup := "      - name: Setup Scripts\n        uses: ./actions/setup\n"
+	afterSetup := "      - name: Download container images\n        run: ./pull.sh\n"
+	got = renderStepForRunner(beforeSetup+setup+afterSetup, "windows-latest")
+	if !strings.HasPrefix(got, beforeSetup+setup) || !strings.Contains(got, "shell: "+windowsWSLShell) {
+		t.Fatalf("WSL dispatch changed steps before setup or missed runtime steps:\n%s", got)
+	}
 
 	ubuntuStep := "      - name: Run script\n        run: ./script.sh\n"
 	if got = renderStepForRunner(ubuntuStep, "runs-on: ubuntu-latest"); got != ubuntuStep {
 		t.Fatalf("Non-Windows step changed:\n%s", got)
+	}
+
+}
+
+func TestWindowsHostOnlyJobPreservesNativeShell(t *testing.T) {
+	jm := NewJobManager()
+	err := jm.AddJob(&Job{
+		Name: "windows_scan", RunsOn: "windows-latest",
+		Steps: []string{"      - name: Configure host\n        shell: bash\n        run: echo native\n"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rendered strings.Builder
+	jm.WriteJobsYAML(&rendered)
+	if strings.Contains(rendered.String(), "windows_wsl.cjs") || !strings.Contains(rendered.String(), "shell: bash") {
+		t.Fatalf("host-only Windows job should not require the WSL runtime:\n%s", rendered.String())
+	}
+	if strings.Contains(rendered.String(), windowsWSLEnv) {
+		t.Fatalf("host-only Windows job should not opt into WSL setup:\n%s", rendered.String())
 	}
 }
 
@@ -324,6 +360,11 @@ engine:
   id: codex
   model-provider: github
 network: {}
+runtimes:
+  go:
+    version: "1.25"
+  elixir:
+    version: "1.18"
 tools:
   bash:
     - "*"
@@ -349,6 +390,21 @@ Compile this workflow on a Windows runner.
 	lockBytes, err := os.ReadFile(lockFile)
 	if err != nil {
 		t.Fatalf("read lock file: %v", err)
+	}
+	if !strings.Contains(string(lockBytes), windowsWSLEnv+`: "true"`) {
+		t.Fatalf("Windows runtime job should opt into WSL setup")
+	}
+	for _, name := range []string{"Capture GOROOT for AWF chroot mode", "Capture ERLANG_HOME for AWF chroot mode"} {
+		step := extractWorkflowStepByName(t, string(lockBytes), name)
+		if !strings.Contains(step, "shell: bash\n") {
+			t.Fatalf("Windows language runtime capture %q should use native Bash:\n%s", name, step)
+		}
+	}
+	for _, name := range []string{"Install AWF binary", "Download container images", "Execute Codex CLI"} {
+		step := extractWorkflowStepByName(t, string(lockBytes), name)
+		if !strings.Contains(step, "shell: "+windowsWSLShell) {
+			t.Fatalf("Windows runtime step %q does not use WSL:\n%s", name, step)
+		}
 	}
 	fallbackStep := extractWorkflowStepByName(t, string(lockBytes), "Upload agent output fallback artifact")
 

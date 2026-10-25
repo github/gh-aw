@@ -23,6 +23,18 @@ import {
 } from "./mount_mcp_as_cli.cjs";
 
 describe("mount_mcp_as_cli.cjs", () => {
+  it("uses POSIX paths in Bash wrappers generated on Windows", () => {
+    const relative = vi.spyOn(path, "relative").mockReturnValueOnce("..\\tools\\fixture.json").mockReturnValueOnce("..\\..\\actions\\mcp_cli_bridge.cjs");
+    try {
+      const wrapper = generateCLIWrapperScript("fixture", "http://example.test/mcp/fixture", "tools.json", "fixture-agent", "bridge.cjs");
+      expect(wrapper).toContain("${CLI_DIR}/../tools/fixture.json");
+      expect(wrapper).toContain("${CLI_DIR}/../../actions/mcp_cli_bridge.cjs");
+    } finally {
+      relative.mockRestore();
+      vi.restoreAllMocks();
+    }
+  });
+
   it("clears stale safe-output registration evidence without removing other tool caches", () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mount-safeoutputs-cleanup-"));
     const flagPath = path.join(tempDir, "gh-aw/safeoutputs/gateway_empty.flag");

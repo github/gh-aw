@@ -77,3 +77,13 @@ func TestWindowsGrowerProbePermissions(t *testing.T) {
 	}, agentPermissions.permissions,
 		"probe permissions must not broaden the OpenAI-backed grower agent's token")
 }
+
+func TestWindowsWorkflowDryRunConfiguration(t *testing.T) {
+	t.Chdir(filepath.Join("..", ".."))
+	compiler := NewCompiler(WithNoEmit(true), WithWorkflowIdentifier("windows"))
+	compiler.SetQuiet(true)
+	compiler.SetDryRun(true)
+	require.NoError(t, compiler.CompileWorkflow(filepath.Join(".github", "workflows", "windows.md")))
+	require.Equal(t, compiler.GetExperimentalWarningCount(), compiler.GetWarningCount(),
+		"the Windows dry-run should have no blocking compiler warnings")
+}

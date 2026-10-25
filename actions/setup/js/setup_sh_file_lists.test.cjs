@@ -13,8 +13,12 @@ const setupActionIndexContent = readFileSync(SETUP_ACTION_INDEX, "utf8");
 const installCopilotCliContent = readFileSync(INSTALL_COPILOT_CLI_SH, "utf8");
 
 describe("setup action Windows support", () => {
-  it("runs setup.sh with Bash", () => {
+  it("uses WSL on Windows and preserves Bash on other runners", () => {
     expect(setupActionIndexContent).toContain('spawnSync("bash", [path.join(__dirname, "setup.sh")]');
+    expect(setupActionIndexContent).toContain('process.platform === "win32"');
+    expect(setupActionIndexContent).toContain('process.env.GH_AW_WINDOWS_WSL === "true"');
+    expect(setupActionIndexContent).toContain("setupWindowsRuntime();");
+    expect(setupActionIndexContent).toContain('runWSLScript(path.join(__dirname, "setup.sh"), setupEnv)');
   });
 
   it("converts Windows paths for Bash without changing RUNNER_TEMP", () => {

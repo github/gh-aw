@@ -44,7 +44,7 @@ safe-outputs:
     title-prefix: "[windows] "
     labels: [automation, ai-generated]
     max: 1
-  missing-tool:
+  report-missing-tool:
 
 timeout-minutes: 10
 strict: true

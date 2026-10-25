@@ -4276,6 +4276,9 @@
                     "identifier": {
                       "type": "string"
                     },
+                    "identity_unavailable_reason": {
+                      "type": "string"
+                    },
                     "target": {
                       "type": "object",
                       "additionalProperties": true

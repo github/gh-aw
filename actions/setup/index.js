@@ -17,19 +17,28 @@ const inputParentSpanId = getActionInput("PARENT_SPAN_ID");
 const inputJobName = getActionInput("JOB_NAME");
 const inputOTLPOIDCToken = getActionInput("OTLP_OIDC_TOKEN");
 
-const result = spawnSync("bash", [path.join(__dirname, "setup.sh")], {
-  stdio: "inherit",
-  env: Object.assign({}, process.env, {
-    INPUT_SAFE_OUTPUT_CUSTOM_TOKENS: safeOutputCustomTokens,
-    INPUT_TRACE_ID: inputTraceId,
-    INPUT_PARENT_SPAN_ID: inputParentSpanId,
-    INPUT_JOB_NAME: inputJobName,
-    INPUT_OTLP_OIDC_TOKEN: inputOTLPOIDCToken,
-    // Tell setup.sh to skip the OTLP span: in action mode index.js sends it
-    // after setup.sh returns so that the startMs captured here is used.
-    GH_AW_SKIP_SETUP_OTLP: "1",
-  }),
+const setupEnv = Object.assign({}, process.env, {
+  INPUT_SAFE_OUTPUT_CUSTOM_TOKENS: safeOutputCustomTokens,
+  INPUT_TRACE_ID: inputTraceId,
+  INPUT_PARENT_SPAN_ID: inputParentSpanId,
+  INPUT_JOB_NAME: inputJobName,
+  INPUT_OTLP_OIDC_TOKEN: inputOTLPOIDCToken,
+  // Tell setup.sh to skip the OTLP span: in action mode index.js sends it
+  // after setup.sh returns so that the startMs captured here is used.
+  GH_AW_SKIP_SETUP_OTLP: "1",
 });
+let result;
+if (process.platform === "win32" && process.env.GH_AW_WINDOWS_WSL === "true") {
+  const { setupWindowsRuntime, runWSLScript } = require("./js/windows_wsl.cjs");
+  try {
+    setupWindowsRuntime();
+    result = { status: runWSLScript(path.join(__dirname, "setup.sh"), setupEnv) };
+  } catch (error) {
+    result = { error };
+  }
+} else {
+  result = spawnSync("bash", [path.join(__dirname, "setup.sh")], { stdio: "inherit", env: setupEnv });
+}
 
 if (result.error) {
   console.error(`Failed to run setup.sh: ${result.error.message}`);

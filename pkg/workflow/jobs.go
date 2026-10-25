@@ -217,7 +217,12 @@ func (jm *JobManager) WriteJobsYAML(b *strings.Builder) {
 		if strings.TrimSpace(strings.TrimPrefix(job.RunsOn, "runs-on:")) == "windows-latest" {
 			var jobYAML strings.Builder
 			jm.renderJobTo(&jobYAML, job)
-			b.WriteString(renderStepForRunner(jobYAML.String(), job.RunsOn))
+			rendered := jobYAML.String()
+			if usesWindowsWSL(job) {
+				b.WriteString(renderStepForRunner(rendered, job.RunsOn))
+			} else {
+				b.WriteString(setRunnerShell(prefixShellScriptWithBash(rendered), "bash"))
+			}
 			continue
 		}
 		jm.renderJobTo(b, job)
@@ -431,6 +436,12 @@ func buildRenderedJobEnv(job *Job) map[string]string {
 		return nil
 	}
 	env := maps.Clone(job.Env)
+	if usesWindowsWSL(job) {
+		if env == nil {
+			env = make(map[string]string)
+		}
+		env[windowsWSLEnv] = `"true"`
+	}
 	if job.Name == string(constants.ConclusionJobName) {
 		if env == nil {
 			env = make(map[string]string)
