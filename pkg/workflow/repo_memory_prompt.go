@@ -10,11 +10,6 @@ import (
 
 var repoMemoryPromptLog = logger.New("workflow:repo_memory_prompt")
 
-// ghaEmptyStringExpr is the GitHub Actions expression that evaluates to an empty string.
-// Using this as an env var value forces the prompt-creation step to include the variable,
-// ensuring the substitution step always has a value to substitute.
-const ghaEmptyStringExpr = "${{ '' }}"
-
 // buildRepoMemoryPromptSection builds a PromptSection for repo memory instructions.
 // Returns a PromptSection that references a template file with substitutions, or nil if no memory is configured.
 func buildRepoMemoryPromptSection(config *RepoMemoryConfig) *PromptSection {
@@ -63,13 +58,7 @@ func buildRepoMemoryPromptSection(config *RepoMemoryConfig) *PromptSection {
 			constraintsText = constraints.String()
 		}
 
-		// Build wiki note text.
-		// When wiki mode is enabled, include a note about the GitHub Wiki.
-		// When wiki mode is disabled, use a GitHub expression that evaluates to the empty string
-		// (${{ '' }}). This ensures that, in newly compiled workflows (or workflows with regenerated
-		// lock files), expression interpolation always substitutes __GH_AW_WIKI_NOTE__ with a value
-		// by forcing the prompt-creation step to include GH_AW_WIKI_NOTE, even when the note is empty.
-		wikiNoteText := ghaEmptyStringExpr
+		wikiNoteText := ""
 		if memory.Wiki {
 			repoMemoryPromptLog.Print("Wiki mode enabled for repo memory")
 			wikiNoteText = "\n\n> **GitHub Wiki**: This memory is backed by the GitHub Wiki for this repository. " +

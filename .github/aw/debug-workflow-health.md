@@ -21,6 +21,12 @@ do not broaden to the fleet or infer another repository from the current checkou
 gh aw health WORKFLOW --repo HOST/OWNER/REPO --json
 ```
 
+Collection defaults to a two-minute budget. Set `--timeout 30s` for a shorter
+check or `--timeout 0` to disable the deadline. Exhaustion returns available
+evidence with `collection.partial=true` and `reason=time_budget`; it does not
+verify health. Use `DEBUG=cli:health` to trace request progress and timings on
+stderr. Increase the budget or narrow the scope when more evidence is needed.
+
 Use available health evidence when the CLI is unavailable; do not assume that
 an MCP equivalent exists without discovering its actual schema.
 
