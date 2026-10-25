@@ -162,9 +162,10 @@ type PoolPolicy struct {
 }
 
 type PoolInstallOperation struct {
-	Kind   string     `json:"kind"`
-	Pool   string     `json:"pool"`
-	Config PoolPolicy `json:"config"`
+	Kind      string     `json:"kind"`
+	Pool      string     `json:"pool"`
+	Config    PoolPolicy `json:"config"`
+	ConfigRef string     `json:"config_ref,omitempty"`
 }
 
 type WorkerProfile struct {
