@@ -100,6 +100,75 @@ func TestAdmissionRejectsInvalidOptIn(t *testing.T) {
 	}
 }
 
+func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
+	t.Parallel()
+	for _, admission := range []bool{false, true} {
+		for _, dryRun := range []bool{false, true} {
+			for _, variant := range []string{"admission-only", "detection-and-evals"} {
+				t.Run("admission="+strconv.FormatBool(admission)+"/dry-run="+strconv.FormatBool(dryRun)+"/"+variant, func(t *testing.T) {
+					t.Parallel()
+					dir := t.TempDir()
+					path := filepath.Join(dir, "admission.md")
+					source := "---\non:\n  workflow_dispatch:\n  admission: " + strconv.FormatBool(admission) + "\ntools:\n  github: false\n"
+					if variant != "admission-only" {
+						source += "safe-outputs:\n  create-issue:\n  threat-detection: true\nevals:\n  - id: completed\n    question: Did the workflow complete?\n"
+					}
+					source += "---\nAdmission output gating\n"
+					require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+					compiler := NewCompiler(WithLint(true))
+					compiler.gitRoot = dir
+					compiler.SetReadOnly(true)
+					compiler.SetSkipValidation(true)
+					compiler.SetDryRun(dryRun)
+					require.NoError(t, compiler.CompileWorkflow(path))
+					require.Zero(t, compiler.GetWarningCount())
+					lock, err := os.ReadFile(filepath.Join(dir, "admission.lock.yml"))
+					require.NoError(t, err)
+					require.Equal(t, admission, strings.Contains(string(lock), "needs.activation.outputs.admission-"))
+
+					for _, name := range []string{"admission", "conclusion_admission"} {
+						_, exists := compiler.jobManager.GetJob(name)
+						assert.Equal(t, admission, exists, name)
+					}
+					activation, exists := compiler.jobManager.GetJob("activation")
+					require.True(t, exists)
+					conclusion, exists := compiler.jobManager.GetJob("conclusion")
+					require.True(t, exists)
+					assert.Contains(t, conclusion.Needs, "activation")
+					conclusionSteps := strings.Join(conclusion.Steps, "")
+					for env, output := range map[string]string{
+						"GH_AW_ADMISSION_RESULT":                          "admission-result",
+						"GH_AW_ADMISSION_MAX_AI_CREDITS":                  "admission-max-ai-credits",
+						"GH_AW_ADMISSION_MAX_AI_CREDITS_THREAT_DETECTION": "admission-max-ai-credits-threat-detection",
+						"GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS":            "admission-max-ai-credits-evals",
+					} {
+						if admission {
+							assert.Equal(t, "${{ needs.admission.outputs."+strings.TrimPrefix(output, "admission-")+" }}", activation.Outputs[output])
+						} else {
+							assert.NotContains(t, activation.Outputs, output)
+						}
+						assert.Equal(t, admission, strings.Contains(conclusionSteps, env+": ${{ needs.activation.outputs."+output+" }}"), env)
+					}
+					assert.Equal(t, admission, strings.Contains(conclusionSteps, "Prepare admission conclusion metadata"))
+					assert.Equal(t, admission, conclusion.Outputs["admission_compact_session"] != "")
+
+					jobs := []string{"agent"}
+					if variant != "admission-only" {
+						jobs = append(jobs, "detection", "evals")
+					}
+					for _, name := range jobs {
+						job, exists := compiler.jobManager.GetJob(name)
+						require.True(t, exists, name)
+						steps := strings.Join(job.Steps, "")
+						assert.Equal(t, admission && !dryRun, strings.Contains(steps, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"), name)
+						assert.Equal(t, admission && !dryRun, strings.Contains(steps, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits"), name)
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestAdmissionRuntimeBudgetSelection(t *testing.T) {
 	for _, tc := range []struct {
 		name, result, allowance, expected string
@@ -190,26 +259,31 @@ func TestAdmissionSessionOutputs(t *testing.T) {
 
 func TestAdmissionComponentExecutionWiring(t *testing.T) {
 	for _, engine := range []string{"copilot", "claude", "codex", "pi"} {
-		t.Run(engine, func(t *testing.T) {
-			data := &WorkflowData{
-				AdmissionEnabled: true,
-				AI:               engine,
-				EngineConfig:     &EngineConfig{ID: engine, MaxAICredits: 777},
-				SafeOutputs:      &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
-			}
-			compiler := NewCompiler()
-			evals := strings.Join(compiler.buildEvalsEngineSteps(data), "")
-			assert.Contains(t, evals, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}")
-			assert.NotContains(t, evals, "needs.activation.outputs.admission-max-ai-credits-threat-detection")
-			assert.Contains(t, evals, `GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"`)
-			for _, external := range []bool{false, true} {
-				data.Features = map[string]any{string(constants.GHAWDetectionFeatureFlag): external}
-				detection := strings.Join(compiler.buildDetectionJobSteps(data), "")
-				assert.Contains(t, detection, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}")
-				assert.NotContains(t, detection, "needs.activation.outputs.admission-max-ai-credits-evals")
-				assert.Contains(t, detection, `GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"`)
-			}
-		})
+		for _, dryRun := range []bool{false, true} {
+			t.Run(engine+"/dry-run="+strconv.FormatBool(dryRun), func(t *testing.T) {
+				data := &WorkflowData{
+					AdmissionEnabled: true,
+					DryRun:           dryRun,
+					AI:               engine,
+					EngineConfig:     &EngineConfig{ID: engine, MaxAICredits: 777},
+					SafeOutputs:      &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+				}
+				compiler := NewCompiler()
+				evals := strings.Join(compiler.buildEvalsEngineSteps(data), "")
+				assert.Equal(t, !dryRun, strings.Contains(evals, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}"))
+				assert.Equal(t, !dryRun, strings.Contains(evals, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"))
+				assert.NotContains(t, evals, "needs.activation.outputs.admission-max-ai-credits-threat-detection")
+				assert.Contains(t, evals, `GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"`)
+				for _, external := range []bool{false, true} {
+					data.Features = map[string]any{string(constants.GHAWDetectionFeatureFlag): external}
+					detection := strings.Join(compiler.buildDetectionJobSteps(data), "")
+					assert.Equal(t, !dryRun, strings.Contains(detection, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}"))
+					assert.Equal(t, !dryRun, strings.Contains(detection, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"))
+					assert.NotContains(t, detection, "needs.activation.outputs.admission-max-ai-credits-evals")
+					assert.Contains(t, detection, `GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"`)
+				}
+			})
+		}
 	}
 }
 

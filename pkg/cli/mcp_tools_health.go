@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -18,6 +19,7 @@ type healthArgs struct {
 	Threshold    *float64 `json:"threshold,omitempty" jsonschema:"Success rate warning threshold in percent (default 80)"`
 	Repo         string   `json:"repo,omitempty" jsonschema:"GitHub repository owner/repo (defaults to the current repository)"`
 	LogsDir      string   `json:"logs_dir,omitempty" jsonschema:"Existing logs cache for failure clustering and sub-agent failures; does not download artifacts"`
+	Timeout      string   `json:"timeout,omitempty" jsonschema:"Maximum collection duration such as 30s or 5m (default 2m); 0 disables the deadline. Expiry returns explicitly partial results"`
 }
 
 func registerHealthTool(server *mcp.Server, execCmd execCmdFunc) {
@@ -44,6 +46,12 @@ Uses the server's existing GitHub credentials and does not modify workflows or c
 		}
 		if args.Days != nil && args.StartDate != "" {
 			return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "days and start_date are mutually exclusive", nil)
+		}
+		if args.Timeout != "" {
+			timeout, err := time.ParseDuration(args.Timeout)
+			if err != nil || timeout < 0 {
+				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "timeout must be a non-negative duration such as 30s or 5m", nil)
+			}
 		}
 
 		mcpLog.Print("Executing health tool")
@@ -77,6 +85,7 @@ func healthMCPCommand(args healthArgs) []string {
 		{"end-date", args.EndDate},
 		{"repo", args.Repo},
 		{"logs-dir", args.LogsDir},
+		{"timeout", args.Timeout},
 	} {
 		if option.value != "" {
 			cmdArgs = append(cmdArgs, "--"+option.flag+"="+option.value)

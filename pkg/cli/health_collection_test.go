@@ -52,7 +52,7 @@ func TestHealthAPIHTMLRequestErrorsAreBoundedBeforeLogging(t *testing.T) {
 				}
 			} else {
 				assert.Empty(t, collection.Warning)
-				assert.Empty(t, debug)
+				assert.NotContains(t, debug, "Health collection stopped:")
 			}
 		})
 	}

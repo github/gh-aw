@@ -2,6 +2,8 @@ package cli
 
 import (
 	"cmp"
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -32,6 +34,7 @@ type HealthConfig struct {
 	JSONOutput         bool
 	RepoOverride       string
 	LogsDir            string
+	Timeout            time.Duration
 	collection         *HealthCollection
 	explicitTimeWindow bool
 }
@@ -73,6 +76,9 @@ Job-presence checks do not decode job/step details. Optional representative Jobs
 enrichment is best-effort: incomplete inventories warn and remain metadata-only
 unless compatible cached evidence is available. API quota and request limits
 still stop collection; primary inventory and presence errors remain errors.
+Collection has a two-minute time budget by default. Use --timeout to change it
+(0 disables the deadline). Expiry returns available evidence with
+collection.partial=true and reason=time_budget, not a healthy verdict.
 
 `
 
@@ -100,7 +106,8 @@ func NewHealthCommand() *cobra.Command {
 				workflowName = args[0]
 			}
 
-			return RunHealth(HealthConfig{
+			timeout, _ := cmd.Flags().GetDuration("timeout")
+			return runHealth(cmd.Context(), HealthConfig{
 				WorkflowName: workflowName,
 				Days:         getIntFlag(cmd, "days"),
 				StartDate:    getStringFlag(cmd, "start-date"),
@@ -110,6 +117,7 @@ func NewHealthCommand() *cobra.Command {
 				JSONOutput:   getBoolFlag(cmd, "json"),
 				RepoOverride: getStringFlag(cmd, "repo"),
 				LogsDir:      getStringFlag(cmd, "logs-dir"),
+				Timeout:      timeout,
 			})
 		},
 	}
@@ -129,13 +137,27 @@ func addHealthFlags(cmd *cobra.Command) {
 	cmd.MarkFlagsMutuallyExclusive("days", "start-date")
 	cmd.Flags().Float64("threshold", 80.0, "Success rate threshold for warnings (percentage)")
 	cmd.Flags().String("logs-dir", defaultLogsOutputDir, "Existing logs cache for failure clustering and sub-agent failures (reports cache compatibility; no artifact downloads)")
+	cmd.Flags().Duration("timeout", 2*time.Minute, "Maximum collection duration (e.g., 30s or 5m; 0 disables the deadline). Returns explicitly partial results when exhausted")
 	addRepoFlag(cmd)
 	addJSONFlag(cmd)
 }
 
 // RunHealth executes the health command with the given configuration
 func RunHealth(config HealthConfig) error {
+	return runHealth(context.Background(), config)
+}
+
+func runHealth(ctx context.Context, config HealthConfig) error {
 	healthLog.Printf("Running health check: workflow=%s, days=%d, threshold=%.1f", config.WorkflowName, config.Days, config.Threshold)
+	if config.Timeout < 0 {
+		return errors.New("--timeout must not be negative")
+	}
+	started := time.Now()
+	if config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
+		defer cancel()
+	}
 
 	config.explicitTimeWindow = config.StartDate != "" || config.EndDate != ""
 	start, end, err := resolveHealthTimeWindow(config, time.Now())
@@ -149,16 +171,8 @@ func RunHealth(config HealthConfig) error {
 	}
 
 	// Fetch workflow runs from GitHub
-	config.collection = &HealthCollection{
-		ProducerVersion:     GetVersion(),
-		ReportSchemaVersion: 1,
-		ObservedAt:          time.Now().UTC(),
-		Capabilities:        []string{"failure_inventory", "source_revisions", "typed_job_steps", "cache_diagnostics", "cross_version_raw_jobs", "pr_lifecycle_filtering", "approval_expiry_filtering", "work_queue"},
-		Host:                normalizedGitHubAPIHost(logsRateLimitHost(config.RepoOverride)),
-		StartDate:           config.StartDate,
-		EndDate:             config.EndDate,
-		MaximumDays:         max(1, int(math.Ceil(end.Sub(start).Hours()/24))),
-	}
+	config.collection = newHealthCollection(ctx, config, start, end)
+	config.collection.startedAt = started
 	if err := discoverHealthWorkflows(&config); err != nil {
 		return err
 	}
@@ -167,6 +181,7 @@ func RunHealth(config HealthConfig) error {
 		return fmt.Errorf("failed to fetch workflow runs: %w", err)
 	}
 	collectHealthWorkQueue(config.collection)
+	checkHealthTimeBudget(config.collection)
 
 	if len(runs) == 0 && len(config.collection.workflows) == 0 && !config.collection.Partial {
 		if config.WorkflowName != "" {
@@ -194,6 +209,21 @@ func RunHealth(config HealthConfig) error {
 	return displayHealthSummary(runs, config)
 }
 
+func newHealthCollection(ctx context.Context, config HealthConfig, start, end time.Time) *HealthCollection {
+	return &HealthCollection{
+		ProducerVersion:     GetVersion(),
+		ReportSchemaVersion: 1,
+		ObservedAt:          time.Now().UTC(),
+		Capabilities:        []string{"failure_inventory", "source_revisions", "typed_job_steps", "cache_diagnostics", "cross_version_raw_jobs", "pr_lifecycle_filtering", "approval_expiry_filtering", "work_queue", "time_budget"},
+		TimeoutSeconds:      config.Timeout.Seconds(),
+		ctx:                 ctx,
+		Host:                normalizedGitHubAPIHost(logsRateLimitHost(config.RepoOverride)),
+		StartDate:           config.StartDate,
+		EndDate:             config.EndDate,
+		MaximumDays:         max(1, int(math.Ceil(end.Sub(start).Hours()/24))),
+	}
+}
+
 // displayHealthSummary displays a summary of health metrics for all workflows
 func displayHealthSummary(runs []WorkflowRun, config HealthConfig) error {
 	healthLog.Printf("Displaying health summary: %d runs", len(runs))
@@ -209,6 +239,7 @@ func displayHealthSummary(runs []WorkflowRun, config HealthConfig) error {
 	summary := CalculateHealthSummary(workflowHealths, config.healthPeriod(), config.Threshold)
 	summary.Collection = config.collection
 	summary.FailureClusters, summary.FailureInvestigation = buildHealthFailureClusters(runs, config)
+	finishHealthCollection(config.collection)
 
 	// Output results
 	if config.JSONOutput {
@@ -226,6 +257,7 @@ func displayDetailedHealth(runs []WorkflowRun, config HealthConfig) error {
 	health := calculateCurrentWorkflowHealth(config.WorkflowName, runs, config)
 	health.Collection = config.collection
 	health.FailureClusters, health.FailureInvestigation = buildHealthFailureClusters(runs, config)
+	finishHealthCollection(config.collection)
 
 	// Output results
 	if config.JSONOutput {

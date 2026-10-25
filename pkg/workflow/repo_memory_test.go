@@ -3,6 +3,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -1358,6 +1360,37 @@ func TestRepoMemoryNonWikiPromptSection(t *testing.T) {
 	mappings := NewCompiler().generateUnifiedPromptCreationStep(&prompt, []PromptSection{*section}, nil, nil, &WorkflowData{})
 	assert.NotContains(t, prompt.String(), "GH_AW_WIKI_NOTE:")
 	assert.Contains(t, mappings, &ExpressionMapping{EnvVar: "GH_AW_WIKI_NOTE", Content: "''"})
+}
+
+func TestRepoMemoryNonWikiCompilation(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "repo-memory.md")
+	source := `---
+on:
+  workflow_dispatch:
+  admission: true
+engine: copilot
+permissions:
+  contents: read
+tools:
+  github: false
+  repo-memory:
+    branch-name: memory/repo-memory
+---
+Maintain the repository memory.
+`
+	require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+	compiler := NewCompiler(WithLint(true))
+	compiler.gitRoot = dir
+	compiler.SetReadOnly(true)
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(path))
+	require.Zero(t, compiler.GetWarningCount())
+	lock, err := os.ReadFile(filepath.Join(dir, "repo-memory.lock.yml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(lock), "GH_AW_WIKI_NOTE: ${{ '' }}")
+	assert.Contains(t, string(lock), "GH_AW_WIKI_NOTE: ''")
 }
 
 // TestRepoMemoryWikiPushAllowedRepos tests that wiki mode sets REPO_MEMORY_ALLOWED_REPOS

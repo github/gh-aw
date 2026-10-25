@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.70 | Specified generated admission-output gating for agent, threat-detection, evals, and conclusion usage/session steps. Disabled admission emits no activation admission-output references; dry-run component execution omits admission environment bindings. Preserves component-specific budget selection and independent grader, daily-credit, and job-duration bindings. Maps admission-only lint compilation and component/usage regressions. Regeneration removes stale references; no new threat identifier, permission grant, lint exception, authentication behavior, or lock-file schema change. |
 | 1.0.69 | Restored CTR-005's `detection-gate: status-only` syntax and added a bounded TLA+ model for the validated exception: detection completion ordering, failure/warn continuation, and prohibited agent-data access. No new threat identifier, permission grant, or lock-file schema change. |
 | 1.0.68 | Specified the supporting runtime privacy contract for CLI proxy and MCP gateway startup diagnostics: name-only proxy forwarding, redaction of all six runner proxy variables and late mask registrations, coalesced credential overlaps, private capture, withheld gateway configuration stdout, and bounded fail-closed CLI publication. Mapped concrete regression suites and added proxy-bearing upstream-failure and gateway late-mask coverage. Does not claim arbitrary-log confidentiality or additional CTR-017 static analysis; no new compiler rejection, threat identifier, permission grant, or lock-file schema change. |
 | 1.0.67 | Audit-only clarification of retained PR-head checkout after source-branch deletion. Maps same-repository `pull_request` ref isolation and actual checked-out baseline export to RS-05a, preserves fatal checkout errors and independent safe-output lifecycle checks, and leaves CTR-008/028/030 unchanged. No new threat identifier, permission grant, or lock-file schema change. |
@@ -64,6 +65,12 @@ This changelog records the version history and the dated mapping audits for `spe
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-10-24)
+
+Reviewed the admission-output gating split in [PR #71784](https://github.com/github/gh-aw/pull/71784), extracted from [PR #71711](https://github.com/github/gh-aw/pull/71711) as a partial response to #71710. The compiler now gates admission environment bindings on effective opt-in, propagates enablement into evals and threat-detection execution, and conditionally emits conclusion usage/session admission metadata. Independent environment bindings remain intact.
+
+`TestAdmissionOptIn`, `TestAdmissionComponentBudgetOutputs`, `TestAdmissionSessionOutputs`, `TestAdmissionComponentExecutionWiring`, and `TestUsageActivityGenerationIncludesJobResults` cover the generated bindings. `TestAdmissionOutputGatingCompilesWithLint` compiles workflows with and without detection/evals jobs across both opt-in and dry-run states, requires zero warnings, and checks the emitted output references. Dry-run retains admission jobs, forwarded outputs, and conclusion metadata while omitting admission bindings from component execution; the shared `admissionBudgetOutputsEnabled` helper centralizes only the execution-budget gate. This fixes generated expression consistency without disabling lint or enabling admission unnecessarily. It does not add a threat identifier, checkout lint exception, repository-memory change, or runtime authentication change, and does not claim live admission-service or budget-enforcement evidence.
 
 ### Mapping Audit (2026-10-22)
 

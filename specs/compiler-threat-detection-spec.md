@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.69
+**Version**: 1.0.70
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.70` | Unreleased | Requires generated admission-output references to follow effective admission enablement, including component execution and conclusion usage metadata. Regeneration removes disabled-admission references; no new threat identifier, permission grant, lint exception, or lock-file schema change. |
 | `1.0.69` | Unreleased | Restores CTR-005's `detection-gate: status-only` syntax and adds bounded TLA+ coverage for the validated continuation exception. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.68` | Unreleased | Maps proxy startup diagnostic privacy to runtime redaction and private capture, including runner proxy values, overlapping credential matches, late mask registration, and fail-closed CLI diagnostic publication. No new compiler rejection, threat identifier, permission grant, or lock-file schema change. |
 | `1.0.67` | Unreleased | Audit-only; maps retained PR-head checkout after source-branch deletion to runtime ref isolation (RS-05a), separate from compiler checkout provenance and safe-output lifecycle fencing. No new threat identifier, permission grant, or lock-file schema change. |
@@ -352,6 +353,16 @@ Pull-request-target-roles follows authored strict policy; only its non-strict wa
 Pull-request-target-checkout also follows authored strict policy and is independent of trigger-risk acknowledgment and role-warning suppression. It shares base-ref and literal-pair predicates with compiler validation, without treating parsed Actions jobs as evidence of AW checkout policy. Prompt-expression findings are always errors, including malformed interpolations that prevent further expression traversal. Its blocked-property check follows case-insensitive Actions property semantics; ordinary string literals are not treated as property access.
 
 Remaining obligations require evidence beyond the parsed ASTs supplied here. Full CTR-001 authorization requires trusted job-purpose policy distinguishing agent privileges from intended safe-output writes. The remaining CTR-004/005/011/019 obligations need trusted command identity and effective sandbox, firewall, output-route, or success-gating semantics. The remaining CTR-008 obligations, CTR-028/030, and the remaining CTR-033/034 obligations need resolved imports, checkout/trigger provenance, guarded-expression reasoning, resolved authorization, or runtime repository metadata. The remaining CTR-003/010/013 obligations and CTR-016/023 need resolved tool/engine capabilities, site-specific expression policy, package operand semantics, or manifest history; full CTR-012 gating needs merged constraints and repository evidence. CTR-007/022/025/027/029/032 include content, subprocess, provenance, or runtime obligations not proven by static field predicates. No rule infers those obligations using raw YAML, helper basenames, or command substring matching. CTR-032 marker persistence specifically requires destination API evidence; host-side `MCP-COMPILE-*` capability boundaries are not generated-workflow properties.
+
+#### 7.4.1 Generated Admission-Output Gating
+
+Generated references to `needs.activation.outputs.admission-*` MUST follow effective admission enablement. When admission is disabled, agent, threat-detection, evals, and conclusion usage/session steps MUST NOT reference those outputs. Dry-run agent, threat-detection, and evals execution MUST NOT receive admission-result or admission-budget environment bindings. When enabled, component execution MUST select its corresponding budget output: `admission-max-ai-credits`, `admission-max-ai-credits-threat-detection`, or `admission-max-ai-credits-evals`. Conclusion usage/session generation MUST include admission metadata only when admission is enabled, preserve independently required grader, daily-credit guardrail, and job-duration bindings, and omit its step `env` block when no bindings remain.
+
+Dry-run compilation retains the admission job, activation's forwarded admission outputs, and admission conclusion reporting when admission is enabled. Conclusion usage/session generation MUST retain admission metadata in this mode; recording the admission decision is distinct from applying its budgets to component execution.
+
+This is a compiler-generated graph/expression correctness requirement supporting lint accuracy, not a new `CTR-*` threat class or an exception to lint analysis. It MUST NOT enable admission merely to satisfy lint, suppress authored findings, or change permissions or checkout authentication. Existing lock files require regeneration to remove stale disabled-admission references; the lock-file schema is unchanged.
+
+Implementation is in `pkg/workflow/compiler_admission.go`, `awf_env.go`, `evals_steps.go`, `threat_detection_external.go`, and `notify_comment.go`. Evidence in `compiler_admission_test.go` covers repository/workflow opt-in combinations, disabled and dry-run component environment bindings, component budget selection across engines and detection paths, and lint-enabled compilation across both opt-in and dry-run states with and without detection/evals jobs. Compilation regressions require zero warnings and verify that dry-run retains admission jobs, forwarded outputs, and conclusion metadata without binding execution budgets. `notify_comment_test.go` verifies absence of admission bindings when disabled and preservation of independent guardrail/job-duration bindings, including omission of an empty step environment. These regressions do not establish live admission-service availability or runtime budget enforcement.
 
 ### 7.5 Proxy Startup Diagnostic Privacy Mapping
 

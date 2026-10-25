@@ -124,6 +124,8 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 		return nil, fmt.Errorf("cannot serialize grader configuration: %w", err)
 	}
 	steps = append(steps, buildUsageArtifactCollectionStep(IsDetectionJobEnabled(data.SafeOutputs))...)
+	// Admission still runs in dry-run mode; record its decision without applying
+	// its budget to agent, detection, or evals execution.
 	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), conclusionReportFailedJobsEnabled(data), c.getActionPin, gradersEnv)...)
 	if data.AdmissionEnabled {
 		steps = append(steps, c.buildConclusionAdmissionMetadataStep(data)...)

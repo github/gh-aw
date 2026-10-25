@@ -942,14 +942,17 @@ gh aw health --days 30             # Summary for last 30 days
 gh aw health --threshold 90        # Warn if below 90% success rate
 gh aw health --json                # Output in JSON format
 gh aw health --start-date -24h      # Evidence from the last 24 hours
+gh aw health --timeout 30s --json   # Return available evidence within a 30-second collection budget
 gh aw health --start-date 2026-10-14T04:49:11Z  # Evidence since a release timestamp
 gh aw health --start-date 2026-10-14 --end-date 2026-10-15  # Bounded window
 gh aw health issue-monster --days 90  # 90-day metrics for workflow
 ```
 
-**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--threshold`, `--repo/-r`, `--json/-j`
+**Options:** `--days`, `--start-date`, `--end-date`, `--logs-dir`, `--timeout`, `--threshold`, `--repo/-r`, `--json/-j`
 
 The `--days` flag accepts 7, 30, or 90 (default: 7). Other values produce an error.
+
+`--timeout` bounds evidence collection (default: `2m`; `0` disables the deadline). The shared deadline cancels API quota checks, requests, local Git revision reads, and work-queue ledger reads. Expiry skips further cache reads and returns available evidence with `collection.partial: true`, `reason: "time_budget"`, and a warning, rather than discarding the report. JSON includes `timeout_seconds` when bounded and `elapsed_seconds`, measured after cache enrichment. An in-progress local cache read and report rendering may finish after the deadline. Partial results do not establish fleet health; increase the budget or narrow the workflow/time window to collect more evidence. `DEBUG=cli:health` logs request progress and elapsed times to stderr without logging response bodies.
 
 `--start-date` and `--end-date` filter run creation times inclusively. Both accept `YYYY-MM-DD` dates, RFC3339 timestamps with time zones, and relative times such as `-24h`, `-1d`, or `-1w`. Dates use UTC; an end date includes that entire day. The end defaults to the current time. Without an explicit start, `--days` counts backward from the end. An explicit start replaces the default seven-day horizon and cannot be combined with an explicit `--days`.
 
