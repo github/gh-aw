@@ -75,6 +75,7 @@ func TestAdmissionOptIn(t *testing.T) {
 					assert.Contains(t, activation.If, admissionJobResultCondition)
 				} else {
 					assert.NotContains(t, output, "needs.admission.")
+					assert.NotContains(t, output, "needs.activation.outputs.admission-")
 					assert.NotContains(t, activation.Needs, "admission")
 					assert.NotContains(t, activation.Permissions, "id-token: write")
 					assert.NotContains(t, conclusion.Permissions, "id-token: write")
@@ -95,6 +96,28 @@ func TestAdmissionRejectsInvalidOptIn(t *testing.T) {
 			_, err := NewCompiler().ParseWorkflowString(source, filepath.Join(t.TempDir(), "workflow.md"))
 			require.Error(t, err)
 			assertInvalidAWJSONWarning(t, `{"admission":`+value+`}`)
+		})
+	}
+}
+
+func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
+	t.Parallel()
+	for _, admission := range []bool{false, true} {
+		t.Run("admission="+strconv.FormatBool(admission), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "admission.md")
+			source := "---\non:\n  workflow_dispatch:\n  admission: " + strconv.FormatBool(admission) + "\ntools:\n  github: false\n---\nAdmission output gating\n"
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithLint(true))
+			compiler.gitRoot = dir
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			require.Zero(t, compiler.GetWarningCount())
+			lock, err := os.ReadFile(filepath.Join(dir, "admission.lock.yml"))
+			require.NoError(t, err)
+			require.Equal(t, admission, strings.Contains(string(lock), "needs.activation.outputs.admission-"))
 		})
 	}
 }
@@ -157,16 +180,25 @@ func TestAdmissionComponentBudgetOutputs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := map[string]string{}
-			applyDefaultMaxAICreditsEnvToMap(env, &WorkflowData{EngineConfig: &EngineConfig{MaxAICredits: 777}, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals})
+			applyDefaultMaxAICreditsEnvToMap(env, &WorkflowData{AdmissionEnabled: true, EngineConfig: &EngineConfig{MaxAICredits: 777}, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals})
 			assert.Equal(t, "${{ needs.activation.outputs."+tc.output+" }}", env["GH_AW_ADMISSION_MAX_AI_CREDITS"])
 			assert.Equal(t, "${{ needs.activation.outputs.admission-result }}", env["GH_AW_ADMISSION_RESULT"])
+			for _, disabled := range []*WorkflowData{
+				{EngineConfig: &EngineConfig{MaxAICredits: 777}, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals},
+				{AdmissionEnabled: true, DryRun: true, IsDetectionRun: tc.detection, IsEvalsRun: tc.evals},
+			} {
+				env := map[string]string{}
+				applyDefaultMaxAICreditsEnvToMap(env, disabled)
+				assert.NotContains(t, env, "GH_AW_ADMISSION_RESULT")
+				assert.NotContains(t, env, "GH_AW_ADMISSION_MAX_AI_CREDITS")
+			}
 		})
 	}
 }
 
 func TestAdmissionSessionOutputs(t *testing.T) {
 	for _, daily := range []bool{false, true} {
-		step := strings.Join(buildUsageActivityGenerationStep(daily, false, func(action string) string { return action }), "")
+		step := strings.Join(buildUsageActivityGenerationStep(true, daily, false, func(action string) string { return action }), "")
 		for env, output := range map[string]string{
 			"GH_AW_ADMISSION_RESULT":                          "admission-result",
 			"GH_AW_ADMISSION_MAX_AI_CREDITS":                  "admission-max-ai-credits",
@@ -182,9 +214,10 @@ func TestAdmissionComponentExecutionWiring(t *testing.T) {
 	for _, engine := range []string{"copilot", "claude", "codex", "pi"} {
 		t.Run(engine, func(t *testing.T) {
 			data := &WorkflowData{
-				AI:           engine,
-				EngineConfig: &EngineConfig{ID: engine, MaxAICredits: 777},
-				SafeOutputs:  &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+				AdmissionEnabled: true,
+				AI:               engine,
+				EngineConfig:     &EngineConfig{ID: engine, MaxAICredits: 777},
+				SafeOutputs:      &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
 			}
 			compiler := NewCompiler()
 			evals := strings.Join(compiler.buildEvalsEngineSteps(data), "")
