@@ -20,7 +20,7 @@ func TestRuleRegistrationAndSelection(t *testing.T) {
 		ruleIDs = append(ruleIDs, rule.ID)
 	}
 	assert.ElementsMatch(t, []string{
-		"secret-leak", "otlp-secret-leak", "action-pin", "job-timeout", "needs-consistency", "template-injection", "workflow-run-scope",
+		"secret-leak", "otlp-secret-leak", "action-pin", "job-timeout", "needs-consistency", "step-reference", "template-injection", "workflow-run-scope",
 		"permission-scope", "version-check", "conditional-import", "private-to-public",
 		"install-scripts", "allowed-labels", "network-scope", "push-target",
 		"tool-scope", "sandbox-config", "image-argument", "checkout-mode", "fork-association",
