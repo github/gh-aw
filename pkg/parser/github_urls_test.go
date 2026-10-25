@@ -8,6 +8,36 @@ import (
 	"testing"
 )
 
+func TestParseStepFragment(t *testing.T) {
+	for _, tc := range []struct {
+		fragment string
+		step     int
+		line     int
+	}{
+		{fragment: "", step: 9, line: 8},
+		{fragment: "other:7:1", step: 9, line: 8},
+		{fragment: "step:", step: 9, line: 8},
+		{fragment: "step:7", step: 7, line: 8},
+		{fragment: "step:7:", step: 7, line: 8},
+		{fragment: "step:7:1", step: 7, line: 1},
+		{fragment: "step:7:1:2", step: 7, line: 1},
+		{fragment: "step:bad:1", step: 9, line: 1},
+		{fragment: "step:7:bad", step: 7, line: 8},
+		{fragment: "step::1", step: 9, line: 1},
+		{fragment: "step:0:0", step: 0, line: 0},
+		{fragment: "step:-1:-2", step: -1, line: -2},
+	} {
+		t.Run(tc.fragment, func(t *testing.T) {
+			components := &GitHubURLComponents{StepNumber: 9, StepLine: 8}
+			parseStepFragment(tc.fragment, components)
+			if components.StepNumber != tc.step || components.StepLine != tc.line {
+				t.Errorf("step and line = %d:%d, want %d:%d",
+					components.StepNumber, components.StepLine, tc.step, tc.line)
+			}
+		})
+	}
+}
+
 func TestParseGitHubURL_RunURLs(t *testing.T) {
 	tests := []struct {
 		name      string

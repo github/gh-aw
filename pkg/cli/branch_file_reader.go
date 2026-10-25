@@ -2,11 +2,9 @@ package cli
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/errorutil"
 	"github.com/github/gh-aw/pkg/logger"
@@ -60,9 +58,7 @@ func readRemoteRepoBranchFileContext(ctx context.Context, repoOverride, branchNa
 		return nil, fmt.Errorf("failed to fetch %s from %s: %w", filePath, branchName, err)
 	}
 
-	// GitHub API returns base64-encoded content with embedded newlines.
-	b64 := strings.Join(strings.Fields(strings.TrimSpace(string(out))), "")
-	decoded, decodeErr := base64.StdEncoding.DecodeString(b64)
+	decoded, decodeErr := decodeBase64FileContent(string(out))
 	if decodeErr != nil {
 		branchFileReaderLog.Printf("Failed to decode %s from %s: %v", filePath, branchName, decodeErr)
 		return nil, fmt.Errorf("failed to decode %s from %s: %w", filePath, branchName, decodeErr)

@@ -20,6 +20,7 @@ func installExperimentFetchFakeGH(t *testing.T, workflowContent, state string) s
 	binDir := t.TempDir()
 	argsLog := filepath.Join(binDir, "gh-args.log")
 	t.Setenv("EXPERIMENT_GH_ARGS_LOG", argsLog)
+	t.Setenv("EXPERIMENT_GH_WORKFLOW_CONTENT", base64.StdEncoding.EncodeToString([]byte(workflowContent)))
 	script := fmt.Sprintf(`#!/bin/sh
 printf '%%s\n' "$@" >> "$EXPERIMENT_GH_ARGS_LOG"
 printf '\n' >> "$EXPERIMENT_GH_ARGS_LOG"
@@ -34,12 +35,12 @@ case "$*" in
     if [ "$EXPERIMENT_GH_PAGED_BRANCHES" = "1" ]; then echo '["experiments/second"]'; fi ;;
   *"/branches/experiments%%2Fci-coach"*) echo "experiments/ci-coach" ;;
   *"contents/.github/workflows "*) echo '["ci-coach.md"]' ;;
-  *"ci-coach.md"*) echo %q ;;
+  *"ci-coach.md"*) printf '%%s\n' "$EXPERIMENT_GH_WORKFLOW_CONTENT" ;;
   *"state.jsonl"*) echo %q ;;
   *"evals.jsonl"*) echo 'eyJpZCI6InF1YWxpdHkiLCJhbnN3ZXIiOiJZRVMiLCJydW5pZCI6IjEifQo=' ;;
   *) exit 1 ;;
 esac
-`, base64.StdEncoding.EncodeToString([]byte(workflowContent)), base64.StdEncoding.EncodeToString([]byte(state)))
+`, base64.StdEncoding.EncodeToString([]byte(state)))
 	require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte(script), 0o755))
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("GH_TOKEN", "")
@@ -78,6 +79,32 @@ func TestLoadRemoteExperimentConfigsRejectsUnsafeNames(t *testing.T) {
 			assert.Empty(t, result)
 			_, err := os.Stat(argsLog)
 			assert.ErrorIs(t, err, os.ErrNotExist, "unsafe experiment names must not invoke gh")
+		})
+	}
+}
+
+func TestLoadRemoteExperimentConfigsDecodesContentsResponse(t *testing.T) {
+	const workflowContent = "---\nexperiments:\n  style:\n    variants: [concise, detailed]\n---\n# Workflow\n"
+	encoded := base64.StdEncoding.EncodeToString([]byte(workflowContent))
+	for _, tt := range []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{name: "wrapped whitespace", raw: " \t" + encoded[:60] + "\r\n" + encoded[60:64] + " \t" + encoded[64:] + "\u2003\n"},
+		{name: "malformed", raw: encoded + "!!!!", wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			installExperimentFetchFakeGH(t, workflowContent, "")
+			t.Setenv("EXPERIMENT_GH_WORKFLOW_CONTENT", tt.raw)
+
+			result := loadRemoteExperimentConfigs("octo/repo", "cicoach")
+			if tt.wantErr {
+				assert.Empty(t, result, "malformed content must not be parsed, even after a valid prefix")
+				return
+			}
+			require.Contains(t, result.ExperimentConfigs, "style")
+			assert.Equal(t, []string{"concise", "detailed"}, result.ExperimentConfigs["style"].Variants)
 		})
 	}
 }

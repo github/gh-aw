@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -227,8 +226,7 @@ func loadRemoteExperimentConfigs(repoOverride, experimentName string) experiment
 			continue
 		}
 
-		b64 := strings.Join(strings.Fields(strings.TrimSpace(string(out))), "")
-		decoded, err := base64.StdEncoding.DecodeString(b64)
+		decoded, err := decodeBase64FileContent(string(out))
 		if err != nil {
 			experimentsLog.Printf("Failed to base64-decode workflow file %s: %v", candidate, err)
 			continue
