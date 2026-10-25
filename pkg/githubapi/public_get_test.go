@@ -103,6 +103,32 @@ func TestGetPublicResponse(t *testing.T) {
 	}
 }
 
+func TestGetPublicResponseTooLarge(t *testing.T) {
+	t.Parallel()
+	body := &trackingBody{Reader: strings.NewReader(strings.Repeat("x", int(maxPublicResponseBytes)+2))}
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
+	})}
+
+	got, err := GetPublic(t.Context(), client, "https://api.github.com/repos/owner/repo")
+	var sizeErr *ResponseTooLargeError
+	if !errors.As(err, &sizeErr) {
+		t.Fatalf("error = %v, want *ResponseTooLargeError", err)
+	}
+	if sizeErr.Limit != maxPublicResponseBytes {
+		t.Errorf("response size limit = %d, want %d", sizeErr.Limit, maxPublicResponseBytes)
+	}
+	if got != nil {
+		t.Errorf("GetPublic() returned %d bytes on error", len(got))
+	}
+	if !body.closed {
+		t.Error("response body was not closed")
+	}
+	if remaining := body.Reader.(*strings.Reader).Len(); remaining != 1 {
+		t.Errorf("read %d bytes beyond the limit, want exactly %d", maxPublicResponseBytes+1-int64(remaining), maxPublicResponseBytes+1)
+	}
+}
+
 func TestGetPublicInvalidURL(t *testing.T) {
 	t.Parallel()
 	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {

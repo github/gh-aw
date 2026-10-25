@@ -17,7 +17,7 @@ The `githubapi` package produces an `api.ClientOptions` value pre-populated with
 
 #### `GetPublic`
 
-Sends a context-aware GET with `Accept: application/vnd.github+json` without adding authorization. The supplied client controls transport and timeouts. Returns the unmodified body for HTTP 200; other statuses return `*HTTPStatusError` with `StatusCode` and a whitespace-trimmed `Body`. Request and body-read errors pass through, and the response body is closed on both success and read or status errors.
+Sends a context-aware GET with `Accept: application/vnd.github+json` without adding authorization. The supplied client controls transport and timeouts. Returns the unmodified body for HTTP 200; other statuses return `*HTTPStatusError` with `StatusCode` and a whitespace-trimmed `Body`. Responses are limited to 10 MiB; larger responses return `*ResponseTooLargeError`. Request and body-read errors pass through, and the response body is closed on success and all errors.
 
 #### `ClientOptions`
 
