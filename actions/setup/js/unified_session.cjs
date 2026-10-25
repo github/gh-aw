@@ -15,6 +15,7 @@ const { sessionTimestamp, orderSessionSources } = require("./unified_session_ord
 const { normalizeOtelEvents } = require("./unified_session_otel.cjs");
 const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
+const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -514,6 +515,16 @@ function collectUnifiedSession({
     ["", "agent"],
     ["threat-detection/", "detection"],
   ]) {
+    const retryFile = path.join(rootDir, prefix, prefix ? "detection_harness_retry.json" : "agent/harness_retry.json");
+    if (exists(retryFile)) {
+      const record = records(retryFile)[0];
+      const data = normalizeHarnessRetryRecord(record);
+      if (data) {
+        sources.push({ component: "harness", phase, path: path.relative(rootDir, retryFile), events: [{ type: "harness.retry", data }] });
+      } else {
+        report(retryFile, "invalid_harness_retry", undefined);
+      }
+    }
     for (const candidates of [[`${prefix}agent/awf-reflect.json`, `${prefix}sandbox/firewall/awf-reflect.json`], [`${prefix}sandbox/firewall/models.json`]]) {
       for (const candidate of candidates) {
         const file = path.join(rootDir, candidate);

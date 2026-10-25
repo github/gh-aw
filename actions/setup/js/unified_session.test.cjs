@@ -1549,6 +1549,60 @@ describe("Unified conclusion session", () => {
     expect(events.some(event => event.type === "session.collection_warning" && event.data.code === "unrecognized_engine_log")).toBe(false);
   });
 
+  it("integrates validated agent and detection retry records into the unified session", () => {
+    write("agent/harness_retry.json", {
+      attempts: 2,
+      exit_code: 0,
+      attempt_results: [
+        { attempt: 1, exit_code: 1, failure_classes: ["rate_limit_error"] },
+        { attempt: 2, exit_code: 0, failure_classes: [] },
+      ],
+      private_output: "PRIVATE_RETRY_OUTPUT",
+    });
+    write("threat-detection/detection_harness_retry.json", {
+      attempts: 1,
+      exit_code: 1,
+      attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["runtime_guard"] }],
+    });
+    const events = writeUnifiedSession({ rootDir: root });
+    const retries = events.filter(event => event.type === "harness.retry");
+    expect(retries).toEqual([
+      {
+        type: "harness.retry",
+        data: {
+          attempts: 2,
+          exitCode: 0,
+          attemptResults: [
+            { attempt: 1, exitCode: 1, failureClasses: ["rate_limit_error"] },
+            { attempt: 2, exitCode: 0, failureClasses: [] },
+          ],
+        },
+        provenance: { component: "harness", phase: "agent", path: "agent/harness_retry.json", index: 0 },
+      },
+      {
+        type: "harness.retry",
+        data: { attempts: 1, exitCode: 1, attemptResults: [{ attempt: 1, exitCode: 1, failureClasses: ["runtime_guard"] }] },
+        provenance: { component: "harness", phase: "detection", path: "threat-detection/detection_harness_retry.json", index: 0 },
+      },
+    ]);
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(persisted).not.toContain("PRIVATE_RETRY_OUTPUT");
+    expect(persisted.trim().split("\n").map(JSON.parse)).toEqual(events);
+    expect(validateSession(persisted)).toBe(events.length);
+  });
+
+  it.each([
+    { attempts: 1, exit_code: 1, attempt_results: [{ attempt: 1, exit_code: null, failure_classes: [] }] },
+    { attempts: 1, exit_code: 1, attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["PRIVATE_FAILURE_TEXT"] }] },
+  ])("does not publish invalid retry records or their private values: %j", record => {
+    write("agent/harness_retry.json", record);
+    const warn = vi.fn();
+    const { events } = collectUnifiedSession({ rootDir: root, warn });
+    expect(events.some(event => event.type === "harness.retry")).toBe(false);
+    expect(events.filter(event => event.type === "session.collection_warning").map(event => event.data.code)).toContain("invalid_harness_retry");
+    expect(JSON.stringify([events, warn.mock.calls])).not.toContain("PRIVATE_");
+  });
+
   it.each([undefined, 3, 4])("reconciles persisted malformed-source warnings with collector copies (line: %s)", line => {
     const nativePath = "sandbox/agent/logs/copilot-session-state/partial/events.jsonl";
     const start = { type: "session.start", id: "start", data: { sessionId: "partial" } };

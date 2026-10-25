@@ -17,6 +17,15 @@ describe("compact unified session projection", () => {
       event("guardrail.daily_aic", { status: "under_budget", exceeded: false, total: 2 }),
       event("workflow.job_result", { jobId: "agent", result: "success", durationMs: 42 }),
       event("execution.result", { outcome: "success", exitCode: 0 }),
+      event("harness.retry", {
+        attempts: 2,
+        exitCode: 0,
+        attemptResults: [
+          { attempt: 1, exitCode: 1, failureClasses: ["rate_limit_error"] },
+          { attempt: 2, exitCode: 0, failureClasses: [] },
+        ],
+        privateOutput: "private retry output",
+      }),
       event("grader.result", { value: 1, run: { passed: 1, errors: 0, unbounded: "private run" }, results: ["private results"] }),
     ];
     const original = JSON.stringify(events);
@@ -28,7 +37,15 @@ describe("compact unified session projection", () => {
     const projected = parse(result);
     expect(projected[2].data).toEqual({ aic: 1.5, model: "model", usage: { inputTokens: 10, outputTokens: 3, inputTokensIncludeCache: false } });
     expect(projected[3].data).toEqual({ status: "success", numTurns: 2, usage: { totalTokens: 13 } });
-    expect(projected[8].data).toEqual({ value: 1, run: { passed: 1, errors: 0 } });
+    expect(projected[8].data).toEqual({
+      attempts: 2,
+      exitCode: 0,
+      attemptResults: [
+        { attempt: 1, exitCode: 1, failureClasses: ["rate_limit_error"] },
+        { attempt: 2, exitCode: 0, failureClasses: [] },
+      ],
+    });
+    expect(projected[9].data).toEqual({ value: 1, run: { passed: 1, errors: 0 } });
     expect(result.session).not.toContain("private");
     expect(JSON.stringify(events)).toBe(original);
   });

@@ -202,6 +202,7 @@ const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
   "workflow.job_result": { jobId: ["jobId"], result: ["result"], durationMs: ["durationMs"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
+  "harness.retry": { attempts: ["attempts"], exitCode: ["exitCode", "exit_code"], attemptResults: ["attemptResults", "attempt_results"] },
   "skill.invoked": { name: ["name"], path: ["path"], source: ["source"], trigger: ["trigger"], model: ["model"], invokedAtTurn: ["invokedAtTurn"] },
   "skill.context_delivered_ref": { interactionId: ["interactionId"], source: ["source"], contentId: ["contentId"] },
   "skill.inventory": { skills: ["skills"] },
