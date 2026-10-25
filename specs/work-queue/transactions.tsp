@@ -224,6 +224,8 @@ model PoolInstallOperation {
   kind: "PoolInstall";
   pool: Identity;
   config: PoolPolicy;
+  // Trusted publication verifies newly introduced workers at this default revision.
+  config_ref?: Revision;
 }
 @jsonSchema
 model ControlOperation {

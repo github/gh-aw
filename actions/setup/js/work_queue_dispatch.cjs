@@ -465,9 +465,9 @@ async function dispatchQueueIntent(options) {
     if (!Object.hasOwn(latest.projection.policy.pools, requested.pool)) {
       const proposal = policyProposalFor(configured);
       if (proposal && Object.hasOwn(proposal.pools, requested.pool)) normalizeDispatchParameters(requested, proposal, options.remainingDispatches);
-      await installWorkQueuePools(configured, trustedContext, [requested.pool]);
-      latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
     }
+    await installWorkQueuePools(configured, trustedContext, [requested.pool]);
+    latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
     if (!Object.hasOwn(latest.projection.policy.pools, requested.pool)) throw queueError("work_queue_pool_not_installed", "dispatch pool is not installed in Policy");
     await synchronizeDeployments(configured, trustedContext, [requested.pool]);
     latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
@@ -594,7 +594,7 @@ async function processParsedWorkQueueIntents(options, runtime, intents, errors) 
         if (!prior) {
           if (!Array.isArray(intent.parameters.nodes)) throw new Error("work_queue_graph_limit");
           const pools = [...new Set(intent.parameters.nodes.map(node => node.pool ?? "default"))];
-          if (latest.projection.policy && pools.some(pool => !Object.hasOwn(latest.projection.policy.pools, pool))) {
+          if (latest.projection.policy) {
             await installWorkQueuePools(options, trustedContext, pools);
             latest = await loadQueue({ ...options, policyProposal: undefined, initializationContext: undefined });
           }

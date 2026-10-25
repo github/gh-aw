@@ -12,7 +12,9 @@ The smoke dispatcher failed because the `smoke-work-queue` pool was configured i
 
 ### Decision
 
-`PoolInstall` adds exactly one new pool to an existing AW-managed Policy without touching installed pools, accepted work, or the Policy epoch. Trusted submit and dispatch processing publish a separate `pool_install` request on first use of a missing configured pool, before deployment synchronization. Workers, observers, staged previews, and accepted-request recovery never trigger installation. The request checks the compiled proposal's stable Policy and existing-pool boundaries, resolves new profiles against repository-wide installed worker authority, and verifies each selected immutable route with `verifyWorkerRoute`. A caller's newer source ref does not replace installed profiles during installation; verified Deployment synchronization handles newer refs separately. Caller-local target checks still govern actual submission and dispatch. Replay in Go (`installReplayPool`) and JS requires each new profile to match an already installed same-named profile or one of its registered Deployment revisions, including ref, logical contract, identity, scopes, and scheduling authority. The new pool's `allowed_repositories` must also be a subset of the repositories authorized by installed pools. Reserved JavaScript pool keys are rejected consistently. The `administrator`, `producer`, and `dispatcher` roles may emit an explicit `PoolInstall` operation. A TLA+ model (`specs/work-queue/QueuePoolInstall.tla`) bounds the safety argument. Missing pools, unapproved worker routes, and proposal mismatches are classified as `work_queue_pool_not_installed`, `work_queue_worker_not_compiler_approved`, and `work_queue_policy_proposal_mismatch`.
+`PoolInstall` adds a configured pool or missing worker profiles to an existing AW-managed Policy. Trusted submit and dispatch processing publish a separate `pool_install` request on first use, before deployment synchronization. Workers, observers, staged previews, and accepted-request recovery never trigger installation. Existing profiles, pool economics, default selection, deployments, accepted work, fairness debt and the Policy epoch remain unchanged. A caller's newer source ref does not replace installed profiles during installation; verified Deployment synchronization handles newer refs separately. Caller-local target checks still govern actual submission and dispatch.
+
+An added profile must either match an installed same-named profile or available registered Deployment revision, or introduce a previously unknown worker verified at the immutable default revision. New workers require canonical workflow paths, repository-scoped singleton authority, worker-enabled Markdown source, matching compiled contracts and active native registration. `config_ref` records the verified revision; trusted JS and Go publishers independently validate it, while replay enforces structural provenance and additive boundaries. Provenance alone is not authorization. The pool's `allowed_repositories` remains a subset of installed repository authority. The `administrator`, `producer`, and `dispatcher` roles may publish the operation; workers cannot. Go and JS replay, checkpoint parity and the bounded `QueuePoolInstall` TLA+ model enforce the transition.
 
 ### Alternatives Considered
 
@@ -36,12 +38,12 @@ Give each pool its own queue branch so that adding a pool always bootstraps a ne
 - Existing pools, accepted work, and the Policy epoch are preserved, enforced at publish time and again at replay, with a bounded TLA+ model.
 
 #### Negative
-- Non-administrator roles (`producer`, `dispatcher`) can now add pools, but cannot introduce worker authority through `PoolInstall`. Replay enforces that boundary even when a publisher bypasses the adapter.
+- Non-administrator roles (`producer`, `dispatcher`) can introduce new worker names only through trusted verification of default-revision AW source and registration. Replay enforces recorded provenance and singleton boundaries, but live source verification remains a publisher obligation.
 - The protocol surface grows: a new operation kind, a new intent, new JSON schemas, and updated canonical fixtures. Go and JS replay must stay in sync.
 - `PoolInstall` is triggered only by authenticated, non-preview producer/dispatcher processing. Worker and observer intents cannot install pools.
 
 #### Neutral
-- Changing an existing pool or economic Policy still requires an explicit administrator `policy` update on a quiescent queue.
+- Changing existing profiles, defaults or economic Policy still requires an explicit administrator `policy` update on a quiescent queue; adding profiles does not.
 - Pool installation is only for AW-managed (`authorization: "aw"`) queues. Other queues report `work_queue_pool_not_installed`.
 
 ---

@@ -92,11 +92,11 @@ function queueControlErrorExplanation(code) {
     case "work_queue_policy_proposal_mismatch":
       return "The proposed queue policy differs from the installed policy. Refresh compatible worker deployments, or use an explicit administrator policy update only after the queue is quiescent.";
     case "work_queue_pool_not_installed":
-      return "The requested pool is absent from the installed queue Policy and could not be installed on demand. Declare it in aw.json and recompile the producer or dispatcher. Automatic installation must preserve installed Policy and worker authority; other changes require an explicit administrator Policy update after the queue is quiescent.";
+      return "The requested pool could not be installed on demand. Declare it in aw.json, publish new workers' Markdown and compiled locks to the default branch, and recompile the producer or dispatcher. Installed pool settings and profiles must remain unchanged; other changes require an administrator Policy update after the queue is quiescent.";
     case "work_queue_profile_not_approved":
-      return "The requested worker profile is absent from the installed pool. Verify the installed Policy and caller-approved worker routes; adding profiles requires an explicit administrator Policy update on a quiescent queue.";
+      return "The requested worker profile could not be registered on demand. Publish its tools.work-queue.worker source and compiled lock to the default branch, then recompile the producer or dispatcher. Existing worker authority cannot be changed by additive registration.";
     case "work_queue_worker_not_compiler_approved":
-      return "The worker route is not approved by the caller's compiled configuration. Check safe-outputs.dispatch-workflow.workflows and the published worker's assignment support; do not bypass the worker allowlist.";
+      return "The worker route is not compiler-approved. New workers require a published default-branch AW worker source, matching compiled contract and active registration. Check the caller's dispatch allowlist; existing authority cannot be replaced by registration.";
     case "checkpoint_invalid":
     case "queue_control_checkpoint_invalid":
       return "The queue checkpoint failed validation. Inspect the authoritative ledger and restore a valid causal history; do not delete the queue or reset its scheduling debt.";
