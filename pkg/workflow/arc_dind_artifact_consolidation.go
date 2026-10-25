@@ -46,6 +46,6 @@ func (c *Compiler) generateArcDindArtifactConsolidationStep(yaml *strings.Builde
 
 func writeArcDindArtifactLine(yaml *strings.Builder, format string, args ...any) {
 	if _, err := fmt.Fprintf(yaml, format, args...); err != nil {
-		panic(err)
+		arcDindLog.Printf("Failed to write ARC/DinD artifact line: %v", err)
 	}
 }
