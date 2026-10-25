@@ -19,6 +19,7 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 
 	// Reset job manager for this compilation
 	c.jobManager = NewJobManager()
+	c.prCheckoutLintBlock = ""
 
 	// Build all jobs
 	if err := c.validateDryRunEffects(data); err != nil {
