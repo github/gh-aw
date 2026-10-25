@@ -40,6 +40,12 @@ func builtInRuleContracts() map[string]ruleContract {
 			safe:   "jobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: [{run: echo build}]\n  check:\n    runs-on: ubuntu-latest\n    needs: build\n    if: needs.build.result == 'success'\n    steps: [{run: echo check}]\n",
 			path:   "jobs.check.if",
 		},
+		"step-reference": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    steps:\n      - id: build\n        run: echo build\n      - id: check\n        if: steps.missing.result == 'success'\n        run: echo check\n",
+			safe:   contractJob + "    steps:\n      - id: build\n        run: echo build\n      - id: check\n        if: steps.build.result == 'success'\n        run: echo check\n",
+			path:   "jobs.check.steps[1].if",
+		},
 		"gateway-dispatch-literals": {
 			targets: AWAST,
 			unsafe:  "on: {gateway-dispatch: {issue: {filters: {labels: ['${{ vars.PRIVATE_VALUE }}']}}}}\n",
