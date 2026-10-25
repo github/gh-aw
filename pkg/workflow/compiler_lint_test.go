@@ -52,6 +52,91 @@ func TestCompilerLintRejectsInvalidGeneratedAST(t *testing.T) {
 	require.ErrorContains(t, NewCompiler(WithLint(true)).lintCompiledWorkflow(&WorkflowData{}, "jobs: [", "test.md"), "cannot parse generated Actions AST")
 }
 
+func TestCompilerLintAuthenticatedWebhookPipeline(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, contract, payload string
+		wantError               bool
+	}{
+		{"opaque endpoint", "", `"$GH_AW_AGENT_OUTPUT"`, true},
+		{"declared endpoint", "# gh-aw: authenticated-endpoint WEBHOOK", `"$GH_AW_AGENT_OUTPUT"`, false},
+		{"secret payload", "# gh-aw: authenticated-endpoint WEBHOOK", `<(printf '%s' "$WEBHOOK")`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			content := `on: workflow_dispatch
+jobs:
+  report_security_finding:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          WEBHOOK: ${{ secrets.PYDANTIC_AI_TRIAGE_SLACK_WEBHOOK_URL }}
+        run: |
+          ` + tc.contract + `
+          jq -c '.items[] | select(.type == "report_security_finding") | {text: "\(.summary)\n\n\(.details)"}' \
+            ` + tc.payload + ` | curl --fail -sS -H 'Content-Type: application/json' --data @- "$WEBHOOK"
+`
+			err := NewCompiler(WithLint(true)).lintCompiledWorkflow(&WorkflowData{}, content, "webhook.md")
+			if tc.wantError {
+				require.ErrorContains(t, err, "[secret-leak]")
+				require.ErrorContains(t, err, "CTR-017")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCompilerLintImportedAuthenticatedWebhook(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "notification.md")
+	source := filepath.Join(dir, "webhook.md")
+	require.NoError(t, os.WriteFile(source, []byte(`---
+on: workflow_dispatch
+imports: [notification.md]
+tools:
+  github: false
+---
+Report findings privately.
+`), 0o600))
+	for _, declared := range []bool{false, true} {
+		contract := ""
+		if declared {
+			contract = "            # gh-aw: authenticated-endpoint WEBHOOK\n"
+		}
+		require.NoError(t, os.WriteFile(shared, []byte(`---
+safe-outputs:
+  jobs:
+    report-security-finding:
+      description: Privately report a security finding
+      runs-on: ubuntu-latest
+      max: 1
+      permissions: {}
+      steps:
+        - env:
+            WEBHOOK: ${{ secrets.PRIVATE_ENDPOINT }}
+          run: |
+`+contract+`            jq -c '.items[] | select(.type == "report_security_finding") | {text: "\(.summary)\n\n\(.details)"}' \
+              "$GH_AW_AGENT_OUTPUT" | curl --fail -sS -H 'Content-Type: application/json' --data @- "$WEBHOOK"
+---
+Report findings privately.
+`), 0o600))
+		compiler := NewCompiler(WithLint(true))
+		compiler.gitRoot = dir
+		compiler.SetReadOnly(true)
+		compiler.SetSkipValidation(true)
+		err := compiler.CompileWorkflow(source)
+		if declared {
+			require.NoError(t, err)
+			lock, err := os.ReadFile(filepath.Join(dir, "webhook.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(lock), "# gh-aw: authenticated-endpoint WEBHOOK")
+		} else {
+			require.ErrorContains(t, err, "[secret-leak]")
+		}
+	}
+}
+
 func TestCompilerLintPreservesThreatSuppressions(t *testing.T) {
 	t.Parallel()
 	content := "jobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo '${{ inputs.message }}'\n"

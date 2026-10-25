@@ -182,6 +182,27 @@ In Bash/sh, recognized `test`/`[` string and file predicates and the `:`, `true`
 
 Unknown file reads produce secret-flow coverage warnings when they could select a modeled secret-bearing file or involve a secret-bearing filename. Unknown output targets warn when the output or filename is tainted; unrelated public file operations do not introduce secret-flow warnings.
 
+### Credential-bearing webhook endpoints
+
+An opaque secret URL remains a disclosure by default: neither a `WEBHOOK`/`SLACK` name nor the destination argument role proves that it is an authentication endpoint. A script can explicitly declare that a direct step-local secret binding contains a complete, approved credential-bearing endpoint:
+
+```yaml wrap
+- env:
+    DESTINATION: ${{ secrets.PRIVATE_NOTIFICATION_ENDPOINT }}
+  run: |
+    # gh-aw: authenticated-endpoint DESTINATION
+    jq -c '{text: .summary}' "$GH_AW_AGENT_OUTPUT" |
+      curl --fail -sS -H 'Content-Type: application/json' --data @- "$DESTINATION"
+```
+
+The comment is an author assertion about the secret's purpose, not verification of its value, host, protocol, or recipient. It applies only within that script, only to an unchanged direct `${{ secrets.NAME }}` step-env binding, and only when `"$DESTINATION"` or `"${DESTINATION}"` is the entire, single `curl` destination (positional or following `--url`). Aliases, composed expressions, URL suffixes, unquoted expansions, and script mutations do not qualify. Scripts using dynamic shell execution, sourced helpers, or other unmodeled environment mutation cannot establish this contract.
+
+Accepted value-taking options are `-H`/`--header`, `-u`/`--user`, `--oauth2-bearer`, `-d`/`--data`, `--data-binary`, `--data-urlencode`, `--json`, `-F`/`--form`, and `-T`/`--upload-file`, including long `--option=value` forms. Accepted literal flags are `--fail`, `--silent`, `--show-error`, `-f`, `-s`, `-S`, `-sS`, `-fsS`, `-q`, and `--disable`. Redirects, proxies, config/trace options, URL rewriting, multiple destinations, other clients, and unknown options retain the endpoint finding. Shell declarations and arithmetic conservatively disable the contract. This finite grammar does not inspect implicit curl configuration or establish runtime network isolation; the author remains responsible for both.
+
+The binding remains secret-tainted everywhere else. Payloads, stdin, tracked uploads, non-authentication headers, logs, and xtrace are still checked, including use of the endpoint credential itself as payload or inside another destination's path/query. No source changes are required for ordinary authentication headers/options; opaque webhook URLs require this explicit opt-in.
+
+### Scope and limitations
+
 For `.lock.yml` inputs, a companion `.md` adds authored-policy and prompt checks to the existing execution graph. Native `.yml`/`.yaml` inputs never acquire an assumed AW companion. Explicit `.md` inputs inspect the AW AST independently: the prompt, top-level `steps`/`post-steps`, authored `jobs` and `safe-outputs.jobs` (including legacy `safe-jobs`), and script hooks. No compiled graph is fabricated. Secret analysis retains a coverage warning for missing imports, generated steps, cross-job flows, and compiler defaults; scripts without an observable shell remain unknown.
 
 Analysis is conservative within Bash/sh control flow and can report infeasible paths. It does not execute analyzed code or inspect external actions, sourced shell scripts, Python/PowerShell programs, dynamically constructed shell code, or arbitrary filesystem operations. JavaScript inspection requires the explicit configuration below. Imported runtime prompt files are not recursively loaded. Authentication arguments are treated as intentional credential use; endpoint trust is not inferred. A clean result is not proof that a workflow cannot leak secrets.
