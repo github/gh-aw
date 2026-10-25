@@ -590,6 +590,20 @@ func injectDevelopmentShellcheckDiagnostics(outputStr, stderrOutput string) stri
 	if err := json.Unmarshal([]byte(outputStr), &results); err != nil {
 		return outputStr
 	}
+	for _, result := range results {
+		if result.Scope == "batch" && result.Workflow == "shellcheck" {
+			for _, issue := range result.Errors {
+				if issue.Type == "shellcheck_finding" {
+					return outputStr
+				}
+			}
+			for _, issue := range result.Warnings {
+				if issue.Type == "shellcheck_finding" {
+					return outputStr
+				}
+			}
+		}
+	}
 	index := -1
 	for i, result := range results {
 		if result.Scope == "batch" && result.Workflow == "shellcheck" {

@@ -445,15 +445,23 @@ func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []strin
 
 	useDocker, available := shellcheckDockerFallback(ctx)
 	if !available {
+		err := errors.New("shellcheck binary not found and Docker is unavailable")
+		if strict {
+			return err
+		}
+		reportCompileScannerResult(ctx, "shellcheck", err)
 		return nil
 	}
 
-	allSteps := collectShellcheckSteps(lockFiles, resources)
-	if len(allSteps) == 0 {
+	allSteps, extractionErrors := collectShellcheckSteps(lockFiles, resources)
+	if len(allSteps) == 0 && len(extractionErrors) == 0 {
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps (0 run steps found in lock files)"))
 		return nil
 	}
-	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker)
+	if len(allSteps) == 0 {
+		return reportShellcheckResultsWithErrors(ctx, nil, nil, strict, extractionErrors)
+	}
+	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker, extractionErrors)
 }
 
 func shellcheckDockerFallback(ctx context.Context) (useDocker bool, available bool) {
@@ -468,13 +476,15 @@ func shellcheckDockerFallback(ctx context.Context) (useDocker bool, available bo
 	return true, true
 }
 
-func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScriptResource) []runStepInfo {
+func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScriptResource) ([]runStepInfo, []error) {
 	var steps []runStepInfo
+	var extractionErrors []error
 	for _, lockFile := range lockFiles {
 		lockSteps, err := extractRunStepsFromLockFile(lockFile)
 		if err != nil {
 			shellcheckLog.Printf("Failed to extract run steps from %s: %v", lockFile, err)
 			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage("shellcheck: could not parse "+filepath.Base(lockFile)+": "+err.Error()))
+			extractionErrors = append(extractionErrors, err)
 			continue
 		}
 		steps = append(steps, lockSteps...)
@@ -490,10 +500,10 @@ func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScript
 			Source: resource.Source,
 		})
 	}
-	return steps
+	return steps, extractionErrors
 }
 
-func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles []string, verbose bool, strict bool, useDocker bool) error {
+func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles []string, verbose bool, strict bool, useDocker bool, extractionErrors []error) error {
 	shellcheckLog.Printf("Running shellcheck on %d run step resource(s) from %d lock file(s) (strict=%t, docker=%t)", len(allSteps), len(lockFiles), strict, useDocker)
 	if len(lockFiles) == 1 {
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps in "+filepath.Base(lockFiles[0])))
@@ -501,7 +511,7 @@ func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running shellcheck on %d run step resources", len(allSteps))))
 	}
 	results := runShellcheckWorkers(ctx, allSteps, verbose, useDocker)
-	return reportShellcheckResults(ctx, allSteps, results, strict)
+	return reportShellcheckResultsWithErrors(ctx, allSteps, results, strict, extractionErrors)
 }
 
 type shellcheckResult struct {
@@ -546,10 +556,18 @@ func runShellcheckWorkers(ctx context.Context, steps []runStepInfo, verbose bool
 }
 
 func reportShellcheckResults(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool) error {
+	return reportShellcheckResultsWithErrors(ctx, steps, results, strict, nil)
+}
+
+func reportShellcheckResultsWithErrors(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool, earlyErrors []error) error {
 	var totalIssues int
 	var firstErr error
 	var diagnostics []scannerDiagnostic
-	var operationalErrors []error
+	operationalErrors := append([]error(nil), earlyErrors...)
+	if len(operationalErrors) > 0 {
+		firstErr = operationalErrors[0]
+		totalIssues = len(operationalErrors)
+	}
 	for i, r := range results {
 		if len(r.output) > 0 {
 			os.Stderr.Write(r.output) //nolint:errcheck

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/github/gh-aw/pkg/workflow/taint"
 	"github.com/rhysd/actionlint"
 	"mvdan.cc/sh/v3/syntax"
@@ -32,8 +33,8 @@ func checkBashCasePatterns(ctx context.Context, input Input) ([]Diagnostic, erro
 			if !ok {
 				continue
 			}
-			shell, shellKnown := step.Fields["shell"].(string)
-			if !shellKnown && step.Fields["shell"] != nil {
+			shell, shellKnown := effectiveStepShell(input, block, step)
+			if !shellKnown {
 				continue
 			}
 			if shell != "" && shell != "bash" && !strings.HasPrefix(shell, "bash ") {
@@ -45,6 +46,71 @@ func checkBashCasePatterns(ctx context.Context, input Input) ([]Diagnostic, erro
 		}
 	}
 	return diagnostics, errors.Join(failures...)
+}
+
+func effectiveStepShell(input Input, block aw.ExecutionBlock, step aw.ExecutionStep) (string, bool) {
+	if value := step.Fields["shell"]; value != nil {
+		shell, ok := value.(string)
+		return shell, ok
+	}
+	if input.Workflow != nil {
+		for _, job := range input.Workflow.Jobs {
+			if block.Path != "jobs."+string(job.ID) {
+				continue
+			}
+			if shell, found, known := defaultRunShell(job.Defaults); found {
+				return shell, known
+			}
+			break
+		}
+		if shell, found, known := defaultRunShell(input.Workflow.Defaults); found {
+			return shell, known
+		}
+		return "", true
+	}
+	if block.Path != "" {
+		if shell, found, known := defaultRunShellField(block.Fields); found {
+			return shell, known
+		}
+	}
+	if input.Document != nil {
+		if shell, found, known := defaultRunShellField(input.Document.Frontmatter); found {
+			return shell, known
+		}
+	}
+	return "", true
+}
+
+func defaultRunShellField(fields map[string]any) (string, bool, bool) {
+	value, ok := fields["defaults"]
+	if !ok || value == nil {
+		return "", false, true
+	}
+	defaults, ok := value.(map[string]any)
+	if !ok {
+		return "", true, false
+	}
+	return defaultRunShell(defaults)
+}
+
+func defaultRunShell(defaults map[string]any) (string, bool, bool) {
+	if defaults == nil {
+		return "", false, true
+	}
+	value, ok := defaults["run"]
+	if !ok || value == nil {
+		return "", false, true
+	}
+	run, ok := value.(map[string]any)
+	if !ok {
+		return "", true, false
+	}
+	value, ok = run["shell"]
+	if !ok || value == nil {
+		return "", false, true
+	}
+	shell, ok := value.(string)
+	return shell, true, ok
 }
 
 func bashCasePatterns(ctx context.Context, script, path string) ([]Diagnostic, error) {

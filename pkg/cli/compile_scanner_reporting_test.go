@@ -47,6 +47,7 @@ func installScannerJSONFakes(t *testing.T, dir string) {
 if [ "$1" = "--version" ]; then printf '1.7.12\n'; exit 0; fi
 if [ "$SCANNER_TEST_MODE" = "tooling" ]; then printf 'broken tool\n' >&2; exit 2; fi
 if [ "$SCANNER_TEST_MODE" = "malformed" ]; then printf 'not JSON\n'; exit 1; fi
+if [ "$SCANNER_TEST_MODE" = "malformed-success" ]; then printf 'not JSON\n'; exit 0; fi
 if [ "$SCANNER_TEST_MODE" = "clean" ]; then printf '[]\n'; exit 0; fi
 printf '['
 sep=''
@@ -123,8 +124,8 @@ Say Done.
 	for _, tool := range []string{"actionlint", "shellcheck"} {
 		for _, count := range []int{1, 2} {
 			for _, strict := range []bool{false, true} {
-				for _, mode := range []string{"findings", "low", "tooling", "malformed", "clean"} {
-					if tool == "shellcheck" && mode == "malformed" {
+				for _, mode := range []string{"findings", "low", "tooling", "malformed", "malformed-success", "clean"} {
+					if tool == "shellcheck" && (mode == "malformed" || mode == "malformed-success") {
 						continue
 					}
 					t.Run(fmt.Sprintf("%s/%d/strict=%t/%s", tool, count, strict, mode), func(t *testing.T) {
@@ -171,7 +172,7 @@ Say Done.
 							assert.Empty(t, result.Errors)
 						}
 						require.NotEmpty(t, issues)
-						if mode == "tooling" || mode == "malformed" {
+						if mode == "tooling" || mode == "malformed" || mode == "malformed-success" {
 							for _, issue := range issues {
 								assert.Equal(t, tool+"_error", issue.Type)
 								assert.Equal(t, scanfindings.SeverityUnknown, issue.Severity)
@@ -238,8 +239,11 @@ func TestDryRunScannerReportingKeepsFindingsAndGate(t *testing.T) {
 	lock := filepath.Join(dir, "test.lock.yml")
 	require.NoError(t, os.WriteFile(lock, []byte("jobs:\n  test:\n    steps:\n      - run: echo hello\n"), 0o600))
 	for _, tool := range []string{"actionlint", "shellcheck"} {
-		for _, mode := range []string{"findings", "low", "tooling"} {
+		for _, mode := range []string{"findings", "low", "tooling", "malformed-success"} {
 			t.Run(tool+"/"+mode, func(t *testing.T) {
+				if tool == "shellcheck" && mode == "malformed-success" {
+					t.Skip("ShellCheck does not emit JSON")
+				}
 				t.Setenv("SCANNER_TEST_MODE", mode)
 				message, kind, level := "quote this variable", "expression", "warning"
 				if mode == "low" {
@@ -293,21 +297,71 @@ func TestDryRunScannerReportingKeepsFindingsAndGate(t *testing.T) {
 	}
 }
 
+func TestDryRunScannerReportingSeparatesLowFindingsFromOperationalFailures(t *testing.T) {
+	t.Parallel()
+	low := withScannerFindings(errors.New("low finding"), []scanfindings.Finding{{
+		RuleID: "SC2086", Severity: scanfindings.SeverityInfo, Message: "advisory",
+	}})
+	dockerFailure := fmt.Errorf("shellcheck (docker) failed: %w: Docker daemon unavailable", errors.New("exit status 125"))
+	rawErr := errors.Join(low, dockerFailure)
+	_, gateErr := (&dryRunScannerBaseline{results: map[string]error{}}).filter("shellcheck", rawErr)
+	require.Error(t, gateErr)
+
+	stats := &CompilationStats{}
+	var results []ValidationResult
+	appendDryRunScannerResult("shellcheck", rawErr, gateErr, stats, &results)
+
+	require.Len(t, results, 1)
+	assert.False(t, results[0].Valid)
+	require.Len(t, results[0].Errors, 1)
+	assert.Contains(t, results[0].Errors[0].Message, "Docker daemon unavailable")
+	require.Len(t, results[0].Warnings, 1)
+	assert.Equal(t, "advisory", results[0].Warnings[0].Message)
+	assert.Equal(t, 1, stats.Errors)
+}
+
 func TestScannerReportingPreservesMixedFailures(t *testing.T) {
 	step := runStepInfo{Script: "echo hello", LockFile: "test.lock.yml"}
 	finding := withShellcheckFindings(errors.New("findings"), step, "script:1:3: warning: quote this [SC2086]")
+	dockerFailure := fmt.Errorf("shellcheck (docker) failed: %w: Docker daemon unavailable", errors.New("exit status 125"))
 	var reported error
 	ctx := context.WithValue(context.Background(), compileScannerReporterKey{}, func(_ string, err error) { reported = err })
 	err := reportShellcheckResults(ctx, []runStepInfo{step, step}, []shellcheckResult{
-		{err: finding}, {err: errors.New("shellcheck unavailable")},
+		{err: finding}, {err: dockerFailure},
 	}, true)
 	require.Error(t, err)
 	issues := scannerValidationIssues("shellcheck", reported)
 	require.Len(t, issues, 2)
 	assert.Equal(t, "SC2086", issues[0].RuleID)
 	assert.Equal(t, "shellcheck_error", issues[1].Type)
-	assert.Contains(t, issues[1].Message, "unavailable")
-	require.Len(t, scannerValidationIssues("shellcheck", err), 2)
+	assert.Contains(t, issues[1].Message, "shellcheck (docker) failed")
+	assert.Contains(t, issues[1].Message, "Docker daemon unavailable")
+	returnedIssues := scannerValidationIssues("shellcheck", err)
+	require.GreaterOrEqual(t, len(returnedIssues), 2)
+	assert.Contains(t, returnedIssues[len(returnedIssues)-1].Message, "Docker daemon unavailable")
+}
+
+func TestShellcheckEarlyFailuresAreReported(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test scanners use POSIX shell scripts")
+	}
+	dir := scannerJSONTestRepo(t)
+	installScannerJSONFakes(t, dir)
+	t.Setenv("SCANNER_TEST_MODE", "clean")
+
+	var reported error
+	ctx := context.WithValue(context.Background(), compileScannerReporterKey{}, func(_ string, err error) { reported = err })
+	lockFile := filepath.Join(dir, "broken.lock.yml")
+	require.NoError(t, os.WriteFile(lockFile, []byte("jobs: [\n"), 0o600))
+	require.NoError(t, RunShellcheckOnLockFilesAndResources(ctx, []string{lockFile}, nil, false, false))
+	require.Error(t, reported)
+	assert.Contains(t, reported.Error(), "failed to parse YAML")
+
+	reported = nil
+	t.Setenv("PATH", "")
+	require.NoError(t, RunShellcheckOnLockFilesAndResources(ctx, []string{lockFile}, nil, false, false))
+	require.Error(t, reported)
+	assert.Contains(t, reported.Error(), "shellcheck binary not found and Docker is unavailable")
 }
 
 func TestScannerValidationIssueSanitizationPreservesFields(t *testing.T) {

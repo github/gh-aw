@@ -122,7 +122,11 @@ func collectScannerDiagnostics(err error) ([]scannerDiagnostic, error) {
 	}
 	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
 		if child := wrapped.Unwrap(); child != nil {
-			return collectScannerDiagnostics(child)
+			diagnostics, failure := collectScannerDiagnostics(child)
+			if failure != nil {
+				return diagnostics, err
+			}
+			return diagnostics, nil
 		}
 	}
 	return nil, err

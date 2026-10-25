@@ -62,7 +62,12 @@ func appendCompileScannerResult(tool string, err error, strict bool, stats *Comp
 func appendDryRunScannerResult(tool string, rawErr, gateErr error, stats *CompilationStats, results *[]ValidationResult) {
 	result := ValidationResult{
 		Scope: "batch", Workflow: tool, Valid: gateErr == nil,
-		Errors: scannerValidationIssues(tool, gateErr), Warnings: []ValidationIssue{},
+		Errors: []ValidationIssue{}, Warnings: []ValidationIssue{},
+	}
+	for _, issue := range scannerValidationIssues(tool, gateErr) {
+		if !isLowSeverityWarning(issue) {
+			result.Errors = append(result.Errors, issue)
+		}
 	}
 	for _, issue := range scannerValidationIssues(tool, rawErr) {
 		if isLowSeverityWarning(issue) {
