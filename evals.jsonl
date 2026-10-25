@@ -138,3 +138,5 @@
 {"id":"insights_report_produced","question":"Was a report produced with usage patterns, success rates, and performance metrics?","answer":"YES","model":"evals","timestamp":"2026-10-23T07:31:34.333Z","runid":"39914677517"}
 {"id":"sessions_analyzed","question":"Did the agent analyze GitHub Copilot coding agent sessions?","answer":"YES","model":"evals","timestamp":"2026-10-24T07:22:51.313Z","runid":"40071993533"}
 {"id":"insights_report_produced","question":"Was a report produced with usage patterns, success rates, and performance metrics?","answer":"YES","model":"evals","timestamp":"2026-10-24T07:22:51.313Z","runid":"40071993533"}
+{"id":"sessions_analyzed","question":"Did the agent analyze GitHub Copilot coding agent sessions?","answer":"NO","model":"evals","timestamp":"2026-10-25T07:24:35.395Z","runid":"40170739595"}
+{"id":"insights_report_produced","question":"Was a report produced with usage patterns, success rates, and performance metrics?","answer":"YES","model":"evals","timestamp":"2026-10-25T07:24:35.395Z","runid":"40170739595"}
