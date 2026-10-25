@@ -142,6 +142,67 @@ Report findings privately.
 	}
 }
 
+func TestCompilerLintImportedCredentialResolver(t *testing.T) {
+	t.Parallel()
+	for _, disclose := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disclose=%t", disclose), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			source := filepath.Join(dir, "credential.md")
+			shared := filepath.Join(dir, "control.md")
+			require.NoError(t, os.WriteFile(source, []byte(`---
+on: workflow_dispatch
+imports: [control.md]
+tools:
+  github: false
+---
+Read the target repository.
+`), 0o600))
+			consumer := `    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
+        token: ${{ steps.cao_target_read_credential.outputs.token }}
+`
+			if disclose {
+				consumer += `    - env:
+        FORWARDED: ${{ steps.cao_target_read_credential.outputs.token }}
+      run: echo "$FORWARDED"
+`
+			}
+			require.NoError(t, os.WriteFile(shared, []byte(`---
+steps:
+    - id: cao_target_read_credential
+      env:
+        APP_TOKEN: ${{ secrets.APP_TOKEN }}
+        PAT: ${{ secrets.READ_TOKEN }}
+        WORKFLOW_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        token="$APP_TOKEN"
+        if [ -z "$token" ]; then token="$PAT"; fi
+        if [ -z "$token" ]; then token="$WORKFLOW_TOKEN"; fi
+        echo "::add-mask::$token"
+        echo "token=$token" >> "$GITHUB_OUTPUT"
+`+consumer+`---
+Shared credential resolver.
+`), 0o600))
+			compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+			compiler.gitRoot = dir
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			err := compiler.CompileWorkflow(source)
+			if disclose {
+				require.ErrorContains(t, err, "[secret-leak]")
+				require.ErrorContains(t, err, "CTR-017")
+			} else {
+				require.NoError(t, err)
+			}
+			_, err = os.Stat(filepath.Join(dir, "credential.lock.yml"))
+			require.True(t, os.IsNotExist(err), "no-emit compilation must not write a lock file")
+		})
+	}
+}
+
 func TestCompilerLintPreservesThreatSuppressions(t *testing.T) {
 	t.Parallel()
 	content := "jobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo '${{ inputs.message }}'\n"

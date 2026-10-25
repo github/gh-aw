@@ -12,6 +12,63 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFastStepLocation(t *testing.T) {
+	tests := []struct {
+		name, location, prefix, suffix string
+		index                          int
+		ok                             bool
+	}{
+		{name: "normal", location: "jobs.agent.steps[2].run", prefix: "jobs.agent.", index: 2, suffix: ".run", ok: true},
+		{name: "no step", location: "jobs.agent.with.script", ok: false},
+		{name: "malformed index", location: "jobs.agent.steps[x].run", prefix: "jobs.agent.", suffix: ".run", ok: false},
+		{name: "nested steps", location: "jobs.agent.steps[0].matrix.steps[3].run", prefix: "jobs.agent.steps[0].matrix.", index: 3, suffix: ".run", ok: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			prefix, index, suffix, ok := fastStepLocation(test.location)
+			assert.Equal(t, test.prefix, prefix)
+			assert.Equal(t, test.index, index)
+			assert.Equal(t, test.suffix, suffix)
+			assert.Equal(t, test.ok, ok)
+		})
+	}
+}
+
+func TestFastSiblingSite(t *testing.T) {
+	tests := []struct {
+		name, compiled, authored, target, from string
+		want                                   bool
+	}{
+		{
+			name:     "matched sibling",
+			compiled: "jobs.agent.steps[2].run", authored: "steps[1].run",
+			target: "jobs.agent.steps[2].run", from: "steps[1].run", want: true,
+		},
+		{
+			name:     "nested steps",
+			compiled: "jobs.agent.steps[0].matrix.steps[3].run", authored: "steps[1].matrix.steps[0].run",
+			target: "jobs.agent.steps[0].matrix.steps[3].run", from: "steps[1].matrix.steps[0].run", want: true,
+		},
+		{
+			name: "missing step", compiled: "jobs.agent.run", authored: "run",
+			target: "jobs.agent.steps[0].run", from: "steps[0].run",
+		},
+		{
+			name: "malformed index", compiled: "jobs.agent.steps[x].run", authored: "steps[0].run",
+			target: "jobs.agent.steps[0].run", from: "steps[0].run",
+		},
+		{
+			name: "mismatched prefixes", compiled: "jobs.other.steps[2].run", authored: "steps[1].run",
+			target: "jobs.agent.steps[2].run", from: "steps[1].run",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, fastSiblingSite(test.compiled, test.authored, test.target, test.from))
+		})
+	}
+}
+
 func TestJavaScriptFastPairedGraph(t *testing.T) {
 	options := nativeJavaScriptOptions(t)
 	options.Mode = JavaScriptFast
@@ -106,7 +163,77 @@ func TestJavaScriptFastAuthoredShellDelta(t *testing.T) {
 	result, err := AnalyzeDocument(document, compiled, rule)
 	require.NoError(t, err)
 	require.Len(t, result.Findings, 1)
-	assert.Equal(t, "steps[0].run", result.Findings[0].Site.Path)
+	assert.Equal(t, "jobs.agent.steps[0].run", result.Findings[0].Site.Path)
+}
+
+func TestJavaScriptFastTransportVerificationIsPerSourceOccurrence(t *testing.T) {
+	options := nativeJavaScriptOptions(t)
+	options.Mode = JavaScriptFast
+	authored := `node -e 'require("@actions/core").setOutput("first", process.env.TOKEN)'; node -e 'require("@actions/core").setOutput("second", process.env.TOKEN)'`
+	compiledScript := `node -e 'require("@actions/core").setOutput("first", process.env.TOKEN)'; node -e 'require("@actions/core").setOutput("other", process.env.TOKEN)'`
+	document, err := aw.Parse(`---
+env:
+  TOKEN: '${{ secrets.TOKEN }}'
+steps:
+  - id: producer
+    shell: bash
+    run: ` + authored + `
+---
+Prompt
+`)
+	require.NoError(t, err)
+	compiled, err := actions.Parse([]byte(`jobs:
+  agent:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: '${{ secrets.TOKEN }}'
+    steps:
+      - id: producer
+        shell: bash
+        run: ` + compiledScript + `
+`))
+	require.NoError(t, err)
+	rule := SecretLeakRule()
+	rule.JavaScript = options
+	result, err := AnalyzeDocument(document, compiled, rule)
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 1, "%+v", result.Findings)
+	assert.Equal(t, Output, result.Findings[0].Site.Kind)
+}
+
+func TestJavaScriptFastUnverifiedStdoutKeepsShellOutputFinding(t *testing.T) {
+	options := nativeJavaScriptOptions(t)
+	options.Mode = JavaScriptFast
+	authored := `value=$(node -e 'process.stdout.write(process.env.TOKEN)'); echo "token=$value" >> "$GITHUB_OUTPUT"`
+	compiledScript := `value=$(node -e 'process.stdout.write("safe")'); echo "token=$value" >> "$GITHUB_OUTPUT"`
+	document, err := aw.Parse(`---
+env:
+  TOKEN: '${{ secrets.TOKEN }}'
+steps:
+  - id: producer
+    shell: bash
+    run: ` + authored + `
+---
+Prompt
+`)
+	require.NoError(t, err)
+	compiled, err := actions.Parse([]byte(`jobs:
+  agent:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: '${{ secrets.TOKEN }}'
+    steps:
+      - id: producer
+        shell: bash
+        run: ` + compiledScript + `
+`))
+	require.NoError(t, err)
+	rule := SecretLeakRule()
+	rule.JavaScript = options
+	result, err := AnalyzeDocument(document, compiled, rule)
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 1, "%+v", result.Findings)
+	assert.Equal(t, Output, result.Findings[0].Site.Kind)
 }
 
 func TestJavaScriptAuthoredDriverSource(t *testing.T) {
