@@ -76,7 +76,7 @@ const DefaultGitHubMCPServerVersion Version = "v2.0.3"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.70"
+const DefaultFirewallVersion Version = "v0.29.0"
 
 // AWFProtectedCommandOutputMinVersion supports native, isolated command output capture.
 const AWFProtectedCommandOutputMinVersion Version = "v0.28.67"
@@ -264,7 +264,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.4.37"
+const DefaultMCPGatewayVersion Version = "v0.5.0"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

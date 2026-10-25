@@ -19,6 +19,7 @@ github/copilot-cli v1.0.98 SHA256SUMS.txt 372f0c8d3d50076455cd19ef080dc59dc2a324
 github/copilot-cli v1.0.21 SHA256SUMS.txt fd9b2fb92a39aeb2a41815a6aa0bf3853307c812b3451a45f5a2217be003987d
 github/gh-aw-firewall v0.28.70 checksums.txt 9a35879a2f405fa7a1aa275a67b96d01eb0d0c6c8fd850637a1ad8ad55b500da
 github/copilot-cli v1.0.101 SHA256SUMS.txt 018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be
+github/gh-aw-firewall v0.29.0 checksums.txt 2d49727b3b65630b5d0ba5375168687a852afac319d05c911d4769c43fa2ed61
 PINS
     ) || {
       local config_field="engine"
