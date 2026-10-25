@@ -47,20 +47,11 @@ func TestFrontmatterRefReplacementBounds(t *testing.T) {
 		{name: "empty"},
 		{name: "no candidates", line: "repo@v1", want: "repo@v1"},
 		{
-			name:       "nil applied",
-			line:       "repo@v1",
-			candidates: []frontmatterRefCandidate{{search: "repo@v1", replacement: "repo@v2"}},
-			want:       "repo@v1",
-		},
-		{
-			name: "invalid candidates before valid match",
+			name: "generated candidates",
 			line: "repo@v1 # keep",
-			candidates: []frontmatterRefCandidate{
-				{update: -1, search: "repo@v1", replacement: "invalid"},
-				{update: 1, search: "repo@v1", replacement: "invalid"},
-				{update: 2, search: "repo@v1", replacement: "invalid"},
-				{update: 0, search: "repo@v1", replacement: "repo@v2"},
-			},
+			candidates: frontmatterRefCandidates([]frontmatterRefUpdate{
+				{old: "repo@v1", replacement: "repo@v2"},
+			}),
 			applied:   []bool{false},
 			want:      "repo@v2 # keep",
 			wantApply: true,

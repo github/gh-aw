@@ -52,10 +52,8 @@ func buildColorPalette() []lipgloss.Style {
 	order := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 3}
 	palette := make([]lipgloss.Style, 0, len(order))
 	for _, idx := range order {
-		if idx >= 0 && idx < len(basePaletteColors) {
-			baseColor := basePaletteColors[idx]
-			palette = append(palette, lipgloss.NewStyle().Foreground(baseColor))
-		}
+		baseColor := basePaletteColors[idx]
+		palette = append(palette, lipgloss.NewStyle().Foreground(baseColor))
 	}
 	return palette
 }
@@ -110,11 +108,7 @@ func selectNamespaceLabel(namespace string) string {
 	hash := h.Sum32()
 
 	// Select color from palette based on hash and render namespace with it.
-	idx := int(uint64(hash) % uint64(len(colorPalette)))
-	if idx >= 0 && idx < len(colorPalette) {
-		return colorPalette[idx].Render(namespace)
-	}
-	return namespace
+	return colorPalette[int(hash%uint32(len(colorPalette)))].Render(namespace)
 }
 
 // Enabled returns whether this logger is enabled

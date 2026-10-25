@@ -4,7 +4,6 @@ package logger
 
 import (
 	"bytes"
-	"image/color"
 	"os"
 	"strings"
 	"testing"
@@ -13,25 +12,9 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
-func TestBuildColorPaletteBounds(t *testing.T) {
-	original := basePaletteColors
-	t.Cleanup(func() { basePaletteColors = original })
-
-	for _, tc := range []struct {
-		name   string
-		colors []color.Color
-		want   int
-	}{
-		{name: "empty"},
-		{name: "single color", colors: original[:1], want: 2},
-		{name: "full palette", colors: original, want: 12},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			basePaletteColors = tc.colors
-			if got := len(buildColorPalette()); got != tc.want {
-				t.Errorf("palette length = %d, want %d", got, tc.want)
-			}
-		})
+func TestBuildColorPalette(t *testing.T) {
+	if got := len(buildColorPalette()); got != 12 {
+		t.Errorf("palette length = %d, want 12", got)
 	}
 }
 

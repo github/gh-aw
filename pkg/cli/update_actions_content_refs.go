@@ -301,9 +301,6 @@ func replaceFrontmatterRefValues(line string, candidates []frontmatterRefCandida
 		best := -1
 		bestLen := 0
 		for j, candidate := range candidates {
-			if candidate.update < 0 || candidate.update >= len(applied) {
-				continue
-			}
 			if applied[candidate.update] || len(candidate.search) <= bestLen {
 				continue
 			}
