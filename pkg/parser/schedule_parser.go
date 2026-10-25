@@ -177,6 +177,9 @@ func (p *ScheduleParser) usesShortDurationSyntax(hasWeekdaysSuffix bool) bool {
 }
 
 func (p *ScheduleParser) parseEveryDayIntervalAlias(hasWeekdaysSuffix bool) (string, bool, error) {
+	if len(p.tokens) < 2 {
+		return "", false, nil
+	}
 	if p.tokens[1] != "day" && p.tokens[1] != "days" {
 		return "", false, nil
 	}
@@ -226,6 +229,9 @@ func (p *ScheduleParser) minimumIntervalTokenCount(hasWeekdaysSuffix bool) int {
 }
 
 func (p *ScheduleParser) parseLongIntervalParts() (int, string, error) {
+	if len(p.tokens) < 3 {
+		return 0, "", errors.New("invalid interval format, expected 'every N unit' or 'every Nunit' (e.g., 'every 2h')")
+	}
 	intervalStr := p.tokens[1]
 	interval, err := strconv.Atoi(intervalStr)
 	if err != nil || interval < 1 {
@@ -243,6 +249,9 @@ func (p *ScheduleParser) parseLongIntervalParts() (int, string, error) {
 }
 
 func (p *ScheduleParser) validateIntervalTimeClause(startPos int, hasWeekdaysSuffix bool) error {
+	if startPos < 0 {
+		return errors.New("invalid interval time clause start position")
+	}
 	endPos := len(p.tokens)
 	if hasWeekdaysSuffix {
 		endPos -= 2
@@ -348,6 +357,9 @@ func formatMonthlyIntervalCron(interval int) string {
 }
 
 func (p *ScheduleParser) parseDailyBase(hasWeekdaysSuffix bool) (string, error) {
+	if len(p.tokens) == 0 {
+		return "", errors.New("empty schedule")
+	}
 	if len(p.tokens) == 1 || (len(p.tokens) == 3 && hasWeekdaysSuffix) {
 		if hasWeekdaysSuffix {
 			return "FUZZY:DAILY_WEEKDAYS * * *", nil
@@ -483,7 +495,7 @@ func (p *ScheduleParser) parseMonthlyBase() (string, error) {
 // extractTime extracts the time specification from tokens starting at startPos
 // Returns the time string (HH:MM, midnight, or noon) with optional UTC offset
 func (p *ScheduleParser) extractTime(startPos int) (string, error) {
-	if startPos >= len(p.tokens) {
+	if startPos < 0 || startPos >= len(p.tokens) {
 		return "", errors.New("expected time specification")
 	}
 
@@ -516,7 +528,7 @@ func (p *ScheduleParser) extractTime(startPos int) (string, error) {
 // extractTimeBetween extracts a time specification from tokens between startPos and endPos (exclusive)
 // Used for parsing the start time in "between START and END" clauses
 func (p *ScheduleParser) extractTimeBetween(startPos, endPos int) (string, error) {
-	if startPos >= len(p.tokens) || startPos >= endPos {
+	if startPos < 0 || startPos >= len(p.tokens) || startPos >= endPos {
 		return "", errors.New("expected time specification")
 	}
 
@@ -538,7 +550,7 @@ func (p *ScheduleParser) extractTimeBetween(startPos, endPos int) (string, error
 // Used for parsing the end time in "between START and END" clauses
 // If hasWeekdaysSuffix is true, excludes the last 2 tokens ("on weekdays")
 func (p *ScheduleParser) extractTimeAfter(startPos int, hasWeekdaysSuffix bool) (string, error) {
-	if startPos >= len(p.tokens) {
+	if startPos < 0 || startPos >= len(p.tokens) {
 		return "", errors.New("expected time specification")
 	}
 
@@ -583,7 +595,7 @@ func (p *ScheduleParser) hasWeekdaysSuffix() bool {
 
 // extractTimeWithWeekdays extracts time specification, handling optional "on weekdays" suffix
 func (p *ScheduleParser) extractTimeWithWeekdays(startPos int, hasWeekdaysSuffix bool) (string, error) {
-	if startPos >= len(p.tokens) {
+	if startPos < 0 || startPos >= len(p.tokens) {
 		return "", errors.New("expected time specification")
 	}
 

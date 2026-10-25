@@ -26,9 +26,9 @@ func Filter[T any](slice []T, predicate func(T) bool) []T {
 // Map transforms each element in a slice using the provided function.
 // This is a pure function that does not modify the input slice.
 func Map[T, U any](slice []T, transform func(T) U) []U {
-	result := make([]U, len(slice))
-	for i, item := range slice {
-		result[i] = transform(item)
+	result := make([]U, 0, len(slice))
+	for _, item := range slice {
+		result = append(result, transform(item))
 	}
 	return result
 }
