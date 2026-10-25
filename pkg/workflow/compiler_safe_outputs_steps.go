@@ -35,8 +35,18 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	checkoutMgr, prCheckoutToken := prepareSharedPRCheckout(data)
 	steps, condition := c.buildSharedPRCheckoutLayout(data, checkoutMgr)
 	steps = append(steps, checkoutMgr.GenerateConfigureGitCredentialsSteps(prCheckoutToken, condition)...)
+	c.prCheckoutLintBlock = preparePRCheckoutLintBlock(steps, c.formatFrameworkJobRunsOn(data))
 	consolidatedSafeOutputsStepsLog.Printf("Built shared PR checkout steps with condition: %s", condition.Render())
 	return steps
+}
+
+func preparePRCheckoutLintBlock(steps []string, runsOn string) string {
+	block := renderStepForRunner(strings.Join(steps, ""), runsOn)
+	finalized, err := finalizeRunnerTempSafety(block)
+	if err != nil {
+		return ""
+	}
+	return normalizeBlankLines(finalized)
 }
 
 func prepareSharedPRCheckout(data *WorkflowData) (*CheckoutManager, string) {

@@ -34,7 +34,15 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if err != nil {
 		failures = append(failures, fmt.Errorf("workflow lint analysis failed: %w", err))
 	}
+	retainedCheckouts, checkoutErr := c.safeOutputRetainedCheckoutLintPaths(graph)
+	if checkoutErr != nil {
+		failures = append(failures, checkoutErr)
+	}
 	for _, diagnostic := range diagnostics {
+		_, retainedCheckout := retainedCheckouts[diagnostic.Path]
+		if diagnostic.RuleID == "artipacked" && diagnostic.Severity == workflowlint.Warning && retainedCheckout {
+			continue
+		}
 		if (diagnostic.RuleID == "secret-leak" || diagnostic.RuleID == "grader-file-io") && diagnostic.Severity == workflowlint.Warning {
 			continue
 		}
