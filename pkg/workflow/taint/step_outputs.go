@@ -52,7 +52,8 @@ func (a *analyzer) transportOutputRecord(site Site, name string, sources value, 
 	if len(sources) > 0 && transport != nil && (!named || !resolved) {
 		a.gapAt(site.Path, site.Line, "step output name or step id is unresolved; downstream output tracking is conservative")
 	}
-	if a.rule.ID != "secret-leak" || !a.workflowContext || !named || !resolved || !transport.modeled {
+	privateTransport := a.rule.ID == "secret-leak" && a.workflowContext && named && resolved && transport != nil && transport.modeled
+	if !privateTransport {
 		a.emit(site, sources)
 	}
 }
