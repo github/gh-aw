@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.69
+**Version**: 1.0.70
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.70` | Unreleased | Specifies the compiler-only `artipacked` warning exception for the exact generated safe-output PR checkout/authentication block, with per-compilation provenance and unchanged standalone lint and runtime authentication. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.69` | Unreleased | Restores CTR-005's `detection-gate: status-only` syntax and adds bounded TLA+ coverage for the validated continuation exception. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.68` | Unreleased | Maps proxy startup diagnostic privacy to runtime redaction and private capture, including runner proxy values, overlapping credential matches, late mask registration, and fail-closed CLI diagnostic publication. No new compiler rejection, threat identifier, permission grant, or lock-file schema change. |
 | `1.0.67` | Unreleased | Audit-only; maps retained PR-head checkout after source-branch deletion to runtime ref isolation (RS-05a), separate from compiler checkout provenance and safe-output lifecycle fencing. No new threat identifier, permission grant, or lock-file schema change. |
@@ -344,6 +345,12 @@ Rules with a known compiler threat mapping MUST declare its `CTR-*` ID in `Rule.
 `pkg/workflow/lint/repository_workflows_test.go` applies the registered checks to repository lock files and companion AW documents. `pkg/workflow/lint/rule_contract_test.go` requires positive and negative fixtures for every registered rule and supported AST, including strict/non-strict AW severity, read-only inputs, and repeatable diagnostics. `pkg/cli/lint_workflow_test.go` exercises default execution and preserves diagnostics from independent rules even when another rule fails.
 
 Secret-leak coverage diagnostics remain available from the AST runner. The CLI hides these warnings in normal text/JSON output and restores them with `--debug`; it MUST NOT hide error findings, analysis failures, or other rules' warnings. Presentation filtering is not additional analysis coverage or evidence of safety. JavaScript object-rest modeling preserves member provenance rather than tainting every copied member from a credential-bearing sibling.
+
+During compilation only, the compiler MAY suppress warning-level `artipacked` diagnostics for `actions/checkout` steps with literal `persist-credentials: true` inside its generated PR checkout/authentication block in `safe_outputs`. Trusted safe-output handlers require these retained credentials for later authenticated Git operations. This exception MUST require compiler-local provenance from the current compilation and an exact parsed-field match of the entire contiguous generated block at a unique position in that job. Missing provenance, a modified block, or multiple matching blocks MUST NOT qualify; the compiler MUST reset the provenance before building each workflow's jobs. A job name or checkout action alone MUST NOT establish ownership.
+
+The exception MUST NOT suppress authored steps outside that block, steps in other jobs, other rules, error findings, or analysis failures. Standalone `gh aw lint` MUST retain its normal `artipacked` diagnostics, including for compiled lock files, because it has no compiler-local provenance. The exception does not change checkout credential persistence, token selection, per-checkout authentication, cleanup, permissions, or runtime authorization, and adds no `CTR-*` rule.
+
+Implementation: `pkg/workflow/compiler_lint_checkouts.go` and `compiler_lint.go`, with provenance captured in `compiler_safe_outputs_steps.go` and reset in `compiler_yaml.go`. Evidence: `TestCompilerLintRetainedCheckoutException` covers generated steps, authored steps before/after the block, other jobs, absent provenance, modified blocks, ambiguous copies, and unchanged standalone rule findings; `TestCompilerLintRetainedMultiRepoCheckouts` covers distinct checkout tokens and retained credentials; `TestCompilerLintGeneratedPRCheckoutSteps` covers compiler integration and provenance reset on reuse. Standalone checkout-policy regressions remain in `pkg/workflow/lint/zizmor_regression_test.go`.
 
 Source-only checks accept an AW AST independently or as a companion and skip native Actions without that evidence. They inspect authored frontmatter only; they do not recursively load imports or reconstruct compiler/CLI policy overrides. Version-check, private-to-public, install-scripts, and network-scope findings follow authored strict policy; conditional imports and bare allowed-label wildcards are always errors. Blanket write grants follow the same authored strict policy, while invalid OIDC read grants are always errors. Push-target findings remain warnings regardless of strict mode and defer when imports may supply constraints. Explicit domain allowances mixed with `defaults` do not hide a bare wildcard from network-scope, unlike the compiler's existing early-default acceptance.
 
