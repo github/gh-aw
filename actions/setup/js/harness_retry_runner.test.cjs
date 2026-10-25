@@ -50,9 +50,9 @@ describe("harness_retry_runner.cjs", () => {
   }
 
   it.each([
-    [{}, "/tmp/gh-aw/harness_retry.json"],
+    [{}, "/tmp/gh-aw/agent/harness_retry.json"],
     [{ GH_AW_PHASE: "detection" }, "/tmp/gh-aw/threat-detection/detection_harness_retry.json"],
-    [{ GH_AW_TMP_DIR: "/custom" }, "/custom/harness_retry.json"],
+    [{ GH_AW_TMP_DIR: "/custom" }, "/custom/agent/harness_retry.json"],
     [{ GH_AW_HARNESS_TELEMETRY_DIR: "/shared/sandbox/agent" }, "/shared/sandbox/agent/harness_retry.json"],
     [{ GH_AW_HARNESS_TELEMETRY_DIR: "/shared/sandbox/agent", GH_AW_PHASE: "detection" }, "/shared/sandbox/agent/detection_harness_retry.json"],
   ])("resolves the phase-isolated telemetry path for %j", (env, expected) => {

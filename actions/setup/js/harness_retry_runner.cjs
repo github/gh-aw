@@ -12,7 +12,7 @@ const executionEvidenceEnvVars = ["GH_AW_AWF_EXECUTION_EVIDENCE_FILE", "GH_AW_AW
 /** @param {NodeJS.ProcessEnv} [env] */
 function resolveHarnessRetryTelemetryPath(env = process.env) {
   const detection = env.GH_AW_PHASE === "detection";
-  const directory = env.GH_AW_HARNESS_TELEMETRY_DIR || path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", detection ? "threat-detection" : "");
+  const directory = env.GH_AW_HARNESS_TELEMETRY_DIR || path.join(env.GH_AW_TMP_DIR || "/tmp/gh-aw", detection ? "threat-detection" : "agent");
   return path.join(directory, detection ? "detection_harness_retry.json" : "harness_retry.json");
 }
 

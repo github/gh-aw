@@ -5900,7 +5900,7 @@ describe("sendJobConclusionSpan", () => {
         attempt_results: exitCodes.map((exit_code, index) => ({ attempt: index + 1, exit_code, failure_classes: exit_code ? ["rate_limit_error"] : [] })),
       };
       readFileSpy.mockImplementation(filePath => {
-        if (filePath === "/tmp/gh-aw/harness_retry.json") return JSON.stringify(telemetry);
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json") return JSON.stringify(telemetry);
         if (filePath === "/tmp/gh-aw/agent_usage.json") return JSON.stringify({ input_tokens: 100, output_tokens: 20 });
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       });
@@ -5936,7 +5936,7 @@ describe("sendJobConclusionSpan", () => {
             ],
           });
         // Inherited agent telemetry must not be mistaken for detection's own retries.
-        if (filePath === "/tmp/gh-aw/harness_retry.json" || filePath === "/tmp/gh-aw/threat-detection/harness_retry.json") return JSON.stringify({ attempts: 0, attempt_results: [] });
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json" || filePath === "/tmp/gh-aw/threat-detection/harness_retry.json") return JSON.stringify({ attempts: 0, attempt_results: [] });
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       });
       await sendJobConclusionSpan("gh-aw.detection.conclusion");
@@ -5948,7 +5948,7 @@ describe("sendJobConclusionSpan", () => {
     it.each(["conclusion", "safe_outputs", "detection"])("does not inherit agent retry telemetry in %s", async jobName => {
       process.env.INPUT_JOB_NAME = jobName;
       readFileSpy.mockImplementation(filePath => {
-        if (filePath === "/tmp/gh-aw/harness_retry.json")
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json")
           return JSON.stringify({
             attempts: 1,
             attempt_results: [{ attempt: 1, exit_code: 0, failure_classes: [] }],
@@ -5960,25 +5960,31 @@ describe("sendJobConclusionSpan", () => {
       expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
     });
 
-    it.each([null, "{invalid", '{"attempts":-1,"attempt_results":[]}', '{"attempts":1.5,"attempt_results":[]}', '{"attempts":"1","attempt_results":[]}', '{"attempts":2,"attempt_results":[]}', '{"attempts":1,"attempt_results":null}'])(
-      "ignores missing or malformed harness telemetry %s",
-      async content => {
-        readFileSpy.mockImplementation(filePath => {
-          if (filePath === "/tmp/gh-aw/harness_retry.json" && content !== null) return content;
-          throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-        });
-        await sendJobConclusionSpan("gh-aw.agent.conclusion");
-        const span = JSON.parse(appendSpy.mock.calls[0][1]).resourceSpans[0].scopeSpans[0].spans[0];
-        expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
-      }
-    );
+    it.each([
+      null,
+      "{invalid",
+      '{"attempts":-1,"attempt_results":[]}',
+      '{"attempts":1.5,"attempt_results":[]}',
+      '{"attempts":"1","attempt_results":[]}',
+      '{"attempts":2,"attempt_results":[]}',
+      '{"attempts":1,"attempt_results":null}',
+      '{"attempts":1,"attempt_results":[{"exit_code":null}]}',
+    ])("ignores missing or malformed harness telemetry %s", async content => {
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json" && content !== null) return content;
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      await sendJobConclusionSpan("gh-aw.agent.conclusion");
+      const span = JSON.parse(appendSpy.mock.calls[0][1]).resourceSpans[0].scopeSpans[0].spans[0];
+      expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
+    });
 
     it("exports only bounded failure-class labels, never arbitrary output", async () => {
       readFileSpy.mockImplementation(filePath => {
-        if (filePath === "/tmp/gh-aw/harness_retry.json")
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json")
           return JSON.stringify({
             attempts: 1,
-            attempt_results: [{ failure_classes: ["rate_limit_error", "private output\nsecret", 123, null, "x".repeat(100)] }],
+            attempt_results: [{ exit_code: 1, failure_classes: ["rate_limit_error", "private output\nsecret", 123, null, "x".repeat(100)] }],
           });
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       });

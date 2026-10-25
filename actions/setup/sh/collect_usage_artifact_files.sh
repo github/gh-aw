@@ -22,7 +22,7 @@ for file in \
   /tmp/gh-aw/aw-info.jsonl \
   /tmp/gh-aw/agent_usage.json \
   /tmp/gh-aw/agent_usage.jsonl \
-  /tmp/gh-aw/harness_retry.json \
+  /tmp/gh-aw/agent/harness_retry.json \
   /tmp/gh-aw/threat-detection/detection_harness_retry.json \
   /tmp/gh-aw/detection_usage.jsonl \
   /tmp/gh-aw/threat-detection/detection_usage.jsonl \
@@ -58,7 +58,7 @@ elif [ -f /tmp/gh-aw/detection_usage.jsonl ]; then
   cp /tmp/gh-aw/detection_usage.jsonl /tmp/gh-aw/usage/detection_usage.jsonl || true
 fi
 if [ -f /tmp/gh-aw/agent_execution.json ]; then cp /tmp/gh-aw/agent_execution.json /tmp/gh-aw/usage/agent/execution.json || true; fi
-if [ -f /tmp/gh-aw/harness_retry.json ]; then cp /tmp/gh-aw/harness_retry.json /tmp/gh-aw/usage/agent/harness_retry.json || true; fi
+if [ -f /tmp/gh-aw/agent/harness_retry.json ]; then cp /tmp/gh-aw/agent/harness_retry.json /tmp/gh-aw/usage/agent/harness_retry.json || true; fi
 if [ -f /tmp/gh-aw/threat-detection/detection_harness_retry.json ]; then cp /tmp/gh-aw/threat-detection/detection_harness_retry.json /tmp/gh-aw/usage/detection/harness_retry.json || true; fi
 if [ -f /tmp/gh-aw/threat-detection/execution.json ]; then cp /tmp/gh-aw/threat-detection/execution.json /tmp/gh-aw/usage/detection/execution.json || true; fi
 # The evals artifact is rooted at /tmp/gh-aw/ in the evals job, so its execution evidence

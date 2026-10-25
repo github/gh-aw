@@ -77,8 +77,11 @@ func TestArcDindDetectionHarnessRetryTelemetryCollection(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{
 		RunnerConfig:  &RunnerConfig{Topology: RunnerTopologyArcDind},
-		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf", Disabled: true}},
 	}
-	detection := strings.Join(compiler.buildCopyDetectionFirewallLogsStep(data), "")
+	detectionData := buildThreatDetectionWorkflowData(data, "")
+	assert.False(t, isFirewallEnabled(data))
+	assert.True(t, isFirewallEnabled(detectionData))
+	detection := strings.Join(compiler.buildCopyDetectionFirewallLogsStep(detectionData), "")
 	assert.Contains(t, detection, `"${RUNNER_TEMP}/gh-aw/sandbox/agent/detection_harness_retry.json" /tmp/gh-aw/threat-detection/detection_harness_retry.json`)
 }

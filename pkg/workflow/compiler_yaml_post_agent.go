@@ -68,7 +68,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 
 	// Collect agent stdio logs path for unified upload
 	paths = append(paths, logFileFull)
-	paths = append(paths, constants.TmpGhAwDirSlash+"harness_retry.json")
+	paths = append(paths, constants.TmpGhAwDirSlash+"agent/harness_retry.json")
 
 	// Include the pre-agent audit file (file listing of agent-related directories captured
 	// before agent execution) so it is available in the agent artifact for post-run inspection.
@@ -298,11 +298,10 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	// and creates a nested directory layout that breaks downstream artifact downloads.
 	// See gh-aw#34896 Bug B.
 	if isArcDindTopology(data) {
-		c.generateArcDindArtifactConsolidationStep(yaml)
-		yaml.WriteString("          if [ -f \"${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json\" ]; then\n")
-		yaml.WriteString("            cp \"${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json\" \"${RUNNER_TEMP}/gh-aw/harness_retry.json\" || true\n")
-		yaml.WriteString("            cp \"${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json\" /tmp/gh-aw/harness_retry.json || true\n")
-		yaml.WriteString("          fi\n")
+		c.generateArcDindArtifactConsolidationStep(yaml, arcDindArtifactCopy{
+			sourcePath: "sandbox/agent/harness_retry.json",
+			targetPath: "agent/harness_retry.json",
+		})
 	}
 
 	// Generate single unified artifact upload with all collected paths.

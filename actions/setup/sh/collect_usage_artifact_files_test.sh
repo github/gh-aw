@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="$SCRIPT_DIR/collect_usage_artifact_files.sh"
 TEST_DIR="$(mktemp -d)"
 RETRY_FILES=(
-  /tmp/gh-aw/harness_retry.json
+  /tmp/gh-aw/agent/harness_retry.json
   /tmp/gh-aw/threat-detection/detection_harness_retry.json
   /tmp/gh-aw/usage/agent/harness_retry.json
   /tmp/gh-aw/usage/detection/harness_retry.json
@@ -42,7 +42,7 @@ trap cleanup EXIT
 mkdir -p "$TEST_DIR/bin-with-node" "$TEST_DIR/bin-without-node" /tmp/gh-aw/usage/activity
 mkdir -p /tmp/gh-aw/agent
 mkdir -p /tmp/gh-aw/threat-detection
-printf '{"attempts":1,"exit_code":0,"attempt_results":[{"attempt":1,"exit_code":0,"failure_classes":[]}]}\n' > /tmp/gh-aw/harness_retry.json
+printf '{"attempts":1,"exit_code":0,"attempt_results":[{"attempt":1,"exit_code":0,"failure_classes":[]}]}\n' > /tmp/gh-aw/agent/harness_retry.json
 printf '{"attempts":2,"exit_code":1,"attempt_results":[{"attempt":1,"exit_code":1,"failure_classes":["rate_limit_error"]},{"attempt":2,"exit_code":1,"failure_classes":["rate_limit_error"]}]}\n' > /tmp/gh-aw/threat-detection/detection_harness_retry.json
 printf '{"model":"early"}\n' > /tmp/gh-aw/aw_info.json
 printf '{"model":"final","model_routing":{"status":"selected"}}\n' > /tmp/gh-aw/agent/aw_info.json
@@ -66,10 +66,10 @@ output_with_node="$(RUNNER_TEMP="$TEST_DIR" PATH="$TEST_DIR/bin-with-node" /bin/
 grep -q '/tmp/gh-aw/usage/activity/collector-test-marker' <<<"$output_with_node"
 
 test ! -f /tmp/gh-aw/usage/activity/summary.json
-cmp /tmp/gh-aw/harness_retry.json /tmp/gh-aw/usage/agent/harness_retry.json
+cmp /tmp/gh-aw/agent/harness_retry.json /tmp/gh-aw/usage/agent/harness_retry.json
 cmp /tmp/gh-aw/threat-detection/detection_harness_retry.json /tmp/gh-aw/usage/detection/harness_retry.json
 
-rm /tmp/gh-aw/harness_retry.json /tmp/gh-aw/threat-detection/detection_harness_retry.json
+rm /tmp/gh-aw/agent/harness_retry.json /tmp/gh-aw/threat-detection/detection_harness_retry.json
 rm /tmp/gh-aw/usage/agent/harness_retry.json /tmp/gh-aw/usage/detection/harness_retry.json
 PATH="$TEST_DIR/bin-with-node" /bin/bash "$SCRIPT" >/dev/null
 test ! -f /tmp/gh-aw/usage/agent/harness_retry.json

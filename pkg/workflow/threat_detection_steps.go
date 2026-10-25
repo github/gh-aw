@@ -103,7 +103,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 		steps = append(steps, c.buildDetectionEngineExecutionStep(data)...)
 	}
 
-	steps = append(steps, c.buildCopyDetectionFirewallLogsStep(data)...)
+	steps = append(steps, c.buildCopyDetectionFirewallLogsStep(buildThreatDetectionWorkflowData(data, ""))...)
 	if len(data.SafeOutputs.ThreatDetection.PostSteps) > 0 {
 		steps = append(steps, c.buildCustomThreatDetectionSteps(data.SafeOutputs.ThreatDetection.PostSteps)...)
 	}

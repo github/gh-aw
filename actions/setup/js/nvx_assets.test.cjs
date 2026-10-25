@@ -279,6 +279,7 @@ process.exit(17);
     fs.writeFileSync(cleanup, "trusted cleanup");
     fs.writeFileSync(path.join(root, "state", "actions-source", "actions", "setup", "clean.sh"), "untrusted cleanup");
     fs.writeFileSync(path.join(root, "state", "gateway-secret"), "untrusted secret");
+    fs.writeFileSync(path.join(root, "state", "agent", "harness_retry.json"), '{"attempts":1}');
     fs.writeFileSync(path.join(root, "state", "pi-streaming.jsonl"), "pi events");
     fs.writeFileSync(path.join(root, "state", "sandbox/agent/logs/pi-streaming.jsonl"), "writable pi events");
     fs.writeFileSync(path.join(root, "state", "claude-debug.log"), "claude events");
@@ -295,6 +296,7 @@ process.exit(17);
     for (const name of ["agent", "threat-detection", "sandbox/agent/logs"]) {
       expect(fs.readFileSync(path.join(state, name, "fixture.txt"), "utf8")).toBe("guest artifact");
     }
+    expect(fs.readFileSync(path.join(state, "agent", "harness_retry.json"), "utf8")).toBe('{"attempts":1}');
     expect(fs.readFileSync(path.join(state, "pi-streaming.jsonl"), "utf8")).toBe("pi events");
     expect(fs.readFileSync(path.join(state, "sandbox/agent/logs/pi-streaming.jsonl"), "utf8")).toBe("writable pi events");
     expect(fs.readFileSync(path.join(state, "claude-debug.log"), "utf8")).toBe("claude events");

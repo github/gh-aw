@@ -76,7 +76,7 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
           .filter(Boolean)
           .map(line => JSON.parse(line))
       : [];
-    const telemetryPath = path.join(env.GH_AW_TMP_DIR, env.GH_AW_PHASE === "detection" ? "threat-detection/detection_harness_retry.json" : "harness_retry.json");
+    const telemetryPath = path.join(env.GH_AW_TMP_DIR, env.GH_AW_PHASE === "detection" ? "threat-detection/detection_harness_retry.json" : "agent/harness_retry.json");
     const harnessRetry = fs.existsSync(telemetryPath) ? JSON.parse(fs.readFileSync(telemetryPath, "utf8")) : null;
     return { result, calls, harnessRetry };
   } finally {
