@@ -1,30 +1,43 @@
 {
-  "last_run_date": "2026-10-24",
+  "last_run_date": "2026-10-25",
   "last_window": {
-    "start": "2026-10-23T07:58:06Z",
-    "end": "2026-10-24T07:58:06Z"
+    "start": "2026-10-24T07:55:23Z",
+    "end": "2026-10-25T07:55:23Z"
   },
   "observed_window": {
-    "runs": 373,
-    "first_run": "2026-10-23T07:58:19Z",
-    "last_run": "2026-10-24T07:53:26Z",
-    "coverage": "No continuation cursor; summary has no canonical episode edges, so lineage is partial."
+    "runs": 569,
+    "segments": [
+      {
+        "runs": 244,
+        "first_run": "2026-10-24T08:23:59Z",
+        "last_run": "2026-10-24T18:00:41Z"
+      },
+      {
+        "runs": 325,
+        "first_run": "2026-10-24T18:21:55Z",
+        "last_run": "2026-10-25T07:53:08Z"
+      }
+    ],
+    "coverage": "Continuation exhausted with zero additional runs; episode roots may still lie outside selected artifact coverage."
   },
   "key_themes": [
-    "Conformance and smoke work-queue settlement failures",
-    "Missing installed smoke pool and human first-use pivot",
-    "Transient cross-workflow AIC activation interruption"
+    "Work-queue publication boundary remains mixed",
+    "Cross-repository smoke checkout stalls both PR paths",
+    "Five-workflow review fan-out succeeds with missing root",
+    "Safety monitoring and conformance diverge"
   ],
   "carry_forward_questions": [
-    "Does PR 71495 merge and does the next smoke dispatch verify a worker launch?",
-    "Do work-queue Issue projection and claim reconciliation failures recur?",
-    "What caused the eight AIC activation failures, and do they recur?"
+    "Do claim reconciliation, Issue projection, and handoff failures recur after the successful work-queue smoke?",
+    "Does side-repository checkout recover in both cross-repo PR smoke paths?",
+    "Does the safe-output health monitor pass after PR 71833?",
+    "Will the container gate clear while the updated CVE ledger remains current?"
   ],
   "representative_runs": [
-    39934255576,
-    39971310352,
-    39939907542,
-    39955435424,
-    40059714295
+    40083405475,
+    40102973967,
+    40115223401,
+    40148115535,
+    40161732282,
+    40165956449
   ]
 }
