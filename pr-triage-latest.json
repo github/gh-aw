@@ -1,10 +1,10 @@
 {
-  "run_date": "2026-10-25T06:35:05Z",
-  "run_id": "40169473065",
+  "run_date": "2026-10-25T12:32:57Z",
+  "run_id": "40193252003",
   "source": "pr-triage",
   "eligible_total": 1,
-  "cooldown_skipped": 0,
-  "open_copilot_prs": 1,
+  "cooldown_skipped": 23,
+  "open_copilot_prs": 24,
   "category_counts": {
     "feature": 1
   },
@@ -34,6 +34,11 @@
       }
     }
   ],
-  "skipped_prs": [],
-  "notes": "Eligible Copilot PRs were older than one hour and remained in scope for triage; no batch cluster met the 3+ threshold."
+  "skipped_prs": [
+    {
+      "count": 23,
+      "reason": "opened/updated within the past hour"
+    }
+  ],
+  "notes": "One eligible Copilot PR met the 1-hour cooldown. It is a feature fix with passing CI, strong tests, and a low-risk, user-facing model-routing fix."
 }
