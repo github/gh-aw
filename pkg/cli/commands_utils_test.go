@@ -4,10 +4,13 @@ package cli
 
 import (
 	"bufio"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/github/gh-aw/pkg/testutil"
 )
@@ -167,6 +170,90 @@ func TestExtractWorkflowNameFromFile_LargeFrontmatterLine(t *testing.T) {
 	}
 	if result != "Large Frontmatter Workflow" {
 		t.Fatalf("Expected %q, got %q", "Large Frontmatter Workflow", result)
+	}
+}
+
+func TestFastParseTitleFromReader(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		content     string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:     "first supported heading wins",
+			content:  "## First heading\n# Later heading\n",
+			expected: "First heading",
+		},
+		{
+			name:     "frontmatter headings are ignored",
+			content:  "---\n# Not a title\n---\n### Actual title",
+			expected: "Actual title",
+		},
+		{
+			name:     "unicode whitespace and CRLF",
+			content:  "\u2003---\u2003\r\nkey: value\r\n---\r\n\u2003# Title\u2003\r\n",
+			expected: "Title",
+		},
+		{
+			name:     "empty heading stops parsing",
+			content:  "# \n# Later heading\n",
+			expected: "",
+		},
+		{
+			name:     "frontmatter only opens on the first line",
+			content:  "\n---\n# Title\n",
+			expected: "Title",
+		},
+		{
+			name:        "unclosed frontmatter",
+			content:     "---\n# Not a title\n",
+			expectError: true,
+		},
+		{
+			name:        "oversized line",
+			content:     strings.Repeat("x", 1024*1024) + "\n# Title\n",
+			expectError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			title, err := fastParseTitleFromReader(strings.NewReader(tt.content))
+			if (err != nil) != tt.expectError {
+				t.Fatalf("Expected error=%v, got %v", tt.expectError, err)
+			}
+			if title != tt.expected {
+				t.Errorf("Expected title %q, got %q", tt.expected, title)
+			}
+		})
+	}
+}
+
+func TestFastParseTitleFromReader_ReadError(t *testing.T) {
+	t.Parallel()
+	readErr := errors.New("unexpected read")
+	for _, tt := range []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{name: "before title"},
+		{name: "after title", content: "# Title\n", expected: "Title"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := io.MultiReader(strings.NewReader(tt.content), iotest.ErrReader(readErr))
+			title, err := fastParseTitleFromReader(reader)
+			if tt.expected == "" && !errors.Is(err, readErr) {
+				t.Fatalf("Expected read error, got %v", err)
+			}
+			if tt.expected != "" && err != nil {
+				t.Fatalf("Parser read past the title: %v", err)
+			}
+			if title != tt.expected {
+				t.Errorf("Expected title %q, got %q", tt.expected, title)
+			}
+		})
 	}
 }
 
@@ -362,6 +449,21 @@ func TestFindIncludesInContent_EmptyContentReturnsNonNilSlice(t *testing.T) {
 }
 
 // Benchmark tests
+// Measure parsing separately from file I/O to distinguish parser regressions
+// from filesystem or runner overhead in BenchmarkExtractWorkflowNameFromFile.
+func BenchmarkFastParseTitleFromReader(b *testing.B) {
+	const content = "---\ntitle: Test Workflow\n---\n\n# Daily Test Coverage Improvement\n\nThis is a test workflow with some content."
+	reader := strings.NewReader(content)
+	b.ReportAllocs()
+	for b.Loop() {
+		reader.Reset(content)
+		title, err := fastParseTitleFromReader(reader)
+		if err != nil || title != "Daily Test Coverage Improvement" {
+			b.Fatalf("Unexpected title %q or error: %v", title, err)
+		}
+	}
+}
+
 func BenchmarkExtractWorkflowNameFromFile(b *testing.B) {
 	// Create temporary test file
 	tmpDir := b.TempDir()
@@ -380,7 +482,10 @@ This is a test workflow with some content.`
 	}
 
 	for b.Loop() {
-		_, _ = extractWorkflowNameFromFile(filePath)
+		title, err := extractWorkflowNameFromFile(filePath)
+		if err != nil || title != "Daily Test Coverage Improvement" {
+			b.Fatalf("Unexpected title %q or error: %v", title, err)
+		}
 	}
 }
 
