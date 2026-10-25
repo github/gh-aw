@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -209,6 +210,11 @@ func TestMCPCompile_WriteCapability(t *testing.T) {
 				wantArgs = append(wantArgs, "--no-emit", "--no-check-update", "--read-only")
 			}
 			wantArgs = append(wantArgs, "--strict", "--", "test")
+			progressFlagIndex := slices.Index(gotArgs, "--mcp-progress-file")
+			require.NotEqual(t, -1, progressFlagIndex)
+			require.Less(t, progressFlagIndex, slices.Index(gotArgs, "--"))
+			require.NotEmpty(t, gotArgs[progressFlagIndex+1])
+			gotArgs = append(gotArgs[:progressFlagIndex], gotArgs[progressFlagIndex+2:]...)
 			assert.Equal(t, wantArgs, gotArgs)
 		})
 	}

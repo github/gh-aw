@@ -61,6 +61,45 @@ func TestCheckAndPrepareDockerImages_ImageAlreadyDownloading(t *testing.T) {
 	ResetDockerPullState()
 }
 
+func TestCheckAndPrepareDockerImagesPullSurvivesProbeCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Docker pull test requires a POSIX shell")
+	}
+	ResetDockerPullState()
+	t.Cleanup(ResetDockerPullState)
+
+	dockerDir := t.TempDir()
+	markerPath := filepath.Join(t.TempDir(), "pull-status")
+	dockerPath := filepath.Join(dockerDir, "docker")
+	dockerScript := `#!/bin/sh
+case "$1" in
+  info) exit 0 ;;
+  image) exit 1 ;;
+  pull)
+    printf 'started\n' >> "$DOCKER_TEST_MARKER"
+    /bin/sleep 0.2
+    printf 'complete\n' >> "$DOCKER_TEST_MARKER"
+    exit 0 ;;
+esac
+exit 1
+`
+	require.NoError(t, os.WriteFile(dockerPath, []byte(dockerScript), 0o755))
+	t.Setenv("PATH", dockerDir)
+	t.Setenv("DOCKER_TEST_MARKER", markerPath)
+
+	probeCtx, cancel := context.WithCancel(t.Context())
+	err := CheckAndPrepareDockerImagesWithDetachedDownloads(probeCtx, DockerImagesOptions{Zizmor: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Started downloading")
+	cancel()
+
+	require.Eventually(t, func() bool {
+		status, readErr := os.ReadFile(markerPath)
+		return readErr == nil && strings.Contains(string(status), "complete")
+	}, time.Second, 10*time.Millisecond)
+	assert.False(t, IsDockerImageDownloading(ZizmorImage))
+}
+
 func TestDockerImageDownloadState(t *testing.T) {
 	// Reset state before test
 	ResetDockerPullState()

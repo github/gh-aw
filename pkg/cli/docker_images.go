@@ -19,6 +19,7 @@ var dockerImagesLog = logger.New("cli:docker_images")
 var dockerMissingNotice sync.Once
 
 const dockerUnavailableMessage = "Docker is unavailable; Docker-based static analysis will be skipped."
+const dockerImageDownloadLifetime = 5 * time.Minute
 
 func isDockerCLIAvailable() bool {
 	if _, err := exec.LookPath("docker"); err != nil {
@@ -198,83 +199,67 @@ func StartDockerImageDownload(ctx context.Context, image string) (bool, func() e
 	pullState.downloading[image] = true
 	pullState.inflight[image] = dl
 
-	// Start the download in a goroutine with retry logic.
-	// Defer order (LIFO): recover+set-error runs first, cleanup runs second,
-	// close(done) runs last so callers only unblock after dl.err is set.
-	go func() {
-		var lastErr error
-		defer close(dl.done)
-		defer func() {
-			pullState.mu.Lock()
-			defer pullState.mu.Unlock()
-			delete(pullState.downloading, image)
-			delete(pullState.inflight, image)
-		}()
-		defer func() {
-			if r := recover(); r != nil {
-				lastErr = fmt.Errorf("panic in docker image download for %s: %v", image, r)
-				dockerImagesLog.Printf("Panic in docker image download for %s (recovered): %v", image, r)
-			}
-			dl.err = lastErr
-		}()
-
-		dockerImagesLog.Printf("Starting download of image %s", image)
-
-		// Retry configuration
-		maxAttempts := 3
-		waitTime := 5 // seconds
-
-		var lastOutput []byte
-
-		for attempt := 1; attempt <= maxAttempts; attempt++ {
-			// Check if context was cancelled
-			if ctx.Err() != nil {
-				dockerImagesLog.Printf("Download of image %s cancelled: %v", image, ctx.Err())
-				return
-			}
-
-			dockerImagesLog.Printf("Attempt %d of %d: Pulling image %s", attempt, maxAttempts, image)
-
-			cmd := exec.CommandContext(ctx, "docker", "pull", image)
-			output, err := cmd.CombinedOutput()
-
-			if err == nil {
-				// Success
-				dockerImagesLog.Printf("Successfully downloaded image %s", image)
-				return
-			}
-
-			lastErr = err
-			lastOutput = output
-
-			// If not the last attempt, wait and retry
-			if attempt < maxAttempts {
-				dockerImagesLog.Printf("Failed to download image %s (attempt %d/%d). Retrying in %ds...", image, attempt, maxAttempts, waitTime)
-
-				// Use context-aware sleep
-				timer := time.NewTimer(time.Duration(waitTime) * time.Second)
-				select {
-				case <-timer.C:
-					// Continue to next retry
-				case <-ctx.Done():
-					timer.Stop()
-					// Context cancelled during sleep
-					dockerImagesLog.Printf("Download of image %s cancelled during retry wait: %v", image, ctx.Err())
-					return
-				}
-
-				waitTime *= 2 // Exponential backoff
-			}
-		}
-
-		// All attempts failed
-		dockerImagesLog.Printf("Failed to download image %s after %d attempts: %v\nOutput: %s", image, maxAttempts, lastErr, string(lastOutput))
-	}()
+	go runDockerImageDownload(ctx, image, dl)
 
 	return true, func() error {
 		<-dl.done
 		return dl.err
 	}
+}
+
+func runDockerImageDownload(ctx context.Context, image string, dl *inflightDownload) {
+	var lastErr error
+	defer close(dl.done)
+	defer func() {
+		pullState.mu.Lock()
+		defer pullState.mu.Unlock()
+		delete(pullState.downloading, image)
+		delete(pullState.inflight, image)
+	}()
+	defer func() {
+		if r := recover(); r != nil {
+			lastErr = fmt.Errorf("panic in docker image download for %s: %v", image, r)
+			dockerImagesLog.Printf("Panic in docker image download for %s (recovered): %v", image, r)
+		}
+		dl.err = lastErr
+	}()
+	lastErr = downloadDockerImageWithRetries(ctx, image)
+}
+
+func downloadDockerImageWithRetries(ctx context.Context, image string) error {
+	dockerImagesLog.Printf("Starting download of image %s", image)
+	const maxAttempts = 3
+	waitTime := 5
+	var lastOutput []byte
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			dockerImagesLog.Printf("Download of image %s cancelled: %v", image, ctx.Err())
+			return lastErr
+		}
+		dockerImagesLog.Printf("Attempt %d of %d: Pulling image %s", attempt, maxAttempts, image)
+		output, err := exec.CommandContext(ctx, "docker", "pull", image).CombinedOutput()
+		if err == nil {
+			dockerImagesLog.Printf("Successfully downloaded image %s", image)
+			return nil
+		}
+		lastErr = err
+		lastOutput = output
+		if attempt < maxAttempts {
+			dockerImagesLog.Printf("Failed to download image %s (attempt %d/%d). Retrying in %ds...", image, attempt, maxAttempts, waitTime)
+			timer := time.NewTimer(time.Duration(waitTime) * time.Second)
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+				dockerImagesLog.Printf("Download of image %s cancelled during retry wait: %v", image, ctx.Err())
+				return lastErr
+			}
+			waitTime *= 2
+		}
+	}
+	dockerImagesLog.Printf("Failed to download image %s after %d attempts: %v\nOutput: %s", image, maxAttempts, lastErr, string(lastOutput))
+	return lastErr
 }
 
 // DockerImagesOptions specifies which Docker-based static analysis tools are requested.
@@ -290,12 +275,60 @@ type DockerImagesOptions struct {
 //   - nil if all required images are available
 //   - error if Docker is unavailable or images are downloading/need to be downloaded
 func CheckAndPrepareDockerImages(ctx context.Context, opts DockerImagesOptions) error {
-	// If no tools requested, nothing to do
-	if !opts.Zizmor && !opts.Poutine && !opts.Actionlint && !opts.RunnerGuard && !opts.Syft && !opts.Grype && !opts.Grant && !opts.Yamllint {
+	return checkAndPrepareDockerImages(ctx, opts, StartDockerImageDownload)
+}
+
+// CheckAndPrepareDockerImagesWithDetachedDownloads keeps image probes bounded by
+// ctx while allowing started pulls to outlive the request for a limited time.
+func CheckAndPrepareDockerImagesWithDetachedDownloads(ctx context.Context, opts DockerImagesOptions) error {
+	return checkAndPrepareDockerImages(ctx, opts, func(probeCtx context.Context, image string) (bool, func() error) {
+		downloadCtx, cancel := context.WithTimeout(context.WithoutCancel(probeCtx), dockerImageDownloadLifetime)
+		started, join := StartDockerImageDownload(downloadCtx, image)
+		if !started {
+			cancel()
+			return started, join
+		}
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					dockerImagesLog.Printf("Panic while waiting for Docker image download: %v", r)
+				}
+			}()
+			defer cancel()
+			_ = join()
+		}()
+		return started, join
+	})
+}
+
+func checkAndPrepareDockerImages(
+	ctx context.Context,
+	opts DockerImagesOptions,
+	startDownload func(context.Context, string) (bool, func() error),
+) error {
+	if !opts.hasRequestedImage() {
 		return nil
 	}
+	opts = disableAvailableNativeScanners(ctx, opts)
+	if !opts.hasRequestedImage() {
+		return nil
+	}
+	if !IsDockerAvailable(ctx) {
+		return &DockerUnavailableError{Message: dockerUnavailableMessage}
+	}
+	missingImages, downloadingImages, err := collectDockerImageStatuses(ctx, opts, startDownload)
+	if err != nil {
+		return err
+	}
+	return dockerImagePreparationRetryError(missingImages, downloadingImages)
+}
 
-	// Compatible native scanners do not require Docker or image downloads.
+func (opts DockerImagesOptions) hasRequestedImage() bool {
+	return opts.Zizmor || opts.Poutine || opts.Actionlint || opts.RunnerGuard ||
+		opts.Syft || opts.Grype || opts.Grant || opts.Yamllint
+}
+
+func disableAvailableNativeScanners(ctx context.Context, opts DockerImagesOptions) DockerImagesOptions {
 	if opts.Zizmor && localScannerPath(ctxutil.OrBackground(ctx), "zizmor") != "" {
 		opts.Zizmor = false
 	}
@@ -305,24 +338,21 @@ func CheckAndPrepareDockerImages(ctx context.Context, opts DockerImagesOptions) 
 	if opts.Actionlint && localScannerPath(ctxutil.OrBackground(ctx), "actionlint") != "" {
 		opts.Actionlint = false
 	}
-	if !opts.Zizmor && !opts.Poutine && !opts.Actionlint && !opts.RunnerGuard && !opts.Syft && !opts.Grype && !opts.Grant && !opts.Yamllint {
-		return nil
-	}
+	return opts
+}
 
-	// Check if Docker daemon is available before attempting any image operations
-	if !IsDockerAvailable(ctx) {
-		return &DockerUnavailableError{Message: dockerUnavailableMessage}
-	}
+type dockerImageRequest struct {
+	use   bool
+	image string
+	name  string
+}
 
-	var missingImages []string
-	var downloadingImages []string
-
-	// Check which images are needed and their availability
-	imagesToCheck := []struct {
-		use   bool
-		image string
-		name  string
-	}{
+func collectDockerImageStatuses(
+	ctx context.Context,
+	opts DockerImagesOptions,
+	startDownload func(context.Context, string) (bool, func() error),
+) ([]string, []string, error) {
+	imagesToCheck := []dockerImageRequest{
 		{opts.Zizmor, ZizmorImage, "zizmor"},
 		{opts.Poutine, PoutineImage, "poutine"},
 		{opts.Actionlint, ActionlintImage, "actionlint"},
@@ -332,52 +362,43 @@ func CheckAndPrepareDockerImages(ctx context.Context, opts DockerImagesOptions) 
 		{opts.Grant, GrantImage, "grant"},
 		{opts.Yamllint, YamllintImage, "yamllint"},
 	}
-
+	var missingImages, downloadingImages []string
 	for _, img := range imagesToCheck {
-		if !img.use {
+		if !img.use || IsDockerImageAvailable(ctx, img.image) {
 			continue
 		}
-
-		if IsDockerImageAvailable(ctx, img.image) {
-			continue
-		}
-
 		if IsDockerImageDownloading(img.image) {
 			downloadingImages = append(downloadingImages, img.name)
-		} else {
-			// Start download
-			started, join := StartDockerImageDownload(ctx, img.image)
-			if started {
-				missingImages = append(missingImages, img.name)
-			} else if IsDockerImageDownloading(img.image) {
-				downloadingImages = append(downloadingImages, img.name)
-			} else if err := join(); err != nil {
-				return err
-			}
+			continue
+		}
+		started, join := startDownload(ctx, img.image)
+		if started {
+			missingImages = append(missingImages, img.name)
+		} else if IsDockerImageDownloading(img.image) {
+			downloadingImages = append(downloadingImages, img.name)
+		} else if err := join(); err != nil {
+			return nil, nil, err
 		}
 	}
+	return missingImages, downloadingImages, nil
+}
 
-	// If any images are downloading or were just started
-	if len(downloadingImages) > 0 || len(missingImages) > 0 {
-		var msg strings.Builder
-		msg.WriteString("Docker images are being downloaded. Please wait and retry the compile command.\n\n")
-
-		if len(missingImages) > 0 {
-			msg.WriteString("Started downloading: ")
-			msg.WriteString(strings.Join(missingImages, ", "))
-			msg.WriteString("\n")
-		}
-
-		if len(downloadingImages) > 0 {
-			msg.WriteString("Currently downloading: ")
-			msg.WriteString(strings.Join(downloadingImages, ", "))
-			msg.WriteString("\n")
-		}
-
-		msg.WriteString("\nRetry in 15-30 seconds.")
-
-		return errors.New(msg.String())
+func dockerImagePreparationRetryError(missingImages, downloadingImages []string) error {
+	if len(downloadingImages) == 0 && len(missingImages) == 0 {
+		return nil
 	}
-
-	return nil
+	var msg strings.Builder
+	msg.WriteString("Docker images are being downloaded. Please wait and retry the compile command.\n\n")
+	if len(missingImages) > 0 {
+		msg.WriteString("Started downloading: ")
+		msg.WriteString(strings.Join(missingImages, ", "))
+		msg.WriteString("\n")
+	}
+	if len(downloadingImages) > 0 {
+		msg.WriteString("Currently downloading: ")
+		msg.WriteString(strings.Join(downloadingImages, ", "))
+		msg.WriteString("\n")
+	}
+	msg.WriteString("\nRetry in 15-30 seconds.")
+	return errors.New(msg.String())
 }

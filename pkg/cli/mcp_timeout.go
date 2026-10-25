@@ -17,13 +17,10 @@ const (
 
 // Leave time to return partial results before the default 60s RPC deadline.
 func mcpToolResponseDeadline(ctx context.Context) time.Time {
-	responseDeadline := time.Now().Add(defaultMCPToolResponseTimeout)
 	if deadline, ok := ctx.Deadline(); ok {
-		if earlier := deadline.Add(-mcpToolResponseMargin); earlier.Before(responseDeadline) {
-			return earlier
-		}
+		return deadline.Add(-mcpToolResponseMargin)
 	}
-	return responseDeadline
+	return time.Now().Add(defaultMCPToolResponseTimeout)
 }
 
 type mcpStageError struct {
@@ -51,7 +48,13 @@ func buildMCPCompileTimeoutResult(err error, stdout []byte, diagnostics *mcpComp
 	stage := mcpErrorStage(err, "compilation")
 	var results []ValidationResult
 	if json.Unmarshal(stdout, &results) != nil {
-		results = nil
+		if diagnostics != nil {
+			results = diagnostics.partialResults()
+		}
+	}
+	diagnosticSummary := "Compiler and scanner diagnostics were withheld because subprocess output may contain sensitive or untrusted data."
+	if diagnostics != nil && diagnostics.timeoutNote != "" {
+		diagnosticSummary = diagnostics.timeoutNote
 	}
 	envelope := map[string]any{
 		"error":           "compile timed out during " + stage,
@@ -60,7 +63,7 @@ func buildMCPCompileTimeoutResult(err error, stdout []byte, diagnostics *mcpComp
 		"stage":           stage,
 		"workflows":       workflows,
 		"partial_results": results,
-		"diagnostics":     diagnostics.failureMessage(err),
+		"diagnostics":     diagnosticSummary,
 	}
 	output, marshalErr := json.Marshal(envelope)
 	if marshalErr != nil {

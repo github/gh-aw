@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -61,18 +64,60 @@ func (text *compileDiagnosticText) String() string {
 // Shellcheck findings are retained separately so bounding execution failures does
 // not discard scanner diagnostics accompanying structured compiler stdout.
 type mcpCompileDiagnostics struct {
-	line       compileDiagnosticText
-	message    string
-	inBlock    bool
-	errorSeen  bool
-	omitted    bool
-	warning    string
-	warnings   strings.Builder
-	inWarning  bool
-	shellcheck strings.Builder
-	inFinding  bool
-	debugLines []string
-	debugBytes int
+	line         compileDiagnosticText
+	message      string
+	inBlock      bool
+	errorSeen    bool
+	omitted      bool
+	warning      string
+	warnings     strings.Builder
+	inWarning    bool
+	shellcheck   strings.Builder
+	inFinding    bool
+	debugLines   []string
+	debugBytes   int
+	progressDir  string
+	progressFile string
+	timeoutNote  string
+}
+
+func (diagnostics *mcpCompileDiagnostics) partialResults() []ValidationResult {
+	if diagnostics == nil || diagnostics.progressFile == "" {
+		return nil
+	}
+	output, err := os.ReadFile(diagnostics.progressFile)
+	if err != nil {
+		return nil
+	}
+	var results []ValidationResult
+	if json.Unmarshal(output, &results) != nil {
+		return nil
+	}
+	return results
+}
+
+func (diagnostics *mcpCompileDiagnostics) cleanup() {
+	if diagnostics != nil && diagnostics.progressDir != "" {
+		_ = os.RemoveAll(diagnostics.progressDir)
+	}
+}
+
+func validateMCPCompileProgressPath(path string) error {
+	if path == "" {
+		return nil
+	}
+	cleanPath := filepath.Clean(path)
+	dir := filepath.Dir(cleanPath)
+	if filepath.Base(cleanPath) != "results.json" ||
+		filepath.Dir(dir) != filepath.Clean(os.TempDir()) ||
+		!strings.HasPrefix(filepath.Base(dir), "gh-aw-mcp-compile-") {
+		return errors.New("MCP compile progress file must be inside a private temporary directory")
+	}
+	info, err := os.Lstat(dir)
+	if err != nil || !info.IsDir() || info.Mode().Perm() != 0o700 {
+		return errors.New("MCP compile progress directory must be a private temporary directory")
+	}
+	return nil
 }
 
 func (diagnostics *mcpCompileDiagnostics) Write(data []byte) (int, error) {
@@ -296,6 +341,22 @@ func runMCPCompileOutput(ctx context.Context, execCmd execCmdFunc, args ...strin
 		return nil, diagnostics, &mcpStageError{stage: "subprocess_slot", err: err}
 	}
 	defer defaultMCPSubprocessGuardrail.release()
+	if progressDir, err := os.MkdirTemp("", "gh-aw-mcp-compile-"); err == nil {
+		diagnostics.progressDir = progressDir
+		diagnostics.progressFile = filepath.Join(progressDir, "results.json")
+		progressArgs := []string{"--mcp-progress-file", diagnostics.progressFile}
+		inserted := false
+		for index, arg := range args {
+			if arg == "--" {
+				args = append(args[:index], append(progressArgs, args[index:]...)...)
+				inserted = true
+				break
+			}
+		}
+		if !inserted {
+			args = append(args, progressArgs...)
+		}
+	}
 	cmd := execCmd(ctx, args...)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout

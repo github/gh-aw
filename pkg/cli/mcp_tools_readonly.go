@@ -139,9 +139,10 @@ Returns JSON array with validation results for each workflow:
 - scope: "batch" for compiler/scanner diagnostics that cannot be attributed to one workflow (omitted for workflow results); development compilation fails if any result is invalid
 - compiled_file: Path to the generated .lock.yml file
 
-Reserves response time before the default 60s deadline. Timeouts return an error
-envelope with partial:true, complete:false, stage, available partial_results, and
-per-call diagnostics, not a successful validation result.`,
+Uses a 55-second budget when the request has no deadline; otherwise reserves five
+seconds before the caller's deadline. Timeouts return an error envelope with
+partial:true, complete:false, stage, available partial_results, and a safe summary
+instead of exposing subprocess diagnostics.`,
 		InputSchema: compileSchema,
 		Icons:       mcpToolIcons("📋"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args compileArgs) (*mcp.CallToolResult, any, error) { //nolint:largefunc
@@ -185,6 +186,7 @@ per-call diagnostics, not a successful validation result.`,
 
 		subCtx, subCancel := context.WithDeadline(ctx, mcpToolResponseDeadline(ctx))
 		defer subCancel()
+		diagnostics := &mcpCompileDiagnostics{}
 
 		// dockerUnavailableWarning is set when Docker is not accessible but the compile
 		// should still proceed without the static-analysis tools.  After the compile
@@ -197,7 +199,7 @@ per-call diagnostics, not a successful validation result.`,
 		// Development mode delegates requested checks to the CLI without downgrading them.
 		if !args.DryRun && args.hasExternalScanners() {
 			// Check if Docker images are available; if not, start downloading and return retry message
-			if err := CheckAndPrepareDockerImages(subCtx, DockerImagesOptions{
+			if err := CheckAndPrepareDockerImagesWithDetachedDownloads(subCtx, DockerImagesOptions{
 				Zizmor:      args.Zizmor,
 				Poutine:     args.Poutine,
 				Actionlint:  args.Actionlint,
@@ -208,9 +210,10 @@ per-call diagnostics, not a successful validation result.`,
 				Yamllint:    args.Yamllint,
 			}); err != nil {
 				if errors.Is(subCtx.Err(), context.DeadlineExceeded) {
+					diagnostics.timeoutNote = "Docker image preparation timed out; started image pulls continue with a bounded lifetime."
 					return buildMCPCompileTimeoutResult(
 						&mcpStageError{stage: "docker_preparation", err: subCtx.Err()},
-						nil, &mcpCompileDiagnostics{}, args.Workflows)
+						nil, diagnostics, args.Workflows)
 				}
 				var dockerUnavailableErr *DockerUnavailableError
 				if errors.As(err, &dockerUnavailableErr) {
@@ -325,6 +328,7 @@ per-call diagnostics, not a successful validation result.`,
 		// - Stdout contains JSON output (--json flag)
 		// - Stderr contains console messages that shouldn't be mixed with JSON
 		stdout, diagnostics, err := runMCPCompileOutput(subCtx, execCmd, cmdArgs...)
+		defer diagnostics.cleanup()
 		if errors.Is(err, context.DeadlineExceeded) {
 			return buildMCPCompileTimeoutResult(err, stdout, diagnostics, args.Workflows)
 		}

@@ -663,8 +663,12 @@ func runMCPAuditSubprocess(ctx context.Context, responseDeadline time.Time, exec
 	cmd := execCmd(ctx, cmdArgs...)
 	cmd.WaitDelay = time.Second
 	stdout, err := cmd.Output()
-	if err != nil && ctx.Err() != nil {
-		err = &mcpStageError{stage: "audit", err: ctx.Err()}
+	if err != nil {
+		if ctx.Err() != nil {
+			err = &mcpStageError{stage: "audit", err: ctx.Err()}
+		} else if errors.Is(err, exec.ErrWaitDelay) {
+			err = &mcpStageError{stage: "pipe_drain", err: err}
+		}
 	}
 	return stdout, err
 }
@@ -768,26 +772,17 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 			"Use the 'logs' tool to list recent run IDs",
 		},
 	}
-	var partial map[string]any
-	if json.Unmarshal([]byte(outputStr), &partial) == nil && partial["partial"] == true && partial["complete"] == false {
+	report, partial := decodeAuditReport(outputStr)
+	if partial != nil && partial["partial"] == true && partial["complete"] == false {
 		errorEnvelope["partial"] = true
 		errorEnvelope["complete"] = false
 		errorEnvelope["partial_results"] = partial
 	}
-	if errors.Is(err, context.DeadlineExceeded) || errorEnvelope["partial"] == true {
-		stage := mcpErrorStage(err, "audit")
-		if partialStage, ok := partial["stage"].(string); ok && partialStage != "" {
-			stage = partialStage
-		}
-		errorEnvelope["partial"] = true
-		errorEnvelope["complete"] = false
-		errorEnvelope["stage"] = stage
-		errorEnvelope["error"] = "audit timed out during " + stage
-		errorEnvelope["suggestions"] = []string{
-			"Retry the same audit to reuse downloaded artifacts",
-			"Request fewer artifact sets with artifacts",
-		}
+	pipeDrainTimeout := mcpErrorStage(err, "") == "pipe_drain"
+	if pipeDrainTimeout {
+		errorEnvelope["partial_results"] = report
 	}
+	setAuditTimeoutEnvelope(errorEnvelope, err, pipeDrainTimeout, partial)
 	jsonBytes, jsonErr := json.Marshal(errorEnvelope)
 	if jsonErr != nil {
 		return nil, nil, newMCPError(jsonrpc.CodeInternalError, errorMsg, nil)
@@ -796,6 +791,36 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 		IsError: errorEnvelope["partial"] == true,
 		Content: []mcp.Content{&mcp.TextContent{Text: string(jsonBytes)}},
 	}, nil, nil
+}
+
+func decodeAuditReport(outputStr string) (any, map[string]any) {
+	var report any
+	if json.Unmarshal([]byte(outputStr), &report) != nil {
+		return nil, nil
+	}
+	partial, ok := report.(map[string]any)
+	if !ok {
+		return report, nil
+	}
+	return report, partial
+}
+
+func setAuditTimeoutEnvelope(errorEnvelope map[string]any, err error, pipeDrain bool, partial map[string]any) {
+	if !errors.Is(err, context.DeadlineExceeded) && !pipeDrain && errorEnvelope["partial"] != true {
+		return
+	}
+	stage := mcpErrorStage(err, "audit")
+	if partialStage, ok := partial["stage"].(string); ok && partialStage != "" {
+		stage = partialStage
+	}
+	errorEnvelope["partial"] = true
+	errorEnvelope["complete"] = false
+	errorEnvelope["stage"] = stage
+	errorEnvelope["error"] = "audit timed out during " + stage
+	errorEnvelope["suggestions"] = []string{
+		"Retry the same audit to reuse downloaded artifacts",
+		"Request fewer artifact sets with artifacts",
+	}
 }
 
 // auditDiffArgs holds the input parameters for the audit-diff tool.

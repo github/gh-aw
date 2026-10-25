@@ -414,6 +414,7 @@ type compileCmdOptions struct {
 	logicalRepo               string
 	scheduleSeed              string
 	priorManifestFile         string
+	mcpProgressFile           string
 	environment               string
 	dryRun                    bool
 	allowExperimental         bool
@@ -504,13 +505,14 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	approve, _ := cmd.Flags().GetBool("approve")
 	validateImages, _ := cmd.Flags().GetBool("validate-images")
 	priorManifestFile, _ := cmd.Flags().GetString("prior-manifest-file")
+	mcpProgressFile, _ := cmd.Flags().GetString("mcp-progress-file")
 	ghes, _ := cmd.Flags().GetBool("ghes")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	useSamples, _ := cmd.Flags().GetBool("use-samples")
 	return compileCmdOptions{
 		explicitBoolFlags: getExplicitDevelopmentBoolFlags(cmd),
 		engineOverride:    engineOverride, actionMode: actionMode, actionTag: actionTag, actionsRepo: actionsRepo, ghAwRef: ghAwRef,
-		dir: dir, workflowsDir: workflowsDir, logicalRepo: logicalRepo, scheduleSeed: scheduleSeed, priorManifestFile: priorManifestFile,
+		dir: dir, workflowsDir: workflowsDir, logicalRepo: logicalRepo, scheduleSeed: scheduleSeed, priorManifestFile: priorManifestFile, mcpProgressFile: mcpProgressFile,
 		environment: environment, dryRun: dryRun, allowExperimental: allowExperimental,
 		validate: validate, watch: watch, noEmit: noEmit, readOnly: readOnly, noLogo: noLogo, purge: purge, strict: strict, requireSelfHostedRunners: requireSelfHostedRunners, trial: trial, dependabot: dependabot,
 		forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
@@ -569,7 +571,7 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, SkipLint: o.skipLint, RunnerGuard: o.runnerGuard,
 		Syft: o.syft, Grype: o.grype, Grant: o.grant, Yamllint: o.yamllint, Shellcheck: o.shellcheck, JSONOutput: o.jsonOutput, ShowAllErrors: o.showAllErrors,
 		Stats: o.stats, Models: o.models, FailFast: o.failFast, ScheduleSeed: o.scheduleSeed, Staged: o.staged, Approve: o.approve,
-		ValidateImages: o.validateImages, PriorManifestFile: o.priorManifestFile, GHESCompat: o.ghes, UseSamples: o.useSamples,
+		ValidateImages: o.validateImages, PriorManifestFile: o.priorManifestFile, MCPProgressFile: o.mcpProgressFile, GHESCompat: o.ghes, UseSamples: o.useSamples,
 	}
 }
 
@@ -864,11 +866,15 @@ func configureCompileToolFlags() {
 	compileCmd.Flags().Bool("approve", false, "Approve all safe update changes. When strict mode is active (the default), the compiler emits warnings for new restricted secrets or unapproved action additions/removals not present in the existing gh-aw-manifest. Use this flag to approve and skip safe update enforcement")
 	compileCmd.Flags().Bool("validate-images", false, "Require Docker to be available for container image validation. Without this flag, container image validation is silently skipped when Docker is not installed or the daemon is not running")
 	compileCmd.Flags().String("prior-manifest-file", "", "Path to a JSON file containing pre-cached gh-aw-manifests (map[lockFile]*GHAWManifest); used by the MCP server to supply a tamper-proof manifest baseline captured at startup")
+	compileCmd.Flags().String("mcp-progress-file", "", "Internal MCP compile progress output file")
 	compileCmd.Flags().Bool("ghes", false, "Enable GitHub Enterprise Server (GHES) compatibility mode: emit upload-artifact@v3.2.2 and download-artifact@v3.1.0. Overrides the aw.json ghes field.")
 }
 
 func finalizeCompileFlags() {
 	if err := compileCmd.Flags().MarkHidden("prior-manifest-file"); err != nil {
+		_ = err
+	}
+	if err := compileCmd.Flags().MarkHidden("mcp-progress-file"); err != nil {
 		_ = err
 	}
 	compileCmd.MarkFlagsMutuallyExclusive("dir", "workflows-dir")
