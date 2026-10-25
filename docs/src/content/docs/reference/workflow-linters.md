@@ -224,6 +224,8 @@ SDK use does not imply SDK implementation coverage: JavaScript inspection remain
 
 For upload bodies, curl `-T`/`--upload-file` treats both `-` and `.` as stdin (`.` selects non-blocking mode). Wget `--post-file` instead reads a regular file; neither spelling consumes piped stdin.
 
+Ordinary-job network checks also follow tracked files and stdin referenced by curl headers (`-H @file`, `--header=@-`), multipart fields (`-F 'name=<file'`, `--form='name=@-'`), and URL-encoded fields (`--data-urlencode 'name@file'`). Resolved shell variables work in separate and inline operands. Literal `--data-raw` and `--form-string` values are not treated as file references; unresolved file sources and quoted or escaped multipart filenames produce coverage gaps.
+
 ### Scope and limitations
 
 For `.lock.yml` inputs, a companion `.md` adds authored-policy and prompt checks to the existing execution graph. Native `.yml`/`.yaml` inputs never acquire an assumed AW companion. Explicit `.md` inputs inspect the AW AST independently: the prompt, top-level `steps`/`post-steps`, authored `jobs` and `safe-outputs.jobs` (including legacy `safe-jobs`), and script hooks. No compiled graph is fabricated. Secret analysis retains a coverage warning for missing imports, generated steps, cross-job flows, and compiler defaults; scripts without an observable shell remain unknown.
