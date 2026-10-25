@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
+	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,4 +49,60 @@ func TestBashCasePatterns(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBashCasePatternsResolveInheritedShell(t *testing.T) {
+	const script = `matched=$(case "$ref" in $pattern) echo yes ;; esac)`
+	defaults := func(shell string) map[string]any {
+		return map[string]any{"run": map[string]any{"shell": shell}}
+	}
+	runStep := func(shell string) actions.Step {
+		fields := map[string]any{"run": script}
+		if shell != "" {
+			fields["shell"] = shell
+		}
+		return actions.RawStep{Fields: fields}
+	}
+
+	t.Run("Actions step job workflow order", func(t *testing.T) {
+		workflow := &actions.Workflow{
+			Defaults: defaults("python"),
+			Jobs: []*actions.Job{
+				{ID: "job-bash", Defaults: defaults("bash"), Steps: []actions.Step{runStep("")}},
+				{ID: "step-python", Defaults: defaults("bash"), Steps: []actions.Step{runStep("python")}},
+				{ID: "step-bash", Defaults: defaults("python"), Steps: []actions.Step{runStep("bash")}},
+				{ID: "workflow-python", Steps: []actions.Step{runStep("")}},
+			},
+		}
+		diagnostics, err := checkBashCasePatterns(context.Background(), Input{Workflow: workflow})
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 2)
+		assert.Equal(t, "jobs.job-bash.steps[0].run", diagnostics[0].Path)
+		assert.Equal(t, "jobs.step-bash.steps[0].run", diagnostics[1].Path)
+	})
+
+	t.Run("authored AW step job workflow order", func(t *testing.T) {
+		step := func(shell string) map[string]any {
+			fields := map[string]any{"run": script}
+			if shell != "" {
+				fields["shell"] = shell
+			}
+			return fields
+		}
+		document := &aw.Document{Frontmatter: map[string]any{
+			"defaults": defaults("python"),
+			"steps":    []any{step("")},
+			"jobs": map[string]any{
+				"job-bash":        map[string]any{"defaults": defaults("bash"), "steps": []any{step("")}},
+				"step-python":     map[string]any{"defaults": defaults("bash"), "steps": []any{step("python")}},
+				"step-bash":       map[string]any{"defaults": defaults("python"), "steps": []any{step("bash")}},
+				"workflow-python": map[string]any{"steps": []any{step("")}},
+			},
+		}}
+		diagnostics, err := checkBashCasePatterns(context.Background(), Input{Document: document})
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 2)
+		assert.Equal(t, "jobs.job-bash.steps[0].run", diagnostics[0].Path)
+		assert.Equal(t, "jobs.step-bash.steps[0].run", diagnostics[1].Path)
+	})
 }

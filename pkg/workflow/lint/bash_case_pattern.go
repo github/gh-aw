@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/github/gh-aw/pkg/workflow/taint"
 	"github.com/rhysd/actionlint"
 	"mvdan.cc/sh/v3/syntax"
@@ -32,8 +33,8 @@ func checkBashCasePatterns(ctx context.Context, input Input) ([]Diagnostic, erro
 			if !ok {
 				continue
 			}
-			shell, shellKnown := step.Fields["shell"].(string)
-			if !shellKnown && step.Fields["shell"] != nil {
+			shell, shellKnown := effectiveRunShell(input, block, step)
+			if !shellKnown {
 				continue
 			}
 			if shell != "" && shell != "bash" && !strings.HasPrefix(shell, "bash ") {
@@ -45,6 +46,58 @@ func checkBashCasePatterns(ctx context.Context, input Input) ([]Diagnostic, erro
 		}
 	}
 	return diagnostics, errors.Join(failures...)
+}
+
+func effectiveRunShell(input Input, block aw.ExecutionBlock, step aw.ExecutionStep) (string, bool) {
+	if value := step.Fields["shell"]; value != nil {
+		shell, ok := value.(string)
+		if !ok {
+			return "", false
+		}
+		if shell != "" {
+			return shell, true
+		}
+	}
+
+	if input.Workflow != nil {
+		for _, job := range input.Workflow.Jobs {
+			if block.Path != "jobs."+string(job.ID) {
+				continue
+			}
+			if shell, configured, valid := runDefaultShell(job.Defaults); configured {
+				return shell, valid
+			}
+			break
+		}
+		if shell, configured, valid := runDefaultShell(input.Workflow.Defaults); configured {
+			return shell, valid
+		}
+	} else if input.Document != nil {
+		if shell, configured, valid := runDefaultShell(block.Fields["defaults"]); configured {
+			return shell, valid
+		}
+		if shell, configured, valid := runDefaultShell(input.Document.Frontmatter["defaults"]); configured {
+			return shell, valid
+		}
+	}
+	return "bash", true
+}
+
+func runDefaultShell(value any) (shell string, configured bool, valid bool) {
+	defaults, ok := value.(map[string]any)
+	if !ok {
+		return "", false, false
+	}
+	run, ok := defaults["run"].(map[string]any)
+	if !ok {
+		return "", false, false
+	}
+	value, configured = run["shell"]
+	if !configured || value == nil {
+		return "", false, false
+	}
+	shell, valid = value.(string)
+	return shell, true, valid
 }
 
 func bashCasePatterns(ctx context.Context, script, path string) ([]Diagnostic, error) {

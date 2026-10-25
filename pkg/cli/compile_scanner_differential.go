@@ -65,7 +65,20 @@ func (b *dryRunScannerBaseline) filter(tool string, err error) (*DryRunScannerDi
 	}
 	current, currentErr := collectScannerDiagnostics(err)
 	if currentErr != nil {
-		return nil, err
+		var actionable []scannerDiagnostic
+		for _, diagnostic := range current {
+			if diagnostic.Finding.Severity != scanfindings.SeverityLow &&
+				diagnostic.Finding.Severity != scanfindings.SeverityInfo {
+				actionable = append(actionable, diagnostic)
+			}
+		}
+		if len(actionable) > 0 {
+			currentErr = errors.Join(currentErr, &scannerFindingsError{
+				err:         fmt.Errorf("%s found %d actionable finding(s) while scanner execution also failed", tool, len(actionable)),
+				diagnostics: actionable,
+			})
+		}
+		return nil, currentErr
 	}
 	diff := &DryRunScannerDifferential{Baseline: len(baseline)}
 	counts := make(map[string]int)
@@ -122,7 +135,11 @@ func collectScannerDiagnostics(err error) ([]scannerDiagnostic, error) {
 	}
 	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
 		if child := wrapped.Unwrap(); child != nil {
-			return collectScannerDiagnostics(child)
+			diagnostics, failure := collectScannerDiagnostics(child)
+			if failure != nil {
+				return diagnostics, err
+			}
+			return diagnostics, nil
 		}
 	}
 	return nil, err

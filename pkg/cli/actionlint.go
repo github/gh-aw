@@ -284,6 +284,9 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 		actionlintStats.TotalWorkflows += len(lockFiles)
 	}
 	err = handleActionlintExecutionError(runResult.err, strict, lockFiles, totalErrors, parseErr, runResult.stdout)
+	if strict && err == nil && parseErr != nil {
+		err = fmt.Errorf("strict mode: actionlint output could not be parsed: %w", parseErr)
+	}
 	return reportActionlintResult(ctx, err, runResult.stdout, parseErr, shouldParseOutput && totalErrors > 0)
 }
 

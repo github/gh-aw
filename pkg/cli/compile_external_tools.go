@@ -98,9 +98,6 @@ func RunShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []strin
 
 	compileExternalToolsLog.Printf("Running batch shellcheck on %d lock files and %d frontmatter resources", len(lockFiles), len(resources))
 	err := runShellcheckOnLockFilesAndResources(ctx, lockFiles, resources, verbose, strict)
-	if err != nil {
-		reportCompileScannerResult(ctx, "shellcheck", err)
-	}
 	return handleBatchToolError("shellcheck", err, strict, verbose)
 }
 
